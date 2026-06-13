@@ -223,6 +223,11 @@
                   <label>Categoria
                     <input name="category" type="text" placeholder="Ex.: Alimentação" required>
                   </label>
+                  <label>Subcategoria
+                    <input name="subcategory" type="text" placeholder="Ex.: Mercado, Luz, Gás">
+                  </label>
+                </div>
+                <div class="field-row">
                   <label>Tag
                     <input name="tags" type="text" placeholder="Ex.: Mercado, Cartão" required>
                   </label>
@@ -250,6 +255,11 @@
               <h2>Categorias</h2>
               <form id="categoryForm" class="form inline-form">
                 <input name="name" type="text" placeholder="Nova categoria" required>
+                <button class="primary" type="submit">Adicionar</button>
+              </form>
+              <form id="subcategoryForm" class="form subcategory-form">
+                <select name="category_id" id="subcategoryCategory" required></select>
+                <input name="name" type="text" placeholder="Nova subcategoria" required>
                 <button class="primary" type="submit">Adicionar</button>
               </form>
               <p class="message" id="categoryMessage" role="alert"></p>
@@ -342,6 +352,6 @@
         </section>
       </section>
     </main>
-    <script src="/app.js?v=8"></script>
+    <script src="/app.js?v=9"></script>
   </body>
 </html>

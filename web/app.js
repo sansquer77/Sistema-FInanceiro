@@ -28,6 +28,8 @@ const transactionForm = document.querySelector("#transactionForm");
 const transactionMessage = document.querySelector("#transactionMessage");
 const transactionList = document.querySelector("#transactionList");
 const categoryForm = document.querySelector("#categoryForm");
+const subcategoryForm = document.querySelector("#subcategoryForm");
+const subcategoryCategory = document.querySelector("#subcategoryCategory");
 const tagForm = document.querySelector("#tagForm");
 const categoryMessage = document.querySelector("#categoryMessage");
 const tagMessage = document.querySelector("#tagMessage");
@@ -90,6 +92,7 @@ backToLoginFromConfirm.addEventListener("click", () => switchAuthMode("login"));
 accountForm.addEventListener("submit", handleAccountSubmit);
 transactionForm.addEventListener("submit", handleTransactionSubmit);
 categoryForm.addEventListener("submit", handleCategorySubmit);
+subcategoryForm.addEventListener("submit", handleSubcategorySubmit);
 tagForm.addEventListener("submit", handleTagSubmit);
 importForm.addEventListener("submit", handleImportSubmit);
 emailForm.addEventListener("submit", handleEmailSubmit);
@@ -171,11 +174,9 @@ async function handlePasswordResetRequest(event) {
       method: "POST",
       body: formData(passwordResetRequestForm),
     });
-    passwordResetConfirmForm.elements.token.value = response.token || "";
+    passwordResetConfirmForm.elements.token.value = "";
     switchAuthMode("reset-confirm");
-    const message = response.token
-      ? `Codigo gerado para uso local. Ele expira em ${response.expires_in_minutes} minutos.`
-      : "Se o email existir, um codigo de recuperacao sera gerado.";
+    const message = `Se o email existir, o codigo de recuperacao sera enviado. Ele expira em ${response.expires_in_minutes} minutos.`;
     setMessage(authMessage, message, "success");
   } catch (error) {
     setMessage(authMessage, error.message, "error");
@@ -364,6 +365,24 @@ async function handleCategorySubmit(event) {
   await createClassification("categories", categoryForm, categoryMessage);
 }
 
+async function handleSubcategorySubmit(event) {
+  event.preventDefault();
+  setMessage(categoryMessage, "");
+  if (state.categories.length === 0) {
+    setMessage(categoryMessage, "Cadastre uma categoria antes de adicionar subcategorias.", "error");
+    return;
+  }
+  try {
+    await api("/api/subcategories", { method: "POST", body: formData(subcategoryForm) });
+    subcategoryForm.elements.name.value = "";
+    await loadClassifications();
+    renderClassifications();
+    setMessage(categoryMessage, "Subcategoria salva.", "success");
+  } catch (error) {
+    setMessage(categoryMessage, error.message, "error");
+  }
+}
+
 async function handleTagSubmit(event) {
   event.preventDefault();
   await createClassification("tags", tagForm, tagMessage);
@@ -407,6 +426,32 @@ async function deleteClassification(type, item) {
     setMessage(messageElement, "Item excluído.", "success");
   } catch (error) {
     setMessage(messageElement, error.message, "error");
+  }
+}
+
+async function renameSubcategory(item) {
+  const name = window.prompt("Renomear subcategoria", item.name);
+  if (name === null) {
+    return;
+  }
+  try {
+    await api(`/api/subcategories/${item.id}`, { method: "PUT", body: { name } });
+    await loadClassifications();
+    renderClassifications();
+  } catch (error) {
+    setMessage(categoryMessage, error.message, "error");
+  }
+}
+
+async function deleteSubcategory(item) {
+  setMessage(categoryMessage, "");
+  try {
+    await api(`/api/subcategories/${item.id}`, { method: "DELETE" });
+    await loadClassifications();
+    renderClassifications();
+    setMessage(categoryMessage, "Subcategoria excluída.", "success");
+  } catch (error) {
+    setMessage(categoryMessage, error.message, "error");
   }
 }
 
@@ -614,8 +659,17 @@ function renderTransactions() {
 }
 
 function renderClassifications() {
+  renderSubcategoryOptions();
   renderClassificationList(categoryList, state.categories, "categories");
   renderClassificationList(tagList, state.tags, "tags");
+}
+
+function renderSubcategoryOptions() {
+  const options = state.categories.map((category) => (
+    `<option value="${category.id}">${escapeHtml(category.name)}</option>`
+  )).join("");
+  subcategoryCategory.innerHTML = options || '<option value="">Cadastre uma categoria</option>';
+  subcategoryForm.querySelector('button[type="submit"]').disabled = state.categories.length === 0;
 }
 
 function renderClassificationList(container, items, type) {
@@ -627,6 +681,7 @@ function renderClassificationList(container, items, type) {
   items.forEach((item) => {
     const row = document.createElement("article");
     row.className = "classification-item";
+    const subcategories = type === "categories" ? item.subcategories || [] : [];
     row.innerHTML = `
       <div>
         <strong>${escapeHtml(item.name)}</strong>
@@ -636,9 +691,27 @@ function renderClassificationList(container, items, type) {
         <button class="ghost small-button" type="button" data-action="rename">Renomear</button>
         <button class="danger small-button" type="button" data-action="delete">Excluir</button>
       </div>
+      ${subcategories.length ? `
+        <div class="subcategory-list">
+          ${subcategories.map((subcategory) => `
+            <div class="subcategory-item" data-subcategory-id="${subcategory.id}">
+              <span>${escapeHtml(subcategory.name)} · ${subcategory.transaction_count} lançamento(s)</span>
+              <div class="card-actions">
+                <button class="ghost small-button" type="button" data-action="rename-subcategory">Renomear</button>
+                <button class="danger small-button" type="button" data-action="delete-subcategory">Excluir</button>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      ` : ""}
     `;
     row.querySelector('[data-action="rename"]').addEventListener("click", () => renameClassification(type, item));
     row.querySelector('[data-action="delete"]').addEventListener("click", () => deleteClassification(type, item));
+    row.querySelectorAll("[data-subcategory-id]").forEach((element) => {
+      const subcategory = subcategories.find((entry) => String(entry.id) === element.dataset.subcategoryId);
+      element.querySelector('[data-action="rename-subcategory"]').addEventListener("click", () => renameSubcategory(subcategory));
+      element.querySelector('[data-action="delete-subcategory"]').addEventListener("click", () => deleteSubcategory(subcategory));
+    });
     container.append(row);
   });
 }
@@ -678,7 +751,7 @@ function transactionTemplate(transaction, compact) {
         <div class="account-meta">
           <span>${transactionTypeLabel(transaction.type)}</span>
           <span>${escapeHtml(transaction.account_name)}${destination}</span>
-          ${transaction.category_name ? `<span>${escapeHtml(transaction.category_name)}</span>` : ""}
+          ${transaction.category_name ? `<span>${escapeHtml(formatCategoryPath(transaction))}</span>` : ""}
           ${transaction.tags && transaction.tags.length ? `<span>${transaction.tags.map((tag) => `#${escapeHtml(tag)}`).join(" ")}</span>` : ""}
         </div>
       </div>
@@ -850,6 +923,13 @@ function transactionTypeLabel(type) {
     expense: "Despesa",
     transfer: "Transferência",
   }[type] || type;
+}
+
+function formatCategoryPath(transaction) {
+  if (!transaction.subcategory_name) {
+    return transaction.category_name;
+  }
+  return `${transaction.category_name} / ${transaction.subcategory_name}`;
 }
 
 function formatMoney(value, currency) {

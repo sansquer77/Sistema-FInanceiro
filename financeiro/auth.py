@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
 
 from financeiro.database import get_connection, row_to_dict
+from financeiro.emailer import send_password_reset_email
 
 RESET_TOKEN_MINUTES = 15
 
@@ -106,9 +107,9 @@ def request_password_reset(email: str) -> dict:
                 """,
                 (user["id"], hash_reset_token(token), reset_expiration()),
             )
+            send_password_reset_email(normalized_email, token, RESET_TOKEN_MINUTES)
     return {
         "ok": True,
-        "token": token,
         "expires_in_minutes": RESET_TOKEN_MINUTES,
     }
 

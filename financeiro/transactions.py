@@ -4,7 +4,7 @@ from datetime import date
 from http import HTTPStatus
 
 from financeiro.accounts import cents_to_money, empty_to_none, money_to_cents
-from financeiro.categories import ClassificationError, get_or_create_category, get_or_create_tag, normalize_name
+from financeiro.categories import ClassificationError, get_or_create_category, get_or_create_subcategory, get_or_create_tag, normalize_name
 from financeiro.database import get_connection, row_to_dict
 
 TRANSACTION_TYPES = {"income", "expense", "transfer"}
@@ -27,6 +27,7 @@ def list_transactions(user_id: int) -> list[dict]:
                 source.currency AS account_currency,
                 destination.name AS destination_account_name,
                 categories.name AS category_name,
+                subcategories.name AS subcategory_name,
                 GROUP_CONCAT(tags.name, '||') AS tag_names
             FROM transactions
             JOIN checking_accounts AS source
@@ -38,6 +39,9 @@ def list_transactions(user_id: int) -> list[dict]:
             LEFT JOIN categories
                 ON categories.id = transactions.category_id
                 AND categories.user_id = transactions.user_id
+            LEFT JOIN subcategories
+                ON subcategories.id = transactions.subcategory_id
+                AND subcategories.user_id = transactions.user_id
             LEFT JOIN transaction_tags
                 ON transaction_tags.transaction_id = transactions.id
             LEFT JOIN tags
@@ -64,6 +68,7 @@ def create_transaction(user_id: int, data: dict) -> dict:
             if source["currency"] != destination["currency"]:
                 raise TransactionError("Transferencias exigem contas com a mesma moeda.")
         category_id = get_or_create_category(conn, user_id, transaction["category"])
+        subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
         tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
         apply_balance_delta(conn, source["id"], balance_delta(transaction["type"], transaction["amount_cents"], "source"))
         if destination:
@@ -72,8 +77,8 @@ def create_transaction(user_id: int, data: dict) -> dict:
             """
             INSERT INTO transactions (
                 user_id, type, description, amount_cents, date, account_id,
-                destination_account_id, category_id, notes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                destination_account_id, category_id, subcategory_id, notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 user_id,
@@ -84,6 +89,7 @@ def create_transaction(user_id: int, data: dict) -> dict:
                 source["id"],
                 destination["id"] if destination else None,
                 category_id,
+                subcategory_id,
                 transaction["notes"],
             ),
         )
@@ -143,6 +149,7 @@ def normalize_transaction_payload(data: dict) -> dict:
         "account_id": account_id,
         "destination_account_id": destination_account_id,
         "category": normalize_name(data.get("category"), "Informe a categoria."),
+        "subcategory": normalize_optional_name(data.get("subcategory")),
         "tags": normalize_tags(data.get("tags") or data.get("tag")),
         "notes": empty_to_none(data.get("notes")),
     }
@@ -218,6 +225,7 @@ def fetch_transaction(conn, user_id: int, transaction_id: int) -> dict:
                 source.currency AS account_currency,
                 destination.name AS destination_account_name,
                 categories.name AS category_name,
+                subcategories.name AS subcategory_name,
                 GROUP_CONCAT(tags.name, '||') AS tag_names
             FROM transactions
             JOIN checking_accounts AS source
@@ -229,6 +237,9 @@ def fetch_transaction(conn, user_id: int, transaction_id: int) -> dict:
             LEFT JOIN categories
                 ON categories.id = transactions.category_id
                 AND categories.user_id = transactions.user_id
+            LEFT JOIN subcategories
+                ON subcategories.id = transactions.subcategory_id
+                AND subcategories.user_id = transactions.user_id
             LEFT JOIN transaction_tags
                 ON transaction_tags.transaction_id = transactions.id
             LEFT JOIN tags
@@ -274,3 +285,12 @@ def normalize_tags(value: object) -> list[str]:
     if not tags:
         raise TransactionError("Informe ao menos uma tag.")
     return tags
+
+
+def normalize_optional_name(value: object) -> str | None:
+    if not str(value or "").strip():
+        return None
+    try:
+        return normalize_name(value, "Informe a subcategoria.")
+    except ClassificationError as exc:
+        raise TransactionError(exc.message) from exc

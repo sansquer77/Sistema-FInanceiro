@@ -7,6 +7,7 @@ Protótipo inicial para validar a arquitetura local do sistema financeiro.
 - Login local com sessão por cookie.
 - Cadastro do primeiro usuário.
 - Cadastro, edição, listagem e arquivamento de contas-correntes.
+- Recuperação de senha por email via SMTP Outlook.
 - Banco SQLite local em `data/finance.db`.
 - Interface web local sem dependências externas.
 
@@ -43,6 +44,22 @@ http://localhost:8000
 ```
 
 Para reiniciar os testes do zero, pare o servidor e apague `data/finance.db`.
+
+## Configuração segura de email
+
+As credenciais SMTP não ficam no código fonte. O app lê a configuração criptografada em:
+
+```text
+data/email_config.enc
+```
+
+A chave local usada para descriptografar fica em:
+
+```text
+data/email_config.key
+```
+
+Ambos são arquivos locais de runtime e estão ignorados pelo Git. Para trocar a conta ou senha de aplicativo, gere novamente a configuração chamando `financeiro.secure_config.save_encrypted_config(...)` em um ambiente local seguro.
 
 ## Estrutura
 

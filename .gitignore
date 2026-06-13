@@ -1,0 +1,6 @@
+data/*.enc
+data/*.key
+__pycache__/
+financeiro/__pycache__/
+*.pyc
+.DS_Store

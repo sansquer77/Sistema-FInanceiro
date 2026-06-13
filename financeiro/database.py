@@ -67,6 +67,15 @@ def initialize_database() -> None:
                 UNIQUE (user_id, name)
             );
 
+            CREATE TABLE IF NOT EXISTS subcategories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (category_id, name)
+            );
+
             CREATE TABLE IF NOT EXISTS tags (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -85,6 +94,7 @@ def initialize_database() -> None:
                 account_id INTEGER NOT NULL REFERENCES checking_accounts(id),
                 destination_account_id INTEGER REFERENCES checking_accounts(id),
                 category_id INTEGER REFERENCES categories(id),
+                subcategory_id INTEGER REFERENCES subcategories(id),
                 tag_id INTEGER REFERENCES tags(id),
                 notes TEXT,
                 archived_at TEXT,
@@ -104,6 +114,9 @@ def initialize_database() -> None:
             CREATE INDEX IF NOT EXISTS idx_transactions_account
             ON transactions (account_id);
 
+            CREATE INDEX IF NOT EXISTS idx_subcategories_category
+            ON subcategories (category_id);
+
             CREATE INDEX IF NOT EXISTS idx_transaction_tags_tag
             ON transaction_tags (tag_id);
 
@@ -112,6 +125,7 @@ def initialize_database() -> None:
             """
         )
         ensure_column(conn, "transactions", "category_id", "INTEGER REFERENCES categories(id)")
+        ensure_column(conn, "transactions", "subcategory_id", "INTEGER REFERENCES subcategories(id)")
         ensure_column(conn, "transactions", "tag_id", "INTEGER REFERENCES tags(id)")
         migrate_transaction_tags(conn)
 

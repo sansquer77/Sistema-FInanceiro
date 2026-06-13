@@ -7,7 +7,7 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from http import HTTPStatus
 from io import StringIO
 
-from financeiro.categories import ClassificationError, get_or_create_category, get_or_create_tag, normalize_name
+from financeiro.categories import ClassificationError, get_or_create_category, get_or_create_subcategory, get_or_create_tag, normalize_name
 from financeiro.transactions import apply_balance_delta, balance_delta, get_active_account, normalize_tags, replace_transaction_tags
 from financeiro.database import get_connection
 
@@ -19,6 +19,8 @@ HEADER_ALIASES = {
     "descrição": "description",
     "descricao": "description",
     "categoria": "category",
+    "subcategoria": "subcategory",
+    "sub-categoria": "subcategory",
     "valor": "amount",
     "situação": "status",
     "situacao": "status",
@@ -50,6 +52,7 @@ def import_organizze_transactions(user_id: int, account_id: object, file_bytes: 
                 skipped.append({"row": raw["row"], "description": raw.get("description", ""), "reason": exc.message})
                 continue
             category_id = get_or_create_category(conn, user_id, transaction["category"])
+            subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
             tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
             apply_balance_delta(
                 conn,
@@ -60,8 +63,8 @@ def import_organizze_transactions(user_id: int, account_id: object, file_bytes: 
                 """
                 INSERT INTO transactions (
                     user_id, type, description, amount_cents, date, account_id,
-                    category_id, notes
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    category_id, subcategory_id, notes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     user_id,
@@ -71,6 +74,7 @@ def import_organizze_transactions(user_id: int, account_id: object, file_bytes: 
                     transaction["date"],
                     normalized_account_id,
                     category_id,
+                    subcategory_id,
                     transaction["notes"],
                 ),
             )
@@ -117,6 +121,7 @@ def rows_to_transactions(rows: list[list[object]]) -> list[dict]:
             "date": get_cell(row, positions["date"]),
             "description": get_cell(row, positions["description"]),
             "category": get_cell(row, positions["category"]),
+            "subcategory": get_cell(row, positions.get("subcategory")),
             "amount": get_cell(row, positions["amount"]),
             "status": get_cell(row, positions.get("status")),
             "tag": get_cell(row, positions["tag"]),
@@ -136,7 +141,7 @@ def normalize_imported_transaction(row: dict) -> dict:
     if not description:
         raise ImportError("Informe a descricao.")
     try:
-        category = normalize_name(row.get("category"), "Informe a categoria.")
+        category, subcategory = normalize_category_parts(row.get("category"), row.get("subcategory"))
         tags = normalize_tags(row.get("tag"))
     except ClassificationError as exc:
         raise ImportError(exc.message) from exc
@@ -150,9 +155,25 @@ def normalize_imported_transaction(row: dict) -> dict:
         "amount_cents": money_decimal_to_cents(abs(amount)),
         "date": normalize_import_date(row.get("date")),
         "category": category,
+        "subcategory": subcategory,
         "tags": tags,
         "notes": notes,
     }
+
+
+def normalize_category_parts(category_value: object, subcategory_value: object) -> tuple[str, str | None]:
+    raw_category = str(category_value or "").strip()
+    raw_subcategory = str(subcategory_value or "").strip()
+    if not raw_subcategory:
+        for separator in (" > ", " / ", " - "):
+            if separator in raw_category:
+                category_part, subcategory_part = raw_category.split(separator, 1)
+                raw_category = category_part
+                raw_subcategory = subcategory_part
+                break
+    category = normalize_name(raw_category, "Informe a categoria.")
+    subcategory = normalize_name(raw_subcategory, "Informe a subcategoria.") if raw_subcategory else None
+    return category, subcategory
 
 
 def normalize_account_id(value: object) -> int:

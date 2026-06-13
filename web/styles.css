@@ -373,6 +373,12 @@ textarea:focus {
   align-items: center;
 }
 
+.subcategory-form {
+  grid-template-columns: minmax(140px, 0.8fr) 1fr auto;
+  align-items: center;
+  margin-top: 10px;
+}
+
 .classification-list {
   display: grid;
   gap: 10px;
@@ -399,6 +405,25 @@ textarea:focus {
   margin-top: 4px;
   color: var(--muted);
   font-size: 13px;
+}
+
+.subcategory-list {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  padding: 10px 0 0 12px;
+  border-top: 1px solid var(--line);
+}
+
+.subcategory-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.subcategory-item span {
+  margin-top: 0;
 }
 
 .import-summary {
@@ -679,6 +704,11 @@ textarea:focus {
   }
 
   .inline-form {
+    grid-template-columns: 1fr;
+  }
+
+  .subcategory-form,
+  .subcategory-item {
     grid-template-columns: 1fr;
   }
 }
