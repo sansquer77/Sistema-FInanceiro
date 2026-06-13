@@ -16,6 +16,8 @@ O objetivo é manter o app evoluindo por SDD (Spec Development Driven): cada mud
 - [Referência de cartões](./referencias/organizze-cartoes.md): cadastro, faturas, limites e pagamento.
 - [Referência de categorias e tags](./referencias/organizze-categorias-tags.md): taxonomia financeira e classificação.
 - [Referência de relatórios](./referencias/organizze-relatorios.md): tipos de relatório, filtros e saídas.
+- [Spec de importação Organizze](./specs/importacao-organizze.md): regras para importar movimentações exportadas pelo Organizze.
+- [Spec de recuperação de senha](./specs/recuperacao-senha.md): fluxo local para redefinir senha esquecida.
 
 ## Regra prática
 

@@ -12,6 +12,11 @@ const loginTab = document.querySelector("#loginTab");
 const registerTab = document.querySelector("#registerTab");
 const loginForm = document.querySelector("#loginForm");
 const registerForm = document.querySelector("#registerForm");
+const passwordResetRequestForm = document.querySelector("#passwordResetRequestForm");
+const passwordResetConfirmForm = document.querySelector("#passwordResetConfirmForm");
+const forgotPasswordButton = document.querySelector("#forgotPasswordButton");
+const backToLoginFromRequest = document.querySelector("#backToLoginFromRequest");
+const backToLoginFromConfirm = document.querySelector("#backToLoginFromConfirm");
 const authMessage = document.querySelector("#authMessage");
 const accountForm = document.querySelector("#accountForm");
 const accountMessage = document.querySelector("#accountMessage");
@@ -20,6 +25,10 @@ const archivedAccountList = document.querySelector("#archivedAccountList");
 const transactionForm = document.querySelector("#transactionForm");
 const transactionMessage = document.querySelector("#transactionMessage");
 const transactionList = document.querySelector("#transactionList");
+const importForm = document.querySelector("#importForm");
+const importAccount = document.querySelector("#importAccount");
+const importMessage = document.querySelector("#importMessage");
+const importResult = document.querySelector("#importResult");
 const emailForm = document.querySelector("#emailForm");
 const passwordForm = document.querySelector("#passwordForm");
 const deleteUserForm = document.querySelector("#deleteUserForm");
@@ -47,6 +56,7 @@ const moduleViews = {
   cockpit: document.querySelector("#cockpitView"),
   accounts: document.querySelector("#accountsView"),
   transactions: document.querySelector("#transactionsView"),
+  imports: document.querySelector("#importsView"),
   user: document.querySelector("#userView"),
 };
 
@@ -54,6 +64,7 @@ const viewTitles = {
   cockpit: ["Cockpit", "Resumo financeiro"],
   accounts: ["Gestão de contas", "Contas"],
   transactions: ["Operação", "Lançamentos"],
+  imports: ["Dados", "Importação"],
   user: ["Segurança", "Usuário"],
 };
 
@@ -61,8 +72,14 @@ loginTab.addEventListener("click", () => switchAuthMode("login"));
 registerTab.addEventListener("click", () => switchAuthMode("register"));
 loginForm.addEventListener("submit", handleLogin);
 registerForm.addEventListener("submit", handleRegister);
+passwordResetRequestForm.addEventListener("submit", handlePasswordResetRequest);
+passwordResetConfirmForm.addEventListener("submit", handlePasswordResetConfirm);
+forgotPasswordButton.addEventListener("click", () => switchAuthMode("reset-request"));
+backToLoginFromRequest.addEventListener("click", () => switchAuthMode("login"));
+backToLoginFromConfirm.addEventListener("click", () => switchAuthMode("login"));
 accountForm.addEventListener("submit", handleAccountSubmit);
 transactionForm.addEventListener("submit", handleTransactionSubmit);
+importForm.addEventListener("submit", handleImportSubmit);
 emailForm.addEventListener("submit", handleEmailSubmit);
 passwordForm.addEventListener("submit", handlePasswordSubmit);
 deleteUserForm.addEventListener("submit", handleDeleteUserSubmit);
@@ -89,10 +106,15 @@ async function boot() {
 
 function switchAuthMode(mode) {
   const isLogin = mode === "login";
+  const isRegister = mode === "register";
+  const isResetRequest = mode === "reset-request";
+  const isResetConfirm = mode === "reset-confirm";
   loginTab.classList.toggle("active", isLogin);
-  registerTab.classList.toggle("active", !isLogin);
+  registerTab.classList.toggle("active", isRegister);
   loginForm.hidden = !isLogin;
-  registerForm.hidden = isLogin;
+  registerForm.hidden = !isRegister;
+  passwordResetRequestForm.hidden = !isResetRequest;
+  passwordResetConfirmForm.hidden = !isResetConfirm;
   setMessage(authMessage, "");
 }
 
@@ -125,6 +147,48 @@ async function handleRegister(event) {
     setMessage(authMessage, error.message, "error");
   } finally {
     setFormBusy(registerForm, false);
+  }
+}
+
+async function handlePasswordResetRequest(event) {
+  event.preventDefault();
+  setMessage(authMessage, "");
+  setFormBusy(passwordResetRequestForm, true);
+  try {
+    const response = await api("/api/password-reset/request", {
+      method: "POST",
+      body: formData(passwordResetRequestForm),
+    });
+    passwordResetConfirmForm.elements.token.value = response.token || "";
+    switchAuthMode("reset-confirm");
+    const message = response.token
+      ? `Codigo gerado para uso local. Ele expira em ${response.expires_in_minutes} minutos.`
+      : "Se o email existir, um codigo de recuperacao sera gerado.";
+    setMessage(authMessage, message, "success");
+  } catch (error) {
+    setMessage(authMessage, error.message, "error");
+  } finally {
+    setFormBusy(passwordResetRequestForm, false);
+  }
+}
+
+async function handlePasswordResetConfirm(event) {
+  event.preventDefault();
+  setMessage(authMessage, "");
+  setFormBusy(passwordResetConfirmForm, true);
+  try {
+    await api("/api/password-reset/confirm", {
+      method: "POST",
+      body: formData(passwordResetConfirmForm),
+    });
+    passwordResetRequestForm.reset();
+    passwordResetConfirmForm.reset();
+    switchAuthMode("login");
+    setMessage(authMessage, "Senha redefinida. Entre com a nova senha.", "success");
+  } catch (error) {
+    setMessage(authMessage, error.message, "error");
+  } finally {
+    setFormBusy(passwordResetConfirmForm, false);
   }
 }
 
@@ -243,6 +307,28 @@ async function handleTransactionSubmit(event) {
     setMessage(transactionMessage, "Lançamento salvo.", "success");
   } catch (error) {
     setMessage(transactionMessage, error.message, "error");
+  }
+}
+
+async function handleImportSubmit(event) {
+  event.preventDefault();
+  setMessage(importMessage, "");
+  importResult.innerHTML = "";
+  if (state.accounts.length === 0) {
+    setMessage(importMessage, "Cadastre uma conta antes de importar lançamentos.", "error");
+    return;
+  }
+  setFormBusy(importForm, true);
+  try {
+    const response = await upload("/api/import/organizze-transactions", new FormData(importForm));
+    importForm.reset();
+    await loadTransactionsAndAccounts();
+    renderImportResult(response);
+    setMessage(importMessage, `${response.imported} lançamento(s) importado(s).`, "success");
+  } catch (error) {
+    setMessage(importMessage, error.message, "error");
+  } finally {
+    setFormBusy(importForm, false);
   }
 }
 
@@ -437,7 +523,9 @@ function renderTransactionAccounts() {
   )).join("");
   transactionAccount.innerHTML = options || '<option value="">Cadastre uma conta</option>';
   destinationAccount.innerHTML = options || '<option value="">Cadastre uma conta</option>';
+  importAccount.innerHTML = options || '<option value="">Cadastre uma conta</option>';
   transactionForm.querySelector('button[type="submit"]').disabled = state.accounts.length === 0;
+  importForm.querySelector('button[type="submit"]').disabled = state.accounts.length === 0;
 }
 
 function renderTransactions() {
@@ -479,6 +567,8 @@ function transactionTemplate(transaction, compact) {
         <div class="account-meta">
           <span>${transactionTypeLabel(transaction.type)}</span>
           <span>${escapeHtml(transaction.account_name)}${destination}</span>
+          ${transaction.category_name ? `<span>${escapeHtml(transaction.category_name)}</span>` : ""}
+          ${transaction.tag_name ? `<span>#${escapeHtml(transaction.tag_name)}</span>` : ""}
         </div>
       </div>
       <div class="transaction-amount">
@@ -555,6 +645,28 @@ function showAuth() {
   switchAuthMode("login");
 }
 
+function renderImportResult(result) {
+  const errors = result.errors || [];
+  importResult.innerHTML = `
+    <div class="import-summary">
+      <div><span>Total lido</span><strong>${result.total_rows}</strong></div>
+      <div><span>Importados</span><strong>${result.imported}</strong></div>
+      <div><span>Ignorados</span><strong>${result.skipped}</strong></div>
+    </div>
+    ${errors.length ? `
+      <div class="import-errors">
+        ${errors.map((error) => `
+          <article>
+            <strong>Linha ${error.row}</strong>
+            <span>${escapeHtml(error.description || "Sem descrição")}</span>
+            <p>${escapeHtml(error.reason)}</p>
+          </article>
+        `).join("")}
+      </div>
+    ` : '<div class="empty-state compact">Nenhuma linha ignorada.</div>'}
+  `;
+}
+
 async function api(path, options = {}) {
   let response;
   try {
@@ -563,6 +675,24 @@ async function api(path, options = {}) {
       method: options.method || "GET",
       headers: options.body ? { "Content-Type": "application/json" } : {},
       body: options.body ? JSON.stringify(options.body) : undefined,
+    });
+  } catch (error) {
+    throw new Error("Nao foi possivel falar com o servidor local. Abra pelo endereco http://localhost:8000.");
+  }
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || "Algo nao saiu como esperado.");
+  }
+  return payload;
+}
+
+async function upload(path, body) {
+  let response;
+  try {
+    response = await fetch(path, {
+      credentials: "same-origin",
+      method: "POST",
+      body,
     });
   } catch (error) {
     throw new Error("Nao foi possivel falar com o servidor local. Abra pelo endereco http://localhost:8000.");

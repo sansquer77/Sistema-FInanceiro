@@ -31,6 +31,7 @@
               <input name="password" type="password" autocomplete="current-password" required>
             </label>
             <button class="primary" type="submit">Entrar</button>
+            <button class="link-button" id="forgotPasswordButton" type="button">Esqueci minha senha</button>
           </form>
 
           <form id="registerForm" class="form" hidden>
@@ -44,6 +45,25 @@
               <input name="password" type="password" autocomplete="new-password" minlength="8" required>
             </label>
             <button class="primary" type="submit">Criar acesso</button>
+          </form>
+
+          <form id="passwordResetRequestForm" class="form" hidden>
+            <label>Email cadastrado
+              <input name="email" type="email" autocomplete="email" required>
+            </label>
+            <button class="primary" type="submit">Gerar código</button>
+            <button class="ghost" id="backToLoginFromRequest" type="button">Voltar</button>
+          </form>
+
+          <form id="passwordResetConfirmForm" class="form" hidden>
+            <label>Código de recuperação
+              <input name="token" type="text" autocomplete="one-time-code" required>
+            </label>
+            <label>Nova senha
+              <input name="new_password" type="password" autocomplete="new-password" minlength="8" required>
+            </label>
+            <button class="primary" type="submit">Redefinir senha</button>
+            <button class="ghost" id="backToLoginFromConfirm" type="button">Voltar</button>
           </form>
 
           <p class="message" id="authMessage" role="alert"></p>
@@ -66,6 +86,7 @@
           <button class="nav-button active" type="button" data-view="cockpit">Cockpit</button>
           <button class="nav-button" type="button" data-view="accounts">Contas</button>
           <button class="nav-button" type="button" data-view="transactions">Lançamentos</button>
+          <button class="nav-button" type="button" data-view="imports">Importação</button>
           <button class="nav-button" type="button" data-view="user">Usuário</button>
         </nav>
 
@@ -197,6 +218,14 @@
                 <label id="destinationAccountLabel" hidden>Conta de destino
                   <select name="destination_account_id" id="destinationAccount"></select>
                 </label>
+                <div class="field-row">
+                  <label>Categoria
+                    <input name="category" type="text" placeholder="Ex.: Alimentação" required>
+                  </label>
+                  <label>Tag
+                    <input name="tag" type="text" placeholder="Ex.: Mercado" required>
+                  </label>
+                </div>
                 <label>Observações
                   <textarea name="notes" rows="3"></textarea>
                 </label>
@@ -210,6 +239,31 @@
                 <h2>Lançamentos</h2>
               </div>
               <div class="transaction-list" id="transactionList"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="module-view" id="importsView" hidden>
+          <div class="workspace">
+            <section class="transaction-form-panel">
+              <h2>Importar Organizze</h2>
+              <form id="importForm" class="form">
+                <label>Conta de destino
+                  <select name="account_id" id="importAccount" required></select>
+                </label>
+                <label>Arquivo exportado
+                  <input name="file" type="file" accept=".xls,.csv" required>
+                </label>
+                <button class="primary" type="submit">Importar lançamentos</button>
+              </form>
+              <p class="message" id="importMessage" role="alert"></p>
+            </section>
+
+            <section class="panel">
+              <div class="section-heading">
+                <h2>Resultado da importação</h2>
+              </div>
+              <div class="import-result" id="importResult"></div>
             </section>
           </div>
         </section>
@@ -263,6 +317,6 @@
         </section>
       </section>
     </main>
-    <script src="/app.js?v=5"></script>
+    <script src="/app.js?v=7"></script>
   </body>
 </html>

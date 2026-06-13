@@ -199,6 +199,16 @@ textarea:focus {
   border-color: #f0c7c2;
 }
 
+.link-button {
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent-dark);
+  font-weight: 800;
+  text-align: left;
+}
+
 .message {
   min-height: 22px;
   margin: 12px 0 0;
@@ -349,6 +359,63 @@ textarea:focus {
   grid-template-columns: repeat(2, minmax(280px, 1fr));
   gap: 18px;
   align-items: start;
+}
+
+.import-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.import-summary > div {
+  display: grid;
+  gap: 4px;
+  min-height: 72px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+}
+
+.import-summary span,
+.import-errors span,
+.import-errors p {
+  color: var(--muted);
+}
+
+.import-summary span {
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.import-summary strong {
+  font-size: 22px;
+}
+
+.import-errors {
+  display: grid;
+  gap: 8px;
+  max-height: 380px;
+  overflow: auto;
+}
+
+.import-errors article {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.import-errors strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.import-errors p {
+  margin: 6px 0 0;
+  font-size: 14px;
 }
 
 .danger-zone {
@@ -529,6 +596,7 @@ textarea:focus {
   .workspace,
   .summary-strip,
   .cockpit-grid,
+  .import-summary,
   .user-settings-grid {
     grid-template-columns: 1fr;
   }

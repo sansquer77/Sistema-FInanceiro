@@ -34,6 +34,15 @@ def initialize_database() -> None:
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
+            CREATE TABLE IF NOT EXISTS password_resets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                token_hash TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                used_at TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
             CREATE TABLE IF NOT EXISTS checking_accounts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -50,6 +59,22 @@ def initialize_database() -> None:
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
+            CREATE TABLE IF NOT EXISTS categories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (user_id, name)
+            );
+
+            CREATE TABLE IF NOT EXISTS tags (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (user_id, name)
+            );
+
             CREATE TABLE IF NOT EXISTS transactions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -59,6 +84,8 @@ def initialize_database() -> None:
                 date TEXT NOT NULL,
                 account_id INTEGER NOT NULL REFERENCES checking_accounts(id),
                 destination_account_id INTEGER REFERENCES checking_accounts(id),
+                category_id INTEGER REFERENCES categories(id),
+                tag_id INTEGER REFERENCES tags(id),
                 notes TEXT,
                 archived_at TEXT,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -70,11 +97,22 @@ def initialize_database() -> None:
 
             CREATE INDEX IF NOT EXISTS idx_transactions_account
             ON transactions (account_id);
+
+            CREATE INDEX IF NOT EXISTS idx_password_resets_token
+            ON password_resets (token_hash, used_at, expires_at);
             """
         )
+        ensure_column(conn, "transactions", "category_id", "INTEGER REFERENCES categories(id)")
+        ensure_column(conn, "transactions", "tag_id", "INTEGER REFERENCES tags(id)")
 
 
 def row_to_dict(row: sqlite3.Row | None) -> dict | None:
     if row is None:
         return None
     return {key: row[key] for key in row.keys()}
+
+
+def ensure_column(conn: sqlite3.Connection, table: str, column: str, definition: str) -> None:
+    columns = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+    if column not in columns:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")

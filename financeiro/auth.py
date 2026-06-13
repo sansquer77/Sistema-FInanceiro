@@ -5,9 +5,12 @@ import hashlib
 import hmac
 import os
 import secrets
+from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
 
 from financeiro.database import get_connection, row_to_dict
+
+RESET_TOKEN_MINUTES = 15
 
 
 class AuthError(Exception):
@@ -80,6 +83,68 @@ def delete_user_account(user_id: int, current_password: str) -> None:
         conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
 
 
+def request_password_reset(email: str) -> dict:
+    normalized_email = email.strip().lower()
+    validate_email(normalized_email)
+    token = None
+    with get_connection() as conn:
+        user = conn.execute("SELECT id FROM users WHERE email = ?", (normalized_email,)).fetchone()
+        if user:
+            token = secrets.token_urlsafe(24)
+            conn.execute(
+                """
+                UPDATE password_resets
+                SET used_at = CURRENT_TIMESTAMP
+                WHERE user_id = ? AND used_at IS NULL
+                """,
+                (user["id"],),
+            )
+            conn.execute(
+                """
+                INSERT INTO password_resets (user_id, token_hash, expires_at)
+                VALUES (?, ?, ?)
+                """,
+                (user["id"], hash_reset_token(token), reset_expiration()),
+            )
+    return {
+        "ok": True,
+        "token": token,
+        "expires_in_minutes": RESET_TOKEN_MINUTES,
+    }
+
+
+def reset_password(token: str, new_password: str) -> None:
+    normalized_token = str(token or "").strip()
+    if len(new_password) < 8:
+        raise AuthError("A nova senha precisa ter pelo menos 8 caracteres.")
+    if not normalized_token:
+        raise AuthError("Informe o codigo de recuperacao.")
+    token_hash = hash_reset_token(normalized_token)
+    now = current_timestamp()
+    with get_connection() as conn:
+        reset = conn.execute(
+            """
+            SELECT *
+            FROM password_resets
+            WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (token_hash, now),
+        ).fetchone()
+        if not reset:
+            raise AuthError("Codigo de recuperacao invalido ou expirado.", HTTPStatus.UNAUTHORIZED)
+        conn.execute(
+            "UPDATE users SET password_hash = ? WHERE id = ?",
+            (hash_password(new_password), reset["user_id"]),
+        )
+        conn.execute(
+            "UPDATE password_resets SET used_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (reset["id"],),
+        )
+        conn.execute("DELETE FROM sessions WHERE user_id = ?", (reset["user_id"],))
+
+
 def create_session(user_id: int) -> str:
     token = secrets.token_urlsafe(32)
     with get_connection() as conn:
@@ -138,3 +203,16 @@ def verify_password(password: str, stored_hash: str) -> bool:
         return hmac.compare_digest(actual, expected)
     except Exception:
         return False
+
+
+def hash_reset_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def reset_expiration() -> str:
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=RESET_TOKEN_MINUTES)
+    return expires_at.replace(microsecond=0).isoformat()
+
+
+def current_timestamp() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import re
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -21,10 +22,13 @@ from financeiro.auth import (
     get_current_user,
     login_user,
     logout_session,
+    request_password_reset,
+    reset_password,
     update_user_email,
     update_user_password,
 )
 from financeiro.database import initialize_database
+from financeiro.imports import import_organizze_transactions
 from financeiro.transactions import (
     create_transaction,
     delete_transaction,
@@ -59,6 +63,12 @@ class AppHandler(BaseHTTPRequestHandler):
         if self.path == "/api/login":
             self.handle_login()
             return
+        if self.path == "/api/password-reset/request":
+            self.handle_password_reset_request()
+            return
+        if self.path == "/api/password-reset/confirm":
+            self.handle_password_reset_confirm()
+            return
         if self.path == "/api/logout":
             self.handle_logout()
             return
@@ -76,6 +86,9 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/api/transactions":
             self.handle_create_transaction()
+            return
+        if self.path == "/api/import/organizze-transactions":
+            self.handle_import_organizze_transactions()
             return
         self.send_json({"error": "Rota nao encontrada."}, HTTPStatus.NOT_FOUND)
 
@@ -118,6 +131,16 @@ class AppHandler(BaseHTTPRequestHandler):
         if token:
             logout_session(token)
         self.send_json({"ok": True}, headers={"Set-Cookie": "session=; Path=/; Max-Age=0; SameSite=Lax; HttpOnly"})
+
+    def handle_password_reset_request(self) -> None:
+        data = self.read_json()
+        result = request_password_reset(data.get("email", ""))
+        self.send_json(result)
+
+    def handle_password_reset_confirm(self) -> None:
+        data = self.read_json()
+        reset_password(data.get("token", ""), data.get("new_password", ""))
+        self.send_json({"ok": True})
 
     def handle_update_email(self) -> None:
         user = self.require_user()
@@ -187,6 +210,20 @@ class AppHandler(BaseHTTPRequestHandler):
         delete_transaction(user["id"], transaction_id)
         self.send_json({"ok": True})
 
+    def handle_import_organizze_transactions(self) -> None:
+        user = self.require_user()
+        form = self.read_multipart()
+        uploaded = form["files"].get("file")
+        if not uploaded:
+            raise ApiError("Envie o arquivo exportado pelo Organizze.")
+        result = import_organizze_transactions(
+            user["id"],
+            form["fields"].get("account_id", ""),
+            uploaded["content"],
+            uploaded["filename"],
+        )
+        self.send_json(result, status=HTTPStatus.CREATED)
+
     def serve_static(self) -> None:
         path = self.path.split("?", 1)[0]
         if path in ("", "/"):
@@ -223,6 +260,42 @@ class AppHandler(BaseHTTPRequestHandler):
             return json.loads(self.rfile.read(length).decode("utf-8"))
         except json.JSONDecodeError as exc:
             raise ApiError("JSON invalido.", HTTPStatus.BAD_REQUEST) from exc
+
+    def read_multipart(self) -> dict:
+        content_type = self.headers.get("Content-Type", "")
+        match = re.search(r"boundary=(?P<boundary>[^;]+)", content_type)
+        if not match:
+            raise ApiError("Formulario de upload invalido.")
+        length = int(self.headers.get("Content-Length", 0))
+        if length <= 0:
+            raise ApiError("Envie o arquivo para importacao.")
+        if length > 5 * 1024 * 1024:
+            raise ApiError("Arquivo muito grande. Envie um arquivo de ate 5 MB.", HTTPStatus.REQUEST_ENTITY_TOO_LARGE)
+        boundary = match.group("boundary").strip('"').encode("utf-8")
+        body = self.rfile.read(length)
+        fields = {}
+        files = {}
+        for part in body.split(b"--" + boundary):
+            part = part.strip(b"\r\n")
+            if not part or part == b"--" or b"\r\n\r\n" not in part:
+                continue
+            raw_headers, content = part.split(b"\r\n\r\n", 1)
+            headers = raw_headers.decode("utf-8", "ignore")
+            name_match = re.search(r'name="([^"]+)"', headers)
+            if not name_match:
+                continue
+            name = name_match.group(1)
+            filename_match = re.search(r'filename="([^"]*)"', headers)
+            if filename_match:
+                if content.endswith(b"\r\n"):
+                    content = content[:-2]
+                files[name] = {
+                    "filename": Path(filename_match.group(1)).name,
+                    "content": content,
+                }
+            else:
+                fields[name] = content.decode("utf-8", "ignore").strip()
+        return {"fields": fields, "files": files}
 
     def send_json(self, payload: dict, status: HTTPStatus = HTTPStatus.OK, headers: dict | None = None) -> None:
         body = json.dumps(payload, ensure_ascii=True).encode("utf-8")

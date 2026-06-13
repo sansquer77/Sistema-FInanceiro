@@ -4,6 +4,7 @@ from datetime import date
 from http import HTTPStatus
 
 from financeiro.accounts import cents_to_money, empty_to_none, money_to_cents
+from financeiro.categories import get_or_create_category, get_or_create_tag, normalize_name
 from financeiro.database import get_connection, row_to_dict
 
 TRANSACTION_TYPES = {"income", "expense", "transfer"}
@@ -24,7 +25,9 @@ def list_transactions(user_id: int) -> list[dict]:
                 transactions.*,
                 source.name AS account_name,
                 source.currency AS account_currency,
-                destination.name AS destination_account_name
+                destination.name AS destination_account_name,
+                categories.name AS category_name,
+                tags.name AS tag_name
             FROM transactions
             JOIN checking_accounts AS source
                 ON source.id = transactions.account_id
@@ -32,6 +35,12 @@ def list_transactions(user_id: int) -> list[dict]:
             LEFT JOIN checking_accounts AS destination
                 ON destination.id = transactions.destination_account_id
                 AND destination.user_id = transactions.user_id
+            LEFT JOIN categories
+                ON categories.id = transactions.category_id
+                AND categories.user_id = transactions.user_id
+            LEFT JOIN tags
+                ON tags.id = transactions.tag_id
+                AND tags.user_id = transactions.user_id
             WHERE transactions.user_id = ? AND transactions.archived_at IS NULL
             ORDER BY transactions.date DESC, transactions.id DESC
             """,
@@ -51,6 +60,8 @@ def create_transaction(user_id: int, data: dict) -> dict:
                 raise TransactionError("Informe contas diferentes para transferencia.")
             if source["currency"] != destination["currency"]:
                 raise TransactionError("Transferencias exigem contas com a mesma moeda.")
+        category_id = get_or_create_category(conn, user_id, transaction["category"])
+        tag_id = get_or_create_tag(conn, user_id, transaction["tag"])
         apply_balance_delta(conn, source["id"], balance_delta(transaction["type"], transaction["amount_cents"], "source"))
         if destination:
             apply_balance_delta(conn, destination["id"], balance_delta(transaction["type"], transaction["amount_cents"], "destination"))
@@ -58,8 +69,8 @@ def create_transaction(user_id: int, data: dict) -> dict:
             """
             INSERT INTO transactions (
                 user_id, type, description, amount_cents, date, account_id,
-                destination_account_id, notes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                destination_account_id, category_id, tag_id, notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 user_id,
@@ -69,6 +80,8 @@ def create_transaction(user_id: int, data: dict) -> dict:
                 transaction["date"],
                 source["id"],
                 destination["id"] if destination else None,
+                category_id,
+                tag_id,
                 transaction["notes"],
             ),
         )
@@ -126,6 +139,8 @@ def normalize_transaction_payload(data: dict) -> dict:
         "date": transaction_date,
         "account_id": account_id,
         "destination_account_id": destination_account_id,
+        "category": normalize_name(data.get("category"), "Informe a categoria."),
+        "tag": normalize_name(data.get("tag"), "Informe a tag."),
         "notes": empty_to_none(data.get("notes")),
     }
 
@@ -188,18 +203,26 @@ def fetch_transaction(conn, user_id: int, transaction_id: int) -> dict:
         """
         SELECT
             transactions.*,
-            source.name AS account_name,
-            source.currency AS account_currency,
-            destination.name AS destination_account_name
-        FROM transactions
-        JOIN checking_accounts AS source
-            ON source.id = transactions.account_id
-            AND source.user_id = transactions.user_id
-        LEFT JOIN checking_accounts AS destination
-            ON destination.id = transactions.destination_account_id
-            AND destination.user_id = transactions.user_id
-        WHERE transactions.id = ? AND transactions.user_id = ?
-        """,
+                source.name AS account_name,
+                source.currency AS account_currency,
+                destination.name AS destination_account_name,
+                categories.name AS category_name,
+                tags.name AS tag_name
+            FROM transactions
+            JOIN checking_accounts AS source
+                ON source.id = transactions.account_id
+                AND source.user_id = transactions.user_id
+            LEFT JOIN checking_accounts AS destination
+                ON destination.id = transactions.destination_account_id
+                AND destination.user_id = transactions.user_id
+            LEFT JOIN categories
+                ON categories.id = transactions.category_id
+                AND categories.user_id = transactions.user_id
+            LEFT JOIN tags
+                ON tags.id = transactions.tag_id
+                AND tags.user_id = transactions.user_id
+            WHERE transactions.id = ? AND transactions.user_id = ?
+            """,
         (transaction_id, user_id),
     ).fetchone()
     return row_to_dict(row)
