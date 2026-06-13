@@ -28,7 +28,7 @@ Regras financeiras não devem ficar espalhadas no front-end.
 
 ### Especificação antes do código
 
-Cada funcionalidade relevante deve nascer em `Docs/specs/` com:
+Cada funcionalidade relevante deve nascer em `docs/specs/` com:
 
 - Problema.
 - Jornada.

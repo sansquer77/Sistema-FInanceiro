@@ -1,13 +1,16 @@
 # Sistema Financeiro Local
 
-Protótipo inicial para validar a arquitetura local do sistema financeiro.
+App financeiro local em Python, SQLite e interface web estática.
 
 ## O que este módulo entrega
 
-- Login local com sessão por cookie.
-- Cadastro do primeiro usuário.
-- Cadastro, edição, listagem e arquivamento de contas-correntes.
-- Recuperação de senha por email via SMTP Outlook.
+- Cadastro, login, logout e sessão por cookie.
+- Alteração de email, alteração de senha e exclusão da conta local.
+- Recuperação de senha por email via SMTP configurado localmente.
+- Cadastro, edição, listagem, arquivamento e restauração de contas-correntes.
+- Categorias, subcategorias e tags.
+- Lançamentos de receita, despesa e transferência com atualização de saldos.
+- Importação de lançamentos do Organizze em `.xls` ou `.csv`.
 - Banco SQLite local em `data/finance.db`.
 - Interface web local sem dependências externas.
 
@@ -45,6 +48,14 @@ http://localhost:8000
 
 Para reiniciar os testes do zero, pare o servidor e apague `data/finance.db`.
 
+## Documentação
+
+A documentação oficial fica em `docs/`:
+
+- `docs/requisitos.md`: escopo funcional e regras.
+- `docs/arquitetura.md`: camadas, rotas, dados e fluxos.
+- `docs/specs/`: especificações por módulo.
+
 ## Configuração segura de email
 
 As credenciais SMTP não ficam no código fonte. O app lê a configuração criptografada em:
@@ -69,9 +80,13 @@ financeiro/             Núcleo da aplicação
   auth.py               Senhas, sessões e autenticação
   database.py           Conexão, schema e migrações simples
   accounts.py           Regras de contas-correntes
+  categories.py         Categorias, subcategorias e tags
+  transactions.py       Lançamentos e saldos
+  imports.py            Importação Organizze
 web/                    Interface local
   index.html
   styles.css
   app.js
-data/                   Banco local criado em runtime
+data/                   Arquivos locais criados em runtime
+docs/                   Requisitos, arquitetura e specs
 ```

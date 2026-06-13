@@ -1,5 +1,7 @@
 data/*.enc
 data/*.key
+data/*.db
+data/*.log
 __pycache__/
 financeiro/__pycache__/
 *.pyc
