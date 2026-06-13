@@ -6,6 +6,7 @@ import re
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from financeiro.accounts import (
     archive_checking_account,
@@ -58,103 +59,113 @@ class AppHandler(BaseHTTPRequestHandler):
     server_version = "SistemaFinanceiro/0.1"
 
     def do_GET(self) -> None:
-        if self.path.startswith("/api/me"):
+        path = self.route_path()
+        if path.startswith("/api/me"):
             self.handle_me()
             return
-        if self.path.startswith("/api/checking-accounts"):
+        if path.startswith("/api/checking-accounts"):
             self.handle_list_accounts()
             return
-        if self.path.startswith("/api/transactions"):
+        if path.startswith("/api/transactions"):
             self.handle_list_transactions()
             return
-        if self.path == "/api/categories":
+        if path == "/api/categories":
             self.handle_list_categories()
             return
-        if self.path == "/api/tags":
+        if path == "/api/tags":
             self.handle_list_tags()
             return
         self.serve_static()
 
     def do_POST(self) -> None:
-        if self.path == "/api/register":
+        path = self.route_path()
+        if path == "/api/register":
             self.handle_register()
             return
-        if self.path == "/api/login":
+        if path == "/api/login":
             self.handle_login()
             return
-        if self.path == "/api/password-reset/request":
+        if path == "/api/password-reset/request":
             self.handle_password_reset_request()
             return
-        if self.path == "/api/password-reset/confirm":
+        if path == "/api/password-reset/confirm":
             self.handle_password_reset_confirm()
             return
-        if self.path == "/api/logout":
+        if path == "/api/logout":
             self.handle_logout()
             return
-        if self.path == "/api/me/email":
+        if path == "/api/me/email":
             self.handle_update_email()
             return
-        if self.path == "/api/me/password":
+        if path == "/api/me/password":
             self.handle_update_password()
             return
-        if self.path.split("?", 1)[0].startswith("/api/checking-accounts/") and self.path.split("?", 1)[0].endswith("/restore"):
+        if path.startswith("/api/checking-accounts/") and path.endswith("/restore"):
             self.handle_restore_account()
             return
-        if self.path == "/api/checking-accounts":
+        if path == "/api/checking-accounts":
             self.handle_create_account()
             return
-        if self.path == "/api/transactions":
+        if path == "/api/transactions":
             self.handle_create_transaction()
             return
-        if self.path == "/api/import/organizze-transactions":
+        if path == "/api/import/organizze-transactions":
             self.handle_import_organizze_transactions()
             return
-        if self.path == "/api/categories":
+        if path == "/api/categories":
             self.handle_create_category()
             return
-        if self.path == "/api/subcategories":
+        if path == "/api/subcategories":
             self.handle_create_subcategory()
             return
-        if self.path == "/api/tags":
+        if path == "/api/tags":
             self.handle_create_tag()
             return
         self.send_json({"error": "Rota nao encontrada."}, HTTPStatus.NOT_FOUND)
 
     def do_PUT(self) -> None:
-        if self.path.startswith("/api/checking-accounts/"):
+        path = self.route_path()
+        if path.startswith("/api/checking-accounts/"):
             self.handle_update_account()
             return
-        if self.path.startswith("/api/categories/"):
+        if path.startswith("/api/categories/"):
             self.handle_update_category()
             return
-        if self.path.startswith("/api/subcategories/"):
+        if path.startswith("/api/subcategories/"):
             self.handle_update_subcategory()
             return
-        if self.path.startswith("/api/tags/"):
+        if path.startswith("/api/tags/"):
             self.handle_update_tag()
             return
         self.send_json({"error": "Rota nao encontrada."}, HTTPStatus.NOT_FOUND)
 
     def do_DELETE(self) -> None:
-        if self.path == "/api/me":
+        path = self.route_path()
+        if path == "/api/me":
             self.handle_delete_user()
             return
-        if self.path.startswith("/api/categories/"):
+        if path.startswith("/api/categories/"):
             self.handle_delete_category()
             return
-        if self.path.startswith("/api/subcategories/"):
+        if path.startswith("/api/subcategories/"):
             self.handle_delete_subcategory()
             return
-        if self.path.startswith("/api/tags/"):
+        if path.startswith("/api/tags/"):
             self.handle_delete_tag()
             return
-        if self.path.startswith("/api/checking-accounts/"):
+        if path.startswith("/api/checking-accounts/"):
             self.handle_archive_account()
             return
-        if self.path.startswith("/api/transactions/"):
+        if path.startswith("/api/transactions/"):
             self.handle_delete_transaction()
             return
         self.send_json({"error": "Rota nao encontrada."}, HTTPStatus.NOT_FOUND)
+
+    def route_path(self) -> str:
+        path = urlsplit(self.path).path
+        if path != "/":
+            path = path.rstrip("/")
+        return path
 
     def handle_me(self) -> None:
         user = self.require_user(allow_anonymous=True)
