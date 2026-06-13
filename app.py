@@ -1,0 +1,275 @@
+from __future__ import annotations
+
+import json
+import mimetypes
+from http import HTTPStatus
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+from financeiro.accounts import (
+    archive_checking_account,
+    create_checking_account,
+    list_archived_checking_accounts,
+    list_checking_accounts,
+    restore_checking_account,
+    update_checking_account,
+)
+from financeiro.auth import (
+    create_session,
+    create_user,
+    delete_user_account,
+    get_current_user,
+    login_user,
+    logout_session,
+    update_user_email,
+    update_user_password,
+)
+from financeiro.database import initialize_database
+from financeiro.transactions import (
+    create_transaction,
+    delete_transaction,
+    list_transactions,
+)
+
+ROOT = Path(__file__).resolve().parent
+WEB_ROOT = ROOT / "web"
+HOST = "127.0.0.1"
+PORT = 8000
+
+
+class AppHandler(BaseHTTPRequestHandler):
+    server_version = "SistemaFinanceiro/0.1"
+
+    def do_GET(self) -> None:
+        if self.path.startswith("/api/me"):
+            self.handle_me()
+            return
+        if self.path.startswith("/api/checking-accounts"):
+            self.handle_list_accounts()
+            return
+        if self.path.startswith("/api/transactions"):
+            self.handle_list_transactions()
+            return
+        self.serve_static()
+
+    def do_POST(self) -> None:
+        if self.path == "/api/register":
+            self.handle_register()
+            return
+        if self.path == "/api/login":
+            self.handle_login()
+            return
+        if self.path == "/api/logout":
+            self.handle_logout()
+            return
+        if self.path == "/api/me/email":
+            self.handle_update_email()
+            return
+        if self.path == "/api/me/password":
+            self.handle_update_password()
+            return
+        if self.path.split("?", 1)[0].startswith("/api/checking-accounts/") and self.path.split("?", 1)[0].endswith("/restore"):
+            self.handle_restore_account()
+            return
+        if self.path == "/api/checking-accounts":
+            self.handle_create_account()
+            return
+        if self.path == "/api/transactions":
+            self.handle_create_transaction()
+            return
+        self.send_json({"error": "Rota nao encontrada."}, HTTPStatus.NOT_FOUND)
+
+    def do_PUT(self) -> None:
+        if self.path.startswith("/api/checking-accounts/"):
+            self.handle_update_account()
+            return
+        self.send_json({"error": "Rota nao encontrada."}, HTTPStatus.NOT_FOUND)
+
+    def do_DELETE(self) -> None:
+        if self.path == "/api/me":
+            self.handle_delete_user()
+            return
+        if self.path.startswith("/api/checking-accounts/"):
+            self.handle_archive_account()
+            return
+        if self.path.startswith("/api/transactions/"):
+            self.handle_delete_transaction()
+            return
+        self.send_json({"error": "Rota nao encontrada."}, HTTPStatus.NOT_FOUND)
+
+    def handle_me(self) -> None:
+        user = self.require_user(allow_anonymous=True)
+        self.send_json({"user": user})
+
+    def handle_register(self) -> None:
+        data = self.read_json()
+        user = create_user(data.get("name", ""), data.get("email", ""), data.get("password", ""))
+        token = create_session(user["id"])
+        self.send_json({"user": user}, headers=self.session_cookie(token), status=HTTPStatus.CREATED)
+
+    def handle_login(self) -> None:
+        data = self.read_json()
+        user = login_user(data.get("email", ""), data.get("password", ""))
+        token = create_session(user["id"])
+        self.send_json({"user": user}, headers=self.session_cookie(token))
+
+    def handle_logout(self) -> None:
+        token = self.get_cookie("session")
+        if token:
+            logout_session(token)
+        self.send_json({"ok": True}, headers={"Set-Cookie": "session=; Path=/; Max-Age=0; SameSite=Lax; HttpOnly"})
+
+    def handle_update_email(self) -> None:
+        user = self.require_user()
+        data = self.read_json()
+        updated = update_user_email(user["id"], data.get("email", ""), data.get("current_password", ""))
+        self.send_json({"user": updated})
+
+    def handle_update_password(self) -> None:
+        user = self.require_user()
+        data = self.read_json()
+        update_user_password(user["id"], data.get("current_password", ""), data.get("new_password", ""))
+        self.send_json({"ok": True})
+
+    def handle_delete_user(self) -> None:
+        user = self.require_user()
+        data = self.read_json()
+        delete_user_account(user["id"], data.get("current_password", ""))
+        self.send_json({"ok": True}, headers={"Set-Cookie": "session=; Path=/; Max-Age=0; SameSite=Lax; HttpOnly"})
+
+    def handle_list_accounts(self) -> None:
+        user = self.require_user()
+        if "status=archived" in self.path.split("?", 1)[-1]:
+            accounts = list_archived_checking_accounts(user["id"])
+        else:
+            accounts = list_checking_accounts(user["id"])
+        self.send_json({"accounts": accounts})
+
+    def handle_list_transactions(self) -> None:
+        user = self.require_user()
+        transactions = list_transactions(user["id"])
+        self.send_json({"transactions": transactions})
+
+    def handle_create_account(self) -> None:
+        user = self.require_user()
+        data = self.read_json()
+        account = create_checking_account(user["id"], data)
+        self.send_json({"account": account}, status=HTTPStatus.CREATED)
+
+    def handle_create_transaction(self) -> None:
+        user = self.require_user()
+        data = self.read_json()
+        transaction = create_transaction(user["id"], data)
+        self.send_json({"transaction": transaction}, status=HTTPStatus.CREATED)
+
+    def handle_update_account(self) -> None:
+        user = self.require_user()
+        account_id = self.path.rsplit("/", 1)[-1]
+        data = self.read_json()
+        account = update_checking_account(user["id"], account_id, data)
+        self.send_json({"account": account})
+
+    def handle_archive_account(self) -> None:
+        user = self.require_user()
+        account_id = self.path.rsplit("/", 1)[-1]
+        archive_checking_account(user["id"], account_id)
+        self.send_json({"ok": True})
+
+    def handle_restore_account(self) -> None:
+        user = self.require_user()
+        account_id = self.path.split("?", 1)[0].split("/")[-2]
+        account = restore_checking_account(user["id"], account_id)
+        self.send_json({"account": account})
+
+    def handle_delete_transaction(self) -> None:
+        user = self.require_user()
+        transaction_id = self.path.rsplit("/", 1)[-1]
+        delete_transaction(user["id"], transaction_id)
+        self.send_json({"ok": True})
+
+    def serve_static(self) -> None:
+        path = self.path.split("?", 1)[0]
+        if path in ("", "/"):
+            file_path = WEB_ROOT / "index.html"
+        else:
+            file_path = (WEB_ROOT / path.lstrip("/")).resolve()
+            if not str(file_path).startswith(str(WEB_ROOT.resolve())):
+                self.send_error(HTTPStatus.FORBIDDEN)
+                return
+        if not file_path.exists() or not file_path.is_file():
+            self.send_error(HTTPStatus.NOT_FOUND)
+            return
+        content_type = mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
+        body = file_path.read_bytes()
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def require_user(self, allow_anonymous: bool = False) -> dict | None:
+        token = self.get_cookie("session")
+        user = get_current_user(token) if token else None
+        if not user and not allow_anonymous:
+            raise ApiError("Sessao expirada. Entre novamente.", HTTPStatus.UNAUTHORIZED)
+        return user
+
+    def read_json(self) -> dict:
+        length = int(self.headers.get("Content-Length", 0))
+        if length == 0:
+            return {}
+        try:
+            return json.loads(self.rfile.read(length).decode("utf-8"))
+        except json.JSONDecodeError as exc:
+            raise ApiError("JSON invalido.", HTTPStatus.BAD_REQUEST) from exc
+
+    def send_json(self, payload: dict, status: HTTPStatus = HTTPStatus.OK, headers: dict | None = None) -> None:
+        body = json.dumps(payload, ensure_ascii=True).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        for key, value in (headers or {}).items():
+            self.send_header(key, value)
+        self.end_headers()
+        self.wfile.write(body)
+
+    def get_cookie(self, name: str) -> str | None:
+        raw_cookie = self.headers.get("Cookie", "")
+        for part in raw_cookie.split(";"):
+            key, _, value = part.strip().partition("=")
+            if key == name:
+                return value
+        return None
+
+    def session_cookie(self, token: str) -> dict:
+        return {"Set-Cookie": f"session={token}; Path=/; SameSite=Lax; HttpOnly"}
+
+    def handle_one_request(self) -> None:
+        try:
+            super().handle_one_request()
+        except Exception as exc:
+            message = getattr(exc, "message", "Erro inesperado.")
+            status = getattr(exc, "status", HTTPStatus.INTERNAL_SERVER_ERROR)
+            self.send_json({"error": message}, status)
+
+    def log_message(self, format: str, *args: object) -> None:
+        return
+
+
+class ApiError(Exception):
+    def __init__(self, message: str, status: HTTPStatus = HTTPStatus.BAD_REQUEST) -> None:
+        self.message = message
+        self.status = status
+        super().__init__(message)
+
+
+def main() -> None:
+    initialize_database()
+    server = ThreadingHTTPServer((HOST, PORT), AppHandler)
+    print(f"Sistema Financeiro rodando em http://localhost:{PORT}")
+    server.serve_forever()
+
+
+if __name__ == "__main__":
+    main()

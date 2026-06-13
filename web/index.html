@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sistema Financeiro</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="auth-panel" id="authView" hidden>
+        <div class="brand">
+          <span class="brand-mark">SF</span>
+          <div>
+            <h1>Sistema Financeiro</h1>
+            <p>Ambiente local para organizar contas, cartões e investimentos.</p>
+          </div>
+        </div>
+
+        <div class="auth-card">
+          <div class="tabs" role="tablist" aria-label="Acesso">
+            <button class="tab active" id="loginTab" type="button">Entrar</button>
+            <button class="tab" id="registerTab" type="button">Criar acesso</button>
+          </div>
+
+          <form id="loginForm" class="form">
+            <label>Email
+              <input name="email" type="email" autocomplete="email" required>
+            </label>
+            <label>Senha
+              <input name="password" type="password" autocomplete="current-password" required>
+            </label>
+            <button class="primary" type="submit">Entrar</button>
+          </form>
+
+          <form id="registerForm" class="form" hidden>
+            <label>Nome
+              <input name="name" type="text" autocomplete="name" required>
+            </label>
+            <label>Email
+              <input name="email" type="email" required>
+            </label>
+            <label>Senha
+              <input name="password" type="password" autocomplete="new-password" minlength="8" required>
+            </label>
+            <button class="primary" type="submit">Criar acesso</button>
+          </form>
+
+          <p class="message" id="authMessage" role="alert"></p>
+        </div>
+      </section>
+
+      <section class="dashboard" id="dashboardView" hidden>
+        <header class="topbar">
+          <div>
+            <p class="eyebrow" id="moduleEyebrow">Cockpit</p>
+            <h1 id="pageTitle">Resumo financeiro</h1>
+          </div>
+          <div class="user-area">
+            <span id="userName"></span>
+            <button class="ghost" id="logoutButton" type="button">Sair</button>
+          </div>
+        </header>
+
+        <nav class="app-nav" aria-label="Modulos">
+          <button class="nav-button active" type="button" data-view="cockpit">Cockpit</button>
+          <button class="nav-button" type="button" data-view="accounts">Contas</button>
+          <button class="nav-button" type="button" data-view="transactions">Lançamentos</button>
+          <button class="nav-button" type="button" data-view="user">Usuário</button>
+        </nav>
+
+        <section class="module-view" id="cockpitView">
+          <section class="summary-strip">
+            <div>
+              <span>Contas ativas</span>
+              <strong id="accountCount">0</strong>
+            </div>
+            <div>
+              <span>Moedas cadastradas</span>
+              <strong id="currencyCount">0</strong>
+            </div>
+            <div>
+              <span>Receitas do mês</span>
+              <strong id="monthIncome">R$ 0,00</strong>
+            </div>
+            <div>
+              <span>Despesas do mês</span>
+              <strong id="monthExpense">R$ 0,00</strong>
+            </div>
+          </section>
+
+          <div class="cockpit-grid">
+            <section class="currency-panel">
+              <div class="section-heading">
+                <h2>Saldos por moeda</h2>
+              </div>
+              <div class="currency-list" id="currencyList"></div>
+            </section>
+
+            <section class="panel">
+              <div class="section-heading">
+                <h2>Últimos lançamentos</h2>
+              </div>
+              <div class="transaction-list compact-list" id="recentTransactionList"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="module-view" id="accountsView" hidden>
+          <div class="workspace">
+            <section class="account-form-panel">
+              <h2 id="formTitle">Nova conta</h2>
+              <form id="accountForm" class="form">
+                <input type="hidden" name="id">
+                <label>Apelido da conta
+                  <input name="name" type="text" placeholder="Conta principal" required>
+                </label>
+                <label>Banco
+                  <input name="bank_name" type="text" placeholder="Itaú, Nubank, Inter..." required>
+                </label>
+                <div class="field-row">
+                  <label>Agência
+                    <input name="branch" type="text">
+                  </label>
+                  <label>Conta
+                    <input name="account_number" type="text">
+                  </label>
+                </div>
+                <div class="field-row">
+                  <label>Moeda
+                    <select name="currency">
+                      <option value="BRL">BRL</option>
+                      <option value="USD">USD</option>
+                      <option value="EUR">EUR</option>
+                      <option value="GBP">GBP</option>
+                    </select>
+                  </label>
+                  <label>Saldo inicial
+                    <input name="initial_balance" type="text" inputmode="decimal" placeholder="0,00">
+                  </label>
+                </div>
+                <label>Observações
+                  <textarea name="notes" rows="3"></textarea>
+                </label>
+                <div class="actions">
+                  <button class="primary" type="submit">Salvar conta</button>
+                  <button class="ghost" id="cancelEditButton" type="button" hidden>Cancelar</button>
+                </div>
+              </form>
+              <p class="message" id="accountMessage" role="alert"></p>
+            </section>
+
+            <section class="accounts-panel">
+              <div class="section-heading">
+                <h2>Contas ativas</h2>
+              </div>
+              <div class="account-list" id="accountList"></div>
+            </section>
+          </div>
+
+          <section class="panel archived-panel">
+            <div class="section-heading">
+              <h2>Contas arquivadas</h2>
+            </div>
+            <div class="account-list" id="archivedAccountList"></div>
+          </section>
+        </section>
+
+        <section class="module-view" id="transactionsView" hidden>
+          <div class="workspace">
+            <section class="transaction-form-panel">
+              <h2>Novo lançamento</h2>
+              <form id="transactionForm" class="form">
+                <div class="field-row">
+                  <label>Tipo
+                    <select name="type" id="transactionType">
+                      <option value="expense">Despesa</option>
+                      <option value="income">Receita</option>
+                      <option value="transfer">Transferência</option>
+                    </select>
+                  </label>
+                  <label>Data
+                    <input name="date" type="date" required>
+                  </label>
+                </div>
+                <label>Descrição
+                  <input name="description" type="text" placeholder="Ex.: Mercado, salário, transferência..." required>
+                </label>
+                <div class="field-row">
+                  <label>Valor
+                    <input name="amount" type="text" inputmode="decimal" placeholder="0,00" required>
+                  </label>
+                  <label>Conta
+                    <select name="account_id" id="transactionAccount" required></select>
+                  </label>
+                </div>
+                <label id="destinationAccountLabel" hidden>Conta de destino
+                  <select name="destination_account_id" id="destinationAccount"></select>
+                </label>
+                <label>Observações
+                  <textarea name="notes" rows="3"></textarea>
+                </label>
+                <button class="primary" type="submit">Salvar lançamento</button>
+              </form>
+              <p class="message" id="transactionMessage" role="alert"></p>
+            </section>
+
+            <section class="panel">
+              <div class="section-heading">
+                <h2>Lançamentos</h2>
+              </div>
+              <div class="transaction-list" id="transactionList"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="module-view" id="userView" hidden>
+          <div class="user-settings-grid">
+            <section class="panel">
+              <h2>Alterar email</h2>
+              <form id="emailForm" class="form">
+                <label>Novo email
+                  <input name="email" type="email" autocomplete="email" required>
+                </label>
+                <label>Senha atual
+                  <input name="current_password" type="password" autocomplete="current-password" required>
+                </label>
+                <button class="primary" type="submit">Salvar email</button>
+              </form>
+              <p class="message" id="emailMessage" role="alert"></p>
+            </section>
+
+            <section class="panel">
+              <h2>Alterar senha</h2>
+              <form id="passwordForm" class="form">
+                <label>Senha atual
+                  <input name="current_password" type="password" autocomplete="current-password" required>
+                </label>
+                <label>Nova senha
+                  <input name="new_password" type="password" autocomplete="new-password" minlength="8" required>
+                </label>
+                <button class="primary" type="submit">Salvar senha</button>
+              </form>
+              <p class="message" id="passwordMessage" role="alert"></p>
+            </section>
+
+            <section class="panel danger-zone">
+              <h2>Apagar conta</h2>
+              <p>Esta ação apaga permanentemente seu usuário, sessões, contas e lançamentos locais. Não há desfazer.</p>
+              <form id="deleteUserForm" class="form">
+                <label class="checkbox-field">
+                  <input name="confirm_delete" type="checkbox" value="yes">
+                  <span>Entendo que todos os dados deste usuário serão apagados.</span>
+                </label>
+                <label>Senha atual
+                  <input name="current_password" type="password" autocomplete="current-password" required>
+                </label>
+                <button class="danger" type="submit">Apagar minha conta</button>
+              </form>
+              <p class="message" id="deleteUserMessage" role="alert"></p>
+            </section>
+          </div>
+        </section>
+      </section>
+    </main>
+    <script src="/app.js?v=5"></script>
+  </body>
+</html>
