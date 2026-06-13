@@ -3,6 +3,8 @@ const state = {
   accounts: [],
   archivedAccounts: [],
   transactions: [],
+  categories: [],
+  tags: [],
   view: "cockpit",
 };
 
@@ -25,6 +27,12 @@ const archivedAccountList = document.querySelector("#archivedAccountList");
 const transactionForm = document.querySelector("#transactionForm");
 const transactionMessage = document.querySelector("#transactionMessage");
 const transactionList = document.querySelector("#transactionList");
+const categoryForm = document.querySelector("#categoryForm");
+const tagForm = document.querySelector("#tagForm");
+const categoryMessage = document.querySelector("#categoryMessage");
+const tagMessage = document.querySelector("#tagMessage");
+const categoryList = document.querySelector("#categoryList");
+const tagList = document.querySelector("#tagList");
 const importForm = document.querySelector("#importForm");
 const importAccount = document.querySelector("#importAccount");
 const importMessage = document.querySelector("#importMessage");
@@ -56,6 +64,7 @@ const moduleViews = {
   cockpit: document.querySelector("#cockpitView"),
   accounts: document.querySelector("#accountsView"),
   transactions: document.querySelector("#transactionsView"),
+  classifications: document.querySelector("#classificationsView"),
   imports: document.querySelector("#importsView"),
   user: document.querySelector("#userView"),
 };
@@ -64,6 +73,7 @@ const viewTitles = {
   cockpit: ["Cockpit", "Resumo financeiro"],
   accounts: ["Gestão de contas", "Contas"],
   transactions: ["Operação", "Lançamentos"],
+  classifications: ["Classificação", "Categorias e tags"],
   imports: ["Dados", "Importação"],
   user: ["Segurança", "Usuário"],
 };
@@ -79,6 +89,8 @@ backToLoginFromRequest.addEventListener("click", () => switchAuthMode("login"));
 backToLoginFromConfirm.addEventListener("click", () => switchAuthMode("login"));
 accountForm.addEventListener("submit", handleAccountSubmit);
 transactionForm.addEventListener("submit", handleTransactionSubmit);
+categoryForm.addEventListener("submit", handleCategorySubmit);
+tagForm.addEventListener("submit", handleTagSubmit);
 importForm.addEventListener("submit", handleImportSubmit);
 emailForm.addEventListener("submit", handleEmailSubmit);
 passwordForm.addEventListener("submit", handlePasswordSubmit);
@@ -198,6 +210,8 @@ async function handleLogout() {
   state.accounts = [];
   state.archivedAccounts = [];
   state.transactions = [];
+  state.categories = [];
+  state.tags = [];
   loginForm.reset();
   registerForm.reset();
   resetAccountForm();
@@ -223,10 +237,13 @@ async function loadAll() {
     state.accounts = accountsResponse.accounts;
     state.transactions = transactionsResponse.transactions;
     await loadArchivedAccounts();
+    await loadClassifications();
   } catch (error) {
     state.accounts = [];
     state.archivedAccounts = [];
     state.transactions = [];
+    state.categories = [];
+    state.tags = [];
     setMessage(accountMessage, error.message, "error");
   }
   renderAll();
@@ -252,7 +269,17 @@ async function loadTransactionsAndAccounts() {
   state.accounts = accountsResponse.accounts;
   state.transactions = transactionsResponse.transactions;
   await loadArchivedAccounts();
+  await loadClassifications();
   renderAll();
+}
+
+async function loadClassifications() {
+  const [categoriesResponse, tagsResponse] = await Promise.all([
+    api("/api/categories"),
+    api("/api/tags"),
+  ]);
+  state.categories = categoriesResponse.categories;
+  state.tags = tagsResponse.tags;
 }
 
 function showModule(view) {
@@ -332,6 +359,57 @@ async function handleImportSubmit(event) {
   }
 }
 
+async function handleCategorySubmit(event) {
+  event.preventDefault();
+  await createClassification("categories", categoryForm, categoryMessage);
+}
+
+async function handleTagSubmit(event) {
+  event.preventDefault();
+  await createClassification("tags", tagForm, tagMessage);
+}
+
+async function createClassification(type, form, messageElement) {
+  setMessage(messageElement, "");
+  try {
+    await api(`/api/${type}`, { method: "POST", body: formData(form) });
+    form.reset();
+    await loadClassifications();
+    renderClassifications();
+    setMessage(messageElement, "Item salvo.", "success");
+  } catch (error) {
+    setMessage(messageElement, error.message, "error");
+  }
+}
+
+async function renameClassification(type, item) {
+  const label = type === "categories" ? "categoria" : "tag";
+  const name = window.prompt(`Renomear ${label}`, item.name);
+  if (name === null) {
+    return;
+  }
+  try {
+    await api(`/api/${type}/${item.id}`, { method: "PUT", body: { name } });
+    await loadClassifications();
+    renderClassifications();
+  } catch (error) {
+    setMessage(type === "categories" ? categoryMessage : tagMessage, error.message, "error");
+  }
+}
+
+async function deleteClassification(type, item) {
+  const messageElement = type === "categories" ? categoryMessage : tagMessage;
+  setMessage(messageElement, "");
+  try {
+    await api(`/api/${type}/${item.id}`, { method: "DELETE" });
+    await loadClassifications();
+    renderClassifications();
+    setMessage(messageElement, "Item excluído.", "success");
+  } catch (error) {
+    setMessage(messageElement, error.message, "error");
+  }
+}
+
 async function handleEmailSubmit(event) {
   event.preventDefault();
   setMessage(emailMessage, "");
@@ -372,6 +450,8 @@ async function handleDeleteUserSubmit(event) {
     state.accounts = [];
     state.archivedAccounts = [];
     state.transactions = [];
+    state.categories = [];
+    state.tags = [];
     deleteUserForm.reset();
     showAuth();
   } catch (error) {
@@ -440,6 +520,7 @@ function renderAll() {
   renderAccounts();
   renderTransactionAccounts();
   renderTransactions();
+  renderClassifications();
 }
 
 function renderCockpit() {
@@ -532,6 +613,36 @@ function renderTransactions() {
   renderTransactionCollection(transactionList, state.transactions, false);
 }
 
+function renderClassifications() {
+  renderClassificationList(categoryList, state.categories, "categories");
+  renderClassificationList(tagList, state.tags, "tags");
+}
+
+function renderClassificationList(container, items, type) {
+  container.innerHTML = "";
+  if (items.length === 0) {
+    container.append(emptyState(type === "categories" ? "Nenhuma categoria cadastrada." : "Nenhuma tag cadastrada."));
+    return;
+  }
+  items.forEach((item) => {
+    const row = document.createElement("article");
+    row.className = "classification-item";
+    row.innerHTML = `
+      <div>
+        <strong>${escapeHtml(item.name)}</strong>
+        <span>${item.transaction_count} lançamento(s)</span>
+      </div>
+      <div class="card-actions">
+        <button class="ghost small-button" type="button" data-action="rename">Renomear</button>
+        <button class="danger small-button" type="button" data-action="delete">Excluir</button>
+      </div>
+    `;
+    row.querySelector('[data-action="rename"]').addEventListener("click", () => renameClassification(type, item));
+    row.querySelector('[data-action="delete"]').addEventListener("click", () => deleteClassification(type, item));
+    container.append(row);
+  });
+}
+
 function renderTransactionCollection(container, transactions, compact) {
   container.innerHTML = "";
   if (transactions.length === 0) {
@@ -568,7 +679,7 @@ function transactionTemplate(transaction, compact) {
           <span>${transactionTypeLabel(transaction.type)}</span>
           <span>${escapeHtml(transaction.account_name)}${destination}</span>
           ${transaction.category_name ? `<span>${escapeHtml(transaction.category_name)}</span>` : ""}
-          ${transaction.tag_name ? `<span>#${escapeHtml(transaction.tag_name)}</span>` : ""}
+          ${transaction.tags && transaction.tags.length ? `<span>${transaction.tags.map((tag) => `#${escapeHtml(tag)}`).join(" ")}</span>` : ""}
         </div>
       </div>
       <div class="transaction-amount">

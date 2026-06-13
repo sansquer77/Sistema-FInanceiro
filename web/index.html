@@ -86,6 +86,7 @@
           <button class="nav-button active" type="button" data-view="cockpit">Cockpit</button>
           <button class="nav-button" type="button" data-view="accounts">Contas</button>
           <button class="nav-button" type="button" data-view="transactions">Lançamentos</button>
+          <button class="nav-button" type="button" data-view="classifications">Categorias e tags</button>
           <button class="nav-button" type="button" data-view="imports">Importação</button>
           <button class="nav-button" type="button" data-view="user">Usuário</button>
         </nav>
@@ -223,7 +224,7 @@
                     <input name="category" type="text" placeholder="Ex.: Alimentação" required>
                   </label>
                   <label>Tag
-                    <input name="tag" type="text" placeholder="Ex.: Mercado" required>
+                    <input name="tags" type="text" placeholder="Ex.: Mercado, Cartão" required>
                   </label>
                 </div>
                 <label>Observações
@@ -239,6 +240,30 @@
                 <h2>Lançamentos</h2>
               </div>
               <div class="transaction-list" id="transactionList"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="module-view" id="classificationsView" hidden>
+          <div class="classification-grid">
+            <section class="panel">
+              <h2>Categorias</h2>
+              <form id="categoryForm" class="form inline-form">
+                <input name="name" type="text" placeholder="Nova categoria" required>
+                <button class="primary" type="submit">Adicionar</button>
+              </form>
+              <p class="message" id="categoryMessage" role="alert"></p>
+              <div class="classification-list" id="categoryList"></div>
+            </section>
+
+            <section class="panel">
+              <h2>Tags</h2>
+              <form id="tagForm" class="form inline-form">
+                <input name="name" type="text" placeholder="Nova tag" required>
+                <button class="primary" type="submit">Adicionar</button>
+              </form>
+              <p class="message" id="tagMessage" role="alert"></p>
+              <div class="classification-list" id="tagList"></div>
             </section>
           </div>
         </section>
@@ -317,6 +342,6 @@
         </section>
       </section>
     </main>
-    <script src="/app.js?v=7"></script>
+    <script src="/app.js?v=8"></script>
   </body>
 </html>

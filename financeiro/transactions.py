@@ -4,7 +4,7 @@ from datetime import date
 from http import HTTPStatus
 
 from financeiro.accounts import cents_to_money, empty_to_none, money_to_cents
-from financeiro.categories import get_or_create_category, get_or_create_tag, normalize_name
+from financeiro.categories import ClassificationError, get_or_create_category, get_or_create_tag, normalize_name
 from financeiro.database import get_connection, row_to_dict
 
 TRANSACTION_TYPES = {"income", "expense", "transfer"}
@@ -27,7 +27,7 @@ def list_transactions(user_id: int) -> list[dict]:
                 source.currency AS account_currency,
                 destination.name AS destination_account_name,
                 categories.name AS category_name,
-                tags.name AS tag_name
+                GROUP_CONCAT(tags.name, '||') AS tag_names
             FROM transactions
             JOIN checking_accounts AS source
                 ON source.id = transactions.account_id
@@ -38,10 +38,13 @@ def list_transactions(user_id: int) -> list[dict]:
             LEFT JOIN categories
                 ON categories.id = transactions.category_id
                 AND categories.user_id = transactions.user_id
+            LEFT JOIN transaction_tags
+                ON transaction_tags.transaction_id = transactions.id
             LEFT JOIN tags
-                ON tags.id = transactions.tag_id
+                ON tags.id = transaction_tags.tag_id
                 AND tags.user_id = transactions.user_id
             WHERE transactions.user_id = ? AND transactions.archived_at IS NULL
+            GROUP BY transactions.id
             ORDER BY transactions.date DESC, transactions.id DESC
             """,
             (user_id,),
@@ -61,7 +64,7 @@ def create_transaction(user_id: int, data: dict) -> dict:
             if source["currency"] != destination["currency"]:
                 raise TransactionError("Transferencias exigem contas com a mesma moeda.")
         category_id = get_or_create_category(conn, user_id, transaction["category"])
-        tag_id = get_or_create_tag(conn, user_id, transaction["tag"])
+        tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
         apply_balance_delta(conn, source["id"], balance_delta(transaction["type"], transaction["amount_cents"], "source"))
         if destination:
             apply_balance_delta(conn, destination["id"], balance_delta(transaction["type"], transaction["amount_cents"], "destination"))
@@ -69,8 +72,8 @@ def create_transaction(user_id: int, data: dict) -> dict:
             """
             INSERT INTO transactions (
                 user_id, type, description, amount_cents, date, account_id,
-                destination_account_id, category_id, tag_id, notes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                destination_account_id, category_id, notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 user_id,
@@ -81,10 +84,10 @@ def create_transaction(user_id: int, data: dict) -> dict:
                 source["id"],
                 destination["id"] if destination else None,
                 category_id,
-                tag_id,
                 transaction["notes"],
             ),
         )
+        replace_transaction_tags(conn, cursor.lastrowid, tag_ids)
         row = fetch_transaction(conn, user_id, cursor.lastrowid)
     return format_transaction(row)
 
@@ -140,7 +143,7 @@ def normalize_transaction_payload(data: dict) -> dict:
         "account_id": account_id,
         "destination_account_id": destination_account_id,
         "category": normalize_name(data.get("category"), "Informe a categoria."),
-        "tag": normalize_name(data.get("tag"), "Informe a tag."),
+        "tags": normalize_tags(data.get("tags") or data.get("tag")),
         "notes": empty_to_none(data.get("notes")),
     }
 
@@ -198,6 +201,14 @@ def apply_balance_delta(conn, account_id: int, delta_cents: int) -> None:
     )
 
 
+def replace_transaction_tags(conn, transaction_id: int, tag_ids: list[int]) -> None:
+    conn.execute("DELETE FROM transaction_tags WHERE transaction_id = ?", (transaction_id,))
+    conn.executemany(
+        "INSERT OR IGNORE INTO transaction_tags (transaction_id, tag_id) VALUES (?, ?)",
+        [(transaction_id, tag_id) for tag_id in tag_ids],
+    )
+
+
 def fetch_transaction(conn, user_id: int, transaction_id: int) -> dict:
     row = conn.execute(
         """
@@ -207,7 +218,7 @@ def fetch_transaction(conn, user_id: int, transaction_id: int) -> dict:
                 source.currency AS account_currency,
                 destination.name AS destination_account_name,
                 categories.name AS category_name,
-                tags.name AS tag_name
+                GROUP_CONCAT(tags.name, '||') AS tag_names
             FROM transactions
             JOIN checking_accounts AS source
                 ON source.id = transactions.account_id
@@ -218,10 +229,13 @@ def fetch_transaction(conn, user_id: int, transaction_id: int) -> dict:
             LEFT JOIN categories
                 ON categories.id = transactions.category_id
                 AND categories.user_id = transactions.user_id
+            LEFT JOIN transaction_tags
+                ON transaction_tags.transaction_id = transactions.id
             LEFT JOIN tags
-                ON tags.id = transactions.tag_id
+                ON tags.id = transaction_tags.tag_id
                 AND tags.user_id = transactions.user_id
             WHERE transactions.id = ? AND transactions.user_id = ?
+            GROUP BY transactions.id
             """,
         (transaction_id, user_id),
     ).fetchone()
@@ -230,4 +244,33 @@ def fetch_transaction(conn, user_id: int, transaction_id: int) -> dict:
 
 def format_transaction(transaction: dict) -> dict:
     transaction["amount"] = cents_to_money(transaction.pop("amount_cents"))
+    raw_tags = transaction.pop("tag_names", "") or ""
+    transaction["tags"] = [tag for tag in raw_tags.split("||") if tag]
+    transaction["tag_name"] = ", ".join(transaction["tags"])
     return transaction
+
+
+def normalize_tags(value: object) -> list[str]:
+    if isinstance(value, list):
+        raw_parts = value
+    else:
+        raw = str(value or "")
+        for separator in (";", "|", "\n"):
+            raw = raw.replace(separator, ",")
+        raw_parts = raw.split(",")
+    tags = []
+    seen = set()
+    for part in raw_parts:
+        if not str(part or "").strip():
+            continue
+        try:
+            tag = normalize_name(part, "Informe ao menos uma tag.")
+        except ClassificationError as exc:
+            raise TransactionError(exc.message) from exc
+        key = tag.casefold()
+        if key not in seen:
+            seen.add(key)
+            tags.append(tag)
+    if not tags:
+        raise TransactionError("Informe ao menos uma tag.")
+    return tags

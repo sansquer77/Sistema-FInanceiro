@@ -15,12 +15,13 @@ Permitir importar movimentacoes exportadas pelo Organizze no modelo `.xls` com a
 ## Regras Funcionais
 
 - A importacao exige que o usuario escolha uma conta ativa de destino.
-- Cada linha importada deve ter descricao, categoria, tag, data valida e valor diferente de zero.
+- Cada linha importada deve ter descricao, uma categoria, ao menos uma tag, data valida e valor diferente de zero.
 - Linhas sem categoria ou sem tag nao devem ser importadas.
 - Linhas com situacao diferente de `Pago` nao devem afetar saldo e devem aparecer como ignoradas no resultado.
 - Valores positivos entram como receita.
 - Valores negativos entram como despesa.
 - Categorias e tags inexistentes sao criadas automaticamente para o usuario autenticado.
+- Quando a coluna Tags trouxer mais de uma tag, todas devem ser vinculadas ao lancamento.
 - A importacao deve retornar resumo com total lido, total importado, total ignorado e motivos das primeiras linhas rejeitadas.
 
 ## Regras de Seguranca
@@ -40,7 +41,7 @@ Permitir importar movimentacoes exportadas pelo Organizze no modelo `.xls` com a
 | Categoria | `categories.name` e `transactions.category_id` |
 | Valor positivo | `transactions.type = income` |
 | Valor negativo | `transactions.type = expense` |
-| Tags | `tags.name` e `transactions.tag_id` |
+| Tags | `tags.name` e `transaction_tags.tag_id` |
 | Informacoes adicionais | `transactions.notes` |
 
 ## Criterios de Aceite

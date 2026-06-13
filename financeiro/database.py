@@ -92,11 +92,20 @@ def initialize_database() -> None:
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
+            CREATE TABLE IF NOT EXISTS transaction_tags (
+                transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+                tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+                PRIMARY KEY (transaction_id, tag_id)
+            );
+
             CREATE INDEX IF NOT EXISTS idx_transactions_user_date
             ON transactions (user_id, date);
 
             CREATE INDEX IF NOT EXISTS idx_transactions_account
             ON transactions (account_id);
+
+            CREATE INDEX IF NOT EXISTS idx_transaction_tags_tag
+            ON transaction_tags (tag_id);
 
             CREATE INDEX IF NOT EXISTS idx_password_resets_token
             ON password_resets (token_hash, used_at, expires_at);
@@ -104,6 +113,7 @@ def initialize_database() -> None:
         )
         ensure_column(conn, "transactions", "category_id", "INTEGER REFERENCES categories(id)")
         ensure_column(conn, "transactions", "tag_id", "INTEGER REFERENCES tags(id)")
+        migrate_transaction_tags(conn)
 
 
 def row_to_dict(row: sqlite3.Row | None) -> dict | None:
@@ -116,3 +126,14 @@ def ensure_column(conn: sqlite3.Connection, table: str, column: str, definition:
     columns = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
     if column not in columns:
         conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
+
+def migrate_transaction_tags(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO transaction_tags (transaction_id, tag_id)
+        SELECT id, tag_id
+        FROM transactions
+        WHERE tag_id IS NOT NULL
+        """
+    )

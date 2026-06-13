@@ -361,6 +361,46 @@ textarea:focus {
   align-items: start;
 }
 
+.classification-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(300px, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+
+.inline-form {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.classification-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.classification-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.classification-item strong,
+.classification-item span {
+  display: block;
+}
+
+.classification-item span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .import-summary {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -596,6 +636,7 @@ textarea:focus {
   .workspace,
   .summary-strip,
   .cockpit-grid,
+  .classification-grid,
   .import-summary,
   .user-settings-grid {
     grid-template-columns: 1fr;
@@ -608,6 +649,7 @@ textarea:focus {
 
   .topbar,
   .account-card,
+  .classification-item,
   .transaction-row {
     align-items: stretch;
     flex-direction: column;
@@ -633,6 +675,10 @@ textarea:focus {
   }
 
   .field-row {
+    grid-template-columns: 1fr;
+  }
+
+  .inline-form {
     grid-template-columns: 1fr;
   }
 }

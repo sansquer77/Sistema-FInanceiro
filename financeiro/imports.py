@@ -8,7 +8,7 @@ from http import HTTPStatus
 from io import StringIO
 
 from financeiro.categories import ClassificationError, get_or_create_category, get_or_create_tag, normalize_name
-from financeiro.transactions import apply_balance_delta, balance_delta, get_active_account
+from financeiro.transactions import apply_balance_delta, balance_delta, get_active_account, normalize_tags, replace_transaction_tags
 from financeiro.database import get_connection
 
 OLE_MAGIC = bytes.fromhex("D0CF11E0A1B11AE1")
@@ -50,7 +50,7 @@ def import_organizze_transactions(user_id: int, account_id: object, file_bytes: 
                 skipped.append({"row": raw["row"], "description": raw.get("description", ""), "reason": exc.message})
                 continue
             category_id = get_or_create_category(conn, user_id, transaction["category"])
-            tag_id = get_or_create_tag(conn, user_id, transaction["tag"])
+            tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
             apply_balance_delta(
                 conn,
                 normalized_account_id,
@@ -60,8 +60,8 @@ def import_organizze_transactions(user_id: int, account_id: object, file_bytes: 
                 """
                 INSERT INTO transactions (
                     user_id, type, description, amount_cents, date, account_id,
-                    category_id, tag_id, notes
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    category_id, notes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     user_id,
@@ -71,10 +71,10 @@ def import_organizze_transactions(user_id: int, account_id: object, file_bytes: 
                     transaction["date"],
                     normalized_account_id,
                     category_id,
-                    tag_id,
                     transaction["notes"],
                 ),
             )
+            replace_transaction_tags(conn, cursor.lastrowid, tag_ids)
             imported.append({"row": raw["row"], "id": cursor.lastrowid, "description": transaction["description"]})
     return {
         "imported": len(imported),
@@ -137,9 +137,12 @@ def normalize_imported_transaction(row: dict) -> dict:
         raise ImportError("Informe a descricao.")
     try:
         category = normalize_name(row.get("category"), "Informe a categoria.")
-        tag = normalize_name(row.get("tag"), "Informe a tag.")
+        tags = normalize_tags(row.get("tag"))
     except ClassificationError as exc:
         raise ImportError(exc.message) from exc
+    except Exception as exc:
+        message = getattr(exc, "message", "Informe ao menos uma tag.")
+        raise ImportError(message) from exc
     notes = " ".join(str(row.get("notes") or "").strip().split()) or None
     return {
         "type": "income" if amount > 0 else "expense",
@@ -147,7 +150,7 @@ def normalize_imported_transaction(row: dict) -> dict:
         "amount_cents": money_decimal_to_cents(abs(amount)),
         "date": normalize_import_date(row.get("date")),
         "category": category,
-        "tag": tag,
+        "tags": tags,
         "notes": notes,
     }
 

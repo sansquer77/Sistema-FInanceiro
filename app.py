@@ -27,6 +27,16 @@ from financeiro.auth import (
     update_user_email,
     update_user_password,
 )
+from financeiro.categories import (
+    create_category,
+    create_tag,
+    delete_category,
+    delete_tag,
+    list_categories,
+    list_tags,
+    update_category,
+    update_tag,
+)
 from financeiro.database import initialize_database
 from financeiro.imports import import_organizze_transactions
 from financeiro.transactions import (
@@ -53,6 +63,12 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if self.path.startswith("/api/transactions"):
             self.handle_list_transactions()
+            return
+        if self.path == "/api/categories":
+            self.handle_list_categories()
+            return
+        if self.path == "/api/tags":
+            self.handle_list_tags()
             return
         self.serve_static()
 
@@ -90,17 +106,35 @@ class AppHandler(BaseHTTPRequestHandler):
         if self.path == "/api/import/organizze-transactions":
             self.handle_import_organizze_transactions()
             return
+        if self.path == "/api/categories":
+            self.handle_create_category()
+            return
+        if self.path == "/api/tags":
+            self.handle_create_tag()
+            return
         self.send_json({"error": "Rota nao encontrada."}, HTTPStatus.NOT_FOUND)
 
     def do_PUT(self) -> None:
         if self.path.startswith("/api/checking-accounts/"):
             self.handle_update_account()
             return
+        if self.path.startswith("/api/categories/"):
+            self.handle_update_category()
+            return
+        if self.path.startswith("/api/tags/"):
+            self.handle_update_tag()
+            return
         self.send_json({"error": "Rota nao encontrada."}, HTTPStatus.NOT_FOUND)
 
     def do_DELETE(self) -> None:
         if self.path == "/api/me":
             self.handle_delete_user()
+            return
+        if self.path.startswith("/api/categories/"):
+            self.handle_delete_category()
+            return
+        if self.path.startswith("/api/tags/"):
+            self.handle_delete_tag()
             return
         if self.path.startswith("/api/checking-accounts/"):
             self.handle_archive_account()
@@ -173,6 +207,14 @@ class AppHandler(BaseHTTPRequestHandler):
         transactions = list_transactions(user["id"])
         self.send_json({"transactions": transactions})
 
+    def handle_list_categories(self) -> None:
+        user = self.require_user()
+        self.send_json({"categories": list_categories(user["id"])})
+
+    def handle_list_tags(self) -> None:
+        user = self.require_user()
+        self.send_json({"tags": list_tags(user["id"])})
+
     def handle_create_account(self) -> None:
         user = self.require_user()
         data = self.read_json()
@@ -185,12 +227,38 @@ class AppHandler(BaseHTTPRequestHandler):
         transaction = create_transaction(user["id"], data)
         self.send_json({"transaction": transaction}, status=HTTPStatus.CREATED)
 
+    def handle_create_category(self) -> None:
+        user = self.require_user()
+        data = self.read_json()
+        category = create_category(user["id"], data.get("name", ""))
+        self.send_json({"category": category}, status=HTTPStatus.CREATED)
+
+    def handle_create_tag(self) -> None:
+        user = self.require_user()
+        data = self.read_json()
+        tag = create_tag(user["id"], data.get("name", ""))
+        self.send_json({"tag": tag}, status=HTTPStatus.CREATED)
+
     def handle_update_account(self) -> None:
         user = self.require_user()
         account_id = self.path.rsplit("/", 1)[-1]
         data = self.read_json()
         account = update_checking_account(user["id"], account_id, data)
         self.send_json({"account": account})
+
+    def handle_update_category(self) -> None:
+        user = self.require_user()
+        category_id = self.path.rsplit("/", 1)[-1]
+        data = self.read_json()
+        category = update_category(user["id"], category_id, data.get("name", ""))
+        self.send_json({"category": category})
+
+    def handle_update_tag(self) -> None:
+        user = self.require_user()
+        tag_id = self.path.rsplit("/", 1)[-1]
+        data = self.read_json()
+        tag = update_tag(user["id"], tag_id, data.get("name", ""))
+        self.send_json({"tag": tag})
 
     def handle_archive_account(self) -> None:
         user = self.require_user()
@@ -208,6 +276,18 @@ class AppHandler(BaseHTTPRequestHandler):
         user = self.require_user()
         transaction_id = self.path.rsplit("/", 1)[-1]
         delete_transaction(user["id"], transaction_id)
+        self.send_json({"ok": True})
+
+    def handle_delete_category(self) -> None:
+        user = self.require_user()
+        category_id = self.path.rsplit("/", 1)[-1]
+        delete_category(user["id"], category_id)
+        self.send_json({"ok": True})
+
+    def handle_delete_tag(self) -> None:
+        user = self.require_user()
+        tag_id = self.path.rsplit("/", 1)[-1]
+        delete_tag(user["id"], tag_id)
         self.send_json({"ok": True})
 
     def handle_import_organizze_transactions(self) -> None:
