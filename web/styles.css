@@ -94,6 +94,8 @@ p {
 .auth-card,
 .account-form-panel,
 .accounts-panel,
+.card-form-panel,
+.cards-panel,
 .currency-panel,
 .panel,
 .transaction-form-panel {
@@ -634,6 +636,8 @@ textarea:focus {
 
 .account-form-panel,
 .accounts-panel,
+.card-form-panel,
+.cards-panel,
 .panel,
 .transaction-form-panel {
   padding: 20px;
@@ -680,6 +684,12 @@ textarea:focus {
   margin-bottom: 16px;
 }
 
+.limit-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 10px;
+}
+
 .month-balance-summary > div {
   display: grid;
   gap: 5px;
@@ -690,14 +700,90 @@ textarea:focus {
   background: #fbfcfd;
 }
 
-.month-balance-summary span {
+.limit-summary > div {
+  display: grid;
+  gap: 5px;
+  min-height: 72px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+}
+
+.month-balance-summary span,
+.limit-summary span {
   color: var(--muted);
   font-size: 13px;
   font-weight: 900;
 }
 
-.month-balance-summary strong {
+.month-balance-summary strong,
+.limit-summary strong {
   font-size: 19px;
+}
+
+.limits-workspace {
+  margin-top: 18px;
+}
+
+.spending-limit-list {
+  display: grid;
+  gap: 12px;
+}
+
+.spending-limit-item {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--accent);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.spending-limit-item.over-limit {
+  border-left-color: var(--danger);
+}
+
+.limit-item-main,
+.limit-item-footer {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.limit-item-main strong {
+  display: block;
+}
+
+.limit-item-main span,
+.limit-item-footer span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.limit-progress {
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e9eef2;
+}
+
+.limit-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.over-limit .limit-progress span {
+  background: var(--danger);
+}
+
+.danger-text {
+  color: var(--danger);
 }
 
 .transaction-search {
@@ -715,7 +801,13 @@ textarea:focus {
   gap: 10px;
 }
 
+.credit-card-list {
+  display: grid;
+  gap: 10px;
+}
+
 .account-card,
+.credit-card-item,
 .transaction-row {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -727,6 +819,15 @@ textarea:focus {
 }
 
 .account-card h3 {
+  margin: 0 0 5px;
+  font-size: 17px;
+}
+
+.credit-card-item {
+  border-left: 4px solid #3b82f6;
+}
+
+.credit-card-item h3 {
   margin: 0 0 5px;
   font-size: 17px;
 }
@@ -881,6 +982,7 @@ textarea:focus {
   .workspace,
   .summary-strip,
   .month-balance-summary,
+  .limit-summary,
   .cockpit-grid,
   .classification-grid,
   .import-summary,
@@ -895,6 +997,7 @@ textarea:focus {
 
   .topbar,
   .account-card,
+  .credit-card-item,
   .classification-item,
   .transaction-row {
     align-items: stretch;

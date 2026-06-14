@@ -43,8 +43,22 @@ from financeiro.categories import (
     update_subcategory,
     update_tag,
 )
+from financeiro.credit_cards import (
+    archive_credit_card,
+    create_credit_card,
+    list_archived_credit_cards,
+    list_credit_cards,
+    restore_credit_card,
+    update_credit_card,
+)
 from financeiro.database import initialize_database
 from financeiro.imports import import_organizze_transactions
+from financeiro.spending_limits import (
+    create_spending_limit,
+    delete_spending_limit,
+    list_spending_limits,
+    update_spending_limit,
+)
 from financeiro.transactions import (
     create_transaction,
     delete_transaction,
@@ -71,6 +85,9 @@ class AppHandler(BaseHTTPRequestHandler):
         if path.startswith("/api/checking-accounts"):
             self.handle_list_accounts()
             return
+        if path.startswith("/api/credit-cards"):
+            self.handle_list_credit_cards()
+            return
         if path.startswith("/api/transactions"):
             self.handle_list_transactions()
             return
@@ -82,6 +99,9 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/tags":
             self.handle_list_tags()
+            return
+        if path == "/api/spending-limits":
+            self.handle_list_spending_limits()
             return
         self.serve_static()
 
@@ -111,8 +131,14 @@ class AppHandler(BaseHTTPRequestHandler):
         if path.startswith("/api/checking-accounts/") and path.endswith("/restore"):
             self.handle_restore_account()
             return
+        if path.startswith("/api/credit-cards/") and path.endswith("/restore"):
+            self.handle_restore_credit_card()
+            return
         if path == "/api/checking-accounts":
             self.handle_create_account()
+            return
+        if path == "/api/credit-cards":
+            self.handle_create_credit_card()
             return
         if path == "/api/transactions":
             self.handle_create_transaction()
@@ -129,6 +155,9 @@ class AppHandler(BaseHTTPRequestHandler):
         if path == "/api/tags":
             self.handle_create_tag()
             return
+        if path == "/api/spending-limits":
+            self.handle_create_spending_limit()
+            return
         self.send_json({"error": "Rota nao encontrada."}, HTTPStatus.NOT_FOUND)
 
     def do_PUT(self) -> None:
@@ -139,6 +168,9 @@ class AppHandler(BaseHTTPRequestHandler):
         if path.startswith("/api/checking-accounts/"):
             self.handle_update_account()
             return
+        if path.startswith("/api/credit-cards/"):
+            self.handle_update_credit_card()
+            return
         if path.startswith("/api/categories/"):
             self.handle_update_category()
             return
@@ -147,6 +179,9 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path.startswith("/api/tags/"):
             self.handle_update_tag()
+            return
+        if path.startswith("/api/spending-limits/"):
+            self.handle_update_spending_limit()
             return
         self.send_json({"error": "Rota nao encontrada."}, HTTPStatus.NOT_FOUND)
 
@@ -164,8 +199,14 @@ class AppHandler(BaseHTTPRequestHandler):
         if path.startswith("/api/tags/"):
             self.handle_delete_tag()
             return
+        if path.startswith("/api/spending-limits/"):
+            self.handle_delete_spending_limit()
+            return
         if path.startswith("/api/checking-accounts/"):
             self.handle_archive_account()
+            return
+        if path.startswith("/api/credit-cards/"):
+            self.handle_archive_credit_card()
             return
         if path.startswith("/api/transactions/"):
             self.handle_delete_transaction()
@@ -236,6 +277,14 @@ class AppHandler(BaseHTTPRequestHandler):
             accounts = list_checking_accounts(user["id"])
         self.send_json({"accounts": accounts})
 
+    def handle_list_credit_cards(self) -> None:
+        user = self.require_user()
+        if "status=archived" in self.path.split("?", 1)[-1]:
+            cards = list_archived_credit_cards(user["id"])
+        else:
+            cards = list_credit_cards(user["id"])
+        self.send_json({"cards": cards})
+
     def handle_list_transactions(self) -> None:
         user = self.require_user()
         transactions = list_transactions(user["id"])
@@ -259,11 +308,23 @@ class AppHandler(BaseHTTPRequestHandler):
         user = self.require_user()
         self.send_json({"tags": list_tags(user["id"])})
 
+    def handle_list_spending_limits(self) -> None:
+        user = self.require_user()
+        query = parse_qs(urlsplit(self.path).query)
+        month = (query.get("month") or [None])[0]
+        self.send_json({"limits": list_spending_limits(user["id"], month)})
+
     def handle_create_account(self) -> None:
         user = self.require_user()
         data = self.read_json()
         account = create_checking_account(user["id"], data)
         self.send_json({"account": account}, status=HTTPStatus.CREATED)
+
+    def handle_create_credit_card(self) -> None:
+        user = self.require_user()
+        data = self.read_json()
+        card = create_credit_card(user["id"], data)
+        self.send_json({"card": card}, status=HTTPStatus.CREATED)
 
     def handle_create_transaction(self) -> None:
         user = self.require_user()
@@ -296,12 +357,25 @@ class AppHandler(BaseHTTPRequestHandler):
         tag = create_tag(user["id"], data.get("name", ""))
         self.send_json({"tag": tag}, status=HTTPStatus.CREATED)
 
+    def handle_create_spending_limit(self) -> None:
+        user = self.require_user()
+        data = self.read_json()
+        spending_limit = create_spending_limit(user["id"], data)
+        self.send_json({"limit": spending_limit}, status=HTTPStatus.CREATED)
+
     def handle_update_account(self) -> None:
         user = self.require_user()
         account_id = self.path.rsplit("/", 1)[-1]
         data = self.read_json()
         account = update_checking_account(user["id"], account_id, data)
         self.send_json({"account": account})
+
+    def handle_update_credit_card(self) -> None:
+        user = self.require_user()
+        card_id = self.path.rsplit("/", 1)[-1]
+        data = self.read_json()
+        card = update_credit_card(user["id"], card_id, data)
+        self.send_json({"card": card})
 
     def handle_update_category(self) -> None:
         user = self.require_user()
@@ -324,10 +398,23 @@ class AppHandler(BaseHTTPRequestHandler):
         tag = update_tag(user["id"], tag_id, data.get("name", ""))
         self.send_json({"tag": tag})
 
+    def handle_update_spending_limit(self) -> None:
+        user = self.require_user()
+        limit_id = self.path.rsplit("/", 1)[-1]
+        data = self.read_json()
+        spending_limit = update_spending_limit(user["id"], limit_id, data)
+        self.send_json({"limit": spending_limit})
+
     def handle_archive_account(self) -> None:
         user = self.require_user()
         account_id = self.path.rsplit("/", 1)[-1]
         archive_checking_account(user["id"], account_id)
+        self.send_json({"ok": True})
+
+    def handle_archive_credit_card(self) -> None:
+        user = self.require_user()
+        card_id = self.path.rsplit("/", 1)[-1]
+        archive_credit_card(user["id"], card_id)
         self.send_json({"ok": True})
 
     def handle_restore_account(self) -> None:
@@ -335,6 +422,12 @@ class AppHandler(BaseHTTPRequestHandler):
         account_id = self.path.split("?", 1)[0].split("/")[-2]
         account = restore_checking_account(user["id"], account_id)
         self.send_json({"account": account})
+
+    def handle_restore_credit_card(self) -> None:
+        user = self.require_user()
+        card_id = self.path.split("?", 1)[0].split("/")[-2]
+        card = restore_credit_card(user["id"], card_id)
+        self.send_json({"card": card})
 
     def handle_delete_transaction(self) -> None:
         user = self.require_user()
@@ -358,6 +451,12 @@ class AppHandler(BaseHTTPRequestHandler):
         user = self.require_user()
         tag_id = self.path.rsplit("/", 1)[-1]
         delete_tag(user["id"], tag_id)
+        self.send_json({"ok": True})
+
+    def handle_delete_spending_limit(self) -> None:
+        user = self.require_user()
+        limit_id = self.path.rsplit("/", 1)[-1]
+        delete_spending_limit(user["id"], limit_id)
         self.send_json({"ok": True})
 
     def handle_import_organizze_transactions(self) -> None:

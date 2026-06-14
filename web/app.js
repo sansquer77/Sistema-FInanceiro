@@ -2,11 +2,15 @@ const state = {
   user: null,
   accounts: [],
   archivedAccounts: [],
+  creditCards: [],
+  archivedCreditCards: [],
   transactions: [],
   categories: [],
   tags: [],
+  spendingLimits: [],
   view: "cockpit",
   transactionMonth: new Date().toISOString().slice(0, 7),
+  limitMonth: new Date().toISOString().slice(0, 7),
 };
 
 const authView = document.querySelector("#authView");
@@ -27,6 +31,12 @@ const accountBankDetails = document.querySelector("#accountBankDetails");
 const accountMessage = document.querySelector("#accountMessage");
 const accountList = document.querySelector("#accountList");
 const archivedAccountList = document.querySelector("#archivedAccountList");
+const creditCardForm = document.querySelector("#creditCardForm");
+const creditCardFormTitle = document.querySelector("#creditCardFormTitle");
+const creditCardMessage = document.querySelector("#creditCardMessage");
+const creditCardList = document.querySelector("#creditCardList");
+const archivedCreditCardList = document.querySelector("#archivedCreditCardList");
+const cancelCreditCardEditButton = document.querySelector("#cancelCreditCardEditButton");
 const transactionForm = document.querySelector("#transactionForm");
 const transactionMessage = document.querySelector("#transactionMessage");
 const transactionList = document.querySelector("#transactionList");
@@ -39,6 +49,20 @@ const categoryMessage = document.querySelector("#categoryMessage");
 const tagMessage = document.querySelector("#tagMessage");
 const categoryList = document.querySelector("#categoryList");
 const tagList = document.querySelector("#tagList");
+const limitForm = document.querySelector("#limitForm");
+const limitFormTitle = document.querySelector("#limitFormTitle");
+const limitCategory = document.querySelector("#limitCategory");
+const limitSubcategory = document.querySelector("#limitSubcategory");
+const limitMonthInput = document.querySelector("#limitMonthInput");
+const limitMonthLabel = document.querySelector("#limitMonthLabel");
+const limitConsumedSummary = document.querySelector("#limitConsumedSummary");
+const limitDefinedSummary = document.querySelector("#limitDefinedSummary");
+const limitAvailableSummary = document.querySelector("#limitAvailableSummary");
+const limitMessage = document.querySelector("#limitMessage");
+const spendingLimitList = document.querySelector("#spendingLimitList");
+const previousLimitMonthButton = document.querySelector("#previousLimitMonthButton");
+const nextLimitMonthButton = document.querySelector("#nextLimitMonthButton");
+const cancelLimitEditButton = document.querySelector("#cancelLimitEditButton");
 const importForm = document.querySelector("#importForm");
 const importAccount = document.querySelector("#importAccount");
 const importMessage = document.querySelector("#importMessage");
@@ -88,7 +112,9 @@ const navButtons = document.querySelectorAll("[data-view]");
 const moduleViews = {
   cockpit: document.querySelector("#cockpitView"),
   accounts: document.querySelector("#accountsView"),
+  creditCards: document.querySelector("#creditCardsView"),
   transactions: document.querySelector("#transactionsView"),
+  limits: document.querySelector("#limitsView"),
   classifications: document.querySelector("#classificationsView"),
   imports: document.querySelector("#importsView"),
   user: document.querySelector("#userView"),
@@ -97,7 +123,9 @@ const moduleViews = {
 const viewTitles = {
   cockpit: ["Cockpit", "Resumo financeiro"],
   accounts: ["Gestão de contas", "Contas"],
+  creditCards: ["Crédito", "Cartões"],
   transactions: ["Operação", "Lançamentos"],
+  limits: ["Controle", "Limite de gastos"],
   classifications: ["Classificação", "Categorias e tags"],
   imports: ["Dados", "Importação"],
   user: ["Segurança", "Usuário"],
@@ -114,11 +142,14 @@ backToLoginFromRequest.addEventListener("click", () => switchAuthMode("login"));
 backToLoginFromConfirm.addEventListener("click", () => switchAuthMode("login"));
 accountForm.addEventListener("submit", handleAccountSubmit);
 accountForm.elements.account_type.addEventListener("change", updateAccountTypeState);
+creditCardForm.addEventListener("submit", handleCreditCardSubmit);
 transactionForm.addEventListener("submit", handleTransactionSubmit);
 categoryForm.addEventListener("submit", handleCategorySubmit);
 categoryGroup.addEventListener("change", handleCategoryGroupChange);
 subcategoryForm.addEventListener("submit", handleSubcategorySubmit);
 tagForm.addEventListener("submit", handleTagSubmit);
+limitForm.addEventListener("submit", handleLimitSubmit);
+limitCategory.addEventListener("change", renderLimitSubcategories);
 importForm.addEventListener("submit", handleImportSubmit);
 emailForm.addEventListener("submit", handleEmailSubmit);
 passwordForm.addEventListener("submit", handlePasswordSubmit);
@@ -130,9 +161,13 @@ seriesKind.addEventListener("change", updateSeriesState);
 transactionForm.elements.date.addEventListener("change", updateExchangeRateState);
 previousMonthButton.addEventListener("click", () => shiftTransactionMonth(-1));
 nextMonthButton.addEventListener("click", () => shiftTransactionMonth(1));
+previousLimitMonthButton.addEventListener("click", () => shiftLimitMonth(-1));
+nextLimitMonthButton.addEventListener("click", () => shiftLimitMonth(1));
 transactionSearch.addEventListener("input", renderTransactions);
 logoutButton.addEventListener("click", handleLogout);
 cancelEditButton.addEventListener("click", resetAccountForm);
+cancelCreditCardEditButton.addEventListener("click", resetCreditCardForm);
+cancelLimitEditButton.addEventListener("click", resetLimitForm);
 navButtons.forEach((button) => button.addEventListener("click", () => showModule(button.dataset.view)));
 
 updateAccountTypeState();
@@ -245,12 +280,16 @@ async function handleLogout() {
   state.user = null;
   state.accounts = [];
   state.archivedAccounts = [];
+  state.creditCards = [];
+  state.archivedCreditCards = [];
   state.transactions = [];
   state.categories = [];
   state.tags = [];
+  state.spendingLimits = [];
   loginForm.reset();
   registerForm.reset();
   resetAccountForm();
+  resetCreditCardForm();
   resetTransactionForm();
   showAuth();
 }
@@ -266,20 +305,27 @@ async function loadDashboard() {
 
 async function loadAll() {
   try {
-    const [accountsResponse, transactionsResponse] = await Promise.all([
+    const [accountsResponse, creditCardsResponse, transactionsResponse] = await Promise.all([
       api("/api/checking-accounts"),
+      api("/api/credit-cards"),
       api("/api/transactions"),
     ]);
     state.accounts = accountsResponse.accounts;
+    state.creditCards = creditCardsResponse.cards;
     state.transactions = transactionsResponse.transactions;
     await loadArchivedAccounts();
+    await loadArchivedCreditCards();
     await loadClassifications();
+    await loadSpendingLimits();
   } catch (error) {
     state.accounts = [];
     state.archivedAccounts = [];
+    state.creditCards = [];
+    state.archivedCreditCards = [];
     state.transactions = [];
     state.categories = [];
     state.tags = [];
+    state.spendingLimits = [];
     setMessage(accountMessage, error.message, "error");
   }
   renderAll();
@@ -292,20 +338,36 @@ async function loadAccounts() {
   renderAll();
 }
 
+async function loadCreditCards() {
+  const response = await api("/api/credit-cards");
+  state.creditCards = response.cards;
+  await loadArchivedCreditCards();
+  renderAll();
+}
+
 async function loadArchivedAccounts() {
   const response = await api("/api/checking-accounts?status=archived");
   state.archivedAccounts = response.accounts;
 }
 
+async function loadArchivedCreditCards() {
+  const response = await api("/api/credit-cards?status=archived");
+  state.archivedCreditCards = response.cards;
+}
+
 async function loadTransactionsAndAccounts() {
-  const [accountsResponse, transactionsResponse] = await Promise.all([
+  const [accountsResponse, creditCardsResponse, transactionsResponse] = await Promise.all([
     api("/api/checking-accounts"),
+    api("/api/credit-cards"),
     api("/api/transactions"),
   ]);
   state.accounts = accountsResponse.accounts;
+  state.creditCards = creditCardsResponse.cards;
   state.transactions = transactionsResponse.transactions;
   await loadArchivedAccounts();
+  await loadArchivedCreditCards();
   await loadClassifications();
+  await loadSpendingLimits();
   renderAll();
 }
 
@@ -318,6 +380,11 @@ async function loadClassifications() {
   state.tags = tagsResponse.tags;
 }
 
+async function loadSpendingLimits() {
+  const response = await api(`/api/spending-limits?month=${encodeURIComponent(state.limitMonth)}`);
+  state.spendingLimits = response.limits;
+}
+
 function showModule(view) {
   state.view = view;
   for (const [name, element] of Object.entries(moduleViews)) {
@@ -328,6 +395,9 @@ function showModule(view) {
   pageTitle.textContent = viewTitles[view][1];
   if (view === "transactions") {
     updateTransactionTypeState();
+  }
+  if (view === "limits") {
+    renderLimits();
   }
   if (view === "user" && state.user) {
     emailForm.elements.email.value = state.user.email;
@@ -349,6 +419,24 @@ async function handleAccountSubmit(event) {
     setMessage(accountMessage, "Conta salva.", "success");
   } catch (error) {
     setMessage(accountMessage, error.message, "error");
+  }
+}
+
+async function handleCreditCardSubmit(event) {
+  event.preventDefault();
+  setMessage(creditCardMessage, "");
+  const data = formData(creditCardForm);
+  const isEditing = Boolean(data.id);
+  try {
+    await api(isEditing ? `/api/credit-cards/${data.id}` : "/api/credit-cards", {
+      method: isEditing ? "PUT" : "POST",
+      body: data,
+    });
+    resetCreditCardForm();
+    await loadCreditCards();
+    setMessage(creditCardMessage, "Cartão salvo.", "success");
+  } catch (error) {
+    setMessage(creditCardMessage, error.message, "error");
   }
 }
 
@@ -434,6 +522,59 @@ async function handleSubcategorySubmit(event) {
 async function handleTagSubmit(event) {
   event.preventDefault();
   await createClassification("tags", tagForm, tagMessage);
+}
+
+async function handleLimitSubmit(event) {
+  event.preventDefault();
+  setMessage(limitMessage, "");
+  const data = formData(limitForm);
+  data.month = state.limitMonth;
+  const isEditing = Boolean(data.id);
+  try {
+    await api(isEditing ? `/api/spending-limits/${data.id}` : "/api/spending-limits", {
+      method: isEditing ? "PUT" : "POST",
+      body: data,
+    });
+    resetLimitForm();
+    await loadSpendingLimits();
+    renderLimits();
+    setMessage(limitMessage, "Limite salvo.", "success");
+  } catch (error) {
+    setMessage(limitMessage, error.message, "error");
+  }
+}
+
+function editSpendingLimit(limit) {
+  limitFormTitle.textContent = "Editar limite";
+  limitForm.elements.id.value = limit.id;
+  limitForm.elements.limit_amount.value = limit.limit_amount.replace(".", ",");
+  limitForm.elements.notes.value = limit.notes || "";
+  limitCategory.value = String(limit.category_id);
+  renderLimitSubcategories();
+  limitSubcategory.value = limit.subcategory_id ? String(limit.subcategory_id) : "";
+  cancelLimitEditButton.hidden = false;
+  limitForm.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function deleteSpendingLimit(id) {
+  try {
+    await api(`/api/spending-limits/${id}`, { method: "DELETE" });
+    await loadSpendingLimits();
+    renderLimits();
+    setMessage(limitMessage, "Limite excluído.", "success");
+  } catch (error) {
+    setMessage(limitMessage, error.message, "error");
+  }
+}
+
+function resetLimitForm() {
+  limitForm.reset();
+  limitForm.elements.id.value = "";
+  limitFormTitle.textContent = "Novo limite";
+  cancelLimitEditButton.hidden = true;
+  limitMonthInput.value = state.limitMonth;
+  renderLimitCategories();
+  setMessage(limitMessage, "");
 }
 
 async function createClassification(type, form, messageElement) {
@@ -570,6 +711,24 @@ async function restoreAccount(id) {
   }
 }
 
+async function archiveCreditCard(id) {
+  try {
+    await api(`/api/credit-cards/${id}`, { method: "DELETE" });
+    await loadCreditCards();
+  } catch (error) {
+    setMessage(creditCardMessage, error.message, "error");
+  }
+}
+
+async function restoreCreditCard(id) {
+  try {
+    await api(`/api/credit-cards/${id}/restore`, { method: "POST" });
+    await loadCreditCards();
+  } catch (error) {
+    setMessage(creditCardMessage, error.message, "error");
+  }
+}
+
 async function deleteTransaction(id) {
   try {
     await api(`/api/transactions/${id}`, { method: "DELETE" });
@@ -608,6 +767,21 @@ function editAccount(account) {
   accountForm.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+function editCreditCard(card) {
+  creditCardFormTitle.textContent = "Editar cartão";
+  creditCardForm.elements.id.value = card.id;
+  creditCardForm.elements.name.value = card.name;
+  creditCardForm.elements.issuer.value = card.issuer;
+  creditCardForm.elements.network.value = card.network || "";
+  creditCardForm.elements.currency.value = card.currency;
+  creditCardForm.elements.limit.value = card.limit.replace(".", ",");
+  creditCardForm.elements.closing_day.value = card.closing_day;
+  creditCardForm.elements.due_day.value = card.due_day;
+  creditCardForm.elements.notes.value = card.notes || "";
+  cancelCreditCardEditButton.hidden = false;
+  creditCardForm.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 function resetAccountForm() {
   accountForm.reset();
   accountForm.elements.id.value = "";
@@ -615,6 +789,14 @@ function resetAccountForm() {
   cancelEditButton.hidden = true;
   updateAccountTypeState();
   setMessage(accountMessage, "");
+}
+
+function resetCreditCardForm() {
+  creditCardForm.reset();
+  creditCardForm.elements.id.value = "";
+  creditCardFormTitle.textContent = "Novo cartão";
+  cancelCreditCardEditButton.hidden = true;
+  setMessage(creditCardMessage, "");
 }
 
 function updateAccountTypeState() {
@@ -645,10 +827,12 @@ function resetTransactionForm() {
 function renderAll() {
   renderCockpit();
   renderAccounts();
+  renderCreditCards();
   renderTransactionAccounts();
   renderTransactionCategories();
   renderTransactions();
   renderClassifications();
+  renderLimits();
 }
 
 function renderCockpit() {
@@ -808,6 +992,72 @@ function renderArchivedAccounts() {
   });
 }
 
+function renderCreditCards() {
+  creditCardList.innerHTML = "";
+  if (state.creditCards.length === 0) {
+    creditCardList.append(emptyState("Nenhum cartão cadastrado ainda."));
+  } else {
+    state.creditCards.forEach((card) => {
+      creditCardList.append(creditCardCard(card, "active"));
+    });
+  }
+  renderArchivedCreditCards();
+}
+
+function renderArchivedCreditCards() {
+  archivedCreditCardList.innerHTML = "";
+  if (state.archivedCreditCards.length === 0) {
+    archivedCreditCardList.append(emptyState("Nenhum cartão arquivado."));
+    return;
+  }
+  state.archivedCreditCards.forEach((card) => {
+    archivedCreditCardList.append(creditCardCard(card, "archived"));
+  });
+}
+
+function creditCardCard(card, status) {
+  const item = document.createElement("article");
+  item.className = "credit-card-item";
+  const actions = status === "archived"
+    ? `<button class="ghost" type="button" data-action="restore">Reativar</button>`
+    : `
+      <button class="ghost" type="button" data-action="edit">Editar</button>
+      <button class="danger" type="button" data-action="archive">Arquivar</button>
+    `;
+  item.innerHTML = `
+    <div>
+      <h3>${escapeHtml(card.name)}</h3>
+      <div class="account-meta">
+        <span>${escapeHtml(card.issuer)}</span>
+        ${card.network ? `<span>${escapeHtml(card.network)}</span>` : ""}
+        <span>${escapeHtml(card.currency)}</span>
+        <span>Fecha dia ${card.closing_day}</span>
+        <span>Vence dia ${card.due_day}</span>
+      </div>
+    </div>
+    <div class="balance">
+      <span>Limite</span>
+      <strong>${formatMoney(card.limit, card.currency)}</strong>
+      <div class="card-actions">
+        ${actions}
+      </div>
+    </div>
+  `;
+  const editButton = item.querySelector('[data-action="edit"]');
+  const archiveButton = item.querySelector('[data-action="archive"]');
+  const restoreButton = item.querySelector('[data-action="restore"]');
+  if (editButton) {
+    editButton.addEventListener("click", () => editCreditCard(card));
+  }
+  if (archiveButton) {
+    archiveButton.addEventListener("click", () => archiveCreditCard(card.id));
+  }
+  if (restoreButton) {
+    restoreButton.addEventListener("click", () => restoreCreditCard(card.id));
+  }
+  return item;
+}
+
 function accountCard(account, status) {
   const card = document.createElement("article");
   card.className = "account-card";
@@ -895,6 +1145,118 @@ function renderClassifications() {
   renderSubcategoryOptions();
   renderClassificationList(categoryList, filteredClassificationCategories(), "categories");
   renderClassificationList(tagList, state.tags, "tags");
+}
+
+function renderLimits() {
+  limitMonthLabel.textContent = formatMonthLabel(state.limitMonth);
+  limitMonthInput.value = state.limitMonth;
+  renderLimitCategories();
+  renderSpendingLimitList();
+}
+
+function renderLimitCategories() {
+  const selectedCategory = limitCategory.value;
+  const expenseCategories = state.categories.filter((category) => category.group_type === "expense");
+  limitCategory.innerHTML = expenseCategories.map((category) => (
+    `<option value="${category.id}">${escapeHtml(category.name)}</option>`
+  )).join("") || '<option value="">Cadastre uma categoria de despesa</option>';
+  if (expenseCategories.some((category) => String(category.id) === selectedCategory)) {
+    limitCategory.value = selectedCategory;
+  }
+  limitCategory.disabled = expenseCategories.length === 0;
+  limitForm.querySelector('button[type="submit"]').disabled = expenseCategories.length === 0;
+  renderLimitSubcategories();
+}
+
+function renderLimitSubcategories() {
+  const category = state.categories.find((entry) => String(entry.id) === limitCategory.value);
+  const subcategories = category ? category.subcategories || [] : [];
+  const selectedSubcategory = limitSubcategory.value;
+  limitSubcategory.innerHTML = '<option value="">Categoria inteira</option>' + subcategories.map((subcategory) => (
+    `<option value="${subcategory.id}">${escapeHtml(subcategory.name)}</option>`
+  )).join("");
+  if (subcategories.some((subcategory) => String(subcategory.id) === selectedSubcategory)) {
+    limitSubcategory.value = selectedSubcategory;
+  }
+  limitSubcategory.disabled = subcategories.length === 0;
+}
+
+function renderSpendingLimitList() {
+  spendingLimitList.innerHTML = "";
+  const rows = spendingLimitRows();
+  renderLimitSummary(rows);
+  if (rows.length === 0) {
+    spendingLimitList.append(emptyState("Nenhum limite definido para este mês."));
+    return;
+  }
+  rows.forEach((row) => {
+    const item = document.createElement("article");
+    item.className = `spending-limit-item ${row.percent > 1 ? "over-limit" : ""}`;
+    item.innerHTML = `
+      <div class="limit-item-main">
+        <div>
+          <strong>${escapeHtml(row.label)}</strong>
+          <span>${formatMoney(row.spent, "BRL")} de ${formatMoney(row.limit, "BRL")}</span>
+        </div>
+        <strong>${formatPercent(row.percent)}</strong>
+      </div>
+      <div class="limit-progress" aria-label="${escapeHtml(row.label)} consumido">
+        <span style="width:${Math.min(row.percent * 100, 100)}%"></span>
+      </div>
+      <div class="limit-item-footer">
+        <span>${row.remaining >= 0 ? "Disponível" : "Excedido"}: ${formatMoney(Math.abs(row.remaining), "BRL")}</span>
+        <div class="card-actions">
+          <button class="ghost small-button" type="button" data-action="edit">Editar</button>
+          <button class="danger small-button" type="button" data-action="delete">Excluir</button>
+        </div>
+      </div>
+    `;
+    item.querySelector('[data-action="edit"]').addEventListener("click", () => editSpendingLimit(row.limitRecord));
+    item.querySelector('[data-action="delete"]').addEventListener("click", () => deleteSpendingLimit(row.limitRecord.id));
+    spendingLimitList.append(item);
+  });
+}
+
+function renderLimitSummary(rows) {
+  const totals = rows.reduce((summary, row) => {
+    summary.spent += row.spent;
+    summary.limit += row.limit;
+    return summary;
+  }, { spent: 0, limit: 0 });
+  limitConsumedSummary.textContent = formatMoney(totals.spent, "BRL");
+  limitDefinedSummary.textContent = formatMoney(totals.limit, "BRL");
+  limitAvailableSummary.textContent = formatMoney(totals.limit - totals.spent, "BRL");
+  limitAvailableSummary.classList.toggle("danger-text", totals.spent > totals.limit && totals.limit > 0);
+}
+
+function spendingLimitRows() {
+  return state.spendingLimits.map((limit) => {
+    const spent = spentForLimit(limit);
+    const limitAmount = Number(limit.limit_amount);
+    return {
+      limitRecord: limit,
+      label: limit.subcategory_name ? `${limit.category_name} / ${limit.subcategory_name}` : limit.category_name,
+      spent,
+      limit: limitAmount,
+      percent: limitAmount > 0 ? spent / limitAmount : 0,
+      remaining: limitAmount - spent,
+    };
+  }).sort((a, b) => b.percent - a.percent || b.spent - a.spent);
+}
+
+function spentForLimit(limit) {
+  return state.transactions.reduce((total, transaction) => {
+    if (transaction.type !== "expense" || !transaction.date.startsWith(limit.month)) {
+      return total;
+    }
+    if (String(transaction.category_id) !== String(limit.category_id)) {
+      return total;
+    }
+    if (limit.subcategory_id && String(transaction.subcategory_id) !== String(limit.subcategory_id)) {
+      return total;
+    }
+    return total + Number(transaction.amount_brl || transaction.amount);
+  }, 0);
 }
 
 function renderSubcategoryOptions() {
@@ -1077,6 +1439,13 @@ function updateSeriesState() {
 function shiftTransactionMonth(delta) {
   state.transactionMonth = shiftMonth(state.transactionMonth, delta);
   renderTransactions();
+}
+
+async function shiftLimitMonth(delta) {
+  state.limitMonth = shiftMonth(state.limitMonth, delta);
+  resetLimitForm();
+  await loadSpendingLimits();
+  renderLimits();
 }
 
 function selectedTransactionGroup() {

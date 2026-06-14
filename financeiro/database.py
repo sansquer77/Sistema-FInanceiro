@@ -60,13 +60,30 @@ def initialize_database() -> None:
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
+            CREATE TABLE IF NOT EXISTS credit_cards (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                issuer TEXT NOT NULL,
+                network TEXT,
+                currency TEXT NOT NULL DEFAULT 'BRL',
+                limit_cents INTEGER NOT NULL CHECK (limit_cents > 0),
+                closing_day INTEGER NOT NULL CHECK (closing_day BETWEEN 1 AND 31),
+                due_day INTEGER NOT NULL CHECK (due_day BETWEEN 1 AND 31),
+                notes TEXT,
+                archived_at TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (user_id, name)
+            );
+
             CREATE TABLE IF NOT EXISTS categories (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 name TEXT NOT NULL,
                 group_type TEXT NOT NULL DEFAULT 'expense' CHECK (group_type IN ('income', 'expense', 'investment')),
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE (user_id, name)
+                UNIQUE (user_id, group_type, name)
             );
 
             CREATE TABLE IF NOT EXISTS subcategories (
@@ -118,6 +135,26 @@ def initialize_database() -> None:
                 PRIMARY KEY (transaction_id, tag_id)
             );
 
+            CREATE TABLE IF NOT EXISTS spending_limits (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                month TEXT NOT NULL,
+                category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+                subcategory_id INTEGER REFERENCES subcategories(id) ON DELETE CASCADE,
+                limit_amount_cents INTEGER NOT NULL CHECK (limit_amount_cents > 0),
+                notes TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_spending_limits_category
+            ON spending_limits (user_id, month, category_id)
+            WHERE subcategory_id IS NULL;
+
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_spending_limits_subcategory
+            ON spending_limits (user_id, month, category_id, subcategory_id)
+            WHERE subcategory_id IS NOT NULL;
+
             CREATE INDEX IF NOT EXISTS idx_transactions_user_date
             ON transactions (user_id, date);
 
@@ -147,6 +184,7 @@ def initialize_database() -> None:
         ensure_column(conn, "transactions", "reconciled_at", "TEXT")
         ensure_column(conn, "checking_accounts", "account_type", "TEXT NOT NULL DEFAULT 'liquidity'")
         ensure_column(conn, "categories", "group_type", "TEXT NOT NULL DEFAULT 'expense'")
+        migrate_category_unique_constraint(conn)
         migrate_transaction_tags(conn)
         migrate_transaction_brl_values(conn)
 
@@ -161,6 +199,42 @@ def ensure_column(conn: sqlite3.Connection, table: str, column: str, definition:
     columns = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
     if column not in columns:
         conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
+
+def migrate_category_unique_constraint(conn: sqlite3.Connection) -> None:
+    row = conn.execute(
+        """
+        SELECT sql
+        FROM sqlite_master
+        WHERE type = 'table' AND name = 'categories'
+        """
+    ).fetchone()
+    table_sql = row["sql"] if row else ""
+    if "UNIQUE (user_id, group_type, name)" in table_sql:
+        return
+    conn.execute("PRAGMA foreign_keys = OFF")
+    try:
+        conn.executescript(
+            """
+            CREATE TABLE categories_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                group_type TEXT NOT NULL DEFAULT 'expense' CHECK (group_type IN ('income', 'expense', 'investment')),
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (user_id, group_type, name)
+            );
+
+            INSERT INTO categories_new (id, user_id, name, group_type, created_at)
+            SELECT id, user_id, name, group_type, created_at
+            FROM categories;
+
+            DROP TABLE categories;
+            ALTER TABLE categories_new RENAME TO categories;
+            """
+        )
+    finally:
+        conn.execute("PRAGMA foreign_keys = ON")
 
 
 def migrate_transaction_tags(conn: sqlite3.Connection) -> None:

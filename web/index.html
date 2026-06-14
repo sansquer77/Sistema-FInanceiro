@@ -85,7 +85,9 @@
         <nav class="app-nav" aria-label="Modulos">
           <button class="nav-button active" type="button" data-view="cockpit">Cockpit</button>
           <button class="nav-button" type="button" data-view="accounts">Contas</button>
+          <button class="nav-button" type="button" data-view="creditCards">Cartões</button>
           <button class="nav-button" type="button" data-view="transactions">Lançamentos</button>
+          <button class="nav-button" type="button" data-view="limits">Limites</button>
           <button class="nav-button" type="button" data-view="classifications">Categorias e tags</button>
           <button class="nav-button" type="button" data-view="imports">Importação</button>
           <button class="nav-button" type="button" data-view="user">Usuário</button>
@@ -215,6 +217,78 @@
           </section>
         </section>
 
+        <section class="module-view" id="creditCardsView" hidden>
+          <div class="workspace">
+            <section class="card-form-panel">
+              <h2 id="creditCardFormTitle">Novo cartão</h2>
+              <form id="creditCardForm" class="form">
+                <input type="hidden" name="id">
+                <label>Apelido do cartão
+                  <input name="name" type="text" placeholder="Porto Seguro, Nubank..." required>
+                </label>
+                <div class="field-row">
+                  <label>Emissor
+                    <input name="issuer" type="text" placeholder="Banco ou instituição" required>
+                  </label>
+                  <label>Bandeira
+                    <select name="network">
+                      <option value="">Não informado</option>
+                      <option value="Visa">Visa</option>
+                      <option value="Mastercard">Mastercard</option>
+                      <option value="Elo">Elo</option>
+                      <option value="American Express">American Express</option>
+                      <option value="Hipercard">Hipercard</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="field-row">
+                  <label>Moeda
+                    <select name="currency">
+                      <option value="BRL">BRL</option>
+                      <option value="USD">USD</option>
+                      <option value="EUR">EUR</option>
+                      <option value="GBP">GBP</option>
+                    </select>
+                  </label>
+                  <label>Limite
+                    <input name="limit" type="text" inputmode="decimal" placeholder="0,00" required>
+                  </label>
+                </div>
+                <div class="field-row">
+                  <label>Fechamento da fatura
+                    <input name="closing_day" type="number" min="1" max="31" placeholder="23" required>
+                  </label>
+                  <label>Vencimento
+                    <input name="due_day" type="number" min="1" max="31" placeholder="28" required>
+                  </label>
+                </div>
+                <label>Observações
+                  <textarea name="notes" rows="3"></textarea>
+                </label>
+                <div class="actions">
+                  <button class="primary" type="submit">Salvar cartão</button>
+                  <button class="ghost" id="cancelCreditCardEditButton" type="button" hidden>Cancelar</button>
+                </div>
+              </form>
+              <p class="message" id="creditCardMessage" role="alert"></p>
+            </section>
+
+            <section class="cards-panel">
+              <div class="section-heading">
+                <h2>Cartões ativos</h2>
+              </div>
+              <div class="credit-card-list" id="creditCardList"></div>
+            </section>
+          </div>
+
+          <section class="panel archived-panel">
+            <div class="section-heading">
+              <h2>Cartões arquivados</h2>
+            </div>
+            <div class="credit-card-list" id="archivedCreditCardList"></div>
+          </section>
+        </section>
+
         <section class="module-view" id="transactionsView" hidden>
           <div class="workspace">
             <section class="transaction-form-panel">
@@ -320,6 +394,68 @@
                 <input id="transactionSearch" type="search" placeholder="Descrição, conta, categoria, tag...">
               </label>
               <div class="transaction-list" id="transactionList"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="module-view" id="limitsView" hidden>
+          <section class="panel">
+            <div class="section-heading">
+              <h2>Limite de gastos</h2>
+              <div class="month-navigator">
+                <button class="ghost small-button" type="button" id="previousLimitMonthButton">Anterior</button>
+                <strong id="limitMonthLabel"></strong>
+                <button class="ghost small-button" type="button" id="nextLimitMonthButton">Próximo</button>
+              </div>
+            </div>
+
+            <div class="limit-summary">
+              <div>
+                <span>Consumido</span>
+                <strong id="limitConsumedSummary">R$ 0,00</strong>
+              </div>
+              <div>
+                <span>Limite definido</span>
+                <strong id="limitDefinedSummary">R$ 0,00</strong>
+              </div>
+              <div>
+                <span>Disponível</span>
+                <strong id="limitAvailableSummary">R$ 0,00</strong>
+              </div>
+            </div>
+          </section>
+
+          <div class="workspace limits-workspace">
+            <section class="panel">
+              <h2 id="limitFormTitle">Novo limite</h2>
+              <form id="limitForm" class="form">
+                <input type="hidden" name="id">
+                <input type="hidden" name="month" id="limitMonthInput">
+                <label>Categoria
+                  <select name="category_id" id="limitCategory" required></select>
+                </label>
+                <label>Subcategoria
+                  <select name="subcategory_id" id="limitSubcategory"></select>
+                </label>
+                <label>Limite mensal
+                  <input name="limit_amount" type="text" inputmode="decimal" placeholder="0,00" required>
+                </label>
+                <label>Observações
+                  <textarea name="notes" rows="3"></textarea>
+                </label>
+                <div class="actions">
+                  <button class="primary" type="submit">Salvar limite</button>
+                  <button class="ghost" id="cancelLimitEditButton" type="button" hidden>Cancelar</button>
+                </div>
+              </form>
+              <p class="message" id="limitMessage" role="alert"></p>
+            </section>
+
+            <section class="panel">
+              <div class="section-heading">
+                <h2>Uso do mês</h2>
+              </div>
+              <div class="spending-limit-list" id="spendingLimitList"></div>
             </section>
           </div>
         </section>

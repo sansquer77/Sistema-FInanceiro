@@ -98,7 +98,7 @@ def create_tag(user_id: int, name: str) -> dict:
 
 
 def update_category(user_id: int, item_id: str, name: str) -> dict:
-    return update_named_item("categories", user_id, item_id, name, "Informe a categoria.")
+    return update_category_name(user_id, item_id, name)
 
 
 def update_subcategory(user_id: int, item_id: str, name: str) -> dict:
@@ -252,7 +252,36 @@ def create_named_item(table: str, user_id: int, name: str, required_message: str
             return row_to_dict(row)
     except Exception as exc:
         if "UNIQUE constraint failed" in str(exc):
-            raise ClassificationError("Ja existe um item com este nome.", HTTPStatus.CONFLICT) from exc
+            message = "Ja existe uma categoria com este nome neste grupo." if table == "categories" else "Ja existe um item com este nome."
+            raise ClassificationError(message, HTTPStatus.CONFLICT) from exc
+        raise
+
+
+def update_category_name(user_id: int, item_id: str, name: str) -> dict:
+    normalized_id = normalize_item_id(item_id, "Categoria nao encontrada.")
+    normalized = normalize_name(name, "Informe a categoria.")
+    try:
+        with get_connection() as conn:
+            cursor = conn.execute(
+                """
+                UPDATE categories
+                SET name = ?
+                WHERE id = ? AND user_id = ?
+                """,
+                (normalized, normalized_id, user_id),
+            )
+            if cursor.rowcount == 0:
+                raise ClassificationError("Categoria nao encontrada.", HTTPStatus.NOT_FOUND)
+            row = conn.execute(
+                "SELECT * FROM categories WHERE id = ? AND user_id = ?",
+                (normalized_id, user_id),
+            ).fetchone()
+            return row_to_dict(row)
+    except ClassificationError:
+        raise
+    except Exception as exc:
+        if "UNIQUE constraint failed" in str(exc):
+            raise ClassificationError("Ja existe uma categoria com este nome neste grupo.", HTTPStatus.CONFLICT) from exc
         raise
 
 
@@ -345,14 +374,10 @@ def get_or_create_named_item(conn, table: str, user_id: int, name: str, required
     normalized_group = normalize_group_type(group_type) if table == "categories" else None
     if table == "categories":
         row = conn.execute(
-            "SELECT id FROM categories WHERE user_id = ? AND name = ?",
-            (user_id, normalized),
+            "SELECT id FROM categories WHERE user_id = ? AND group_type = ? AND name = ?",
+            (user_id, normalized_group, normalized),
         ).fetchone()
         if row:
-            conn.execute(
-                "UPDATE categories SET group_type = ? WHERE id = ? AND user_id = ?",
-                (normalized_group, row["id"], user_id),
-            )
             return row["id"]
         cursor = conn.execute(
             "INSERT INTO categories (user_id, name, group_type) VALUES (?, ?, ?)",
