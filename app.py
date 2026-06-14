@@ -50,6 +50,7 @@ from financeiro.transactions import (
     delete_transaction,
     get_exchange_rate_to_brl,
     list_transactions,
+    set_transaction_reconciled,
 )
 
 ROOT = Path(__file__).resolve().parent
@@ -132,6 +133,9 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def do_PUT(self) -> None:
         path = self.route_path()
+        if path.startswith("/api/transactions/") and path.endswith("/reconciliation"):
+            self.handle_reconcile_transaction()
+            return
         if path.startswith("/api/checking-accounts/"):
             self.handle_update_account()
             return
@@ -247,7 +251,9 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def handle_list_categories(self) -> None:
         user = self.require_user()
-        self.send_json({"categories": list_categories(user["id"])})
+        query = parse_qs(urlsplit(self.path).query)
+        group_type = (query.get("group") or [None])[0]
+        self.send_json({"categories": list_categories(user["id"], group_type)})
 
     def handle_list_tags(self) -> None:
         user = self.require_user()
@@ -265,10 +271,17 @@ class AppHandler(BaseHTTPRequestHandler):
         transaction = create_transaction(user["id"], data)
         self.send_json({"transaction": transaction}, status=HTTPStatus.CREATED)
 
+    def handle_reconcile_transaction(self) -> None:
+        user = self.require_user()
+        transaction_id = self.path.split("?", 1)[0].split("/")[-2]
+        data = self.read_json()
+        transaction = set_transaction_reconciled(user["id"], transaction_id, bool(data.get("reconciled")))
+        self.send_json({"transaction": transaction})
+
     def handle_create_category(self) -> None:
         user = self.require_user()
         data = self.read_json()
-        category = create_category(user["id"], data.get("name", ""))
+        category = create_category(user["id"], data.get("name", ""), data.get("group_type", "expense"))
         self.send_json({"category": category}, status=HTTPStatus.CREATED)
 
     def handle_create_subcategory(self) -> None:

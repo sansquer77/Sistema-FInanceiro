@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from http import HTTPStatus
 import json
+from uuid import uuid4
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -12,6 +13,8 @@ from financeiro.categories import ClassificationError, get_or_create_category, g
 from financeiro.database import get_connection, row_to_dict
 
 TRANSACTION_TYPES = {"income", "expense", "transfer"}
+SERIES_KINDS = {"single", "installment", "recurring"}
+RECURRENCE_FREQUENCIES = {"weekly", "monthly", "quarterly", "semiannual", "annual"}
 EXCHANGE_RATE_SCALE = Decimal("1000000")
 FRANKFURTER_RATE_URL = "https://api.frankfurter.dev/v2/rate/{base}/BRL"
 
@@ -66,6 +69,7 @@ def list_transactions(user_id: int) -> list[dict]:
 
 def create_transaction(user_id: int, data: dict) -> dict:
     transaction = normalize_transaction_payload(data)
+    occurrences = build_transaction_occurrences(transaction)
     with get_connection() as conn:
         source = get_active_account(conn, user_id, transaction["account_id"])
         destination = None
@@ -77,36 +81,48 @@ def create_transaction(user_id: int, data: dict) -> dict:
                 raise TransactionError("Transferencias exigem contas com a mesma moeda.")
         exchange_rate_micros = resolve_exchange_rate_micros(source["currency"], transaction["date"], transaction["exchange_rate"])
         amount_brl_cents = convert_to_brl_cents(transaction["amount_cents"], exchange_rate_micros)
-        category_id = get_or_create_category(conn, user_id, transaction["category"])
+        category_group_type = transaction_category_group(transaction["type"], destination)
+        category_id = get_or_create_category(conn, user_id, transaction["category"], category_group_type)
         subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
         tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
-        apply_balance_delta(conn, source["id"], balance_delta(transaction["type"], transaction["amount_cents"], "source"))
-        if destination:
-            apply_balance_delta(conn, destination["id"], balance_delta(transaction["type"], transaction["amount_cents"], "destination"))
-        cursor = conn.execute(
-            """
-            INSERT INTO transactions (
-                user_id, type, description, amount_cents, exchange_rate_micros, amount_brl_cents, date, account_id,
-                destination_account_id, category_id, subcategory_id, notes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                user_id,
-                transaction["type"],
-                transaction["description"],
-                transaction["amount_cents"],
-                exchange_rate_micros,
-                amount_brl_cents,
-                transaction["date"],
-                source["id"],
-                destination["id"] if destination else None,
-                category_id,
-                subcategory_id,
-                transaction["notes"],
-            ),
-        )
-        replace_transaction_tags(conn, cursor.lastrowid, tag_ids)
-        row = fetch_transaction(conn, user_id, cursor.lastrowid)
+        first_transaction_id = None
+        series_id = str(uuid4()) if transaction["series_kind"] != "single" else None
+        for occurrence in occurrences:
+            apply_balance_delta(conn, source["id"], balance_delta(transaction["type"], transaction["amount_cents"], "source"))
+            if destination:
+                apply_balance_delta(conn, destination["id"], balance_delta(transaction["type"], transaction["amount_cents"], "destination"))
+            cursor = conn.execute(
+                """
+                INSERT INTO transactions (
+                    user_id, type, description, amount_cents, exchange_rate_micros, amount_brl_cents, date, account_id,
+                    destination_account_id, category_id, subcategory_id, series_id, series_kind, installment_index,
+                    installment_count, recurrence_frequency, notes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    user_id,
+                    transaction["type"],
+                    occurrence["description"],
+                    transaction["amount_cents"],
+                    exchange_rate_micros,
+                    amount_brl_cents,
+                    occurrence["date"],
+                    source["id"],
+                    destination["id"] if destination else None,
+                    category_id,
+                    subcategory_id,
+                    series_id,
+                    transaction["series_kind"],
+                    occurrence["installment_index"],
+                    occurrence["installment_count"],
+                    transaction["recurrence_frequency"],
+                    transaction["notes"],
+                ),
+            )
+            if first_transaction_id is None:
+                first_transaction_id = cursor.lastrowid
+            replace_transaction_tags(conn, cursor.lastrowid, tag_ids)
+        row = fetch_transaction(conn, user_id, first_transaction_id)
     return format_transaction(row)
 
 
@@ -138,6 +154,23 @@ def delete_transaction(user_id: int, transaction_id: str) -> None:
         )
 
 
+def set_transaction_reconciled(user_id: int, transaction_id: str, reconciled: bool) -> dict:
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            UPDATE transactions
+            SET reconciled_at = CASE WHEN ? THEN CURRENT_TIMESTAMP ELSE NULL END,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND user_id = ? AND archived_at IS NULL
+            """,
+            (1 if reconciled else 0, transaction_id, user_id),
+        )
+        if cursor.rowcount == 0:
+            raise TransactionError("Lancamento nao encontrado.", HTTPStatus.NOT_FOUND)
+        row = fetch_transaction(conn, user_id, int(transaction_id))
+    return format_transaction(row)
+
+
 def normalize_transaction_payload(data: dict) -> dict:
     transaction_type = str(data.get("type", "")).strip().lower()
     description = str(data.get("description", "")).strip()
@@ -165,7 +198,98 @@ def normalize_transaction_payload(data: dict) -> dict:
         "subcategory": normalize_optional_name(data.get("subcategory")),
         "tags": normalize_tags(data.get("tags") or data.get("tag")),
         "notes": empty_to_none(data.get("notes")),
+        **normalize_series_payload(data),
     }
+
+
+def normalize_series_payload(data: dict) -> dict:
+    series_kind = str(data.get("series_kind") or data.get("payment_mode") or "single").strip().lower()
+    if series_kind not in SERIES_KINDS:
+        raise TransactionError("Tipo de repeticao invalido.")
+    installment_count = None
+    recurrence_frequency = None
+    recurrence_count = None
+    if series_kind == "installment":
+        installment_count = normalize_count(data.get("installment_count"), "Informe a quantidade de parcelas.", maximum=120)
+    if series_kind == "recurring":
+        recurrence_frequency = str(data.get("recurrence_frequency", "")).strip().lower()
+        if recurrence_frequency not in RECURRENCE_FREQUENCIES:
+            raise TransactionError("Informe a frequencia da recorrencia.")
+        recurrence_count = normalize_count(data.get("recurrence_count"), "Informe a quantidade de ocorrencias.", maximum=240)
+    return {
+        "series_kind": series_kind,
+        "installment_count": installment_count,
+        "recurrence_frequency": recurrence_frequency,
+        "recurrence_count": recurrence_count,
+    }
+
+
+def normalize_count(value: object, message: str, maximum: int) -> int:
+    try:
+        count = int(str(value or "").strip())
+    except ValueError as exc:
+        raise TransactionError(message) from exc
+    if count < 2:
+        raise TransactionError(message)
+    if count > maximum:
+        raise TransactionError("Quantidade de repeticoes muito alta.")
+    return count
+
+
+def build_transaction_occurrences(transaction: dict) -> list[dict]:
+    start_date = date.fromisoformat(transaction["date"])
+    if transaction["series_kind"] == "installment":
+        return [
+            {
+                "date": add_months(start_date, index).isoformat(),
+                "description": f"{transaction['description']} ({index + 1}/{transaction['installment_count']})",
+                "installment_index": index + 1,
+                "installment_count": transaction["installment_count"],
+            }
+            for index in range(transaction["installment_count"])
+        ]
+    if transaction["series_kind"] == "recurring":
+        return [
+            {
+                "date": add_recurrence(start_date, transaction["recurrence_frequency"], index).isoformat(),
+                "description": transaction["description"],
+                "installment_index": None,
+                "installment_count": transaction["recurrence_count"],
+            }
+            for index in range(transaction["recurrence_count"])
+        ]
+    return [{
+        "date": transaction["date"],
+        "description": transaction["description"],
+        "installment_index": None,
+        "installment_count": None,
+    }]
+
+
+def add_recurrence(start_date: date, frequency: str, index: int) -> date:
+    if frequency == "weekly":
+        return start_date + timedelta(days=7 * index)
+    months = {
+        "monthly": 1,
+        "quarterly": 3,
+        "semiannual": 6,
+        "annual": 12,
+    }[frequency]
+    return add_months(start_date, months * index)
+
+
+def add_months(start_date: date, months: int) -> date:
+    target_month = start_date.month - 1 + months
+    year = start_date.year + target_month // 12
+    month = target_month % 12 + 1
+    day = min(start_date.day, days_in_month(year, month))
+    return date(year, month, day)
+
+
+def days_in_month(year: int, month: int) -> int:
+    if month == 12:
+        return 31
+    return (date(year, month + 1, 1) - timedelta(days=1)).day
 
 
 def normalize_id(value: object, message: str) -> int:
@@ -189,7 +313,7 @@ def normalize_date(value: object) -> str:
 def get_active_account(conn, user_id: int, account_id: int):
     account = conn.execute(
         """
-        SELECT id, currency
+        SELECT id, currency, account_type
         FROM checking_accounts
         WHERE id = ? AND user_id = ? AND archived_at IS NULL
         """,
@@ -252,6 +376,14 @@ def micros_to_rate(micros: int) -> str:
 def convert_to_brl_cents(amount_cents: int, exchange_rate_micros: int) -> int:
     amount = Decimal(amount_cents) * Decimal(exchange_rate_micros) / EXCHANGE_RATE_SCALE
     return int(amount.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
+def transaction_category_group(transaction_type: str, destination) -> str:
+    if transaction_type == "income":
+        return "income"
+    if transaction_type == "transfer" and destination and destination["account_type"] == "investment":
+        return "investment"
+    return "expense"
 
 
 def balance_delta(transaction_type: str, amount_cents: int, side: str) -> int:

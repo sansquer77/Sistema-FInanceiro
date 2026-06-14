@@ -125,9 +125,25 @@
 
             <section class="panel">
               <div class="section-heading">
-                <h2>Últimos lançamentos</h2>
+                <h2>Planejamento do mês</h2>
               </div>
-              <div class="transaction-list compact-list" id="recentTransactionList"></div>
+              <div class="planning-list" id="monthlyPlanningList"></div>
+            </section>
+          </div>
+
+          <div class="cockpit-grid analytics-grid">
+            <section class="panel">
+              <div class="section-heading">
+                <h2>Maiores despesas do mês</h2>
+              </div>
+              <div class="chart-panel" id="topExpensesChart"></div>
+            </section>
+
+            <section class="panel">
+              <div class="section-heading">
+                <h2>Distribuição do caixa mensal</h2>
+              </div>
+              <div class="chart-panel" id="cashDistributionChart"></div>
             </section>
           </div>
         </section>
@@ -227,6 +243,32 @@
                     <select name="account_id" id="transactionAccount" required></select>
                   </label>
                 </div>
+                <div class="field-row">
+                  <label>Repetição
+                    <select name="series_kind" id="seriesKind">
+                      <option value="single">À vista</option>
+                      <option value="installment">Parcelado</option>
+                      <option value="recurring">Recorrente</option>
+                    </select>
+                  </label>
+                  <label id="installmentCountLabel" hidden>Parcelas
+                    <input name="installment_count" id="installmentCount" type="number" min="2" max="120" value="2">
+                  </label>
+                </div>
+                <div class="field-row" id="recurrenceFields" hidden>
+                  <label>Frequência
+                    <select name="recurrence_frequency" id="recurrenceFrequency">
+                      <option value="weekly">Semanal</option>
+                      <option value="monthly">Mensal</option>
+                      <option value="quarterly">Trimestral</option>
+                      <option value="semiannual">Semestral</option>
+                      <option value="annual">Anual</option>
+                    </select>
+                  </label>
+                  <label>Ocorrências
+                    <input name="recurrence_count" id="recurrenceCount" type="number" min="2" max="240" value="12">
+                  </label>
+                </div>
                 <label id="destinationAccountLabel" hidden>Conta de destino
                   <select name="destination_account_id" id="destinationAccount"></select>
                 </label>
@@ -235,10 +277,10 @@
                 </label>
                 <div class="field-row">
                   <label>Categoria
-                    <input name="category" type="text" placeholder="Ex.: Alimentação" required>
+                    <select name="category" id="transactionCategory" required></select>
                   </label>
                   <label>Subcategoria
-                    <input name="subcategory" type="text" placeholder="Ex.: Mercado, Luz, Gás">
+                    <select name="subcategory" id="transactionSubcategory"></select>
                   </label>
                 </div>
                 <div class="field-row">
@@ -257,7 +299,25 @@
             <section class="panel">
               <div class="section-heading">
                 <h2>Lançamentos</h2>
+                <div class="month-navigator">
+                  <button class="ghost small-button" type="button" id="previousMonthButton">Anterior</button>
+                  <strong id="transactionMonthLabel"></strong>
+                  <button class="ghost small-button" type="button" id="nextMonthButton">Próximo</button>
+                </div>
               </div>
+              <div class="month-balance-summary">
+                <div>
+                  <span>Saldo atual</span>
+                  <strong id="currentBalanceSummary">R$ 0,00</strong>
+                </div>
+                <div>
+                  <span>Saldo previsto</span>
+                  <strong id="forecastBalanceSummary">R$ 0,00</strong>
+                </div>
+              </div>
+              <label class="transaction-search">Buscar lançamento
+                <input id="transactionSearch" type="search" placeholder="Descrição, conta, categoria, tag...">
+              </label>
               <div class="transaction-list" id="transactionList"></div>
             </section>
           </div>
@@ -267,7 +327,15 @@
           <div class="classification-grid">
             <section class="panel">
               <h2>Categorias</h2>
+              <label class="classification-group-selector">Grupo
+                <select id="categoryGroup">
+                  <option value="expense">Despesas</option>
+                  <option value="income">Receitas</option>
+                  <option value="investment">Investimentos</option>
+                </select>
+              </label>
               <form id="categoryForm" class="form inline-form">
+                <input name="group_type" type="hidden" value="expense">
                 <input name="name" type="text" placeholder="Nova categoria" required>
                 <button class="primary" type="submit">Adicionar</button>
               </form>

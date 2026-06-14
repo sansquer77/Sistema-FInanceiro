@@ -64,6 +64,7 @@ def initialize_database() -> None:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 name TEXT NOT NULL,
+                group_type TEXT NOT NULL DEFAULT 'expense' CHECK (group_type IN ('income', 'expense', 'investment')),
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE (user_id, name)
             );
@@ -99,6 +100,12 @@ def initialize_database() -> None:
                 category_id INTEGER REFERENCES categories(id),
                 subcategory_id INTEGER REFERENCES subcategories(id),
                 tag_id INTEGER REFERENCES tags(id),
+                series_id TEXT,
+                series_kind TEXT NOT NULL DEFAULT 'single',
+                installment_index INTEGER,
+                installment_count INTEGER,
+                recurrence_frequency TEXT,
+                reconciled_at TEXT,
                 notes TEXT,
                 archived_at TEXT,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -132,7 +139,14 @@ def initialize_database() -> None:
         ensure_column(conn, "transactions", "tag_id", "INTEGER REFERENCES tags(id)")
         ensure_column(conn, "transactions", "exchange_rate_micros", "INTEGER NOT NULL DEFAULT 1000000")
         ensure_column(conn, "transactions", "amount_brl_cents", "INTEGER NOT NULL DEFAULT 0")
+        ensure_column(conn, "transactions", "series_id", "TEXT")
+        ensure_column(conn, "transactions", "series_kind", "TEXT NOT NULL DEFAULT 'single'")
+        ensure_column(conn, "transactions", "installment_index", "INTEGER")
+        ensure_column(conn, "transactions", "installment_count", "INTEGER")
+        ensure_column(conn, "transactions", "recurrence_frequency", "TEXT")
+        ensure_column(conn, "transactions", "reconciled_at", "TEXT")
         ensure_column(conn, "checking_accounts", "account_type", "TEXT NOT NULL DEFAULT 'liquidity'")
+        ensure_column(conn, "categories", "group_type", "TEXT NOT NULL DEFAULT 'expense'")
         migrate_transaction_tags(conn)
         migrate_transaction_brl_values(conn)
 

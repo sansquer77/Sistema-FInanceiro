@@ -65,7 +65,8 @@ def import_organizze_transactions(user_id: int, account_id: object, file_bytes: 
                 message = getattr(exc, "message", "Nao foi possivel consolidar o valor em reais.")
                 skipped.append({"row": raw["row"], "description": raw.get("description", ""), "reason": message})
                 continue
-            category_id = get_or_create_category(conn, user_id, transaction["category"])
+            category_group = "income" if transaction["type"] == "income" else "expense"
+            category_id = get_or_create_category(conn, user_id, transaction["category"], category_group)
             subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
             tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
             apply_balance_delta(

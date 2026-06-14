@@ -5,6 +5,19 @@ from http import HTTPStatus
 from financeiro.database import get_connection
 from financeiro.database import row_to_dict
 
+GROUP_TYPES = {"income", "expense", "investment"}
+GROUP_ALIASES = {
+    "receita": "income",
+    "receitas": "income",
+    "income": "income",
+    "despesa": "expense",
+    "despesas": "expense",
+    "expense": "expense",
+    "investimento": "investment",
+    "investimentos": "investment",
+    "investment": "investment",
+}
+
 
 class ClassificationError(Exception):
     def __init__(self, message: str, status: HTTPStatus = HTTPStatus.BAD_REQUEST) -> None:
@@ -13,8 +26,8 @@ class ClassificationError(Exception):
         super().__init__(message)
 
 
-def get_or_create_category(conn, user_id: int, name: str) -> int:
-    return get_or_create_named_item(conn, "categories", user_id, name, "Informe a categoria.")
+def get_or_create_category(conn, user_id: int, name: str, group_type: object = "expense") -> int:
+    return get_or_create_named_item(conn, "categories", user_id, name, "Informe a categoria.", group_type)
 
 
 def get_or_create_subcategory(conn, user_id: int, category_id: int, name: str | None) -> int | None:
@@ -46,16 +59,16 @@ def get_or_create_tag(conn, user_id: int, name: str) -> int:
     return get_or_create_named_item(conn, "tags", user_id, name, "Informe a tag.")
 
 
-def list_categories(user_id: int) -> list[dict]:
-    return list_named_items("categories", user_id)
+def list_categories(user_id: int, group_type: object | None = None) -> list[dict]:
+    return list_named_items("categories", user_id, group_type)
 
 
 def list_tags(user_id: int) -> list[dict]:
     return list_named_items("tags", user_id)
 
 
-def create_category(user_id: int, name: str) -> dict:
-    return create_named_item("categories", user_id, name, "Informe a categoria.")
+def create_category(user_id: int, name: str, group_type: object = "expense") -> dict:
+    return create_named_item("categories", user_id, name, "Informe a categoria.", group_type)
 
 
 def create_subcategory(user_id: int, category_id: object, name: str) -> dict:
@@ -148,8 +161,13 @@ def delete_tag(user_id: int, item_id: str) -> None:
     delete_named_item("tags", user_id, item_id)
 
 
-def list_named_items(table: str, user_id: int) -> list[dict]:
+def list_named_items(table: str, user_id: int, group_type: object | None = None) -> list[dict]:
     ensure_allowed_table(table)
+    normalized_group = normalize_group_type(group_type, required=False) if table == "categories" else None
+    category_group_filter = "AND items.group_type = ?" if normalized_group else ""
+    params = [user_id, user_id]
+    if normalized_group:
+        params.append(normalized_group)
     usage_sql = {
         "categories": """
             SELECT COUNT(*) FROM transactions
@@ -168,13 +186,14 @@ def list_named_items(table: str, user_id: int) -> list[dict]:
             SELECT
                 items.id,
                 items.name,
+                {"items.group_type," if table == "categories" else ""}
                 items.created_at,
                 ({usage_sql}) AS transaction_count
             FROM {table} AS items
-            WHERE items.user_id = ?
+            WHERE items.user_id = ? {category_group_filter}
             ORDER BY items.name COLLATE NOCASE
             """,
-            (user_id, user_id),
+            tuple(params),
         ).fetchall()
         items = [row_to_dict(row) for row in rows]
         if table == "categories":
@@ -212,11 +231,19 @@ def attach_subcategories(conn, user_id: int, categories: list[dict]) -> None:
         category["subcategories"] = by_category[category["id"]]
 
 
-def create_named_item(table: str, user_id: int, name: str, required_message: str) -> dict:
+def create_named_item(table: str, user_id: int, name: str, required_message: str, group_type: object = "expense") -> dict:
     ensure_allowed_table(table)
     normalized = normalize_name(name, required_message)
+    normalized_group = normalize_group_type(group_type) if table == "categories" else None
     try:
         with get_connection() as conn:
+            if table == "categories":
+                cursor = conn.execute(
+                    "INSERT INTO categories (user_id, name, group_type) VALUES (?, ?, ?)",
+                    (user_id, normalized, normalized_group),
+                )
+                row = conn.execute("SELECT * FROM categories WHERE id = ? AND user_id = ?", (cursor.lastrowid, user_id)).fetchone()
+                return row_to_dict(row)
             cursor = conn.execute(
                 f"INSERT INTO {table} (user_id, name) VALUES (?, ?)",
                 (user_id, normalized),
@@ -312,9 +339,26 @@ def fetch_subcategory(conn, user_id: int, subcategory_id: int) -> dict:
     return row_to_dict(row)
 
 
-def get_or_create_named_item(conn, table: str, user_id: int, name: str, required_message: str) -> int:
+def get_or_create_named_item(conn, table: str, user_id: int, name: str, required_message: str, group_type: object = "expense") -> int:
     ensure_allowed_table(table)
     normalized = normalize_name(name, required_message)
+    normalized_group = normalize_group_type(group_type) if table == "categories" else None
+    if table == "categories":
+        row = conn.execute(
+            "SELECT id FROM categories WHERE user_id = ? AND name = ?",
+            (user_id, normalized),
+        ).fetchone()
+        if row:
+            conn.execute(
+                "UPDATE categories SET group_type = ? WHERE id = ? AND user_id = ?",
+                (normalized_group, row["id"], user_id),
+            )
+            return row["id"]
+        cursor = conn.execute(
+            "INSERT INTO categories (user_id, name, group_type) VALUES (?, ?, ?)",
+            (user_id, normalized, normalized_group),
+        )
+        return cursor.lastrowid
     row = conn.execute(
         f"SELECT id FROM {table} WHERE user_id = ? AND name = ?",
         (user_id, normalized),
@@ -338,6 +382,16 @@ def normalize_name(name: object, required_message: str) -> str:
         raise ClassificationError(required_message)
     if len(normalized) > 80:
         raise ClassificationError("Categoria ou tag deve ter ate 80 caracteres.")
+    return normalized
+
+
+def normalize_group_type(value: object, required: bool = True) -> str | None:
+    raw = " ".join(str(value or "").strip().lower().split())
+    if not raw and not required:
+        return None
+    normalized = GROUP_ALIASES.get(raw, raw)
+    if normalized not in GROUP_TYPES:
+        raise ClassificationError("Grupo de categoria invalido.")
     return normalized
 
 

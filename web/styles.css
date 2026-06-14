@@ -157,6 +157,15 @@ textarea {
   background: #fff;
 }
 
+.field-row > label,
+.form > label {
+  min-width: 0;
+}
+
+.field-row:has(> [hidden]) {
+  grid-template-columns: 1fr;
+}
+
 textarea {
   resize: vertical;
 }
@@ -314,10 +323,123 @@ textarea:focus {
   margin-bottom: 0;
 }
 
+.analytics-grid {
+  margin-top: 18px;
+}
+
 .currency-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 10px;
+}
+
+.chart-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.donut-chart {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 210px;
+}
+
+.donut-chart svg {
+  width: min(210px, 70vw);
+  height: auto;
+  transform: rotate(-90deg);
+}
+
+.donut-chart circle {
+  transition: stroke-dasharray 0.2s ease;
+}
+
+.donut-center {
+  position: absolute;
+  display: grid;
+  gap: 4px;
+  text-align: center;
+}
+
+.donut-center span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.donut-center strong {
+  font-size: 18px;
+}
+
+.chart-list {
+  display: grid;
+  gap: 8px;
+}
+
+.chart-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 38px;
+  border-bottom: 1px solid var(--line);
+}
+
+.chart-row span {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  font-weight: 700;
+}
+
+.chart-row i {
+  width: 11px;
+  height: 11px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+}
+
+.chart-row strong {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.planning-list {
+  display: grid;
+  gap: 14px;
+}
+
+.planning-section {
+  display: grid;
+  gap: 8px;
+}
+
+.planning-section h3 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.planning-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 42px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.planning-row span {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.planning-row strong {
+  text-align: right;
 }
 
 .currency-item {
@@ -371,6 +493,10 @@ textarea:focus {
 .inline-form {
   grid-template-columns: 1fr auto;
   align-items: center;
+}
+
+.classification-group-selector {
+  margin: 12px 0 14px;
 }
 
 .subcategory-form {
@@ -533,6 +659,51 @@ textarea:focus {
   margin-bottom: 14px;
 }
 
+.month-navigator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.month-navigator strong {
+  min-width: 150px;
+  text-align: center;
+  text-transform: capitalize;
+}
+
+.month-balance-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.month-balance-summary > div {
+  display: grid;
+  gap: 5px;
+  min-height: 72px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+}
+
+.month-balance-summary span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.month-balance-summary strong {
+  font-size: 19px;
+}
+
+.transaction-search {
+  margin-bottom: 14px;
+}
+
 .section-heading h2,
 .account-form-panel h2 {
   margin-bottom: 0;
@@ -621,6 +792,47 @@ textarea:focus {
   text-align: right;
 }
 
+.transaction-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.reconcile-button {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.reconcile-button.active {
+  border-color: #0f9f6e;
+  background: #dcfce7;
+  color: #047857;
+}
+
+.daily-balance {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  padding: 2px 4px 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.daily-balance strong {
+  color: var(--accent-dark);
+  font-size: 16px;
+}
+
 .transaction-amount span {
   display: block;
   margin-bottom: 8px;
@@ -668,6 +880,7 @@ textarea:focus {
   .auth-panel,
   .workspace,
   .summary-strip,
+  .month-balance-summary,
   .cockpit-grid,
   .classification-grid,
   .import-summary,
@@ -690,6 +903,8 @@ textarea:focus {
   }
 
   .user-area,
+  .month-navigator,
+  .transaction-actions,
   .balance,
   .transaction-amount {
     justify-content: space-between;
