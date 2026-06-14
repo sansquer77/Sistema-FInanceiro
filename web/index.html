@@ -100,6 +100,7 @@
             <div class="nav-group">
               <span>Gestão</span>
               <button class="nav-button" type="button" data-view="limits">Limites</button>
+              <button class="nav-button" type="button" data-view="reports">Relatórios</button>
               <button class="nav-button" type="button" data-view="classifications">Categorias</button>
               <button class="nav-button" type="button" data-view="imports">Importação</button>
             </div>
@@ -367,8 +368,9 @@
 
           <div class="workspace card-transaction-workspace">
             <section class="panel">
-              <h2>Novo lançamento no cartão</h2>
+              <h2 id="cardTransactionFormTitle">Novo lançamento no cartão</h2>
               <form id="cardTransactionForm" class="form">
+                <input type="hidden" name="id">
                 <input type="hidden" name="credit_card_id">
                 <input type="hidden" name="invoice_month">
                 <div class="field-row">
@@ -399,7 +401,10 @@
                 <label>Observações
                   <textarea name="notes" rows="3"></textarea>
                 </label>
-                <button class="primary" type="submit">Salvar lançamento</button>
+                <div class="actions">
+                  <button class="primary" type="submit">Salvar lançamento</button>
+                  <button class="ghost" id="cancelCardTransactionEditButton" type="button" hidden>Cancelar</button>
+                </div>
               </form>
             </section>
 
@@ -415,8 +420,9 @@
         <section class="module-view" id="transactionsView" hidden>
           <div class="workspace">
             <section class="transaction-form-panel">
-              <h2>Novo lançamento</h2>
+              <h2 id="transactionFormTitle">Novo lançamento</h2>
               <form id="transactionForm" class="form">
+                <input type="hidden" name="id">
                 <div class="field-row">
                   <label>Tipo
                     <select name="type" id="transactionType">
@@ -483,13 +489,16 @@
                 </div>
                 <div class="field-row">
                   <label>Tag
-                    <input name="tags" type="text" placeholder="Ex.: Mercado, Cartão" required>
+                    <input name="tags" type="text" placeholder="Ex.: Mercado, Cartão">
                   </label>
                 </div>
                 <label>Observações
                   <textarea name="notes" rows="3"></textarea>
                 </label>
-                <button class="primary" type="submit">Salvar lançamento</button>
+                <div class="actions">
+                  <button class="primary" type="submit">Salvar lançamento</button>
+                  <button class="ghost" id="cancelTransactionEditButton" type="button" hidden>Cancelar</button>
+                </div>
               </form>
               <p class="message" id="transactionMessage" role="alert"></p>
             </section>
@@ -581,6 +590,53 @@
               <div class="spending-limit-list" id="spendingLimitList"></div>
             </section>
           </div>
+        </section>
+
+        <section class="module-view" id="reportsView" hidden>
+          <section class="panel">
+            <div class="section-heading">
+              <h2>Relatórios</h2>
+              <div class="month-navigator">
+                <button class="ghost small-button" type="button" id="previousReportMonthButton">Anterior</button>
+                <strong id="reportMonthLabel"></strong>
+                <button class="ghost small-button" type="button" id="nextReportMonthButton">Próximo</button>
+              </div>
+            </div>
+
+            <div class="report-tabs" role="tablist" aria-label="Relatórios financeiros">
+              <button class="report-tab active" type="button" data-report-tab="categories">Categorias</button>
+              <button class="report-tab" type="button" data-report-tab="cashflow">Entradas x Saídas</button>
+              <button class="report-tab" type="button" data-report-tab="accounts">Contas</button>
+              <button class="report-tab" type="button" data-report-tab="tags">Tags</button>
+            </div>
+
+            <div class="report-summary">
+              <div>
+                <span>Receitas</span>
+                <strong id="reportIncomeSummary">R$ 0,00</strong>
+              </div>
+              <div>
+                <span>Despesas</span>
+                <strong id="reportExpenseSummary">R$ 0,00</strong>
+              </div>
+              <div>
+                <span>Aportes</span>
+                <strong id="reportInvestmentSummary">R$ 0,00</strong>
+              </div>
+              <div>
+                <span>Resultado</span>
+                <strong id="reportResultSummary">R$ 0,00</strong>
+              </div>
+            </div>
+
+            <label class="report-account-filter" id="reportAccountFilter" hidden>Conta
+              <select id="reportAccountSelect"></select>
+            </label>
+          </section>
+
+          <section class="panel report-content-panel">
+            <div id="reportContent" class="report-content"></div>
+          </section>
         </section>
 
         <section class="module-view" id="classificationsView" hidden>

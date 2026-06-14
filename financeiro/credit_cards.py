@@ -94,6 +94,39 @@ def list_credit_card_invoice(user_id: int, card_id: object, month: object) -> di
     }
 
 
+def list_credit_card_transactions(user_id: int) -> list[dict]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                credit_card_transactions.*,
+                credit_cards.name AS credit_card_name,
+                credit_cards.issuer AS credit_card_issuer,
+                credit_cards.currency AS card_currency,
+                categories.name AS category_name,
+                subcategories.name AS subcategory_name
+            FROM credit_card_transactions
+            JOIN credit_cards
+                ON credit_cards.id = credit_card_transactions.credit_card_id
+                AND credit_cards.user_id = credit_card_transactions.user_id
+            LEFT JOIN categories
+                ON categories.id = credit_card_transactions.category_id
+                AND categories.user_id = credit_card_transactions.user_id
+            LEFT JOIN subcategories
+                ON subcategories.id = credit_card_transactions.subcategory_id
+                AND subcategories.user_id = credit_card_transactions.user_id
+            WHERE credit_card_transactions.user_id = ?
+                AND credit_card_transactions.archived_at IS NULL
+            ORDER BY credit_card_transactions.date DESC, credit_card_transactions.id DESC
+            """,
+            (user_id,),
+        ).fetchall()
+    return [
+        format_card_transaction(row_to_dict(row), row["card_currency"])
+        for row in rows
+    ]
+
+
 def create_credit_card(user_id: int, data: dict) -> dict:
     card = normalize_credit_card_payload(data)
     try:
@@ -153,6 +186,51 @@ def create_credit_card_transaction(user_id: int, data: dict) -> dict:
             ),
         )
         row = fetch_card_transaction(conn, user_id, cursor.lastrowid)
+    return format_card_transaction(row, card["currency"])
+
+
+def update_credit_card_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
+    normalized_id = normalize_card_id(transaction_id)
+    transaction = normalize_card_transaction_payload(data)
+    with get_connection() as conn:
+        existing = conn.execute(
+            """
+            SELECT credit_card_id, invoice_month
+            FROM credit_card_transactions
+            WHERE id = ? AND user_id = ? AND archived_at IS NULL
+            """,
+            (normalized_id, user_id),
+        ).fetchone()
+        if not existing:
+            raise CreditCardError("Lancamento do cartao nao encontrado.", HTTPStatus.NOT_FOUND)
+        ensure_invoice_is_open(conn, user_id, existing["credit_card_id"], existing["invoice_month"])
+        card = get_active_credit_card(conn, user_id, transaction["credit_card_id"])
+        if card["id"] != existing["credit_card_id"]:
+            raise CreditCardError("Nao e possivel mover lancamento entre cartoes.")
+        if transaction["invoice_month"] != existing["invoice_month"]:
+            raise CreditCardError("Nao e possivel mover lancamento entre faturas.")
+        category_id = get_or_create_category(conn, user_id, transaction["category"], transaction["type"])
+        subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
+        conn.execute(
+            """
+            UPDATE credit_card_transactions
+            SET type = ?, description = ?, amount_cents = ?, date = ?, category_id = ?,
+                subcategory_id = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND user_id = ? AND archived_at IS NULL
+            """,
+            (
+                transaction["type"],
+                transaction["description"],
+                transaction["amount_cents"],
+                transaction["date"],
+                category_id,
+                subcategory_id,
+                transaction["notes"],
+                normalized_id,
+                user_id,
+            ),
+        )
+        row = fetch_card_transaction(conn, user_id, normalized_id)
     return format_card_transaction(row, card["currency"])
 
 

@@ -6,6 +6,7 @@ const state = {
   archivedCreditCards: [],
   cardInvoiceTransactions: [],
   cardInvoicePayments: [],
+  cardTransactions: [],
   selectedCreditCardId: "",
   transactions: [],
   categories: [],
@@ -15,6 +16,9 @@ const state = {
   transactionMonth: new Date().toISOString().slice(0, 7),
   limitMonth: new Date().toISOString().slice(0, 7),
   cardInvoiceMonth: new Date().toISOString().slice(0, 7),
+  reportMonth: new Date().toISOString().slice(0, 7),
+  reportTab: "categories",
+  reportAccountId: "",
 };
 
 const authView = document.querySelector("#authView");
@@ -55,11 +59,14 @@ const cardPaymentDate = document.querySelector("#cardPaymentDate");
 const payCardInvoiceButton = document.querySelector("#payCardInvoiceButton");
 const cardInvoiceMessage = document.querySelector("#cardInvoiceMessage");
 const cardTransactionForm = document.querySelector("#cardTransactionForm");
+const cardTransactionFormTitle = document.querySelector("#cardTransactionFormTitle");
 const cardTransactionType = document.querySelector("#cardTransactionType");
 const cardTransactionCategory = document.querySelector("#cardTransactionCategory");
 const cardTransactionSubcategory = document.querySelector("#cardTransactionSubcategory");
 const cardInvoiceList = document.querySelector("#cardInvoiceList");
+const cancelCardTransactionEditButton = document.querySelector("#cancelCardTransactionEditButton");
 const transactionForm = document.querySelector("#transactionForm");
+const transactionFormTitle = document.querySelector("#transactionFormTitle");
 const transactionMessage = document.querySelector("#transactionMessage");
 const transactionList = document.querySelector("#transactionList");
 const categoryForm = document.querySelector("#categoryForm");
@@ -85,6 +92,17 @@ const spendingLimitList = document.querySelector("#spendingLimitList");
 const previousLimitMonthButton = document.querySelector("#previousLimitMonthButton");
 const nextLimitMonthButton = document.querySelector("#nextLimitMonthButton");
 const cancelLimitEditButton = document.querySelector("#cancelLimitEditButton");
+const reportMonthLabel = document.querySelector("#reportMonthLabel");
+const previousReportMonthButton = document.querySelector("#previousReportMonthButton");
+const nextReportMonthButton = document.querySelector("#nextReportMonthButton");
+const reportTabs = document.querySelectorAll("[data-report-tab]");
+const reportIncomeSummary = document.querySelector("#reportIncomeSummary");
+const reportExpenseSummary = document.querySelector("#reportExpenseSummary");
+const reportInvestmentSummary = document.querySelector("#reportInvestmentSummary");
+const reportResultSummary = document.querySelector("#reportResultSummary");
+const reportAccountFilter = document.querySelector("#reportAccountFilter");
+const reportAccountSelect = document.querySelector("#reportAccountSelect");
+const reportContent = document.querySelector("#reportContent");
 const importForm = document.querySelector("#importForm");
 const importAccount = document.querySelector("#importAccount");
 const importMessage = document.querySelector("#importMessage");
@@ -113,6 +131,7 @@ const exchangeRateLabel = document.querySelector("#exchangeRateLabel");
 const userName = document.querySelector("#userName");
 const logoutButton = document.querySelector("#logoutButton");
 const cancelEditButton = document.querySelector("#cancelEditButton");
+const cancelTransactionEditButton = document.querySelector("#cancelTransactionEditButton");
 const formTitle = document.querySelector("#formTitle");
 const moduleEyebrow = document.querySelector("#moduleEyebrow");
 const pageTitle = document.querySelector("#pageTitle");
@@ -138,6 +157,7 @@ const moduleViews = {
   cardLaunches: document.querySelector("#cardLaunchesView"),
   transactions: document.querySelector("#transactionsView"),
   limits: document.querySelector("#limitsView"),
+  reports: document.querySelector("#reportsView"),
   classifications: document.querySelector("#classificationsView"),
   imports: document.querySelector("#importsView"),
   user: document.querySelector("#userView"),
@@ -150,6 +170,7 @@ const viewTitles = {
   cardLaunches: ["Lançamentos", "Cartões"],
   transactions: ["Lançamentos", "Contas"],
   limits: ["Gestão", "Limite de gastos"],
+  reports: ["Gestão", "Relatórios"],
   classifications: ["Gestão", "Categorias e tags"],
   imports: ["Gestão", "Importação"],
   user: ["Usuário", "Preferências"],
@@ -195,10 +216,19 @@ previousMonthButton.addEventListener("click", () => shiftTransactionMonth(-1));
 nextMonthButton.addEventListener("click", () => shiftTransactionMonth(1));
 previousLimitMonthButton.addEventListener("click", () => shiftLimitMonth(-1));
 nextLimitMonthButton.addEventListener("click", () => shiftLimitMonth(1));
+previousReportMonthButton.addEventListener("click", () => shiftReportMonth(-1));
+nextReportMonthButton.addEventListener("click", () => shiftReportMonth(1));
+reportTabs.forEach((button) => button.addEventListener("click", () => switchReportTab(button.dataset.reportTab)));
+reportAccountSelect.addEventListener("change", () => {
+  state.reportAccountId = reportAccountSelect.value;
+  renderReports();
+});
 transactionSearch.addEventListener("input", renderTransactions);
 logoutButton.addEventListener("click", handleLogout);
 cancelEditButton.addEventListener("click", resetAccountForm);
+cancelTransactionEditButton.addEventListener("click", resetTransactionForm);
 cancelCreditCardEditButton.addEventListener("click", resetCreditCardForm);
+cancelCardTransactionEditButton.addEventListener("click", resetCardTransactionForm);
 cancelLimitEditButton.addEventListener("click", resetLimitForm);
 navButtons.forEach((button) => button.addEventListener("click", () => showModule(button.dataset.view)));
 
@@ -316,6 +346,7 @@ async function handleLogout() {
   state.archivedCreditCards = [];
   state.cardInvoiceTransactions = [];
   state.cardInvoicePayments = [];
+  state.cardTransactions = [];
   state.selectedCreditCardId = "";
   state.transactions = [];
   state.categories = [];
@@ -342,15 +373,17 @@ async function loadDashboard() {
 
 async function loadAll() {
   try {
-    const [accountsResponse, creditCardsResponse, transactionsResponse] = await Promise.all([
+    const [accountsResponse, creditCardsResponse, transactionsResponse, cardTransactionsResponse] = await Promise.all([
       api("/api/checking-accounts"),
       api("/api/credit-cards"),
       api("/api/transactions"),
+      api("/api/credit-card-transactions"),
     ]);
     state.accounts = accountsResponse.accounts;
     state.creditCards = creditCardsResponse.cards;
     ensureSelectedCreditCard();
     state.transactions = transactionsResponse.transactions;
+    state.cardTransactions = cardTransactionsResponse.transactions;
     await loadArchivedAccounts();
     await loadArchivedCreditCards();
     await loadClassifications();
@@ -363,6 +396,7 @@ async function loadAll() {
     state.archivedCreditCards = [];
     state.cardInvoiceTransactions = [];
     state.cardInvoicePayments = [];
+    state.cardTransactions = [];
     state.selectedCreditCardId = "";
     state.transactions = [];
     state.categories = [];
@@ -385,6 +419,7 @@ async function loadCreditCards() {
   state.creditCards = response.cards;
   ensureSelectedCreditCard();
   await loadArchivedCreditCards();
+  await loadCardTransactions();
   await loadCardInvoice();
   renderAll();
 }
@@ -400,15 +435,17 @@ async function loadArchivedCreditCards() {
 }
 
 async function loadTransactionsAndAccounts() {
-  const [accountsResponse, creditCardsResponse, transactionsResponse] = await Promise.all([
+  const [accountsResponse, creditCardsResponse, transactionsResponse, cardTransactionsResponse] = await Promise.all([
     api("/api/checking-accounts"),
     api("/api/credit-cards"),
     api("/api/transactions"),
+    api("/api/credit-card-transactions"),
   ]);
   state.accounts = accountsResponse.accounts;
   state.creditCards = creditCardsResponse.cards;
   ensureSelectedCreditCard();
   state.transactions = transactionsResponse.transactions;
+  state.cardTransactions = cardTransactionsResponse.transactions;
   await loadArchivedAccounts();
   await loadArchivedCreditCards();
   await loadClassifications();
@@ -442,6 +479,11 @@ async function loadCardInvoice() {
   state.cardInvoicePayments = response.payments || [];
 }
 
+async function loadCardTransactions() {
+  const response = await api("/api/credit-card-transactions");
+  state.cardTransactions = response.transactions || [];
+}
+
 function ensureSelectedCreditCard() {
   if (state.creditCards.some((card) => String(card.id) === String(state.selectedCreditCardId))) {
     return;
@@ -462,6 +504,9 @@ function showModule(view) {
   }
   if (view === "limits") {
     renderLimits();
+  }
+  if (view === "reports") {
+    renderReports();
   }
   if (view === "creditCards") {
     renderCreditCards();
@@ -527,12 +572,17 @@ async function handleCardTransactionSubmit(event) {
   const data = formData(cardTransactionForm);
   data.credit_card_id = state.selectedCreditCardId;
   data.invoice_month = state.cardInvoiceMonth;
+  const isEditing = Boolean(data.id);
   try {
-    await api("/api/credit-card-transactions", { method: "POST", body: data });
+    await api(isEditing ? `/api/credit-card-transactions/${data.id}` : "/api/credit-card-transactions", {
+      method: isEditing ? "PUT" : "POST",
+      body: data,
+    });
     resetCardTransactionForm();
     await loadCardInvoice();
+    await loadCardTransactions();
     renderCreditCards();
-    setMessage(cardInvoiceMessage, "Lançamento do cartão salvo.", "success");
+    setMessage(cardInvoiceMessage, isEditing ? "Lançamento do cartão atualizado." : "Lançamento do cartão salvo.", "success");
   } catch (error) {
     setMessage(cardInvoiceMessage, error.message, "error");
   }
@@ -569,13 +619,25 @@ async function handleTransactionSubmit(event) {
     if (data.type !== "transfer") {
       delete data.destination_account_id;
     }
-    await api("/api/transactions", { method: "POST", body: data });
+    const isEditing = Boolean(data.id);
+    if (isEditing && shouldAskFutureReplication(data.id)) {
+      data.apply_to_future = window.confirm("Replicar esta alteração nos próximos lançamentos recorrentes desta série?");
+    }
+    await api(isEditing ? `/api/transactions/${data.id}` : "/api/transactions", {
+      method: isEditing ? "PUT" : "POST",
+      body: data,
+    });
     resetTransactionForm();
     await loadTransactionsAndAccounts();
-    setMessage(transactionMessage, "Lançamento salvo.", "success");
+    setMessage(transactionMessage, isEditing ? "Lançamento atualizado." : "Lançamento salvo.", "success");
   } catch (error) {
     setMessage(transactionMessage, error.message, "error");
   }
+}
+
+function shouldAskFutureReplication(transactionId) {
+  const transaction = state.transactions.find((entry) => String(entry.id) === String(transactionId));
+  return Boolean(transaction && transaction.series_id && transaction.series_kind === "recurring");
 }
 
 async function handleImportSubmit(event) {
@@ -846,6 +908,7 @@ async function deleteCardTransaction(id) {
   try {
     await api(`/api/credit-card-transactions/${id}`, { method: "DELETE" });
     await loadCardInvoice();
+    await loadCardTransactions();
     renderCreditCards();
     setMessage(cardInvoiceMessage, "Lançamento do cartão excluído.", "success");
   } catch (error) {
@@ -860,6 +923,7 @@ async function toggleCardTransactionReconciliation(id, reconciled) {
       body: { reconciled },
     });
     await loadCardInvoice();
+    await loadCardTransactions();
     renderCreditCards();
   } catch (error) {
     setMessage(cardInvoiceMessage, error.message, "error");
@@ -938,9 +1002,13 @@ function resetCreditCardForm() {
 
 function resetCardTransactionForm() {
   cardTransactionForm.reset();
+  cardTransactionForm.elements.id.value = "";
   cardTransactionForm.elements.date.value = new Date().toISOString().slice(0, 10);
   cardTransactionForm.elements.credit_card_id.value = state.selectedCreditCardId;
   cardTransactionForm.elements.invoice_month.value = state.cardInvoiceMonth;
+  cardTransactionFormTitle.textContent = "Novo lançamento no cartão";
+  cancelCardTransactionEditButton.hidden = true;
+  cardTransactionForm.querySelector('button[type="submit"]').textContent = "Salvar lançamento";
   renderCardTransactionCategories();
 }
 
@@ -961,12 +1029,73 @@ function updateAccountTypeState() {
 
 function resetTransactionForm() {
   transactionForm.reset();
+  transactionForm.elements.id.value = "";
   transactionForm.elements.date.value = new Date().toISOString().slice(0, 10);
   installmentCount.value = "2";
   recurrenceFrequency.value = "monthly";
   recurrenceCount.value = "12";
+  transactionFormTitle.textContent = "Novo lançamento";
+  cancelTransactionEditButton.hidden = true;
+  transactionForm.querySelector('button[type="submit"]').textContent = "Salvar lançamento";
+  seriesKind.disabled = false;
   updateSeriesState();
   updateTransactionTypeState();
+}
+
+function editTransaction(transaction) {
+  setMessage(transactionMessage, "");
+  transactionForm.elements.id.value = transaction.id;
+  transactionType.value = isInvestmentTransfer(transaction) ? "investment" : transaction.type;
+  transactionForm.elements.date.value = transaction.date;
+  transactionForm.elements.description.value = transaction.description;
+  transactionForm.elements.amount.value = moneyInputValue(transaction.amount);
+  transactionAccount.value = String(transaction.account_id);
+  transactionForm.elements.notes.value = transaction.notes || "";
+  transactionForm.elements.tags.value = (transaction.tags || []).join(", ");
+  transactionForm.elements.exchange_rate_to_brl.value = (transaction.exchange_rate_to_brl || "1.000000").replace(".", ",");
+  seriesKind.value = "single";
+  seriesKind.disabled = true;
+  updateSeriesState();
+  updateTransactionTypeState();
+  if (transaction.destination_account_id) {
+    destinationAccount.value = String(transaction.destination_account_id);
+  }
+  renderTransactionCategories();
+  if (transaction.category_name) {
+    transactionCategory.value = transaction.category_name;
+  }
+  renderTransactionSubcategories();
+  if (transaction.subcategory_name) {
+    transactionSubcategory.value = transaction.subcategory_name;
+  }
+  transactionFormTitle.textContent = "Editar lançamento";
+  cancelTransactionEditButton.hidden = false;
+  transactionForm.querySelector('button[type="submit"]').textContent = "Salvar alterações";
+  transactionForm.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function editCardTransaction(transaction) {
+  setMessage(cardInvoiceMessage, "");
+  cardTransactionForm.elements.id.value = transaction.id;
+  cardTransactionForm.elements.credit_card_id.value = transaction.credit_card_id;
+  cardTransactionForm.elements.invoice_month.value = transaction.invoice_month;
+  cardTransactionType.value = transaction.type;
+  cardTransactionForm.elements.date.value = transaction.date;
+  cardTransactionForm.elements.description.value = transaction.description;
+  cardTransactionForm.elements.amount.value = moneyInputValue(transaction.amount);
+  cardTransactionForm.elements.notes.value = transaction.notes || "";
+  renderCardTransactionCategories();
+  if (transaction.category_name) {
+    cardTransactionCategory.value = transaction.category_name;
+  }
+  renderCardTransactionSubcategories();
+  if (transaction.subcategory_name) {
+    cardTransactionSubcategory.value = transaction.subcategory_name;
+  }
+  cardTransactionFormTitle.textContent = "Editar lançamento no cartão";
+  cancelCardTransactionEditButton.hidden = false;
+  cardTransactionForm.querySelector('button[type="submit"]').textContent = "Salvar alterações";
+  cardTransactionForm.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function renderAll() {
@@ -978,6 +1107,7 @@ function renderAll() {
   renderTransactions();
   renderClassifications();
   renderLimits();
+  renderReports();
 }
 
 function renderCockpit() {
@@ -1293,6 +1423,7 @@ function renderCardInvoiceList(card) {
         <strong>${sign}${formatMoney(transaction.amount, card.currency)}</strong>
         ${state.cardInvoicePayments.length ? "" : `
           <div class="transaction-actions">
+            <button class="ghost small-button" type="button" data-card-edit-id="${transaction.id}">Editar</button>
             <button class="reconcile-button ${isReconciled ? "active" : ""}" type="button" data-card-reconcile-id="${transaction.id}" data-reconciled="${isReconciled}" title="${isReconciled ? "Desmarcar conciliação" : "Marcar como conciliado"}">OK</button>
             <button class="danger small-button" type="button" data-card-transaction-id="${transaction.id}">Excluir</button>
           </div>
@@ -1300,6 +1431,10 @@ function renderCardInvoiceList(card) {
       </div>
     `;
     const reconcileButton = item.querySelector("[data-card-reconcile-id]");
+    const editButton = item.querySelector("[data-card-edit-id]");
+    if (editButton) {
+      editButton.addEventListener("click", () => editCardTransaction(transaction));
+    }
     if (reconcileButton) {
       reconcileButton.addEventListener("click", () => toggleCardTransactionReconciliation(
         reconcileButton.dataset.cardReconcileId,
@@ -1483,6 +1618,271 @@ function renderLimits() {
   renderSpendingLimitList();
 }
 
+function renderReports() {
+  reportMonthLabel.textContent = formatMonthLabel(state.reportMonth);
+  reportTabs.forEach((button) => button.classList.toggle("active", button.dataset.reportTab === state.reportTab));
+  renderReportAccountOptions();
+  const items = reportItemsForMonth(state.reportMonth);
+  const totals = reportTotals(items);
+  reportIncomeSummary.textContent = formatMoney(totals.income, "BRL");
+  reportExpenseSummary.textContent = formatMoney(totals.expense, "BRL");
+  reportInvestmentSummary.textContent = formatMoney(totals.investment, "BRL");
+  reportResultSummary.textContent = formatMoney(totals.income - totals.expense - totals.investment, "BRL");
+  reportResultSummary.classList.toggle("danger-text", totals.income - totals.expense - totals.investment < 0);
+  reportAccountFilter.hidden = state.reportTab !== "accounts";
+  if (state.reportTab === "cashflow") {
+    renderCashflowReport(items);
+    return;
+  }
+  if (state.reportTab === "accounts") {
+    renderAccountsReport();
+    return;
+  }
+  if (state.reportTab === "tags") {
+    renderTagsReport(items);
+    return;
+  }
+  renderCategoriesReport(items);
+}
+
+function renderReportAccountOptions() {
+  const options = state.accounts.map((account) => (
+    `<option value="${account.id}">${escapeHtml(account.name)} (${escapeHtml(account.currency)})</option>`
+  )).join("");
+  reportAccountSelect.innerHTML = options || '<option value="">Cadastre uma conta</option>';
+  reportAccountSelect.disabled = state.accounts.length === 0;
+  if (!state.accounts.some((account) => String(account.id) === String(state.reportAccountId))) {
+    state.reportAccountId = state.accounts[0] ? String(state.accounts[0].id) : "";
+  }
+  reportAccountSelect.value = state.reportAccountId;
+}
+
+function renderCategoriesReport(items) {
+  const sections = [
+    ["Despesas", "expense"],
+    ["Receitas", "income"],
+    ["Investimentos", "investment"],
+  ];
+  reportContent.innerHTML = sections.map(([title, type]) => (
+    reportRankedSection(title, groupReportItems(items.filter((item) => item.reportType === type), "category"), `Nenhum item em ${title.toLowerCase()} neste mês.`)
+  )).join("");
+}
+
+function renderTagsReport(items) {
+  const taggedItems = [];
+  for (const item of items) {
+    for (const tag of item.tags) {
+      taggedItems.push({ ...item, tag });
+    }
+  }
+  const sections = [
+    ["Despesas", "expense"],
+    ["Receitas", "income"],
+    ["Investimentos", "investment"],
+  ];
+  reportContent.innerHTML = sections.map(([title, type]) => (
+    reportRankedSection(title, groupReportItems(taggedItems.filter((item) => item.reportType === type), "tag"), `Nenhuma tag em ${title.toLowerCase()} neste mês.`)
+  )).join("");
+}
+
+function renderCashflowReport(items) {
+  const rows = monthDayRows(state.reportMonth).map((dateKey) => {
+    const dayItems = items.filter((item) => item.date === dateKey);
+    const income = sumReportItems(dayItems, "income");
+    const expense = sumReportItems(dayItems, "expense");
+    const investment = sumReportItems(dayItems, "investment");
+    return {
+      date: dateKey,
+      income,
+      expense,
+      investment,
+      result: income - expense - investment,
+    };
+  });
+  let running = 0;
+  const body = rows.map((row) => {
+    running += row.result;
+    return `
+      <tr>
+        <td>${formatDate(row.date)}</td>
+        <td class="money-cell positive-text">${formatMoney(row.income, "BRL")}</td>
+        <td class="money-cell negative-text">${formatMoney(row.expense, "BRL")}</td>
+        <td class="money-cell neutral-text">${formatMoney(row.investment, "BRL")}</td>
+        <td class="money-cell ${row.result < 0 ? "negative-text" : "positive-text"}">${formatMoney(row.result, "BRL")}</td>
+        <td class="money-cell">${formatMoney(running, "BRL")}</td>
+      </tr>
+    `;
+  }).join("");
+  reportContent.innerHTML = `
+    <div class="report-table-wrap">
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th>Dia</th>
+            <th>Entradas</th>
+            <th>Despesas</th>
+            <th>Aportes</th>
+            <th>Resultado</th>
+            <th>Saldo do mês</th>
+          </tr>
+        </thead>
+        <tbody>${body}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderAccountsReport() {
+  const account = state.accounts.find((entry) => String(entry.id) === String(state.reportAccountId));
+  if (!account) {
+    reportContent.innerHTML = '<div class="empty-state">Cadastre uma conta para visualizar este relatório.</div>';
+    return;
+  }
+  const items = state.transactions
+    .filter((transaction) => transaction.date.startsWith(state.reportMonth))
+    .filter((transaction) => String(transaction.account_id) === String(account.id));
+  const reportItems = items.map(accountTransactionReportItem).filter(Boolean);
+  const totals = reportTotals(reportItems);
+  const rows = groupReportItems(reportItems, "category");
+  reportContent.innerHTML = `
+    <div class="account-report-header">
+      <div>
+        <span>Conta selecionada</span>
+        <strong>${escapeHtml(account.name)}</strong>
+      </div>
+      <div>
+        <span>Receitas</span>
+        <strong>${formatMoney(totals.income, "BRL")}</strong>
+      </div>
+      <div>
+        <span>Saídas</span>
+        <strong>${formatMoney(totals.expense + totals.investment, "BRL")}</strong>
+      </div>
+      <div>
+        <span>Resultado</span>
+        <strong>${formatMoney(totals.income - totals.expense - totals.investment, "BRL")}</strong>
+      </div>
+    </div>
+    ${reportRankedSection("Movimentação por categoria", rows, "Nenhum lançamento nesta conta no mês.")}
+  `;
+}
+
+function reportRankedSection(title, rows, emptyText) {
+  const total = rows.reduce((sum, row) => sum + row.total, 0);
+  const content = rows.length ? rows.map((row, index) => {
+    const percent = total > 0 ? row.total / total : 0;
+    return `
+      <article class="report-rank-row">
+        <div>
+          <strong><i style="background:${chartColor(index)}"></i>${escapeHtml(row.label)}</strong>
+          <span>${row.count} lançamento(s)</span>
+        </div>
+        <div class="report-rank-value">
+          <strong>${formatMoney(row.total, "BRL")}</strong>
+          <span>${formatPercent(percent)}</span>
+        </div>
+        <div class="report-bar"><span style="width:${Math.max(percent * 100, 2)}%; background:${chartColor(index)}"></span></div>
+      </article>
+    `;
+  }).join("") : `<div class="empty-state compact">${emptyText}</div>`;
+  return `
+    <section class="report-section">
+      <div class="section-heading">
+        <h2>${escapeHtml(title)}</h2>
+        <strong>${formatMoney(total, "BRL")}</strong>
+      </div>
+      <div class="report-rank-list">${content}</div>
+    </section>
+  `;
+}
+
+function reportItemsForMonth(month) {
+  const accountItems = state.transactions
+    .filter((transaction) => transaction.date.startsWith(month))
+    .map(accountTransactionReportItem)
+    .filter(Boolean);
+  const cardItems = state.cardTransactions
+    .filter((transaction) => transaction.date.startsWith(month))
+    .map(cardTransactionReportItem)
+    .filter(Boolean);
+  return [...accountItems, ...cardItems];
+}
+
+function accountTransactionReportItem(transaction) {
+  const reportType = isInvestmentTransfer(transaction)
+    ? "investment"
+    : transaction.type === "income" || transaction.type === "expense"
+      ? transaction.type
+      : "";
+  if (!reportType) {
+    return null;
+  }
+  return {
+    date: transaction.date,
+    reportType,
+    amount: Number(transaction.amount_brl || transaction.amount),
+    category: transaction.category_name || "Sem categoria",
+    subcategory: transaction.subcategory_name || "",
+    tag: "",
+    tags: Array.isArray(transaction.tags) ? transaction.tags : transaction.tag_name ? [transaction.tag_name] : [],
+    accountId: transaction.account_id,
+    accountName: transaction.account_name,
+    source: "Conta",
+  };
+}
+
+function cardTransactionReportItem(transaction) {
+  if (transaction.type !== "income" && transaction.type !== "expense") {
+    return null;
+  }
+  return {
+    date: transaction.date,
+    reportType: transaction.type,
+    amount: Number(transaction.amount),
+    category: transaction.category_name || "Sem categoria",
+    subcategory: transaction.subcategory_name || "",
+    tag: "",
+    tags: [],
+    accountId: "",
+    accountName: transaction.credit_card_name || "Cartão",
+    source: "Cartão",
+  };
+}
+
+function reportTotals(items) {
+  return items.reduce((totals, item) => {
+    totals[item.reportType] += item.amount;
+    return totals;
+  }, { income: 0, expense: 0, investment: 0 });
+}
+
+function groupReportItems(items, key) {
+  const grouped = new Map();
+  for (const item of items) {
+    const label = key === "tag" ? item.tag : item.category;
+    if (!label) {
+      continue;
+    }
+    const current = grouped.get(label) || { label, total: 0, count: 0 };
+    current.total += item.amount;
+    current.count += 1;
+    grouped.set(label, current);
+  }
+  return [...grouped.values()].sort((a, b) => b.total - a.total || a.label.localeCompare(b.label));
+}
+
+function sumReportItems(items, type) {
+  return items.reduce((total, item) => item.reportType === type ? total + item.amount : total, 0);
+}
+
+function monthDayRows(month) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const lastDay = new Date(year, monthNumber, 0).getDate();
+  return Array.from({ length: lastDay }, (_, index) => (
+    `${year}-${String(monthNumber).padStart(2, "0")}-${String(index + 1).padStart(2, "0")}`
+  ));
+}
+
 function renderLimitCategories() {
   const selectedCategory = limitCategory.value;
   const expenseCategories = state.categories.filter((category) => category.group_type === "expense");
@@ -1664,6 +2064,10 @@ function renderTransactionCollection(container, transactions, compact) {
       group.querySelectorAll("[data-transaction-id]").forEach((button) => {
         button.addEventListener("click", () => deleteTransaction(button.dataset.transactionId));
       });
+      group.querySelectorAll("[data-edit-transaction-id]").forEach((button) => {
+        const transaction = items.find((entry) => String(entry.id) === String(button.dataset.editTransactionId));
+        button.addEventListener("click", () => editTransaction(transaction));
+      });
       group.querySelectorAll("[data-reconcile-id]").forEach((button) => {
         button.addEventListener("click", () => toggleTransactionReconciliation(
           button.dataset.reconcileId,
@@ -1704,6 +2108,7 @@ function transactionTemplate(transaction, compact) {
         ${convertedAmount}
         ${compact ? "" : `
           <div class="transaction-actions">
+            <button class="ghost small-button" type="button" data-edit-transaction-id="${transaction.id}">Editar</button>
             <button class="reconcile-button ${isReconciled ? "active" : ""}" type="button" data-reconcile-id="${transaction.id}" data-reconciled="${isReconciled}" title="${isReconciled ? "Desmarcar conciliação" : "Marcar como conciliado"}">OK</button>
             <button class="danger small-button" type="button" data-transaction-id="${transaction.id}">Excluir</button>
           </div>
@@ -1775,6 +2180,16 @@ async function shiftLimitMonth(delta) {
   resetLimitForm();
   await loadSpendingLimits();
   renderLimits();
+}
+
+function shiftReportMonth(delta) {
+  state.reportMonth = shiftMonth(state.reportMonth, delta);
+  renderReports();
+}
+
+function switchReportTab(tab) {
+  state.reportTab = tab;
+  renderReports();
 }
 
 async function shiftCardInvoiceMonth(delta) {
@@ -2073,6 +2488,13 @@ function cardCategoryPath(transaction) {
 function formatMoney(value, currency) {
   const amount = Number(value);
   return amount.toLocaleString("pt-BR", { style: "currency", currency });
+}
+
+function moneyInputValue(value) {
+  return Number(value).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 function formatPercent(value) {

@@ -50,10 +50,12 @@ from financeiro.credit_cards import (
     delete_credit_card_transaction,
     list_archived_credit_cards,
     list_credit_card_invoice,
+    list_credit_card_transactions,
     list_credit_cards,
     pay_credit_card_invoice,
     restore_credit_card,
     set_credit_card_transaction_reconciled,
+    update_credit_card_transaction,
     update_credit_card,
 )
 from financeiro.database import initialize_database
@@ -70,6 +72,7 @@ from financeiro.transactions import (
     get_exchange_rate_to_brl,
     list_transactions,
     set_transaction_reconciled,
+    update_transaction,
 )
 
 ROOT = Path(__file__).resolve().parent
@@ -95,6 +98,9 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/credit-card-invoice":
             self.handle_list_credit_card_invoice()
+            return
+        if path == "/api/credit-card-transactions":
+            self.handle_list_credit_card_transactions()
             return
         if path.startswith("/api/transactions"):
             self.handle_list_transactions()
@@ -181,6 +187,12 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path.startswith("/api/credit-card-transactions/") and path.endswith("/reconciliation"):
             self.handle_reconcile_credit_card_transaction()
+            return
+        if path.startswith("/api/credit-card-transactions/"):
+            self.handle_update_credit_card_transaction()
+            return
+        if path.startswith("/api/transactions/"):
+            self.handle_update_transaction()
             return
         if path.startswith("/api/checking-accounts/"):
             self.handle_update_account()
@@ -312,6 +324,10 @@ class AppHandler(BaseHTTPRequestHandler):
         month = (query.get("month") or [""])[0]
         self.send_json(list_credit_card_invoice(user["id"], card_id, month))
 
+    def handle_list_credit_card_transactions(self) -> None:
+        user = self.require_user()
+        self.send_json({"transactions": list_credit_card_transactions(user["id"])})
+
     def handle_list_transactions(self) -> None:
         user = self.require_user()
         transactions = list_transactions(user["id"])
@@ -359,6 +375,13 @@ class AppHandler(BaseHTTPRequestHandler):
         transaction = create_credit_card_transaction(user["id"], data)
         self.send_json({"transaction": transaction}, status=HTTPStatus.CREATED)
 
+    def handle_update_credit_card_transaction(self) -> None:
+        user = self.require_user()
+        transaction_id = self.path.split("?", 1)[0].split("/")[-1]
+        data = self.read_json()
+        transaction = update_credit_card_transaction(user["id"], transaction_id, data)
+        self.send_json({"transaction": transaction})
+
     def handle_pay_credit_card_invoice(self) -> None:
         user = self.require_user()
         data = self.read_json()
@@ -370,6 +393,13 @@ class AppHandler(BaseHTTPRequestHandler):
         data = self.read_json()
         transaction = create_transaction(user["id"], data)
         self.send_json({"transaction": transaction}, status=HTTPStatus.CREATED)
+
+    def handle_update_transaction(self) -> None:
+        user = self.require_user()
+        transaction_id = self.path.split("?", 1)[0].split("/")[-1]
+        data = self.read_json()
+        transaction = update_transaction(user["id"], transaction_id, data)
+        self.send_json({"transaction": transaction})
 
     def handle_reconcile_transaction(self) -> None:
         user = self.require_user()

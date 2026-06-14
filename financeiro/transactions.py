@@ -126,6 +126,137 @@ def create_transaction(user_id: int, data: dict) -> dict:
     return format_transaction(row)
 
 
+def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
+    normalized_id = normalize_id(transaction_id, "Lancamento nao encontrado.")
+    transaction = normalize_transaction_update_payload(data)
+    apply_to_future = should_apply_to_future(data)
+    with get_connection() as conn:
+        existing = conn.execute(
+            """
+            SELECT *
+            FROM transactions
+            WHERE id = ? AND user_id = ? AND archived_at IS NULL
+            """,
+            (normalized_id, user_id),
+        ).fetchone()
+        if not existing:
+            raise TransactionError("Lancamento nao encontrado.", HTTPStatus.NOT_FOUND)
+        source = get_active_account(conn, user_id, transaction["account_id"])
+        destination = None
+        if transaction["type"] == "transfer":
+            destination = get_active_account(conn, user_id, transaction["destination_account_id"])
+            if source["id"] == destination["id"]:
+                raise TransactionError("Informe contas diferentes para transferencia.")
+            if source["currency"] != destination["currency"]:
+                raise TransactionError("Transferencias exigem contas com a mesma moeda.")
+        exchange_rate_micros = resolve_exchange_rate_micros(source["currency"], transaction["date"], transaction["exchange_rate"])
+        amount_brl_cents = convert_to_brl_cents(transaction["amount_cents"], exchange_rate_micros)
+        category_group_type = transaction_category_group(transaction["type"], destination)
+        category_id = get_or_create_category(conn, user_id, transaction["category"], category_group_type)
+        subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
+        tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
+
+        apply_balance_delta(conn, existing["account_id"], -balance_delta(existing["type"], existing["amount_cents"], "source"))
+        if existing["destination_account_id"]:
+            apply_balance_delta(
+                conn,
+                existing["destination_account_id"],
+                -balance_delta(existing["type"], existing["amount_cents"], "destination"),
+            )
+        apply_balance_delta(conn, source["id"], balance_delta(transaction["type"], transaction["amount_cents"], "source"))
+        if destination:
+            apply_balance_delta(conn, destination["id"], balance_delta(transaction["type"], transaction["amount_cents"], "destination"))
+        conn.execute(
+            """
+            UPDATE transactions
+            SET type = ?, description = ?, amount_cents = ?, exchange_rate_micros = ?,
+                amount_brl_cents = ?, date = ?, account_id = ?, destination_account_id = ?,
+                category_id = ?, subcategory_id = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND user_id = ? AND archived_at IS NULL
+            """,
+            (
+                transaction["type"],
+                transaction["description"],
+                transaction["amount_cents"],
+                exchange_rate_micros,
+                amount_brl_cents,
+                transaction["date"],
+                source["id"],
+                destination["id"] if destination else None,
+                category_id,
+                subcategory_id,
+                transaction["notes"],
+                normalized_id,
+                user_id,
+            ),
+        )
+        replace_transaction_tags(conn, normalized_id, tag_ids)
+        if apply_to_future:
+            update_future_recurring_transactions(conn, user_id, existing, transaction)
+        row = fetch_transaction(conn, user_id, normalized_id)
+    return format_transaction(row)
+
+
+def update_future_recurring_transactions(conn, user_id: int, existing, transaction: dict) -> None:
+    if existing["series_kind"] != "recurring" or not existing["series_id"]:
+        return
+    future_rows = conn.execute(
+        """
+        SELECT *
+        FROM transactions
+        WHERE user_id = ? AND archived_at IS NULL
+            AND series_id = ? AND id <> ? AND date > ?
+        ORDER BY date ASC, id ASC
+        """,
+        (user_id, existing["series_id"], existing["id"], existing["date"]),
+    ).fetchall()
+    for row in future_rows:
+        source = get_active_account(conn, user_id, transaction["account_id"])
+        destination = None
+        if transaction["type"] == "transfer":
+            destination = get_active_account(conn, user_id, transaction["destination_account_id"])
+            if source["id"] == destination["id"]:
+                raise TransactionError("Informe contas diferentes para transferencia.")
+            if source["currency"] != destination["currency"]:
+                raise TransactionError("Transferencias exigem contas com a mesma moeda.")
+        exchange_rate_micros = resolve_exchange_rate_micros(source["currency"], row["date"], transaction["exchange_rate"])
+        amount_brl_cents = convert_to_brl_cents(transaction["amount_cents"], exchange_rate_micros)
+        category_group_type = transaction_category_group(transaction["type"], destination)
+        category_id = get_or_create_category(conn, user_id, transaction["category"], category_group_type)
+        subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
+        tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
+        apply_balance_delta(conn, row["account_id"], -balance_delta(row["type"], row["amount_cents"], "source"))
+        if row["destination_account_id"]:
+            apply_balance_delta(conn, row["destination_account_id"], -balance_delta(row["type"], row["amount_cents"], "destination"))
+        apply_balance_delta(conn, source["id"], balance_delta(transaction["type"], transaction["amount_cents"], "source"))
+        if destination:
+            apply_balance_delta(conn, destination["id"], balance_delta(transaction["type"], transaction["amount_cents"], "destination"))
+        conn.execute(
+            """
+            UPDATE transactions
+            SET type = ?, description = ?, amount_cents = ?, exchange_rate_micros = ?,
+                amount_brl_cents = ?, account_id = ?, destination_account_id = ?,
+                category_id = ?, subcategory_id = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND user_id = ? AND archived_at IS NULL
+            """,
+            (
+                transaction["type"],
+                transaction["description"],
+                transaction["amount_cents"],
+                exchange_rate_micros,
+                amount_brl_cents,
+                source["id"],
+                destination["id"] if destination else None,
+                category_id,
+                subcategory_id,
+                transaction["notes"],
+                row["id"],
+                user_id,
+            ),
+        )
+        replace_transaction_tags(conn, row["id"], tag_ids)
+
+
 def delete_transaction(user_id: int, transaction_id: str) -> None:
     with get_connection() as conn:
         transaction = conn.execute(
@@ -196,10 +327,23 @@ def normalize_transaction_payload(data: dict) -> dict:
         "exchange_rate": data.get("exchange_rate_to_brl") or data.get("exchange_rate"),
         "category": normalize_name(data.get("category"), "Informe a categoria."),
         "subcategory": normalize_optional_name(data.get("subcategory")),
-        "tags": normalize_tags(data.get("tags") or data.get("tag")),
+        "tags": normalize_optional_tags(data.get("tags") or data.get("tag")),
         "notes": empty_to_none(data.get("notes")),
         **normalize_series_payload(data),
     }
+
+
+def normalize_transaction_update_payload(data: dict) -> dict:
+    transaction = normalize_transaction_payload({**data, "series_kind": "single"})
+    transaction.pop("series_kind", None)
+    transaction.pop("installment_count", None)
+    transaction.pop("recurrence_frequency", None)
+    transaction.pop("recurrence_count", None)
+    return transaction
+
+
+def should_apply_to_future(data: dict) -> bool:
+    return str(data.get("apply_to_future") or "").strip().lower() in {"1", "true", "yes", "sim"}
 
 
 def normalize_series_payload(data: dict) -> dict:
@@ -488,6 +632,15 @@ def normalize_tags(value: object) -> list[str]:
     if not tags:
         raise TransactionError("Informe ao menos uma tag.")
     return tags
+
+
+def normalize_optional_tags(value: object) -> list[str]:
+    if isinstance(value, list):
+        if not any(str(item or "").strip() for item in value):
+            return []
+    elif not str(value or "").strip():
+        return []
+    return normalize_tags(value)
 
 
 def normalize_optional_name(value: object) -> str | None:

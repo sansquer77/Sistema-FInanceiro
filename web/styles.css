@@ -776,6 +776,12 @@ textarea:focus {
   gap: 10px;
 }
 
+.report-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 10px;
+}
+
 .month-balance-summary > div {
   display: grid;
   gap: 5px;
@@ -796,8 +802,26 @@ textarea:focus {
   background: #fbfcfd;
 }
 
+.report-summary > div,
+.account-report-header > div {
+  display: grid;
+  gap: 5px;
+  min-height: 72px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+}
+
 .month-balance-summary span,
 .limit-summary span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.report-summary span,
+.account-report-header span {
   color: var(--muted);
   font-size: 13px;
   font-weight: 900;
@@ -808,8 +832,155 @@ textarea:focus {
   font-size: 19px;
 }
 
+.report-summary strong,
+.account-report-header strong {
+  font-size: 19px;
+}
+
 .limits-workspace {
   margin-top: 18px;
+}
+
+.report-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  padding: 4px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+  background: #eef2f4;
+}
+
+.report-tab {
+  min-height: 40px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.report-tab.active {
+  background: #fff;
+  color: var(--accent-dark);
+  box-shadow: 0 1px 3px rgba(31, 41, 51, 0.12);
+}
+
+.report-account-filter {
+  max-width: 360px;
+  margin-top: 16px;
+}
+
+.report-content-panel {
+  margin-top: 18px;
+}
+
+.report-content,
+.report-section,
+.report-rank-list {
+  display: grid;
+  gap: 14px;
+}
+
+.report-section + .report-section {
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.report-rank-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px 16px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.report-rank-row strong {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.report-rank-row i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+}
+
+.report-rank-row span,
+.report-rank-value span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.report-rank-value {
+  text-align: right;
+}
+
+.report-bar {
+  grid-column: 1 / -1;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e9eef2;
+}
+
+.report-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.report-table-wrap {
+  overflow: auto;
+}
+
+.report-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+}
+
+.report-table th,
+.report-table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.report-table th {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.money-cell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+.positive-text {
+  color: var(--accent-dark);
+}
+
+.negative-text {
+  color: var(--danger);
+}
+
+.neutral-text {
+  color: #2563eb;
+}
+
+.account-report-header {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 10px;
 }
 
 .card-invoice-panel,
@@ -1135,6 +1306,8 @@ textarea:focus {
   .summary-strip,
   .month-balance-summary,
   .limit-summary,
+  .report-summary,
+  .account-report-header,
   .card-invoice-summary,
   .cockpit-grid,
   .classification-grid,
@@ -1172,6 +1345,7 @@ textarea:focus {
   .card-invoice-row,
   .card-invoice-payment,
   .classification-item,
+  .report-rank-row,
   .transaction-row {
     align-items: stretch;
     flex-direction: column;
@@ -1207,6 +1381,10 @@ textarea:focus {
   }
 
   .inline-form {
+    grid-template-columns: 1fr;
+  }
+
+  .report-tabs {
     grid-template-columns: 1fr;
   }
 

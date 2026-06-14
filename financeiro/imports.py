@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import csv
 import struct
+import unicodedata
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from difflib import SequenceMatcher
 from http import HTTPStatus
 from io import StringIO
 
@@ -17,7 +19,7 @@ from financeiro.transactions import (
     replace_transaction_tags,
     resolve_exchange_rate_micros,
 )
-from financeiro.database import get_connection
+from financeiro.database import get_connection, row_to_dict
 
 OLE_MAGIC = bytes.fromhex("D0CF11E0A1B11AE1")
 END_OF_CHAIN = 0xFFFFFFFE
@@ -36,6 +38,90 @@ HEADER_ALIASES = {
     "tag": "tag",
     "informações adicionais": "notes",
     "informacoes adicionais": "notes",
+}
+INVESTMENT_TAG_CATEGORY_ALIASES = {
+    "previdencia": ("Previdência Privada", "PGBL (Plano Gerador de Benefício Livre)"),
+    "pgbl": ("Previdência Privada", "PGBL (Plano Gerador de Benefício Livre)"),
+    "vgbl": ("Previdência Privada", "VGBL (Vida Gerador de Benefício Livre)"),
+    "fii": ("Renda Variável", "Fundos de Investimento Imobiliário (FIIs)"),
+    "etf": ("Renda Variável", "ETFs (Exchange Traded Funds)"),
+    "itub4": ("Renda Variável", "Ações (Bolsa de Valores - B3)"),
+    "vale3": ("Renda Variável", "Ações (Bolsa de Valores - B3)"),
+    "isae4": ("Renda Variável", "Ações (Bolsa de Valores - B3)"),
+    "tesouro direto": ("Renda Fixa", "Tesouro Direto (Selic, IPCA+, Prefixado)"),
+    "cdb": ("Renda Fixa", "CDB / RDB / LC (Certificados de Depósito)"),
+    "lca": ("Renda Fixa", "LCI / LCA (Letras de Crédito Imobiliário/Agrícola)"),
+    "lci": ("Renda Fixa", "LCI / LCA (Letras de Crédito Imobiliário/Agrícola)"),
+    "cra": ("Renda Fixa", "CRI / CRA / Debêntures (Crédito Privado)"),
+    "cri": ("Renda Fixa", "CRI / CRA / Debêntures (Crédito Privado)"),
+    "poupanca": ("Renda Fixa", "Poupança (Fundo de Emergência antigo)"),
+    "cofrinho": ("Renda Fixa", "Poupança (Fundo de Emergência antigo)"),
+    "fundos": ("Fundos de Investimentos", "Fundos Multimercado"),
+    "cripto": ("Criptoativos", "Outras Altcoins (Solana, Cardano, etc.)"),
+    "bitcoin": ("Criptoativos", "Bitcoin (BTC)"),
+    "btc": ("Criptoativos", "Bitcoin (BTC)"),
+    "ethereum": ("Criptoativos", "Ethereum (ETH)"),
+    "eth": ("Criptoativos", "Ethereum (ETH)"),
+    "avenue": ("Renda Variável", "BDRs / Investimentos no Exterior"),
+    "wise": ("Renda Variável", "BDRs / Investimentos no Exterior"),
+}
+EXPENSE_CATEGORY_ALIASES = {
+    "alimentacao": ("Alimentação", None),
+    "bares e restaurantes": ("Alimentação", "Restaurantes / Bares / Delivery"),
+    "casa": ("Habitação", None),
+    "eletricidade": ("Habitação", "Energia Elétrica (Luz)"),
+    "gas": ("Habitação", "Gás (Encanado ou Botijão)"),
+    "celular": ("Assinaturas e Serviços", "Celular"),
+    "assinaturas e servicos": ("Assinaturas e Serviços", None),
+    "impostos e taxas": ("Serviços Financeiros e Impostos", None),
+    "pagamento de fatura": ("Serviços Financeiros e Impostos", "Pagamento de Fatura de Cartão"),
+    "familia e filhos": ("Dependentes e Filhos", None),
+    "presentes e doacoes": ("Outras Despesas", "Presentes para Amigos e Família"),
+    "cuidados pessoais": ("Cuidados Pessoais", None),
+    "roupas": ("Cuidados Pessoais", "Vestuário (Roupas, Calçados e Underwear)"),
+    "viagem": ("Lazer e Estilo de Vida", "Viagens, Passagens e Hospedagens (Férias)"),
+    "lazer e hobbies": ("Lazer e Estilo de Vida", "Hobbies, Passatempos e Jogos"),
+    "dividas e emprestimos": ("Empréstimos", None),
+    "emprestimos": ("Empréstimos", None),
+    "outros": ("Outras Despesas", "Imprevistos e Emergências Domésticas"),
+}
+EXPENSE_HINT_ALIASES = {
+    "enel": ("Habitação", "Energia Elétrica (Luz)"),
+    "comgas": ("Habitação", "Gás (Encanado ou Botijão)"),
+    "condominio": ("Habitação", "Condomínio"),
+    "iptu": ("Habitação", "IPTU"),
+    "faxina": ("Habitação", "Empregada Doméstica / Diarista"),
+    "seguro": ("Serviços Financeiros e Impostos", "Seguro de Vida / Previdência do Estado"),
+    "irpf": ("Serviços Financeiros e Impostos", "Imposto de Renda a Pagar (IRPF)"),
+    "ipva": ("Transporte", "IPVA / Licenciamento / DPVAT"),
+    "multas": ("Transporte", "IPVA / Licenciamento / DPVAT"),
+    "carros": ("Transporte", "Manutenção, Revisão e Troca de Óleo"),
+    "estacionamento": ("Transporte", "Estacionamento e Pedágio"),
+    "uber": ("Transporte", "Aplicativos de Transporte (Uber, 99)"),
+    "taxi": ("Transporte", "Aplicativos de Transporte (Uber, 99)"),
+    "celular": ("Assinaturas e Serviços", "Celular"),
+    "netflix": ("Assinaturas e Serviços", "Streaming de Vídeo (Netflix, Disney+, Prime, etc.)"),
+}
+INCOME_CATEGORY_ALIASES = {
+    "salario": ("Trabalho e Salário", "Salário Líquido"),
+    "outuras receitas": ("Outras Receitas", None),
+    "outras receitas": ("Outras Receitas", None),
+    "investimentos": ("Rendimentos e Investimentos", None),
+    "emprestimos": ("Empréstimos", None),
+}
+INCOME_HINT_ALIASES = {
+    "ferias": ("Trabalho e Salário", "Férias"),
+    "plr": ("Trabalho e Salário", "Bônus / PLR"),
+    "salario": ("Trabalho e Salário", "Salário Líquido"),
+    "irpf": ("Outras Receitas", "Restituição de Imposto de Renda"),
+    "reembolso": ("Outras Receitas", "Reembolsos Corporativos"),
+    "dividendos": ("Rendimentos e Investimentos", "Dividendos / JCP"),
+    "jcp": ("Rendimentos e Investimentos", "Dividendos / JCP"),
+    "juros": ("Rendimentos e Investimentos", "Rendimento de Renda Fixa"),
+    "tesouro direto": ("Rendimentos e Investimentos", "Rendimento de Renda Fixa"),
+    "cdb": ("Rendimentos e Investimentos", "Rendimento de Renda Fixa"),
+    "lca": ("Rendimentos e Investimentos", "Rendimento de Renda Fixa"),
+    "poupanca": ("Rendimentos e Investimentos", "Rendimento de Renda Fixa"),
 }
 
 
@@ -65,7 +151,10 @@ def import_organizze_transactions(user_id: int, account_id: object, file_bytes: 
                 message = getattr(exc, "message", "Nao foi possivel consolidar o valor em reais.")
                 skipped.append({"row": raw["row"], "description": raw.get("description", ""), "reason": message})
                 continue
-            category_group = "income" if transaction["type"] == "income" else "expense"
+            category_group, category_name, subcategory_name, tags = resolve_import_classification(conn, user_id, transaction)
+            transaction["category"] = category_name
+            transaction["subcategory"] = subcategory_name
+            transaction["tags"] = tags
             category_id = get_or_create_category(conn, user_id, transaction["category"], category_group)
             subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
             tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
@@ -158,8 +247,13 @@ def normalize_imported_transaction(row: dict) -> dict:
     if not description:
         raise ImportError("Informe a descricao.")
     try:
-        category, subcategory = normalize_category_parts(row.get("category"), row.get("subcategory"))
-        tags = normalize_tags(row.get("tag"))
+        category_value = row.get("category")
+        if normalize_key(category_value) in {"transferencia", "transferencias"}:
+            raise ImportError("Transferencia ignorada porque o arquivo nao informa a conta de destino.")
+        if not str(category_value or "").strip() and "fatura" in normalize_key(description):
+            category_value = "Pagamento de fatura"
+        category, subcategory = normalize_category_parts(category_value, row.get("subcategory"))
+        tags = normalize_import_tags(row.get("tag"))
     except ClassificationError as exc:
         raise ImportError(exc.message) from exc
     except Exception as exc:
@@ -175,7 +269,139 @@ def normalize_imported_transaction(row: dict) -> dict:
         "subcategory": subcategory,
         "tags": tags,
         "notes": notes,
+        "raw_category": str(row.get("category") or "").strip(),
+        "raw_subcategory": str(row.get("subcategory") or "").strip(),
     }
+
+
+def resolve_import_classification(conn, user_id: int, transaction: dict) -> tuple[str, str, str | None, list[str]]:
+    raw_category = transaction.get("raw_category") or transaction["category"]
+    raw_subcategory = transaction.get("raw_subcategory") or transaction["subcategory"]
+    tags = transaction["tags"]
+    hint = classification_hint(raw_category, raw_subcategory, transaction["description"], tags)
+    if is_investment_import(raw_category, tags, transaction["description"]):
+        group = "investment" if transaction["type"] == "expense" else "income"
+        category, subcategory = investment_classification(transaction, hint)
+    elif transaction["type"] == "income":
+        group = "income"
+        category, subcategory = semantic_classification(
+            raw_category,
+            raw_subcategory,
+            hint,
+            INCOME_CATEGORY_ALIASES,
+            INCOME_HINT_ALIASES,
+            transaction["category"],
+            transaction["subcategory"],
+        )
+    else:
+        group = "expense"
+        category, subcategory = semantic_classification(
+            raw_category,
+            raw_subcategory,
+            hint,
+            EXPENSE_CATEGORY_ALIASES,
+            EXPENSE_HINT_ALIASES,
+            transaction["category"],
+            transaction["subcategory"],
+        )
+    category = match_existing_category(conn, user_id, group, category)
+    subcategory = match_existing_subcategory(conn, user_id, group, category, subcategory)
+    tags = [match_existing_tag(conn, user_id, tag) for tag in tags]
+    return group, category, subcategory, tags
+
+
+def semantic_classification(raw_category, raw_subcategory, hint, category_aliases, hint_aliases, fallback_category, fallback_subcategory):
+    category_key = normalize_key(raw_category)
+    hint_key = normalize_key(hint)
+    category, subcategory = category_aliases.get(category_key, (fallback_category, fallback_subcategory))
+    for key, target in hint_aliases.items():
+        if key in hint_key:
+            category, subcategory = target
+            break
+    return category, subcategory or fallback_subcategory
+
+
+def investment_classification(transaction: dict, hint: str) -> tuple[str, str | None]:
+    hint_key = normalize_key(hint)
+    if transaction["type"] == "income":
+        if any(key in hint_key for key in ("dividendo", "jcp", "fii", "itub4", "vale3", "isae4", "etf")):
+            return "Rendimentos e Investimentos", "Dividendos / JCP"
+        return "Rendimentos e Investimentos", "Rendimento de Renda Fixa"
+    for key, target in INVESTMENT_TAG_CATEGORY_ALIASES.items():
+        if key in hint_key:
+            return target
+    return "Outros Investimentos", None
+
+
+def is_investment_import(raw_category: object, tags: list[str], description: str) -> bool:
+    hint = normalize_key(classification_hint(raw_category, "", description, tags))
+    return "investimento" in normalize_key(raw_category) or any(key in hint for key in INVESTMENT_TAG_CATEGORY_ALIASES)
+
+
+def classification_hint(raw_category: object, raw_subcategory: object, description: str, tags: list[str]) -> str:
+    return " ".join([
+        str(raw_category or ""),
+        str(raw_subcategory or ""),
+        description or "",
+        " ".join(tags),
+    ])
+
+
+def normalize_import_tags(value: object) -> list[str]:
+    if not str(value or "").strip():
+        return []
+    return normalize_tags(value)
+
+
+def match_existing_category(conn, user_id: int, group: str, name: str) -> str:
+    rows = conn.execute(
+        "SELECT name FROM categories WHERE user_id = ? AND group_type = ?",
+        (user_id, group),
+    ).fetchall()
+    return best_existing_name(rows, name)
+
+
+def match_existing_subcategory(conn, user_id: int, group: str, category_name: str, subcategory_name: str | None) -> str | None:
+    if not subcategory_name:
+        return None
+    rows = conn.execute(
+        """
+        SELECT subcategories.name
+        FROM subcategories
+        JOIN categories ON categories.id = subcategories.category_id
+        WHERE categories.user_id = ? AND categories.group_type = ? AND categories.name = ?
+        """,
+        (user_id, group, category_name),
+    ).fetchall()
+    return best_existing_name(rows, subcategory_name)
+
+
+def match_existing_tag(conn, user_id: int, name: str) -> str:
+    rows = conn.execute("SELECT name FROM tags WHERE user_id = ?", (user_id,)).fetchall()
+    return best_existing_name(rows, name)
+
+
+def best_existing_name(rows, proposed: str) -> str:
+    names = [row_to_dict(row)["name"] for row in rows]
+    proposed_key = normalize_key(proposed)
+    for name in names:
+        if normalize_key(name) == proposed_key:
+            return name
+    scored = [
+        (SequenceMatcher(None, proposed_key, normalize_key(name)).ratio(), name)
+        for name in names
+    ]
+    if scored:
+        score, name = max(scored, key=lambda item: item[0])
+        if score >= 0.84:
+            return name
+    return proposed
+
+
+def normalize_key(value: object) -> str:
+    text = unicodedata.normalize("NFKD", str(value or "").casefold())
+    text = "".join(char for char in text if not unicodedata.combining(char))
+    return " ".join("".join(char if char.isalnum() else " " for char in text).split())
 
 
 def normalize_category_parts(category_value: object, subcategory_value: object) -> tuple[str, str | None]:
