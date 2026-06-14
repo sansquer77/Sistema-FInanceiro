@@ -157,10 +157,10 @@
                 <label>Apelido da conta
                   <input name="name" type="text" placeholder="Conta principal" required>
                 </label>
-                <label>Banco
+                <label id="accountBankLabel">Banco
                   <input name="bank_name" type="text" placeholder="Itaú, Nubank, Inter..." required>
                 </label>
-                <div class="field-row">
+                <div class="field-row" id="accountBankDetails">
                   <label>Agência
                     <input name="branch" type="text">
                   </label>
@@ -172,6 +172,7 @@
                   <label>Natureza
                     <select name="account_type">
                       <option value="liquidity">Liquidez</option>
+                      <option value="wallet">Carteira</option>
                       <option value="investment">Investimento</option>
                     </select>
                   </label>

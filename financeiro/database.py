@@ -50,7 +50,7 @@ def initialize_database() -> None:
                 bank_name TEXT NOT NULL,
                 branch TEXT,
                 account_number TEXT,
-                account_type TEXT NOT NULL DEFAULT 'liquidity' CHECK (account_type IN ('liquidity', 'investment')),
+                account_type TEXT NOT NULL DEFAULT 'liquidity' CHECK (account_type IN ('liquidity', 'wallet', 'investment')),
                 currency TEXT NOT NULL DEFAULT 'BRL',
                 initial_balance_cents INTEGER NOT NULL DEFAULT 0,
                 current_balance_cents INTEGER NOT NULL DEFAULT 0,

@@ -6,7 +6,7 @@ from http import HTTPStatus
 from financeiro.database import get_connection, row_to_dict
 
 SUPPORTED_CURRENCIES = {"BRL", "USD", "EUR", "GBP"}
-ACCOUNT_TYPES = {"liquidity", "investment"}
+ACCOUNT_TYPES = {"liquidity", "wallet", "investment"}
 
 
 class AccountError(Exception):
@@ -158,6 +158,8 @@ def normalize_account_payload(data: dict) -> dict:
     account_type = str(data.get("account_type", "liquidity")).strip().lower()
     if not name:
         raise AccountError("Informe o nome da conta.")
+    if account_type == "wallet" and not bank_name:
+        bank_name = "Carteira"
     if not bank_name:
         raise AccountError("Informe o banco.")
     if account_type not in ACCOUNT_TYPES:
@@ -168,8 +170,8 @@ def normalize_account_payload(data: dict) -> dict:
         "name": name,
         "bank_name": bank_name,
         "account_type": account_type,
-        "branch": empty_to_none(data.get("branch")),
-        "account_number": empty_to_none(data.get("account_number")),
+        "branch": None if account_type == "wallet" else empty_to_none(data.get("branch")),
+        "account_number": None if account_type == "wallet" else empty_to_none(data.get("account_number")),
         "currency": currency,
         "initial_balance_cents": money_to_cents(data.get("initial_balance", "0")),
         "notes": empty_to_none(data.get("notes")),

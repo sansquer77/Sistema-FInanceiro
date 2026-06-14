@@ -22,6 +22,8 @@ const backToLoginFromRequest = document.querySelector("#backToLoginFromRequest")
 const backToLoginFromConfirm = document.querySelector("#backToLoginFromConfirm");
 const authMessage = document.querySelector("#authMessage");
 const accountForm = document.querySelector("#accountForm");
+const accountBankLabel = document.querySelector("#accountBankLabel");
+const accountBankDetails = document.querySelector("#accountBankDetails");
 const accountMessage = document.querySelector("#accountMessage");
 const accountList = document.querySelector("#accountList");
 const archivedAccountList = document.querySelector("#archivedAccountList");
@@ -111,6 +113,7 @@ forgotPasswordButton.addEventListener("click", () => switchAuthMode("reset-reque
 backToLoginFromRequest.addEventListener("click", () => switchAuthMode("login"));
 backToLoginFromConfirm.addEventListener("click", () => switchAuthMode("login"));
 accountForm.addEventListener("submit", handleAccountSubmit);
+accountForm.elements.account_type.addEventListener("change", updateAccountTypeState);
 transactionForm.addEventListener("submit", handleTransactionSubmit);
 categoryForm.addEventListener("submit", handleCategorySubmit);
 categoryGroup.addEventListener("change", handleCategoryGroupChange);
@@ -132,6 +135,7 @@ logoutButton.addEventListener("click", handleLogout);
 cancelEditButton.addEventListener("click", resetAccountForm);
 navButtons.forEach((button) => button.addEventListener("click", () => showModule(button.dataset.view)));
 
+updateAccountTypeState();
 boot();
 
 async function boot() {
@@ -600,6 +604,7 @@ function editAccount(account) {
   accountForm.elements.initial_balance.value = account.initial_balance.replace(".", ",");
   accountForm.elements.notes.value = account.notes || "";
   cancelEditButton.hidden = false;
+  updateAccountTypeState();
   accountForm.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -608,7 +613,23 @@ function resetAccountForm() {
   accountForm.elements.id.value = "";
   formTitle.textContent = "Nova conta";
   cancelEditButton.hidden = true;
+  updateAccountTypeState();
   setMessage(accountMessage, "");
+}
+
+function updateAccountTypeState() {
+  const isWallet = accountForm.elements.account_type.value === "wallet";
+  accountBankLabel.hidden = isWallet;
+  accountBankDetails.hidden = isWallet;
+  accountForm.elements.bank_name.required = !isWallet;
+  accountForm.elements.bank_name.disabled = isWallet;
+  accountForm.elements.branch.disabled = isWallet;
+  accountForm.elements.account_number.disabled = isWallet;
+  if (isWallet) {
+    accountForm.elements.bank_name.value = "";
+    accountForm.elements.branch.value = "";
+    accountForm.elements.account_number.value = "";
+  }
 }
 
 function resetTransactionForm() {
@@ -800,7 +821,7 @@ function accountCard(account, status) {
       <div>
         <h3>${escapeHtml(account.name)}</h3>
         <div class="account-meta">
-          <span>${escapeHtml(account.bank_name)}</span>
+          ${account.account_type !== "wallet" ? `<span>${escapeHtml(account.bank_name)}</span>` : ""}
           <span>${accountTypeLabel(account.account_type)}</span>
           <span>${escapeHtml(account.currency)}</span>
           ${account.branch ? `<span>Ag. ${escapeHtml(account.branch)}</span>` : ""}
@@ -1299,6 +1320,7 @@ function transactionTypeLabel(type) {
 function accountTypeLabel(type) {
   return {
     liquidity: "Liquidez",
+    wallet: "Carteira",
     investment: "Investimento",
   }[type] || "Liquidez";
 }
