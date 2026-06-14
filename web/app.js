@@ -50,6 +50,8 @@ const transactionType = document.querySelector("#transactionType");
 const transactionAccount = document.querySelector("#transactionAccount");
 const destinationAccount = document.querySelector("#destinationAccount");
 const destinationAccountLabel = document.querySelector("#destinationAccountLabel");
+const exchangeRate = document.querySelector("#exchangeRate");
+const exchangeRateLabel = document.querySelector("#exchangeRateLabel");
 const userName = document.querySelector("#userName");
 const logoutButton = document.querySelector("#logoutButton");
 const cancelEditButton = document.querySelector("#cancelEditButton");
@@ -57,9 +59,10 @@ const formTitle = document.querySelector("#formTitle");
 const moduleEyebrow = document.querySelector("#moduleEyebrow");
 const pageTitle = document.querySelector("#pageTitle");
 const accountCount = document.querySelector("#accountCount");
-const currencyCount = document.querySelector("#currencyCount");
 const monthIncome = document.querySelector("#monthIncome");
 const monthExpense = document.querySelector("#monthExpense");
+const monthInvestment = document.querySelector("#monthInvestment");
+const savingsRate = document.querySelector("#savingsRate");
 const currencyList = document.querySelector("#currencyList");
 const navButtons = document.querySelectorAll("[data-view]");
 const moduleViews = {
@@ -99,6 +102,8 @@ emailForm.addEventListener("submit", handleEmailSubmit);
 passwordForm.addEventListener("submit", handlePasswordSubmit);
 deleteUserForm.addEventListener("submit", handleDeleteUserSubmit);
 transactionType.addEventListener("change", updateTransactionTypeState);
+transactionAccount.addEventListener("change", updateTransactionTypeState);
+transactionForm.elements.date.addEventListener("change", updateExchangeRateState);
 logoutButton.addEventListener("click", handleLogout);
 cancelEditButton.addEventListener("click", resetAccountForm);
 navButtons.forEach((button) => button.addEventListener("click", () => showModule(button.dataset.view)));
@@ -136,9 +141,9 @@ function switchAuthMode(mode) {
 async function handleLogin(event) {
   event.preventDefault();
   setMessage(authMessage, "");
+  const data = formData(loginForm);
   setFormBusy(loginForm, true);
   try {
-    const data = formData(loginForm);
     const response = await api("/api/login", { method: "POST", body: data });
     state.user = response.user;
     await loadDashboard();
@@ -152,9 +157,9 @@ async function handleLogin(event) {
 async function handleRegister(event) {
   event.preventDefault();
   setMessage(authMessage, "");
+  const data = formData(registerForm);
   setFormBusy(registerForm, true);
   try {
-    const data = formData(registerForm);
     const response = await api("/api/register", { method: "POST", body: data });
     state.user = response.user;
     await loadDashboard();
@@ -168,11 +173,12 @@ async function handleRegister(event) {
 async function handlePasswordResetRequest(event) {
   event.preventDefault();
   setMessage(authMessage, "");
+  const data = formData(passwordResetRequestForm);
   setFormBusy(passwordResetRequestForm, true);
   try {
     const response = await api("/api/password-reset/request", {
       method: "POST",
-      body: formData(passwordResetRequestForm),
+      body: data,
     });
     passwordResetConfirmForm.elements.token.value = "";
     switchAuthMode("reset-confirm");
@@ -188,11 +194,12 @@ async function handlePasswordResetRequest(event) {
 async function handlePasswordResetConfirm(event) {
   event.preventDefault();
   setMessage(authMessage, "");
+  const data = formData(passwordResetConfirmForm);
   setFormBusy(passwordResetConfirmForm, true);
   try {
     await api("/api/password-reset/confirm", {
       method: "POST",
-      body: formData(passwordResetConfirmForm),
+      body: data,
     });
     passwordResetRequestForm.reset();
     passwordResetConfirmForm.reset();
@@ -326,6 +333,11 @@ async function handleTransactionSubmit(event) {
   }
   try {
     const data = formData(transactionForm);
+    if (data.type === "investment") {
+      data.type = "transfer";
+      data.category = "Investimentos";
+      data.tags = data.tags || "Investimento";
+    }
     if (data.type !== "transfer") {
       delete data.destination_account_id;
     }
@@ -346,9 +358,10 @@ async function handleImportSubmit(event) {
     setMessage(importMessage, "Cadastre uma conta antes de importar lançamentos.", "error");
     return;
   }
+  const data = new FormData(importForm);
   setFormBusy(importForm, true);
   try {
-    const response = await upload("/api/import/organizze-transactions", new FormData(importForm));
+    const response = await upload("/api/import/organizze-transactions", data);
     importForm.reset();
     await loadTransactionsAndAccounts();
     renderImportResult(response);
@@ -539,6 +552,7 @@ function editAccount(account) {
   accountForm.elements.bank_name.value = account.bank_name;
   accountForm.elements.branch.value = account.branch || "";
   accountForm.elements.account_number.value = account.account_number || "";
+  accountForm.elements.account_type.value = account.account_type || "liquidity";
   accountForm.elements.currency.value = account.currency;
   accountForm.elements.initial_balance.value = account.initial_balance.replace(".", ",");
   accountForm.elements.notes.value = account.notes || "";
@@ -572,9 +586,10 @@ function renderCockpit() {
   const totals = getCurrencyTotals();
   const monthTotals = getCurrentMonthTotals();
   accountCount.textContent = String(state.accounts.length);
-  currencyCount.textContent = String(totals.size);
   monthIncome.textContent = formatMoney(monthTotals.income, "BRL");
   monthExpense.textContent = formatMoney(monthTotals.expense, "BRL");
+  monthInvestment.textContent = formatMoney(monthTotals.investment, "BRL");
+  savingsRate.textContent = formatPercent(monthTotals.savingsRate);
   renderCurrencyTotals(totals);
   renderTransactionCollection(recentTransactionList, state.transactions.slice(0, 5), true);
 }
@@ -616,6 +631,7 @@ function accountCard(account, status) {
         <h3>${escapeHtml(account.name)}</h3>
         <div class="account-meta">
           <span>${escapeHtml(account.bank_name)}</span>
+          <span>${accountTypeLabel(account.account_type)}</span>
           <span>${escapeHtml(account.currency)}</span>
           ${account.branch ? `<span>Ag. ${escapeHtml(account.branch)}</span>` : ""}
           ${account.account_number ? `<span>Conta ${escapeHtml(account.account_number)}</span>` : ""}
@@ -648,10 +664,10 @@ function renderTransactionAccounts() {
     `<option value="${account.id}">${escapeHtml(account.name)} (${escapeHtml(account.currency)})</option>`
   )).join("");
   transactionAccount.innerHTML = options || '<option value="">Cadastre uma conta</option>';
-  destinationAccount.innerHTML = options || '<option value="">Cadastre uma conta</option>';
   importAccount.innerHTML = options || '<option value="">Cadastre uma conta</option>';
   transactionForm.querySelector('button[type="submit"]').disabled = state.accounts.length === 0;
   importForm.querySelector('button[type="submit"]').disabled = state.accounts.length === 0;
+  updateTransactionTypeState();
 }
 
 function renderTransactions() {
@@ -744,12 +760,16 @@ function transactionTemplate(transaction, compact) {
   const signal = transaction.type === "income" ? "positive" : transaction.type === "expense" ? "negative" : "neutral";
   const amountPrefix = transaction.type === "income" ? "" : transaction.type === "expense" ? "-" : "";
   const destination = transaction.destination_account_name ? ` para ${escapeHtml(transaction.destination_account_name)}` : "";
+  const typeLabel = isInvestmentTransfer(transaction) ? "Investimento" : transactionTypeLabel(transaction.type);
+  const convertedAmount = transaction.account_currency === "BRL" ? "" : `
+        <span>${formatMoney(transaction.amount_brl, "BRL")}</span>
+      `;
   return `
     <article class="transaction-row ${signal}">
       <div>
         <strong>${escapeHtml(transaction.description)}</strong>
         <div class="account-meta">
-          <span>${transactionTypeLabel(transaction.type)}</span>
+          <span>${typeLabel}</span>
           <span>${escapeHtml(transaction.account_name)}${destination}</span>
           ${transaction.category_name ? `<span>${escapeHtml(formatCategoryPath(transaction))}</span>` : ""}
           ${transaction.tags && transaction.tags.length ? `<span>${transaction.tags.map((tag) => `#${escapeHtml(tag)}`).join(" ")}</span>` : ""}
@@ -757,6 +777,7 @@ function transactionTemplate(transaction, compact) {
       </div>
       <div class="transaction-amount">
         <strong>${amountPrefix}${formatMoney(transaction.amount, transaction.account_currency)}</strong>
+        ${convertedAmount}
         ${compact ? "" : `<button class="danger small-button" type="button" data-transaction-id="${transaction.id}">Excluir</button>`}
       </div>
     </article>
@@ -764,9 +785,41 @@ function transactionTemplate(transaction, compact) {
 }
 
 function updateTransactionTypeState() {
-  const isTransfer = transactionType.value === "transfer";
+  const isInvestment = transactionType.value === "investment";
+  const isTransfer = transactionType.value === "transfer" || isInvestment;
+  const destinationOptions = destinationAccountOptions(isInvestment);
+  destinationAccount.innerHTML = destinationOptions || '<option value="">Cadastre uma conta compatível</option>';
   destinationAccountLabel.hidden = !isTransfer;
-  destinationAccount.disabled = !isTransfer;
+  destinationAccount.disabled = !isTransfer || !destinationOptions;
+  transactionForm.elements.category.value = isInvestment ? "Investimentos" : transactionForm.elements.category.value;
+  transactionForm.elements.category.readOnly = isInvestment;
+  if (isInvestment && !transactionForm.elements.tags.value.trim()) {
+    transactionForm.elements.tags.value = "Investimento";
+  }
+  updateExchangeRateState();
+}
+
+async function updateExchangeRateState() {
+  const account = state.accounts.find((entry) => String(entry.id) === transactionAccount.value);
+  const currency = account ? account.currency : "BRL";
+  const isBrl = currency === "BRL";
+  exchangeRateLabel.hidden = isBrl;
+  exchangeRate.disabled = isBrl;
+  if (isBrl) {
+    exchangeRate.value = "1,000000";
+    return;
+  }
+  if (!transactionForm.elements.date.value) {
+    return;
+  }
+  exchangeRate.placeholder = "Buscando cotação...";
+  try {
+    const response = await api(`/api/exchange-rate?currency=${encodeURIComponent(currency)}&date=${encodeURIComponent(transactionForm.elements.date.value)}`);
+    exchangeRate.value = response.rate.replace(".", ",");
+  } catch (error) {
+    exchangeRate.value = "";
+    exchangeRate.placeholder = "Informe a cotação manual";
+  }
 }
 
 function groupTransactionsByDate(transactions) {
@@ -793,17 +846,33 @@ function getCurrentMonthTotals() {
   const now = new Date();
   const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   return state.transactions.reduce((totals, transaction) => {
-    if (!transaction.date.startsWith(prefix) || transaction.account_currency !== "BRL") {
+    if (!transaction.date.startsWith(prefix)) {
       return totals;
     }
+    const amountBrl = Number(transaction.amount_brl || transaction.amount);
     if (transaction.type === "income") {
-      totals.income += Number(transaction.amount);
+      totals.income += amountBrl;
     }
     if (transaction.type === "expense") {
-      totals.expense += Number(transaction.amount);
+      totals.expense += amountBrl;
+    }
+    if (isInvestmentTransfer(transaction)) {
+      totals.investment += amountBrl;
     }
     return totals;
-  }, { income: 0, expense: 0 });
+  }, { income: 0, expense: 0, investment: 0, get savingsRate() {
+    return this.income > 0 ? this.investment / this.income : 0;
+  } });
+}
+
+function destinationAccountOptions(investmentOnly) {
+  const sourceAccount = state.accounts.find((account) => String(account.id) === transactionAccount.value);
+  return state.accounts
+    .filter((account) => String(account.id) !== transactionAccount.value)
+    .filter((account) => !sourceAccount || account.currency === sourceAccount.currency)
+    .filter((account) => !investmentOnly || account.account_type === "investment")
+    .map((account) => `<option value="${account.id}">${escapeHtml(account.name)} (${escapeHtml(account.currency)})</option>`)
+    .join("");
 }
 
 function renderCurrencyTotals(totals) {
@@ -861,7 +930,7 @@ async function api(path, options = {}) {
       body: options.body ? JSON.stringify(options.body) : undefined,
     });
   } catch (error) {
-    throw new Error("Nao foi possivel falar com o servidor local. Abra pelo endereco http://localhost:8000.");
+    throw new Error(`Nao foi possivel falar com o servidor local. Abra pelo endereco ${window.location.origin}.`);
   }
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -879,7 +948,7 @@ async function upload(path, body) {
       body,
     });
   } catch (error) {
-    throw new Error("Nao foi possivel falar com o servidor local. Abra pelo endereco http://localhost:8000.");
+    throw new Error(`Nao foi possivel falar com o servidor local. Abra pelo endereco ${window.location.origin}.`);
   }
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -925,6 +994,17 @@ function transactionTypeLabel(type) {
   }[type] || type;
 }
 
+function accountTypeLabel(type) {
+  return {
+    liquidity: "Liquidez",
+    investment: "Investimento",
+  }[type] || "Liquidez";
+}
+
+function isInvestmentTransfer(transaction) {
+  return transaction.type === "transfer" && transaction.destination_account_type === "investment";
+}
+
 function formatCategoryPath(transaction) {
   if (!transaction.subcategory_name) {
     return transaction.category_name;
@@ -935,6 +1015,10 @@ function formatCategoryPath(transaction) {
 function formatMoney(value, currency) {
   const amount = Number(value);
   return amount.toLocaleString("pt-BR", { style: "currency", currency });
+}
+
+function formatPercent(value) {
+  return Number(value).toLocaleString("pt-BR", { style: "percent", maximumFractionDigits: 1 });
 }
 
 function formatDate(value) {

@@ -27,7 +27,7 @@ Dê dois cliques em:
 O app inicia o servidor local em segundo plano e abre o sistema no navegador em:
 
 ```text
-http://localhost:8000
+http://sistema-financeiro.localhost:8010
 ```
 
 Se o macOS bloquear a primeira abertura, use botão direito no app > `Abrir`.
@@ -43,7 +43,13 @@ python3 app.py
 Depois acesse:
 
 ```text
-http://localhost:8000
+http://sistema-financeiro.localhost:8010
+```
+
+Se quiser usar outra porta temporariamente:
+
+```bash
+APP_PORT=8020 APP_URL=http://sistema-financeiro.localhost:8020 python3 app.py
 ```
 
 Para reiniciar os testes do zero, pare o servidor e apague `data/finance.db`.

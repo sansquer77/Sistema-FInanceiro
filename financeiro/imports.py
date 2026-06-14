@@ -8,7 +8,15 @@ from http import HTTPStatus
 from io import StringIO
 
 from financeiro.categories import ClassificationError, get_or_create_category, get_or_create_subcategory, get_or_create_tag, normalize_name
-from financeiro.transactions import apply_balance_delta, balance_delta, get_active_account, normalize_tags, replace_transaction_tags
+from financeiro.transactions import (
+    apply_balance_delta,
+    balance_delta,
+    convert_to_brl_cents,
+    get_active_account,
+    normalize_tags,
+    replace_transaction_tags,
+    resolve_exchange_rate_micros,
+)
 from financeiro.database import get_connection
 
 OLE_MAGIC = bytes.fromhex("D0CF11E0A1B11AE1")
@@ -44,12 +52,18 @@ def import_organizze_transactions(user_id: int, account_id: object, file_bytes: 
     imported = []
     skipped = []
     with get_connection() as conn:
-        get_active_account(conn, user_id, normalized_account_id)
+        account = get_active_account(conn, user_id, normalized_account_id)
         for raw in raw_rows:
             try:
                 transaction = normalize_imported_transaction(raw)
+                exchange_rate_micros = resolve_exchange_rate_micros(account["currency"], transaction["date"], None)
+                amount_brl_cents = convert_to_brl_cents(transaction["amount_cents"], exchange_rate_micros)
             except ImportError as exc:
                 skipped.append({"row": raw["row"], "description": raw.get("description", ""), "reason": exc.message})
+                continue
+            except Exception as exc:
+                message = getattr(exc, "message", "Nao foi possivel consolidar o valor em reais.")
+                skipped.append({"row": raw["row"], "description": raw.get("description", ""), "reason": message})
                 continue
             category_id = get_or_create_category(conn, user_id, transaction["category"])
             subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
@@ -62,15 +76,17 @@ def import_organizze_transactions(user_id: int, account_id: object, file_bytes: 
             cursor = conn.execute(
                 """
                 INSERT INTO transactions (
-                    user_id, type, description, amount_cents, date, account_id,
+                    user_id, type, description, amount_cents, exchange_rate_micros, amount_brl_cents, date, account_id,
                     category_id, subcategory_id, notes
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     user_id,
                     transaction["type"],
                     transaction["description"],
                     transaction["amount_cents"],
+                    exchange_rate_micros,
+                    amount_brl_cents,
                     transaction["date"],
                     normalized_account_id,
                     category_id,

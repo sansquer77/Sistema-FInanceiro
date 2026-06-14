@@ -6,6 +6,7 @@ from http import HTTPStatus
 from financeiro.database import get_connection, row_to_dict
 
 SUPPORTED_CURRENCIES = {"BRL", "USD", "EUR", "GBP"}
+ACCOUNT_TYPES = {"liquidity", "investment"}
 
 
 class AccountError(Exception):
@@ -44,9 +45,9 @@ def create_checking_account(user_id: int, data: dict) -> dict:
         cursor = conn.execute(
             """
             INSERT INTO checking_accounts (
-                user_id, name, bank_name, branch, account_number, currency,
+                user_id, name, bank_name, branch, account_number, account_type, currency,
                 initial_balance_cents, current_balance_cents, notes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 user_id,
@@ -54,6 +55,7 @@ def create_checking_account(user_id: int, data: dict) -> dict:
                 account["bank_name"],
                 account["branch"],
                 account["account_number"],
+                account["account_type"],
                 account["currency"],
                 account["initial_balance_cents"],
                 account["initial_balance_cents"],
@@ -93,7 +95,7 @@ def update_checking_account(user_id: int, account_id: str, data: dict) -> dict:
         conn.execute(
             """
             UPDATE checking_accounts
-            SET name = ?, bank_name = ?, branch = ?, account_number = ?, currency = ?,
+            SET name = ?, bank_name = ?, branch = ?, account_number = ?, account_type = ?, currency = ?,
                 initial_balance_cents = ?, current_balance_cents = ?, notes = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND user_id = ?
@@ -103,6 +105,7 @@ def update_checking_account(user_id: int, account_id: str, data: dict) -> dict:
                 account["bank_name"],
                 account["branch"],
                 account["account_number"],
+                account["account_type"],
                 account["currency"],
                 account["initial_balance_cents"],
                 updated_current_balance,
@@ -152,15 +155,19 @@ def normalize_account_payload(data: dict) -> dict:
     name = str(data.get("name", "")).strip()
     bank_name = str(data.get("bank_name", "")).strip()
     currency = str(data.get("currency", "BRL")).strip().upper()
+    account_type = str(data.get("account_type", "liquidity")).strip().lower()
     if not name:
         raise AccountError("Informe o nome da conta.")
     if not bank_name:
         raise AccountError("Informe o banco.")
+    if account_type not in ACCOUNT_TYPES:
+        raise AccountError("Natureza da conta invalida.")
     if currency not in SUPPORTED_CURRENCIES:
         raise AccountError("Moeda nao suportada neste modulo inicial.")
     return {
         "name": name,
         "bank_name": bank_name,
+        "account_type": account_type,
         "branch": empty_to_none(data.get("branch")),
         "account_number": empty_to_none(data.get("account_number")),
         "currency": currency,

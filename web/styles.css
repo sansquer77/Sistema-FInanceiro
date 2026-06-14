@@ -279,7 +279,7 @@ textarea:focus {
 
 .summary-strip {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 12px;
   margin-bottom: 18px;
 }
@@ -619,6 +619,14 @@ textarea:focus {
 
 .transaction-amount {
   text-align: right;
+}
+
+.transaction-amount span {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .transaction-row.positive .transaction-amount strong {

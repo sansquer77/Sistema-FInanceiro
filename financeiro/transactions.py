@@ -1,13 +1,19 @@
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from http import HTTPStatus
+import json
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 from financeiro.accounts import cents_to_money, empty_to_none, money_to_cents
 from financeiro.categories import ClassificationError, get_or_create_category, get_or_create_subcategory, get_or_create_tag, normalize_name
 from financeiro.database import get_connection, row_to_dict
 
 TRANSACTION_TYPES = {"income", "expense", "transfer"}
+EXCHANGE_RATE_SCALE = Decimal("1000000")
+FRANKFURTER_RATE_URL = "https://api.frankfurter.dev/v2/rate/{base}/BRL"
 
 
 class TransactionError(Exception):
@@ -25,7 +31,9 @@ def list_transactions(user_id: int) -> list[dict]:
                 transactions.*,
                 source.name AS account_name,
                 source.currency AS account_currency,
+                source.account_type AS account_type,
                 destination.name AS destination_account_name,
+                destination.account_type AS destination_account_type,
                 categories.name AS category_name,
                 subcategories.name AS subcategory_name,
                 GROUP_CONCAT(tags.name, '||') AS tag_names
@@ -67,6 +75,8 @@ def create_transaction(user_id: int, data: dict) -> dict:
                 raise TransactionError("Informe contas diferentes para transferencia.")
             if source["currency"] != destination["currency"]:
                 raise TransactionError("Transferencias exigem contas com a mesma moeda.")
+        exchange_rate_micros = resolve_exchange_rate_micros(source["currency"], transaction["date"], transaction["exchange_rate"])
+        amount_brl_cents = convert_to_brl_cents(transaction["amount_cents"], exchange_rate_micros)
         category_id = get_or_create_category(conn, user_id, transaction["category"])
         subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
         tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
@@ -76,15 +86,17 @@ def create_transaction(user_id: int, data: dict) -> dict:
         cursor = conn.execute(
             """
             INSERT INTO transactions (
-                user_id, type, description, amount_cents, date, account_id,
+                user_id, type, description, amount_cents, exchange_rate_micros, amount_brl_cents, date, account_id,
                 destination_account_id, category_id, subcategory_id, notes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 user_id,
                 transaction["type"],
                 transaction["description"],
                 transaction["amount_cents"],
+                exchange_rate_micros,
+                amount_brl_cents,
                 transaction["date"],
                 source["id"],
                 destination["id"] if destination else None,
@@ -148,6 +160,7 @@ def normalize_transaction_payload(data: dict) -> dict:
         "date": transaction_date,
         "account_id": account_id,
         "destination_account_id": destination_account_id,
+        "exchange_rate": data.get("exchange_rate_to_brl") or data.get("exchange_rate"),
         "category": normalize_name(data.get("category"), "Informe a categoria."),
         "subcategory": normalize_optional_name(data.get("subcategory")),
         "tags": normalize_tags(data.get("tags") or data.get("tag")),
@@ -187,6 +200,60 @@ def get_active_account(conn, user_id: int, account_id: int):
     return account
 
 
+def get_exchange_rate_to_brl(currency: str, transaction_date: str | None = None) -> Decimal:
+    normalized_currency = str(currency or "BRL").strip().upper()
+    if normalized_currency == "BRL":
+        return Decimal("1")
+    query_date = normalize_date(transaction_date) if transaction_date else date.today().isoformat()
+    url = f"{FRANKFURTER_RATE_URL.format(base=normalized_currency)}?date={query_date}"
+    request = Request(url, headers={"User-Agent": "SistemaFinanceiro/0.1"})
+    try:
+        with urlopen(request, timeout=5) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise TransactionError("Nao foi possivel consultar a cotacao. Informe a cotacao manualmente.") from exc
+    try:
+        return parse_exchange_rate(payload["rate"])
+    except (KeyError, TypeError, InvalidOperation) as exc:
+        raise TransactionError("Cotacao nao encontrada para esta moeda. Informe a cotacao manualmente.") from exc
+
+
+def resolve_exchange_rate_micros(currency: str, transaction_date: str, raw_rate: object) -> int:
+    normalized_currency = str(currency or "BRL").strip().upper()
+    if normalized_currency == "BRL":
+        return rate_to_micros(Decimal("1"))
+    if str(raw_rate or "").strip():
+        return rate_to_micros(parse_exchange_rate(raw_rate))
+    return rate_to_micros(get_exchange_rate_to_brl(normalized_currency, transaction_date))
+
+
+def parse_exchange_rate(value: object) -> Decimal:
+    raw = str(value or "").strip()
+    if "," in raw:
+        raw = raw.replace(".", "").replace(",", ".")
+    try:
+        rate = Decimal(raw).quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP)
+    except InvalidOperation as exc:
+        raise TransactionError("Cotacao invalida.") from exc
+    if rate <= 0:
+        raise TransactionError("Informe uma cotacao maior que zero.")
+    return rate
+
+
+def rate_to_micros(rate: Decimal) -> int:
+    return int((rate * EXCHANGE_RATE_SCALE).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
+def micros_to_rate(micros: int) -> str:
+    rate = Decimal(micros) / EXCHANGE_RATE_SCALE
+    return f"{rate:.6f}"
+
+
+def convert_to_brl_cents(amount_cents: int, exchange_rate_micros: int) -> int:
+    amount = Decimal(amount_cents) * Decimal(exchange_rate_micros) / EXCHANGE_RATE_SCALE
+    return int(amount.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
 def balance_delta(transaction_type: str, amount_cents: int, side: str) -> int:
     if transaction_type == "income":
         return amount_cents
@@ -223,7 +290,9 @@ def fetch_transaction(conn, user_id: int, transaction_id: int) -> dict:
             transactions.*,
                 source.name AS account_name,
                 source.currency AS account_currency,
+                source.account_type AS account_type,
                 destination.name AS destination_account_name,
+                destination.account_type AS destination_account_type,
                 categories.name AS category_name,
                 subcategories.name AS subcategory_name,
                 GROUP_CONCAT(tags.name, '||') AS tag_names
@@ -255,6 +324,8 @@ def fetch_transaction(conn, user_id: int, transaction_id: int) -> dict:
 
 def format_transaction(transaction: dict) -> dict:
     transaction["amount"] = cents_to_money(transaction.pop("amount_cents"))
+    transaction["exchange_rate_to_brl"] = micros_to_rate(transaction.pop("exchange_rate_micros"))
+    transaction["amount_brl"] = cents_to_money(transaction.pop("amount_brl_cents"))
     raw_tags = transaction.pop("tag_names", "") or ""
     transaction["tags"] = [tag for tag in raw_tags.split("||") if tag]
     transaction["tag_name"] = ", ".join(transaction["tags"])

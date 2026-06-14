@@ -98,16 +98,20 @@
               <strong id="accountCount">0</strong>
             </div>
             <div>
-              <span>Moedas cadastradas</span>
-              <strong id="currencyCount">0</strong>
-            </div>
-            <div>
               <span>Receitas do mês</span>
               <strong id="monthIncome">R$ 0,00</strong>
             </div>
             <div>
               <span>Despesas do mês</span>
               <strong id="monthExpense">R$ 0,00</strong>
+            </div>
+            <div>
+              <span>Aportes do mês</span>
+              <strong id="monthInvestment">R$ 0,00</strong>
+            </div>
+            <div>
+              <span>Taxa de poupança</span>
+              <strong id="savingsRate">0%</strong>
             </div>
           </section>
 
@@ -149,6 +153,12 @@
                   </label>
                 </div>
                 <div class="field-row">
+                  <label>Natureza
+                    <select name="account_type">
+                      <option value="liquidity">Liquidez</option>
+                      <option value="investment">Investimento</option>
+                    </select>
+                  </label>
                   <label>Moeda
                     <select name="currency">
                       <option value="BRL">BRL</option>
@@ -199,6 +209,7 @@
                       <option value="expense">Despesa</option>
                       <option value="income">Receita</option>
                       <option value="transfer">Transferência</option>
+                      <option value="investment">Investimento</option>
                     </select>
                   </label>
                   <label>Data
@@ -218,6 +229,9 @@
                 </div>
                 <label id="destinationAccountLabel" hidden>Conta de destino
                   <select name="destination_account_id" id="destinationAccount"></select>
+                </label>
+                <label id="exchangeRateLabel" hidden>Cotação para BRL
+                  <input name="exchange_rate_to_brl" id="exchangeRate" type="text" inputmode="decimal" placeholder="1,000000">
                 </label>
                 <div class="field-row">
                   <label>Categoria

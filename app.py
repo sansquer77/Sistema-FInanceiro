@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import os
 import re
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
+from urllib.parse import parse_qs
 
 from financeiro.accounts import (
     archive_checking_account,
@@ -46,13 +48,15 @@ from financeiro.imports import import_organizze_transactions
 from financeiro.transactions import (
     create_transaction,
     delete_transaction,
+    get_exchange_rate_to_brl,
     list_transactions,
 )
 
 ROOT = Path(__file__).resolve().parent
 WEB_ROOT = ROOT / "web"
-HOST = "127.0.0.1"
-PORT = 8000
+HOST = os.environ.get("APP_HOST", "127.0.0.1")
+PORT = int(os.environ.get("APP_PORT", "8010"))
+PUBLIC_URL = os.environ.get("APP_URL", f"http://sistema-financeiro.localhost:{PORT}")
 
 
 class AppHandler(BaseHTTPRequestHandler):
@@ -68,6 +72,9 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path.startswith("/api/transactions"):
             self.handle_list_transactions()
+            return
+        if path == "/api/exchange-rate":
+            self.handle_exchange_rate()
             return
         if path == "/api/categories":
             self.handle_list_categories()
@@ -229,6 +236,14 @@ class AppHandler(BaseHTTPRequestHandler):
         user = self.require_user()
         transactions = list_transactions(user["id"])
         self.send_json({"transactions": transactions})
+
+    def handle_exchange_rate(self) -> None:
+        self.require_user()
+        query = parse_qs(urlsplit(self.path).query)
+        currency = (query.get("currency") or ["BRL"])[0]
+        transaction_date = (query.get("date") or [None])[0]
+        rate = get_exchange_rate_to_brl(currency, transaction_date)
+        self.send_json({"currency": currency.upper(), "date": transaction_date, "rate": f"{rate:.6f}"})
 
     def handle_list_categories(self) -> None:
         user = self.require_user()
@@ -462,7 +477,7 @@ class ApiError(Exception):
 def main() -> None:
     initialize_database()
     server = ThreadingHTTPServer((HOST, PORT), AppHandler)
-    print(f"Sistema Financeiro rodando em http://localhost:{PORT}")
+    print(f"Sistema Financeiro rodando em {PUBLIC_URL}")
     server.serve_forever()
 
 

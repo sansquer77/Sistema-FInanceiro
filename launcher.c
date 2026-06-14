@@ -3,17 +3,23 @@
 
 int main(void) {
     const char *check =
-        "/usr/bin/curl -fsS --max-time 1 http://localhost:8000 >/dev/null 2>&1";
+        "/usr/bin/curl -fsS --max-time 1 http://sistema-financeiro.localhost:8010 >/dev/null 2>&1";
     const char *start =
         "cd '/Users/sansquer/Documents/Sistema Financeiro' && "
         "mkdir -p data && "
-        "/usr/bin/python3 app.py >> data/server.log 2>&1 </dev/null &";
+        "APP_HOST=127.0.0.1 APP_PORT=8010 APP_URL='http://sistema-financeiro.localhost:8010' "
+        "/usr/bin/nohup /usr/bin/python3 app.py >> data/server.log 2>&1 </dev/null &";
     const char *open_url =
-        "/usr/bin/open http://localhost:8000 >/dev/null 2>&1 &";
+        "/usr/bin/open http://sistema-financeiro.localhost:8010 >/dev/null 2>&1 &";
 
     if (system(check) != 0) {
         system(start);
-        sleep(1);
+        for (int i = 0; i < 40; i++) {
+            if (system(check) == 0) {
+                break;
+            }
+            usleep(250000);
+        }
     }
 
     system(open_url);
