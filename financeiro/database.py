@@ -77,6 +77,38 @@ def initialize_database() -> None:
                 UNIQUE (user_id, name)
             );
 
+            CREATE TABLE IF NOT EXISTS credit_card_transactions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                credit_card_id INTEGER NOT NULL REFERENCES credit_cards(id) ON DELETE CASCADE,
+                type TEXT NOT NULL CHECK (type IN ('income', 'expense')),
+                description TEXT NOT NULL,
+                amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+                date TEXT NOT NULL,
+                invoice_month TEXT NOT NULL,
+                category_id INTEGER REFERENCES categories(id),
+                subcategory_id INTEGER REFERENCES subcategories(id),
+                reconciled_at TEXT,
+                notes TEXT,
+                archived_at TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS credit_card_payments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                credit_card_id INTEGER NOT NULL REFERENCES credit_cards(id) ON DELETE CASCADE,
+                invoice_month TEXT NOT NULL,
+                account_id INTEGER NOT NULL REFERENCES checking_accounts(id),
+                transaction_id INTEGER NOT NULL REFERENCES transactions(id),
+                payment_date TEXT NOT NULL,
+                amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+                notes TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (user_id, credit_card_id, invoice_month)
+            );
+
             CREATE TABLE IF NOT EXISTS categories (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -161,6 +193,9 @@ def initialize_database() -> None:
             CREATE INDEX IF NOT EXISTS idx_transactions_account
             ON transactions (account_id);
 
+            CREATE INDEX IF NOT EXISTS idx_credit_card_transactions_card_month
+            ON credit_card_transactions (credit_card_id, invoice_month);
+
             CREATE INDEX IF NOT EXISTS idx_subcategories_category
             ON subcategories (category_id);
 
@@ -182,6 +217,7 @@ def initialize_database() -> None:
         ensure_column(conn, "transactions", "installment_count", "INTEGER")
         ensure_column(conn, "transactions", "recurrence_frequency", "TEXT")
         ensure_column(conn, "transactions", "reconciled_at", "TEXT")
+        ensure_column(conn, "credit_card_transactions", "reconciled_at", "TEXT")
         ensure_column(conn, "checking_accounts", "account_type", "TEXT NOT NULL DEFAULT 'liquidity'")
         ensure_column(conn, "categories", "group_type", "TEXT NOT NULL DEFAULT 'expense'")
         migrate_category_unique_constraint(conn)

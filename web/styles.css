@@ -235,9 +235,59 @@ textarea:focus {
 }
 
 .dashboard {
-  width: min(1180px, calc(100% - 32px));
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr);
+  gap: 24px;
+  width: min(1320px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 30px 0 48px;
+  padding: 24px 0 48px;
+  align-items: start;
+}
+
+.dashboard-main {
+  min-width: 0;
+}
+
+.app-sidebar {
+  position: sticky;
+  top: 24px;
+  display: grid;
+  gap: 18px;
+  min-height: calc(100vh - 48px);
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--shadow);
+}
+
+.sidebar-brand {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.sidebar-brand .brand-mark {
+  width: 44px;
+  height: 44px;
+}
+
+.sidebar-brand strong,
+.sidebar-brand span {
+  display: block;
+}
+
+.sidebar-brand strong {
+  line-height: 1.15;
+}
+
+.sidebar-brand span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .topbar {
@@ -245,7 +295,8 @@ textarea:focus {
   justify-content: space-between;
   gap: 18px;
   align-items: center;
-  margin-bottom: 24px;
+  min-height: 76px;
+  margin-bottom: 18px;
 }
 
 .eyebrow {
@@ -265,27 +316,54 @@ textarea:focus {
 }
 
 .app-nav {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 18px;
-  padding-bottom: 2px;
-  overflow-x: auto;
+  display: grid;
+  gap: 16px;
+}
+
+.nav-group {
+  display: grid;
+  gap: 6px;
+}
+
+.nav-group > span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
 }
 
 .nav-button {
-  min-height: 40px;
-  padding: 0 16px;
-  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  min-height: 38px;
+  width: 100%;
+  padding: 0 12px;
+  border: 1px solid transparent;
   border-radius: 6px;
-  background: #fff;
-  color: var(--muted);
+  background: transparent;
+  color: #394756;
   font-weight: 800;
+  text-align: left;
+}
+
+.nav-button:hover {
+  background: #eef2f4;
 }
 
 .nav-button.active {
-  color: #fff;
-  background: var(--accent);
-  border-color: var(--accent);
+  color: var(--accent-dark);
+  background: var(--soft);
+  border-color: rgba(15, 118, 110, 0.2);
+}
+
+.logout-nav-button {
+  color: var(--danger);
+}
+
+.logout-nav-button:hover {
+  background: #fff1ef;
+  border-color: #f0c7c2;
 }
 
 .summary-strip {
@@ -726,6 +804,71 @@ textarea:focus {
   margin-top: 18px;
 }
 
+.card-invoice-panel,
+.card-transaction-workspace {
+  margin-top: 18px;
+}
+
+#cardLaunchesView > .card-invoice-panel {
+  margin-top: 0;
+}
+
+.card-invoice-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.card-invoice-summary > div {
+  display: grid;
+  gap: 5px;
+  min-height: 72px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+}
+
+.card-invoice-summary span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.card-invoice-summary strong {
+  font-size: 19px;
+}
+
+.invoice-payment-form {
+  padding-top: 2px;
+}
+
+.card-invoice-list {
+  display: grid;
+  gap: 10px;
+}
+
+.card-invoice-row,
+.card-invoice-payment {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.card-invoice-row.negative {
+  border-left: 4px solid var(--danger);
+}
+
+.card-invoice-row.positive,
+.card-invoice-payment {
+  border-left: 4px solid var(--accent);
+}
+
 .spending-limit-list {
   display: grid;
   gap: 12px;
@@ -979,15 +1122,35 @@ textarea:focus {
 
 @media (max-width: 860px) {
   .auth-panel,
+  .dashboard,
   .workspace,
   .summary-strip,
   .month-balance-summary,
   .limit-summary,
+  .card-invoice-summary,
   .cockpit-grid,
   .classification-grid,
   .import-summary,
   .user-settings-grid {
     grid-template-columns: 1fr;
+  }
+
+  .dashboard {
+    gap: 18px;
+    padding-top: 16px;
+  }
+
+  .app-sidebar {
+    position: static;
+    min-height: 0;
+  }
+
+  .app-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .nav-group {
+    align-content: start;
   }
 
   .auth-panel {
@@ -998,6 +1161,8 @@ textarea:focus {
   .topbar,
   .account-card,
   .credit-card-item,
+  .card-invoice-row,
+  .card-invoice-payment,
   .classification-item,
   .transaction-row {
     align-items: stretch;
@@ -1026,6 +1191,10 @@ textarea:focus {
   }
 
   .field-row {
+    grid-template-columns: 1fr;
+  }
+
+  .app-nav {
     grid-template-columns: 1fr;
   }
 

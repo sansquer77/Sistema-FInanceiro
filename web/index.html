@@ -71,27 +71,51 @@
       </section>
 
       <section class="dashboard" id="dashboardView" hidden>
-        <header class="topbar">
-          <div>
-            <p class="eyebrow" id="moduleEyebrow">Cockpit</p>
-            <h1 id="pageTitle">Resumo financeiro</h1>
+        <aside class="app-sidebar">
+          <div class="sidebar-brand">
+            <span class="brand-mark">SF</span>
+            <div>
+              <strong>Sistema Financeiro</strong>
+              <span id="userName"></span>
+            </div>
           </div>
-          <div class="user-area">
-            <span id="userName"></span>
-            <button class="ghost" id="logoutButton" type="button">Sair</button>
-          </div>
-        </header>
 
-        <nav class="app-nav" aria-label="Modulos">
-          <button class="nav-button active" type="button" data-view="cockpit">Cockpit</button>
-          <button class="nav-button" type="button" data-view="accounts">Contas</button>
-          <button class="nav-button" type="button" data-view="creditCards">Cartões</button>
-          <button class="nav-button" type="button" data-view="transactions">Lançamentos</button>
-          <button class="nav-button" type="button" data-view="limits">Limites</button>
-          <button class="nav-button" type="button" data-view="classifications">Categorias e tags</button>
-          <button class="nav-button" type="button" data-view="imports">Importação</button>
-          <button class="nav-button" type="button" data-view="user">Usuário</button>
-        </nav>
+          <nav class="app-nav" aria-label="Modulos">
+            <div class="nav-group">
+              <span>Visão geral</span>
+              <button class="nav-button active" type="button" data-view="cockpit">Cockpit</button>
+            </div>
+            <div class="nav-group">
+              <span>Cadastro</span>
+              <button class="nav-button" type="button" data-view="accounts">Contas</button>
+              <button class="nav-button" type="button" data-view="creditCards">Cartões</button>
+            </div>
+            <div class="nav-group">
+              <span>Lançamentos</span>
+              <button class="nav-button" type="button" data-view="transactions">Contas</button>
+              <button class="nav-button" type="button" data-view="cardLaunches">Cartões</button>
+            </div>
+            <div class="nav-group">
+              <span>Gestão</span>
+              <button class="nav-button" type="button" data-view="limits">Limites</button>
+              <button class="nav-button" type="button" data-view="classifications">Categorias</button>
+              <button class="nav-button" type="button" data-view="imports">Importação</button>
+            </div>
+            <div class="nav-group">
+              <span>Usuário</span>
+              <button class="nav-button" type="button" data-view="user">Preferências</button>
+              <button class="nav-button logout-nav-button" id="logoutButton" type="button">Sair</button>
+            </div>
+          </nav>
+        </aside>
+
+        <div class="dashboard-main">
+          <header class="topbar">
+            <div>
+              <p class="eyebrow" id="moduleEyebrow">Cockpit</p>
+              <h1 id="pageTitle">Resumo financeiro</h1>
+            </div>
+          </header>
 
         <section class="module-view" id="cockpitView">
           <section class="summary-strip">
@@ -287,6 +311,103 @@
             </div>
             <div class="credit-card-list" id="archivedCreditCardList"></div>
           </section>
+        </section>
+
+        <section class="module-view" id="cardLaunchesView" hidden>
+          <section class="panel card-invoice-panel">
+            <div class="section-heading">
+              <h2>Fatura do cartão</h2>
+              <div class="month-navigator">
+                <button class="ghost small-button" type="button" id="previousCardInvoiceButton">Anterior</button>
+                <strong id="cardInvoiceMonthLabel"></strong>
+                <button class="ghost small-button" type="button" id="nextCardInvoiceButton">Próxima</button>
+              </div>
+            </div>
+
+            <label class="transaction-search">Cartão
+              <select id="cardInvoiceCard"></select>
+            </label>
+
+            <div class="card-invoice-summary">
+              <div>
+                <span>Fatura atual</span>
+                <strong id="cardInvoiceTotal">R$ 0,00</strong>
+              </div>
+              <div>
+                <span>Fatura conciliada</span>
+                <strong id="cardInvoiceReconciledTotal">R$ 0,00</strong>
+              </div>
+              <div>
+                <span>Fechamento</span>
+                <strong id="cardInvoiceClosingDate">--</strong>
+              </div>
+              <div>
+                <span>Vencimento</span>
+                <strong id="cardInvoiceDueDate">--</strong>
+              </div>
+            </div>
+
+            <form id="cardInvoicePaymentForm" class="form invoice-payment-form">
+              <input type="hidden" name="credit_card_id">
+              <input type="hidden" name="invoice_month">
+              <div class="field-row">
+                <label>Conta para pagamento
+                  <select name="account_id" id="cardPaymentAccount" required></select>
+                </label>
+                <label>Data do pagamento
+                  <input name="payment_date" id="cardPaymentDate" type="date" required>
+                </label>
+              </div>
+              <button class="primary" type="submit" id="payCardInvoiceButton">Pagar fatura</button>
+            </form>
+            <p class="message" id="cardInvoiceMessage" role="alert"></p>
+          </section>
+
+          <div class="workspace card-transaction-workspace">
+            <section class="panel">
+              <h2>Novo lançamento no cartão</h2>
+              <form id="cardTransactionForm" class="form">
+                <input type="hidden" name="credit_card_id">
+                <input type="hidden" name="invoice_month">
+                <div class="field-row">
+                  <label>Tipo
+                    <select name="type" id="cardTransactionType">
+                      <option value="expense">Despesa</option>
+                      <option value="income">Receita</option>
+                    </select>
+                  </label>
+                  <label>Data
+                    <input name="date" type="date" required>
+                  </label>
+                </div>
+                <label>Descrição
+                  <input name="description" type="text" placeholder="Ex.: mercado, estorno, assinatura..." required>
+                </label>
+                <label>Valor
+                  <input name="amount" type="text" inputmode="decimal" placeholder="0,00" required>
+                </label>
+                <div class="field-row">
+                  <label>Categoria
+                    <select name="category" id="cardTransactionCategory" required></select>
+                  </label>
+                  <label>Subcategoria
+                    <select name="subcategory" id="cardTransactionSubcategory"></select>
+                  </label>
+                </div>
+                <label>Observações
+                  <textarea name="notes" rows="3"></textarea>
+                </label>
+                <button class="primary" type="submit">Salvar lançamento</button>
+              </form>
+            </section>
+
+            <section class="panel">
+              <div class="section-heading">
+                <h2>Lançamentos da fatura</h2>
+              </div>
+              <div class="card-invoice-list" id="cardInvoiceList"></div>
+            </section>
+          </div>
         </section>
 
         <section class="module-view" id="transactionsView" hidden>
@@ -569,8 +690,9 @@
             </section>
           </div>
         </section>
+        </div>
       </section>
     </main>
-    <script src="/app.js?v=9"></script>
+    <script src="/app.js?v=10"></script>
   </body>
 </html>

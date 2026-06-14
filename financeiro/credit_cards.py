@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+from datetime import date
 from http import HTTPStatus
+import re
 
 from financeiro.accounts import SUPPORTED_CURRENCIES, cents_to_money, empty_to_none, money_to_cents
+from financeiro.categories import get_or_create_category, get_or_create_subcategory, get_or_create_tag, normalize_name
 from financeiro.database import get_connection, row_to_dict
+from financeiro.transactions import create_transaction
 
+CARD_TRANSACTION_TYPES = {"income", "expense"}
+MONTH_PATTERN = re.compile(r"^\d{4}-\d{2}$")
 
 class CreditCardError(Exception):
     def __init__(self, message: str, status: HTTPStatus = HTTPStatus.BAD_REQUEST) -> None:
@@ -36,6 +42,58 @@ def list_credit_cards_by_status(user_id: int, archived: bool) -> list[dict]:
     return [format_credit_card(row_to_dict(row)) for row in rows]
 
 
+def list_credit_card_invoice(user_id: int, card_id: object, month: object) -> dict:
+    normalized_card_id = normalize_card_id(card_id)
+    normalized_month = normalize_month(month)
+    with get_connection() as conn:
+        card = get_active_credit_card(conn, user_id, normalized_card_id)
+        rows = conn.execute(
+            """
+            SELECT
+                credit_card_transactions.*,
+                categories.name AS category_name,
+                subcategories.name AS subcategory_name
+            FROM credit_card_transactions
+            LEFT JOIN categories
+                ON categories.id = credit_card_transactions.category_id
+                AND categories.user_id = credit_card_transactions.user_id
+            LEFT JOIN subcategories
+                ON subcategories.id = credit_card_transactions.subcategory_id
+                AND subcategories.user_id = credit_card_transactions.user_id
+            WHERE credit_card_transactions.user_id = ?
+                AND credit_card_transactions.credit_card_id = ?
+                AND credit_card_transactions.invoice_month = ?
+                AND credit_card_transactions.archived_at IS NULL
+            ORDER BY credit_card_transactions.date DESC, credit_card_transactions.id DESC
+            """,
+            (user_id, normalized_card_id, normalized_month),
+        ).fetchall()
+        payment_rows = conn.execute(
+            """
+            SELECT
+                credit_card_payments.*,
+                checking_accounts.name AS account_name
+            FROM credit_card_payments
+            JOIN checking_accounts
+                ON checking_accounts.id = credit_card_payments.account_id
+                AND checking_accounts.user_id = credit_card_payments.user_id
+            WHERE credit_card_payments.user_id = ?
+                AND credit_card_payments.credit_card_id = ?
+                AND credit_card_payments.invoice_month = ?
+            ORDER BY credit_card_payments.payment_date DESC, credit_card_payments.id DESC
+            """,
+            (user_id, normalized_card_id, normalized_month),
+        ).fetchall()
+    transactions = [format_card_transaction(row_to_dict(row), card["currency"]) for row in rows]
+    payments = [format_card_payment(row_to_dict(row), card["currency"]) for row in payment_rows]
+    return {
+        "card": format_credit_card(row_to_dict(card)),
+        "month": normalized_month,
+        "transactions": transactions,
+        "payments": payments,
+    }
+
+
 def create_credit_card(user_id: int, data: dict) -> dict:
     card = normalize_credit_card_payload(data)
     try:
@@ -65,6 +123,182 @@ def create_credit_card(user_id: int, data: dict) -> dict:
             raise CreditCardError("Ja existe um cartao com este nome.", HTTPStatus.CONFLICT) from exc
         raise
     return format_credit_card(row_to_dict(row))
+
+
+def create_credit_card_transaction(user_id: int, data: dict) -> dict:
+    transaction = normalize_card_transaction_payload(data)
+    with get_connection() as conn:
+        card = get_active_credit_card(conn, user_id, transaction["credit_card_id"])
+        ensure_invoice_is_open(conn, user_id, card["id"], transaction["invoice_month"])
+        category_id = get_or_create_category(conn, user_id, transaction["category"], transaction["type"])
+        subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
+        cursor = conn.execute(
+            """
+            INSERT INTO credit_card_transactions (
+                user_id, credit_card_id, type, description, amount_cents, date,
+                invoice_month, category_id, subcategory_id, notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                user_id,
+                card["id"],
+                transaction["type"],
+                transaction["description"],
+                transaction["amount_cents"],
+                transaction["date"],
+                transaction["invoice_month"],
+                category_id,
+                subcategory_id,
+                transaction["notes"],
+            ),
+        )
+        row = fetch_card_transaction(conn, user_id, cursor.lastrowid)
+    return format_card_transaction(row, card["currency"])
+
+
+def delete_credit_card_transaction(user_id: int, transaction_id: str) -> None:
+    normalized_id = normalize_card_id(transaction_id)
+    with get_connection() as conn:
+        existing = conn.execute(
+            """
+            SELECT credit_card_id, invoice_month
+            FROM credit_card_transactions
+            WHERE id = ? AND user_id = ? AND archived_at IS NULL
+            """,
+            (normalized_id, user_id),
+        ).fetchone()
+        if not existing:
+            raise CreditCardError("Lancamento do cartao nao encontrado.", HTTPStatus.NOT_FOUND)
+        ensure_invoice_is_open(conn, user_id, existing["credit_card_id"], existing["invoice_month"])
+        cursor = conn.execute(
+            """
+            UPDATE credit_card_transactions
+            SET archived_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND user_id = ? AND archived_at IS NULL
+            """,
+            (normalized_id, user_id),
+        )
+        if cursor.rowcount == 0:
+            raise CreditCardError("Lancamento do cartao nao encontrado.", HTTPStatus.NOT_FOUND)
+
+
+def set_credit_card_transaction_reconciled(user_id: int, transaction_id: str, reconciled: bool) -> dict:
+    normalized_id = normalize_card_id(transaction_id)
+    with get_connection() as conn:
+        existing = conn.execute(
+            """
+            SELECT credit_card_id, invoice_month
+            FROM credit_card_transactions
+            WHERE id = ? AND user_id = ? AND archived_at IS NULL
+            """,
+            (normalized_id, user_id),
+        ).fetchone()
+        if not existing:
+            raise CreditCardError("Lancamento do cartao nao encontrado.", HTTPStatus.NOT_FOUND)
+        ensure_invoice_is_open(conn, user_id, existing["credit_card_id"], existing["invoice_month"])
+        cursor = conn.execute(
+            """
+            UPDATE credit_card_transactions
+            SET reconciled_at = CASE WHEN ? THEN CURRENT_TIMESTAMP ELSE NULL END,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND user_id = ? AND archived_at IS NULL
+            """,
+            (1 if reconciled else 0, normalized_id, user_id),
+        )
+        if cursor.rowcount == 0:
+            raise CreditCardError("Lancamento do cartao nao encontrado.", HTTPStatus.NOT_FOUND)
+        row = fetch_card_transaction(conn, user_id, normalized_id)
+        card = get_active_credit_card(conn, user_id, row["credit_card_id"])
+    return format_card_transaction(row, card["currency"])
+
+
+def pay_credit_card_invoice(user_id: int, data: dict) -> dict:
+    card_id = normalize_card_id(data.get("credit_card_id"))
+    invoice_month = normalize_month(data.get("invoice_month"))
+    account_id = normalize_card_id(data.get("account_id"))
+    payment_date = normalize_date(data.get("payment_date"))
+    notes = empty_to_none(data.get("notes"))
+    with get_connection() as conn:
+        card = get_active_credit_card(conn, user_id, card_id)
+        account = conn.execute(
+            """
+            SELECT id, name, currency
+            FROM checking_accounts
+            WHERE id = ? AND user_id = ? AND archived_at IS NULL
+            """,
+            (account_id, user_id),
+        ).fetchone()
+        if not account:
+            raise CreditCardError("Conta de pagamento nao encontrada.", HTTPStatus.NOT_FOUND)
+        if account["currency"] != card["currency"]:
+            raise CreditCardError("A conta de pagamento deve ter a mesma moeda do cartao.")
+        existing = conn.execute(
+            """
+            SELECT id
+            FROM credit_card_payments
+            WHERE user_id = ? AND credit_card_id = ? AND invoice_month = ?
+            """,
+            (user_id, card_id, invoice_month),
+        ).fetchone()
+        if existing:
+            raise CreditCardError("Esta fatura ja foi paga.", HTTPStatus.CONFLICT)
+        amount_cents = invoice_balance_cents(conn, user_id, card_id, invoice_month)
+    if amount_cents <= 0:
+        raise CreditCardError("Nao ha valor em aberto para pagar nesta fatura.")
+    payment_transaction = create_transaction(
+        user_id,
+        {
+            "type": "expense",
+            "description": f"Pagamento fatura {card['name']} {format_invoice_month(invoice_month)}",
+            "amount": cents_to_money(amount_cents).replace(".", ","),
+            "date": payment_date,
+            "account_id": str(account_id),
+            "category": "Serviços Financeiros e Impostos",
+            "subcategory": "Pagamento de Fatura de Cartão",
+            "tags": "Cartão de Crédito",
+            "notes": notes or f"Pagamento da fatura {invoice_month}.",
+        },
+    )
+    try:
+        with get_connection() as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO credit_card_payments (
+                    user_id, credit_card_id, invoice_month, account_id, transaction_id,
+                    payment_date, amount_cents, notes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    user_id,
+                    card_id,
+                    invoice_month,
+                    account_id,
+                    payment_transaction["id"],
+                    payment_date,
+                    amount_cents,
+                    notes,
+                ),
+            )
+            row = conn.execute(
+                """
+                SELECT
+                    credit_card_payments.*,
+                    checking_accounts.name AS account_name
+                FROM credit_card_payments
+                JOIN checking_accounts
+                    ON checking_accounts.id = credit_card_payments.account_id
+                WHERE credit_card_payments.id = ? AND credit_card_payments.user_id = ?
+                """,
+                (cursor.lastrowid, user_id),
+            ).fetchone()
+    except Exception as exc:
+        if "UNIQUE constraint failed" in str(exc):
+            raise CreditCardError("Esta fatura ja foi paga.", HTTPStatus.CONFLICT) from exc
+        raise
+    return {
+        "payment": format_card_payment(row_to_dict(row), card["currency"]),
+        "transaction": payment_transaction,
+    }
 
 
 def update_credit_card(user_id: int, card_id: str, data: dict) -> dict:
@@ -167,6 +401,32 @@ def normalize_credit_card_payload(data: dict) -> dict:
     }
 
 
+def normalize_card_transaction_payload(data: dict) -> dict:
+    transaction_type = str(data.get("type", "")).strip().lower()
+    description = str(data.get("description", "")).strip()
+    try:
+        amount_cents = money_to_cents(data.get("amount", "0"))
+    except Exception as exc:
+        raise CreditCardError("Valor invalido.") from exc
+    if transaction_type not in CARD_TRANSACTION_TYPES:
+        raise CreditCardError("Cartao aceita apenas despesas e receitas.")
+    if not description:
+        raise CreditCardError("Informe a descricao do lancamento.")
+    if amount_cents <= 0:
+        raise CreditCardError("Informe um valor maior que zero.")
+    return {
+        "credit_card_id": normalize_card_id(data.get("credit_card_id")),
+        "type": transaction_type,
+        "description": description,
+        "amount_cents": amount_cents,
+        "date": normalize_date(data.get("date")),
+        "invoice_month": normalize_month(data.get("invoice_month")),
+        "category": normalize_name(data.get("category"), "Informe a categoria."),
+        "subcategory": normalize_optional_name(data.get("subcategory")),
+        "notes": empty_to_none(data.get("notes")),
+    }
+
+
 def normalize_day(value: object, message: str) -> int:
     try:
         day = int(str(value or "").strip())
@@ -175,6 +435,31 @@ def normalize_day(value: object, message: str) -> int:
     if day < 1 or day > 31:
         raise CreditCardError("Informe um dia entre 1 e 31.")
     return day
+
+
+def normalize_date(value: object) -> str:
+    raw = str(value or "").strip()
+    try:
+        return date.fromisoformat(raw).isoformat()
+    except ValueError as exc:
+        raise CreditCardError("Data invalida.") from exc
+
+
+def normalize_month(value: object) -> str:
+    raw = str(value or "").strip()
+    if not MONTH_PATTERN.match(raw):
+        raise CreditCardError("Informe a fatura no formato AAAA-MM.")
+    month = int(raw[-2:])
+    if month < 1 or month > 12:
+        raise CreditCardError("Informe uma fatura valida.")
+    return raw
+
+
+def normalize_optional_name(value: object) -> str | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    return normalize_name(raw, "Informe a subcategoria.")
 
 
 def normalize_card_id(value: object) -> int:
@@ -187,6 +472,97 @@ def normalize_card_id(value: object) -> int:
     return normalized
 
 
+def get_active_credit_card(conn, user_id: int, card_id: int):
+    card = conn.execute(
+        """
+        SELECT *
+        FROM credit_cards
+        WHERE id = ? AND user_id = ? AND archived_at IS NULL
+        """,
+        (card_id, user_id),
+    ).fetchone()
+    if not card:
+        raise CreditCardError("Cartao nao encontrado.", HTTPStatus.NOT_FOUND)
+    return card
+
+
+def fetch_card_transaction(conn, user_id: int, transaction_id: int) -> dict:
+    row = conn.execute(
+        """
+        SELECT
+            credit_card_transactions.*,
+            credit_cards.currency AS card_currency,
+            categories.name AS category_name,
+            subcategories.name AS subcategory_name
+        FROM credit_card_transactions
+        JOIN credit_cards
+            ON credit_cards.id = credit_card_transactions.credit_card_id
+            AND credit_cards.user_id = credit_card_transactions.user_id
+        LEFT JOIN categories
+            ON categories.id = credit_card_transactions.category_id
+            AND categories.user_id = credit_card_transactions.user_id
+        LEFT JOIN subcategories
+            ON subcategories.id = credit_card_transactions.subcategory_id
+            AND subcategories.user_id = credit_card_transactions.user_id
+        WHERE credit_card_transactions.id = ? AND credit_card_transactions.user_id = ?
+        """,
+        (transaction_id, user_id),
+    ).fetchone()
+    if not row:
+        raise CreditCardError("Lancamento do cartao nao encontrado.", HTTPStatus.NOT_FOUND)
+    return row_to_dict(row)
+
+
+def invoice_balance_cents(conn, user_id: int, card_id: int, invoice_month: str) -> int:
+    row = conn.execute(
+        """
+        SELECT
+            COALESCE(SUM(
+                CASE
+                    WHEN type = 'expense' THEN amount_cents
+                    WHEN type = 'income' THEN -amount_cents
+                    ELSE 0
+                END
+            ), 0) AS total
+        FROM credit_card_transactions
+        WHERE user_id = ? AND credit_card_id = ? AND invoice_month = ?
+            AND archived_at IS NULL
+        """,
+        (user_id, card_id, invoice_month),
+    ).fetchone()
+    return int(row["total"])
+
+
+def ensure_invoice_is_open(conn, user_id: int, card_id: int, invoice_month: str) -> None:
+    row = conn.execute(
+        """
+        SELECT id
+        FROM credit_card_payments
+        WHERE user_id = ? AND credit_card_id = ? AND invoice_month = ?
+        """,
+        (user_id, card_id, invoice_month),
+    ).fetchone()
+    if row:
+        raise CreditCardError("Esta fatura ja foi paga e esta fechada.", HTTPStatus.CONFLICT)
+
+
+def format_invoice_month(value: str) -> str:
+    year, month = value.split("-")
+    return f"{month}/{year}"
+
+
 def format_credit_card(card: dict) -> dict:
     card["limit"] = cents_to_money(card.pop("limit_cents"))
     return card
+
+
+def format_card_transaction(transaction: dict, currency: str) -> dict:
+    transaction["amount"] = cents_to_money(transaction.pop("amount_cents"))
+    transaction["card_currency"] = transaction.pop("card_currency", currency) or currency
+    return transaction
+
+
+def format_card_payment(payment: dict, currency: str) -> dict:
+    payment["amount"] = cents_to_money(payment.pop("amount_cents"))
+    payment["card_currency"] = currency
+    return payment

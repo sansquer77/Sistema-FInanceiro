@@ -4,6 +4,9 @@ const state = {
   archivedAccounts: [],
   creditCards: [],
   archivedCreditCards: [],
+  cardInvoiceTransactions: [],
+  cardInvoicePayments: [],
+  selectedCreditCardId: "",
   transactions: [],
   categories: [],
   tags: [],
@@ -11,6 +14,7 @@ const state = {
   view: "cockpit",
   transactionMonth: new Date().toISOString().slice(0, 7),
   limitMonth: new Date().toISOString().slice(0, 7),
+  cardInvoiceMonth: new Date().toISOString().slice(0, 7),
 };
 
 const authView = document.querySelector("#authView");
@@ -37,6 +41,24 @@ const creditCardMessage = document.querySelector("#creditCardMessage");
 const creditCardList = document.querySelector("#creditCardList");
 const archivedCreditCardList = document.querySelector("#archivedCreditCardList");
 const cancelCreditCardEditButton = document.querySelector("#cancelCreditCardEditButton");
+const cardInvoiceCard = document.querySelector("#cardInvoiceCard");
+const cardInvoiceMonthLabel = document.querySelector("#cardInvoiceMonthLabel");
+const previousCardInvoiceButton = document.querySelector("#previousCardInvoiceButton");
+const nextCardInvoiceButton = document.querySelector("#nextCardInvoiceButton");
+const cardInvoiceTotal = document.querySelector("#cardInvoiceTotal");
+const cardInvoiceReconciledTotal = document.querySelector("#cardInvoiceReconciledTotal");
+const cardInvoiceClosingDate = document.querySelector("#cardInvoiceClosingDate");
+const cardInvoiceDueDate = document.querySelector("#cardInvoiceDueDate");
+const cardInvoicePaymentForm = document.querySelector("#cardInvoicePaymentForm");
+const cardPaymentAccount = document.querySelector("#cardPaymentAccount");
+const cardPaymentDate = document.querySelector("#cardPaymentDate");
+const payCardInvoiceButton = document.querySelector("#payCardInvoiceButton");
+const cardInvoiceMessage = document.querySelector("#cardInvoiceMessage");
+const cardTransactionForm = document.querySelector("#cardTransactionForm");
+const cardTransactionType = document.querySelector("#cardTransactionType");
+const cardTransactionCategory = document.querySelector("#cardTransactionCategory");
+const cardTransactionSubcategory = document.querySelector("#cardTransactionSubcategory");
+const cardInvoiceList = document.querySelector("#cardInvoiceList");
 const transactionForm = document.querySelector("#transactionForm");
 const transactionMessage = document.querySelector("#transactionMessage");
 const transactionList = document.querySelector("#transactionList");
@@ -113,6 +135,7 @@ const moduleViews = {
   cockpit: document.querySelector("#cockpitView"),
   accounts: document.querySelector("#accountsView"),
   creditCards: document.querySelector("#creditCardsView"),
+  cardLaunches: document.querySelector("#cardLaunchesView"),
   transactions: document.querySelector("#transactionsView"),
   limits: document.querySelector("#limitsView"),
   classifications: document.querySelector("#classificationsView"),
@@ -122,13 +145,14 @@ const moduleViews = {
 
 const viewTitles = {
   cockpit: ["Cockpit", "Resumo financeiro"],
-  accounts: ["Gestão de contas", "Contas"],
-  creditCards: ["Crédito", "Cartões"],
-  transactions: ["Operação", "Lançamentos"],
-  limits: ["Controle", "Limite de gastos"],
-  classifications: ["Classificação", "Categorias e tags"],
-  imports: ["Dados", "Importação"],
-  user: ["Segurança", "Usuário"],
+  accounts: ["Cadastro", "Contas"],
+  creditCards: ["Cadastro", "Cartões"],
+  cardLaunches: ["Lançamentos", "Cartões"],
+  transactions: ["Lançamentos", "Contas"],
+  limits: ["Gestão", "Limite de gastos"],
+  classifications: ["Gestão", "Categorias e tags"],
+  imports: ["Gestão", "Importação"],
+  user: ["Usuário", "Preferências"],
 };
 
 loginTab.addEventListener("click", () => switchAuthMode("login"));
@@ -143,6 +167,14 @@ backToLoginFromConfirm.addEventListener("click", () => switchAuthMode("login"));
 accountForm.addEventListener("submit", handleAccountSubmit);
 accountForm.elements.account_type.addEventListener("change", updateAccountTypeState);
 creditCardForm.addEventListener("submit", handleCreditCardSubmit);
+cardInvoiceCard.addEventListener("change", handleCardInvoiceCardChange);
+previousCardInvoiceButton.addEventListener("click", () => shiftCardInvoiceMonth(-1));
+nextCardInvoiceButton.addEventListener("click", () => shiftCardInvoiceMonth(1));
+cardInvoicePaymentForm.addEventListener("submit", handleCardInvoicePaymentSubmit);
+cardPaymentAccount.addEventListener("change", renderCardInvoice);
+cardTransactionForm.addEventListener("submit", handleCardTransactionSubmit);
+cardTransactionType.addEventListener("change", renderCardTransactionCategories);
+cardTransactionCategory.addEventListener("change", renderCardTransactionSubcategories);
 transactionForm.addEventListener("submit", handleTransactionSubmit);
 categoryForm.addEventListener("submit", handleCategorySubmit);
 categoryGroup.addEventListener("change", handleCategoryGroupChange);
@@ -282,6 +314,9 @@ async function handleLogout() {
   state.archivedAccounts = [];
   state.creditCards = [];
   state.archivedCreditCards = [];
+  state.cardInvoiceTransactions = [];
+  state.cardInvoicePayments = [];
+  state.selectedCreditCardId = "";
   state.transactions = [];
   state.categories = [];
   state.tags = [];
@@ -290,6 +325,7 @@ async function handleLogout() {
   registerForm.reset();
   resetAccountForm();
   resetCreditCardForm();
+  resetCardTransactionForm();
   resetTransactionForm();
   showAuth();
 }
@@ -299,6 +335,7 @@ async function loadDashboard() {
   authView.hidden = true;
   dashboardView.hidden = false;
   resetTransactionForm();
+  resetCardTransactionForm();
   await loadAll();
   showModule(state.view);
 }
@@ -312,16 +349,21 @@ async function loadAll() {
     ]);
     state.accounts = accountsResponse.accounts;
     state.creditCards = creditCardsResponse.cards;
+    ensureSelectedCreditCard();
     state.transactions = transactionsResponse.transactions;
     await loadArchivedAccounts();
     await loadArchivedCreditCards();
     await loadClassifications();
     await loadSpendingLimits();
+    await loadCardInvoice();
   } catch (error) {
     state.accounts = [];
     state.archivedAccounts = [];
     state.creditCards = [];
     state.archivedCreditCards = [];
+    state.cardInvoiceTransactions = [];
+    state.cardInvoicePayments = [];
+    state.selectedCreditCardId = "";
     state.transactions = [];
     state.categories = [];
     state.tags = [];
@@ -341,7 +383,9 @@ async function loadAccounts() {
 async function loadCreditCards() {
   const response = await api("/api/credit-cards");
   state.creditCards = response.cards;
+  ensureSelectedCreditCard();
   await loadArchivedCreditCards();
+  await loadCardInvoice();
   renderAll();
 }
 
@@ -363,11 +407,13 @@ async function loadTransactionsAndAccounts() {
   ]);
   state.accounts = accountsResponse.accounts;
   state.creditCards = creditCardsResponse.cards;
+  ensureSelectedCreditCard();
   state.transactions = transactionsResponse.transactions;
   await loadArchivedAccounts();
   await loadArchivedCreditCards();
   await loadClassifications();
   await loadSpendingLimits();
+  await loadCardInvoice();
   renderAll();
 }
 
@@ -385,6 +431,24 @@ async function loadSpendingLimits() {
   state.spendingLimits = response.limits;
 }
 
+async function loadCardInvoice() {
+  if (!state.selectedCreditCardId) {
+    state.cardInvoiceTransactions = [];
+    state.cardInvoicePayments = [];
+    return;
+  }
+  const response = await api(`/api/credit-card-invoice?card_id=${encodeURIComponent(state.selectedCreditCardId)}&month=${encodeURIComponent(state.cardInvoiceMonth)}`);
+  state.cardInvoiceTransactions = response.transactions || [];
+  state.cardInvoicePayments = response.payments || [];
+}
+
+function ensureSelectedCreditCard() {
+  if (state.creditCards.some((card) => String(card.id) === String(state.selectedCreditCardId))) {
+    return;
+  }
+  state.selectedCreditCardId = state.creditCards[0] ? String(state.creditCards[0].id) : "";
+}
+
 function showModule(view) {
   state.view = view;
   for (const [name, element] of Object.entries(moduleViews)) {
@@ -398,6 +462,12 @@ function showModule(view) {
   }
   if (view === "limits") {
     renderLimits();
+  }
+  if (view === "creditCards") {
+    renderCreditCards();
+  }
+  if (view === "cardLaunches") {
+    renderCardInvoice();
   }
   if (view === "user" && state.user) {
     emailForm.elements.email.value = state.user.email;
@@ -437,6 +507,49 @@ async function handleCreditCardSubmit(event) {
     setMessage(creditCardMessage, "Cartão salvo.", "success");
   } catch (error) {
     setMessage(creditCardMessage, error.message, "error");
+  }
+}
+
+async function handleCardInvoiceCardChange() {
+  state.selectedCreditCardId = cardInvoiceCard.value;
+  setMessage(cardInvoiceMessage, "");
+  await loadCardInvoice();
+  renderCreditCards();
+}
+
+async function handleCardTransactionSubmit(event) {
+  event.preventDefault();
+  setMessage(cardInvoiceMessage, "");
+  if (!state.selectedCreditCardId) {
+    setMessage(cardInvoiceMessage, "Cadastre um cartão antes de lançar na fatura.", "error");
+    return;
+  }
+  const data = formData(cardTransactionForm);
+  data.credit_card_id = state.selectedCreditCardId;
+  data.invoice_month = state.cardInvoiceMonth;
+  try {
+    await api("/api/credit-card-transactions", { method: "POST", body: data });
+    resetCardTransactionForm();
+    await loadCardInvoice();
+    renderCreditCards();
+    setMessage(cardInvoiceMessage, "Lançamento do cartão salvo.", "success");
+  } catch (error) {
+    setMessage(cardInvoiceMessage, error.message, "error");
+  }
+}
+
+async function handleCardInvoicePaymentSubmit(event) {
+  event.preventDefault();
+  setMessage(cardInvoiceMessage, "");
+  const data = formData(cardInvoicePaymentForm);
+  data.credit_card_id = state.selectedCreditCardId;
+  data.invoice_month = state.cardInvoiceMonth;
+  try {
+    await api("/api/credit-card-invoice/pay", { method: "POST", body: data });
+    await loadTransactionsAndAccounts();
+    setMessage(cardInvoiceMessage, "Fatura paga e débito lançado na conta.", "success");
+  } catch (error) {
+    setMessage(cardInvoiceMessage, error.message, "error");
   }
 }
 
@@ -729,6 +842,30 @@ async function restoreCreditCard(id) {
   }
 }
 
+async function deleteCardTransaction(id) {
+  try {
+    await api(`/api/credit-card-transactions/${id}`, { method: "DELETE" });
+    await loadCardInvoice();
+    renderCreditCards();
+    setMessage(cardInvoiceMessage, "Lançamento do cartão excluído.", "success");
+  } catch (error) {
+    setMessage(cardInvoiceMessage, error.message, "error");
+  }
+}
+
+async function toggleCardTransactionReconciliation(id, reconciled) {
+  try {
+    await api(`/api/credit-card-transactions/${id}/reconciliation`, {
+      method: "PUT",
+      body: { reconciled },
+    });
+    await loadCardInvoice();
+    renderCreditCards();
+  } catch (error) {
+    setMessage(cardInvoiceMessage, error.message, "error");
+  }
+}
+
 async function deleteTransaction(id) {
   try {
     await api(`/api/transactions/${id}`, { method: "DELETE" });
@@ -797,6 +934,14 @@ function resetCreditCardForm() {
   creditCardFormTitle.textContent = "Novo cartão";
   cancelCreditCardEditButton.hidden = true;
   setMessage(creditCardMessage, "");
+}
+
+function resetCardTransactionForm() {
+  cardTransactionForm.reset();
+  cardTransactionForm.elements.date.value = new Date().toISOString().slice(0, 10);
+  cardTransactionForm.elements.credit_card_id.value = state.selectedCreditCardId;
+  cardTransactionForm.elements.invoice_month.value = state.cardInvoiceMonth;
+  renderCardTransactionCategories();
 }
 
 function updateAccountTypeState() {
@@ -1002,6 +1147,7 @@ function renderCreditCards() {
     });
   }
   renderArchivedCreditCards();
+  renderCardInvoice();
 }
 
 function renderArchivedCreditCards() {
@@ -1013,6 +1159,189 @@ function renderArchivedCreditCards() {
   state.archivedCreditCards.forEach((card) => {
     archivedCreditCardList.append(creditCardCard(card, "archived"));
   });
+}
+
+function renderCardInvoice() {
+  renderCardInvoiceSelector();
+  renderCardTransactionCategories();
+  renderCardPaymentAccounts();
+  cardInvoiceMonthLabel.textContent = formatMonthLabel(state.cardInvoiceMonth);
+  cardTransactionForm.elements.credit_card_id.value = state.selectedCreditCardId;
+  cardTransactionForm.elements.invoice_month.value = state.cardInvoiceMonth;
+  cardInvoicePaymentForm.elements.credit_card_id.value = state.selectedCreditCardId;
+  cardInvoicePaymentForm.elements.invoice_month.value = state.cardInvoiceMonth;
+  const card = selectedCreditCard();
+  if (!card) {
+    cardInvoiceTotal.textContent = formatMoney(0, "BRL");
+    cardInvoiceReconciledTotal.textContent = formatMoney(0, "BRL");
+    cardInvoiceClosingDate.textContent = "--";
+    cardInvoiceDueDate.textContent = "--";
+    cardPaymentDate.value = "";
+    cardTransactionForm.querySelector('button[type="submit"]').disabled = true;
+    payCardInvoiceButton.disabled = true;
+    cardInvoiceList.innerHTML = "";
+    cardInvoiceList.append(emptyState("Cadastre um cartão para lançar faturas."));
+    return;
+  }
+  const total = cardInvoiceOpenAmount();
+  const reconciledTotal = cardInvoiceReconciledAmount();
+  const closingDate = cardInvoiceDate(state.cardInvoiceMonth, card.closing_day);
+  const dueDate = cardInvoiceDate(state.cardInvoiceMonth, card.due_day);
+  cardInvoiceTotal.textContent = formatMoney(total, card.currency);
+  cardInvoiceReconciledTotal.textContent = formatMoney(reconciledTotal, card.currency);
+  cardInvoiceClosingDate.textContent = formatDate(closingDate);
+  cardInvoiceDueDate.textContent = formatDate(dueDate);
+  if (!cardPaymentDate.value || !cardPaymentDate.value.startsWith(state.cardInvoiceMonth)) {
+    cardPaymentDate.value = dueDate;
+  }
+  const alreadyPaid = state.cardInvoicePayments.length > 0;
+  cardTransactionForm.querySelector('button[type="submit"]').disabled = alreadyPaid;
+  payCardInvoiceButton.disabled = total <= 0 || alreadyPaid || !cardPaymentAccount.value;
+  payCardInvoiceButton.textContent = alreadyPaid ? "Fatura paga" : "Pagar fatura";
+  renderCardInvoiceList(card);
+}
+
+function renderCardInvoiceSelector() {
+  const options = state.creditCards.map((card) => (
+    `<option value="${card.id}">${escapeHtml(card.name)} (${escapeHtml(card.currency)})</option>`
+  )).join("");
+  cardInvoiceCard.innerHTML = options || '<option value="">Cadastre um cartão</option>';
+  cardInvoiceCard.disabled = state.creditCards.length === 0;
+  if (state.selectedCreditCardId) {
+    cardInvoiceCard.value = state.selectedCreditCardId;
+  }
+}
+
+function renderCardPaymentAccounts() {
+  const card = selectedCreditCard();
+  const accounts = card
+    ? state.accounts.filter((account) => account.currency === card.currency)
+    : [];
+  cardPaymentAccount.innerHTML = accounts.map((account) => (
+    `<option value="${account.id}">${escapeHtml(account.name)} (${escapeHtml(account.currency)})</option>`
+  )).join("") || '<option value="">Cadastre uma conta compatível</option>';
+  cardPaymentAccount.disabled = accounts.length === 0;
+}
+
+function renderCardTransactionCategories() {
+  const groupType = cardTransactionType.value;
+  const categories = state.categories.filter((category) => category.group_type === groupType);
+  const selected = cardTransactionCategory.value;
+  cardTransactionCategory.innerHTML = categories.map((category) => (
+    `<option value="${escapeHtml(category.name)}">${escapeHtml(category.name)}</option>`
+  )).join("") || '<option value="">Cadastre uma categoria para este grupo</option>';
+  if (categories.some((category) => category.name === selected)) {
+    cardTransactionCategory.value = selected;
+  }
+  cardTransactionCategory.disabled = categories.length === 0;
+  cardTransactionForm.querySelector('button[type="submit"]').disabled = categories.length === 0 || !state.selectedCreditCardId;
+  renderCardTransactionSubcategories();
+}
+
+function renderCardTransactionSubcategories() {
+  const category = state.categories.find((entry) => (
+    entry.group_type === cardTransactionType.value && entry.name === cardTransactionCategory.value
+  ));
+  const subcategories = category ? category.subcategories || [] : [];
+  const selected = cardTransactionSubcategory.value;
+  cardTransactionSubcategory.innerHTML = '<option value="">Sem subcategoria</option>' + subcategories.map((subcategory) => (
+    `<option value="${escapeHtml(subcategory.name)}">${escapeHtml(subcategory.name)}</option>`
+  )).join("");
+  if (subcategories.some((subcategory) => subcategory.name === selected)) {
+    cardTransactionSubcategory.value = selected;
+  }
+  cardTransactionSubcategory.disabled = subcategories.length === 0;
+}
+
+function renderCardInvoiceList(card) {
+  cardInvoiceList.innerHTML = "";
+  if (state.cardInvoicePayments.length) {
+    const payment = state.cardInvoicePayments[0];
+    const paid = document.createElement("article");
+    paid.className = "card-invoice-payment";
+    paid.innerHTML = `
+      <div>
+        <strong>Fatura paga</strong>
+        <div class="account-meta">
+          <span>${formatDate(payment.payment_date)}</span>
+          <span>${escapeHtml(payment.account_name)}</span>
+        </div>
+      </div>
+      <strong>${formatMoney(payment.amount, card.currency)}</strong>
+    `;
+    cardInvoiceList.append(paid);
+  }
+  if (state.cardInvoiceTransactions.length === 0) {
+    cardInvoiceList.append(emptyState("Nenhum lançamento nesta fatura."));
+    return;
+  }
+  state.cardInvoiceTransactions.forEach((transaction) => {
+    const item = document.createElement("article");
+    item.className = `card-invoice-row ${transaction.type === "income" ? "positive" : "negative"}`;
+    const sign = transaction.type === "income" ? "+" : "-";
+    const isReconciled = Boolean(transaction.reconciled_at);
+    item.innerHTML = `
+      <div>
+        <strong>${escapeHtml(transaction.description)}</strong>
+        <div class="account-meta">
+          <span>${formatDate(transaction.date)}</span>
+          <span>${cardTransactionTypeLabel(transaction.type)}</span>
+          ${transaction.category_name ? `<span>${escapeHtml(cardCategoryPath(transaction))}</span>` : ""}
+        </div>
+      </div>
+      <div class="transaction-amount">
+        <strong>${sign}${formatMoney(transaction.amount, card.currency)}</strong>
+        ${state.cardInvoicePayments.length ? "" : `
+          <div class="transaction-actions">
+            <button class="reconcile-button ${isReconciled ? "active" : ""}" type="button" data-card-reconcile-id="${transaction.id}" data-reconciled="${isReconciled}" title="${isReconciled ? "Desmarcar conciliação" : "Marcar como conciliado"}">OK</button>
+            <button class="danger small-button" type="button" data-card-transaction-id="${transaction.id}">Excluir</button>
+          </div>
+        `}
+      </div>
+    `;
+    const reconcileButton = item.querySelector("[data-card-reconcile-id]");
+    if (reconcileButton) {
+      reconcileButton.addEventListener("click", () => toggleCardTransactionReconciliation(
+        reconcileButton.dataset.cardReconcileId,
+        reconcileButton.dataset.reconciled !== "true",
+      ));
+    }
+    const deleteButton = item.querySelector("[data-card-transaction-id]");
+    if (deleteButton) {
+      deleteButton.addEventListener("click", () => deleteCardTransaction(transaction.id));
+    }
+    cardInvoiceList.append(item);
+  });
+}
+
+function selectedCreditCard() {
+  return state.creditCards.find((card) => String(card.id) === String(state.selectedCreditCardId));
+}
+
+function cardInvoiceOpenAmount() {
+  const transactionTotal = state.cardInvoiceTransactions.reduce((total, transaction) => {
+    const amount = Number(transaction.amount);
+    return total + (transaction.type === "expense" ? amount : -amount);
+  }, 0);
+  const paidTotal = state.cardInvoicePayments.reduce((total, payment) => total + Number(payment.amount), 0);
+  return transactionTotal - paidTotal;
+}
+
+function cardInvoiceReconciledAmount() {
+  return state.cardInvoiceTransactions.reduce((total, transaction) => {
+    if (!transaction.reconciled_at) {
+      return total;
+    }
+    const amount = Number(transaction.amount);
+    return total + (transaction.type === "expense" ? amount : -amount);
+  }, 0);
+}
+
+function cardInvoiceDate(month, day) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const lastDay = new Date(year, monthNumber, 0).getDate();
+  const normalizedDay = Math.min(Number(day), lastDay);
+  return `${year}-${String(monthNumber).padStart(2, "0")}-${String(normalizedDay).padStart(2, "0")}`;
 }
 
 function creditCardCard(card, status) {
@@ -1448,6 +1777,14 @@ async function shiftLimitMonth(delta) {
   renderLimits();
 }
 
+async function shiftCardInvoiceMonth(delta) {
+  state.cardInvoiceMonth = shiftMonth(state.cardInvoiceMonth, delta);
+  resetCardTransactionForm();
+  setMessage(cardInvoiceMessage, "");
+  await loadCardInvoice();
+  renderCreditCards();
+}
+
 function selectedTransactionGroup() {
   if (transactionType.value === "income") {
     return "income";
@@ -1686,6 +2023,13 @@ function transactionTypeLabel(type) {
   }[type] || type;
 }
 
+function cardTransactionTypeLabel(type) {
+  return {
+    income: "Receita",
+    expense: "Despesa",
+  }[type] || type;
+}
+
 function accountTypeLabel(type) {
   return {
     liquidity: "Liquidez",
@@ -1707,6 +2051,16 @@ function isInvestmentTransfer(transaction) {
 }
 
 function formatCategoryPath(transaction) {
+  if (!transaction.category_name) {
+    return "Sem categoria";
+  }
+  if (!transaction.subcategory_name) {
+    return transaction.category_name;
+  }
+  return `${transaction.category_name} / ${transaction.subcategory_name}`;
+}
+
+function cardCategoryPath(transaction) {
   if (!transaction.category_name) {
     return "Sem categoria";
   }
