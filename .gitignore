@@ -1,8 +1,20 @@
-data/*.enc
-data/*.key
-data/*.db
-data/*.log
+```
+# Python
 __pycache__/
-financeiro/__pycache__/
 *.pyc
-.DS_Store
+*.pyo
+*.pyd
+
+# Logs and temp files
+*.log
+*.tmp
+
+# Environment
+.env
+.env.local
+*.env.*
+
+# Editors
+.vscode/
+.idea/
+```
