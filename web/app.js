@@ -8,6 +8,7 @@ const state = {
   cardInvoicePayments: [],
   cardTransactions: [],
   selectedCreditCardId: "",
+  selectedAccountId: "",
   transactions: [],
   categories: [],
   tags: [],
@@ -1019,6 +1020,7 @@ async function toggleTransactionReconciliation(id, reconciled) {
       body: { reconciled },
     });
     await loadTransactionsAndAccounts();
+    renderTransactions();
   } catch (error) {
     setMessage(transactionMessage, error.message, "error");
   }
@@ -1118,7 +1120,7 @@ function resetTransactionForm() {
   transactionForm.querySelector('button[type="submit"]').textContent = "Salvar lançamento";
   seriesKind.disabled = false;
   updateSeriesState();
-  applyInvestmentAccountDefault();
+  applyWalletAccountDefault();
   updateTransactionTypeState();
 }
 
@@ -1147,6 +1149,7 @@ function editTransaction(transaction) {
   seriesKind.disabled = true;
   updateSeriesState();
   updateTransactionTypeState();
+  applyWalletAccountRestrictions();
   if (transaction.destination_account_id) {
     destinationAccount.value = String(transaction.destination_account_id);
   }
@@ -1863,7 +1866,18 @@ function renderTransactionAccounts() {
   importAccount.innerHTML = options || '<option value="">Cadastre uma conta</option>';
   transactionForm.querySelector('button[type="submit"]').disabled = state.accounts.length === 0;
   importForm.querySelector('button[type="submit"]').disabled = state.accounts.length === 0;
-  applyInvestmentAccountDefault();
+  
+  // Restore previously selected account if it still exists
+  if (state.selectedAccountId) {
+    const accountExists = state.accounts.some((entry) => String(entry.id) === String(state.selectedAccountId));
+    if (accountExists) {
+      transactionAccount.value = state.selectedAccountId;
+    } else {
+      state.selectedAccountId = "";
+    }
+  }
+  
+  applyWalletAccountDefault();
   updateTransactionTypeState();
 }
 
@@ -1889,11 +1903,23 @@ function renderTransactionSubcategories() {
 
 function renderTransactions() {
   transactionMonthLabel.textContent = formatMonthLabel(state.transactionMonth);
-  currentBalanceSummary.textContent = formatCurrencySummary(getBalanceUntil(new Date().toISOString().slice(0, 10)));
-  forecastBalanceSummary.textContent = formatCurrencySummary(getBalanceUntil(monthEndDate(state.transactionMonth)));
-  const monthTransactions = state.transactions
+  
+  // Filter transactions by selected account if one is selected
+  let accountTransactions = state.transactions;
+  if (state.selectedAccountId) {
+    accountTransactions = state.transactions.filter((transaction) => String(transaction.account_id) === String(state.selectedAccountId));
+  }
+  
+  const monthTransactions = accountTransactions
     .filter((transaction) => transaction.date.startsWith(state.transactionMonth))
     .filter(matchesTransactionSearch);
+  
+  // Calculate balances considering only the filtered transactions
+  // Saldo Atual: apenas lançamentos conciliados até hoje
+  currentBalanceSummary.textContent = formatCurrencySummary(getBalanceUntil(new Date().toISOString().slice(0, 10), accountTransactions, true));
+  // Saldo Previsto: todos os lançamentos até o fim do mês
+  forecastBalanceSummary.textContent = formatCurrencySummary(getBalanceUntil(monthEndDate(state.transactionMonth), accountTransactions, false));
+  
   renderTransactionCollection(transactionList, monthTransactions, false);
 }
 
@@ -2520,6 +2546,37 @@ function renderTransactionCollection(container, transactions, compact) {
     }
     container.append(group);
   }
+  
+  // Add subtotal lines at the end: Current Balance (Reconciled) and Forecast Balance
+  if (!compact) {
+    const today = new Date().toISOString().slice(0, 10);
+    const monthEnd = monthEndDate(state.transactionMonth);
+    
+    // Filter transactions for the selected account (if any) up to month end
+    let relevantTransactions = transactions.filter(t => t.date <= monthEnd);
+    if (state.selectedAccountId) {
+      relevantTransactions = state.transactions.filter(t => 
+        String(t.account_id) === String(state.selectedAccountId) && t.date <= monthEnd
+      );
+    }
+    
+    const reconciledBalance = getBalanceUntil(today, relevantTransactions, true);
+    const forecastBalance = getBalanceUntil(monthEnd, relevantTransactions, false);
+    
+    const subtotalSection = document.createElement("section");
+    subtotalSection.className = "transaction-subtotals";
+    subtotalSection.innerHTML = `
+      <div class="subtotal-row">
+        <span>Saldo atual (Conciliado)</span>
+        <strong>${formatCurrencySummary(reconciledBalance)}</strong>
+      </div>
+      <div class="subtotal-row">
+        <span>Saldo previsto (Todos os lançamentos)</span>
+        <strong>${formatCurrencySummary(forecastBalance)}</strong>
+      </div>
+    `;
+    container.append(subtotalSection);
+  }
 }
 
 function transactionTemplate(transaction, compact) {
@@ -2619,14 +2676,57 @@ function updateTransactionTypeState() {
 }
 
 function handleTransactionAccountChange() {
-  applyInvestmentAccountDefault();
+  const account = state.accounts.find((entry) => String(entry.id) === transactionAccount.value);
+  if (account) {
+    state.selectedAccountId = account.id;
+  }
+  applyWalletAccountDefault();
+  applyWalletAccountRestrictions();
   updateTransactionTypeState();
+  renderTransactions();
 }
 
-function applyInvestmentAccountDefault() {
+function applyWalletAccountDefault() {
   const account = state.accounts.find((entry) => String(entry.id) === transactionAccount.value);
   if (account && account.account_type === "investment" && !transactionForm.elements.id.value) {
     transactionType.value = "investment";
+  }
+}
+
+function applyWalletAccountRestrictions() {
+  const account = state.accounts.find((entry) => String(entry.id) === transactionAccount.value);
+  const isEditing = !!transactionForm.elements.id.value;
+  
+  if (account && account.account_type === "wallet") {
+    // Restrict transaction type to only income, expense, or transfer
+    const currentType = transactionType.value;
+    if (!["income", "expense", "transfer"].includes(currentType)) {
+      transactionType.value = "expense";
+    }
+    
+    // Disable investment and exchange options in the select
+    for (const option of transactionType.options) {
+      if (option.value === "investment" || option.value === "exchange") {
+        option.disabled = true;
+      } else {
+        option.disabled = false;
+      }
+    }
+    
+    // Force repetition to "À vista" (single)
+    seriesKind.value = "single";
+    seriesKind.disabled = true;
+    
+    // Clear tag field
+    transactionForm.elements.tags.value = "";
+  } else {
+    // Re-enable all transaction type options when not wallet
+    for (const option of transactionType.options) {
+      option.disabled = false;
+    }
+    
+    // Re-enable series kind selection
+    seriesKind.disabled = false;
   }
 }
 
@@ -2795,25 +2895,59 @@ function getCurrencyTotals() {
   return new Map([...totals.entries()].sort(([currencyA], [currencyB]) => currencyA.localeCompare(currencyB)));
 }
 
-function getBalanceUntil(limitDate) {
+function getBalanceUntil(limitDate, transactions = state.transactions, reconciledOnly = false) {
   const totals = new Map();
-  for (const account of state.accounts) {
-    const current = totals.get(account.currency) || 0;
-    totals.set(account.currency, current + Number(account.initial_balance));
-  }
-  for (const transaction of state.transactions) {
-    if (transaction.date > limitDate) {
-      continue;
+  
+  // If a specific account is selected, calculate balance only for that account
+  if (state.selectedAccountId) {
+    const account = state.accounts.find((entry) => String(entry.id) === String(state.selectedAccountId));
+    if (account) {
+      totals.set(account.currency, Number(account.initial_balance));
+      
+      for (const transaction of transactions) {
+        if (String(transaction.account_id) !== String(state.selectedAccountId)) {
+          continue;
+        }
+        if (transaction.date > limitDate) {
+          continue;
+        }
+        if (reconciledOnly && !transaction.reconciled_at) {
+          continue;
+        }
+        const amount = Number(transaction.amount);
+        const sourceCurrency = transaction.account_currency;
+        totals.set(sourceCurrency, (totals.get(sourceCurrency) || 0) + transactionSourceDelta(transaction.type, amount));
+        if (transaction.type === "transfer" && transaction.destination_account_id) {
+          const destinationCurrency = transaction.destination_account_currency || sourceCurrency;
+          const destinationAmount = Number(transaction.destination_amount || transaction.amount);
+          totals.set(destinationCurrency, (totals.get(destinationCurrency) || 0) + destinationAmount);
+        }
+      }
     }
-    const amount = Number(transaction.amount);
-    const sourceCurrency = transaction.account_currency;
-    totals.set(sourceCurrency, (totals.get(sourceCurrency) || 0) + transactionSourceDelta(transaction.type, amount));
-    if (transaction.type === "transfer" && transaction.destination_account_id) {
-      const destinationCurrency = transaction.destination_account_currency || sourceCurrency;
-      const destinationAmount = Number(transaction.destination_amount || transaction.amount);
-      totals.set(destinationCurrency, (totals.get(destinationCurrency) || 0) + destinationAmount);
+  } else {
+    // No account selected: calculate balance for all accounts
+    for (const account of state.accounts) {
+      const current = totals.get(account.currency) || 0;
+      totals.set(account.currency, current + Number(account.initial_balance));
+    }
+    for (const transaction of transactions) {
+      if (transaction.date > limitDate) {
+        continue;
+      }
+      if (reconciledOnly && !transaction.reconciled_at) {
+        continue;
+      }
+      const amount = Number(transaction.amount);
+      const sourceCurrency = transaction.account_currency;
+      totals.set(sourceCurrency, (totals.get(sourceCurrency) || 0) + transactionSourceDelta(transaction.type, amount));
+      if (transaction.type === "transfer" && transaction.destination_account_id) {
+        const destinationCurrency = transaction.destination_account_currency || sourceCurrency;
+        const destinationAmount = Number(transaction.destination_amount || transaction.amount);
+        totals.set(destinationCurrency, (totals.get(destinationCurrency) || 0) + destinationAmount);
+      }
     }
   }
+  
   return new Map([...totals.entries()].sort(([currencyA], [currencyB]) => currencyA.localeCompare(currencyB)));
 }
 

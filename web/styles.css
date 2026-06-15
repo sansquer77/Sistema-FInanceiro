@@ -1362,6 +1362,33 @@ textarea:focus {
   font-size: 16px;
 }
 
+.transaction-subtotals {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  margin-top: 12px;
+  background-color: var(--bg-alt);
+  border-radius: 8px;
+  border-top: 2px solid var(--accent-dark);
+}
+
+.subtotal-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+
+.subtotal-row span {
+  color: var(--muted);
+}
+
+.subtotal-row strong {
+  color: var(--accent-dark);
+  font-size: 16px;
+}
+
 .transaction-amount span {
   display: block;
   margin-bottom: 8px;
