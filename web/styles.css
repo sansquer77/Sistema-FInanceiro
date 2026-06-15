@@ -531,9 +531,7 @@ textarea:focus {
 }
 
 .currency-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
   gap: 14px;
   min-height: 58px;
   padding: 12px 14px;
@@ -551,6 +549,29 @@ textarea:focus {
 .currency-item strong {
   font-size: 18px;
   text-align: right;
+}
+
+.currency-item > span,
+.currency-item > strong {
+  grid-row: 1;
+}
+
+.currency-breakdown {
+  display: grid;
+  gap: 6px;
+}
+
+.currency-breakdown span {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.currency-breakdown b {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .workspace {
@@ -961,7 +982,7 @@ textarea:focus {
 
 .portfolio-summary {
   display: grid;
-  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  grid-template-columns: repeat(6, minmax(140px, 1fr));
   gap: 10px;
 }
 
@@ -994,7 +1015,7 @@ textarea:focus {
 
 .portfolio-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  grid-template-columns: repeat(5, minmax(190px, 1fr));
   gap: 18px;
   margin: 18px 0;
 }
@@ -1244,6 +1265,18 @@ textarea:focus {
   flex-shrink: 0;
   overflow: hidden;
   box-shadow: 0 2px 5px rgba(31, 41, 51, 0.08);
+}
+
+.bank-logo-badge.image-logo {
+  background: #fff;
+  padding: 5px;
+}
+
+.bank-logo-badge img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
 }
 
 .account-card h3 {

@@ -444,7 +444,7 @@
                 <label>Descrição
                   <input name="description" type="text" placeholder="Ex.: Mercado, salário, transferência..." required>
                 </label>
-                <div class="field-row">
+                <div class="field-row" id="transactionCategoryRow">
                   <label>Categoria
                     <select name="category" id="transactionCategory" required></select>
                   </label>
@@ -524,7 +524,7 @@
                     <input name="amount" id="transactionAmount" type="text" inputmode="decimal" placeholder="0,00" required>
                   </label>
                 </div>
-                <div class="field-row">
+                <div class="field-row" id="seriesKindRow">
                   <label>Repetição
                     <select name="series_kind" id="seriesKind">
                       <option value="single">À vista</option>
@@ -612,7 +612,10 @@
           <section class="panel">
             <div class="section-heading">
               <h2>Portfólio</h2>
-              <button class="ghost small-button" type="button" id="refreshPortfolioButton">Atualizar cotações</button>
+              <div class="card-actions">
+                <button class="ghost small-button" type="button" id="addPortfolioAssetButton">Adicionar ativo</button>
+                <button class="ghost small-button" type="button" id="refreshPortfolioButton">Atualizar cotações</button>
+              </div>
             </div>
 
             <div class="portfolio-summary">
@@ -642,6 +645,90 @@
               </div>
             </div>
             <p class="message" id="portfolioMessage" role="alert"></p>
+          </section>
+
+          <section class="panel" id="portfolioAssetFormPanel" hidden>
+            <div class="section-heading">
+              <h2>Ativo em carteira</h2>
+            </div>
+            <form id="portfolioAssetForm" class="form">
+              <div class="field-row">
+                <label>Carteira
+                  <select name="account_id" id="portfolioAssetAccount" required></select>
+                </label>
+                <label>Data de aquisição
+                  <input name="acquisition_date" type="date" required>
+                </label>
+              </div>
+              <div class="field-row">
+                <label>Tipo
+                  <select name="asset_type" id="portfolioAssetType">
+                    <option value="stock">Ações / ETFs / BDRs</option>
+                    <option value="crypto">Cripto</option>
+                    <option value="fund">Fundo de investimento</option>
+                    <option value="fixed_income">Renda fixa</option>
+                    <option value="other">Outro</option>
+                  </select>
+                </label>
+                <label>Custo total
+                  <input name="total_cost" type="text" inputmode="decimal" placeholder="0,00" required>
+                </label>
+              </div>
+              <div class="field-row">
+                <label>Ativo
+                  <input name="asset_identifier" type="text" placeholder="Ex.: PETR4, IVVB11, BTC">
+                </label>
+                <label>Nome do ativo
+                  <input name="asset_name" type="text" placeholder="Ex.: Petrobras PN">
+                </label>
+              </div>
+              <div class="field-row" id="portfolioFundFields" hidden>
+                <label>CNPJ do fundo
+                  <input name="cnpj" type="text" placeholder="00.000.000/0000-00 ou alfanumérico">
+                </label>
+              </div>
+              <div class="field-row" id="portfolioFixedFields" hidden>
+                <label>Modalidade
+                  <select name="fixed_income_mode">
+                    <option value="">Selecione</option>
+                    <option value="post">Pós-fixada</option>
+                    <option value="pre">Pré-fixada</option>
+                    <option value="hybrid">Híbrida</option>
+                  </select>
+                </label>
+                <label>Indexador
+                  <select name="fixed_income_indexer">
+                    <option value="">Selecione</option>
+                    <option value="CDI">CDI</option>
+                    <option value="SELIC">SELIC</option>
+                    <option value="IPCA">IPCA</option>
+                    <option value="IGP-M">IGP-M</option>
+                    <option value="TR">TR</option>
+                  </select>
+                </label>
+                <label>Taxa (% a.a.)
+                  <input name="fixed_income_rate" type="text" inputmode="decimal" placeholder="Ex.: 14,00">
+                </label>
+              </div>
+              <div class="field-row">
+                <label>Quantidade
+                  <input name="quantity" type="text" inputmode="decimal" placeholder="0,000000">
+                </label>
+                <label>Preço médio
+                  <input name="unit_price" type="text" inputmode="decimal" placeholder="0,00">
+                </label>
+              </div>
+              <label>Cotação para BRL
+                <input name="exchange_rate_to_brl" type="text" inputmode="decimal" placeholder="Opcional para carteira em moeda estrangeira">
+              </label>
+              <label>Observações
+                <textarea name="notes" rows="3"></textarea>
+              </label>
+              <div class="actions">
+                <button class="primary" type="submit">Salvar ativo</button>
+                <button class="ghost" id="cancelPortfolioAssetButton" type="button">Cancelar</button>
+              </div>
+            </form>
           </section>
 
           <div class="portfolio-grid">
@@ -901,6 +988,22 @@
             </section>
 
             <section class="panel danger-zone">
+              <h2>Apagar lançamentos</h2>
+              <p>Remove lançamentos de contas, cartões, pagamentos de faturas e posições do portfólio. Categorias, subcategorias, tags, contas e cartões serão preservados.</p>
+              <form id="clearLaunchesForm" class="form">
+                <label class="checkbox-field">
+                  <input name="confirm_clear" type="checkbox" value="yes">
+                  <span>Entendo que os lançamentos serão apagados e os saldos das contas voltarão ao saldo inicial.</span>
+                </label>
+                <label>Senha atual
+                  <input name="current_password" type="password" autocomplete="current-password" required>
+                </label>
+                <button class="danger" type="submit">Apagar lançamentos</button>
+              </form>
+              <p class="message" id="clearLaunchesMessage" role="alert"></p>
+            </section>
+
+            <section class="panel danger-zone">
               <h2>Apagar conta</h2>
               <p>Esta ação apaga permanentemente seu usuário, sessões, contas e lançamentos locais. Não há desfazer.</p>
               <form id="deleteUserForm" class="form">
@@ -920,6 +1023,6 @@
         </div>
       </section>
     </main>
-    <script src="/app.js?v=10"></script>
+    <script src="/app.js?v=12"></script>
   </body>
 </html>

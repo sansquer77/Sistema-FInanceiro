@@ -187,6 +187,27 @@ def initialize_database() -> None:
                 UNIQUE (transaction_id)
             );
 
+            CREATE TABLE IF NOT EXISTS investment_opening_positions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                account_id INTEGER NOT NULL REFERENCES checking_accounts(id) ON DELETE CASCADE,
+                asset_type TEXT NOT NULL DEFAULT 'other',
+                asset_identifier TEXT,
+                asset_name TEXT,
+                cnpj TEXT,
+                acquisition_date TEXT NOT NULL,
+                quantity_micros INTEGER NOT NULL DEFAULT 0 CHECK (quantity_micros >= 0),
+                unit_price_cents INTEGER NOT NULL DEFAULT 0 CHECK (unit_price_cents >= 0),
+                total_cost_cents INTEGER NOT NULL CHECK (total_cost_cents > 0),
+                exchange_rate_micros INTEGER NOT NULL DEFAULT 1000000 CHECK (exchange_rate_micros > 0),
+                fixed_income_mode TEXT,
+                fixed_income_indexer TEXT,
+                fixed_income_rate_micros INTEGER NOT NULL DEFAULT 0 CHECK (fixed_income_rate_micros >= 0),
+                notes TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
             CREATE TABLE IF NOT EXISTS transaction_tags (
                 transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
                 tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
@@ -221,6 +242,9 @@ def initialize_database() -> None:
 
             CREATE INDEX IF NOT EXISTS idx_investment_operations_user
             ON investment_operations (user_id, account_id, asset_type);
+
+            CREATE INDEX IF NOT EXISTS idx_investment_opening_positions_user
+            ON investment_opening_positions (user_id, account_id, asset_type);
 
             CREATE INDEX IF NOT EXISTS idx_credit_card_transactions_card_month
             ON credit_card_transactions (credit_card_id, invoice_month);
@@ -258,6 +282,7 @@ def initialize_database() -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions (user_id, date)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_transactions_account ON transactions (account_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_investment_operations_user ON investment_operations (user_id, account_id, asset_type)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_investment_opening_positions_user ON investment_opening_positions (user_id, account_id, asset_type)")
 
 
 def row_to_dict(row: sqlite3.Row | None) -> dict | None:

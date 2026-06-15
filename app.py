@@ -19,6 +19,7 @@ from financeiro.accounts import (
     update_checking_account,
 )
 from financeiro.auth import (
+    clear_user_launches,
     create_session,
     create_user,
     delete_user_account,
@@ -60,7 +61,7 @@ from financeiro.credit_cards import (
 )
 from financeiro.database import initialize_database
 from financeiro.imports import import_organizze_transactions
-from financeiro.portfolio import get_portfolio
+from financeiro.portfolio import create_opening_position, get_portfolio
 from financeiro.spending_limits import (
     create_spending_limit,
     delete_spending_limit,
@@ -146,6 +147,9 @@ class AppHandler(BaseHTTPRequestHandler):
         if path == "/api/me/password":
             self.handle_update_password()
             return
+        if path == "/api/me/clear-launches":
+            self.handle_clear_launches()
+            return
         if path.startswith("/api/checking-accounts/") and path.endswith("/restore"):
             self.handle_restore_account()
             return
@@ -166,6 +170,9 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/transactions":
             self.handle_create_transaction()
+            return
+        if path == "/api/portfolio/positions":
+            self.handle_create_portfolio_position()
             return
         if path == "/api/import/organizze-transactions":
             self.handle_import_organizze_transactions()
@@ -305,6 +312,12 @@ class AppHandler(BaseHTTPRequestHandler):
         delete_user_account(user["id"], data.get("current_password", ""))
         self.send_json({"ok": True}, headers={"Set-Cookie": "session=; Path=/; Max-Age=0; SameSite=Lax; HttpOnly"})
 
+    def handle_clear_launches(self) -> None:
+        user = self.require_user()
+        data = self.read_json()
+        clear_user_launches(user["id"], data.get("current_password", ""))
+        self.send_json({"ok": True})
+
     def handle_list_accounts(self) -> None:
         user = self.require_user()
         if "status=archived" in self.path.split("?", 1)[-1]:
@@ -364,6 +377,11 @@ class AppHandler(BaseHTTPRequestHandler):
     def handle_portfolio(self) -> None:
         user = self.require_user()
         self.send_json(get_portfolio(user["id"]))
+
+    def handle_create_portfolio_position(self) -> None:
+        user = self.require_user()
+        data = self.read_json()
+        self.send_json(create_opening_position(user["id"], data), status=HTTPStatus.CREATED)
 
     def handle_create_account(self) -> None:
         user = self.require_user()

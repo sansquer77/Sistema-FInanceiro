@@ -89,9 +89,11 @@ def list_transactions(user_id: int) -> list[dict]:
 
 def create_transaction(user_id: int, data: dict) -> dict:
     transaction = normalize_transaction_payload(data)
-    occurrences = build_transaction_occurrences(transaction)
     with get_connection() as conn:
         source = get_active_account(conn, user_id, transaction["account_id"])
+        if source["account_type"] == "wallet":
+            force_single_transaction(transaction)
+        occurrences = build_transaction_occurrences(transaction)
         destination = None
         if transaction["type"] == "transfer":
             destination = get_active_account(conn, user_id, transaction["destination_account_id"])
@@ -99,9 +101,7 @@ def create_transaction(user_id: int, data: dict) -> dict:
             normalize_transfer_amounts(transaction, source, destination)
         exchange_rate_micros = resolve_exchange_rate_micros(source["currency"], transaction["date"], transaction["exchange_rate"])
         amount_brl_cents = convert_to_brl_cents(transaction["amount_cents"], exchange_rate_micros)
-        category_group_type = transaction_category_group(conn, user_id, transaction["type"], destination, transaction["category"])
-        category_id = get_or_create_category(conn, user_id, transaction["category"], category_group_type)
-        subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
+        category_id, subcategory_id = resolve_transaction_category(conn, user_id, transaction, destination)
         tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
         first_transaction_id = None
         series_id = str(uuid4()) if transaction["series_kind"] != "single" else None
@@ -171,9 +171,7 @@ def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
             normalize_transfer_amounts(transaction, source, destination)
         exchange_rate_micros = resolve_exchange_rate_micros(source["currency"], transaction["date"], transaction["exchange_rate"])
         amount_brl_cents = convert_to_brl_cents(transaction["amount_cents"], exchange_rate_micros)
-        category_group_type = transaction_category_group(conn, user_id, transaction["type"], destination, transaction["category"])
-        category_id = get_or_create_category(conn, user_id, transaction["category"], category_group_type)
-        subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
+        category_id, subcategory_id = resolve_transaction_category(conn, user_id, transaction, destination)
         tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
 
         apply_balance_delta(conn, existing["account_id"], -balance_delta(existing["type"], existing["amount_cents"], "source"))
@@ -243,9 +241,7 @@ def update_future_recurring_transactions(conn, user_id: int, existing, transacti
             normalize_transfer_amounts(transaction, source, destination)
         exchange_rate_micros = resolve_exchange_rate_micros(source["currency"], row["date"], transaction["exchange_rate"])
         amount_brl_cents = convert_to_brl_cents(transaction["amount_cents"], exchange_rate_micros)
-        category_group_type = transaction_category_group(conn, user_id, transaction["type"], destination, transaction["category"])
-        category_id = get_or_create_category(conn, user_id, transaction["category"], category_group_type)
-        subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
+        category_id, subcategory_id = resolve_transaction_category(conn, user_id, transaction, destination)
         tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
         apply_balance_delta(conn, row["account_id"], -balance_delta(row["type"], row["amount_cents"], "source"))
         if row["destination_account_id"]:
@@ -354,8 +350,8 @@ def normalize_transaction_payload(data: dict) -> dict:
         "account_id": account_id,
         "destination_account_id": destination_account_id,
         "exchange_rate": data.get("exchange_rate_to_brl") or data.get("exchange_rate"),
-        "category": normalize_name(data.get("category"), "Informe a categoria."),
-        "subcategory": normalize_optional_name(data.get("subcategory")),
+        "category": normalize_transaction_category(transaction_type, data.get("category")),
+        "subcategory": normalize_optional_name(data.get("subcategory")) if transaction_type != "transfer" else None,
         "tags": normalize_optional_tags(data.get("tags") or data.get("tag")),
         "notes": empty_to_none(data.get("notes")),
         "investment_operation": normalize_investment_operation(data, amount_cents, transaction_type),
@@ -370,6 +366,12 @@ def normalize_transaction_update_payload(data: dict) -> dict:
     transaction.pop("recurrence_frequency", None)
     transaction.pop("recurrence_count", None)
     return transaction
+
+
+def normalize_transaction_category(transaction_type: str, value: object) -> str | None:
+    if transaction_type == "transfer":
+        return None
+    return normalize_name(value, "Informe a categoria.")
 
 
 def should_apply_to_future(data: dict) -> bool:
@@ -408,6 +410,13 @@ def normalize_count(value: object, message: str, maximum: int) -> int:
     if count > maximum:
         raise TransactionError("Quantidade de repeticoes muito alta.")
     return count
+
+
+def force_single_transaction(transaction: dict) -> None:
+    transaction["series_kind"] = "single"
+    transaction["installment_count"] = None
+    transaction["recurrence_frequency"] = None
+    transaction["recurrence_count"] = None
 
 
 def normalize_investment_operation(data: dict, amount_cents: int, transaction_type: str) -> dict | None:
@@ -643,6 +652,15 @@ def existing_destination_balance_amount(transaction) -> int:
     except (IndexError, KeyError):
         amount = 0
     return amount or int(transaction["amount_cents"])
+
+
+def resolve_transaction_category(conn, user_id: int, transaction: dict, destination) -> tuple[int | None, int | None]:
+    if not transaction["category"]:
+        return None, None
+    category_group_type = transaction_category_group(conn, user_id, transaction["type"], destination, transaction["category"])
+    category_id = get_or_create_category(conn, user_id, transaction["category"], category_group_type)
+    subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
+    return category_id, subcategory_id
 
 
 def transaction_category_group(conn, user_id: int, transaction_type: str, destination, category_name: str) -> str:

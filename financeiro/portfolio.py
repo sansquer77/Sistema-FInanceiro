@@ -9,9 +9,9 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
-from financeiro.accounts import cents_to_money
+from financeiro.accounts import cents_to_money, empty_to_none, money_to_cents
 from financeiro.database import get_connection
-from financeiro.transactions import convert_to_brl_cents, get_exchange_rate_to_brl
+from financeiro.transactions import convert_to_brl_cents, get_exchange_rate_to_brl, parse_exchange_rate, rate_to_micros
 
 MONEY_SCALE = Decimal("100")
 MICRO_SCALE = Decimal("1000000")
@@ -45,7 +45,7 @@ class PortfolioError(Exception):
 
 def get_portfolio(user_id: int) -> dict:
     with get_connection() as conn:
-        rows = conn.execute(
+        operation_rows = conn.execute(
             """
             SELECT
                 investment_operations.*,
@@ -69,7 +69,47 @@ def get_portfolio(user_id: int) -> dict:
             """,
             (user_id,),
         ).fetchall()
+        opening_rows = conn.execute(
+            """
+            SELECT
+                investment_opening_positions.id,
+                investment_opening_positions.user_id,
+                NULL AS transaction_id,
+                investment_opening_positions.account_id,
+                investment_opening_positions.asset_type,
+                investment_opening_positions.asset_identifier,
+                investment_opening_positions.asset_name,
+                investment_opening_positions.cnpj,
+                investment_opening_positions.quantity_micros,
+                investment_opening_positions.unit_price_cents,
+                investment_opening_positions.total_cost_cents AS invested_amount_cents,
+                0 AS brokerage_fee_cents,
+                0 AS exchange_fee_cents,
+                0 AS tax_cents,
+                0 AS other_costs_cents,
+                investment_opening_positions.fixed_income_mode,
+                investment_opening_positions.fixed_income_indexer,
+                investment_opening_positions.fixed_income_rate_micros,
+                investment_opening_positions.acquisition_date AS date,
+                'Posicao inicial' AS description,
+                investment_opening_positions.total_cost_cents AS amount_cents,
+                investment_opening_positions.exchange_rate_micros,
+                convert_placeholder.amount_brl_cents AS amount_brl_cents,
+                checking_accounts.name AS account_name,
+                checking_accounts.currency AS account_currency
+            FROM investment_opening_positions
+            JOIN checking_accounts
+                ON checking_accounts.id = investment_opening_positions.account_id
+                AND checking_accounts.user_id = investment_opening_positions.user_id
+            LEFT JOIN (
+                SELECT 0 AS amount_brl_cents
+            ) AS convert_placeholder
+            WHERE investment_opening_positions.user_id = ?
+            """,
+            (user_id,),
+        ).fetchall()
 
+    rows = sorted([*operation_rows, *opening_rows], key=lambda row: (row["date"], row["id"]))
     positions = build_positions(rows)
     quote_positions(positions)
     summary = summarize_positions(positions)
@@ -79,6 +119,117 @@ def get_portfolio(user_id: int) -> dict:
         "summary": summary,
         "indexers": indexer_catalog(),
     }
+
+
+def create_opening_position(user_id: int, data: dict) -> dict:
+    position = normalize_opening_position_payload(data)
+    with get_connection() as conn:
+        account = conn.execute(
+            """
+            SELECT id, currency, account_type
+            FROM checking_accounts
+            WHERE id = ? AND user_id = ? AND archived_at IS NULL
+            """,
+            (position["account_id"], user_id),
+        ).fetchone()
+        if not account:
+            raise PortfolioError("Conta nao encontrada.", HTTPStatus.NOT_FOUND)
+        if account["account_type"] != "investment":
+            raise PortfolioError("Selecione uma conta de investimento para a posicao inicial.")
+        exchange_rate_micros = resolve_position_exchange_rate(account["currency"], position["acquisition_date"], position["exchange_rate"])
+        conn.execute(
+            """
+            INSERT INTO investment_opening_positions (
+                user_id, account_id, asset_type, asset_identifier, asset_name, cnpj,
+                acquisition_date, quantity_micros, unit_price_cents, total_cost_cents,
+                exchange_rate_micros, fixed_income_mode, fixed_income_indexer,
+                fixed_income_rate_micros, notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                user_id,
+                position["account_id"],
+                position["asset_type"],
+                position["asset_identifier"],
+                position["asset_name"],
+                position["cnpj"],
+                position["acquisition_date"],
+                position["quantity_micros"],
+                position["unit_price_cents"],
+                position["total_cost_cents"],
+                exchange_rate_micros,
+                position["fixed_income_mode"],
+                position["fixed_income_indexer"],
+                position["fixed_income_rate_micros"],
+                position["notes"],
+            ),
+        )
+    return get_portfolio(user_id)
+
+
+def normalize_opening_position_payload(data: dict) -> dict:
+    account_id = normalize_id(data.get("account_id"), "Informe a carteira.")
+    asset_type = str(data.get("asset_type") or "other").strip().lower()
+    if asset_type not in ASSET_TYPE_LABELS:
+        raise PortfolioError("Tipo de investimento invalido.")
+    acquisition_date = normalize_date(data.get("acquisition_date"))
+    quantity = decimal_to_micros(data.get("quantity"))
+    unit_price_cents = money_to_cents(data.get("unit_price", "0")) if str(data.get("unit_price") or "").strip() else 0
+    total_cost_cents = money_to_cents(data.get("total_cost", "0")) if str(data.get("total_cost") or "").strip() else 0
+    if total_cost_cents <= 0 and quantity > 0 and unit_price_cents > 0:
+        total_cost_cents = int((Decimal(quantity) * Decimal(unit_price_cents) / MICRO_SCALE).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    if total_cost_cents <= 0:
+        raise PortfolioError("Informe o custo total da posicao.")
+    fixed_income_mode = optional_key(data.get("fixed_income_mode"))
+    if fixed_income_mode and fixed_income_mode not in {"pre", "post", "hybrid"}:
+        raise PortfolioError("Modalidade de renda fixa invalida.")
+    return {
+        "account_id": account_id,
+        "asset_type": asset_type,
+        "asset_identifier": empty_to_none(data.get("asset_identifier")),
+        "asset_name": empty_to_none(data.get("asset_name")),
+        "cnpj": empty_to_none(data.get("cnpj")),
+        "acquisition_date": acquisition_date,
+        "quantity_micros": quantity,
+        "unit_price_cents": unit_price_cents,
+        "total_cost_cents": total_cost_cents,
+        "exchange_rate": data.get("exchange_rate_to_brl") or data.get("exchange_rate"),
+        "fixed_income_mode": fixed_income_mode,
+        "fixed_income_indexer": empty_to_none(data.get("fixed_income_indexer")),
+        "fixed_income_rate_micros": decimal_to_micros(data.get("fixed_income_rate")),
+        "notes": empty_to_none(data.get("notes")),
+    }
+
+
+def resolve_position_exchange_rate(currency: str, acquisition_date: str, raw_rate: object) -> int:
+    if str(currency or "BRL").upper() == "BRL":
+        return rate_to_micros(Decimal("1"))
+    if str(raw_rate or "").strip():
+        return rate_to_micros(parse_exchange_rate(raw_rate))
+    return rate_to_micros(get_exchange_rate_to_brl(currency, acquisition_date))
+
+
+def normalize_id(value: object, message: str) -> int:
+    try:
+        normalized = int(str(value or "").strip())
+    except ValueError as exc:
+        raise PortfolioError(message) from exc
+    if normalized <= 0:
+        raise PortfolioError(message)
+    return normalized
+
+
+def normalize_date(value: object) -> str:
+    raw = str(value or "").strip()
+    try:
+        return date.fromisoformat(raw).isoformat()
+    except ValueError as exc:
+        raise PortfolioError("Informe uma data valida.") from exc
+
+
+def optional_key(value: object) -> str | None:
+    raw = str(value or "").strip().lower()
+    return raw or None
 
 
 def build_positions(rows) -> list[dict]:
@@ -203,7 +354,7 @@ def apply_fixed_income_value(position: dict) -> None:
         rate_factor = annual_rate / Decimal("100")
     gross_factor = (Decimal("1") + rate_factor) ** (Decimal(days) / Decimal("365")) if rate_factor else Decimal("1")
     current = Decimal(position["total_cost_cents"]) * gross_factor
-    position["quote"] = f"{(rate_factor * Decimal('100')).quantize(Decimal('0.0001'), rounding=ROUND_HALF_UP):f}% a.a."
+    position["quote"] = f"{format_decimal_percent(rate_factor * Decimal('100'))}% a.a."
     position["quote_source"] = source
     position["quote_status"] = status
     position["quote_date"] = date.today().isoformat()
@@ -333,7 +484,7 @@ def group_positions(positions: list[dict], key: str) -> list[dict]:
 def format_position(position: dict) -> dict:
     average_cents = decimal_to_cents(Decimal(position["total_cost_cents"]) / position["quantity"] / MONEY_SCALE) if position["quantity"] else position["last_unit_price_cents"]
     position["quantity"] = decimal_to_string(position["quantity"])
-    position["fixed_income_rate"] = decimal_to_string(position["fixed_income_rate"])
+    position["fixed_income_rate"] = format_decimal_percent(position["fixed_income_rate"])
     position["average_price"] = cents_to_money(average_cents)
     position["invested"] = cents_to_money(position["invested_cents"])
     position["costs"] = cents_to_money(position["costs_cents"])
@@ -361,6 +512,21 @@ def micros_to_decimal(micros: int) -> Decimal:
     return Decimal(int(micros or 0)) / MICRO_SCALE
 
 
+def decimal_to_micros(value: object) -> int:
+    raw = str(value or "").strip()
+    if not raw:
+        return 0
+    if "," in raw:
+        raw = raw.replace(".", "").replace(",", ".")
+    try:
+        decimal_value = Decimal(raw)
+    except InvalidOperation as exc:
+        raise PortfolioError("Informe um numero valido na posicao inicial.") from exc
+    if decimal_value < 0:
+        raise PortfolioError("Informe valores positivos na posicao inicial.")
+    return int((decimal_value * MICRO_SCALE).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
 def decimal_to_cents(value: Decimal) -> int:
     return int((value * MONEY_SCALE).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
@@ -373,6 +539,12 @@ def decimal_to_string(value: Decimal) -> str:
     if not value:
         return "0"
     return f"{value.normalize():f}"
+
+
+def format_decimal_percent(value: Decimal) -> str:
+    rounded = value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    text = f"{rounded.normalize():f}"
+    return text.replace(".", ",")
 
 
 def value_to_brl(amount_cents: int, currency: str) -> int:

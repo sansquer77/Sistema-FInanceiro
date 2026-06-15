@@ -86,6 +86,27 @@ def delete_user_account(user_id: int, current_password: str) -> None:
         conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
 
 
+def clear_user_launches(user_id: int, current_password: str) -> None:
+    with get_connection() as conn:
+        row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+        if not row or not verify_password(current_password, row["password_hash"]):
+            raise AuthError("Senha atual invalida.", HTTPStatus.UNAUTHORIZED)
+        conn.execute("DELETE FROM credit_card_payments WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM credit_card_transactions WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM investment_opening_positions WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM transaction_tags WHERE transaction_id IN (SELECT id FROM transactions WHERE user_id = ?)", (user_id,))
+        conn.execute("DELETE FROM transactions WHERE user_id = ?", (user_id,))
+        conn.execute(
+            """
+            UPDATE checking_accounts
+            SET current_balance_cents = initial_balance_cents,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE user_id = ?
+            """,
+            (user_id,),
+        )
+
+
 def request_password_reset(email: str) -> dict:
     normalized_email = email.strip().lower()
     validate_email(normalized_email)
