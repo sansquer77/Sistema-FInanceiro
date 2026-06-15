@@ -433,3 +433,185 @@ def normalize_item_id(value: object, message: str) -> int:
 def ensure_allowed_table(table: str) -> None:
     if table not in {"categories", "tags"}:
         raise ClassificationError("Classificacao invalida.")
+
+
+DEFAULT_CATEGORIES = {
+    "expense": {
+        "Alimentação": [
+            "Feira, Sacolão e Peixaria",
+            "Lanches, Padaria e Cafés",
+            "Restaurantes / Bares / Delivery",
+            "Supermercado / Despensa",
+        ],
+        "Animais de Estimação (Pets)": [
+            "Banho, Tosa e Estética",
+            "Brinquedos, Caminhas e Acessórios Pet",
+            "Consultas Veterinárias e Hospital Vet",
+            "Medicamentos, Antipulgas e Vacinas",
+            "Ração, Petiscos e Alimentação Natural",
+        ],
+        "Assinaturas e Serviços": [
+            "Armazenamento em Nuvem e Softwares (iCloud, Drive, Office)",
+            "Assinaturas de Jornais / Revistas / Portais",
+            "Celular",
+            "Clubes de Assinatura (Livros, Vinhos, Cafés, etc.)",
+            "Streaming de Música (Spotify, Deezer, Apple Music)",
+            "Streaming de Vídeo (Netflix, Disney+, Prime, etc.)",
+        ],
+        "Compras": [],
+        "Cuidados Pessoais": [
+            "Academia, Estúdio de Pilates e Esportes",
+            "Acessórios, Joias e Relógios",
+            "Cosméticos, Maquiagem e Perfumaria",
+            "Salão de Beleza / Barbearia",
+            "Vestuário (Roupas, Calçados e Underwear)",
+        ],
+        "Dependentes e Filhos": [
+            "Atividades Extracurriculares (Futebol, Ballet, etc.)",
+            "Brinquedos, Jogos e Recreação",
+            "Fraldas, Fórmulas e Artigos Infantis",
+            "Mensalidade Escolar / Creche (Filhos)",
+            "Mesada dos Filhos",
+            "Vestuário Infantil / Uniformes",
+        ],
+        "Educação": [
+            "Cursos Livres, Workshops e Certificações",
+            "Eventos Acadêmicos e Congressos",
+            "Idiomas e Intercâmbio",
+            "Livros, Apostilas e Material Escolar",
+            "Mensalidade Escolar / Faculdade / Pós",
+        ],
+        "Empréstimos": [],
+        "Habitação": [
+            "Aluguel / Prestação do Imóvel",
+            "Condomínio",
+            "Empregada Doméstica / Diarista",
+            "Energia Elétrica (Luz)",
+            "Gás (Encanado ou Botijão)",
+            "IPTU",
+            "Internet / TV a Cabo / Telefone Fixo",
+            "Manutenção, Reparos e Reformas",
+            "Móveis e Decoração",
+            "Seguro Residencial",
+            "Água e Saneamento",
+        ],
+        "Lazer e Estilo de Vida": [
+            "Baladas, Festas e Grandes Eventos",
+            "Cinema, Teatro, Shows e Eventos",
+            "Clubes, Parques e Associações",
+            "Hobbies, Passatempos e Jogos",
+            "Viagens, Passagens e Hospedagens (Férias)",
+        ],
+        "Outras Despesas": [
+            "Doações, Dízimos e Ações Sociais",
+            "Imprevistos e Emergências Domésticas",
+            "Multas de Trânsito / Juros por Atraso",
+            "Presentes para Amigos e Família",
+        ],
+        "Saúde": [
+            "Consultas Médicas / Terapias / Psicólogo",
+            "Dentista e Tratamento Odontológico",
+            "Exames Clínicos e Laboratoriais",
+            "Medicamentos e Farmácia",
+            "Plano de Saúde / Seguro Saúde",
+            "Ótica (Óculos, Lentes de Contato)",
+        ],
+        "Serviços Financeiros e Impostos": [
+            "Anuidade de Cartão de Crédito",
+            "Imposto de Renda a Pagar (IRPF)",
+            "Juros, Empréstimos e Financiamentos",
+            "Seguro de Vida / Previdência do Estado",
+            "Tarifas e Taxas de Conta Corrente",
+        ],
+        "Trabalho": [
+            "Impostos MEI",
+        ],
+        "Transporte": [
+            "Aplicativos de Transporte (Uber, 99)",
+            "Combustível",
+            "Estacionamento e Pedágio",
+            "IPVA / Licenciamento / DPVAT",
+            "Lavagem e Cuidados com o Carro",
+            "Manutenção, Revisão e Troca de Óleo",
+            "Seguro Auto",
+            "Transporte Público (Ônibus, Metrô, Trem)",
+        ],
+    },
+    "income": {
+        "Empréstimos": [],
+        "Freelance e Autônomo": [
+            "Comissões",
+            "Consultorias",
+            "Projetos / Serviços Prestados",
+        ],
+        "Outras Receitas": [
+            "Presentes / Doações Recebidas",
+            "Prêmios / Sorteios / Loterias",
+            "Reembolso médico",
+            "Reembolsos Corporativos",
+            "Restituição de Imposto de Renda",
+            "Venda de Bens (Móveis, Carro, etc.)",
+        ],
+        "Rendimentos e Investimentos": [
+            "Aluguéis Recebidos",
+            "Dividendos / JCP",
+            "Rendimento de Renda Fixa",
+        ],
+        "Trabalho e Salário": [
+            "Bônus / PLR",
+            "Décimo Terceiro (13º)",
+            "Férias",
+            "Horas Extras / Adicionais",
+            "Salário Líquido",
+        ],
+    },
+    "investment": {
+        "Criptoativos": [
+            "Bitcoin (BTC)",
+            "Ethereum (ETH)",
+            "Outras Altcoins (Solana, Cardano, etc.)",
+            "Stablecoins (USDT, USDC)",
+        ],
+        "Fundos de Investimentos": [
+            "Cambial",
+            "Fundos Multimercado",
+            "Renda Fixa",
+        ],
+        "Outros Investimentos": [
+            "Aportes em Negócios Próprios / Startups / Equity",
+            "Imóveis Físicos (Foco em Valorização/Construção)",
+        ],
+        "Previdência Privada": [
+            "PGBL (Plano Gerador de Benefício Livre)",
+            "VGBL (Vida Gerador de Benefício Livre)",
+        ],
+        "Renda Fixa": [
+            "CDB / RDB / LC (Certificados de Depósito)",
+            "CRI / CRA / Debêntures (Crédito Privado)",
+            "LCI / LCA (Letras de Crédito Imobiliário/Agrícola)",
+            "Poupança (Fundo de Emergência antigo)",
+            "Tesouro Direto (Selic, IPCA+, Prefixado)",
+        ],
+        "Renda Variável": [
+            "Ações (Bolsa de Valores - B3)",
+            "BDRs / Investimentos no Exterior",
+            "ETFs (Exchange Traded Funds)",
+            "Fundos de Investimento Imobiliário (FIIs)",
+            "Mercado de Opções / Contratos Futuros",
+        ],
+    },
+}
+
+def seed_default_categories(conn, user_id: int) -> None:
+    for group_type, categories in DEFAULT_CATEGORIES.items():
+        for category_name, subcategories in categories.items():
+            cursor = conn.execute(
+                "INSERT INTO categories (user_id, name, group_type) VALUES (?, ?, ?)",
+                (user_id, category_name, group_type)
+            )
+            category_id = cursor.lastrowid
+            for subcategory_name in subcategories:
+                conn.execute(
+                    "INSERT INTO subcategories (user_id, category_id, name) VALUES (?, ?, ?)",
+                    (user_id, category_id, subcategory_name)
+                )

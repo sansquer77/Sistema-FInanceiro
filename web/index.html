@@ -444,17 +444,16 @@
                 <label>Descrição
                   <input name="description" type="text" placeholder="Ex.: Mercado, salário, transferência..." required>
                 </label>
+                <div class="field-row">
+                  <label>Categoria
+                    <select name="category" id="transactionCategory" required></select>
+                  </label>
+                  <label>Subcategoria
+                    <select name="subcategory" id="transactionSubcategory"></select>
+                  </label>
+                </div>
                 <div class="investment-fields" id="investmentOperationFields" hidden>
                   <div class="field-row">
-                    <label>Tipo de investimento
-                      <select name="investment_asset_type" id="investmentAssetType">
-                        <option value="stock">Ações / ETFs / BDRs</option>
-                        <option value="crypto">Cripto</option>
-                        <option value="fund">Fundo de investimento</option>
-                        <option value="fixed_income">Renda fixa</option>
-                        <option value="other">Outro</option>
-                      </select>
-                    </label>
                     <label>Valor investido
                       <input name="investment_amount" id="investmentAmount" type="text" inputmode="decimal" placeholder="0,00">
                     </label>
@@ -565,14 +564,7 @@
                 <label id="exchangeRateLabel" hidden>Cotação para BRL
                   <input name="exchange_rate_to_brl" id="exchangeRate" type="text" inputmode="decimal" placeholder="1,000000">
                 </label>
-                <div class="field-row">
-                  <label>Categoria
-                    <select name="category" id="transactionCategory" required></select>
-                  </label>
-                  <label>Subcategoria
-                    <select name="subcategory" id="transactionSubcategory"></select>
-                  </label>
-                </div>
+
                 <div class="field-row">
                   <label>Tag
                     <input name="tags" type="text" placeholder="Ex.: Mercado, Cartão">

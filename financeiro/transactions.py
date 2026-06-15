@@ -99,7 +99,7 @@ def create_transaction(user_id: int, data: dict) -> dict:
             normalize_transfer_amounts(transaction, source, destination)
         exchange_rate_micros = resolve_exchange_rate_micros(source["currency"], transaction["date"], transaction["exchange_rate"])
         amount_brl_cents = convert_to_brl_cents(transaction["amount_cents"], exchange_rate_micros)
-        category_group_type = transaction_category_group(transaction["type"], destination)
+        category_group_type = transaction_category_group(conn, user_id, transaction["type"], destination, transaction["category"])
         category_id = get_or_create_category(conn, user_id, transaction["category"], category_group_type)
         subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
         tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
@@ -171,7 +171,7 @@ def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
             normalize_transfer_amounts(transaction, source, destination)
         exchange_rate_micros = resolve_exchange_rate_micros(source["currency"], transaction["date"], transaction["exchange_rate"])
         amount_brl_cents = convert_to_brl_cents(transaction["amount_cents"], exchange_rate_micros)
-        category_group_type = transaction_category_group(transaction["type"], destination)
+        category_group_type = transaction_category_group(conn, user_id, transaction["type"], destination, transaction["category"])
         category_id = get_or_create_category(conn, user_id, transaction["category"], category_group_type)
         subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
         tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
@@ -243,7 +243,7 @@ def update_future_recurring_transactions(conn, user_id: int, existing, transacti
             normalize_transfer_amounts(transaction, source, destination)
         exchange_rate_micros = resolve_exchange_rate_micros(source["currency"], row["date"], transaction["exchange_rate"])
         amount_brl_cents = convert_to_brl_cents(transaction["amount_cents"], exchange_rate_micros)
-        category_group_type = transaction_category_group(transaction["type"], destination)
+        category_group_type = transaction_category_group(conn, user_id, transaction["type"], destination, transaction["category"])
         category_id = get_or_create_category(conn, user_id, transaction["category"], category_group_type)
         subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
         tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
@@ -413,9 +413,17 @@ def normalize_count(value: object, message: str, maximum: int) -> int:
 def normalize_investment_operation(data: dict, amount_cents: int, transaction_type: str) -> dict | None:
     if transaction_type != "investment":
         return None
-    asset_type = str(data.get("investment_asset_type") or "other").strip().lower()
-    if asset_type not in INVESTMENT_ASSET_TYPES:
-        raise TransactionError("Tipo de investimento invalido.")
+    category = str(data.get("category") or "").strip()
+    if category == "Renda Variável":
+        asset_type = "stock"
+    elif category == "Criptoativos":
+        asset_type = "crypto"
+    elif category == "Fundos de Investimentos":
+        asset_type = "fund"
+    elif category == "Renda Fixa":
+        asset_type = "fixed_income"
+    else:
+        asset_type = "other"
     fixed_income_mode = normalize_optional_key(data.get("investment_fixed_income_mode"))
     if fixed_income_mode and fixed_income_mode not in FIXED_INCOME_MODES:
         raise TransactionError("Modalidade de renda fixa invalida.")
@@ -637,13 +645,21 @@ def existing_destination_balance_amount(transaction) -> int:
     return amount or int(transaction["amount_cents"])
 
 
-def transaction_category_group(transaction_type: str, destination) -> str:
+def transaction_category_group(conn, user_id: int, transaction_type: str, destination, category_name: str) -> str:
     if transaction_type == "income":
         return "income"
     if transaction_type == "investment":
         return "investment"
-    if transaction_type == "transfer" and destination and destination["account_type"] == "investment":
-        return "investment"
+    if transaction_type == "transfer":
+        if destination and destination["account_type"] == "investment":
+            return "investment"
+        if category_name:
+            row = conn.execute(
+                "SELECT 1 FROM categories WHERE user_id = ? AND group_type = 'investment' AND name = ?",
+                (user_id, category_name.strip()),
+            ).fetchone()
+            if row:
+                return "investment"
     return "expense"
 
 

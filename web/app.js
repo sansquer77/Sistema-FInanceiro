@@ -141,7 +141,6 @@ const exchangeTransferFields = document.querySelector("#exchangeTransferFields")
 const destinationAmount = document.querySelector("#destinationAmount");
 const transferExchangeRate = document.querySelector("#transferExchangeRate");
 const investmentOperationFields = document.querySelector("#investmentOperationFields");
-const investmentAssetType = document.querySelector("#investmentAssetType");
 const investmentAmount = document.querySelector("#investmentAmount");
 const investmentFundFields = document.querySelector("#investmentFundFields");
 const investmentFixedFields = document.querySelector("#investmentFixedFields");
@@ -239,13 +238,15 @@ deleteUserForm.addEventListener("submit", handleDeleteUserSubmit);
 transactionType.addEventListener("change", updateTransactionTypeState);
 transactionAccount.addEventListener("change", handleTransactionAccountChange);
 destinationAccount.addEventListener("change", updateTransferExchangeRateState);
-investmentAssetType.addEventListener("change", updateInvestmentFieldState);
 investmentAmount.addEventListener("input", () => {
   if (transactionType.value === "investment") {
     transactionAmount.value = investmentAmount.value;
   }
 });
-transactionCategory.addEventListener("change", renderTransactionSubcategories);
+transactionCategory.addEventListener("change", () => {
+  renderTransactionSubcategories();
+  updateInvestmentFieldState();
+});
 seriesKind.addEventListener("change", updateSeriesState);
 transactionForm.elements.date.addEventListener("change", updateExchangeRateState);
 transactionForm.elements.date.addEventListener("change", updateTransferExchangeRateState);
@@ -683,8 +684,6 @@ async function handleTransactionSubmit(event) {
     }
     if (data.type === "exchange") {
       data.type = "transfer";
-      data.category = data.category || "Serviços Financeiros e Impostos";
-      data.subcategory = data.subcategory || "Câmbio";
       data.tags = data.tags || "Câmbio";
     }
     if (data.type !== "transfer") {
@@ -1159,6 +1158,7 @@ function editTransaction(transaction) {
   if (transaction.subcategory_name) {
     transactionSubcategory.value = transaction.subcategory_name;
   }
+  updateInvestmentFieldState();
   transactionFormTitle.textContent = "Editar lançamento";
   cancelTransactionEditButton.hidden = false;
   transactionForm.querySelector('button[type="submit"]').textContent = "Salvar alterações";
@@ -1184,13 +1184,11 @@ function fillInvestmentOperation(operation) {
       transactionForm.elements[field].value = "";
     }
   }
-  investmentAssetType.value = "other";
   transactionForm.elements.investment_fixed_income_mode.value = "";
   if (!operation) {
     updateInvestmentFieldState();
     return;
   }
-  investmentAssetType.value = operation.asset_type || "other";
   transactionForm.elements.investment_asset_identifier.value = operation.asset_identifier || "";
   transactionForm.elements.investment_asset_name.value = operation.asset_name || "";
   transactionForm.elements.investment_cnpj.value = operation.cnpj || "";
@@ -1671,15 +1669,21 @@ function accountCard(account, status) {
       <button class="ghost" type="button" data-action="edit">Editar</button>
       <button class="danger" type="button" data-action="archive">Arquivar</button>
     `;
+
+  const logoHtml = getBankLogo(account.bank_name, account.account_type);
+
   card.innerHTML = `
-      <div>
-        <h3>${escapeHtml(account.name)}</h3>
-        <div class="account-meta">
-          ${account.account_type !== "wallet" ? `<span>${escapeHtml(account.bank_name)}</span>` : ""}
-          <span>${accountTypeLabel(account.account_type)}</span>
-          <span>${escapeHtml(account.currency)}</span>
-          ${account.branch ? `<span>Ag. ${escapeHtml(account.branch)}</span>` : ""}
-          ${account.account_number ? `<span>Conta ${escapeHtml(account.account_number)}</span>` : ""}
+      <div class="account-card-info">
+        ${logoHtml}
+        <div>
+          <h3>${escapeHtml(account.name)}</h3>
+          <div class="account-meta">
+            ${account.account_type !== "wallet" ? `<span>${escapeHtml(account.bank_name)}</span>` : ""}
+            <span>${accountTypeLabel(account.account_type)}</span>
+            <span>${escapeHtml(account.currency)}</span>
+            ${account.branch ? `<span>Ag. ${escapeHtml(account.branch)}</span>` : ""}
+            ${account.account_number ? `<span>Conta ${escapeHtml(account.account_number)}</span>` : ""}
+          </div>
         </div>
       </div>
       <div class="balance">
@@ -1702,6 +1706,153 @@ function accountCard(account, status) {
     restoreButton.addEventListener("click", () => restoreAccount(account.id));
   }
   return card;
+}
+
+function getBankLogo(bankName, accountType) {
+  if (accountType === "wallet") {
+    return `<div class="bank-logo-badge" style="background-color: #e2e8f0;" title="Carteira / Dinheiro">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
+        <path d="M16 11h6v2h-6z"></path>
+        <path d="M12 4v16"></path>
+      </svg>
+    </div>`;
+  }
+
+  const name = String(bankName || "").toLowerCase().trim();
+
+  // Nubank
+  if (name.includes("nubank") || name.includes("nu ")) {
+    return `<div class="bank-logo-badge" style="background-color: #820ad1;" title="Nubank">
+      <svg viewBox="0 0 100 100" width="24" height="24" fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M25 75V25c0 0 10-10 20 0s10 20 10 30c0 10 0 20 20 20s20-20 20-30" />
+      </svg>
+    </div>`;
+  }
+  // Itaú
+  if (name.includes("itau") || name.includes("itaú")) {
+    return `<div class="bank-logo-badge" style="background-color: #ec7000;" title="Itaú">
+      <svg viewBox="0 0 100 100" width="30" height="30">
+        <rect x="10" y="10" width="80" height="80" rx="15" fill="#002d62" />
+        <path d="M25 35h50v6h-22v24h22v6h-50v-6h22V41h-22z" fill="#ec7000" />
+        <path d="M30 40h40v4H50v16h20v4H30v-4h16V44H30z" fill="#ffec00" />
+      </svg>
+    </div>`;
+  }
+  // Bradesco
+  if (name.includes("bradesco")) {
+    return `<div class="bank-logo-badge" style="background-color: #cc092f;" title="Bradesco">
+      <svg viewBox="0 0 100 100" width="22" height="22" fill="#ffffff">
+        <path d="M50 15c-12 0-22 10-22 22 0 6 2 11 6 15L50 68l16-16c4-4 6-9 6-15 0-12-10-22-22-22zm0 8c8 0 14 6 14 14 0 4-2 8-5 10L50 58l-9-11c-3-2-5-6-5-10 0-8 6-14 14-14z" />
+        <rect x="25" y="75" width="50" height="8" rx="2" />
+        <rect x="35" y="85" width="30" height="5" rx="1" />
+      </svg>
+    </div>`;
+  }
+  // Banco do Brasil
+  if (name.includes("banco do brasil") || name.includes(" bb ") || name === "bb") {
+    return `<div class="bank-logo-badge" style="background-color: #0038a8;" title="Banco do Brasil">
+      <svg viewBox="0 0 100 100" width="26" height="26" fill="#fcf800">
+        <path d="M20 30c5-10 15-15 30-15s25 5 30 15l-12 6c-3-6-10-10-18-10s-15 4-18 10l-12-6z" />
+        <path d="M20 70c5 10 15 15 30 15s25-5 30-15l-12-6c-3 6-10 10-18 10s-15-4-18-10l-12 6z" />
+        <path d="M50 35c8 0 15 7 15 15s-7 15-15 15-15-7-15-15 7-15 15-15z" />
+      </svg>
+    </div>`;
+  }
+  // Caixa
+  if (name.includes("caixa") || name.includes("cef")) {
+    return `<div class="bank-logo-badge" style="background-color: #005c9e;" title="Caixa">
+      <svg viewBox="0 0 100 100" width="24" height="24" fill="#ffffff">
+        <rect x="15" y="15" width="70" height="70" rx="10" />
+        <path d="M30 30l15 15-15 15h12l9-9 9 9h12L57 45l15-15H60l-9 9-9-9H30z" fill="#f37021" />
+        <circle cx="50" cy="50" r="10" fill="#ffffff" />
+      </svg>
+    </div>`;
+  }
+  // Santander
+  if (name.includes("santander")) {
+    return `<div class="bank-logo-badge" style="background-color: #ec0000;" title="Santander">
+      <svg viewBox="0 0 100 100" width="24" height="24" fill="#ffffff">
+        <path d="M50 15c-15 0-25 15-20 28 3 7 10 12 17 12h6c7 0 14-5 17-12 5-13-5-28-20-28zm-3 8c1 0 2 1 2 2v6h-4v-6c0-1 1-2 2-2zm6 0c1 0 2 1 2 2v6h-4v-6c0-1 1-2 2-2zM32 50h36v32H32z" />
+      </svg>
+    </div>`;
+  }
+  // Inter
+  if (name.includes("inter")) {
+    return `<div class="bank-logo-badge" style="background-color: #ff7a00;" title="Banco Inter">
+      <svg viewBox="0 0 100 100" width="24" height="24" fill="none" stroke="#ffffff" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M30 25h40v50H30z" />
+        <path d="M50 25v50" />
+      </svg>
+    </div>`;
+  }
+  // C6 Bank
+  if (name.includes("c6")) {
+    return `<div class="bank-logo-badge" style="background-color: #111111;" title="C6 Bank">
+      <svg viewBox="0 0 100 100" width="24" height="24" fill="#ffffff">
+        <text x="50" y="65" font-size="45" font-family="Arial, sans-serif" font-weight="900" text-anchor="middle">C6</text>
+      </svg>
+    </div>`;
+  }
+  // XP
+  if (name.includes("xp")) {
+    return `<div class="bank-logo-badge" style="background-color: #000000;" title="XP Investimentos">
+      <svg viewBox="0 0 100 100" width="24" height="24" fill="#d5b265">
+        <path d="M20 20l25 30-25 30h15l17-21 17 21h15L60 50l25-30H70L53 40 35 20H20z" />
+      </svg>
+    </div>`;
+  }
+  // BTG
+  if (name.includes("btg")) {
+    return `<div class="bank-logo-badge" style="background-color: #0f172a;" title="BTG Pactual">
+      <svg viewBox="0 0 100 100" width="24" height="24" fill="#d5b265">
+        <text x="50" y="65" font-size="32" font-family="Arial, sans-serif" font-weight="bold" text-anchor="middle">BTG</text>
+      </svg>
+    </div>`;
+  }
+  // Avenue
+  if (name.includes("avenue")) {
+    return `<div class="bank-logo-badge" style="background-color: #0c0c0e;" title="Avenue">
+      <svg viewBox="0 0 100 100" width="22" height="22" fill="none" stroke="#ffffff" stroke-width="10" stroke-linecap="round">
+        <path d="M25 80L50 20L75 80" />
+        <path d="M38 55h24" />
+      </svg>
+    </div>`;
+  }
+  // Wise
+  if (name.includes("wise")) {
+    return `<div class="bank-logo-badge" style="background-color: #9fe870;" title="Wise">
+      <svg viewBox="0 0 100 100" width="24" height="24" fill="#1e3b2b">
+        <path d="M20 30h40L40 50h30L45 80h10L75 42H50l20-12H20v8z" />
+      </svg>
+    </div>`;
+  }
+  // Coinbase
+  if (name.includes("coinbase")) {
+    return `<div class="bank-logo-badge" style="background-color: #0052ff;" title="Coinbase">
+      <svg viewBox="0 0 100 100" width="24" height="24" fill="none" stroke="#ffffff" stroke-width="12">
+        <circle cx="50" cy="50" r="30" />
+        <circle cx="50" cy="50" r="10" fill="#ffffff" />
+      </svg>
+    </div>`;
+  }
+  // Generic Crypto
+  if (name.includes("cripto") || name.includes("crypto") || name.includes("binance") || name.includes("ledger") || name.includes("metamask") || name.includes("trezor") || name.includes("blockchain")) {
+    return `<div class="bank-logo-badge" style="background-color: #f59e0b;" title="Criptoativos / Wallet">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="9"></circle>
+        <path d="M12 7v10M9 9h5a2 2 0 0 1 0 4H9h4a2 2 0 0 1 0 4H9"></path>
+      </svg>
+    </div>`;
+  }
+
+  // Generic Bank
+  return `<div class="bank-logo-badge" style="background-color: #f1f5f9;" title="Banco / Outro">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="2" y="10" width="20" height="11" rx="2"></rect>
+      <path d="M6 6v4M10 6v4M14 6v4M18 6v4M2 6h20M12 2L2 6h20L12 2z"></path>
+    </svg>
+  </div>`;
 }
 
 function renderTransactionAccounts() {
@@ -2461,8 +2612,8 @@ function updateTransactionTypeState() {
   if (isInvestment && !transactionForm.elements.tags.value.trim()) {
     transactionForm.elements.tags.value = "Investimento";
   }
-  updateInvestmentFieldState();
   renderTransactionCategories();
+  updateInvestmentFieldState();
   updateExchangeRateState();
   updateTransferExchangeRateState();
 }
@@ -2481,9 +2632,9 @@ function applyInvestmentAccountDefault() {
 
 function updateInvestmentFieldState() {
   const isInvestment = transactionType.value === "investment";
-  const assetType = investmentAssetType.value;
-  investmentFundFields.hidden = !isInvestment || assetType !== "fund";
-  investmentFixedFields.hidden = !isInvestment || assetType !== "fixed_income";
+  const cat = transactionCategory.value;
+  investmentFundFields.hidden = !isInvestment || cat !== "Fundos de Investimentos";
+  investmentFixedFields.hidden = !isInvestment || cat !== "Renda Fixa";
   for (const field of investmentOperationFields.querySelectorAll("input, select")) {
     field.disabled = !isInvestment;
   }
@@ -2534,11 +2685,8 @@ function selectedTransactionGroup() {
   if (transactionType.value === "income") {
     return "income";
   }
-  if (transactionType.value === "investment") {
+  if (transactionType.value === "investment" || transactionType.value === "exchange") {
     return "investment";
-  }
-  if (transactionType.value === "exchange") {
-    return "expense";
   }
   return "expense";
 }

@@ -32,6 +32,8 @@ def create_user(name: str, email: str, password: str) -> dict:
                 (name, email, hash_password(password)),
             )
             user_id = cursor.lastrowid
+            from financeiro.categories import seed_default_categories
+            seed_default_categories(conn, user_id)
             row = conn.execute("SELECT id, name, email, created_at FROM users WHERE id = ?", (user_id,)).fetchone()
             return row_to_dict(row)
     except Exception as exc:

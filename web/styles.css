@@ -246,7 +246,7 @@ textarea:focus {
   display: grid;
   grid-template-columns: 236px minmax(0, 1fr);
   gap: 24px;
-  width: min(1320px, calc(100% - 32px));
+  width: calc(100% - 32px);
   margin: 0 auto;
   padding: 24px 0 48px;
   align-items: start;
@@ -555,8 +555,8 @@ textarea:focus {
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(300px, 390px) 1fr;
-  gap: 18px;
+  grid-template-columns: minmax(320px, 460px) 1fr;
+  gap: 20px;
   align-items: start;
 }
 
@@ -1226,6 +1226,24 @@ textarea:focus {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fff;
+}
+
+.account-card-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.bank-logo-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  overflow: hidden;
+  box-shadow: 0 2px 5px rgba(31, 41, 51, 0.08);
 }
 
 .account-card h3 {
