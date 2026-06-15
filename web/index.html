@@ -99,6 +99,7 @@
             </div>
             <div class="nav-group">
               <span>Gestão</span>
+              <button class="nav-button" type="button" data-view="portfolio">Portfólio</button>
               <button class="nav-button" type="button" data-view="limits">Limites</button>
               <button class="nav-button" type="button" data-view="reports">Relatórios</button>
               <button class="nav-button" type="button" data-view="classifications">Categorias</button>
@@ -423,12 +424,16 @@
               <h2 id="transactionFormTitle">Novo lançamento</h2>
               <form id="transactionForm" class="form">
                 <input type="hidden" name="id">
+                <label>Conta
+                  <select name="account_id" id="transactionAccount" required></select>
+                </label>
                 <div class="field-row">
                   <label>Tipo
                     <select name="type" id="transactionType">
                       <option value="expense">Despesa</option>
                       <option value="income">Receita</option>
                       <option value="transfer">Transferência</option>
+                      <option value="exchange">Câmbio</option>
                       <option value="investment">Investimento</option>
                     </select>
                   </label>
@@ -439,12 +444,85 @@
                 <label>Descrição
                   <input name="description" type="text" placeholder="Ex.: Mercado, salário, transferência..." required>
                 </label>
-                <div class="field-row">
+                <div class="investment-fields" id="investmentOperationFields" hidden>
+                  <div class="field-row">
+                    <label>Tipo de investimento
+                      <select name="investment_asset_type" id="investmentAssetType">
+                        <option value="stock">Ações / ETFs / BDRs</option>
+                        <option value="crypto">Cripto</option>
+                        <option value="fund">Fundo de investimento</option>
+                        <option value="fixed_income">Renda fixa</option>
+                        <option value="other">Outro</option>
+                      </select>
+                    </label>
+                    <label>Valor investido
+                      <input name="investment_amount" id="investmentAmount" type="text" inputmode="decimal" placeholder="0,00">
+                    </label>
+                  </div>
+                  <div class="field-row">
+                    <label>Ativo
+                      <input name="investment_asset_identifier" id="investmentAssetIdentifier" type="text" placeholder="Ex.: PETR4, IVVB11, BTC">
+                    </label>
+                    <label>Nome do ativo
+                      <input name="investment_asset_name" id="investmentAssetName" type="text" placeholder="Ex.: Petrobras PN">
+                    </label>
+                  </div>
+                  <div class="field-row investment-fund-fields" id="investmentFundFields" hidden>
+                    <label>CNPJ do fundo
+                      <input name="investment_cnpj" id="investmentCnpj" type="text" placeholder="00.000.000/0000-00 ou alfanumérico">
+                    </label>
+                  </div>
+                  <div class="field-row investment-fixed-fields" id="investmentFixedFields" hidden>
+                    <label>Modalidade
+                      <select name="investment_fixed_income_mode" id="investmentFixedIncomeMode">
+                        <option value="">Selecione</option>
+                        <option value="post">Pós-fixada</option>
+                        <option value="pre">Pré-fixada</option>
+                        <option value="hybrid">Híbrida</option>
+                      </select>
+                    </label>
+                    <label>Indexador
+                      <select name="investment_fixed_income_indexer" id="investmentFixedIncomeIndexer">
+                        <option value="">Selecione</option>
+                        <option value="CDI">CDI</option>
+                        <option value="SELIC">SELIC</option>
+                        <option value="IPCA">IPCA</option>
+                        <option value="IGP-M">IGP-M</option>
+                        <option value="TR">TR</option>
+                      </select>
+                    </label>
+                    <label>Taxa (% a.a.)
+                      <input name="investment_fixed_income_rate" id="investmentFixedIncomeRate" type="text" inputmode="decimal" placeholder="Ex.: 6,50">
+                    </label>
+                  </div>
+                  <div class="field-row">
+                    <label>Quantidade
+                      <input name="investment_quantity" id="investmentQuantity" type="text" inputmode="decimal" placeholder="0,000000">
+                    </label>
+                    <label>Preço unitário
+                      <input name="investment_unit_price" id="investmentUnitPrice" type="text" inputmode="decimal" placeholder="0,00">
+                    </label>
+                  </div>
+                  <div class="field-row">
+                    <label>Tx. corretagem
+                      <input name="investment_brokerage_fee" type="text" inputmode="decimal" placeholder="0,00">
+                    </label>
+                    <label>Tx. emolumentos
+                      <input name="investment_exchange_fee" type="text" inputmode="decimal" placeholder="0,00">
+                    </label>
+                  </div>
+                  <div class="field-row">
+                    <label>Impostos
+                      <input name="investment_tax" type="text" inputmode="decimal" placeholder="0,00">
+                    </label>
+                    <label>Outros custos
+                      <input name="investment_other_costs" type="text" inputmode="decimal" placeholder="0,00">
+                    </label>
+                  </div>
+                </div>
+                <div class="field-row" id="transactionAmountRow">
                   <label>Valor
-                    <input name="amount" type="text" inputmode="decimal" placeholder="0,00" required>
-                  </label>
-                  <label>Conta
-                    <select name="account_id" id="transactionAccount" required></select>
+                    <input name="amount" id="transactionAmount" type="text" inputmode="decimal" placeholder="0,00" required>
                   </label>
                 </div>
                 <div class="field-row">
@@ -476,6 +554,14 @@
                 <label id="destinationAccountLabel" hidden>Conta de destino
                   <select name="destination_account_id" id="destinationAccount"></select>
                 </label>
+                <div class="field-row" id="exchangeTransferFields" hidden>
+                  <label>Valor no destino
+                    <input name="destination_amount" id="destinationAmount" type="text" inputmode="decimal" placeholder="0,00">
+                  </label>
+                  <label>Cotação do câmbio
+                    <input name="transfer_exchange_rate" id="transferExchangeRate" type="text" inputmode="decimal" placeholder="Ex.: 0,180000">
+                  </label>
+                </div>
                 <label id="exchangeRateLabel" hidden>Cotação para BRL
                   <input name="exchange_rate_to_brl" id="exchangeRate" type="text" inputmode="decimal" placeholder="1,000000">
                 </label>
@@ -528,6 +614,97 @@
               <div class="transaction-list" id="transactionList"></div>
             </section>
           </div>
+        </section>
+
+        <section class="module-view" id="portfolioView" hidden>
+          <section class="panel">
+            <div class="section-heading">
+              <h2>Portfólio</h2>
+              <button class="ghost small-button" type="button" id="refreshPortfolioButton">Atualizar cotações</button>
+            </div>
+
+            <div class="portfolio-summary">
+              <div>
+                <span>Patrimônio atual</span>
+                <strong id="portfolioCurrentSummary">R$ 0,00</strong>
+              </div>
+              <div>
+                <span>Custo de aquisição</span>
+                <strong id="portfolioCostSummary">R$ 0,00</strong>
+              </div>
+              <div>
+                <span>Resultado</span>
+                <strong id="portfolioResultSummary">R$ 0,00</strong>
+              </div>
+              <div>
+                <span>Rentabilidade</span>
+                <strong id="portfolioReturnSummary">0,00%</strong>
+              </div>
+              <div>
+                <span>Variação do dia</span>
+                <strong id="portfolioDayResultSummary">R$ 0,00</strong>
+              </div>
+              <div>
+                <span>Ativos em carteira</span>
+                <strong id="portfolioPositionCount">0</strong>
+              </div>
+            </div>
+            <p class="message" id="portfolioMessage" role="alert"></p>
+          </section>
+
+          <div class="portfolio-grid">
+            <section class="panel">
+              <div class="section-heading">
+                <h2>Por mercado</h2>
+              </div>
+              <div class="portfolio-group-list" id="portfolioMarketList"></div>
+            </section>
+
+            <section class="panel">
+              <div class="section-heading">
+                <h2>Por classe</h2>
+              </div>
+              <div class="portfolio-group-list" id="portfolioTypeList"></div>
+            </section>
+
+            <section class="panel">
+              <div class="section-heading">
+                <h2>Por indexador</h2>
+              </div>
+              <div class="portfolio-group-list" id="portfolioIndexerList"></div>
+            </section>
+
+            <section class="panel">
+              <div class="section-heading">
+                <h2>Por moeda</h2>
+              </div>
+              <div class="portfolio-group-list" id="portfolioCurrencyList"></div>
+            </section>
+
+            <section class="panel">
+              <div class="section-heading">
+                <h2>Por carteira</h2>
+              </div>
+              <div class="portfolio-group-list" id="portfolioAccountList"></div>
+            </section>
+          </div>
+
+          <section class="panel report-content-panel">
+            <div class="section-heading">
+              <h2>Posição atual</h2>
+              <label class="compact-filter">Agrupar
+                <select id="portfolioGroupFilter">
+                  <option value="none">Ativo</option>
+                  <option value="market_label">Mercado</option>
+                  <option value="asset_type_label">Tipo</option>
+                  <option value="fixed_income_indexer">Indexador</option>
+                  <option value="account_name">Carteira</option>
+                  <option value="currency">Moeda</option>
+                </select>
+              </label>
+            </div>
+            <div id="portfolioPositions" class="portfolio-positions"></div>
+          </section>
         </section>
 
         <section class="module-view" id="limitsView" hidden>

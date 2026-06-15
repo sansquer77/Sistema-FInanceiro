@@ -138,10 +138,12 @@ def initialize_database() -> None:
             CREATE TABLE IF NOT EXISTS transactions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                type TEXT NOT NULL CHECK (type IN ('income', 'expense', 'transfer')),
+                type TEXT NOT NULL CHECK (type IN ('income', 'expense', 'transfer', 'investment')),
                 description TEXT NOT NULL,
                 amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+                destination_amount_cents INTEGER NOT NULL DEFAULT 0 CHECK (destination_amount_cents >= 0),
                 exchange_rate_micros INTEGER NOT NULL DEFAULT 1000000 CHECK (exchange_rate_micros > 0),
+                transfer_exchange_rate_micros INTEGER NOT NULL DEFAULT 0 CHECK (transfer_exchange_rate_micros >= 0),
                 amount_brl_cents INTEGER NOT NULL DEFAULT 0 CHECK (amount_brl_cents >= 0),
                 date TEXT NOT NULL,
                 account_id INTEGER NOT NULL REFERENCES checking_accounts(id),
@@ -159,6 +161,30 @@ def initialize_database() -> None:
                 archived_at TEXT,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS investment_operations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+                account_id INTEGER NOT NULL REFERENCES checking_accounts(id) ON DELETE CASCADE,
+                asset_type TEXT NOT NULL DEFAULT 'other',
+                asset_identifier TEXT,
+                asset_name TEXT,
+                cnpj TEXT,
+                quantity_micros INTEGER NOT NULL DEFAULT 0 CHECK (quantity_micros >= 0),
+                unit_price_cents INTEGER NOT NULL DEFAULT 0 CHECK (unit_price_cents >= 0),
+                invested_amount_cents INTEGER NOT NULL DEFAULT 0 CHECK (invested_amount_cents >= 0),
+                brokerage_fee_cents INTEGER NOT NULL DEFAULT 0 CHECK (brokerage_fee_cents >= 0),
+                exchange_fee_cents INTEGER NOT NULL DEFAULT 0 CHECK (exchange_fee_cents >= 0),
+                tax_cents INTEGER NOT NULL DEFAULT 0 CHECK (tax_cents >= 0),
+                other_costs_cents INTEGER NOT NULL DEFAULT 0 CHECK (other_costs_cents >= 0),
+                fixed_income_mode TEXT,
+                fixed_income_indexer TEXT,
+                fixed_income_rate_micros INTEGER NOT NULL DEFAULT 0 CHECK (fixed_income_rate_micros >= 0),
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (transaction_id)
             );
 
             CREATE TABLE IF NOT EXISTS transaction_tags (
@@ -193,6 +219,9 @@ def initialize_database() -> None:
             CREATE INDEX IF NOT EXISTS idx_transactions_account
             ON transactions (account_id);
 
+            CREATE INDEX IF NOT EXISTS idx_investment_operations_user
+            ON investment_operations (user_id, account_id, asset_type);
+
             CREATE INDEX IF NOT EXISTS idx_credit_card_transactions_card_month
             ON credit_card_transactions (credit_card_id, invoice_month);
 
@@ -209,7 +238,9 @@ def initialize_database() -> None:
         ensure_column(conn, "transactions", "category_id", "INTEGER REFERENCES categories(id)")
         ensure_column(conn, "transactions", "subcategory_id", "INTEGER REFERENCES subcategories(id)")
         ensure_column(conn, "transactions", "tag_id", "INTEGER REFERENCES tags(id)")
+        ensure_column(conn, "transactions", "destination_amount_cents", "INTEGER NOT NULL DEFAULT 0")
         ensure_column(conn, "transactions", "exchange_rate_micros", "INTEGER NOT NULL DEFAULT 1000000")
+        ensure_column(conn, "transactions", "transfer_exchange_rate_micros", "INTEGER NOT NULL DEFAULT 0")
         ensure_column(conn, "transactions", "amount_brl_cents", "INTEGER NOT NULL DEFAULT 0")
         ensure_column(conn, "transactions", "series_id", "TEXT")
         ensure_column(conn, "transactions", "series_kind", "TEXT NOT NULL DEFAULT 'single'")
@@ -221,8 +252,12 @@ def initialize_database() -> None:
         ensure_column(conn, "checking_accounts", "account_type", "TEXT NOT NULL DEFAULT 'liquidity'")
         ensure_column(conn, "categories", "group_type", "TEXT NOT NULL DEFAULT 'expense'")
         migrate_category_unique_constraint(conn)
+        migrate_transaction_type_constraint(conn)
         migrate_transaction_tags(conn)
         migrate_transaction_brl_values(conn)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions (user_id, date)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_transactions_account ON transactions (account_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_investment_operations_user ON investment_operations (user_id, account_id, asset_type)")
 
 
 def row_to_dict(row: sqlite3.Row | None) -> dict | None:
@@ -282,6 +317,72 @@ def migrate_transaction_tags(conn: sqlite3.Connection) -> None:
         WHERE tag_id IS NOT NULL
         """
     )
+
+
+def migrate_transaction_type_constraint(conn: sqlite3.Connection) -> None:
+    row = conn.execute(
+        """
+        SELECT sql
+        FROM sqlite_master
+        WHERE type = 'table' AND name = 'transactions'
+        """
+    ).fetchone()
+    table_sql = row["sql"] if row else ""
+    if "'investment'" in table_sql:
+        return
+    conn.execute("PRAGMA foreign_keys = OFF")
+    try:
+        conn.executescript(
+            """
+            CREATE TABLE transactions_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                type TEXT NOT NULL CHECK (type IN ('income', 'expense', 'transfer', 'investment')),
+                description TEXT NOT NULL,
+                amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+                destination_amount_cents INTEGER NOT NULL DEFAULT 0 CHECK (destination_amount_cents >= 0),
+                exchange_rate_micros INTEGER NOT NULL DEFAULT 1000000 CHECK (exchange_rate_micros > 0),
+                transfer_exchange_rate_micros INTEGER NOT NULL DEFAULT 0 CHECK (transfer_exchange_rate_micros >= 0),
+                amount_brl_cents INTEGER NOT NULL DEFAULT 0 CHECK (amount_brl_cents >= 0),
+                date TEXT NOT NULL,
+                account_id INTEGER NOT NULL REFERENCES checking_accounts(id),
+                destination_account_id INTEGER REFERENCES checking_accounts(id),
+                category_id INTEGER REFERENCES categories(id),
+                subcategory_id INTEGER REFERENCES subcategories(id),
+                tag_id INTEGER REFERENCES tags(id),
+                series_id TEXT,
+                series_kind TEXT NOT NULL DEFAULT 'single',
+                installment_index INTEGER,
+                installment_count INTEGER,
+                recurrence_frequency TEXT,
+                reconciled_at TEXT,
+                notes TEXT,
+                archived_at TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            INSERT INTO transactions_new (
+                id, user_id, type, description, amount_cents, destination_amount_cents,
+                exchange_rate_micros, transfer_exchange_rate_micros, amount_brl_cents, date,
+                account_id, destination_account_id, category_id, subcategory_id, tag_id,
+                series_id, series_kind, installment_index, installment_count, recurrence_frequency,
+                reconciled_at, notes, archived_at, created_at, updated_at
+            )
+            SELECT
+                id, user_id, type, description, amount_cents, destination_amount_cents,
+                exchange_rate_micros, transfer_exchange_rate_micros, amount_brl_cents, date,
+                account_id, destination_account_id, category_id, subcategory_id, tag_id,
+                series_id, series_kind, installment_index, installment_count, recurrence_frequency,
+                reconciled_at, notes, archived_at, created_at, updated_at
+            FROM transactions;
+
+            DROP TABLE transactions;
+            ALTER TABLE transactions_new RENAME TO transactions;
+            """
+        )
+    finally:
+        conn.execute("PRAGMA foreign_keys = ON")
 
 
 def migrate_transaction_brl_values(conn: sqlite3.Connection) -> None:

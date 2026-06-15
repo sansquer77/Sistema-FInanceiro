@@ -12,7 +12,9 @@ from financeiro.accounts import cents_to_money, empty_to_none, money_to_cents
 from financeiro.categories import ClassificationError, get_or_create_category, get_or_create_subcategory, get_or_create_tag, normalize_name
 from financeiro.database import get_connection, row_to_dict
 
-TRANSACTION_TYPES = {"income", "expense", "transfer"}
+TRANSACTION_TYPES = {"income", "expense", "transfer", "investment"}
+INVESTMENT_ASSET_TYPES = {"stock", "crypto", "fund", "fixed_income", "other"}
+FIXED_INCOME_MODES = {"pre", "post", "hybrid"}
 SERIES_KINDS = {"single", "installment", "recurring"}
 RECURRENCE_FREQUENCIES = {"weekly", "monthly", "quarterly", "semiannual", "annual"}
 EXCHANGE_RATE_SCALE = Decimal("1000000")
@@ -37,8 +39,23 @@ def list_transactions(user_id: int) -> list[dict]:
                 source.account_type AS account_type,
                 destination.name AS destination_account_name,
                 destination.account_type AS destination_account_type,
+                destination.currency AS destination_account_currency,
                 categories.name AS category_name,
                 subcategories.name AS subcategory_name,
+                investment_operations.asset_type AS investment_asset_type,
+                investment_operations.asset_identifier AS investment_asset_identifier,
+                investment_operations.asset_name AS investment_asset_name,
+                investment_operations.cnpj AS investment_cnpj,
+                investment_operations.quantity_micros AS investment_quantity_micros,
+                investment_operations.unit_price_cents AS investment_unit_price_cents,
+                investment_operations.invested_amount_cents AS investment_invested_amount_cents,
+                investment_operations.brokerage_fee_cents AS investment_brokerage_fee_cents,
+                investment_operations.exchange_fee_cents AS investment_exchange_fee_cents,
+                investment_operations.tax_cents AS investment_tax_cents,
+                investment_operations.other_costs_cents AS investment_other_costs_cents,
+                investment_operations.fixed_income_mode AS investment_fixed_income_mode,
+                investment_operations.fixed_income_indexer AS investment_fixed_income_indexer,
+                investment_operations.fixed_income_rate_micros AS investment_fixed_income_rate_micros,
                 GROUP_CONCAT(tags.name, '||') AS tag_names
             FROM transactions
             JOIN checking_accounts AS source
@@ -53,6 +70,9 @@ def list_transactions(user_id: int) -> list[dict]:
             LEFT JOIN subcategories
                 ON subcategories.id = transactions.subcategory_id
                 AND subcategories.user_id = transactions.user_id
+            LEFT JOIN investment_operations
+                ON investment_operations.transaction_id = transactions.id
+                AND investment_operations.user_id = transactions.user_id
             LEFT JOIN transaction_tags
                 ON transaction_tags.transaction_id = transactions.id
             LEFT JOIN tags
@@ -75,10 +95,8 @@ def create_transaction(user_id: int, data: dict) -> dict:
         destination = None
         if transaction["type"] == "transfer":
             destination = get_active_account(conn, user_id, transaction["destination_account_id"])
-            if source["id"] == destination["id"]:
-                raise TransactionError("Informe contas diferentes para transferencia.")
-            if source["currency"] != destination["currency"]:
-                raise TransactionError("Transferencias exigem contas com a mesma moeda.")
+            ensure_transfer_accounts(source, destination)
+            normalize_transfer_amounts(transaction, source, destination)
         exchange_rate_micros = resolve_exchange_rate_micros(source["currency"], transaction["date"], transaction["exchange_rate"])
         amount_brl_cents = convert_to_brl_cents(transaction["amount_cents"], exchange_rate_micros)
         category_group_type = transaction_category_group(transaction["type"], destination)
@@ -90,21 +108,24 @@ def create_transaction(user_id: int, data: dict) -> dict:
         for occurrence in occurrences:
             apply_balance_delta(conn, source["id"], balance_delta(transaction["type"], transaction["amount_cents"], "source"))
             if destination:
-                apply_balance_delta(conn, destination["id"], balance_delta(transaction["type"], transaction["amount_cents"], "destination"))
+                apply_balance_delta(conn, destination["id"], balance_delta(transaction["type"], destination_balance_amount(transaction), "destination"))
             cursor = conn.execute(
                 """
                 INSERT INTO transactions (
-                    user_id, type, description, amount_cents, exchange_rate_micros, amount_brl_cents, date, account_id,
+                    user_id, type, description, amount_cents, destination_amount_cents,
+                    exchange_rate_micros, transfer_exchange_rate_micros, amount_brl_cents, date, account_id,
                     destination_account_id, category_id, subcategory_id, series_id, series_kind, installment_index,
                     installment_count, recurrence_frequency, notes
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     user_id,
                     transaction["type"],
                     occurrence["description"],
                     transaction["amount_cents"],
+                    transaction["destination_amount_cents"],
                     exchange_rate_micros,
+                    transaction["transfer_exchange_rate_micros"],
                     amount_brl_cents,
                     occurrence["date"],
                     source["id"],
@@ -122,6 +143,7 @@ def create_transaction(user_id: int, data: dict) -> dict:
             if first_transaction_id is None:
                 first_transaction_id = cursor.lastrowid
             replace_transaction_tags(conn, cursor.lastrowid, tag_ids)
+            upsert_investment_operation(conn, user_id, cursor.lastrowid, source["id"], transaction)
         row = fetch_transaction(conn, user_id, first_transaction_id)
     return format_transaction(row)
 
@@ -145,10 +167,8 @@ def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
         destination = None
         if transaction["type"] == "transfer":
             destination = get_active_account(conn, user_id, transaction["destination_account_id"])
-            if source["id"] == destination["id"]:
-                raise TransactionError("Informe contas diferentes para transferencia.")
-            if source["currency"] != destination["currency"]:
-                raise TransactionError("Transferencias exigem contas com a mesma moeda.")
+            ensure_transfer_accounts(source, destination)
+            normalize_transfer_amounts(transaction, source, destination)
         exchange_rate_micros = resolve_exchange_rate_micros(source["currency"], transaction["date"], transaction["exchange_rate"])
         amount_brl_cents = convert_to_brl_cents(transaction["amount_cents"], exchange_rate_micros)
         category_group_type = transaction_category_group(transaction["type"], destination)
@@ -161,25 +181,28 @@ def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
             apply_balance_delta(
                 conn,
                 existing["destination_account_id"],
-                -balance_delta(existing["type"], existing["amount_cents"], "destination"),
+                -balance_delta(existing["type"], existing_destination_balance_amount(existing), "destination"),
             )
         apply_balance_delta(conn, source["id"], balance_delta(transaction["type"], transaction["amount_cents"], "source"))
         if destination:
-            apply_balance_delta(conn, destination["id"], balance_delta(transaction["type"], transaction["amount_cents"], "destination"))
+            apply_balance_delta(conn, destination["id"], balance_delta(transaction["type"], destination_balance_amount(transaction), "destination"))
         conn.execute(
             """
             UPDATE transactions
-            SET type = ?, description = ?, amount_cents = ?, exchange_rate_micros = ?,
+            SET type = ?, description = ?, amount_cents = ?, destination_amount_cents = ?,
+                exchange_rate_micros = ?, transfer_exchange_rate_micros = ?,
                 amount_brl_cents = ?, date = ?, account_id = ?, destination_account_id = ?,
                 category_id = ?, subcategory_id = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND user_id = ? AND archived_at IS NULL
             """,
             (
                 transaction["type"],
-                transaction["description"],
-                transaction["amount_cents"],
-                exchange_rate_micros,
-                amount_brl_cents,
+                    transaction["description"],
+                    transaction["amount_cents"],
+                    transaction["destination_amount_cents"],
+                    exchange_rate_micros,
+                    transaction["transfer_exchange_rate_micros"],
+                    amount_brl_cents,
                 transaction["date"],
                 source["id"],
                 destination["id"] if destination else None,
@@ -191,6 +214,7 @@ def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
             ),
         )
         replace_transaction_tags(conn, normalized_id, tag_ids)
+        upsert_investment_operation(conn, user_id, normalized_id, source["id"], transaction)
         if apply_to_future:
             update_future_recurring_transactions(conn, user_id, existing, transaction)
         row = fetch_transaction(conn, user_id, normalized_id)
@@ -215,10 +239,8 @@ def update_future_recurring_transactions(conn, user_id: int, existing, transacti
         destination = None
         if transaction["type"] == "transfer":
             destination = get_active_account(conn, user_id, transaction["destination_account_id"])
-            if source["id"] == destination["id"]:
-                raise TransactionError("Informe contas diferentes para transferencia.")
-            if source["currency"] != destination["currency"]:
-                raise TransactionError("Transferencias exigem contas com a mesma moeda.")
+            ensure_transfer_accounts(source, destination)
+            normalize_transfer_amounts(transaction, source, destination)
         exchange_rate_micros = resolve_exchange_rate_micros(source["currency"], row["date"], transaction["exchange_rate"])
         amount_brl_cents = convert_to_brl_cents(transaction["amount_cents"], exchange_rate_micros)
         category_group_type = transaction_category_group(transaction["type"], destination)
@@ -227,14 +249,15 @@ def update_future_recurring_transactions(conn, user_id: int, existing, transacti
         tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
         apply_balance_delta(conn, row["account_id"], -balance_delta(row["type"], row["amount_cents"], "source"))
         if row["destination_account_id"]:
-            apply_balance_delta(conn, row["destination_account_id"], -balance_delta(row["type"], row["amount_cents"], "destination"))
+            apply_balance_delta(conn, row["destination_account_id"], -balance_delta(row["type"], existing_destination_balance_amount(row), "destination"))
         apply_balance_delta(conn, source["id"], balance_delta(transaction["type"], transaction["amount_cents"], "source"))
         if destination:
-            apply_balance_delta(conn, destination["id"], balance_delta(transaction["type"], transaction["amount_cents"], "destination"))
+            apply_balance_delta(conn, destination["id"], balance_delta(transaction["type"], destination_balance_amount(transaction), "destination"))
         conn.execute(
             """
             UPDATE transactions
-            SET type = ?, description = ?, amount_cents = ?, exchange_rate_micros = ?,
+            SET type = ?, description = ?, amount_cents = ?, destination_amount_cents = ?,
+                exchange_rate_micros = ?, transfer_exchange_rate_micros = ?,
                 amount_brl_cents = ?, account_id = ?, destination_account_id = ?,
                 category_id = ?, subcategory_id = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND user_id = ? AND archived_at IS NULL
@@ -243,7 +266,9 @@ def update_future_recurring_transactions(conn, user_id: int, existing, transacti
                 transaction["type"],
                 transaction["description"],
                 transaction["amount_cents"],
+                transaction["destination_amount_cents"],
                 exchange_rate_micros,
+                transaction["transfer_exchange_rate_micros"],
                 amount_brl_cents,
                 source["id"],
                 destination["id"] if destination else None,
@@ -255,6 +280,7 @@ def update_future_recurring_transactions(conn, user_id: int, existing, transacti
             ),
         )
         replace_transaction_tags(conn, row["id"], tag_ids)
+        upsert_investment_operation(conn, user_id, row["id"], source["id"], transaction)
 
 
 def delete_transaction(user_id: int, transaction_id: str) -> None:
@@ -274,7 +300,7 @@ def delete_transaction(user_id: int, transaction_id: str) -> None:
             apply_balance_delta(
                 conn,
                 transaction["destination_account_id"],
-                -balance_delta(transaction["type"], transaction["amount_cents"], "destination"),
+                -balance_delta(transaction["type"], existing_destination_balance_amount(transaction), "destination"),
             )
         conn.execute(
             """
@@ -321,6 +347,9 @@ def normalize_transaction_payload(data: dict) -> dict:
         "type": transaction_type,
         "description": description,
         "amount_cents": amount_cents,
+        "destination_amount_cents": money_to_cents(data.get("destination_amount", "0")) if str(data.get("destination_amount") or "").strip() else 0,
+        "transfer_exchange_rate": data.get("transfer_exchange_rate"),
+        "transfer_exchange_rate_micros": 0,
         "date": transaction_date,
         "account_id": account_id,
         "destination_account_id": destination_account_id,
@@ -329,6 +358,7 @@ def normalize_transaction_payload(data: dict) -> dict:
         "subcategory": normalize_optional_name(data.get("subcategory")),
         "tags": normalize_optional_tags(data.get("tags") or data.get("tag")),
         "notes": empty_to_none(data.get("notes")),
+        "investment_operation": normalize_investment_operation(data, amount_cents, transaction_type),
         **normalize_series_payload(data),
     }
 
@@ -378,6 +408,54 @@ def normalize_count(value: object, message: str, maximum: int) -> int:
     if count > maximum:
         raise TransactionError("Quantidade de repeticoes muito alta.")
     return count
+
+
+def normalize_investment_operation(data: dict, amount_cents: int, transaction_type: str) -> dict | None:
+    if transaction_type != "investment":
+        return None
+    asset_type = str(data.get("investment_asset_type") or "other").strip().lower()
+    if asset_type not in INVESTMENT_ASSET_TYPES:
+        raise TransactionError("Tipo de investimento invalido.")
+    fixed_income_mode = normalize_optional_key(data.get("investment_fixed_income_mode"))
+    if fixed_income_mode and fixed_income_mode not in FIXED_INCOME_MODES:
+        raise TransactionError("Modalidade de renda fixa invalida.")
+    invested_amount_cents = money_to_cents(data.get("investment_amount", "0")) if str(data.get("investment_amount") or "").strip() else amount_cents
+    return {
+        "asset_type": asset_type,
+        "asset_identifier": empty_to_none(data.get("investment_asset_identifier")),
+        "asset_name": empty_to_none(data.get("investment_asset_name")),
+        "cnpj": empty_to_none(data.get("investment_cnpj")),
+        "quantity_micros": decimal_to_micros(data.get("investment_quantity")),
+        "unit_price_cents": money_to_cents(data.get("investment_unit_price", "0")) if str(data.get("investment_unit_price") or "").strip() else 0,
+        "invested_amount_cents": invested_amount_cents,
+        "brokerage_fee_cents": money_to_cents(data.get("investment_brokerage_fee", "0")) if str(data.get("investment_brokerage_fee") or "").strip() else 0,
+        "exchange_fee_cents": money_to_cents(data.get("investment_exchange_fee", "0")) if str(data.get("investment_exchange_fee") or "").strip() else 0,
+        "tax_cents": money_to_cents(data.get("investment_tax", "0")) if str(data.get("investment_tax") or "").strip() else 0,
+        "other_costs_cents": money_to_cents(data.get("investment_other_costs", "0")) if str(data.get("investment_other_costs") or "").strip() else 0,
+        "fixed_income_mode": fixed_income_mode,
+        "fixed_income_indexer": empty_to_none(data.get("investment_fixed_income_indexer")),
+        "fixed_income_rate_micros": decimal_to_micros(data.get("investment_fixed_income_rate")),
+    }
+
+
+def normalize_optional_key(value: object) -> str | None:
+    raw = str(value or "").strip().lower()
+    return raw or None
+
+
+def decimal_to_micros(value: object) -> int:
+    raw = str(value or "").strip()
+    if not raw:
+        return 0
+    if "," in raw:
+        raw = raw.replace(".", "").replace(",", ".")
+    try:
+        decimal_value = Decimal(raw)
+    except InvalidOperation as exc:
+        raise TransactionError("Informe um numero valido nos detalhes do investimento.") from exc
+    if decimal_value < 0:
+        raise TransactionError("Informe valores positivos nos detalhes do investimento.")
+    return int((decimal_value * EXCHANGE_RATE_SCALE).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
 def build_transaction_occurrences(transaction: dict) -> list[dict]:
@@ -522,9 +600,48 @@ def convert_to_brl_cents(amount_cents: int, exchange_rate_micros: int) -> int:
     return int(amount.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
+def ensure_transfer_accounts(source, destination) -> None:
+    if source["id"] == destination["id"]:
+        raise TransactionError("Informe contas diferentes para transferencia.")
+
+
+def normalize_transfer_amounts(transaction: dict, source, destination) -> None:
+    if transaction["type"] != "transfer":
+        transaction["destination_amount_cents"] = 0
+        transaction["transfer_exchange_rate_micros"] = 0
+        return
+    if source["currency"] == destination["currency"]:
+        transaction["destination_amount_cents"] = transaction["amount_cents"]
+        transaction["transfer_exchange_rate_micros"] = rate_to_micros(Decimal("1"))
+        return
+    if transaction["destination_amount_cents"] <= 0 and str(transaction.get("transfer_exchange_rate") or "").strip():
+        rate_micros = rate_to_micros(parse_exchange_rate(transaction["transfer_exchange_rate"]))
+        transaction["transfer_exchange_rate_micros"] = rate_micros
+        transaction["destination_amount_cents"] = convert_to_brl_cents(transaction["amount_cents"], rate_micros)
+        return
+    if transaction["destination_amount_cents"] <= 0:
+        raise TransactionError("Informe o valor que entra na conta de destino.")
+    rate = Decimal(transaction["destination_amount_cents"]) / Decimal(transaction["amount_cents"])
+    transaction["transfer_exchange_rate_micros"] = rate_to_micros(rate)
+
+
+def destination_balance_amount(transaction: dict) -> int:
+    return transaction["destination_amount_cents"] or transaction["amount_cents"]
+
+
+def existing_destination_balance_amount(transaction) -> int:
+    try:
+        amount = int(transaction["destination_amount_cents"] or 0)
+    except (IndexError, KeyError):
+        amount = 0
+    return amount or int(transaction["amount_cents"])
+
+
 def transaction_category_group(transaction_type: str, destination) -> str:
     if transaction_type == "income":
         return "income"
+    if transaction_type == "investment":
+        return "investment"
     if transaction_type == "transfer" and destination and destination["account_type"] == "investment":
         return "investment"
     return "expense"
@@ -533,7 +650,7 @@ def transaction_category_group(transaction_type: str, destination) -> str:
 def balance_delta(transaction_type: str, amount_cents: int, side: str) -> int:
     if transaction_type == "income":
         return amount_cents
-    if transaction_type == "expense":
+    if transaction_type in {"expense", "investment"}:
         return -amount_cents
     if side == "destination":
         return amount_cents
@@ -559,6 +676,59 @@ def replace_transaction_tags(conn, transaction_id: int, tag_ids: list[int]) -> N
     )
 
 
+def upsert_investment_operation(conn, user_id: int, transaction_id: int, account_id: int, transaction: dict) -> None:
+    operation = transaction.get("investment_operation")
+    if transaction["type"] != "investment" or not operation:
+        conn.execute("DELETE FROM investment_operations WHERE transaction_id = ?", (transaction_id,))
+        return
+    conn.execute(
+        """
+        INSERT INTO investment_operations (
+            user_id, transaction_id, account_id, asset_type, asset_identifier, asset_name, cnpj,
+            quantity_micros, unit_price_cents, invested_amount_cents, brokerage_fee_cents,
+            exchange_fee_cents, tax_cents, other_costs_cents, fixed_income_mode,
+            fixed_income_indexer, fixed_income_rate_micros
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(transaction_id) DO UPDATE SET
+            account_id = excluded.account_id,
+            asset_type = excluded.asset_type,
+            asset_identifier = excluded.asset_identifier,
+            asset_name = excluded.asset_name,
+            cnpj = excluded.cnpj,
+            quantity_micros = excluded.quantity_micros,
+            unit_price_cents = excluded.unit_price_cents,
+            invested_amount_cents = excluded.invested_amount_cents,
+            brokerage_fee_cents = excluded.brokerage_fee_cents,
+            exchange_fee_cents = excluded.exchange_fee_cents,
+            tax_cents = excluded.tax_cents,
+            other_costs_cents = excluded.other_costs_cents,
+            fixed_income_mode = excluded.fixed_income_mode,
+            fixed_income_indexer = excluded.fixed_income_indexer,
+            fixed_income_rate_micros = excluded.fixed_income_rate_micros,
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (
+            user_id,
+            transaction_id,
+            account_id,
+            operation["asset_type"],
+            operation["asset_identifier"],
+            operation["asset_name"],
+            operation["cnpj"],
+            operation["quantity_micros"],
+            operation["unit_price_cents"],
+            operation["invested_amount_cents"],
+            operation["brokerage_fee_cents"],
+            operation["exchange_fee_cents"],
+            operation["tax_cents"],
+            operation["other_costs_cents"],
+            operation["fixed_income_mode"],
+            operation["fixed_income_indexer"],
+            operation["fixed_income_rate_micros"],
+        ),
+    )
+
+
 def fetch_transaction(conn, user_id: int, transaction_id: int) -> dict:
     row = conn.execute(
         """
@@ -569,8 +739,23 @@ def fetch_transaction(conn, user_id: int, transaction_id: int) -> dict:
                 source.account_type AS account_type,
                 destination.name AS destination_account_name,
                 destination.account_type AS destination_account_type,
+                destination.currency AS destination_account_currency,
                 categories.name AS category_name,
                 subcategories.name AS subcategory_name,
+                investment_operations.asset_type AS investment_asset_type,
+                investment_operations.asset_identifier AS investment_asset_identifier,
+                investment_operations.asset_name AS investment_asset_name,
+                investment_operations.cnpj AS investment_cnpj,
+                investment_operations.quantity_micros AS investment_quantity_micros,
+                investment_operations.unit_price_cents AS investment_unit_price_cents,
+                investment_operations.invested_amount_cents AS investment_invested_amount_cents,
+                investment_operations.brokerage_fee_cents AS investment_brokerage_fee_cents,
+                investment_operations.exchange_fee_cents AS investment_exchange_fee_cents,
+                investment_operations.tax_cents AS investment_tax_cents,
+                investment_operations.other_costs_cents AS investment_other_costs_cents,
+                investment_operations.fixed_income_mode AS investment_fixed_income_mode,
+                investment_operations.fixed_income_indexer AS investment_fixed_income_indexer,
+                investment_operations.fixed_income_rate_micros AS investment_fixed_income_rate_micros,
                 GROUP_CONCAT(tags.name, '||') AS tag_names
             FROM transactions
             JOIN checking_accounts AS source
@@ -585,6 +770,9 @@ def fetch_transaction(conn, user_id: int, transaction_id: int) -> dict:
             LEFT JOIN subcategories
                 ON subcategories.id = transactions.subcategory_id
                 AND subcategories.user_id = transactions.user_id
+            LEFT JOIN investment_operations
+                ON investment_operations.transaction_id = transactions.id
+                AND investment_operations.user_id = transactions.user_id
             LEFT JOIN transaction_tags
                 ON transaction_tags.transaction_id = transactions.id
             LEFT JOIN tags
@@ -599,13 +787,46 @@ def fetch_transaction(conn, user_id: int, transaction_id: int) -> dict:
 
 
 def format_transaction(transaction: dict) -> dict:
+    investment_operation = extract_investment_operation(transaction)
     transaction["amount"] = cents_to_money(transaction.pop("amount_cents"))
+    transaction["destination_amount"] = cents_to_money(transaction.pop("destination_amount_cents", 0) or 0)
     transaction["exchange_rate_to_brl"] = micros_to_rate(transaction.pop("exchange_rate_micros"))
+    transaction["transfer_exchange_rate"] = micros_to_rate(transaction.pop("transfer_exchange_rate_micros", 0) or 0)
     transaction["amount_brl"] = cents_to_money(transaction.pop("amount_brl_cents"))
     raw_tags = transaction.pop("tag_names", "") or ""
     transaction["tags"] = [tag for tag in raw_tags.split("||") if tag]
     transaction["tag_name"] = ", ".join(transaction["tags"])
+    transaction["investment_operation"] = investment_operation
     return transaction
+
+
+def extract_investment_operation(transaction: dict) -> dict | None:
+    asset_type = transaction.pop("investment_asset_type", None)
+    fields = {
+        "asset_identifier": transaction.pop("investment_asset_identifier", None),
+        "asset_name": transaction.pop("investment_asset_name", None),
+        "cnpj": transaction.pop("investment_cnpj", None),
+        "quantity": micros_to_decimal(transaction.pop("investment_quantity_micros", 0) or 0),
+        "unit_price": cents_to_money(transaction.pop("investment_unit_price_cents", 0) or 0),
+        "invested_amount": cents_to_money(transaction.pop("investment_invested_amount_cents", 0) or 0),
+        "brokerage_fee": cents_to_money(transaction.pop("investment_brokerage_fee_cents", 0) or 0),
+        "exchange_fee": cents_to_money(transaction.pop("investment_exchange_fee_cents", 0) or 0),
+        "tax": cents_to_money(transaction.pop("investment_tax_cents", 0) or 0),
+        "other_costs": cents_to_money(transaction.pop("investment_other_costs_cents", 0) or 0),
+        "fixed_income_mode": transaction.pop("investment_fixed_income_mode", None),
+        "fixed_income_indexer": transaction.pop("investment_fixed_income_indexer", None),
+        "fixed_income_rate": micros_to_decimal(transaction.pop("investment_fixed_income_rate_micros", 0) or 0),
+    }
+    if not asset_type:
+        return None
+    return {"asset_type": asset_type, **fields}
+
+
+def micros_to_decimal(micros: int) -> str:
+    if not micros:
+        return ""
+    value = Decimal(micros) / EXCHANGE_RATE_SCALE
+    return f"{value.normalize():f}"
 
 
 def normalize_tags(value: object) -> list[str]:

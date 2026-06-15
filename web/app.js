@@ -12,6 +12,8 @@ const state = {
   categories: [],
   tags: [],
   spendingLimits: [],
+  portfolio: null,
+  portfolioGroup: "none",
   view: "cockpit",
   transactionMonth: new Date().toISOString().slice(0, 7),
   limitMonth: new Date().toISOString().slice(0, 7),
@@ -103,6 +105,21 @@ const reportResultSummary = document.querySelector("#reportResultSummary");
 const reportAccountFilter = document.querySelector("#reportAccountFilter");
 const reportAccountSelect = document.querySelector("#reportAccountSelect");
 const reportContent = document.querySelector("#reportContent");
+const refreshPortfolioButton = document.querySelector("#refreshPortfolioButton");
+const portfolioCostSummary = document.querySelector("#portfolioCostSummary");
+const portfolioCurrentSummary = document.querySelector("#portfolioCurrentSummary");
+const portfolioResultSummary = document.querySelector("#portfolioResultSummary");
+const portfolioReturnSummary = document.querySelector("#portfolioReturnSummary");
+const portfolioDayResultSummary = document.querySelector("#portfolioDayResultSummary");
+const portfolioPositionCount = document.querySelector("#portfolioPositionCount");
+const portfolioMessage = document.querySelector("#portfolioMessage");
+const portfolioMarketList = document.querySelector("#portfolioMarketList");
+const portfolioTypeList = document.querySelector("#portfolioTypeList");
+const portfolioIndexerList = document.querySelector("#portfolioIndexerList");
+const portfolioCurrencyList = document.querySelector("#portfolioCurrencyList");
+const portfolioAccountList = document.querySelector("#portfolioAccountList");
+const portfolioPositions = document.querySelector("#portfolioPositions");
+const portfolioGroupFilter = document.querySelector("#portfolioGroupFilter");
 const importForm = document.querySelector("#importForm");
 const importAccount = document.querySelector("#importAccount");
 const importMessage = document.querySelector("#importMessage");
@@ -116,8 +133,18 @@ const deleteUserMessage = document.querySelector("#deleteUserMessage");
 const monthlyPlanningList = document.querySelector("#monthlyPlanningList");
 const transactionType = document.querySelector("#transactionType");
 const transactionAccount = document.querySelector("#transactionAccount");
+const transactionAmount = document.querySelector("#transactionAmount");
+const transactionAmountRow = document.querySelector("#transactionAmountRow");
 const destinationAccount = document.querySelector("#destinationAccount");
 const destinationAccountLabel = document.querySelector("#destinationAccountLabel");
+const exchangeTransferFields = document.querySelector("#exchangeTransferFields");
+const destinationAmount = document.querySelector("#destinationAmount");
+const transferExchangeRate = document.querySelector("#transferExchangeRate");
+const investmentOperationFields = document.querySelector("#investmentOperationFields");
+const investmentAssetType = document.querySelector("#investmentAssetType");
+const investmentAmount = document.querySelector("#investmentAmount");
+const investmentFundFields = document.querySelector("#investmentFundFields");
+const investmentFixedFields = document.querySelector("#investmentFixedFields");
 const transactionCategory = document.querySelector("#transactionCategory");
 const transactionSubcategory = document.querySelector("#transactionSubcategory");
 const seriesKind = document.querySelector("#seriesKind");
@@ -156,6 +183,7 @@ const moduleViews = {
   creditCards: document.querySelector("#creditCardsView"),
   cardLaunches: document.querySelector("#cardLaunchesView"),
   transactions: document.querySelector("#transactionsView"),
+  portfolio: document.querySelector("#portfolioView"),
   limits: document.querySelector("#limitsView"),
   reports: document.querySelector("#reportsView"),
   classifications: document.querySelector("#classificationsView"),
@@ -169,6 +197,7 @@ const viewTitles = {
   creditCards: ["Cadastro", "Cartões"],
   cardLaunches: ["Lançamentos", "Cartões"],
   transactions: ["Lançamentos", "Contas"],
+  portfolio: ["Gestão", "Portfólio"],
   limits: ["Gestão", "Limite de gastos"],
   reports: ["Gestão", "Relatórios"],
   classifications: ["Gestão", "Categorias e tags"],
@@ -208,10 +237,20 @@ emailForm.addEventListener("submit", handleEmailSubmit);
 passwordForm.addEventListener("submit", handlePasswordSubmit);
 deleteUserForm.addEventListener("submit", handleDeleteUserSubmit);
 transactionType.addEventListener("change", updateTransactionTypeState);
-transactionAccount.addEventListener("change", updateTransactionTypeState);
+transactionAccount.addEventListener("change", handleTransactionAccountChange);
+destinationAccount.addEventListener("change", updateTransferExchangeRateState);
+investmentAssetType.addEventListener("change", updateInvestmentFieldState);
+investmentAmount.addEventListener("input", () => {
+  if (transactionType.value === "investment") {
+    transactionAmount.value = investmentAmount.value;
+  }
+});
 transactionCategory.addEventListener("change", renderTransactionSubcategories);
 seriesKind.addEventListener("change", updateSeriesState);
 transactionForm.elements.date.addEventListener("change", updateExchangeRateState);
+transactionForm.elements.date.addEventListener("change", updateTransferExchangeRateState);
+transactionForm.elements.amount.addEventListener("input", updateDestinationAmountFromRate);
+transferExchangeRate.addEventListener("input", updateDestinationAmountFromRate);
 previousMonthButton.addEventListener("click", () => shiftTransactionMonth(-1));
 nextMonthButton.addEventListener("click", () => shiftTransactionMonth(1));
 previousLimitMonthButton.addEventListener("click", () => shiftLimitMonth(-1));
@@ -222,6 +261,11 @@ reportTabs.forEach((button) => button.addEventListener("click", () => switchRepo
 reportAccountSelect.addEventListener("change", () => {
   state.reportAccountId = reportAccountSelect.value;
   renderReports();
+});
+refreshPortfolioButton.addEventListener("click", () => loadPortfolio({ refreshMessage: true }));
+portfolioGroupFilter.addEventListener("change", () => {
+  state.portfolioGroup = portfolioGroupFilter.value;
+  renderPortfolio();
 });
 transactionSearch.addEventListener("input", renderTransactions);
 logoutButton.addEventListener("click", handleLogout);
@@ -352,6 +396,7 @@ async function handleLogout() {
   state.categories = [];
   state.tags = [];
   state.spendingLimits = [];
+  state.portfolio = null;
   loginForm.reset();
   registerForm.reset();
   resetAccountForm();
@@ -389,6 +434,7 @@ async function loadAll() {
     await loadClassifications();
     await loadSpendingLimits();
     await loadCardInvoice();
+    await loadPortfolio();
   } catch (error) {
     state.accounts = [];
     state.archivedAccounts = [];
@@ -402,6 +448,7 @@ async function loadAll() {
     state.categories = [];
     state.tags = [];
     state.spendingLimits = [];
+    state.portfolio = null;
     setMessage(accountMessage, error.message, "error");
   }
   renderAll();
@@ -411,6 +458,7 @@ async function loadAccounts() {
   const response = await api("/api/checking-accounts");
   state.accounts = response.accounts;
   await loadArchivedAccounts();
+  await loadPortfolio();
   renderAll();
 }
 
@@ -451,7 +499,24 @@ async function loadTransactionsAndAccounts() {
   await loadClassifications();
   await loadSpendingLimits();
   await loadCardInvoice();
+  await loadPortfolio();
   renderAll();
+}
+
+async function loadPortfolio(options = {}) {
+  if (options.refreshMessage) {
+    setMessage(portfolioMessage, "Atualizando cotações...");
+  }
+  try {
+    state.portfolio = await api("/api/portfolio");
+    if (options.refreshMessage) {
+      setMessage(portfolioMessage, "Portfólio atualizado.", "success");
+    }
+  } catch (error) {
+    state.portfolio = null;
+    setMessage(portfolioMessage, error.message, "error");
+  }
+  renderPortfolio();
 }
 
 async function loadClassifications() {
@@ -613,11 +678,19 @@ async function handleTransactionSubmit(event) {
   try {
     const data = formData(transactionForm);
     if (data.type === "investment") {
-      data.type = "transfer";
+      data.amount = data.investment_amount || data.amount;
       data.tags = data.tags || "Investimento";
+    }
+    if (data.type === "exchange") {
+      data.type = "transfer";
+      data.category = data.category || "Serviços Financeiros e Impostos";
+      data.subcategory = data.subcategory || "Câmbio";
+      data.tags = data.tags || "Câmbio";
     }
     if (data.type !== "transfer") {
       delete data.destination_account_id;
+      delete data.destination_amount;
+      delete data.transfer_exchange_rate;
     }
     const isEditing = Boolean(data.id);
     if (isEditing && shouldAskFutureReplication(data.id)) {
@@ -1034,25 +1107,43 @@ function resetTransactionForm() {
   installmentCount.value = "2";
   recurrenceFrequency.value = "monthly";
   recurrenceCount.value = "12";
+  destinationAmount.value = "";
+  transferExchangeRate.value = "";
+  investmentAmount.value = "";
+  fillInvestmentOperation(null);
+  transactionAmount.disabled = false;
+  transactionAmount.required = true;
+  transactionAmountRow.hidden = false;
   transactionFormTitle.textContent = "Novo lançamento";
   cancelTransactionEditButton.hidden = true;
   transactionForm.querySelector('button[type="submit"]').textContent = "Salvar lançamento";
   seriesKind.disabled = false;
   updateSeriesState();
+  applyInvestmentAccountDefault();
   updateTransactionTypeState();
 }
 
 function editTransaction(transaction) {
   setMessage(transactionMessage, "");
   transactionForm.elements.id.value = transaction.id;
-  transactionType.value = isInvestmentTransfer(transaction) ? "investment" : transaction.type;
+  transactionType.value = isExchangeTransfer(transaction) ? "exchange" : isInvestmentTransfer(transaction) ? "investment" : transaction.type;
   transactionForm.elements.date.value = transaction.date;
   transactionForm.elements.description.value = transaction.description;
   transactionForm.elements.amount.value = moneyInputValue(transaction.amount);
+  investmentAmount.value = transaction.investment_operation
+    ? moneyInputValue(transaction.investment_operation.invested_amount)
+    : "";
   transactionAccount.value = String(transaction.account_id);
   transactionForm.elements.notes.value = transaction.notes || "";
   transactionForm.elements.tags.value = (transaction.tags || []).join(", ");
   transactionForm.elements.exchange_rate_to_brl.value = (transaction.exchange_rate_to_brl || "1.000000").replace(".", ",");
+  destinationAmount.value = transaction.destination_amount && Number(transaction.destination_amount) > 0
+    ? moneyInputValue(transaction.destination_amount)
+    : "";
+  transferExchangeRate.value = transaction.transfer_exchange_rate && Number(transaction.transfer_exchange_rate) > 0
+    ? transaction.transfer_exchange_rate.replace(".", ",")
+    : "";
+  fillInvestmentOperation(transaction.investment_operation);
   seriesKind.value = "single";
   seriesKind.disabled = true;
   updateSeriesState();
@@ -1072,6 +1163,54 @@ function editTransaction(transaction) {
   cancelTransactionEditButton.hidden = false;
   transactionForm.querySelector('button[type="submit"]').textContent = "Salvar alterações";
   transactionForm.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function fillInvestmentOperation(operation) {
+  const fields = [
+    "investment_asset_identifier",
+    "investment_asset_name",
+    "investment_cnpj",
+    "investment_quantity",
+    "investment_unit_price",
+    "investment_brokerage_fee",
+    "investment_exchange_fee",
+    "investment_tax",
+    "investment_other_costs",
+    "investment_fixed_income_indexer",
+    "investment_fixed_income_rate",
+  ];
+  for (const field of fields) {
+    if (transactionForm.elements[field]) {
+      transactionForm.elements[field].value = "";
+    }
+  }
+  investmentAssetType.value = "other";
+  transactionForm.elements.investment_fixed_income_mode.value = "";
+  if (!operation) {
+    updateInvestmentFieldState();
+    return;
+  }
+  investmentAssetType.value = operation.asset_type || "other";
+  transactionForm.elements.investment_asset_identifier.value = operation.asset_identifier || "";
+  transactionForm.elements.investment_asset_name.value = operation.asset_name || "";
+  transactionForm.elements.investment_cnpj.value = operation.cnpj || "";
+  transactionForm.elements.investment_quantity.value = decimalInputValue(operation.quantity);
+  transactionForm.elements.investment_unit_price.value = moneyInputValue(operation.unit_price);
+  transactionForm.elements.investment_brokerage_fee.value = moneyInputValue(operation.brokerage_fee);
+  transactionForm.elements.investment_exchange_fee.value = moneyInputValue(operation.exchange_fee);
+  transactionForm.elements.investment_tax.value = moneyInputValue(operation.tax);
+  transactionForm.elements.investment_other_costs.value = moneyInputValue(operation.other_costs);
+  transactionForm.elements.investment_fixed_income_mode.value = operation.fixed_income_mode || "";
+  transactionForm.elements.investment_fixed_income_indexer.value = operation.fixed_income_indexer || "";
+  transactionForm.elements.investment_fixed_income_rate.value = decimalInputValue(operation.fixed_income_rate);
+  updateInvestmentFieldState();
+}
+
+function decimalInputValue(value) {
+  if (!value || Number(value) === 0) {
+    return "";
+  }
+  return String(value).replace(".", ",");
 }
 
 function editCardTransaction(transaction) {
@@ -1108,6 +1247,7 @@ function renderAll() {
   renderClassifications();
   renderLimits();
   renderReports();
+  renderPortfolio();
 }
 
 function renderCockpit() {
@@ -1128,7 +1268,7 @@ function renderMonthlyPlanning() {
   const prefix = new Date().toISOString().slice(0, 7);
   const sections = [
     ["Receitas recorrentes", (transaction) => transaction.type === "income" && transaction.series_kind === "recurring"],
-    ["Investimentos planejados", (transaction) => isInvestmentTransfer(transaction) && transaction.series_kind !== "single"],
+    ["Investimentos planejados", (transaction) => isInvestmentTransaction(transaction) && transaction.series_kind !== "single"],
     ["Despesas recorrentes", (transaction) => transaction.type === "expense" && transaction.series_kind === "recurring"],
   ];
   monthlyPlanningList.innerHTML = "";
@@ -1572,6 +1712,7 @@ function renderTransactionAccounts() {
   importAccount.innerHTML = options || '<option value="">Cadastre uma conta</option>';
   transactionForm.querySelector('button[type="submit"]').disabled = state.accounts.length === 0;
   importForm.querySelector('button[type="submit"]').disabled = state.accounts.length === 0;
+  applyInvestmentAccountDefault();
   updateTransactionTypeState();
 }
 
@@ -1767,6 +1908,154 @@ function renderAccountsReport() {
   `;
 }
 
+function renderPortfolio() {
+  const portfolio = state.portfolio;
+  portfolioGroupFilter.value = state.portfolioGroup;
+  if (!portfolio) {
+    portfolioCostSummary.textContent = formatMoney(0, "BRL");
+    portfolioCurrentSummary.textContent = formatMoney(0, "BRL");
+    portfolioResultSummary.textContent = formatMoney(0, "BRL");
+    portfolioReturnSummary.textContent = "0,00%";
+    portfolioDayResultSummary.textContent = formatMoney(0, "BRL");
+    portfolioPositionCount.textContent = "0";
+    portfolioMarketList.innerHTML = "";
+    portfolioTypeList.innerHTML = "";
+    portfolioIndexerList.innerHTML = "";
+    portfolioCurrencyList.innerHTML = "";
+    portfolioAccountList.innerHTML = "";
+    portfolioPositions.innerHTML = '<div class="empty-state">Nenhuma posição de investimento encontrada.</div>';
+    return;
+  }
+  const summary = portfolio.summary;
+  const result = Number(summary.result_brl);
+  const dayResult = Number(summary.day_result_brl);
+  portfolioCostSummary.textContent = formatMoney(summary.total_cost_brl, "BRL");
+  portfolioCurrentSummary.textContent = formatMoney(summary.current_value_brl, "BRL");
+  portfolioResultSummary.textContent = formatMoney(summary.result_brl, "BRL");
+  portfolioResultSummary.classList.toggle("danger-text", result < 0);
+  portfolioResultSummary.classList.toggle("positive-text", result > 0);
+  portfolioReturnSummary.textContent = `${Number(summary.result_percent).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+  portfolioReturnSummary.classList.toggle("danger-text", result < 0);
+  portfolioReturnSummary.classList.toggle("positive-text", result > 0);
+  portfolioDayResultSummary.textContent = `${formatMoney(summary.day_result_brl, "BRL")} · ${Number(summary.day_result_percent).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+  portfolioDayResultSummary.classList.toggle("danger-text", dayResult < 0);
+  portfolioDayResultSummary.classList.toggle("positive-text", dayResult > 0);
+  portfolioPositionCount.textContent = String(summary.position_count || 0);
+  renderPortfolioGroupList(portfolioMarketList, summary.by_market);
+  renderPortfolioGroupList(portfolioTypeList, summary.by_type);
+  renderPortfolioGroupList(portfolioIndexerList, summary.by_indexer);
+  renderPortfolioGroupList(portfolioCurrencyList, summary.by_currency);
+  renderPortfolioGroupList(portfolioAccountList, summary.by_account);
+  renderPortfolioPositions(portfolio.positions || []);
+}
+
+function renderPortfolioGroupList(container, rows) {
+  if (!rows || rows.length === 0) {
+    container.innerHTML = '<div class="empty-state compact">Sem dados para consolidar.</div>';
+    return;
+  }
+  const total = rows.reduce((sum, row) => sum + Number(row.current_brl), 0);
+  container.innerHTML = rows.map((row, index) => {
+    const current = Number(row.current_brl);
+    const result = Number(row.result_brl);
+    const percent = total > 0 ? current / total : 0;
+    return `
+      <article class="portfolio-group-row">
+        <div>
+          <strong><i style="background:${chartColor(index)}"></i>${escapeHtml(row.label)}</strong>
+          <span>${row.count} posição(ões)</span>
+        </div>
+        <div>
+          <strong>${formatMoney(row.current_brl, "BRL")}</strong>
+          <span class="${result < 0 ? "danger-text" : "positive-text"}">${formatMoney(row.result_brl, "BRL")} · ${Number(row.result_percent).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%</span>
+        </div>
+        <div class="report-bar"><span style="width:${Math.max(percent * 100, 2)}%; background:${chartColor(index)}"></span></div>
+      </article>
+    `;
+  }).join("");
+}
+
+function renderPortfolioPositions(positions) {
+  if (positions.length === 0) {
+    portfolioPositions.innerHTML = '<div class="empty-state">Lance uma compra de investimento para formar o portfólio.</div>';
+    return;
+  }
+  const grouped = groupPortfolioPositions(positions);
+  portfolioPositions.innerHTML = grouped.map((group) => `
+    ${group.label ? `<h3 class="portfolio-group-title">${escapeHtml(group.label)}</h3>` : ""}
+    <div class="report-table-wrap">
+      <table class="report-table portfolio-table">
+        <thead>
+          <tr>
+            <th>Ativo</th>
+            <th>Tipo</th>
+            <th>Carteira</th>
+            <th>Qtd.</th>
+            <th>Preço médio</th>
+            <th>Custo</th>
+            <th>Cotação</th>
+            <th>Valor atual</th>
+            <th>Dia</th>
+            <th>Resultado</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${group.positions.map(portfolioPositionRow).join("")}
+        </tbody>
+      </table>
+    </div>
+  `).join("");
+}
+
+function groupPortfolioPositions(positions) {
+  if (state.portfolioGroup === "none") {
+    return [{ label: "", positions }];
+  }
+  const groups = new Map();
+  for (const position of positions) {
+    const label = position[state.portfolioGroup] || "Nao informado";
+    if (!groups.has(label)) {
+      groups.set(label, []);
+    }
+    groups.get(label).push(position);
+  }
+  return [...groups.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([label, groupPositions]) => ({ label, positions: groupPositions }));
+}
+
+function portfolioPositionRow(position) {
+  const result = Number(position.current_value_brl || 0) - Number(position.total_cost_brl || 0);
+  const resultPercent = Number(position.total_cost_brl) > 0 ? result / Number(position.total_cost_brl) : 0;
+  const dayResult = Number(position.day_result_brl || 0);
+  const dayBase = Number(position.current_value_brl || 0) - dayResult;
+  const dayPercent = dayBase > 0 ? dayResult / dayBase : 0;
+  const quoteStatus = position.quote_status === "ok" ? position.quote_source : position.quote_status;
+  const identifier = position.asset_identifier || position.asset_name || "Sem codigo";
+  const assetDetail = [
+    position.asset_name && position.asset_name !== identifier ? position.asset_name : "",
+    position.cnpj ? `CNPJ ${position.cnpj}` : "",
+    position.fixed_income_indexer ? `${position.fixed_income_indexer}${position.fixed_income_rate ? ` · ${position.fixed_income_rate}%` : ""}` : "",
+  ].filter(Boolean).join(" · ");
+  return `
+    <tr>
+      <td>
+        <strong>${escapeHtml(identifier)}</strong>
+        <span>${escapeHtml(assetDetail || "Sem detalhe adicional")}</span>
+      </td>
+      <td>${escapeHtml(position.asset_type_label)}<span>${escapeHtml(position.market_label || "Brasil")}</span></td>
+      <td>${escapeHtml(position.account_name)}<span>${escapeHtml(position.currency)}</span></td>
+      <td class="money-cell">${escapeHtml(position.quantity)}</td>
+      <td class="money-cell">${formatMoney(position.average_price, position.currency)}</td>
+      <td class="money-cell">${formatMoney(position.total_cost, position.currency)}<span>${formatMoney(position.total_cost_brl, "BRL")}</span></td>
+      <td>${position.quote ? escapeHtml(position.quote) : "--"}<span>${escapeHtml(quoteStatus || "Pendente")}</span></td>
+      <td class="money-cell">${formatMoney(position.current_value_cents / 100, position.currency)}<span>${formatMoney(position.current_value_brl, "BRL")}</span></td>
+      <td class="money-cell ${dayResult < 0 ? "danger-text" : "positive-text"}">${formatMoney(position.day_result_brl, "BRL")}<span>${formatPercent(dayPercent)}</span></td>
+      <td class="money-cell ${result < 0 ? "danger-text" : "positive-text"}">${formatMoney(result, "BRL")}<span>${formatPercent(resultPercent)}</span></td>
+    </tr>
+  `;
+}
+
 function reportRankedSection(title, rows, emptyText) {
   const total = rows.reduce((sum, row) => sum + row.total, 0);
   const content = rows.length ? rows.map((row, index) => {
@@ -1809,7 +2098,7 @@ function reportItemsForMonth(month) {
 }
 
 function accountTransactionReportItem(transaction) {
-  const reportType = isInvestmentTransfer(transaction)
+  const reportType = isInvestmentTransaction(transaction)
     ? "investment"
     : transaction.type === "income" || transaction.type === "expense"
       ? transaction.type
@@ -2083,14 +2372,17 @@ function renderTransactionCollection(container, transactions, compact) {
 }
 
 function transactionTemplate(transaction, compact) {
-  const signal = transaction.type === "income" ? "positive" : transaction.type === "expense" ? "negative" : "neutral";
-  const amountPrefix = transaction.type === "income" ? "" : transaction.type === "expense" ? "-" : "";
+  const signal = transaction.type === "income" ? "positive" : transaction.type === "expense" || transaction.type === "investment" ? "negative" : "neutral";
+  const amountPrefix = transaction.type === "income" ? "" : transaction.type === "expense" || transaction.type === "transfer" || transaction.type === "investment" ? "-" : "";
   const destination = transaction.destination_account_name ? ` para ${escapeHtml(transaction.destination_account_name)}` : "";
-  const typeLabel = isInvestmentTransfer(transaction) ? "Investimento" : transactionTypeLabel(transaction.type);
+  const typeLabel = isExchangeTransfer(transaction) ? "Câmbio" : isInvestmentTransaction(transaction) ? "Investimento" : transactionTypeLabel(transaction.type);
   const isReconciled = Boolean(transaction.reconciled_at);
   const convertedAmount = transaction.account_currency === "BRL" ? "" : `
         <span>${formatMoney(transaction.amount_brl, "BRL")}</span>
       `;
+  const destinationConvertedAmount = isExchangeTransfer(transaction) ? `
+        <span>+${formatMoney(transaction.destination_amount, transaction.destination_account_currency)}</span>
+      ` : "";
   return `
     <article class="transaction-row ${signal}">
       <div>
@@ -2105,6 +2397,7 @@ function transactionTemplate(transaction, compact) {
       </div>
       <div class="transaction-amount">
         <strong>${amountPrefix}${formatMoney(transaction.amount, transaction.account_currency)}</strong>
+        ${destinationConvertedAmount}
         ${convertedAmount}
         ${compact ? "" : `
           <div class="transaction-actions">
@@ -2148,16 +2441,53 @@ function matchesTransactionSearch(transaction) {
 
 function updateTransactionTypeState() {
   const isInvestment = transactionType.value === "investment";
-  const isTransfer = transactionType.value === "transfer" || isInvestment;
-  const destinationOptions = destinationAccountOptions(isInvestment);
+  const isExchange = transactionType.value === "exchange";
+  const isTransfer = transactionType.value === "transfer" || isExchange;
+  const destinationOptions = destinationAccountOptions(false, isExchange);
   destinationAccount.innerHTML = destinationOptions || '<option value="">Cadastre uma conta compatível</option>';
   destinationAccountLabel.hidden = !isTransfer;
   destinationAccount.disabled = !isTransfer || !destinationOptions;
+  exchangeTransferFields.hidden = !isExchange;
+  destinationAmount.disabled = !isExchange;
+  transferExchangeRate.disabled = !isExchange;
+  destinationAmount.required = isExchange;
+  transferExchangeRate.required = false;
+  investmentOperationFields.hidden = !isInvestment;
+  investmentAmount.disabled = !isInvestment;
+  investmentAmount.required = isInvestment;
+  transactionAmountRow.hidden = isInvestment;
+  transactionAmount.disabled = isInvestment;
+  transactionAmount.required = !isInvestment;
   if (isInvestment && !transactionForm.elements.tags.value.trim()) {
     transactionForm.elements.tags.value = "Investimento";
   }
+  updateInvestmentFieldState();
   renderTransactionCategories();
   updateExchangeRateState();
+  updateTransferExchangeRateState();
+}
+
+function handleTransactionAccountChange() {
+  applyInvestmentAccountDefault();
+  updateTransactionTypeState();
+}
+
+function applyInvestmentAccountDefault() {
+  const account = state.accounts.find((entry) => String(entry.id) === transactionAccount.value);
+  if (account && account.account_type === "investment" && !transactionForm.elements.id.value) {
+    transactionType.value = "investment";
+  }
+}
+
+function updateInvestmentFieldState() {
+  const isInvestment = transactionType.value === "investment";
+  const assetType = investmentAssetType.value;
+  investmentFundFields.hidden = !isInvestment || assetType !== "fund";
+  investmentFixedFields.hidden = !isInvestment || assetType !== "fixed_income";
+  for (const field of investmentOperationFields.querySelectorAll("input, select")) {
+    field.disabled = !isInvestment;
+  }
+  investmentAmount.required = isInvestment;
 }
 
 function updateSeriesState() {
@@ -2207,6 +2537,9 @@ function selectedTransactionGroup() {
   if (transactionType.value === "investment") {
     return "investment";
   }
+  if (transactionType.value === "exchange") {
+    return "expense";
+  }
   return "expense";
 }
 
@@ -2237,6 +2570,61 @@ async function updateExchangeRateState() {
     exchangeRate.value = "";
     exchangeRate.placeholder = "Informe a cotação manual";
   }
+}
+
+async function updateTransferExchangeRateState() {
+  if (transactionType.value !== "exchange") {
+    return;
+  }
+  const source = state.accounts.find((entry) => String(entry.id) === transactionAccount.value);
+  const destination = state.accounts.find((entry) => String(entry.id) === destinationAccount.value);
+  if (!source || !destination || source.currency === destination.currency || !transactionForm.elements.date.value) {
+    return;
+  }
+  transferExchangeRate.placeholder = "Buscando cotação...";
+  try {
+    const [sourceToBrl, destinationToBrl] = await Promise.all([
+      exchangeRateToBrl(source.currency, transactionForm.elements.date.value),
+      exchangeRateToBrl(destination.currency, transactionForm.elements.date.value),
+    ]);
+    const rate = sourceToBrl / destinationToBrl;
+    transferExchangeRate.value = rate.toLocaleString("pt-BR", {
+      minimumFractionDigits: 6,
+      maximumFractionDigits: 6,
+    });
+    updateDestinationAmountFromRate();
+  } catch (error) {
+    transferExchangeRate.placeholder = "Informe a cotação manual";
+  }
+}
+
+async function exchangeRateToBrl(currency, dateValue) {
+  if (currency === "BRL") {
+    return 1;
+  }
+  const response = await api(`/api/exchange-rate?currency=${encodeURIComponent(currency)}&date=${encodeURIComponent(dateValue)}`);
+  return Number(response.rate);
+}
+
+function updateDestinationAmountFromRate() {
+  if (transactionType.value !== "exchange") {
+    return;
+  }
+  const amount = parseDecimalInput(transactionForm.elements.amount.value);
+  const rate = parseDecimalInput(transferExchangeRate.value);
+  if (!amount || !rate) {
+    return;
+  }
+  destinationAmount.value = (amount * rate).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function parseDecimalInput(value) {
+  const normalized = String(value || "").replace(/\./g, "").replace(",", ".");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function groupTransactionsByDate(transactions) {
@@ -2273,7 +2661,9 @@ function getBalanceUntil(limitDate) {
     const sourceCurrency = transaction.account_currency;
     totals.set(sourceCurrency, (totals.get(sourceCurrency) || 0) + transactionSourceDelta(transaction.type, amount));
     if (transaction.type === "transfer" && transaction.destination_account_id) {
-      totals.set(sourceCurrency, (totals.get(sourceCurrency) || 0) + amount);
+      const destinationCurrency = transaction.destination_account_currency || sourceCurrency;
+      const destinationAmount = Number(transaction.destination_amount || transaction.amount);
+      totals.set(destinationCurrency, (totals.get(destinationCurrency) || 0) + destinationAmount);
     }
   }
   return new Map([...totals.entries()].sort(([currencyA], [currencyB]) => currencyA.localeCompare(currencyB)));
@@ -2300,7 +2690,7 @@ function getCurrentMonthTotals() {
     if (transaction.type === "expense") {
       totals.expense += amountBrl;
     }
-    if (isInvestmentTransfer(transaction)) {
+    if (isInvestmentTransaction(transaction)) {
       totals.investment += amountBrl;
     }
     return totals;
@@ -2309,11 +2699,11 @@ function getCurrentMonthTotals() {
   } });
 }
 
-function destinationAccountOptions(investmentOnly) {
+function destinationAccountOptions(investmentOnly, exchangeOnly = false) {
   const sourceAccount = state.accounts.find((account) => String(account.id) === transactionAccount.value);
   return state.accounts
     .filter((account) => String(account.id) !== transactionAccount.value)
-    .filter((account) => !sourceAccount || account.currency === sourceAccount.currency)
+    .filter((account) => !sourceAccount || (exchangeOnly ? account.currency !== sourceAccount.currency : account.currency === sourceAccount.currency))
     .filter((account) => !investmentOnly || account.account_type === "investment")
     .map((account) => `<option value="${account.id}">${escapeHtml(account.name)} (${escapeHtml(account.currency)})</option>`)
     .join("");
@@ -2435,6 +2825,7 @@ function transactionTypeLabel(type) {
     income: "Receita",
     expense: "Despesa",
     transfer: "Transferência",
+    investment: "Investimento",
   }[type] || type;
 }
 
@@ -2463,6 +2854,17 @@ function classificationGroupLabel(type) {
 
 function isInvestmentTransfer(transaction) {
   return transaction.type === "transfer" && transaction.destination_account_type === "investment";
+}
+
+function isInvestmentTransaction(transaction) {
+  return transaction.type === "investment" || isInvestmentTransfer(transaction);
+}
+
+function isExchangeTransfer(transaction) {
+  return transaction.type === "transfer"
+    && transaction.destination_account_id
+    && transaction.destination_account_currency
+    && transaction.account_currency !== transaction.destination_account_currency;
 }
 
 function formatCategoryPath(transaction) {

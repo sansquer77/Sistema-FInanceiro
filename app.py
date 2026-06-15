@@ -60,6 +60,7 @@ from financeiro.credit_cards import (
 )
 from financeiro.database import initialize_database
 from financeiro.imports import import_organizze_transactions
+from financeiro.portfolio import get_portfolio
 from financeiro.spending_limits import (
     create_spending_limit,
     delete_spending_limit,
@@ -116,6 +117,9 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/spending-limits":
             self.handle_list_spending_limits()
+            return
+        if path == "/api/portfolio":
+            self.handle_portfolio()
             return
         self.serve_static()
 
@@ -356,6 +360,10 @@ class AppHandler(BaseHTTPRequestHandler):
         query = parse_qs(urlsplit(self.path).query)
         month = (query.get("month") or [None])[0]
         self.send_json({"limits": list_spending_limits(user["id"], month)})
+
+    def handle_portfolio(self) -> None:
+        user = self.require_user()
+        self.send_json(get_portfolio(user["id"]))
 
     def handle_create_account(self) -> None:
         user = self.require_user()

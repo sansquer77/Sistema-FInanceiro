@@ -959,6 +959,94 @@ textarea:focus {
   text-transform: uppercase;
 }
 
+.portfolio-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.portfolio-summary > div,
+.portfolio-group-row {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+}
+
+.portfolio-summary > div {
+  display: grid;
+  gap: 5px;
+  min-height: 72px;
+  padding: 14px;
+}
+
+.portfolio-summary span,
+.portfolio-group-row span,
+.portfolio-table td span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.portfolio-summary strong {
+  font-size: 19px;
+}
+
+.portfolio-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  gap: 18px;
+  margin: 18px 0;
+}
+
+.portfolio-group-list {
+  display: grid;
+  gap: 10px;
+}
+
+.portfolio-group-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  padding: 12px;
+}
+
+.portfolio-group-row strong {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.portfolio-group-row i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+}
+
+.compact-filter {
+  width: min(240px, 100%);
+}
+
+.portfolio-group-title {
+  margin: 18px 0 8px;
+  font-size: 16px;
+}
+
+.portfolio-positions {
+  display: grid;
+  gap: 14px;
+}
+
+.portfolio-table {
+  min-width: 1100px;
+}
+
+.portfolio-table td {
+  vertical-align: top;
+}
+
 .money-cell {
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -1307,6 +1395,8 @@ textarea:focus {
   .month-balance-summary,
   .limit-summary,
   .report-summary,
+  .portfolio-summary,
+  .portfolio-grid,
   .account-report-header,
   .card-invoice-summary,
   .cockpit-grid,
