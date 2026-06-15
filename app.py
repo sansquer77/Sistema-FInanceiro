@@ -51,6 +51,7 @@ from financeiro.credit_cards import (
     delete_credit_card_transaction,
     list_archived_credit_cards,
     list_credit_card_invoice,
+    list_credit_card_payments,
     list_credit_card_transactions,
     list_credit_cards,
     pay_credit_card_invoice,
@@ -103,6 +104,9 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/credit-card-transactions":
             self.handle_list_credit_card_transactions()
+            return
+        if path == "/api/credit-card-payments":
+            self.handle_list_credit_card_payments()
             return
         if path.startswith("/api/transactions"):
             self.handle_list_transactions()
@@ -344,6 +348,10 @@ class AppHandler(BaseHTTPRequestHandler):
     def handle_list_credit_card_transactions(self) -> None:
         user = self.require_user()
         self.send_json({"transactions": list_credit_card_transactions(user["id"])})
+
+    def handle_list_credit_card_payments(self) -> None:
+        user = self.require_user()
+        self.send_json({"payments": list_credit_card_payments(user["id"])})
 
     def handle_list_transactions(self) -> None:
         user = self.require_user()

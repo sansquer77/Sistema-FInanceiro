@@ -7,6 +7,7 @@ const state = {
   cardInvoiceTransactions: [],
   cardInvoicePayments: [],
   cardTransactions: [],
+  cardPayments: [],
   selectedCreditCardId: "",
   selectedAccountId: "",
   transactions: [],
@@ -180,6 +181,7 @@ const monthExpense = document.querySelector("#monthExpense");
 const monthInvestment = document.querySelector("#monthInvestment");
 const savingsRate = document.querySelector("#savingsRate");
 const currencyList = document.querySelector("#currencyList");
+const cockpitPortfolioByType = document.querySelector("#cockpitPortfolioByType");
 const topExpensesChart = document.querySelector("#topExpensesChart");
 const cashDistributionChart = document.querySelector("#cashDistributionChart");
 const previousMonthButton = document.querySelector("#previousMonthButton");
@@ -413,6 +415,7 @@ async function handleLogout() {
   state.cardInvoiceTransactions = [];
   state.cardInvoicePayments = [];
   state.cardTransactions = [];
+  state.cardPayments = [];
   state.selectedCreditCardId = "";
   state.transactions = [];
   state.categories = [];
@@ -440,17 +443,19 @@ async function loadDashboard() {
 
 async function loadAll() {
   try {
-    const [accountsResponse, creditCardsResponse, transactionsResponse, cardTransactionsResponse] = await Promise.all([
+    const [accountsResponse, creditCardsResponse, transactionsResponse, cardTransactionsResponse, cardPaymentsResponse] = await Promise.all([
       api("/api/checking-accounts"),
       api("/api/credit-cards"),
       api("/api/transactions"),
       api("/api/credit-card-transactions"),
+      api("/api/credit-card-payments"),
     ]);
     state.accounts = accountsResponse.accounts;
     state.creditCards = creditCardsResponse.cards;
     ensureSelectedCreditCard();
     state.transactions = transactionsResponse.transactions;
     state.cardTransactions = cardTransactionsResponse.transactions;
+    state.cardPayments = cardPaymentsResponse.payments || [];
     await loadArchivedAccounts();
     await loadArchivedCreditCards();
     await loadClassifications();
@@ -465,6 +470,7 @@ async function loadAll() {
     state.cardInvoiceTransactions = [];
     state.cardInvoicePayments = [];
     state.cardTransactions = [];
+    state.cardPayments = [];
     state.selectedCreditCardId = "";
     state.transactions = [];
     state.categories = [];
@@ -505,17 +511,19 @@ async function loadArchivedCreditCards() {
 }
 
 async function loadTransactionsAndAccounts() {
-  const [accountsResponse, creditCardsResponse, transactionsResponse, cardTransactionsResponse] = await Promise.all([
+  const [accountsResponse, creditCardsResponse, transactionsResponse, cardTransactionsResponse, cardPaymentsResponse] = await Promise.all([
     api("/api/checking-accounts"),
     api("/api/credit-cards"),
     api("/api/transactions"),
     api("/api/credit-card-transactions"),
+    api("/api/credit-card-payments"),
   ]);
   state.accounts = accountsResponse.accounts;
   state.creditCards = creditCardsResponse.cards;
   ensureSelectedCreditCard();
   state.transactions = transactionsResponse.transactions;
   state.cardTransactions = cardTransactionsResponse.transactions;
+  state.cardPayments = cardPaymentsResponse.payments || [];
   await loadArchivedAccounts();
   await loadArchivedCreditCards();
   await loadClassifications();
@@ -607,8 +615,12 @@ async function loadCardInvoice() {
 }
 
 async function loadCardTransactions() {
-  const response = await api("/api/credit-card-transactions");
-  state.cardTransactions = response.transactions || [];
+  const [transactionsResponse, paymentsResponse] = await Promise.all([
+    api("/api/credit-card-transactions"),
+    api("/api/credit-card-payments"),
+  ]);
+  state.cardTransactions = transactionsResponse.transactions || [];
+  state.cardPayments = paymentsResponse.payments || [];
 }
 
 function ensureSelectedCreditCard() {
@@ -1007,6 +1019,7 @@ async function handleClearLaunchesSubmit(event) {
     state.selectedAccountId = "";
     state.transactions = [];
     state.cardTransactions = [];
+    state.cardPayments = [];
     state.cardInvoiceTransactions = [];
     state.cardInvoicePayments = [];
     state.portfolio = null;
@@ -1030,7 +1043,13 @@ async function handleDeleteUserSubmit(event) {
     state.user = null;
     state.accounts = [];
     state.archivedAccounts = [];
+    state.creditCards = [];
+    state.archivedCreditCards = [];
     state.transactions = [];
+    state.cardTransactions = [];
+    state.cardPayments = [];
+    state.cardInvoiceTransactions = [];
+    state.cardInvoicePayments = [];
     state.categories = [];
     state.tags = [];
     deleteUserForm.reset();
@@ -1361,6 +1380,7 @@ function renderCockpit() {
   monthInvestment.textContent = formatMoney(monthTotals.investment, "BRL");
   savingsRate.textContent = formatPercent(monthTotals.savingsRate);
   renderCurrencyTotals(totals);
+  renderCockpitPortfolioByType();
   renderMonthlyPlanning();
   renderTopExpensesChart();
   renderCashDistributionChart(monthTotals);
@@ -3059,36 +3079,26 @@ function getCurrencyTotals() {
   const totals = new Map();
   for (const account of state.accounts) {
     const row = currencyTotalRow(totals, account.currency);
-    row.current += Number(account.current_balance);
-    row.reconciledAccounts += Number(account.initial_balance);
-  }
-  for (const transaction of state.transactions) {
-    if (!transaction.reconciled_at) {
-      continue;
-    }
-    const amount = Number(transaction.amount);
-    const sourceCurrency = transaction.account_currency;
-    currencyTotalRow(totals, sourceCurrency).reconciledAccounts += transactionSourceDelta(transaction.type, amount);
-    if (transaction.type === "transfer" && transaction.destination_account_id) {
-      const destinationCurrency = transaction.destination_account_currency || sourceCurrency;
-      const destinationAmount = Number(transaction.destination_amount || transaction.amount);
-      currencyTotalRow(totals, destinationCurrency).reconciledAccounts += destinationAmount;
-    }
+    const amount = Number(account.current_balance);
+    row.current += amount;
+    row.accounts.push({
+      id: account.id,
+      name: account.name,
+      type: accountTypeLabel(account.account_type),
+      amount,
+    });
   }
   for (const card of state.creditCards) {
-    currencyTotalRow(totals, card.currency);
-  }
-  for (const transaction of state.cardTransactions) {
-    if (!transaction.reconciled_at) {
-      continue;
-    }
-    const currency = transaction.card_currency || creditCardCurrency(transaction.credit_card_id);
-    const amount = Number(transaction.amount);
-    const signedAmount = transaction.type === "income" ? amount : -amount;
-    currencyTotalRow(totals, currency).reconciledCards += signedAmount;
-  }
-  for (const row of totals.values()) {
-    row.reconciledNet = row.reconciledAccounts + row.reconciledCards;
+    const row = currencyTotalRow(totals, card.currency);
+    const openAmount = cardOpenBalance(card.id);
+    const signedAmount = -openAmount;
+    row.current += signedAmount;
+    row.cards.push({
+      id: card.id,
+      name: card.name,
+      issuer: card.issuer,
+      amount: signedAmount,
+    });
   }
   return new Map([...totals.entries()].sort(([currencyA], [currencyB]) => currencyA.localeCompare(currencyB)));
 }
@@ -3098,12 +3108,25 @@ function currencyTotalRow(totals, currency) {
   if (!totals.has(normalizedCurrency)) {
     totals.set(normalizedCurrency, {
       current: 0,
-      reconciledAccounts: 0,
-      reconciledCards: 0,
-      reconciledNet: 0,
+      accounts: [],
+      cards: [],
     });
   }
   return totals.get(normalizedCurrency);
+}
+
+function cardOpenBalance(cardId) {
+  const transactionTotal = state.cardTransactions.reduce((total, transaction) => {
+    if (String(transaction.credit_card_id) !== String(cardId)) {
+      return total;
+    }
+    const amount = Number(transaction.amount);
+    return total + (transaction.type === "expense" ? amount : -amount);
+  }, 0);
+  const paidTotal = state.cardPayments.reduce((total, payment) => (
+    String(payment.credit_card_id) === String(cardId) ? total + Number(payment.amount) : total
+  ), 0);
+  return transactionTotal - paidTotal;
 }
 
 function creditCardCurrency(cardId) {
@@ -3217,17 +3240,71 @@ function renderCurrencyTotals(totals) {
   for (const [currency, amounts] of totals.entries()) {
     const item = document.createElement("div");
     item.className = "currency-item";
+    const accountRows = amounts.accounts.map((account) => currencyDetailRow(
+      account.name,
+      account.type,
+      account.amount,
+      currency,
+    )).join("");
+    const cardRows = amounts.cards.map((card) => currencyDetailRow(
+      card.name,
+      card.issuer ? `Cartão · ${card.issuer}` : "Cartão",
+      card.amount,
+      currency,
+      "card",
+    )).join("");
     item.innerHTML = `
       <span>${escapeHtml(currency)} (Previsto)</span>
       <strong>${formatMoney(amounts.current, currency)}</strong>
       <div class="currency-breakdown">
-        <span>Contas conciliadas <b>${formatMoney(amounts.reconciledAccounts, currency)}</b></span>
-        <span>Cartões conciliados <b>${formatMoney(amounts.reconciledCards, currency)}</b></span>
-        <span>Saldo conciliado <b>${formatMoney(amounts.reconciledNet, currency)}</b></span>
+        ${accountRows || '<span class="muted-row">Nenhuma conta ativa nesta moeda.</span>'}
+        ${cardRows ? `<div class="currency-section-label">Cartões</div>${cardRows}` : ""}
       </div>
     `;
     currencyList.append(item);
   }
+}
+
+function currencyDetailRow(name, detail, amount, currency, kind = "account") {
+  const amountClass = amount < 0 ? "danger-text" : amount > 0 ? "positive-text" : "";
+  return `
+    <div class="currency-detail-row ${kind}">
+      <span>
+        <b>${escapeHtml(name)}</b>
+        <em>${escapeHtml(detail)}</em>
+      </span>
+      <strong class="${amountClass}">${formatMoney(amount, currency)}</strong>
+    </div>
+  `;
+}
+
+function renderCockpitPortfolioByType() {
+  if (!cockpitPortfolioByType) {
+    return;
+  }
+  const rows = state.portfolio && state.portfolio.summary ? state.portfolio.summary.by_type || [] : [];
+  if (rows.length === 0) {
+    cockpitPortfolioByType.innerHTML = '<div class="empty-state compact">Nenhum investimento em carteira.</div>';
+    return;
+  }
+  const total = rows.reduce((sum, row) => sum + Number(row.current_brl || 0), 0);
+  cockpitPortfolioByType.innerHTML = rows.map((row, index) => {
+    const current = Number(row.current_brl || 0);
+    const result = Number(row.result_brl || 0);
+    const percent = total > 0 ? current / total : 0;
+    return `
+      <article class="portfolio-cockpit-row">
+        <div>
+          <strong><i style="background:${chartColor(index)}"></i>${escapeHtml(row.label)}</strong>
+          <span>${row.count} posição(ões) · ${formatPercent(percent)}</span>
+        </div>
+        <div>
+          <strong>${formatMoney(current, "BRL")}</strong>
+          <span class="${result < 0 ? "danger-text" : "positive-text"}">${formatMoney(result, "BRL")}</span>
+        </div>
+      </article>
+    `;
+  }).join("");
 }
 
 function showAuth() {

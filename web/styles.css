@@ -417,7 +417,7 @@ textarea:focus {
 
 .currency-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 10px;
 }
 
@@ -558,10 +558,52 @@ textarea:focus {
 
 .currency-breakdown {
   display: grid;
-  gap: 6px;
+  gap: 8px;
 }
 
-.currency-breakdown span {
+.currency-detail-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.currency-detail-row span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.currency-detail-row b {
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.currency-detail-row em,
+.currency-section-label,
+.muted-row {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.currency-detail-row strong {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.currency-section-label {
+  padding-top: 4px;
+  text-transform: uppercase;
+}
+
+.currency-breakdown > span {
   display: flex;
   justify-content: space-between;
   gap: 10px;
@@ -572,6 +614,62 @@ textarea:focus {
   color: var(--ink);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.cockpit-portfolio-summary {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.cockpit-portfolio-summary h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+#cockpitPortfolioByType {
+  display: grid;
+  gap: 8px;
+}
+
+.portfolio-cockpit-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 48px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.portfolio-cockpit-row > div {
+  display: grid;
+  gap: 3px;
+}
+
+.portfolio-cockpit-row > div:last-child {
+  text-align: right;
+}
+
+.portfolio-cockpit-row strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.portfolio-cockpit-row i {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+}
+
+.portfolio-cockpit-row span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .workspace {

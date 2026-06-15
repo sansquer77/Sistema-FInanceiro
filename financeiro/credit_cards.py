@@ -127,6 +127,32 @@ def list_credit_card_transactions(user_id: int) -> list[dict]:
     ]
 
 
+def list_credit_card_payments(user_id: int) -> list[dict]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                credit_card_payments.*,
+                credit_cards.currency AS card_currency,
+                checking_accounts.name AS account_name
+            FROM credit_card_payments
+            JOIN credit_cards
+                ON credit_cards.id = credit_card_payments.credit_card_id
+                AND credit_cards.user_id = credit_card_payments.user_id
+            JOIN checking_accounts
+                ON checking_accounts.id = credit_card_payments.account_id
+                AND checking_accounts.user_id = credit_card_payments.user_id
+            WHERE credit_card_payments.user_id = ?
+            ORDER BY credit_card_payments.payment_date DESC, credit_card_payments.id DESC
+            """,
+            (user_id,),
+        ).fetchall()
+    return [
+        format_card_payment(row_to_dict(row), row["card_currency"])
+        for row in rows
+    ]
+
+
 def create_credit_card(user_id: int, data: dict) -> dict:
     card = normalize_credit_card_payload(data)
     try:
