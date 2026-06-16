@@ -10,10 +10,12 @@ from http import HTTPStatus
 from io import StringIO
 
 from financeiro.categories import ClassificationError, get_or_create_category, get_or_create_subcategory, get_or_create_tag, normalize_name
+from financeiro.credit_cards import create_credit_card_transaction
 from financeiro.transactions import (
     apply_balance_delta,
     balance_delta,
     convert_to_brl_cents,
+    create_transaction,
     get_active_account,
     normalize_tags,
     replace_transaction_tags,
@@ -22,6 +24,31 @@ from financeiro.transactions import (
 from financeiro.database import get_connection, row_to_dict
 
 OLE_MAGIC = bytes.fromhex("D0CF11E0A1B11AE1")
+SYSTEM_IMPORT_ACCOUNT_HEADERS = [
+    "data",
+    "tipo",
+    "descricao",
+    "valor",
+    "categoria",
+    "subcategoria",
+    "tags",
+    "conta_destino_id",
+    "valor_destino",
+    "cotacao_cambio",
+    "cotacao_brl",
+    "observacoes",
+]
+SYSTEM_IMPORT_CARD_HEADERS = [
+    "data",
+    "competencia_fatura",
+    "tipo",
+    "descricao",
+    "valor",
+    "categoria",
+    "subcategoria",
+    "tags",
+    "observacoes",
+]
 END_OF_CHAIN = 0xFFFFFFFE
 FREE_SECTOR = 0xFFFFFFFF
 HEADER_ALIASES = {
@@ -130,6 +157,183 @@ class ImportError(Exception):
         self.message = message
         self.status = status
         super().__init__(message)
+
+
+def system_import_template(user_id: int, target: str) -> bytes:
+    normalized_target = normalize_import_target(target)
+    headers = SYSTEM_IMPORT_CARD_HEADERS if normalized_target == "card" else SYSTEM_IMPORT_ACCOUNT_HEADERS
+    output = StringIO()
+    writer = csv.writer(output, delimiter=";", lineterminator="\n")
+    writer.writerow(headers)
+    if normalized_target == "card":
+        writer.writerow(["2026-06-15", "2026-06", "expense", "Exemplo compra no cartão", "123,45", "Alimentação", "Restaurantes / Bares / Delivery", "Organizze; Revisar", "Linha exemplo"])
+        writer.writerow(["2026-06-20", "2026-06", "income", "Exemplo estorno", "10,00", "Outras Receitas", "Reembolsos Corporativos", "Organizze", "Linha exemplo"])
+    else:
+        writer.writerow(["2026-06-15", "expense", "Exemplo mercado", "123,45", "Alimentação", "Supermercado / Feira / Hortifruti", "Organizze; Revisar", "", "", "", "", "Linha exemplo"])
+        writer.writerow(["2026-06-15", "income", "Exemplo salário", "1000,00", "Trabalho e Salário", "Salário Líquido", "Organizze", "", "", "", "", "Linha exemplo"])
+        writer.writerow(["2026-06-15", "transfer", "Exemplo transferência", "500,00", "", "", "", "2", "", "", "", "Informe conta_destino_id"])
+        writer.writerow(["2026-06-15", "exchange", "Exemplo câmbio", "1000,00", "", "", "Câmbio", "3", "197,10", "0,197100", "", "Conta destino em outra moeda"])
+    writer.writerow([])
+    writer.writerow(["Categorias do sistema"])
+    writer.writerow(["grupo", "categoria", "subcategoria"])
+    with get_connection() as conn:
+        categories = conn.execute(
+            """
+            SELECT categories.group_type, categories.name AS category_name, subcategories.name AS subcategory_name
+            FROM categories
+            LEFT JOIN subcategories ON subcategories.category_id = categories.id
+            WHERE categories.user_id = ?
+            ORDER BY categories.group_type, categories.name COLLATE NOCASE, subcategories.name COLLATE NOCASE
+            """,
+            (user_id,),
+        ).fetchall()
+        for row in categories:
+            writer.writerow([row["group_type"], row["category_name"], row["subcategory_name"] or ""])
+        tags = conn.execute(
+            "SELECT name FROM tags WHERE user_id = ? ORDER BY name COLLATE NOCASE",
+            (user_id,),
+        ).fetchall()
+    writer.writerow([])
+    writer.writerow(["Tags existentes"])
+    writer.writerow(["tag"])
+    for row in tags:
+        writer.writerow([row["name"]])
+    return ("\ufeff" + output.getvalue()).encode("utf-8")
+
+
+def import_system_template(user_id: int, target: str, target_id: object, file_bytes: bytes, filename: str) -> dict:
+    normalized_target = normalize_import_target(target)
+    rows = parse_system_template_file(file_bytes, filename)
+    imported = []
+    skipped = []
+    for raw in rows:
+        try:
+            if normalized_target == "card":
+                payload = normalize_system_card_row(raw, target_id)
+                created = create_credit_card_transaction(user_id, payload)
+            else:
+                payload = normalize_system_account_row(raw, target_id)
+                created = create_transaction(user_id, payload)
+            imported.append({"row": raw["row"], "id": created["id"], "description": payload["description"]})
+        except Exception as exc:
+            skipped.append({
+                "row": raw.get("row", ""),
+                "description": raw.get("descricao") or raw.get("description") or "",
+                "reason": getattr(exc, "message", str(exc) or "Nao foi possivel importar a linha."),
+            })
+    return {
+        "imported": len(imported),
+        "skipped": len(skipped),
+        "total_rows": len(rows),
+        "rows": imported,
+        "errors": skipped[:50],
+    }
+
+
+def parse_system_template_file(file_bytes: bytes, filename: str) -> list[dict]:
+    if not file_bytes:
+        raise ImportError("Envie uma planilha modelo preenchida.")
+    if not filename.lower().endswith(".csv"):
+        raise ImportError("Envie o modelo em CSV UTF-8 separado por ponto e virgula.")
+    rows = parse_csv_rows(file_bytes)
+    if not rows:
+        raise ImportError("Arquivo sem dados para importar.")
+    headers = [normalize_template_header(value) for value in rows[0]]
+    mapped_rows = []
+    for row_number, row in enumerate(rows[1:], start=2):
+        if not any(str(value or "").strip() for value in row):
+            continue
+        if is_template_reference_section(row):
+            break
+        mapped_rows.append({
+            "row": row_number,
+            **{header: get_cell(row, index) for index, header in enumerate(headers) if header},
+        })
+    if not mapped_rows:
+        raise ImportError("Nenhuma linha de lancamento encontrada no modelo.")
+    return mapped_rows
+
+
+def normalize_system_account_row(row: dict, account_id: object) -> dict:
+    transaction_type = normalize_system_type(row.get("tipo") or row.get("type"))
+    if transaction_type == "exchange":
+        transaction_type = "transfer"
+    payload = {
+        "account_id": account_id,
+        "type": transaction_type,
+        "date": row.get("data") or row.get("date"),
+        "description": row.get("descricao") or row.get("description"),
+        "amount": row.get("valor") or row.get("amount"),
+        "category": row.get("categoria") or row.get("category"),
+        "subcategory": row.get("subcategoria") or row.get("subcategory"),
+        "tags": row.get("tags") or row.get("tag"),
+        "destination_account_id": row.get("conta_destino_id") or row.get("destination_account_id"),
+        "destination_amount": row.get("valor_destino") or row.get("destination_amount"),
+        "transfer_exchange_rate": row.get("cotacao_cambio") or row.get("transfer_exchange_rate"),
+        "exchange_rate_to_brl": row.get("cotacao_brl") or row.get("exchange_rate_to_brl"),
+        "notes": row.get("observacoes") or row.get("notes"),
+        "series_kind": "single",
+    }
+    if payload["type"] == "transfer":
+        payload["category"] = ""
+        payload["subcategory"] = ""
+    return payload
+
+
+def normalize_system_card_row(row: dict, card_id: object) -> dict:
+    return {
+        "credit_card_id": card_id,
+        "type": normalize_card_import_type(row.get("tipo") or row.get("type")),
+        "date": row.get("data") or row.get("date"),
+        "invoice_month": row.get("competencia_fatura") or row.get("invoice_month"),
+        "description": row.get("descricao") or row.get("description"),
+        "amount": row.get("valor") or row.get("amount"),
+        "category": row.get("categoria") or row.get("category"),
+        "subcategory": row.get("subcategoria") or row.get("subcategory"),
+        "notes": row.get("observacoes") or row.get("notes"),
+    }
+
+
+def normalize_import_target(value: object) -> str:
+    target = normalize_key(value)
+    if target in {"card", "cartao", "cartoes", "credit_card"}:
+        return "card"
+    return "account"
+
+
+def normalize_system_type(value: object) -> str:
+    key = normalize_key(value)
+    aliases = {
+        "despesa": "expense",
+        "expense": "expense",
+        "receita": "income",
+        "income": "income",
+        "transferencia": "transfer",
+        "transfer": "transfer",
+        "cambio": "exchange",
+        "exchange": "exchange",
+        "investimento": "investment",
+        "investment": "investment",
+    }
+    if key not in aliases:
+        raise ImportError("Tipo invalido. Use expense, income, transfer, exchange ou investment.")
+    return aliases[key]
+
+
+def normalize_card_import_type(value: object) -> str:
+    key = normalize_system_type(value)
+    if key not in {"expense", "income"}:
+        raise ImportError("Cartao aceita apenas expense ou income.")
+    return key
+
+
+def normalize_template_header(value: object) -> str:
+    return normalize_key(value).replace(" ", "_").replace("-", "_")
+
+
+def is_template_reference_section(row: list[object]) -> bool:
+    first = normalize_key(get_cell(row, 0))
+    return first in {"categorias_do_sistema", "tags_existentes"}
 
 
 def import_organizze_transactions(user_id: int, account_id: object, file_bytes: bytes, filename: str) -> dict:

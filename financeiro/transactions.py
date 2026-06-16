@@ -56,6 +56,7 @@ def list_transactions(user_id: int) -> list[dict]:
                 investment_operations.fixed_income_mode AS investment_fixed_income_mode,
                 investment_operations.fixed_income_indexer AS investment_fixed_income_indexer,
                 investment_operations.fixed_income_rate_micros AS investment_fixed_income_rate_micros,
+                investment_operations.fixed_income_maturity_date AS investment_fixed_income_maturity_date,
                 GROUP_CONCAT(tags.name, '||') AS tag_names
             FROM transactions
             JOIN checking_accounts AS source
@@ -452,6 +453,7 @@ def normalize_investment_operation(data: dict, amount_cents: int, transaction_ty
         "fixed_income_mode": fixed_income_mode,
         "fixed_income_indexer": empty_to_none(data.get("investment_fixed_income_indexer")),
         "fixed_income_rate_micros": decimal_to_micros(data.get("investment_fixed_income_rate")),
+        "fixed_income_maturity_date": normalize_optional_date(data.get("investment_fixed_income_maturity_date")),
     }
 
 
@@ -543,6 +545,16 @@ def normalize_id(value: object, message: str) -> int:
 
 def normalize_date(value: object) -> str:
     raw = str(value or "").strip()
+    try:
+        return date.fromisoformat(raw).isoformat()
+    except ValueError as exc:
+        raise TransactionError("Informe uma data valida.") from exc
+
+
+def normalize_optional_date(value: object) -> str | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
     try:
         return date.fromisoformat(raw).isoformat()
     except ValueError as exc:
@@ -721,8 +733,8 @@ def upsert_investment_operation(conn, user_id: int, transaction_id: int, account
             user_id, transaction_id, account_id, asset_type, asset_identifier, asset_name, cnpj,
             quantity_micros, unit_price_cents, invested_amount_cents, brokerage_fee_cents,
             exchange_fee_cents, tax_cents, other_costs_cents, fixed_income_mode,
-            fixed_income_indexer, fixed_income_rate_micros
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            fixed_income_indexer, fixed_income_rate_micros, fixed_income_maturity_date
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(transaction_id) DO UPDATE SET
             account_id = excluded.account_id,
             asset_type = excluded.asset_type,
@@ -739,6 +751,7 @@ def upsert_investment_operation(conn, user_id: int, transaction_id: int, account
             fixed_income_mode = excluded.fixed_income_mode,
             fixed_income_indexer = excluded.fixed_income_indexer,
             fixed_income_rate_micros = excluded.fixed_income_rate_micros,
+            fixed_income_maturity_date = excluded.fixed_income_maturity_date,
             updated_at = CURRENT_TIMESTAMP
         """,
         (
@@ -759,6 +772,7 @@ def upsert_investment_operation(conn, user_id: int, transaction_id: int, account
             operation["fixed_income_mode"],
             operation["fixed_income_indexer"],
             operation["fixed_income_rate_micros"],
+            operation["fixed_income_maturity_date"],
         ),
     )
 
@@ -790,6 +804,7 @@ def fetch_transaction(conn, user_id: int, transaction_id: int) -> dict:
                 investment_operations.fixed_income_mode AS investment_fixed_income_mode,
                 investment_operations.fixed_income_indexer AS investment_fixed_income_indexer,
                 investment_operations.fixed_income_rate_micros AS investment_fixed_income_rate_micros,
+                investment_operations.fixed_income_maturity_date AS investment_fixed_income_maturity_date,
                 GROUP_CONCAT(tags.name, '||') AS tag_names
             FROM transactions
             JOIN checking_accounts AS source
@@ -850,6 +865,7 @@ def extract_investment_operation(transaction: dict) -> dict | None:
         "fixed_income_mode": transaction.pop("investment_fixed_income_mode", None),
         "fixed_income_indexer": transaction.pop("investment_fixed_income_indexer", None),
         "fixed_income_rate": micros_to_decimal(transaction.pop("investment_fixed_income_rate_micros", 0) or 0),
+        "fixed_income_maturity_date": transaction.pop("investment_fixed_income_maturity_date", None),
     }
     if not asset_type:
         return None

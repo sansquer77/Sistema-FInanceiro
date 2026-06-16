@@ -17,6 +17,7 @@ MONEY_SCALE = Decimal("100")
 MICRO_SCALE = Decimal("1000000")
 YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=5d&interval=1d"
 BCB_SERIES_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{series}/dados/ultimos/1?formato=json"
+BCB_SERIES_RANGE_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{series}/dados?formato=json&dataInicial={start}&dataFinal={end}"
 
 ASSET_TYPE_LABELS = {
     "stock": "Renda variável",
@@ -35,6 +36,8 @@ INDEXER_SERIES = {
     "PREFIXADO": "",
 }
 
+MONTHLY_INDEXERS = {"IPCA", "IGP-M"}
+
 
 class PortfolioError(Exception):
     def __init__(self, message: str, status: HTTPStatus = HTTPStatus.BAD_REQUEST) -> None:
@@ -49,6 +52,8 @@ def get_portfolio(user_id: int) -> dict:
             """
             SELECT
                 investment_operations.*,
+                'operation' AS source_type,
+                investment_operations.id AS source_id,
                 transactions.date,
                 transactions.description,
                 transactions.amount_cents,
@@ -73,6 +78,8 @@ def get_portfolio(user_id: int) -> dict:
             """
             SELECT
                 investment_opening_positions.id,
+                'opening' AS source_type,
+                investment_opening_positions.id AS source_id,
                 investment_opening_positions.user_id,
                 NULL AS transaction_id,
                 investment_opening_positions.account_id,
@@ -90,6 +97,7 @@ def get_portfolio(user_id: int) -> dict:
                 investment_opening_positions.fixed_income_mode,
                 investment_opening_positions.fixed_income_indexer,
                 investment_opening_positions.fixed_income_rate_micros,
+                investment_opening_positions.fixed_income_maturity_date,
                 investment_opening_positions.acquisition_date AS date,
                 'Posicao inicial' AS description,
                 investment_opening_positions.total_cost_cents AS amount_cents,
@@ -143,8 +151,8 @@ def create_opening_position(user_id: int, data: dict) -> dict:
                 user_id, account_id, asset_type, asset_identifier, asset_name, cnpj,
                 acquisition_date, quantity_micros, unit_price_cents, total_cost_cents,
                 exchange_rate_micros, fixed_income_mode, fixed_income_indexer,
-                fixed_income_rate_micros, notes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                fixed_income_rate_micros, fixed_income_maturity_date, notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 user_id,
@@ -161,7 +169,68 @@ def create_opening_position(user_id: int, data: dict) -> dict:
                 position["fixed_income_mode"],
                 position["fixed_income_indexer"],
                 position["fixed_income_rate_micros"],
+                position["fixed_income_maturity_date"],
                 position["notes"],
+            ),
+        )
+    return get_portfolio(user_id)
+
+
+def update_opening_position(user_id: int, position_id: object, data: dict) -> dict:
+    normalized_id = normalize_id(position_id, "Posicao nao encontrada.")
+    position = normalize_opening_position_payload(data)
+    with get_connection() as conn:
+        existing = conn.execute(
+            """
+            SELECT id
+            FROM investment_opening_positions
+            WHERE id = ? AND user_id = ?
+            """,
+            (normalized_id, user_id),
+        ).fetchone()
+        if not existing:
+            raise PortfolioError("Posicao nao encontrada.", HTTPStatus.NOT_FOUND)
+        account = conn.execute(
+            """
+            SELECT id, currency, account_type
+            FROM checking_accounts
+            WHERE id = ? AND user_id = ? AND archived_at IS NULL
+            """,
+            (position["account_id"], user_id),
+        ).fetchone()
+        if not account:
+            raise PortfolioError("Conta nao encontrada.", HTTPStatus.NOT_FOUND)
+        if account["account_type"] != "investment":
+            raise PortfolioError("Selecione uma conta de investimento para a posicao inicial.")
+        exchange_rate_micros = resolve_position_exchange_rate(account["currency"], position["acquisition_date"], position["exchange_rate"])
+        conn.execute(
+            """
+            UPDATE investment_opening_positions
+            SET account_id = ?, asset_type = ?, asset_identifier = ?, asset_name = ?, cnpj = ?,
+                acquisition_date = ?, quantity_micros = ?, unit_price_cents = ?, total_cost_cents = ?,
+                exchange_rate_micros = ?, fixed_income_mode = ?, fixed_income_indexer = ?,
+                fixed_income_rate_micros = ?, fixed_income_maturity_date = ?, notes = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND user_id = ?
+            """,
+            (
+                position["account_id"],
+                position["asset_type"],
+                position["asset_identifier"],
+                position["asset_name"],
+                position["cnpj"],
+                position["acquisition_date"],
+                position["quantity_micros"],
+                position["unit_price_cents"],
+                position["total_cost_cents"],
+                exchange_rate_micros,
+                position["fixed_income_mode"],
+                position["fixed_income_indexer"],
+                position["fixed_income_rate_micros"],
+                position["fixed_income_maturity_date"],
+                position["notes"],
+                normalized_id,
+                user_id,
             ),
         )
     return get_portfolio(user_id)
@@ -197,6 +266,7 @@ def normalize_opening_position_payload(data: dict) -> dict:
         "fixed_income_mode": fixed_income_mode,
         "fixed_income_indexer": empty_to_none(data.get("fixed_income_indexer")),
         "fixed_income_rate_micros": decimal_to_micros(data.get("fixed_income_rate")),
+        "fixed_income_maturity_date": normalize_optional_date(data.get("fixed_income_maturity_date")),
         "notes": empty_to_none(data.get("notes")),
     }
 
@@ -227,6 +297,16 @@ def normalize_date(value: object) -> str:
         raise PortfolioError("Informe uma data valida.") from exc
 
 
+def normalize_optional_date(value: object) -> str | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    try:
+        return date.fromisoformat(raw).isoformat()
+    except ValueError as exc:
+        raise PortfolioError("Informe uma data valida.") from exc
+
+
 def optional_key(value: object) -> str | None:
     raw = str(value or "").strip().lower()
     return raw or None
@@ -245,6 +325,7 @@ def build_positions(rows) -> list[dict]:
             row["asset_name"] or "",
             row["cnpj"] or "",
             row["fixed_income_indexer"] or "",
+            row["fixed_income_maturity_date"] or "",
         )
         position = grouped.setdefault(key, empty_position(row, asset_type, identifier))
         quantity = micros_to_decimal(row["quantity_micros"])
@@ -262,6 +343,12 @@ def build_positions(rows) -> list[dict]:
         position["total_cost_cents"] += total_cost_cents
         position["total_cost_brl_cents"] += convert_to_brl_cents(total_cost_cents, int(row["exchange_rate_micros"] or 1000000))
         position["operations_count"] += 1
+        if position["operations_count"] == 1:
+            position["source_type"] = row["source_type"]
+            position["source_id"] = row["source_id"]
+        else:
+            position["source_type"] = "mixed"
+            position["source_id"] = None
         position["last_operation_date"] = row["date"]
         position["first_operation_date"] = min(position["first_operation_date"], row["date"])
         if row["unit_price_cents"]:
@@ -282,6 +369,7 @@ def empty_position(row, asset_type: str, identifier: str) -> dict:
         "fixed_income_mode": row["fixed_income_mode"],
         "fixed_income_indexer": normalize_indexer(row["fixed_income_indexer"]),
         "fixed_income_rate": micros_to_decimal(row["fixed_income_rate_micros"]),
+        "fixed_income_maturity_date": row["fixed_income_maturity_date"],
         "market_label": "Brasil" if row["account_currency"] == "BRL" else "Exterior",
         "quantity": Decimal("0"),
         "invested_cents": 0,
@@ -290,12 +378,16 @@ def empty_position(row, asset_type: str, identifier: str) -> dict:
         "total_cost_brl_cents": 0,
         "current_value_cents": 0,
         "current_value_brl_cents": 0,
+        "fixed_income_income_tax_cents": 0,
+        "fixed_income_net_value_cents": 0,
         "day_result_cents": 0,
         "day_result_brl_cents": 0,
         "quote": None,
         "quote_source": None,
         "quote_status": "pending",
         "quote_date": None,
+        "source_type": None,
+        "source_id": None,
         "operations_count": 0,
         "first_operation_date": row["date"],
         "last_operation_date": row["date"],
@@ -333,35 +425,88 @@ def apply_market_quote(position: dict) -> None:
 
 
 def apply_fixed_income_value(position: dict) -> None:
-    days = max((date.today() - date.fromisoformat(position["first_operation_date"])).days, 0)
+    start_date = date.fromisoformat(position["first_operation_date"])
+    maturity_date = parse_optional_iso_date(position.get("fixed_income_maturity_date"))
+    end_date = min(date.today(), maturity_date) if maturity_date else date.today()
+    days = max((end_date - start_date).days, 0)
     annual_rate = Decimal(str(position["fixed_income_rate"] or "0"))
     mode = position["fixed_income_mode"] or "post"
     indexer = position["fixed_income_indexer"] or "CDI"
     rate_factor = Decimal("0")
+    gross_factor = Decimal("1")
     status = "ok"
     source = "Taxa cadastrada"
     try:
         if mode == "pre":
             rate_factor = annual_rate / Decimal("100")
+            gross_factor = compound_annual_factor(rate_factor, days)
         else:
-            indexer_rate = fetch_indexer_rate(indexer)
-            source = f"Banco Central SGS ({indexer})"
-            rate_factor = indexer_rate * (annual_rate / Decimal("100") if annual_rate else Decimal("1"))
+            indexer_factor = fetch_accumulated_indexer_factor(indexer, start_date, end_date)
+            source = f"Banco Central SGS ({indexer} acumulado)"
             if mode == "hybrid":
-                rate_factor += annual_rate / Decimal("100")
+                rate_factor = indexer_factor - Decimal("1") + annual_rate / Decimal("100")
+                gross_factor = indexer_factor * compound_annual_factor(annual_rate / Decimal("100"), days)
+            else:
+                multiplier = annual_rate / Decimal("100") if annual_rate else Decimal("1")
+                rate_factor = (indexer_factor - Decimal("1")) * multiplier
+                gross_factor = Decimal("1") + rate_factor
     except PortfolioError as exc:
         status = exc.message
         rate_factor = annual_rate / Decimal("100")
-    gross_factor = (Decimal("1") + rate_factor) ** (Decimal(days) / Decimal("365")) if rate_factor else Decimal("1")
+        gross_factor = compound_annual_factor(rate_factor, days)
     current = Decimal(position["total_cost_cents"]) * gross_factor
-    position["quote"] = f"{format_decimal_percent(rate_factor * Decimal('100'))}% a.a."
+    current_cents = int(current.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    income_tax_cents = fixed_income_income_tax_cents(max(current_cents - position["total_cost_cents"], 0), days)
+    position["quote"] = fixed_income_quote_label(mode, indexer, annual_rate, rate_factor)
     position["quote_source"] = source
     position["quote_status"] = status
     position["quote_date"] = date.today().isoformat()
-    position["current_value_cents"] = int(current.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    position["current_value_cents"] = current_cents
     position["current_value_brl_cents"] = value_to_brl(position["current_value_cents"], position["currency"])
+    position["fixed_income_income_tax_cents"] = income_tax_cents
+    position["fixed_income_net_value_cents"] = max(current_cents - income_tax_cents, 0)
     position["day_result_cents"] = 0
     position["day_result_brl_cents"] = 0
+
+
+def parse_optional_iso_date(value: object) -> date | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    try:
+        return date.fromisoformat(raw)
+    except ValueError:
+        return None
+
+
+def compound_annual_factor(rate: Decimal, days: int) -> Decimal:
+    if not rate or days <= 0:
+        return Decimal("1")
+    return (Decimal("1") + rate) ** (Decimal(days) / Decimal("365"))
+
+
+def fixed_income_quote_label(mode: str, indexer: str, annual_rate: Decimal, rate_factor: Decimal) -> str:
+    if mode == "pre":
+        return f"{format_decimal_percent(annual_rate)}% a.a."
+    if mode == "hybrid":
+        return f"{indexer} + {format_decimal_percent(annual_rate)}% a.a."
+    if annual_rate:
+        return f"{format_decimal_percent(annual_rate)}% do {indexer}"
+    return f"{format_decimal_percent(rate_factor * Decimal('100'))}% acumulado"
+
+
+def fixed_income_income_tax_cents(gross_profit_cents: int, days: int) -> int:
+    if gross_profit_cents <= 0:
+        return 0
+    if days <= 180:
+        tax_rate = Decimal("0.225")
+    elif days <= 360:
+        tax_rate = Decimal("0.20")
+    elif days <= 720:
+        tax_rate = Decimal("0.175")
+    else:
+        tax_rate = Decimal("0.15")
+    return int((Decimal(gross_profit_cents) * tax_rate).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
 def apply_cost_value(position: dict, status: str) -> None:
@@ -403,6 +548,77 @@ def fetch_indexer_rate(indexer: str) -> Decimal:
     if normalized in {"CDI", "SELIC"}:
         return ((Decimal("1") + daily_percent / Decimal("100")) ** Decimal("252")) - Decimal("1")
     return daily_percent / Decimal("100")
+
+
+def fetch_accumulated_indexer_factor(indexer: str, start_date: date, end_date: date) -> Decimal:
+    normalized = normalize_indexer(indexer)
+    series = INDEXER_SERIES.get(normalized)
+    if not series:
+        raise PortfolioError("Indexador sem serie automatica")
+    if end_date < start_date:
+        return Decimal("1")
+    payload = read_json_url(
+        BCB_SERIES_RANGE_URL.format(
+            series=series,
+            start=format_bcb_date(start_date),
+            end=format_bcb_date(end_date),
+        ),
+        "Nao foi possivel consultar o indexador.",
+    )
+    if not payload:
+        latest_rate = fetch_indexer_rate(indexer)
+        return compound_annual_factor(latest_rate, max((end_date - start_date).days, 0))
+    factor = Decimal("1")
+    try:
+        for row in payload:
+            percent_value = Decimal(str(row["valor"]).replace(",", "."))
+            if normalized in MONTHLY_INDEXERS:
+                row_date = parse_bcb_row_date(row["data"])
+                weight = monthly_overlap_weight(row_date, start_date, end_date)
+                if weight <= 0:
+                    continue
+                factor *= (Decimal("1") + percent_value / Decimal("100")) ** weight
+            else:
+                factor *= Decimal("1") + percent_value / Decimal("100")
+    except (KeyError, InvalidOperation, TypeError, ValueError) as exc:
+        raise PortfolioError("Indexador indisponivel") from exc
+    return factor
+
+
+def parse_bcb_row_date(value: str) -> date:
+    day, month, year = str(value).split("/")
+    return date(int(year), int(month), int(day))
+
+
+def monthly_overlap_weight(reference_date: date, start_date: date, end_date: date) -> Decimal:
+    month_start = date(reference_date.year, reference_date.month, 1)
+    next_month = add_months(month_start, 1)
+    month_end = next_month - timedelta(days=1)
+    overlap_start = max(month_start, start_date)
+    overlap_end = min(month_end, end_date)
+    if overlap_end < overlap_start:
+        return Decimal("0")
+    overlap_days = (overlap_end - overlap_start).days + 1
+    month_days = (month_end - month_start).days + 1
+    return Decimal(overlap_days) / Decimal(month_days)
+
+
+def add_months(start_date: date, months: int) -> date:
+    target_month = start_date.month - 1 + months
+    year = start_date.year + target_month // 12
+    month = target_month % 12 + 1
+    day = min(start_date.day, days_in_month(year, month))
+    return date(year, month, day)
+
+
+def days_in_month(year: int, month: int) -> int:
+    if month == 12:
+        return 31
+    return (date(year, month + 1, 1) - timedelta(days=1)).day
+
+
+def format_bcb_date(value: date) -> str:
+    return value.strftime("%d/%m/%Y")
 
 
 def read_json_url(url: str, message: str) -> dict | list:
@@ -454,6 +670,9 @@ def format_quoted_position(position: dict) -> dict:
     position = format_position(position)
     position["current_value"] = cents_to_money(position["current_value_cents"])
     position["current_value_brl"] = cents_to_money(position["current_value_brl_cents"])
+    position["fixed_income_income_tax"] = cents_to_money(position["fixed_income_income_tax_cents"])
+    position["fixed_income_net_value"] = cents_to_money(position["fixed_income_net_value_cents"])
+    position["fixed_income_maturity_date"] = position.get("fixed_income_maturity_date")
     position["day_result"] = cents_to_money(position["day_result_cents"])
     position["day_result_brl"] = cents_to_money(position["day_result_brl_cents"])
     return position

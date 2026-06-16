@@ -182,6 +182,7 @@ def initialize_database() -> None:
                 fixed_income_mode TEXT,
                 fixed_income_indexer TEXT,
                 fixed_income_rate_micros INTEGER NOT NULL DEFAULT 0 CHECK (fixed_income_rate_micros >= 0),
+                fixed_income_maturity_date TEXT,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE (transaction_id)
@@ -203,6 +204,7 @@ def initialize_database() -> None:
                 fixed_income_mode TEXT,
                 fixed_income_indexer TEXT,
                 fixed_income_rate_micros INTEGER NOT NULL DEFAULT 0 CHECK (fixed_income_rate_micros >= 0),
+                fixed_income_maturity_date TEXT,
                 notes TEXT,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -273,6 +275,8 @@ def initialize_database() -> None:
         ensure_column(conn, "transactions", "recurrence_frequency", "TEXT")
         ensure_column(conn, "transactions", "reconciled_at", "TEXT")
         ensure_column(conn, "credit_card_transactions", "reconciled_at", "TEXT")
+        ensure_column(conn, "investment_operations", "fixed_income_maturity_date", "TEXT")
+        ensure_column(conn, "investment_opening_positions", "fixed_income_maturity_date", "TEXT")
         ensure_column(conn, "checking_accounts", "account_type", "TEXT NOT NULL DEFAULT 'liquidity'")
         ensure_column(conn, "categories", "group_type", "TEXT NOT NULL DEFAULT 'expense'")
         migrate_category_unique_constraint(conn)

@@ -497,6 +497,9 @@
                     <label>Taxa (% a.a.)
                       <input name="investment_fixed_income_rate" id="investmentFixedIncomeRate" type="text" inputmode="decimal" placeholder="Ex.: 6,50">
                     </label>
+                    <label>Vencimento
+                      <input name="investment_fixed_income_maturity_date" id="investmentFixedIncomeMaturityDate" type="date">
+                    </label>
                   </div>
                   <div class="field-row">
                     <label>Quantidade
@@ -653,9 +656,10 @@
 
           <section class="panel" id="portfolioAssetFormPanel" hidden>
             <div class="section-heading">
-              <h2>Ativo em carteira</h2>
+              <h2 id="portfolioAssetFormTitle">Ativo em carteira</h2>
             </div>
             <form id="portfolioAssetForm" class="form">
+              <input type="hidden" name="id">
               <div class="field-row">
                 <label>Carteira
                   <select name="account_id" id="portfolioAssetAccount" required></select>
@@ -712,6 +716,9 @@
                 </label>
                 <label>Taxa (% a.a.)
                   <input name="fixed_income_rate" type="text" inputmode="decimal" placeholder="Ex.: 14,00">
+                </label>
+                <label>Vencimento
+                  <input name="fixed_income_maturity_date" type="date">
                 </label>
               </div>
               <div class="field-row">
@@ -939,14 +946,24 @@
         <section class="module-view" id="importsView" hidden>
           <div class="workspace">
             <section class="transaction-form-panel">
-              <h2>Importar Organizze</h2>
+              <h2>Importar planilha modelo</h2>
               <form id="importForm" class="form">
-                <label>Conta de destino
-                  <select name="account_id" id="importAccount" required></select>
+                <label>Destino
+                  <select name="target" id="importTarget">
+                    <option value="account">Conta</option>
+                    <option value="card">Cartão de crédito</option>
+                  </select>
                 </label>
-                <label>Arquivo exportado
-                  <input name="file" type="file" accept=".xls,.csv" required>
+                <label id="importAccountLabel">Conta
+                  <select name="target_id" id="importAccount" required></select>
                 </label>
+                <label id="importCardLabel" hidden>Cartão
+                  <select id="importCreditCard"></select>
+                </label>
+                <label>Modelo preenchido
+                  <input name="file" type="file" accept=".csv" required>
+                </label>
+                <button class="ghost" id="downloadImportTemplateButton" type="button">Baixar modelo</button>
                 <button class="primary" type="submit">Importar lançamentos</button>
               </form>
               <p class="message" id="importMessage" role="alert"></p>
@@ -1027,6 +1044,6 @@
         </div>
       </section>
     </main>
-    <script src="/app.js?v=13"></script>
+    <script src="/app.js?v=15"></script>
   </body>
 </html>

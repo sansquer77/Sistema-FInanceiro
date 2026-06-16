@@ -111,6 +111,7 @@ const addPortfolioAssetButton = document.querySelector("#addPortfolioAssetButton
 const refreshPortfolioButton = document.querySelector("#refreshPortfolioButton");
 const portfolioAssetFormPanel = document.querySelector("#portfolioAssetFormPanel");
 const portfolioAssetForm = document.querySelector("#portfolioAssetForm");
+const portfolioAssetFormTitle = document.querySelector("#portfolioAssetFormTitle");
 const portfolioAssetAccount = document.querySelector("#portfolioAssetAccount");
 const portfolioAssetType = document.querySelector("#portfolioAssetType");
 const portfolioFundFields = document.querySelector("#portfolioFundFields");
@@ -131,7 +132,12 @@ const portfolioAccountList = document.querySelector("#portfolioAccountList");
 const portfolioPositions = document.querySelector("#portfolioPositions");
 const portfolioGroupFilter = document.querySelector("#portfolioGroupFilter");
 const importForm = document.querySelector("#importForm");
+const importTarget = document.querySelector("#importTarget");
 const importAccount = document.querySelector("#importAccount");
+const importAccountLabel = document.querySelector("#importAccountLabel");
+const importCreditCard = document.querySelector("#importCreditCard");
+const importCardLabel = document.querySelector("#importCardLabel");
+const downloadImportTemplateButton = document.querySelector("#downloadImportTemplateButton");
 const importMessage = document.querySelector("#importMessage");
 const importResult = document.querySelector("#importResult");
 const emailForm = document.querySelector("#emailForm");
@@ -247,6 +253,8 @@ tagForm.addEventListener("submit", handleTagSubmit);
 limitForm.addEventListener("submit", handleLimitSubmit);
 limitCategory.addEventListener("change", renderLimitSubcategories);
 importForm.addEventListener("submit", handleImportSubmit);
+importTarget.addEventListener("change", renderImportTargets);
+downloadImportTemplateButton.addEventListener("click", downloadImportTemplate);
 emailForm.addEventListener("submit", handleEmailSubmit);
 passwordForm.addEventListener("submit", handlePasswordSubmit);
 clearLaunchesForm.addEventListener("submit", handleClearLaunchesSubmit);
@@ -553,20 +561,24 @@ async function handlePortfolioAssetSubmit(event) {
   event.preventDefault();
   setMessage(portfolioMessage, "");
   try {
-    const response = await api("/api/portfolio/positions", {
-      method: "POST",
-      body: formData(portfolioAssetForm),
+    const data = formData(portfolioAssetForm);
+    const isEditing = Boolean(data.id);
+    const response = await api(isEditing ? `/api/portfolio/positions/${data.id}` : "/api/portfolio/positions", {
+      method: isEditing ? "PUT" : "POST",
+      body: data,
     });
     state.portfolio = response;
     resetPortfolioAssetForm();
     renderPortfolio();
-    setMessage(portfolioMessage, "Ativo incluído no portfólio sem movimentar conta.", "success");
+    setMessage(portfolioMessage, isEditing ? "Ativo atualizado no portfólio." : "Ativo incluído no portfólio sem movimentar conta.", "success");
   } catch (error) {
     setMessage(portfolioMessage, error.message, "error");
   }
 }
 
 function showPortfolioAssetForm() {
+  portfolioAssetForm.elements.id.value = "";
+  portfolioAssetFormTitle.textContent = "Ativo em carteira";
   renderPortfolioAssetAccounts();
   portfolioAssetFormPanel.hidden = false;
   if (!portfolioAssetForm.elements.acquisition_date.value) {
@@ -578,9 +590,40 @@ function showPortfolioAssetForm() {
 
 function resetPortfolioAssetForm() {
   portfolioAssetForm.reset();
+  portfolioAssetForm.elements.id.value = "";
+  portfolioAssetFormTitle.textContent = "Ativo em carteira";
   portfolioAssetForm.elements.acquisition_date.value = new Date().toISOString().slice(0, 10);
   portfolioAssetFormPanel.hidden = true;
   updatePortfolioAssetTypeState();
+}
+
+function editPortfolioPosition(position) {
+  if (position.source_type !== "opening" || !position.source_id) {
+    setMessage(portfolioMessage, "Edite esta posição pelo lançamento de origem.", "error");
+    return;
+  }
+  renderPortfolioAssetAccounts();
+  portfolioAssetForm.reset();
+  portfolioAssetForm.elements.id.value = position.source_id;
+  portfolioAssetForm.elements.account_id.value = position.account_id;
+  portfolioAssetForm.elements.acquisition_date.value = position.first_operation_date || new Date().toISOString().slice(0, 10);
+  portfolioAssetForm.elements.asset_type.value = position.asset_type || "other";
+  portfolioAssetForm.elements.total_cost.value = moneyInputValue(position.total_cost);
+  portfolioAssetForm.elements.asset_identifier.value = position.asset_identifier || "";
+  portfolioAssetForm.elements.asset_name.value = position.asset_name || "";
+  portfolioAssetForm.elements.cnpj.value = position.cnpj || "";
+  portfolioAssetForm.elements.fixed_income_mode.value = position.fixed_income_mode || "";
+  portfolioAssetForm.elements.fixed_income_indexer.value = position.fixed_income_indexer || "";
+  portfolioAssetForm.elements.fixed_income_rate.value = decimalInputValue(position.fixed_income_rate);
+  portfolioAssetForm.elements.fixed_income_maturity_date.value = position.fixed_income_maturity_date || "";
+  portfolioAssetForm.elements.quantity.value = decimalInputValue(position.quantity);
+  portfolioAssetForm.elements.unit_price.value = moneyInputValue(position.average_price);
+  portfolioAssetForm.elements.exchange_rate_to_brl.value = "";
+  portfolioAssetForm.elements.notes.value = "";
+  portfolioAssetFormTitle.textContent = "Editar ativo em carteira";
+  portfolioAssetFormPanel.hidden = false;
+  updatePortfolioAssetTypeState();
+  portfolioAssetFormPanel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function updatePortfolioAssetTypeState() {
@@ -663,6 +706,9 @@ function showModule(view) {
   }
   if (view === "cardLaunches") {
     renderCardInvoice();
+  }
+  if (view === "imports") {
+    renderImportTargets();
   }
   if (view === "user" && state.user) {
     emailForm.elements.email.value = state.user.email;
@@ -804,15 +850,24 @@ async function handleImportSubmit(event) {
   event.preventDefault();
   setMessage(importMessage, "");
   importResult.innerHTML = "";
-  if (state.accounts.length === 0) {
+  const target = importTarget.value;
+  if (target === "account" && state.accounts.length === 0) {
     setMessage(importMessage, "Cadastre uma conta antes de importar lançamentos.", "error");
     return;
   }
+  if (target === "card" && state.creditCards.length === 0) {
+    setMessage(importMessage, "Cadastre um cartão antes de importar lançamentos.", "error");
+    return;
+  }
   const data = new FormData(importForm);
+  data.set("target", target);
+  data.set("target_id", target === "card" ? importCreditCard.value : importAccount.value);
   setFormBusy(importForm, true);
   try {
-    const response = await upload("/api/import/organizze-transactions", data);
+    const response = await upload("/api/import/system-template", data);
     importForm.reset();
+    importTarget.value = target;
+    renderImportTargets();
     await loadTransactionsAndAccounts();
     renderImportResult(response);
     setMessage(importMessage, `${response.imported} lançamento(s) importado(s).`, "success");
@@ -821,6 +876,11 @@ async function handleImportSubmit(event) {
   } finally {
     setFormBusy(importForm, false);
   }
+}
+
+function downloadImportTemplate() {
+  const target = importTarget.value || "account";
+  window.location.href = `/api/import/template?target=${encodeURIComponent(target)}`;
 }
 
 async function handleCategorySubmit(event) {
@@ -1300,6 +1360,7 @@ function fillInvestmentOperation(operation) {
     "investment_other_costs",
     "investment_fixed_income_indexer",
     "investment_fixed_income_rate",
+    "investment_fixed_income_maturity_date",
   ];
   for (const field of fields) {
     if (transactionForm.elements[field]) {
@@ -1323,6 +1384,7 @@ function fillInvestmentOperation(operation) {
   transactionForm.elements.investment_fixed_income_mode.value = operation.fixed_income_mode || "";
   transactionForm.elements.investment_fixed_income_indexer.value = operation.fixed_income_indexer || "";
   transactionForm.elements.investment_fixed_income_rate.value = decimalInputValue(operation.fixed_income_rate);
+  transactionForm.elements.investment_fixed_income_maturity_date.value = operation.fixed_income_maturity_date || "";
   updateInvestmentFieldState();
 }
 
@@ -1362,6 +1424,7 @@ function renderAll() {
   renderAccounts();
   renderCreditCards();
   renderTransactionAccounts();
+  renderImportTargets();
   renderPortfolioAssetAccounts();
   renderTransactionCategories();
   renderTransactions();
@@ -2019,9 +2082,8 @@ function renderTransactionAccounts() {
     `<option value="${account.id}">${escapeHtml(account.name)} (${escapeHtml(account.currency)})</option>`
   )).join("");
   transactionAccount.innerHTML = options || '<option value="">Cadastre uma conta</option>';
-  importAccount.innerHTML = options || '<option value="">Cadastre uma conta</option>';
   transactionForm.querySelector('button[type="submit"]').disabled = state.accounts.length === 0;
-  importForm.querySelector('button[type="submit"]').disabled = state.accounts.length === 0;
+  renderImportTargets();
   
   if (state.selectedAccountId) {
     transactionAccount.value = state.selectedAccountId;
@@ -2030,6 +2092,23 @@ function renderTransactionAccounts() {
   applyWalletAccountDefault();
   applyWalletAccountRestrictions();
   updateTransactionTypeState();
+}
+
+function renderImportTargets() {
+  const isCard = importTarget.value === "card";
+  importAccountLabel.hidden = isCard;
+  importCardLabel.hidden = !isCard;
+  importAccount.disabled = isCard;
+  importCreditCard.disabled = !isCard;
+  importAccount.name = isCard ? "" : "target_id";
+  importCreditCard.name = isCard ? "target_id" : "";
+  importAccount.innerHTML = state.accounts.map((account) => (
+    `<option value="${account.id}">${escapeHtml(account.name)} (${escapeHtml(account.currency)})</option>`
+  )).join("") || '<option value="">Cadastre uma conta</option>';
+  importCreditCard.innerHTML = state.creditCards.map((card) => (
+    `<option value="${card.id}">${escapeHtml(card.name)} (${escapeHtml(card.currency)})</option>`
+  )).join("") || '<option value="">Cadastre um cartão</option>';
+  importForm.querySelector('button[type="submit"]').disabled = isCard ? state.creditCards.length === 0 : state.accounts.length === 0;
 }
 
 function renderPortfolioAssetAccounts() {
@@ -2363,6 +2442,7 @@ function renderPortfolioPositions(positions) {
             <th>Valor atual</th>
             <th>Dia</th>
             <th>Resultado</th>
+            <th>Ações</th>
           </tr>
         </thead>
         <tbody>
@@ -2371,6 +2451,10 @@ function renderPortfolioPositions(positions) {
       </table>
     </div>
   `).join("");
+  portfolioPositions.querySelectorAll("[data-edit-portfolio-position-id]").forEach((button) => {
+    const position = positions.find((entry) => String(entry.source_id) === String(button.dataset.editPortfolioPositionId));
+    button.addEventListener("click", () => editPortfolioPosition(position));
+  });
 }
 
 function groupPortfolioPositions(positions) {
@@ -2402,7 +2486,15 @@ function portfolioPositionRow(position) {
     position.asset_name && position.asset_name !== identifier ? position.asset_name : "",
     position.cnpj ? `CNPJ ${position.cnpj}` : "",
     position.fixed_income_indexer ? `${position.fixed_income_indexer}${position.fixed_income_rate ? ` · ${position.fixed_income_rate}%` : ""}` : "",
+    position.fixed_income_maturity_date ? `Venc. ${formatDate(position.fixed_income_maturity_date)}` : "",
   ].filter(Boolean).join(" · ");
+  const hasFixedIncomeTax = position.asset_type === "fixed_income" && Number(position.fixed_income_income_tax || 0) > 0;
+  const valueDetail = hasFixedIncomeTax
+    ? `<span>Bruto ${formatMoney(position.current_value, position.currency)}</span><span>IR estimado -${formatMoney(position.fixed_income_income_tax, position.currency)}</span><span>Líquido ${formatMoney(position.fixed_income_net_value, position.currency)}</span>`
+    : `<span>${formatMoney(position.current_value_brl, "BRL")}</span>`;
+  const actions = position.source_type === "opening" && position.source_id
+    ? `<button class="ghost small-button" type="button" data-edit-portfolio-position-id="${position.source_id}">Editar</button>`
+    : `<span class="muted-row">Pelo lançamento</span>`;
   return `
     <tr>
       <td>
@@ -2415,9 +2507,10 @@ function portfolioPositionRow(position) {
       <td class="money-cell">${formatMoney(position.average_price, position.currency)}</td>
       <td class="money-cell">${formatMoney(position.total_cost, position.currency)}<span>${formatMoney(position.total_cost_brl, "BRL")}</span></td>
       <td>${position.quote ? escapeHtml(position.quote) : "--"}<span>${escapeHtml(quoteStatus || "Pendente")}</span></td>
-      <td class="money-cell">${formatMoney(position.current_value_cents / 100, position.currency)}<span>${formatMoney(position.current_value_brl, "BRL")}</span></td>
+      <td class="money-cell">${formatMoney(position.current_value_cents / 100, position.currency)}${valueDetail}</td>
       <td class="money-cell ${dayResult < 0 ? "danger-text" : "positive-text"}">${formatMoney(position.day_result_brl, "BRL")}<span>${formatPercent(dayPercent)}</span></td>
       <td class="money-cell ${result < 0 ? "danger-text" : "positive-text"}">${formatMoney(result, "BRL")}<span>${formatPercent(resultPercent)}</span></td>
+      <td>${actions}</td>
     </tr>
   `;
 }
