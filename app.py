@@ -62,7 +62,7 @@ from financeiro.credit_cards import (
 )
 from financeiro.database import initialize_database
 from financeiro.imports import import_organizze_transactions, import_system_template, system_import_template
-from financeiro.portfolio import create_opening_position, delete_opening_position, get_portfolio, redeem_position, update_opening_position, update_position_value_override
+from financeiro.portfolio import close_position, create_opening_position, delete_opening_position, get_portfolio, redeem_position, update_opening_position, update_position_value_override
 from financeiro.spending_limits import (
     create_spending_limit,
     delete_spending_limit,
@@ -183,6 +183,9 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/portfolio/redeem":
             self.handle_redeem_portfolio_position()
+            return
+        if path == "/api/portfolio/close":
+            self.handle_close_portfolio_position()
             return
         if path == "/api/import/organizze-transactions":
             self.handle_import_organizze_transactions()
@@ -424,6 +427,11 @@ class AppHandler(BaseHTTPRequestHandler):
         user = self.require_user()
         data = self.read_json()
         self.send_json(redeem_position(user["id"], data), status=HTTPStatus.CREATED)
+
+    def handle_close_portfolio_position(self) -> None:
+        user = self.require_user()
+        data = self.read_json()
+        self.send_json(close_position(user["id"], data), status=HTTPStatus.CREATED)
 
     def handle_update_portfolio_value(self) -> None:
         user = self.require_user()

@@ -252,6 +252,39 @@ def initialize_database() -> None:
                 )
             );
 
+            CREATE TABLE IF NOT EXISTS investment_closed_positions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                account_id INTEGER NOT NULL REFERENCES checking_accounts(id) ON DELETE CASCADE,
+                currency TEXT NOT NULL,
+                asset_type TEXT NOT NULL DEFAULT 'other',
+                asset_identifier TEXT NOT NULL DEFAULT '',
+                asset_name TEXT NOT NULL DEFAULT '',
+                cnpj TEXT NOT NULL DEFAULT '',
+                fixed_income_indexer TEXT NOT NULL DEFAULT '',
+                fixed_income_maturity_date TEXT NOT NULL DEFAULT '',
+                closed_at TEXT NOT NULL,
+                source_count INTEGER NOT NULL DEFAULT 0 CHECK (source_count >= 0),
+                quantity_micros INTEGER NOT NULL DEFAULT 0 CHECK (quantity_micros >= 0),
+                total_cost_cents INTEGER NOT NULL DEFAULT 0 CHECK (total_cost_cents >= 0),
+                total_cost_brl_cents INTEGER NOT NULL DEFAULT 0 CHECK (total_cost_brl_cents >= 0),
+                closing_value_cents INTEGER NOT NULL DEFAULT 0 CHECK (closing_value_cents >= 0),
+                closing_value_brl_cents INTEGER NOT NULL DEFAULT 0 CHECK (closing_value_brl_cents >= 0),
+                result_brl_cents INTEGER NOT NULL DEFAULT 0,
+                result_percent_micros INTEGER NOT NULL DEFAULT 0,
+                first_operation_date TEXT,
+                last_operation_date TEXT,
+                quote_source TEXT,
+                notes TEXT,
+                position_json TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (
+                    user_id, account_id, asset_type, asset_identifier, asset_name,
+                    cnpj, fixed_income_indexer, fixed_income_maturity_date, closed_at
+                )
+            );
+
             CREATE TABLE IF NOT EXISTS transaction_tags (
                 transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
                 tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
@@ -346,6 +379,7 @@ def initialize_database() -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_investment_opening_positions_user ON investment_opening_positions (user_id, account_id, asset_type)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_investment_redemptions_source ON investment_redemptions (user_id, source_type, source_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_investment_value_overrides_user ON investment_value_overrides (user_id, account_id, asset_type)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_investment_closed_positions_user ON investment_closed_positions (user_id, account_id, asset_type, closed_at)")
 
 
 def row_to_dict(row: sqlite3.Row | None) -> dict | None:

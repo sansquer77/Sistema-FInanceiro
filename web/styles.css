@@ -1513,7 +1513,7 @@ textarea:focus {
 
 .portfolio-table th:last-child,
 .portfolio-table td:last-child {
-  width: 124px;
+  width: 156px;
   text-align: right;
 }
 
@@ -1521,7 +1521,13 @@ textarea:focus {
   display: flex;
   justify-content: flex-end;
   gap: 6px;
-  min-width: 114px;
+  min-width: 146px;
+}
+
+.portfolio-history-table th:last-child,
+.portfolio-history-table td:last-child {
+  width: auto;
+  text-align: right;
 }
 
 .portfolio-icon-button {

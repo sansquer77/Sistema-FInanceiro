@@ -26,6 +26,7 @@ ASSET_TYPE_LABELS = {
     "crypto": "Cripto",
     "fund": "Fundos",
     "fixed_income": "Renda fixa",
+    "private_pension": "Previdência privada",
     "other": "Outros",
 }
 PORTFOLIO_ACCOUNT_TYPES = {"liquidity", "investment"}
@@ -174,6 +175,18 @@ def get_portfolio(user_id: int) -> dict:
             """,
             (user_id,),
         ).fetchall()
+        closed_rows = conn.execute(
+            """
+            SELECT investment_closed_positions.*, checking_accounts.name AS account_name
+            FROM investment_closed_positions
+            JOIN checking_accounts
+                ON checking_accounts.id = investment_closed_positions.account_id
+                AND checking_accounts.user_id = investment_closed_positions.user_id
+            WHERE investment_closed_positions.user_id = ?
+            ORDER BY investment_closed_positions.closed_at DESC, investment_closed_positions.id DESC
+            """,
+            (user_id,),
+        ).fetchall()
 
     redemption_totals = {
         (row["source_type"], row["source_id"]): {
@@ -184,7 +197,9 @@ def get_portfolio(user_id: int) -> dict:
     }
     operation_rows = [portfolio_row_with_redemptions(row_to_dict(row), redemption_totals) for row in operation_rows_raw]
     opening_rows = [portfolio_row_with_redemptions(row_to_dict(row), redemption_totals) for row in opening_rows_raw]
-    rows = sorted([*operation_rows, *opening_rows], key=lambda row: (row["date"], row["id"]))
+    closed_positions = [format_closed_position(row_to_dict(row)) for row in closed_rows]
+    rows = filter_closed_portfolio_rows([*operation_rows, *opening_rows], closed_positions)
+    rows = sorted(rows, key=lambda row: (row["date"], row["id"]))
     positions = build_positions(rows)
     quote_positions(positions)
     apply_value_overrides(user_id, positions)
@@ -192,6 +207,7 @@ def get_portfolio(user_id: int) -> dict:
     positions = [format_quoted_position(position) for position in positions]
     return {
         "positions": positions,
+        "history": closed_positions,
         "summary": summary,
         "indexers": indexer_catalog(),
     }
@@ -469,6 +485,101 @@ def redeem_position(user_id: int, data: dict) -> dict:
     return get_portfolio(user_id)
 
 
+def close_position(user_id: int, data: dict) -> dict:
+    selector = normalize_redemption_selector(data)
+    closed_at = normalize_date(data.get("date") or date.today().isoformat())
+    closing_value_cents = money_to_cents(data.get("closing_value", data.get("current_value", "0")))
+    if closing_value_cents < 0:
+        raise PortfolioError("Informe um valor final valido.")
+    with get_connection() as conn:
+        account = conn.execute(
+            """
+            SELECT id, currency
+            FROM checking_accounts
+            WHERE id = ? AND user_id = ? AND archived_at IS NULL
+            """,
+            (selector["account_id"], user_id),
+        ).fetchone()
+        if not account:
+            raise PortfolioError("Conta da carteira nao encontrada.", HTTPStatus.NOT_FOUND)
+        positions = current_portfolio_positions(user_id)
+        matches = [
+            position for position in positions
+            if matches_redemption_selector(position, selector)
+            and position["first_operation_date"] <= closed_at
+        ]
+        if not matches:
+            raise PortfolioError("Posicao nao encontrada para encerramento.", HTTPStatus.NOT_FOUND)
+        position = aggregate_backend_positions(matches)
+        exchange_rate_micros = rate_to_micros(get_exchange_rate_to_brl(account["currency"], closed_at))
+        closing_value_brl_cents = convert_to_brl_cents(closing_value_cents, exchange_rate_micros)
+        total_cost_brl_cents = int(position["total_cost_brl_cents"] or 0)
+        result_brl_cents = closing_value_brl_cents - total_cost_brl_cents
+        result_percent_micros = int((Decimal(result_brl_cents) * MICRO_SCALE / Decimal(total_cost_brl_cents)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)) if total_cost_brl_cents > 0 else 0
+        closed_indexer = common_value(matches, "fixed_income_indexer")
+        closed_maturity_date = common_value(matches, "fixed_income_maturity_date")
+        snapshot = format_quoted_position({**position})
+        snapshot["closed_at"] = closed_at
+        snapshot["closing_value"] = cents_to_money(closing_value_cents)
+        snapshot["closing_value_brl"] = cents_to_money(closing_value_brl_cents)
+        conn.execute(
+            """
+            INSERT INTO investment_closed_positions (
+                user_id, account_id, currency, asset_type, asset_identifier, asset_name,
+                cnpj, fixed_income_indexer, fixed_income_maturity_date, closed_at,
+                source_count, quantity_micros, total_cost_cents, total_cost_brl_cents,
+                closing_value_cents, closing_value_brl_cents, result_brl_cents,
+                result_percent_micros, first_operation_date, last_operation_date,
+                quote_source, notes, position_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (
+                user_id, account_id, asset_type, asset_identifier, asset_name,
+                cnpj, fixed_income_indexer, fixed_income_maturity_date, closed_at
+            ) DO UPDATE SET
+                source_count = excluded.source_count,
+                quantity_micros = excluded.quantity_micros,
+                total_cost_cents = excluded.total_cost_cents,
+                total_cost_brl_cents = excluded.total_cost_brl_cents,
+                closing_value_cents = excluded.closing_value_cents,
+                closing_value_brl_cents = excluded.closing_value_brl_cents,
+                result_brl_cents = excluded.result_brl_cents,
+                result_percent_micros = excluded.result_percent_micros,
+                first_operation_date = excluded.first_operation_date,
+                last_operation_date = excluded.last_operation_date,
+                quote_source = excluded.quote_source,
+                notes = excluded.notes,
+                position_json = excluded.position_json,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (
+                user_id,
+                selector["account_id"],
+                account["currency"],
+                selector["asset_type"],
+                selector["asset_identifier"],
+                selector["asset_name"],
+                selector["cnpj"],
+                closed_indexer,
+                closed_maturity_date,
+                closed_at,
+                len(matches),
+                decimal_to_micros_value(position["quantity"]),
+                int(position["total_cost_cents"] or 0),
+                total_cost_brl_cents,
+                closing_value_cents,
+                closing_value_brl_cents,
+                result_brl_cents,
+                result_percent_micros,
+                position["first_operation_date"],
+                position["last_operation_date"],
+                position.get("quote_source"),
+                empty_to_none(data.get("notes")),
+                json.dumps(snapshot, ensure_ascii=True),
+            ),
+        )
+    return get_portfolio(user_id)
+
+
 def current_portfolio_positions(user_id: int) -> list[dict]:
     with get_connection() as conn:
         operation_rows_raw = conn.execute(
@@ -521,12 +632,114 @@ def current_portfolio_positions(user_id: int) -> list[dict]:
             """,
             (user_id,),
         ).fetchall()
+        closed_rows = conn.execute(
+            "SELECT * FROM investment_closed_positions WHERE user_id = ?",
+            (user_id,),
+        ).fetchall()
     redemption_totals = {(row["source_type"], row["source_id"]): {"redeemed_cost_cents": int(row["redeemed_cost_cents"] or 0), "redeemed_quantity_micros": int(row["redeemed_quantity_micros"] or 0)} for row in redemption_rows}
+    closed_positions = [format_closed_position(row_to_dict(row)) for row in closed_rows]
     rows = [portfolio_row_with_redemptions(row_to_dict(row), redemption_totals) for row in [*operation_rows_raw, *opening_rows_raw]]
+    rows = filter_closed_portfolio_rows(rows, closed_positions)
     positions = build_positions(sorted(rows, key=lambda row: (row["date"], row["id"])))
     quote_positions(positions)
     apply_value_overrides(user_id, positions)
     return positions
+
+
+def filter_closed_portfolio_rows(rows: list[dict], closed_positions: list[dict]) -> list[dict]:
+    if not closed_positions:
+        return rows
+    filtered = []
+    for row in rows:
+        if any(row_matches_closed_position(row, closed) for closed in closed_positions):
+            continue
+        filtered.append(row)
+    return filtered
+
+
+def row_matches_closed_position(row: dict, closed: dict) -> bool:
+    asset_type = row["asset_type"] or "other"
+    closed_indexer = str(closed.get("fixed_income_indexer") or "")
+    closed_maturity_date = str(closed.get("fixed_income_maturity_date") or "")
+    return (
+        int(row["account_id"]) == int(closed["account_id"])
+        and str(row["account_currency"] or "").upper() == str(closed["currency"] or "").upper()
+        and asset_type == closed["asset_type"]
+        and normalize_asset_identifier(row["asset_identifier"], asset_type) == closed["asset_identifier"]
+        and str(row.get("asset_name") or normalize_asset_identifier(row["asset_identifier"], asset_type) or row.get("description") or "") == closed["asset_name"]
+        and str(row.get("cnpj") or "") == closed["cnpj"]
+        and (not closed_indexer or normalize_indexer(row.get("fixed_income_indexer")) == closed_indexer)
+        and (not closed_maturity_date or str(row.get("fixed_income_maturity_date") or "") == closed_maturity_date)
+        and str(row.get("date") or "") <= str(closed["closed_at"] or "")
+    )
+
+
+def aggregate_backend_positions(positions: list[dict]) -> dict:
+    base = {**positions[0]}
+    quantity = sum(Decimal(str(position["quantity"] or "0")) for position in positions)
+    for field in (
+        "invested_cents",
+        "costs_cents",
+        "total_cost_cents",
+        "total_cost_brl_cents",
+        "current_value_cents",
+        "current_value_brl_cents",
+        "fixed_income_gross_value_cents",
+        "fixed_income_iof_tax_cents",
+        "fixed_income_income_tax_cents",
+        "fixed_income_net_value_cents",
+        "day_result_cents",
+        "day_result_brl_cents",
+    ):
+        base[field] = sum(int(position.get(field) or 0) for position in positions)
+    base["quantity"] = quantity
+    base["operations_count"] = sum(int(position.get("operations_count") or 1) for position in positions)
+    base["source_type"] = positions[0]["source_type"] if len(positions) == 1 else "mixed"
+    base["source_id"] = positions[0]["source_id"] if len(positions) == 1 else None
+    base["source_transaction_id"] = positions[0]["source_transaction_id"] if len(positions) == 1 else None
+    base["first_operation_date"] = min(position["first_operation_date"] for position in positions)
+    base["last_operation_date"] = max(position["last_operation_date"] for position in positions)
+    base["last_unit_price_cents"] = positions[-1].get("last_unit_price_cents") or 0
+    return base
+
+
+def decimal_to_micros_value(value: Decimal) -> int:
+    return int((Decimal(value or 0) * MICRO_SCALE).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
+def common_value(positions: list[dict], key: str) -> str:
+    values = {str(position.get(key) or "") for position in positions}
+    return values.pop() if len(values) == 1 else ""
+
+
+def format_closed_position(row: dict) -> dict:
+    result_percent = Decimal(int(row["result_percent_micros"] or 0)) / Decimal("10000")
+    return {
+        "id": row["id"],
+        "account_id": row["account_id"],
+        "account_name": row.get("account_name") or "",
+        "currency": row["currency"],
+        "asset_type": row["asset_type"],
+        "asset_type_label": ASSET_TYPE_LABELS.get(row["asset_type"], "Outros"),
+        "asset_identifier": row["asset_identifier"],
+        "asset_name": row["asset_name"],
+        "cnpj": row["cnpj"],
+        "fixed_income_indexer": row["fixed_income_indexer"],
+        "fixed_income_maturity_date": row["fixed_income_maturity_date"],
+        "closed_at": row["closed_at"],
+        "source_count": row["source_count"],
+        "quantity": decimal_to_string(micros_to_decimal(row["quantity_micros"])),
+        "total_cost": cents_to_money(row["total_cost_cents"]),
+        "total_cost_brl": cents_to_money(row["total_cost_brl_cents"]),
+        "closing_value": cents_to_money(row["closing_value_cents"]),
+        "closing_value_brl": cents_to_money(row["closing_value_brl_cents"]),
+        "result_brl": cents_to_money(row["result_brl_cents"]),
+        "result_percent": f"{result_percent:.2f}",
+        "first_operation_date": row["first_operation_date"],
+        "last_operation_date": row["last_operation_date"],
+        "quote_source": row["quote_source"],
+        "notes": row["notes"],
+    }
 
 
 def normalize_redemption_selector(data: dict) -> dict:
@@ -854,15 +1067,16 @@ def apply_fixed_income_value(position: dict) -> None:
             rate_factor = annual_rate / Decimal("100")
             gross_factor = compound_annual_factor(rate_factor, days)
         else:
-            indexer_factor = fetch_accumulated_indexer_factor(indexer, start_date, end_date)
+            multiplier = annual_rate / Decimal("100") if annual_rate else Decimal("1")
+            indexer_factor = fetch_accumulated_indexer_factor(indexer, start_date, end_date, multiplier)
             source = f"Banco Central SGS ({indexer} acumulado)"
             if mode == "hybrid":
+                indexer_factor = fetch_accumulated_indexer_factor(indexer, start_date, end_date)
                 rate_factor = indexer_factor - Decimal("1") + annual_rate / Decimal("100")
                 gross_factor = indexer_factor * compound_annual_factor(annual_rate / Decimal("100"), days)
             else:
-                multiplier = annual_rate / Decimal("100") if annual_rate else Decimal("1")
-                rate_factor = (indexer_factor - Decimal("1")) * multiplier
-                gross_factor = Decimal("1") + rate_factor
+                rate_factor = indexer_factor - Decimal("1")
+                gross_factor = indexer_factor
     except PortfolioError as exc:
         if mode == "pre":
             status = exc.message
@@ -870,16 +1084,17 @@ def apply_fixed_income_value(position: dict) -> None:
             gross_factor = compound_annual_factor(rate_factor, days)
         else:
             fallback_indexer_rate = fallback_indexer_annual_rate(indexer)
-            fallback_indexer_factor = compound_annual_factor(fallback_indexer_rate, days)
+            multiplier = annual_rate / Decimal("100") if annual_rate else Decimal("1")
+            fallback_indexer_factor = compound_annual_factor(fallback_indexer_rate * multiplier, days)
             fallback_source = f"Estimativa local ({indexer}); Banco Central indisponivel"
             status = "ok"
             if mode == "hybrid":
+                fallback_indexer_factor = compound_annual_factor(fallback_indexer_rate, days)
                 rate_factor = fallback_indexer_factor - Decimal("1") + annual_rate / Decimal("100")
                 gross_factor = fallback_indexer_factor * compound_annual_factor(annual_rate / Decimal("100"), days)
             else:
-                multiplier = annual_rate / Decimal("100") if annual_rate else Decimal("1")
-                rate_factor = (fallback_indexer_factor - Decimal("1")) * multiplier
-                gross_factor = Decimal("1") + rate_factor
+                rate_factor = fallback_indexer_factor - Decimal("1")
+                gross_factor = fallback_indexer_factor
     gross = Decimal(position["total_cost_cents"]) * gross_factor
     gross_cents = int(gross.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
     iof_tax_cents = 0
@@ -1064,7 +1279,7 @@ def fetch_indexer_rate(indexer: str) -> Decimal:
     return daily_percent / Decimal("100")
 
 
-def fetch_accumulated_indexer_factor(indexer: str, start_date: date, end_date: date) -> Decimal:
+def fetch_accumulated_indexer_factor(indexer: str, start_date: date, end_date: date, multiplier: Decimal = Decimal("1")) -> Decimal:
     normalized = normalize_indexer(indexer)
     series = INDEXER_SERIES.get(normalized)
     if not series:
@@ -1091,9 +1306,10 @@ def fetch_accumulated_indexer_factor(indexer: str, start_date: date, end_date: d
                 weight = monthly_overlap_weight(row_date, start_date, end_date)
                 if weight <= 0:
                     continue
-                factor *= (Decimal("1") + percent_value / Decimal("100")) ** weight
+                weighted_rate = ((Decimal("1") + percent_value / Decimal("100")) ** weight) - Decimal("1")
+                factor *= Decimal("1") + weighted_rate * multiplier
             else:
-                factor *= Decimal("1") + percent_value / Decimal("100")
+                factor *= Decimal("1") + (percent_value / Decimal("100")) * multiplier
     except (KeyError, InvalidOperation, TypeError, ValueError) as exc:
         raise PortfolioError("Indexador indisponivel") from exc
     return factor

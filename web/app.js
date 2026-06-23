@@ -18,8 +18,9 @@ const state = {
   portfolioDirty: true,
   portfolioLoading: false,
   portfolioError: "",
-  portfolioGroup: "none",
+  portfolioGroup: "account_name",
   portfolioExpandedGroups: new Set(),
+  portfolioAssetSaving: false,
   view: "cockpit",
   transactionMonth: new Date().toISOString().slice(0, 7),
   limitMonth: new Date().toISOString().slice(0, 7),
@@ -128,6 +129,8 @@ const portfolioAssetType = document.querySelector("#portfolioAssetType");
 const portfolioAssetIdentifier = document.querySelector("#portfolioAssetIdentifier");
 const portfolioAssetIdentifierLabel = document.querySelector("#portfolioAssetIdentifierLabel");
 const portfolioFundFields = document.querySelector("#portfolioFundFields");
+const portfolioPensionFields = document.querySelector("#portfolioPensionFields");
+const portfolioPensionSubtype = document.querySelector("#portfolioPensionSubtype");
 const portfolioFixedFields = document.querySelector("#portfolioFixedFields");
 const portfolioFixedIncomeSubtype = document.querySelector("#portfolioFixedIncomeSubtype");
 const cancelPortfolioAssetButton = document.querySelector("#cancelPortfolioAssetButton");
@@ -145,6 +148,7 @@ const portfolioIndexerList = document.querySelector("#portfolioIndexerList");
 const portfolioCurrencyList = document.querySelector("#portfolioCurrencyList");
 const portfolioAccountList = document.querySelector("#portfolioAccountList");
 const portfolioPositions = document.querySelector("#portfolioPositions");
+const portfolioHistory = document.querySelector("#portfolioHistory");
 const portfolioGroupFilter = document.querySelector("#portfolioGroupFilter");
 const importForm = document.querySelector("#importForm");
 const importTarget = document.querySelector("#importTarget");
@@ -325,6 +329,7 @@ refreshPortfolioButton.addEventListener("click", () => loadPortfolio({ refreshMe
 portfolioAssetForm.addEventListener("submit", handlePortfolioAssetSubmit);
 portfolioAssetType.addEventListener("change", updatePortfolioAssetTypeState);
 portfolioFixedIncomeSubtype.addEventListener("change", syncPortfolioFixedIncomeSubtype);
+portfolioPensionSubtype.addEventListener("change", syncPortfolioPensionSubtype);
 cancelPortfolioAssetButton.addEventListener("click", resetPortfolioAssetForm);
 deletePortfolioAssetButton.addEventListener("click", deletePortfolioAsset);
 portfolioGroupFilter.addEventListener("change", () => {
@@ -613,7 +618,15 @@ function markPortfolioDirty() {
 
 async function handlePortfolioAssetSubmit(event) {
   event.preventDefault();
+  if (state.portfolioAssetSaving) {
+    return;
+  }
   setMessage(portfolioMessage, "");
+  const submitButton = portfolioAssetForm.querySelector('button[type="submit"]');
+  const originalButtonText = submitButton.textContent;
+  state.portfolioAssetSaving = true;
+  submitButton.disabled = true;
+  submitButton.textContent = "Salvando...";
   try {
     syncPortfolioFixedIncomeSubtype();
     const data = formData(portfolioAssetForm);
@@ -629,6 +642,10 @@ async function handlePortfolioAssetSubmit(event) {
     setMessage(portfolioMessage, isEditing ? "Ativo atualizado no portfólio." : "Ativo incluído no portfólio sem movimentar conta.", "success");
   } catch (error) {
     setMessage(portfolioMessage, error.message, "error");
+  } finally {
+    state.portfolioAssetSaving = false;
+    submitButton.textContent = originalButtonText;
+    updatePortfolioAssetSubmitState();
   }
 }
 
@@ -759,21 +776,35 @@ function updatePortfolioAssetTypeState() {
   const assetType = portfolioAssetType.value;
   portfolioFundFields.hidden = assetType !== "fund";
   portfolioFixedFields.hidden = assetType !== "fixed_income";
+  portfolioPensionFields.hidden = assetType !== "private_pension";
   if (assetType === "fixed_income") {
     portfolioAssetIdentifierLabel.hidden = true;
     const matchedSubtype = [...portfolioFixedIncomeSubtype.options].find((option) => option.value === portfolioAssetIdentifier.value);
     portfolioFixedIncomeSubtype.value = matchedSubtype ? matchedSubtype.value : "";
+    portfolioPensionSubtype.value = "";
+  } else if (assetType === "private_pension") {
+    portfolioAssetIdentifierLabel.hidden = true;
+    const matchedSubtype = [...portfolioPensionSubtype.options].find((option) => option.value === portfolioAssetIdentifier.value);
+    portfolioPensionSubtype.value = matchedSubtype ? matchedSubtype.value : "";
+    portfolioFixedIncomeSubtype.value = "";
   } else {
     portfolioAssetIdentifierLabel.hidden = false;
     portfolioAssetIdentifierLabel.childNodes[0].textContent = "Ativo ";
     portfolioAssetIdentifier.placeholder = "Ex.: PETR4, IVVB11, BTC";
     portfolioFixedIncomeSubtype.value = "";
+    portfolioPensionSubtype.value = "";
   }
 }
 
 function syncPortfolioFixedIncomeSubtype() {
   if (portfolioAssetType.value === "fixed_income" && portfolioFixedIncomeSubtype.value) {
     portfolioAssetIdentifier.value = portfolioFixedIncomeSubtype.value;
+  }
+}
+
+function syncPortfolioPensionSubtype() {
+  if (portfolioAssetType.value === "private_pension" && portfolioPensionSubtype.value) {
+    portfolioAssetIdentifier.value = portfolioPensionSubtype.value;
   }
 }
 
@@ -2451,7 +2482,13 @@ function renderPortfolioAssetAccounts() {
     `<option value="${account.id}">${escapeHtml(account.name)} (${escapeHtml(account.currency)})</option>`
   )).join("") || '<option value="">Cadastre uma conta de liquidez ou investimento</option>';
   portfolioAssetAccount.disabled = portfolioAccounts.length === 0;
-  portfolioAssetForm.querySelector('button[type="submit"]').disabled = portfolioAccounts.length === 0;
+  updatePortfolioAssetSubmitState();
+}
+
+function updatePortfolioAssetSubmitState() {
+  const hasPortfolioAccount = state.accounts.some((account) => ["liquidity", "investment"].includes(account.account_type));
+  const submitButton = portfolioAssetForm.querySelector('button[type="submit"]');
+  submitButton.disabled = state.portfolioAssetSaving || !hasPortfolioAccount;
 }
 
 function renderTransactionCategories() {
@@ -2712,6 +2749,7 @@ function renderPortfolio() {
     portfolioCurrencyList.innerHTML = "";
     portfolioAccountList.innerHTML = "";
     portfolioPositions.innerHTML = '<div class="empty-state">Nenhuma posição de investimento encontrada.</div>';
+    portfolioHistory.innerHTML = '<div class="empty-state compact">Nenhuma posição encerrada.</div>';
     return;
   }
   const summary = portfolio.summary;
@@ -2735,6 +2773,7 @@ function renderPortfolio() {
   renderPortfolioGroupList(portfolioCurrencyList, summary.by_currency);
   renderPortfolioGroupList(portfolioAccountList, summary.by_account);
   renderPortfolioPositions(portfolio.positions || []);
+  renderPortfolioHistory(portfolio.history || []);
 }
 
 function renderPortfolioGroupList(container, rows) {
@@ -2818,6 +2857,60 @@ function renderPortfolioPositions(positions) {
   portfolioPositions.querySelectorAll("[data-redeem-portfolio-payload]").forEach((button) => {
     button.addEventListener("click", () => redeemPortfolioPosition(JSON.parse(button.dataset.redeemPortfolioPayload)));
   });
+  portfolioPositions.querySelectorAll("[data-close-portfolio-payload]").forEach((button) => {
+    button.addEventListener("click", () => closePortfolioPosition(JSON.parse(button.dataset.closePortfolioPayload)));
+  });
+}
+
+function renderPortfolioHistory(history) {
+  if (!history.length) {
+    portfolioHistory.innerHTML = '<div class="empty-state compact">Nenhuma posição encerrada.</div>';
+    return;
+  }
+  portfolioHistory.innerHTML = `
+    <div class="report-table-wrap">
+      <table class="report-table portfolio-table portfolio-history-table">
+        <thead>
+          <tr>
+            <th>Ativo</th>
+            <th>Tipo</th>
+            <th>Carteira</th>
+            <th>Encerramento</th>
+            <th>Custo</th>
+            <th>Valor final</th>
+            <th>Resultado</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${history.map(portfolioHistoryRow).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function portfolioHistoryRow(position) {
+  const result = Number(position.result_brl || 0);
+  const detail = [
+    position.asset_identifier && position.asset_identifier !== position.asset_name ? position.asset_identifier : "",
+    position.fixed_income_indexer || "",
+    position.fixed_income_maturity_date ? `Venc. ${formatDate(position.fixed_income_maturity_date)}` : "",
+    Number(position.source_count || 0) > 1 ? `${position.source_count} origem(ns)` : "",
+  ].filter(Boolean).join(" · ");
+  return `
+    <tr>
+      <td>
+        <div class="portfolio-asset-name"><strong>${escapeHtml(position.asset_name || position.asset_identifier || "Sem nome")}</strong></div>
+        <span>${escapeHtml(detail || "Posição encerrada")}</span>
+      </td>
+      <td>${escapeHtml(position.asset_type_label)}<span>${escapeHtml(position.first_operation_date ? `Desde ${formatDate(position.first_operation_date)}` : "")}</span></td>
+      <td>${escapeHtml(position.account_name)}<span>${escapeHtml(position.currency)}</span></td>
+      <td>${formatDate(position.closed_at)}<span>${escapeHtml(position.quote_source || "")}</span></td>
+      <td class="money-cell">${formatMoney(position.total_cost, position.currency)}<span>${formatMoney(position.total_cost_brl, "BRL")}</span></td>
+      <td class="money-cell">${formatMoney(position.closing_value, position.currency)}<span>${formatMoney(position.closing_value_brl, "BRL")}</span></td>
+      <td class="money-cell ${result < 0 ? "danger-text" : "positive-text"}">${formatMoney(position.result_brl, "BRL")}<span>${Number(position.result_percent).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%</span></td>
+    </tr>
+  `;
 }
 
 function groupPortfolioPositions(positions) {
@@ -2959,6 +3052,7 @@ function portfolioPositionRow(position, options = {}) {
       : portfolioInfoIcon("Múltiplas origens");
   const redeemAction = portfolioIconButton("redeem", "Resgatar", `data-redeem-portfolio-payload="${escapeHtml(JSON.stringify(portfolioRedemptionPayload(position)))}"`);
   const valueAction = portfolioIconButton("edit-value", "Atualizar valor atual", `data-edit-portfolio-value-payload="${escapeHtml(JSON.stringify(portfolioValuePayload(position)))}"`);
+  const closeAction = portfolioIconButton("close-position", "Encerrar posição", `data-close-portfolio-payload="${escapeHtml(JSON.stringify(portfolioClosePayload(position)))}"`);
   return `
     <tr class="${options.parent ? "portfolio-parent-row" : ""} ${options.child ? "portfolio-child-row" : ""}">
       <td>
@@ -2974,7 +3068,7 @@ function portfolioPositionRow(position, options = {}) {
       <td class="money-cell">${formatMoney(position.current_value_cents / 100, position.currency)}${valueDetail}</td>
       <td class="money-cell ${dayResult < 0 ? "danger-text" : "positive-text"}">${formatMoney(position.day_result_brl, "BRL")}<span>${formatPercent(dayPercent)}</span></td>
       <td class="money-cell ${result < 0 ? "danger-text" : "positive-text"}">${formatMoney(result, "BRL")}<span>${formatPercent(resultPercent)}</span></td>
-      <td><div class="portfolio-actions">${redeemAction}${valueAction}${actions}</div></td>
+      <td><div class="portfolio-actions">${redeemAction}${valueAction}${closeAction}${actions}</div></td>
     </tr>
   `;
 }
@@ -3001,9 +3095,42 @@ function portfolioIconSvg(icon) {
     "edit-value": '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18h16"/><path d="M7 15l3-4 3 2 4-7"/><path d="M17 6h3v3"/></svg>',
     "edit-position": '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l11-11a2.8 2.8 0 0 0-4-4L4 16v4z"/><path d="M13 6l5 5"/><path d="M12 20h8"/></svg>',
     "edit-transaction": '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l3 3v15H6z"/><path d="M14 3v4h4"/><path d="M8 15l5-5 3 3-5 5H8z"/><path d="M13 10l3 3"/></svg>',
+    "close-position": '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6L6 18"/><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/></svg>',
     multiple: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10"/><path d="M7 12h10"/><path d="M7 17h10"/><path d="M4 7h.01"/><path d="M4 12h.01"/><path d="M4 17h.01"/></svg>',
   };
   return icons[icon] || icons["edit-position"];
+}
+
+async function closePortfolioPosition(position) {
+  const rawDate = window.prompt("Data de encerramento", new Date().toISOString().slice(0, 10));
+  if (rawDate === null) {
+    return;
+  }
+  const rawValue = window.prompt("Valor final reconhecido pelo banco", moneyInputValue(position.current_value));
+  if (rawValue === null) {
+    return;
+  }
+  if (!window.confirm("Encerrar esta posição? Ela deixará a posição atual e será movida para Histórico.")) {
+    return;
+  }
+  setMessage(portfolioMessage, "Encerrando posição...");
+  try {
+    const response = await api("/api/portfolio/close", {
+      method: "POST",
+      body: {
+        ...position,
+        date: rawDate,
+        closing_value: rawValue,
+      },
+    });
+    state.portfolio = response;
+    state.portfolioDirty = false;
+    renderPortfolio();
+    renderCockpitPortfolioByType();
+    setMessage(portfolioMessage, "Posição encerrada e movida para o histórico.", "success");
+  } catch (error) {
+    setMessage(portfolioMessage, error.message, "error");
+  }
 }
 
 async function editPortfolioCurrentValue(position) {
@@ -3057,6 +3184,14 @@ function portfolioValuePayload(position) {
     fixed_income_indexer: position.fixed_income_indexer || "",
     fixed_income_maturity_date: position.fixed_income_maturity_date || "",
     current_value: position.current_value,
+  };
+}
+
+function portfolioClosePayload(position) {
+  return {
+    ...portfolioRedemptionPayload(position),
+    fixed_income_indexer: position.fixed_income_indexer || "",
+    fixed_income_maturity_date: position.fixed_income_maturity_date || "",
   };
 }
 
