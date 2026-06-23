@@ -109,6 +109,7 @@ def get_portfolio(user_id: int) -> dict:
                 ON transactions.id = investment_operations.transaction_id
                 AND transactions.user_id = investment_operations.user_id
                 AND transactions.archived_at IS NULL
+                AND transactions.reconciled_at IS NOT NULL
             JOIN checking_accounts
                 ON checking_accounts.id = investment_operations.account_id
                 AND checking_accounts.user_id = investment_operations.user_id
@@ -186,6 +187,7 @@ def get_portfolio(user_id: int) -> dict:
     rows = sorted([*operation_rows, *opening_rows], key=lambda row: (row["date"], row["id"]))
     positions = build_positions(rows)
     quote_positions(positions)
+    apply_value_overrides(user_id, positions)
     summary = summarize_positions(positions)
     positions = [format_quoted_position(position) for position in positions]
     return {
@@ -306,6 +308,52 @@ def update_opening_position(user_id: int, position_id: object, data: dict) -> di
                 position["notes"],
                 normalized_id,
                 user_id,
+            ),
+        )
+    return get_portfolio(user_id)
+
+
+def update_position_value_override(user_id: int, data: dict) -> dict:
+    selector = normalize_position_value_override_payload(data)
+    with get_connection() as conn:
+        account = conn.execute(
+            """
+            SELECT id
+            FROM checking_accounts
+            WHERE id = ? AND user_id = ? AND archived_at IS NULL
+            """,
+            (selector["account_id"], user_id),
+        ).fetchone()
+        if not account:
+            raise PortfolioError("Conta da carteira nao encontrada.", HTTPStatus.NOT_FOUND)
+        conn.execute(
+            """
+            INSERT INTO investment_value_overrides (
+                user_id, account_id, asset_type, asset_identifier, asset_name, cnpj,
+                fixed_income_indexer, fixed_income_maturity_date, current_value_cents,
+                quote_date, notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (
+                user_id, account_id, asset_type, asset_identifier, asset_name,
+                cnpj, fixed_income_indexer, fixed_income_maturity_date
+            ) DO UPDATE SET
+                current_value_cents = excluded.current_value_cents,
+                quote_date = excluded.quote_date,
+                notes = excluded.notes,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (
+                user_id,
+                selector["account_id"],
+                selector["asset_type"],
+                selector["asset_identifier"],
+                selector["asset_name"],
+                selector["cnpj"],
+                selector["fixed_income_indexer"],
+                selector["fixed_income_maturity_date"],
+                selector["current_value_cents"],
+                selector["quote_date"],
+                selector["notes"],
             ),
         )
     return get_portfolio(user_id)
@@ -433,6 +481,7 @@ def current_portfolio_positions(user_id: int) -> list[dict]:
             JOIN transactions ON transactions.id = investment_operations.transaction_id
                 AND transactions.user_id = investment_operations.user_id
                 AND transactions.archived_at IS NULL
+                AND transactions.reconciled_at IS NOT NULL
             JOIN checking_accounts ON checking_accounts.id = investment_operations.account_id
                 AND checking_accounts.user_id = investment_operations.user_id
             WHERE investment_operations.user_id = ?
@@ -476,6 +525,7 @@ def current_portfolio_positions(user_id: int) -> list[dict]:
     rows = [portfolio_row_with_redemptions(row_to_dict(row), redemption_totals) for row in [*operation_rows_raw, *opening_rows_raw]]
     positions = build_positions(sorted(rows, key=lambda row: (row["date"], row["id"])))
     quote_positions(positions)
+    apply_value_overrides(user_id, positions)
     return positions
 
 
@@ -539,6 +589,73 @@ def normalize_opening_position_payload(data: dict) -> dict:
         "apply_tax_estimate": 1 if str(data.get("apply_tax_estimate") or "").strip().lower() in {"1", "true", "on", "yes"} else 0,
         "notes": empty_to_none(data.get("notes")),
     }
+
+
+def normalize_position_value_override_payload(data: dict) -> dict:
+    asset_type = str(data.get("asset_type") or "other").strip().lower()
+    if asset_type not in ASSET_TYPE_LABELS:
+        raise PortfolioError("Tipo de ativo invalido.")
+    current_value_cents = money_to_cents(data.get("current_value", "0"))
+    if current_value_cents < 0:
+        raise PortfolioError("Informe um valor atual valido.")
+    return {
+        "account_id": normalize_id(data.get("account_id"), "Conta da carteira nao encontrada."),
+        "asset_type": asset_type,
+        "asset_identifier": normalize_asset_identifier(data.get("asset_identifier"), asset_type),
+        "asset_name": str(data.get("asset_name") or "").strip(),
+        "cnpj": str(data.get("cnpj") or "").strip(),
+        "fixed_income_indexer": normalize_indexer(data.get("fixed_income_indexer")),
+        "fixed_income_maturity_date": normalize_optional_date(data.get("fixed_income_maturity_date")) or "",
+        "current_value_cents": current_value_cents,
+        "quote_date": normalize_date(data.get("quote_date") or date.today().isoformat()),
+        "notes": empty_to_none(data.get("notes")),
+    }
+
+
+def apply_value_overrides(user_id: int, positions: list[dict]) -> None:
+    if not positions:
+        return
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM investment_value_overrides
+            WHERE user_id = ?
+            """,
+            (user_id,),
+        ).fetchall()
+    overrides = {portfolio_override_key(row_to_dict(row)): row_to_dict(row) for row in rows}
+    for position in positions:
+        override = overrides.get(portfolio_override_key(position))
+        if not override:
+            continue
+        current_value_cents = int(override["current_value_cents"] or 0)
+        position["current_value_cents"] = current_value_cents
+        position["current_value_brl_cents"] = value_to_brl(current_value_cents, position["currency"])
+        position["fixed_income_gross_value_cents"] = 0
+        position["fixed_income_iof_tax_cents"] = 0
+        position["fixed_income_income_tax_cents"] = 0
+        position["fixed_income_net_value_cents"] = current_value_cents
+        position["day_result_cents"] = 0
+        position["day_result_brl_cents"] = 0
+        position["quote"] = "-"
+        position["quote_source"] = "Valor atual informado manualmente"
+        position["quote_status"] = "ok"
+        position["quote_date"] = override["quote_date"]
+        position["manual_value_override"] = True
+        position["manual_value_notes"] = override["notes"]
+
+
+def portfolio_override_key(row: dict) -> tuple:
+    return (
+        int(row["account_id"]),
+        str(row.get("asset_type") or "other").strip().lower(),
+        normalize_asset_identifier(row.get("asset_identifier"), row.get("asset_type")),
+        str(row.get("asset_name") or "").strip(),
+        str(row.get("cnpj") or "").strip(),
+        normalize_indexer(row.get("fixed_income_indexer")),
+        str(row.get("fixed_income_maturity_date") or "").strip(),
+    )
 
 
 def resolve_position_exchange_rate(currency: str, acquisition_date: str, raw_rate: object) -> int:

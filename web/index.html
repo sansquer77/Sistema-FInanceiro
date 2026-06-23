@@ -6,7 +6,7 @@
     <title>Sistema Financeiro</title>
     <link rel="icon" href="/assets/app-icon.png">
     <link rel="apple-touch-icon" href="/assets/app-icon.png">
-    <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="/styles.css?v=50">
   </head>
   <body>
     <main class="app-shell">
@@ -76,39 +76,44 @@
         <aside class="app-sidebar">
           <div class="sidebar-brand">
             <span class="brand-mark"><img src="/assets/app-icon.png" alt="" aria-hidden="true"></span>
-            <div>
+            <div class="sidebar-brand-copy">
               <strong>Sistema Financeiro</strong>
               <span id="userName"></span>
             </div>
+            <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Recolher menu" aria-expanded="true" title="Recolher menu">
+              <span></span>
+              <span></span>
+              <span></span>
+            </button>
           </div>
 
           <nav class="app-nav" aria-label="Modulos">
             <div class="nav-group">
               <span>Visão geral</span>
-              <button class="nav-button active" type="button" data-view="cockpit">Cockpit</button>
+              <button class="nav-button active" type="button" data-view="cockpit" data-short="CP" title="Cockpit">Cockpit</button>
             </div>
             <div class="nav-group">
               <span>Cadastro</span>
-              <button class="nav-button" type="button" data-view="accounts">Contas</button>
-              <button class="nav-button" type="button" data-view="creditCards">Cartões</button>
+              <button class="nav-button" type="button" data-view="accounts" data-short="CT" title="Contas">Contas</button>
+              <button class="nav-button" type="button" data-view="creditCards" data-short="CC" title="Cartões">Cartões</button>
             </div>
             <div class="nav-group">
               <span>Lançamentos</span>
-              <button class="nav-button" type="button" data-view="transactions">Contas</button>
-              <button class="nav-button" type="button" data-view="cardLaunches">Cartões</button>
+              <button class="nav-button" type="button" data-view="transactions" data-short="LC" title="Lançamentos de contas">Contas</button>
+              <button class="nav-button" type="button" data-view="cardLaunches" data-short="LA" title="Lançamentos de cartões">Cartões</button>
             </div>
             <div class="nav-group">
               <span>Gestão</span>
-              <button class="nav-button" type="button" data-view="portfolio">Portfólio</button>
-              <button class="nav-button" type="button" data-view="limits">Limites</button>
-              <button class="nav-button" type="button" data-view="reports">Relatórios</button>
-              <button class="nav-button" type="button" data-view="classifications">Categorias</button>
-              <button class="nav-button" type="button" data-view="imports">Importação</button>
+              <button class="nav-button" type="button" data-view="portfolio" data-short="PF" title="Portfólio">Portfólio</button>
+              <button class="nav-button" type="button" data-view="limits" data-short="LM" title="Limites">Limites</button>
+              <button class="nav-button" type="button" data-view="reports" data-short="RL" title="Relatórios">Relatórios</button>
+              <button class="nav-button" type="button" data-view="classifications" data-short="CG" title="Categorias">Categorias</button>
+              <button class="nav-button" type="button" data-view="imports" data-short="IM" title="Importação">Importação</button>
             </div>
             <div class="nav-group">
               <span>Usuário</span>
-              <button class="nav-button" type="button" data-view="user">Preferências</button>
-              <button class="nav-button logout-nav-button" id="logoutButton" type="button">Sair</button>
+              <button class="nav-button" type="button" data-view="user" data-short="PR" title="Preferências">Preferências</button>
+              <button class="nav-button logout-nav-button" id="logoutButton" type="button" data-short="SA" title="Sair">Sair</button>
             </div>
           </nav>
         </aside>
@@ -123,29 +128,25 @@
 
         <section class="module-view" id="cockpitView">
           <section class="summary-strip">
-            <div>
-              <span>Contas ativas</span>
-              <strong id="accountCount">0</strong>
-            </div>
-            <div>
+            <div class="kpi-income">
               <span>Receitas do mês</span>
               <strong id="monthIncome">R$ 0,00</strong>
             </div>
-            <div>
+            <div class="kpi-expense">
               <span>Despesas do mês</span>
               <strong id="monthExpense">R$ 0,00</strong>
             </div>
-            <div>
+            <div class="kpi-investment">
               <span>Aportes do mês</span>
               <strong id="monthInvestment">R$ 0,00</strong>
             </div>
-            <div>
+            <div class="kpi-rate">
               <span>Taxa de poupança</span>
               <strong id="savingsRate">0%</strong>
             </div>
           </section>
 
-          <div class="cockpit-grid">
+          <div class="cockpit-stack">
             <section class="currency-panel">
               <div class="section-heading">
                 <h2>Saldos por moeda</h2>
@@ -157,6 +158,7 @@
               </div>
             </section>
 
+            <div class="cockpit-grid planning-debt-grid">
             <section class="panel">
               <div class="section-heading">
                 <h2>Planejamento do mês</h2>
@@ -170,6 +172,7 @@
               </div>
               <div class="planning-list" id="installmentDebtList"></div>
             </section>
+            </div>
           </div>
 
           <div class="cockpit-grid analytics-grid">
@@ -334,7 +337,8 @@
               <h2>Fatura do cartão</h2>
               <div class="month-navigator">
                 <button class="ghost small-button" type="button" id="previousCardInvoiceButton">Anterior</button>
-                <strong id="cardInvoiceMonthLabel"></strong>
+                <button class="month-label" type="button" id="cardInvoiceMonthLabel" aria-haspopup="dialog"></button>
+                <button class="ghost small-button" type="button" id="todayCardInvoiceButton">Hoje</button>
                 <button class="ghost small-button" type="button" id="nextCardInvoiceButton">Próxima</button>
               </div>
             </div>
@@ -612,7 +616,8 @@
                 <h2>Lançamentos</h2>
                 <div class="month-navigator">
                   <button class="ghost small-button" type="button" id="previousMonthButton">Anterior</button>
-                  <strong id="transactionMonthLabel"></strong>
+                  <button class="month-label" type="button" id="transactionMonthLabel" aria-haspopup="dialog"></button>
+                  <button class="ghost small-button" type="button" id="todayMonthButton">Hoje</button>
                   <button class="ghost small-button" type="button" id="nextMonthButton">Próximo</button>
                 </div>
               </div>
@@ -1084,6 +1089,6 @@
         </div>
       </section>
     </main>
-    <script src="/app.js?v=35"></script>
+    <script src="/app.js?v=50"></script>
   </body>
 </html>

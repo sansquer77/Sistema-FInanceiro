@@ -31,6 +31,8 @@ const state = {
 
 const authView = document.querySelector("#authView");
 const dashboardView = document.querySelector("#dashboardView");
+const appSidebar = document.querySelector(".app-sidebar");
+const sidebarToggle = document.querySelector("#sidebarToggle");
 const loginTab = document.querySelector("#loginTab");
 const registerTab = document.querySelector("#registerTab");
 const loginForm = document.querySelector("#loginForm");
@@ -56,6 +58,7 @@ const cancelCreditCardEditButton = document.querySelector("#cancelCreditCardEdit
 const cardInvoiceCard = document.querySelector("#cardInvoiceCard");
 const cardInvoiceMonthLabel = document.querySelector("#cardInvoiceMonthLabel");
 const previousCardInvoiceButton = document.querySelector("#previousCardInvoiceButton");
+const todayCardInvoiceButton = document.querySelector("#todayCardInvoiceButton");
 const nextCardInvoiceButton = document.querySelector("#nextCardInvoiceButton");
 const cardInvoiceTotal = document.querySelector("#cardInvoiceTotal");
 const cardInvoiceReconciledTotal = document.querySelector("#cardInvoiceReconciledTotal");
@@ -194,7 +197,6 @@ const cancelTransactionEditButton = document.querySelector("#cancelTransactionEd
 const formTitle = document.querySelector("#formTitle");
 const moduleEyebrow = document.querySelector("#moduleEyebrow");
 const pageTitle = document.querySelector("#pageTitle");
-const accountCount = document.querySelector("#accountCount");
 const monthIncome = document.querySelector("#monthIncome");
 const monthExpense = document.querySelector("#monthExpense");
 const monthInvestment = document.querySelector("#monthInvestment");
@@ -204,6 +206,7 @@ const cockpitPortfolioByType = document.querySelector("#cockpitPortfolioByType")
 const topExpensesChart = document.querySelector("#topExpensesChart");
 const cashDistributionChart = document.querySelector("#cashDistributionChart");
 const previousMonthButton = document.querySelector("#previousMonthButton");
+const todayMonthButton = document.querySelector("#todayMonthButton");
 const nextMonthButton = document.querySelector("#nextMonthButton");
 const transactionMonthLabel = document.querySelector("#transactionMonthLabel");
 const currentBalanceSummary = document.querySelector("#currentBalanceSummary");
@@ -238,6 +241,9 @@ const viewTitles = {
   user: ["Usuário", "Preferências"],
 };
 
+const SIDEBAR_COLLAPSED_KEY = "financeiro.sidebar.collapsed";
+const monthPickerPopover = createMonthPickerPopover();
+
 loginTab.addEventListener("click", () => switchAuthMode("login"));
 registerTab.addEventListener("click", () => switchAuthMode("register"));
 loginForm.addEventListener("submit", handleLogin);
@@ -252,6 +258,11 @@ accountForm.elements.account_type.addEventListener("change", updateAccountTypeSt
 creditCardForm.addEventListener("submit", handleCreditCardSubmit);
 cardInvoiceCard.addEventListener("change", handleCardInvoiceCardChange);
 previousCardInvoiceButton.addEventListener("click", () => shiftCardInvoiceMonth(-1));
+todayCardInvoiceButton.addEventListener("click", () => setCardInvoiceMonth(currentMonthValue()));
+cardInvoiceMonthLabel.addEventListener("click", (event) => {
+  event.stopPropagation();
+  openMonthPicker(event.currentTarget, state.cardInvoiceMonth, setCardInvoiceMonth);
+});
 nextCardInvoiceButton.addEventListener("click", () => shiftCardInvoiceMonth(1));
 cardInvoicePaymentForm.addEventListener("submit", handleCardInvoicePaymentSubmit);
 cardPaymentAccount.addEventListener("change", renderCardInvoice);
@@ -294,6 +305,11 @@ transactionForm.elements.date.addEventListener("change", updateTransferExchangeR
 transactionForm.elements.amount.addEventListener("input", updateDestinationAmountFromRate);
 transferExchangeRate.addEventListener("input", updateDestinationAmountFromRate);
 previousMonthButton.addEventListener("click", () => shiftTransactionMonth(-1));
+todayMonthButton.addEventListener("click", () => setTransactionMonth(currentMonthValue()));
+transactionMonthLabel.addEventListener("click", (event) => {
+  event.stopPropagation();
+  openMonthPicker(event.currentTarget, state.transactionMonth, setTransactionMonth);
+});
 nextMonthButton.addEventListener("click", () => shiftTransactionMonth(1));
 previousLimitMonthButton.addEventListener("click", () => shiftLimitMonth(-1));
 nextLimitMonthButton.addEventListener("click", () => shiftLimitMonth(1));
@@ -323,8 +339,10 @@ cancelCreditCardEditButton.addEventListener("click", resetCreditCardForm);
 cancelCardTransactionEditButton.addEventListener("click", resetCardTransactionForm);
 cancelLimitEditButton.addEventListener("click", resetLimitForm);
 navButtons.forEach((button) => button.addEventListener("click", () => showModule(button.dataset.view)));
+sidebarToggle.addEventListener("click", () => toggleSidebar());
 
 updateAccountTypeState();
+initializeSidebar();
 boot();
 
 async function boot() {
@@ -847,6 +865,28 @@ function showModule(view) {
   }
 }
 
+function initializeSidebar() {
+  const storedValue = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+  const preferCollapsed = window.matchMedia("(max-width: 860px)").matches;
+  setSidebarCollapsed(storedValue === null ? preferCollapsed : storedValue === "1", false);
+}
+
+function toggleSidebar() {
+  const collapsed = !dashboardView.classList.contains("sidebar-collapsed");
+  setSidebarCollapsed(collapsed, true);
+}
+
+function setSidebarCollapsed(collapsed, persist) {
+  dashboardView.classList.toggle("sidebar-collapsed", collapsed);
+  appSidebar.classList.toggle("is-collapsed", collapsed);
+  sidebarToggle.setAttribute("aria-expanded", String(!collapsed));
+  sidebarToggle.setAttribute("aria-label", collapsed ? "Expandir menu" : "Recolher menu");
+  sidebarToggle.title = collapsed ? "Expandir menu" : "Recolher menu";
+  if (persist) {
+    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? "1" : "0");
+  }
+}
+
 async function handleAccountSubmit(event) {
   event.preventDefault();
   setMessage(accountMessage, "");
@@ -902,6 +942,9 @@ async function handleCardTransactionSubmit(event) {
   data.credit_card_id = state.selectedCreditCardId;
   data.invoice_month = state.cardInvoiceMonth;
   const isEditing = Boolean(data.id);
+  if (isEditing && shouldAskFutureCardReplication(data.id)) {
+    data.apply_to_future = window.confirm("Replicar esta alteração nos próximos lançamentos parcelados desta série? Lançamentos passados ou conciliados não serão alterados.");
+  }
   try {
     await api(isEditing ? `/api/credit-card-transactions/${data.id}` : "/api/credit-card-transactions", {
       method: isEditing ? "PUT" : "POST",
@@ -962,7 +1005,7 @@ async function handleTransactionSubmit(event) {
     }
     const isEditing = Boolean(data.id);
     if (isEditing && shouldAskFutureReplication(data.id)) {
-      data.apply_to_future = window.confirm("Replicar esta alteração nos próximos lançamentos recorrentes desta série?");
+      data.apply_to_future = window.confirm("Replicar esta alteração nos próximos lançamentos desta série? Lançamentos passados ou conciliados não serão alterados.");
     }
     await api(isEditing ? `/api/transactions/${data.id}` : "/api/transactions", {
       method: isEditing ? "PUT" : "POST",
@@ -980,7 +1023,12 @@ async function handleTransactionSubmit(event) {
 
 function shouldAskFutureReplication(transactionId) {
   const transaction = state.transactions.find((entry) => String(entry.id) === String(transactionId));
-  return Boolean(transaction && transaction.series_id && transaction.series_kind === "recurring");
+  return Boolean(transaction && transaction.series_id && (transaction.series_kind === "recurring" || isInstallmentTransaction(transaction)));
+}
+
+function shouldAskFutureCardReplication(transactionId) {
+  const transaction = state.cardTransactions.find((entry) => String(entry.id) === String(transactionId));
+  return Boolean(transaction && transaction.series_id && isInstallmentTransaction(transaction));
 }
 
 async function handleImportSubmit(event) {
@@ -1294,7 +1342,8 @@ async function restoreCreditCard(id) {
 
 async function deleteCardTransaction(id) {
   try {
-    await api(`/api/credit-card-transactions/${id}`, { method: "DELETE" });
+    const scope = deleteSeriesScope(id, state.cardTransactions, "cartão");
+    await api(`/api/credit-card-transactions/${id}${scope}`, { method: "DELETE" });
     await loadCardInvoice();
     await loadCardTransactions();
     renderCreditCards();
@@ -1320,12 +1369,26 @@ async function toggleCardTransactionReconciliation(id, reconciled) {
 
 async function deleteTransaction(id) {
   try {
-    await api(`/api/transactions/${id}`, { method: "DELETE" });
+    const scope = deleteSeriesScope(id, state.transactions, "conta");
+    await api(`/api/transactions/${id}${scope}`, { method: "DELETE" });
     await loadTransactionsAndAccounts();
     setMessage(transactionMessage, "Lançamento excluído.", "success");
   } catch (error) {
     setMessage(transactionMessage, error.message, "error");
   }
+}
+
+function deleteSeriesScope(id, transactions, label) {
+  const transaction = transactions.find((entry) => String(entry.id) === String(id));
+  if (!transaction || !transaction.series_id) {
+    return "";
+  }
+  const isSeries = transaction.series_kind === "recurring" || isInstallmentTransaction(transaction);
+  if (!isSeries) {
+    return "";
+  }
+  const replicate = window.confirm(`Este lançamento pertence a uma série. Clique em OK para apagar este lançamento e os próximos lançamentos futuros não conciliados da mesma série no módulo de ${label}. Clique em Cancelar para apagar apenas este lançamento.`);
+  return replicate ? "?scope=future" : "";
 }
 
 async function toggleTransactionReconciliation(id, reconciled) {
@@ -1466,11 +1529,17 @@ function editTransaction(transaction) {
     ? transaction.transfer_exchange_rate.replace(".", ",")
     : "";
   fillInvestmentOperation(transaction.investment_operation);
-  seriesKind.value = "single";
-  seriesKind.disabled = true;
+  seriesKind.value = isInstallmentTransaction(transaction) ? "installment" : transaction.series_kind || "single";
+  installmentCount.value = transaction.installment_count || "2";
+  recurrenceFrequency.value = transaction.recurrence_frequency || "monthly";
+  recurrenceCount.value = transaction.recurrence_count || (transaction.series_kind === "recurring" ? transaction.installment_count : "12") || "12";
   updateSeriesState();
   updateTransactionTypeState();
   applyWalletAccountRestrictions();
+  seriesKind.disabled = true;
+  installmentCount.disabled = true;
+  recurrenceFrequency.disabled = true;
+  recurrenceCount.disabled = true;
   if (transaction.destination_account_id) {
     destinationAccount.value = String(transaction.destination_account_id);
   }
@@ -1547,11 +1616,13 @@ function editCardTransaction(transaction) {
   cardTransactionForm.elements.description.value = transaction.description;
   cardTransactionForm.elements.amount.value = moneyInputValue(transaction.amount);
   cardTransactionForm.elements.notes.value = transaction.notes || "";
-  cardSeriesKind.value = transaction.series_kind || "single";
+  cardSeriesKind.value = isInstallmentTransaction(transaction) ? "installment" : transaction.series_kind || "single";
   cardInstallmentCount.value = transaction.installment_count || "2";
   cardSeriesKind.disabled = true;
   cardInstallmentCount.disabled = true;
   updateCardSeriesState();
+  cardSeriesKind.disabled = true;
+  cardInstallmentCount.disabled = true;
   renderCardTransactionCategories();
   if (transaction.category_name) {
     cardTransactionCategory.value = transaction.category_name;
@@ -1590,7 +1661,6 @@ function renderAll() {
 function renderCockpit() {
   const totals = getCurrencyTotals();
   const monthTotals = getCurrentMonthTotals();
-  accountCount.textContent = String(state.accounts.length);
   monthIncome.textContent = formatMoney(monthTotals.income, "BRL");
   monthExpense.textContent = formatMoney(monthTotals.expense, "BRL");
   monthInvestment.textContent = formatMoney(monthTotals.investment, "BRL");
@@ -1622,6 +1692,7 @@ function planningSection(title, transactions) {
   const section = document.createElement("section");
   section.className = "planning-section";
   const grouped = groupTransactionsByCategory(transactions);
+  const total = grouped.reduce((sum, item) => sum + item.total, 0);
   const rows = grouped.length
     ? grouped.map((item) => `
       <div class="planning-row">
@@ -1630,7 +1701,13 @@ function planningSection(title, transactions) {
       </div>
     `).join("")
     : '<div class="empty-state compact">Nada previsto neste mês.</div>';
-  section.innerHTML = `<h3>${title}</h3>${rows}`;
+  section.innerHTML = `
+    <div class="planning-section-header">
+      <h3>${title}</h3>
+      <strong>${formatMoney(total, "BRL")}</strong>
+    </div>
+    ${rows}
+  `;
   return section;
 }
 
@@ -1641,43 +1718,99 @@ function renderInstallmentDebts() {
   const currentMonth = new Date().toISOString().slice(0, 7);
   const rows = new Map();
   for (const transaction of state.transactions) {
-    if (transaction.series_kind !== "installment" || transaction.type !== "expense" || transaction.date.slice(0, 7) < currentMonth) {
+    const transactionMonth = transaction.date.slice(0, 7);
+    if (!isOpenInstallmentDebt(transaction, transactionMonth, currentMonth)) {
       continue;
     }
     const key = `account:${transaction.account_id}`;
-    const row = rows.get(key) || { label: transaction.account_name || "Conta", detail: "Conta", currency: transaction.account_currency || "BRL", total: 0, count: 0 };
-    row.total += Number(transaction.amount || 0);
-    row.count += 1;
+    const row = rows.get(key) || { label: transaction.account_name || "Conta", detail: "Conta", currency: transaction.account_currency || "BRL", total: 0, debts: new Map() };
+    addInstallmentDebt(row, transaction, "account");
     rows.set(key, row);
   }
   for (const transaction of state.cardTransactions) {
-    if (transaction.series_kind !== "installment" || transaction.type !== "expense" || transaction.invoice_month < currentMonth) {
+    if (!isOpenInstallmentDebt(transaction, transaction.invoice_month, currentMonth)) {
       continue;
     }
     const key = `card:${transaction.credit_card_id}`;
-    const row = rows.get(key) || { label: transaction.credit_card_name || "Cartão", detail: "Cartão", currency: transaction.card_currency || "BRL", total: 0, count: 0 };
-    row.total += Number(transaction.amount || 0);
-    row.count += 1;
+    const row = rows.get(key) || { label: transaction.credit_card_name || "Cartão", detail: "Cartão", currency: transaction.card_currency || "BRL", total: 0, debts: new Map() };
+    addInstallmentDebt(row, transaction, "card");
     rows.set(key, row);
   }
   const debts = [...rows.values()].sort((a, b) => b.total - a.total);
   if (debts.length === 0) {
-    installmentDebtList.innerHTML = '<section class="planning-section"><div class="empty-state compact">Nenhuma compra parcelada em aberto.</div></section>';
+    installmentDebtList.innerHTML = `
+      <section class="planning-section">
+        <div class="planning-section-header">
+          <h3>Total em aberto</h3>
+          <strong>${formatMoney(0, "BRL")}</strong>
+        </div>
+        <div class="empty-state compact">Nenhuma compra parcelada em aberto.</div>
+      </section>
+    `;
     return;
   }
+  const debtTotals = summarizeDebtTotals(debts);
   installmentDebtList.innerHTML = `
     <section class="planning-section">
+      <div class="planning-section-header">
+        <h3>Total em aberto</h3>
+        <strong>${formatDebtTotals(debtTotals)}</strong>
+      </div>
       ${debts.map((row) => `
-        <div class="planning-row">
-          <div>
-            <strong>${escapeHtml(row.label)}</strong>
-            <span>${escapeHtml(row.detail)} · ${row.count} parcela(s) restante(s)</span>
+        <div class="debt-group">
+          <div class="debt-group-header">
+            <span>${escapeHtml(row.label)}</span>
+            <strong>${formatMoney(row.total, row.currency)}</strong>
           </div>
-          <strong>${formatMoney(row.total, row.currency)}</strong>
+          <div class="debt-items">
+            ${[...row.debts.values()].sort((a, b) => b.total - a.total).map((debt) => `
+              <div class="debt-item">
+                <span>${escapeHtml(debt.description)} - ${installmentDebtCountLabel(debt.count)}</span>
+                <strong>${formatMoney(debt.total, row.currency)}</strong>
+              </div>
+            `).join("")}
+          </div>
         </div>
       `).join("")}
     </section>
   `;
+}
+
+function summarizeDebtTotals(debts) {
+  return debts.reduce((totals, row) => {
+    totals.set(row.currency, (totals.get(row.currency) || 0) + row.total);
+    return totals;
+  }, new Map());
+}
+
+function formatDebtTotals(totals) {
+  if (!totals.size) {
+    return formatMoney(0, "BRL");
+  }
+  return [...totals.entries()].map(([currency, total]) => formatMoney(total, currency)).join(" · ");
+}
+
+function addInstallmentDebt(row, transaction, origin) {
+  const amount = Number(transaction.amount || 0);
+  const debtKey = transaction.series_id
+    ? `${origin}:series:${transaction.series_id}`
+    : `${origin}:single:${transaction.description}`;
+  const debt = row.debts.get(debtKey) || { description: transaction.description || "Lançamento parcelado", total: 0, count: 0 };
+  row.total += amount;
+  debt.total += amount;
+  debt.count += 1;
+  row.debts.set(debtKey, debt);
+}
+
+function installmentDebtCountLabel(count) {
+  return `${count} ${count === 1 ? "parcela restante" : "parcelas restantes"}`;
+}
+
+function isOpenInstallmentDebt(transaction, transactionMonth, currentMonth) {
+  if (!isInstallmentTransaction(transaction) || transaction.type !== "expense" || transactionMonth < currentMonth) {
+    return false;
+  }
+  return transactionMonth > currentMonth || !transaction.reconciled_at;
 }
 
 function groupTransactionsByCategory(transactions) {
@@ -2679,6 +2812,9 @@ function renderPortfolioPositions(positions) {
   portfolioPositions.querySelectorAll("[data-edit-portfolio-transaction-id]").forEach((button) => {
     button.addEventListener("click", () => editPortfolioSourceTransaction(button.dataset.editPortfolioTransactionId));
   });
+  portfolioPositions.querySelectorAll("[data-edit-portfolio-value-payload]").forEach((button) => {
+    button.addEventListener("click", () => editPortfolioCurrentValue(JSON.parse(button.dataset.editPortfolioValuePayload)));
+  });
   portfolioPositions.querySelectorAll("[data-redeem-portfolio-payload]").forEach((button) => {
     button.addEventListener("click", () => redeemPortfolioPosition(JSON.parse(button.dataset.redeemPortfolioPayload)));
   });
@@ -2817,11 +2953,12 @@ function portfolioPositionRow(position, options = {}) {
     ? `<span>Bruto ${formatMoney(position.fixed_income_gross_value || position.current_value, position.currency)}</span>${fixedIncomeIof > 0 ? `<span>IOF estimado -${formatMoney(position.fixed_income_iof_tax, position.currency)}</span>` : ""}<span>IR estimado -${formatMoney(position.fixed_income_income_tax, position.currency)}</span><span>Líquido ${formatMoney(position.fixed_income_net_value, position.currency)}</span>`
     : `<span>${formatMoney(position.current_value_brl, "BRL")}</span>`;
   const actions = position.source_type === "opening" && position.source_id
-    ? `<button class="ghost small-button" type="button" data-edit-portfolio-position-id="${position.source_id}">Editar</button>`
+    ? portfolioIconButton("edit-position", "Editar ativo", `data-edit-portfolio-position-id="${position.source_id}"`)
     : position.source_type === "operation" && position.source_transaction_id
-      ? `<button class="ghost small-button" type="button" data-edit-portfolio-transaction-id="${position.source_transaction_id}">Editar lançamento</button>`
-      : `<span class="muted-row">Múltiplas origens</span>`;
-  const redeemAction = `<button class="ghost small-button" type="button" data-redeem-portfolio-payload="${escapeHtml(JSON.stringify(portfolioRedemptionPayload(position)))}">Resgatar</button>`;
+      ? portfolioIconButton("edit-transaction", "Editar lançamento", `data-edit-portfolio-transaction-id="${position.source_transaction_id}"`)
+      : portfolioInfoIcon("Múltiplas origens");
+  const redeemAction = portfolioIconButton("redeem", "Resgatar", `data-redeem-portfolio-payload="${escapeHtml(JSON.stringify(portfolioRedemptionPayload(position)))}"`);
+  const valueAction = portfolioIconButton("edit-value", "Atualizar valor atual", `data-edit-portfolio-value-payload="${escapeHtml(JSON.stringify(portfolioValuePayload(position)))}"`);
   return `
     <tr class="${options.parent ? "portfolio-parent-row" : ""} ${options.child ? "portfolio-child-row" : ""}">
       <td>
@@ -2837,9 +2974,65 @@ function portfolioPositionRow(position, options = {}) {
       <td class="money-cell">${formatMoney(position.current_value_cents / 100, position.currency)}${valueDetail}</td>
       <td class="money-cell ${dayResult < 0 ? "danger-text" : "positive-text"}">${formatMoney(position.day_result_brl, "BRL")}<span>${formatPercent(dayPercent)}</span></td>
       <td class="money-cell ${result < 0 ? "danger-text" : "positive-text"}">${formatMoney(result, "BRL")}<span>${formatPercent(resultPercent)}</span></td>
-      <td>${redeemAction}${actions}</td>
+      <td><div class="portfolio-actions">${redeemAction}${valueAction}${actions}</div></td>
     </tr>
   `;
+}
+
+function portfolioIconButton(icon, label, attributes) {
+  return `
+    <button class="portfolio-icon-button" type="button" ${attributes} title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">
+      ${portfolioIconSvg(icon)}
+    </button>
+  `;
+}
+
+function portfolioInfoIcon(label) {
+  return `
+    <span class="portfolio-icon-button portfolio-icon-static" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}" role="img">
+      ${portfolioIconSvg("multiple")}
+    </span>
+  `;
+}
+
+function portfolioIconSvg(icon) {
+  const icons = {
+    redeem: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h12a4 4 0 0 1 0 8H8"/><path d="M8 11l-4 4 4 4"/><path d="M20 5v4"/><path d="M18 7h4"/></svg>',
+    "edit-value": '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18h16"/><path d="M7 15l3-4 3 2 4-7"/><path d="M17 6h3v3"/></svg>',
+    "edit-position": '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l11-11a2.8 2.8 0 0 0-4-4L4 16v4z"/><path d="M13 6l5 5"/><path d="M12 20h8"/></svg>',
+    "edit-transaction": '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l3 3v15H6z"/><path d="M14 3v4h4"/><path d="M8 15l5-5 3 3-5 5H8z"/><path d="M13 10l3 3"/></svg>',
+    multiple: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10"/><path d="M7 12h10"/><path d="M7 17h10"/><path d="M4 7h.01"/><path d="M4 12h.01"/><path d="M4 17h.01"/></svg>',
+  };
+  return icons[icon] || icons["edit-position"];
+}
+
+async function editPortfolioCurrentValue(position) {
+  const rawAmount = window.prompt("Valor atual da posição", moneyInputValue(position.current_value));
+  if (rawAmount === null) {
+    return;
+  }
+  const rawDate = window.prompt("Data da atualização", new Date().toISOString().slice(0, 10));
+  if (rawDate === null) {
+    return;
+  }
+  setMessage(portfolioMessage, "Atualizando valor atual...");
+  try {
+    const response = await api("/api/portfolio/value", {
+      method: "PUT",
+      body: {
+        ...position,
+        current_value: rawAmount,
+        quote_date: rawDate,
+      },
+    });
+    state.portfolio = response;
+    state.portfolioDirty = false;
+    renderPortfolio();
+    renderCockpitPortfolioByType();
+    setMessage(portfolioMessage, "Valor atual do portfólio atualizado.", "success");
+  } catch (error) {
+    setMessage(portfolioMessage, error.message, "error");
+  }
 }
 
 function portfolioRedemptionPayload(position) {
@@ -2850,6 +3043,19 @@ function portfolioRedemptionPayload(position) {
     asset_identifier: position.asset_identifier || "",
     asset_name: position.asset_name || "",
     cnpj: position.cnpj || "",
+    current_value: position.current_value,
+  };
+}
+
+function portfolioValuePayload(position) {
+  return {
+    account_id: position.account_id,
+    asset_type: position.asset_type,
+    asset_identifier: position.asset_identifier || "",
+    asset_name: position.asset_name || "",
+    cnpj: position.cnpj || "",
+    fixed_income_indexer: position.fixed_income_indexer || "",
+    fixed_income_maturity_date: position.fixed_income_maturity_date || "",
     current_value: position.current_value,
   };
 }
@@ -3378,7 +3584,14 @@ function updateSeriesState() {
 }
 
 function shiftTransactionMonth(delta) {
-  state.transactionMonth = shiftMonth(state.transactionMonth, delta);
+  setTransactionMonth(shiftMonth(state.transactionMonth, delta));
+}
+
+function setTransactionMonth(month) {
+  if (!isValidMonthValue(month)) {
+    return;
+  }
+  state.transactionMonth = month;
   renderTransactions();
 }
 
@@ -3400,7 +3613,14 @@ function switchReportTab(tab) {
 }
 
 async function shiftCardInvoiceMonth(delta) {
-  state.cardInvoiceMonth = shiftMonth(state.cardInvoiceMonth, delta);
+  await setCardInvoiceMonth(shiftMonth(state.cardInvoiceMonth, delta));
+}
+
+async function setCardInvoiceMonth(month) {
+  if (!isValidMonthValue(month)) {
+    return;
+  }
+  state.cardInvoiceMonth = month;
   resetCardTransactionForm();
   setMessage(cardInvoiceMessage, "");
   await loadCardInvoice();
@@ -3518,21 +3738,21 @@ function groupTransactionsByDate(transactions) {
 
 function getCurrencyTotals() {
   const totals = new Map();
-  const reconciledTotals = getBalanceUntil(currentMonthEndDate(), state.transactions, true);
   for (const account of state.accounts) {
     const row = currencyTotalRow(totals, account.currency);
-    const amount = Number(account.current_balance);
+    const amount = accountProjectedBalance(account);
     row.current += amount;
     row.accounts.push({
       id: account.id,
       name: account.name,
       type: accountTypeLabel(account.account_type),
       amount,
+      reconciled: accountReconciledBalance(account),
     });
   }
   for (const card of state.creditCards) {
     const row = currencyTotalRow(totals, card.currency);
-    const openAmount = cardOpenBalance(card.id);
+    const openAmount = cardOpenBalance(card.id, new Date().toISOString().slice(0, 7));
     const signedAmount = -openAmount;
     row.current += signedAmount;
     row.cards.push({
@@ -3540,14 +3760,8 @@ function getCurrencyTotals() {
       name: card.name,
       issuer: card.issuer,
       amount: signedAmount,
+      reconciled: -cardReconciledBalance(card.id),
     });
-  }
-  for (const [currency, amount] of reconciledTotals.entries()) {
-    currencyTotalRow(totals, currency).reconciled = amount;
-  }
-  for (const card of state.creditCards) {
-    const row = currencyTotalRow(totals, card.currency);
-    row.reconciled -= cardReconciledBalance(card.id);
   }
   return new Map([...totals.entries()].sort(([currencyA], [currencyB]) => currencyA.localeCompare(currencyB)));
 }
@@ -3557,12 +3771,41 @@ function currencyTotalRow(totals, currency) {
   if (!totals.has(normalizedCurrency)) {
     totals.set(normalizedCurrency, {
       current: 0,
-      reconciled: 0,
       accounts: [],
       cards: [],
     });
   }
   return totals.get(normalizedCurrency);
+}
+
+function accountReconciledBalance(account) {
+  const limitDate = currentMonthEndDate();
+  return accountBalanceUntil(account, limitDate, true);
+}
+
+function accountProjectedBalance(account) {
+  return accountBalanceUntil(account, currentMonthEndDate(), false);
+}
+
+function accountBalanceUntil(account, limitDate, reconciledOnly) {
+  return Number(account.initial_balance || 0) + state.transactions.reduce((total, transaction) => {
+    if (transaction.date > limitDate || !transaction.reconciled_at) {
+      if (reconciledOnly || transaction.date > limitDate) {
+        return total;
+      }
+    }
+    if (reconciledOnly && !transaction.reconciled_at) {
+      return total;
+    }
+    const amount = Number(transaction.amount);
+    if (String(transaction.account_id) === String(account.id)) {
+      total += transactionSourceDelta(transaction.type, amount);
+    }
+    if (transaction.type === "transfer" && String(transaction.destination_account_id || "") === String(account.id)) {
+      total += Number(transaction.destination_amount || transaction.amount);
+    }
+    return total;
+  }, 0);
 }
 
 function currentMonthEndDate() {
@@ -3586,16 +3829,19 @@ function cardReconciledBalance(cardId) {
   return transactionTotal - paidTotal;
 }
 
-function cardOpenBalance(cardId) {
+function cardOpenBalance(cardId, untilInvoiceMonth = null) {
   const transactionTotal = state.cardTransactions.reduce((total, transaction) => {
     if (String(transaction.credit_card_id) !== String(cardId)) {
+      return total;
+    }
+    if (untilInvoiceMonth && transaction.invoice_month > untilInvoiceMonth) {
       return total;
     }
     const amount = Number(transaction.amount);
     return total + (transaction.type === "expense" ? amount : -amount);
   }, 0);
   const paidTotal = state.cardPayments.reduce((total, payment) => (
-    String(payment.credit_card_id) === String(cardId) ? total + Number(payment.amount) : total
+    String(payment.credit_card_id) === String(cardId) && (!untilInvoiceMonth || payment.invoice_month <= untilInvoiceMonth) ? total + Number(payment.amount) : total
   ), 0);
   return transactionTotal - paidTotal;
 }
@@ -3709,44 +3955,56 @@ function renderCurrencyTotals(totals) {
     return;
   }
   for (const [currency, amounts] of totals.entries()) {
-    const item = document.createElement("div");
-    item.className = "currency-item";
-    const accountRows = amounts.accounts.map((account) => currencyDetailRow(
+    const section = document.createElement("section");
+    section.className = "currency-section";
+    const accountRows = amounts.accounts.map((account) => currencyTableRow(
       account.name,
       account.type,
       account.amount,
+      account.reconciled,
       currency,
+      "account",
     )).join("");
-    const cardRows = amounts.cards.map((card) => currencyDetailRow(
+    const cardRows = amounts.cards.map((card) => currencyTableRow(
       card.name,
-      card.issuer ? `Cartão · ${card.issuer}` : "Cartão",
+      card.issuer || "Cartão",
       card.amount,
+      card.reconciled,
       currency,
       "card",
     )).join("");
-    item.innerHTML = `
-      <span>${escapeHtml(currency)} (Previsto)</span>
-      <strong>${formatMoney(amounts.current, currency)}</strong>
-      <div class="currency-breakdown">
-        ${accountRows || '<span class="muted-row">Nenhuma conta ativa nesta moeda.</span>'}
-        ${cardRows ? `<div class="currency-section-label">Cartões</div>${cardRows}` : ""}
-        <div class="currency-section-label">Saldo conciliado do mês</div>
-        ${currencyDetailRow("Consolidado", "Contas e cartões conciliados", amounts.reconciled, currency)}
+    section.innerHTML = `
+      <div class="currency-section-header">
+        <div>
+          <span>${escapeHtml(currency)}</span>
+          <em>Previsto</em>
+        </div>
+        <strong>${formatMoney(amounts.current, currency)}</strong>
+      </div>
+      <div class="currency-table" role="table" aria-label="Saldos em ${escapeHtml(currency)}">
+        <div class="currency-table-head" role="row">
+          <span>Conta</span>
+          <span>Tipo</span>
+          <span>Saldo</span>
+          <span>Conciliado</span>
+        </div>
+        ${accountRows || '<div class="currency-empty-row">Nenhuma conta ativa nesta moeda.</div>'}
+        ${cardRows ? `<div class="currency-subgroup">Cartões de crédito</div>${cardRows}` : ""}
       </div>
     `;
-    currencyList.append(item);
+    currencyList.append(section);
   }
 }
 
-function currencyDetailRow(name, detail, amount, currency, kind = "account") {
+function currencyTableRow(name, detail, amount, reconciled, currency, kind = "account") {
   const amountClass = amount < 0 ? "danger-text" : amount > 0 ? "positive-text" : "";
+  const reconciledClass = reconciled < 0 ? "danger-text" : reconciled > 0 ? "positive-text" : "";
   return `
-    <div class="currency-detail-row ${kind}">
-      <span>
-        <b>${escapeHtml(name)}</b>
-        <em>${escapeHtml(detail)}</em>
-      </span>
+    <div class="currency-table-row ${kind}" role="row">
+      <span><b>${escapeHtml(name)}</b></span>
+      <span>${escapeHtml(detail)}</span>
       <strong class="${amountClass}">${formatMoney(amount, currency)}</strong>
+      <strong class="${reconciledClass}">${formatMoney(reconciled || 0, currency)}</strong>
     </div>
   `;
 }
@@ -3999,6 +4257,93 @@ function formatMonthLabel(value) {
   return new Date(year, month - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 }
 
+function currentMonthValue() {
+  return new Date().toISOString().slice(0, 7);
+}
+
+function isValidMonthValue(value) {
+  return /^\d{4}-\d{2}$/.test(String(value || ""));
+}
+
+function createMonthPickerPopover() {
+  const popover = document.createElement("div");
+  popover.className = "month-popover";
+  popover.hidden = true;
+  popover.innerHTML = `
+    <label>Mês
+      <select data-month-select>
+        <option value="01">Janeiro</option>
+        <option value="02">Fevereiro</option>
+        <option value="03">Março</option>
+        <option value="04">Abril</option>
+        <option value="05">Maio</option>
+        <option value="06">Junho</option>
+        <option value="07">Julho</option>
+        <option value="08">Agosto</option>
+        <option value="09">Setembro</option>
+        <option value="10">Outubro</option>
+        <option value="11">Novembro</option>
+        <option value="12">Dezembro</option>
+      </select>
+    </label>
+    <label>Ano
+      <input data-year-input type="number" min="1900" max="2200" step="1">
+    </label>
+    <div class="month-popover-actions">
+      <button class="ghost small-button" type="button" data-month-cancel>Cancelar</button>
+      <button class="primary small-button" type="button" data-month-apply>Aplicar</button>
+    </div>
+  `;
+  document.body.append(popover);
+  const monthSelect = popover.querySelector("[data-month-select]");
+  const yearInput = popover.querySelector("[data-year-input]");
+  const applyButton = popover.querySelector("[data-month-apply]");
+  const cancelButton = popover.querySelector("[data-month-cancel]");
+  const picker = { popover, monthSelect, yearInput, applyButton, cancelButton, onSelect: null };
+  popover.addEventListener("click", (event) => event.stopPropagation());
+  cancelButton.addEventListener("click", closeMonthPicker);
+  applyButton.addEventListener("click", () => {
+    const value = `${String(yearInput.value || "").padStart(4, "0")}-${monthSelect.value}`;
+    if (isValidMonthValue(value) && picker.onSelect) {
+      picker.onSelect(value);
+    }
+    closeMonthPicker();
+  });
+  document.addEventListener("click", closeMonthPicker);
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeMonthPicker();
+    }
+  });
+  return picker;
+}
+
+function openMonthPicker(anchor, value, onSelect) {
+  if (!anchor || !isValidMonthValue(value)) {
+    return;
+  }
+  const [year, month] = value.split("-");
+  monthPickerPopover.monthSelect.value = month;
+  monthPickerPopover.yearInput.value = year;
+  monthPickerPopover.onSelect = onSelect;
+  const rect = anchor.getBoundingClientRect();
+  monthPickerPopover.popover.style.top = `${window.scrollY + rect.bottom + 6}px`;
+  monthPickerPopover.popover.style.left = `${window.scrollX + rect.left}px`;
+  monthPickerPopover.popover.hidden = false;
+  anchor.setAttribute("aria-expanded", "true");
+  monthPickerPopover.anchor = anchor;
+  monthPickerPopover.monthSelect.focus();
+}
+
+function closeMonthPicker() {
+  if (monthPickerPopover.anchor) {
+    monthPickerPopover.anchor.setAttribute("aria-expanded", "false");
+  }
+  monthPickerPopover.popover.hidden = true;
+  monthPickerPopover.onSelect = null;
+  monthPickerPopover.anchor = null;
+}
+
 function monthEndDate(value) {
   const [year, month] = value.split("-").map(Number);
   const date = new Date(year, month, 0);
@@ -4019,13 +4364,20 @@ function shiftMonth(value, delta) {
 }
 
 function transactionSeriesLabel(transaction) {
-  if (transaction.series_kind === "installment" && transaction.installment_index && transaction.installment_count) {
+  if (isInstallmentTransaction(transaction) && transaction.installment_index && transaction.installment_count) {
     return `Parcela ${transaction.installment_index}/${transaction.installment_count}`;
   }
   if (transaction.series_kind === "recurring") {
     return `Recorrente · ${recurrenceFrequencyLabel(transaction.recurrence_frequency)}`;
   }
   return "";
+}
+
+function isInstallmentTransaction(transaction) {
+  return Boolean(transaction && (
+    transaction.series_kind === "installment" ||
+    (Number(transaction.installment_index) > 0 && Number(transaction.installment_count) > 0)
+  ));
 }
 
 function recurrenceFrequencyLabel(frequency) {

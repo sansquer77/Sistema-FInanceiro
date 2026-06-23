@@ -62,7 +62,7 @@ from financeiro.credit_cards import (
 )
 from financeiro.database import initialize_database
 from financeiro.imports import import_organizze_transactions, import_system_template, system_import_template
-from financeiro.portfolio import create_opening_position, delete_opening_position, get_portfolio, redeem_position, update_opening_position
+from financeiro.portfolio import create_opening_position, delete_opening_position, get_portfolio, redeem_position, update_opening_position, update_position_value_override
 from financeiro.spending_limits import (
     create_spending_limit,
     delete_spending_limit,
@@ -220,6 +220,9 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path.startswith("/api/portfolio/positions/"):
             self.handle_update_portfolio_position()
+            return
+        if path == "/api/portfolio/value":
+            self.handle_update_portfolio_value()
             return
         if path.startswith("/api/checking-accounts/"):
             self.handle_update_account()
@@ -422,6 +425,11 @@ class AppHandler(BaseHTTPRequestHandler):
         data = self.read_json()
         self.send_json(redeem_position(user["id"], data), status=HTTPStatus.CREATED)
 
+    def handle_update_portfolio_value(self) -> None:
+        user = self.require_user()
+        data = self.read_json()
+        self.send_json(update_position_value_override(user["id"], data))
+
     def handle_create_account(self) -> None:
         user = self.require_user()
         data = self.read_json()
@@ -572,15 +580,19 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def handle_delete_transaction(self) -> None:
         user = self.require_user()
-        transaction_id = self.path.rsplit("/", 1)[-1]
-        delete_transaction(user["id"], transaction_id)
+        transaction_id = self.route_path().rsplit("/", 1)[-1]
+        delete_transaction(user["id"], transaction_id, apply_to_future=self.delete_scope_is_future())
         self.send_json({"ok": True})
 
     def handle_delete_credit_card_transaction(self) -> None:
         user = self.require_user()
-        transaction_id = self.path.rsplit("/", 1)[-1]
-        delete_credit_card_transaction(user["id"], transaction_id)
+        transaction_id = self.route_path().rsplit("/", 1)[-1]
+        delete_credit_card_transaction(user["id"], transaction_id, apply_to_future=self.delete_scope_is_future())
         self.send_json({"ok": True})
+
+    def delete_scope_is_future(self) -> bool:
+        query = parse_qs(urlsplit(self.path).query)
+        return (query.get("scope") or [""])[0] == "future"
 
     def handle_delete_category(self) -> None:
         user = self.require_user()

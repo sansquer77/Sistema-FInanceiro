@@ -215,72 +215,84 @@ def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
         replace_transaction_tags(conn, normalized_id, tag_ids)
         upsert_investment_operation(conn, user_id, normalized_id, source["id"], transaction)
         if apply_to_future:
-            update_future_recurring_transactions(conn, user_id, existing, transaction)
+            update_future_series_transactions(conn, user_id, existing, transaction)
         row = fetch_transaction(conn, user_id, normalized_id)
     return format_transaction(row)
 
 
-def update_future_recurring_transactions(conn, user_id: int, existing, transaction: dict) -> None:
-    if existing["series_kind"] != "recurring" or not existing["series_id"]:
+def update_future_series_transactions(conn, user_id: int, existing, transaction: dict) -> None:
+    if not existing["series_id"]:
         return
+    is_installment = existing["series_kind"] == "installment" or (
+        existing["installment_index"] and existing["installment_count"]
+    )
+    if existing["series_kind"] != "recurring" and not is_installment:
+        return
+    date_delta = date.fromisoformat(transaction["date"]) - date.fromisoformat(existing["date"])
+    future_filter = "installment_index > ?" if is_installment and existing["installment_index"] else "date > ?"
+    future_marker = existing["installment_index"] if is_installment and existing["installment_index"] else existing["date"]
     future_rows = conn.execute(
-        """
+        f"""
         SELECT *
         FROM transactions
         WHERE user_id = ? AND archived_at IS NULL
-            AND series_id = ? AND id <> ? AND date > ?
+            AND series_id = ? AND id <> ? AND reconciled_at IS NULL
+            AND {future_filter}
         ORDER BY date ASC, id ASC
         """,
-        (user_id, existing["series_id"], existing["id"], existing["date"]),
+        (user_id, existing["series_id"], existing["id"], future_marker),
     ).fetchall()
     for row in future_rows:
+        row_date = date.fromisoformat(row["date"])
+        future_transaction = {**transaction, "date": (row_date + date_delta).isoformat()}
         source = get_active_account(conn, user_id, transaction["account_id"])
         destination = None
-        if transaction["type"] == "transfer":
-            destination = get_active_account(conn, user_id, transaction["destination_account_id"])
+        if future_transaction["type"] == "transfer":
+            destination = get_active_account(conn, user_id, future_transaction["destination_account_id"])
             ensure_transfer_accounts(source, destination)
-            normalize_transfer_amounts(transaction, source, destination)
-        exchange_rate_micros = resolve_exchange_rate_micros(source["currency"], row["date"], transaction["exchange_rate"])
-        amount_brl_cents = convert_to_brl_cents(transaction["amount_cents"], exchange_rate_micros)
-        category_id, subcategory_id = resolve_transaction_category(conn, user_id, transaction, destination)
-        tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
+            normalize_transfer_amounts(future_transaction, source, destination)
+        exchange_rate_micros = resolve_exchange_rate_micros(source["currency"], future_transaction["date"], future_transaction["exchange_rate"])
+        amount_brl_cents = convert_to_brl_cents(future_transaction["amount_cents"], exchange_rate_micros)
+        category_id, subcategory_id = resolve_transaction_category(conn, user_id, future_transaction, destination)
+        tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in future_transaction["tags"]]
         apply_balance_delta(conn, row["account_id"], -balance_delta(row["type"], row["amount_cents"], "source"))
         if row["destination_account_id"]:
             apply_balance_delta(conn, row["destination_account_id"], -balance_delta(row["type"], existing_destination_balance_amount(row), "destination"))
-        apply_balance_delta(conn, source["id"], balance_delta(transaction["type"], transaction["amount_cents"], "source"))
+        apply_balance_delta(conn, source["id"], balance_delta(future_transaction["type"], future_transaction["amount_cents"], "source"))
         if destination:
-            apply_balance_delta(conn, destination["id"], balance_delta(transaction["type"], destination_balance_amount(transaction), "destination"))
+            apply_balance_delta(conn, destination["id"], balance_delta(future_transaction["type"], destination_balance_amount(future_transaction), "destination"))
         conn.execute(
             """
             UPDATE transactions
             SET type = ?, description = ?, amount_cents = ?, destination_amount_cents = ?,
                 exchange_rate_micros = ?, transfer_exchange_rate_micros = ?,
-                amount_brl_cents = ?, account_id = ?, destination_account_id = ?,
+                amount_brl_cents = ?, date = ?, account_id = ?, destination_account_id = ?,
                 category_id = ?, subcategory_id = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND user_id = ? AND archived_at IS NULL
             """,
             (
-                transaction["type"],
-                transaction["description"],
-                transaction["amount_cents"],
-                transaction["destination_amount_cents"],
+                future_transaction["type"],
+                future_transaction["description"],
+                future_transaction["amount_cents"],
+                future_transaction["destination_amount_cents"],
                 exchange_rate_micros,
-                transaction["transfer_exchange_rate_micros"],
+                future_transaction["transfer_exchange_rate_micros"],
                 amount_brl_cents,
+                future_transaction["date"],
                 source["id"],
                 destination["id"] if destination else None,
                 category_id,
                 subcategory_id,
-                transaction["notes"],
+                future_transaction["notes"],
                 row["id"],
                 user_id,
             ),
         )
         replace_transaction_tags(conn, row["id"], tag_ids)
-        upsert_investment_operation(conn, user_id, row["id"], source["id"], transaction)
+        upsert_investment_operation(conn, user_id, row["id"], source["id"], future_transaction)
 
 
-def delete_transaction(user_id: int, transaction_id: str) -> None:
+def delete_transaction(user_id: int, transaction_id: str, apply_to_future: bool = False) -> None:
     with get_connection() as conn:
         transaction = conn.execute(
             """
@@ -292,20 +304,46 @@ def delete_transaction(user_id: int, transaction_id: str) -> None:
         ).fetchone()
         if not transaction:
             raise TransactionError("Lancamento nao encontrado.", HTTPStatus.NOT_FOUND)
-        apply_balance_delta(conn, transaction["account_id"], -balance_delta(transaction["type"], transaction["amount_cents"], "source"))
-        if transaction["destination_account_id"]:
-            apply_balance_delta(
-                conn,
-                transaction["destination_account_id"],
-                -balance_delta(transaction["type"], existing_destination_balance_amount(transaction), "destination"),
-            )
+        transactions = [transaction, *future_transactions_to_delete(conn, user_id, transaction, apply_to_future)]
+        for item in transactions:
+            apply_balance_delta(conn, item["account_id"], -balance_delta(item["type"], item["amount_cents"], "source"))
+            if item["destination_account_id"]:
+                apply_balance_delta(
+                    conn,
+                    item["destination_account_id"],
+                    -balance_delta(item["type"], existing_destination_balance_amount(item), "destination"),
+                )
+        transaction_ids = [item["id"] for item in transactions]
         conn.execute(
-            """
+            f"""
             DELETE FROM transactions
-            WHERE id = ? AND user_id = ?
+            WHERE user_id = ? AND id IN ({",".join("?" for _ in transaction_ids)})
             """,
-            (transaction_id, user_id),
+            (user_id, *transaction_ids),
         )
+
+
+def future_transactions_to_delete(conn, user_id: int, transaction, apply_to_future: bool):
+    if not apply_to_future or not transaction["series_id"]:
+        return []
+    is_installment = transaction["series_kind"] == "installment" or (
+        transaction["installment_index"] and transaction["installment_count"]
+    )
+    if transaction["series_kind"] != "recurring" and not is_installment:
+        return []
+    future_filter = "installment_index > ?" if is_installment and transaction["installment_index"] else "date > ?"
+    future_marker = transaction["installment_index"] if is_installment and transaction["installment_index"] else transaction["date"]
+    return conn.execute(
+        f"""
+        SELECT *
+        FROM transactions
+        WHERE user_id = ? AND archived_at IS NULL
+            AND series_id = ? AND id <> ? AND reconciled_at IS NULL
+            AND {future_filter}
+        ORDER BY date ASC, id ASC
+        """,
+        (user_id, transaction["series_id"], transaction["id"], future_marker),
+    ).fetchall()
 
 
 def set_transaction_reconciled(user_id: int, transaction_id: str, reconciled: bool) -> dict:

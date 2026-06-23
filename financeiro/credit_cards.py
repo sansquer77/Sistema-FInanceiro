@@ -248,10 +248,11 @@ def create_credit_card_transaction(user_id: int, data: dict) -> dict:
 def update_credit_card_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
     normalized_id = normalize_card_id(transaction_id)
     transaction = normalize_card_transaction_payload(data)
+    apply_to_future = should_apply_to_future_card(data)
     with get_connection() as conn:
         existing = conn.execute(
             """
-            SELECT credit_card_id, invoice_month
+            SELECT *
             FROM credit_card_transactions
             WHERE id = ? AND user_id = ? AND archived_at IS NULL
             """,
@@ -288,16 +289,73 @@ def update_credit_card_transaction(user_id: int, transaction_id: str, data: dict
             ),
         )
         replace_credit_card_transaction_tags(conn, normalized_id, tag_ids)
+        if apply_to_future:
+            update_future_card_installments(conn, user_id, existing, transaction, category_id, subcategory_id, tag_ids)
         row = fetch_card_transaction(conn, user_id, normalized_id)
     return format_card_transaction(row, card["currency"])
 
 
-def delete_credit_card_transaction(user_id: int, transaction_id: str) -> None:
+def update_future_card_installments(
+    conn,
+    user_id: int,
+    existing,
+    transaction: dict,
+    category_id: int,
+    subcategory_id: int | None,
+    tag_ids: list[int],
+) -> None:
+    if not existing["series_id"]:
+        return
+    is_installment = existing["series_kind"] == "installment" or (
+        existing["installment_index"] and existing["installment_count"]
+    )
+    if not is_installment:
+        return
+    date_delta = date.fromisoformat(transaction["date"]) - date.fromisoformat(existing["date"])
+    future_filter = "installment_index > ?" if existing["installment_index"] else "date > ?"
+    future_marker = existing["installment_index"] if existing["installment_index"] else existing["date"]
+    future_rows = conn.execute(
+        f"""
+        SELECT *
+        FROM credit_card_transactions
+        WHERE user_id = ? AND archived_at IS NULL
+            AND series_id = ? AND id <> ? AND reconciled_at IS NULL
+            AND {future_filter}
+        ORDER BY invoice_month ASC, date ASC, id ASC
+        """,
+        (user_id, existing["series_id"], existing["id"], future_marker),
+    ).fetchall()
+    for row in future_rows:
+        ensure_invoice_is_open(conn, user_id, row["credit_card_id"], row["invoice_month"])
+        shifted_date = (date.fromisoformat(row["date"]) + date_delta).isoformat()
+        conn.execute(
+            """
+            UPDATE credit_card_transactions
+            SET type = ?, description = ?, amount_cents = ?, date = ?, category_id = ?,
+                subcategory_id = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND user_id = ? AND archived_at IS NULL
+            """,
+            (
+                transaction["type"],
+                transaction["description"],
+                transaction["amount_cents"],
+                shifted_date,
+                category_id,
+                subcategory_id,
+                transaction["notes"],
+                row["id"],
+                user_id,
+            ),
+        )
+        replace_credit_card_transaction_tags(conn, row["id"], tag_ids)
+
+
+def delete_credit_card_transaction(user_id: int, transaction_id: str, apply_to_future: bool = False) -> None:
     normalized_id = normalize_card_id(transaction_id)
     with get_connection() as conn:
         existing = conn.execute(
             """
-            SELECT credit_card_id, invoice_month
+            SELECT *
             FROM credit_card_transactions
             WHERE id = ? AND user_id = ? AND archived_at IS NULL
             """,
@@ -306,16 +364,51 @@ def delete_credit_card_transaction(user_id: int, transaction_id: str) -> None:
         if not existing:
             raise CreditCardError("Lancamento do cartao nao encontrado.", HTTPStatus.NOT_FOUND)
         ensure_invoice_is_open(conn, user_id, existing["credit_card_id"], existing["invoice_month"])
+        transaction_ids = [existing["id"], *[
+            row["id"] for row in future_card_transactions_to_delete(conn, user_id, existing, apply_to_future)
+        ]]
         cursor = conn.execute(
-            """
+            f"""
             UPDATE credit_card_transactions
             SET archived_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ? AND user_id = ? AND archived_at IS NULL
+            WHERE user_id = ? AND archived_at IS NULL
+                AND id IN ({",".join("?" for _ in transaction_ids)})
             """,
-            (normalized_id, user_id),
+            (user_id, *transaction_ids),
         )
         if cursor.rowcount == 0:
             raise CreditCardError("Lancamento do cartao nao encontrado.", HTTPStatus.NOT_FOUND)
+
+
+def future_card_transactions_to_delete(conn, user_id: int, transaction, apply_to_future: bool):
+    if not apply_to_future or not transaction["series_id"]:
+        return []
+    is_installment = transaction["series_kind"] == "installment" or (
+        transaction["installment_index"] and transaction["installment_count"]
+    )
+    if not is_installment:
+        return []
+    future_filter = "installment_index > ?" if transaction["installment_index"] else "date > ?"
+    future_marker = transaction["installment_index"] if transaction["installment_index"] else transaction["date"]
+    return conn.execute(
+        f"""
+        SELECT credit_card_transactions.*
+        FROM credit_card_transactions
+        LEFT JOIN credit_card_payments
+            ON credit_card_payments.user_id = credit_card_transactions.user_id
+            AND credit_card_payments.credit_card_id = credit_card_transactions.credit_card_id
+            AND credit_card_payments.invoice_month = credit_card_transactions.invoice_month
+        WHERE credit_card_transactions.user_id = ?
+            AND credit_card_transactions.archived_at IS NULL
+            AND credit_card_transactions.series_id = ?
+            AND credit_card_transactions.id <> ?
+            AND credit_card_transactions.reconciled_at IS NULL
+            AND credit_card_payments.id IS NULL
+            AND {future_filter}
+        ORDER BY credit_card_transactions.invoice_month ASC, credit_card_transactions.date ASC, credit_card_transactions.id ASC
+        """,
+        (user_id, transaction["series_id"], transaction["id"], future_marker),
+    ).fetchall()
 
 
 def set_credit_card_transaction_reconciled(user_id: int, transaction_id: str, reconciled: bool) -> dict:
@@ -587,6 +680,10 @@ def normalize_installment_count(value: object) -> int | None:
     return count
 
 
+def should_apply_to_future_card(data: dict) -> bool:
+    return str(data.get("apply_to_future") or "").strip().lower() in {"1", "true", "yes", "sim"}
+
+
 def build_card_transaction_occurrences(transaction: dict) -> list[dict]:
     if transaction["series_kind"] != "installment":
         return [{
@@ -767,6 +864,9 @@ def format_credit_card(card: dict) -> dict:
 
 
 def format_card_transaction(transaction: dict, currency: str) -> dict:
+    if transaction.get("installment_index") and transaction.get("installment_count"):
+        transaction["series_kind"] = "installment"
+        transaction["recurrence_frequency"] = None
     transaction["amount"] = cents_to_money(transaction.pop("amount_cents"))
     transaction["card_currency"] = transaction.pop("card_currency", currency) or currency
     raw_tags = transaction.pop("tag_names", "") or ""

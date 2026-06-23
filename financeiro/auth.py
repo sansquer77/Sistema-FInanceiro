@@ -93,6 +93,7 @@ def clear_user_launches(user_id: int, current_password: str) -> None:
             raise AuthError("Senha atual invalida.", HTTPStatus.UNAUTHORIZED)
         conn.execute("DELETE FROM credit_card_payments WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM credit_card_transactions WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM investment_value_overrides WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM investment_opening_positions WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM transaction_tags WHERE transaction_id IN (SELECT id FROM transactions WHERE user_id = ?)", (user_id,))
         conn.execute("DELETE FROM transactions WHERE user_id = ?", (user_id,))

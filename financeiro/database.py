@@ -231,6 +231,27 @@ def initialize_database() -> None:
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
+            CREATE TABLE IF NOT EXISTS investment_value_overrides (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                account_id INTEGER NOT NULL REFERENCES checking_accounts(id) ON DELETE CASCADE,
+                asset_type TEXT NOT NULL DEFAULT 'other',
+                asset_identifier TEXT NOT NULL DEFAULT '',
+                asset_name TEXT NOT NULL DEFAULT '',
+                cnpj TEXT NOT NULL DEFAULT '',
+                fixed_income_indexer TEXT NOT NULL DEFAULT '',
+                fixed_income_maturity_date TEXT NOT NULL DEFAULT '',
+                current_value_cents INTEGER NOT NULL CHECK (current_value_cents >= 0),
+                quote_date TEXT NOT NULL,
+                notes TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (
+                    user_id, account_id, asset_type, asset_identifier, asset_name,
+                    cnpj, fixed_income_indexer, fixed_income_maturity_date
+                )
+            );
+
             CREATE TABLE IF NOT EXISTS transaction_tags (
                 transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
                 tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
@@ -324,6 +345,7 @@ def initialize_database() -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_investment_operations_user ON investment_operations (user_id, account_id, asset_type)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_investment_opening_positions_user ON investment_opening_positions (user_id, account_id, asset_type)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_investment_redemptions_source ON investment_redemptions (user_id, source_type, source_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_investment_value_overrides_user ON investment_value_overrides (user_id, account_id, asset_type)")
 
 
 def row_to_dict(row: sqlite3.Row | None) -> dict | None:
