@@ -110,7 +110,13 @@ def get_portfolio(user_id: int) -> dict:
                 ON transactions.id = investment_operations.transaction_id
                 AND transactions.user_id = investment_operations.user_id
                 AND transactions.archived_at IS NULL
-                AND transactions.reconciled_at IS NOT NULL
+                AND (
+                    transactions.reconciled_at IS NOT NULL
+                    OR (
+                        transactions.series_kind = 'single'
+                        AND transactions.date <= DATE('now', 'localtime')
+                    )
+                )
             JOIN checking_accounts
                 ON checking_accounts.id = investment_operations.account_id
                 AND checking_accounts.user_id = investment_operations.user_id
@@ -592,7 +598,13 @@ def current_portfolio_positions(user_id: int) -> list[dict]:
             JOIN transactions ON transactions.id = investment_operations.transaction_id
                 AND transactions.user_id = investment_operations.user_id
                 AND transactions.archived_at IS NULL
-                AND transactions.reconciled_at IS NOT NULL
+                AND (
+                    transactions.reconciled_at IS NOT NULL
+                    OR (
+                        transactions.series_kind = 'single'
+                        AND transactions.date <= DATE('now', 'localtime')
+                    )
+                )
             JOIN checking_accounts ON checking_accounts.id = investment_operations.account_id
                 AND checking_accounts.user_id = investment_operations.user_id
             WHERE investment_operations.user_id = ?

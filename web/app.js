@@ -14,12 +14,14 @@ const state = {
   categories: [],
   tags: [],
   spendingLimits: [],
+  currentSpendingLimits: [],
   portfolio: null,
   portfolioDirty: true,
   portfolioLoading: false,
   portfolioError: "",
   portfolioGroup: "account_name",
   portfolioExpandedGroups: new Set(),
+  portfolioCollapsedGroups: new Set(),
   portfolioAssetSaving: false,
   view: "cockpit",
   transactionMonth: new Date().toISOString().slice(0, 7),
@@ -207,6 +209,7 @@ const monthInvestment = document.querySelector("#monthInvestment");
 const savingsRate = document.querySelector("#savingsRate");
 const currencyList = document.querySelector("#currencyList");
 const cockpitPortfolioByType = document.querySelector("#cockpitPortfolioByType");
+const cockpitLimitAlert = document.querySelector("#cockpitLimitAlert");
 const topExpensesChart = document.querySelector("#topExpensesChart");
 const cashDistributionChart = document.querySelector("#cashDistributionChart");
 const previousMonthButton = document.querySelector("#previousMonthButton");
@@ -468,6 +471,7 @@ async function handleLogout() {
   state.categories = [];
   state.tags = [];
   state.spendingLimits = [];
+  state.currentSpendingLimits = [];
   state.portfolio = null;
   loginForm.reset();
   registerForm.reset();
@@ -507,6 +511,7 @@ async function loadAll() {
     await loadArchivedCreditCards();
     await loadClassifications();
     await loadSpendingLimits();
+    await loadCurrentSpendingLimits();
     await loadCardInvoice();
   } catch (error) {
     state.accounts = [];
@@ -522,6 +527,7 @@ async function loadAll() {
     state.categories = [];
     state.tags = [];
     state.spendingLimits = [];
+    state.currentSpendingLimits = [];
     state.portfolio = null;
     setMessage(accountMessage, error.message, "error");
   }
@@ -574,6 +580,7 @@ async function loadTransactionsAndAccounts() {
   await loadArchivedCreditCards();
   await loadClassifications();
   await loadSpendingLimits();
+  await loadCurrentSpendingLimits();
   await loadCardInvoice();
   markPortfolioDirty();
   renderAll();
@@ -823,6 +830,11 @@ async function loadSpendingLimits() {
   state.spendingLimits = response.limits;
 }
 
+async function loadCurrentSpendingLimits() {
+  const response = await api(`/api/spending-limits?month=${encodeURIComponent(currentMonthValue())}`);
+  state.currentSpendingLimits = response.limits;
+}
+
 async function loadCardInvoice() {
   if (!state.selectedCreditCardId) {
     state.cardInvoiceTransactions = [];
@@ -864,6 +876,7 @@ function showModule(view) {
     element.hidden = name !== view;
   }
   navButtons.forEach((button) => button.classList.toggle("active", button.dataset.view === view));
+  renderLimitAlerts();
   moduleEyebrow.textContent = viewTitles[view][0];
   pageTitle.textContent = viewTitles[view][1];
   if (view === "transactions") {
@@ -1148,7 +1161,9 @@ async function handleLimitSubmit(event) {
     });
     resetLimitForm();
     await loadSpendingLimits();
+    await loadCurrentSpendingLimits();
     renderLimits();
+    renderCockpit();
     setMessage(limitMessage, "Limite salvo.", "success");
   } catch (error) {
     setMessage(limitMessage, error.message, "error");
@@ -1171,7 +1186,9 @@ async function deleteSpendingLimit(id) {
   try {
     await api(`/api/spending-limits/${id}`, { method: "DELETE" });
     await loadSpendingLimits();
+    await loadCurrentSpendingLimits();
     renderLimits();
+    renderCockpit();
     setMessage(limitMessage, "Limite excluído.", "success");
   } catch (error) {
     setMessage(limitMessage, error.message, "error");
@@ -1700,8 +1717,46 @@ function renderCockpit() {
   renderCockpitPortfolioByType();
   renderMonthlyPlanning();
   renderInstallmentDebts();
+  renderLimitAlerts();
   renderTopExpensesChart();
   renderCashDistributionChart(monthTotals);
+}
+
+function renderLimitAlerts() {
+  const exceededRows = exceededCurrentLimitRows();
+  navButtons.forEach((button) => {
+    if (button.dataset.view === "limits") {
+      button.classList.toggle("has-alert", exceededRows.length > 0);
+    }
+  });
+  if (!cockpitLimitAlert) {
+    return;
+  }
+  if (exceededRows.length === 0) {
+    cockpitLimitAlert.hidden = true;
+    cockpitLimitAlert.innerHTML = "";
+    return;
+  }
+  const worst = exceededRows[0];
+  const overflowTotal = exceededRows.reduce((total, row) => total + Math.abs(row.remaining), 0);
+  cockpitLimitAlert.hidden = false;
+  cockpitLimitAlert.innerHTML = `
+    <button class="limit-alert-card" type="button" data-go-limits>
+      <span class="limit-alert-beacon" aria-hidden="true"></span>
+      <span>
+        <strong>${exceededRows.length} limite(s) estourado(s)</strong>
+        <small>Maior desvio: ${escapeHtml(worst.label)} em ${formatMoney(Math.abs(worst.remaining), "BRL")}. Total excedido: ${formatMoney(overflowTotal, "BRL")}.</small>
+      </span>
+      <b>Ver limites</b>
+    </button>
+  `;
+  cockpitLimitAlert.querySelector("[data-go-limits]").addEventListener("click", () => showModule("limits"));
+}
+
+function exceededCurrentLimitRows() {
+  return spendingLimitRows(state.currentSpendingLimits)
+    .filter((row) => row.percent > 1)
+    .sort((a, b) => Math.abs(b.remaining) - Math.abs(a.remaining));
 }
 
 function renderMonthlyPlanning() {
@@ -2565,10 +2620,7 @@ function selectedAccountVisibleTransactions(transactions = state.transactions) {
   if (!state.selectedAccountId) {
     return [];
   }
-  return selectedAccountTransactions(transactions).filter((transaction) => (
-    !isExchangeTransfer(transaction)
-    || String(transaction.destination_account_id || "") === String(state.selectedAccountId)
-  ));
+  return selectedAccountTransactions(transactions);
 }
 
 function renderClassifications() {
@@ -2808,9 +2860,11 @@ function renderPortfolioPositions(positions) {
     return;
   }
   const grouped = groupPortfolioPositions(positions);
-  portfolioPositions.innerHTML = grouped.map((group) => `
-    ${group.label ? `<h3 class="portfolio-group-title">${escapeHtml(group.label)}</h3>` : ""}
-    <div class="report-table-wrap">
+  portfolioPositions.innerHTML = grouped.map((group) => {
+    const collapsed = state.portfolioCollapsedGroups.has(group.key);
+    return `
+    ${group.label ? portfolioGroupHeader(group, collapsed) : ""}
+    <div class="report-table-wrap ${collapsed ? "portfolio-group-collapsed" : ""}">
       <table class="report-table portfolio-table">
         <thead>
           <tr>
@@ -2832,7 +2886,19 @@ function renderPortfolioPositions(positions) {
         </tbody>
       </table>
     </div>
-  `).join("");
+  `;
+  }).join("");
+  portfolioPositions.querySelectorAll("[data-toggle-portfolio-section]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const key = button.dataset.togglePortfolioSection;
+      if (state.portfolioCollapsedGroups.has(key)) {
+        state.portfolioCollapsedGroups.delete(key);
+      } else {
+        state.portfolioCollapsedGroups.add(key);
+      }
+      renderPortfolioPositions(positions);
+    });
+  });
   portfolioPositions.querySelectorAll("[data-toggle-portfolio-group]").forEach((button) => {
     button.addEventListener("click", () => {
       const key = button.dataset.togglePortfolioGroup;
@@ -2860,6 +2926,28 @@ function renderPortfolioPositions(positions) {
   portfolioPositions.querySelectorAll("[data-close-portfolio-payload]").forEach((button) => {
     button.addEventListener("click", () => closePortfolioPosition(JSON.parse(button.dataset.closePortfolioPayload)));
   });
+}
+
+function portfolioGroupHeader(group, collapsed) {
+  const currentValue = group.positions.reduce((total, position) => total + Number(position.current_value_brl || 0), 0);
+  const totalCost = group.positions.reduce((total, position) => total + Number(position.total_cost_brl || 0), 0);
+  const result = currentValue - totalCost;
+  const resultPercent = totalCost > 0 ? result / totalCost : 0;
+  const groupKind = state.portfolioGroup === "account_name" ? "Carteira" : "Grupo";
+  return `
+    <button class="portfolio-group-title" type="button" data-toggle-portfolio-section="${escapeHtml(group.key)}" aria-expanded="${String(!collapsed)}">
+      <span class="portfolio-group-toggle">${collapsed ? "+" : "-"}</span>
+      <span>
+        <small>${groupKind}</small>
+        <strong>${escapeHtml(group.label)}</strong>
+        <em>${group.positions.length} posição(ões)</em>
+      </span>
+      <span class="portfolio-group-total">
+        <strong>${formatMoney(currentValue, "BRL")}</strong>
+        <em class="${result < 0 ? "danger-text" : "positive-text"}">${formatMoney(result, "BRL")} · ${formatPercent(resultPercent)}</em>
+      </span>
+    </button>
+  `;
 }
 
 function renderPortfolioHistory(history) {
@@ -2927,7 +3015,11 @@ function groupPortfolioPositions(positions) {
   }
   return [...groups.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([label, groupPositions]) => ({ label, positions: groupPositions }));
+    .map(([label, groupPositions]) => ({ label, key: portfolioSectionGroupKey(label), positions: groupPositions }));
+}
+
+function portfolioSectionGroupKey(label) {
+  return JSON.stringify([state.portfolioGroup, label || ""]);
 }
 
 function portfolioPositionRows(positions) {
@@ -3414,8 +3506,8 @@ function renderLimitSummary(rows) {
   limitAvailableSummary.classList.toggle("danger-text", totals.spent > totals.limit && totals.limit > 0);
 }
 
-function spendingLimitRows() {
-  return state.spendingLimits.map((limit) => {
+function spendingLimitRows(limits = state.spendingLimits) {
+  return limits.map((limit) => {
     const spent = spentForLimit(limit);
     const limitAmount = Number(limit.limit_amount);
     return {
