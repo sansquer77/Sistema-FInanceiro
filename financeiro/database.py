@@ -70,6 +70,7 @@ def initialize_database() -> None:
                 limit_cents INTEGER NOT NULL CHECK (limit_cents > 0),
                 closing_day INTEGER NOT NULL CHECK (closing_day BETWEEN 1 AND 31),
                 due_day INTEGER NOT NULL CHECK (due_day BETWEEN 1 AND 31),
+                preferred_payment_account_id INTEGER REFERENCES checking_accounts(id),
                 notes TEXT,
                 archived_at TEXT,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -375,6 +376,7 @@ def initialize_database() -> None:
         ensure_column(conn, "credit_card_transactions", "installment_index", "INTEGER")
         ensure_column(conn, "credit_card_transactions", "installment_count", "INTEGER")
         ensure_column(conn, "credit_card_transactions", "recurrence_frequency", "TEXT")
+        ensure_column(conn, "credit_cards", "preferred_payment_account_id", "INTEGER REFERENCES checking_accounts(id)")
         ensure_column(conn, "investment_operations", "fixed_income_maturity_date", "TEXT")
         ensure_column(conn, "investment_opening_positions", "fixed_income_maturity_date", "TEXT")
         ensure_column(conn, "investment_opening_positions", "apply_tax_estimate", "INTEGER NOT NULL DEFAULT 0")

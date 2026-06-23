@@ -1357,6 +1357,30 @@ textarea:focus {
   font-size: 19px;
 }
 
+.money-stack-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: inherit;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.money-stack-line + .money-stack-line {
+  margin-top: 4px;
+}
+
+.money-stack-line b {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.money-stack-line em {
+  font-style: normal;
+  white-space: nowrap;
+}
+
 .limits-workspace {
   margin-top: 18px;
 }
@@ -1409,15 +1433,31 @@ textarea:focus {
 
 .report-rank-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px 16px;
+  gap: 10px;
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fff;
 }
 
-.report-rank-row strong {
+.report-rank-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px 16px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.report-rank-main:hover strong {
+  color: var(--accent-dark);
+}
+
+.report-rank-main > div:first-child strong {
   display: flex;
   gap: 8px;
   align-items: center;
@@ -1443,7 +1483,6 @@ textarea:focus {
 }
 
 .report-bar {
-  grid-column: 1 / -1;
   height: 8px;
   overflow: hidden;
   border-radius: 999px;
@@ -1480,6 +1519,22 @@ textarea:focus {
   text-transform: uppercase;
 }
 
+.report-detail {
+  padding-top: 6px;
+}
+
+.compact-report-table td strong {
+  display: block;
+  font-size: 13px;
+}
+
+.compact-report-table td span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .portfolio-summary {
   display: grid;
   grid-template-columns: repeat(6, minmax(140px, 1fr));
@@ -1511,6 +1566,35 @@ textarea:focus {
 
 .portfolio-summary strong {
   font-size: 19px;
+}
+
+.portfolio-summary strong:has(.portfolio-summary-line) {
+  display: grid;
+  gap: 5px;
+  font-size: 16px;
+}
+
+.portfolio-summary .portfolio-summary-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.portfolio-summary .portfolio-summary-line b {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.portfolio-summary .portfolio-summary-line em {
+  font-style: normal;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .portfolio-grid {

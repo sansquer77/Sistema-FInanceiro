@@ -1575,7 +1575,7 @@ def format_quoted_position(position: dict) -> dict:
 
 
 def group_positions(positions: list[dict], key: str) -> list[dict]:
-    totals = defaultdict(lambda: {"label": "", "currency": "BRL", "cost_brl_cents": 0, "current_brl_cents": 0, "count": 0})
+    totals = defaultdict(lambda: {"label": "", "currency": "BRL", "cost_brl_cents": 0, "current_brl_cents": 0, "day_result_brl_cents": 0, "count": 0})
     for position in positions:
         label = portfolio_group_label(position, key)
         currency = position.get("currency") or "BRL"
@@ -1584,6 +1584,7 @@ def group_positions(positions: list[dict], key: str) -> list[dict]:
         row["currency"] = currency
         row["cost_brl_cents"] += position["total_cost_brl_cents"]
         row["current_brl_cents"] += position["current_value_brl_cents"]
+        row["day_result_brl_cents"] += position["day_result_brl_cents"]
         row["count"] += 1
     return [
         {
@@ -1592,6 +1593,8 @@ def group_positions(positions: list[dict], key: str) -> list[dict]:
             "current_brl": cents_to_money(row["current_brl_cents"]),
             "result_brl": cents_to_money(row["current_brl_cents"] - row["cost_brl_cents"]),
             "result_percent": percent(row["current_brl_cents"] - row["cost_brl_cents"], row["cost_brl_cents"]),
+            "day_result_brl": cents_to_money(row["day_result_brl_cents"]),
+            "day_result_percent": percent(row["day_result_brl_cents"], row["current_brl_cents"] - row["day_result_brl_cents"]),
             "count": row["count"],
             "currency": row["currency"],
         }

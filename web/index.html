@@ -6,7 +6,7 @@
     <title>Sistema Financeiro</title>
     <link rel="icon" href="/assets/app-icon.png">
     <link rel="apple-touch-icon" href="/assets/app-icon.png">
-    <link rel="stylesheet" href="/styles.css?v=65">
+    <link rel="stylesheet" href="/styles.css?v=72">
   </head>
   <body>
     <main class="app-shell">
@@ -306,6 +306,11 @@
                     <input name="due_day" type="number" min="1" max="31" placeholder="28" required>
                   </label>
                 </div>
+                <label>Conta preferencial de pagamento
+                  <select name="preferred_payment_account_id" id="creditCardPreferredPaymentAccount">
+                    <option value="">Sem preferência</option>
+                  </select>
+                </label>
                 <label>Observações
                   <textarea name="notes" rows="3"></textarea>
                 </label>
@@ -413,10 +418,25 @@
                     <select name="series_kind" id="cardSeriesKind">
                       <option value="single">À vista</option>
                       <option value="installment">Parcelado</option>
+                      <option value="recurring">Recorrente</option>
                     </select>
                   </label>
                   <label id="cardInstallmentCountLabel" hidden>Parcelas
                     <input name="installment_count" id="cardInstallmentCount" type="number" min="2" max="120" value="2">
+                  </label>
+                </div>
+                <div class="field-row" id="cardRecurrenceFields" hidden>
+                  <label>Recorrência
+                    <select name="recurrence_frequency" id="cardRecurrenceFrequency">
+                      <option value="weekly">Semanal</option>
+                      <option value="monthly" selected>Mensal</option>
+                      <option value="quarterly">Trimestral</option>
+                      <option value="semiannual">Semestral</option>
+                      <option value="annual">Anual</option>
+                    </select>
+                  </label>
+                  <label>Ocorrências
+                    <input name="recurrence_count" id="cardRecurrenceCount" type="number" min="2" max="240" value="12">
                   </label>
                 </div>
                 <div class="field-row">
@@ -1098,6 +1118,6 @@
         </div>
       </section>
     </main>
-    <script src="/app.js?v=65"></script>
+    <script src="/app.js?v=72"></script>
   </body>
 </html>

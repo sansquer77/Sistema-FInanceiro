@@ -4,6 +4,7 @@ import json
 import mimetypes
 import os
 import re
+from datetime import date
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -125,6 +126,9 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/spending-limits":
             self.handle_list_spending_limits()
+            return
+        if path == "/api/cockpit":
+            self.handle_cockpit()
             return
         if path == "/api/portfolio":
             self.handle_portfolio()
@@ -376,8 +380,22 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def handle_list_transactions(self) -> None:
         user = self.require_user()
-        transactions = list_transactions(user["id"])
+        query = parse_qs(urlsplit(self.path).query)
+        month = (query.get("month") or [None])[0]
+        account_id = (query.get("account_id") or [None])[0]
+        try:
+            normalized_account_id = int(account_id) if account_id else None
+        except ValueError as exc:
+            raise ApiError("Conta invalida.") from exc
+        transactions = list_transactions(user["id"], month=month, account_id=normalized_account_id)
         self.send_json({"transactions": transactions})
+
+    def handle_cockpit(self) -> None:
+        user = self.require_user()
+        query = parse_qs(urlsplit(self.path).query)
+        month = (query.get("month") or [date.today().strftime("%Y-%m")])[0]
+        transactions = list_transactions(user["id"], month=month)
+        self.send_json(cockpit_payload(transactions))
 
     def handle_exchange_rate(self) -> None:
         self.require_user()
@@ -782,6 +800,71 @@ class ApiError(Exception):
         self.message = message
         self.status = status
         super().__init__(message)
+
+
+def cockpit_payload(transactions: list[dict]) -> dict:
+    totals = {"income": 0.0, "expense": 0.0, "investment": 0.0}
+    category_rows = {"income": {}, "expense": {}, "investment": {}}
+    planning = {
+        "income": {},
+        "expense": {},
+        "investment": {},
+    }
+    for transaction in transactions:
+        report_type = cockpit_transaction_type(transaction)
+        if not report_type:
+            continue
+        amount = float(transaction.get("amount_brl") or transaction.get("amount") or 0)
+        totals[report_type] += amount
+        label = cockpit_category_label(transaction)
+        add_cockpit_group(category_rows[report_type], label, amount)
+        if transaction.get("series_kind") == "recurring" or (report_type == "investment" and transaction.get("series_kind") != "single"):
+            add_cockpit_group(planning[report_type], label, amount)
+    savings_rate = totals["investment"] / totals["income"] if totals["income"] > 0 else 0
+    return {
+        "month_totals": {**totals, "savings_rate": savings_rate},
+        "top_income": ranked_cockpit_rows(category_rows["income"], 3),
+        "top_expenses": ranked_cockpit_rows(category_rows["expense"], 5),
+        "planning": {
+            "income": ranked_cockpit_rows(planning["income"]),
+            "investment": ranked_cockpit_rows(planning["investment"]),
+            "expense": ranked_cockpit_rows(planning["expense"]),
+        },
+    }
+
+
+def cockpit_transaction_type(transaction: dict) -> str:
+    if transaction.get("type") == "income":
+        return "income"
+    if transaction.get("type") == "expense":
+        return "expense"
+    if transaction.get("type") == "investment" or transaction.get("investment_operation"):
+        return "investment"
+    return ""
+
+
+def cockpit_category_label(transaction: dict) -> str:
+    category = transaction.get("category_name") or "Sem categoria"
+    subcategory = transaction.get("subcategory_name") or ""
+    return f"{category} / {subcategory}" if subcategory else category
+
+
+def add_cockpit_group(groups: dict, label: str, amount: float) -> None:
+    row = groups.setdefault(label, {"label": label, "total": 0.0, "count": 0})
+    row["total"] += amount
+    row["count"] += 1
+
+
+def ranked_cockpit_rows(groups: dict, limit: int | None = None) -> list[dict]:
+    rows = sorted(groups.values(), key=lambda row: (-row["total"], row["label"]))
+    if limit and len(rows) > limit:
+        visible = rows[:limit]
+        other_total = sum(row["total"] for row in rows[limit:])
+        other_count = sum(row["count"] for row in rows[limit:])
+        if other_total > 0:
+            visible.append({"label": "Outros", "total": other_total, "count": other_count})
+        return visible
+    return rows
 
 
 def main() -> None:

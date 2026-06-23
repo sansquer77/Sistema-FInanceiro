@@ -28,10 +28,24 @@ class TransactionError(Exception):
         super().__init__(message)
 
 
-def list_transactions(user_id: int) -> list[dict]:
+def list_transactions(user_id: int, month: str | None = None, account_id: int | None = None) -> list[dict]:
+    filters = ["transactions.user_id = ?", "transactions.archived_at IS NULL"]
+    params: list[object] = [user_id]
+    if month:
+        normalized_month = normalize_month_filter(month)
+        if account_id:
+            filters.append("transactions.date <= ?")
+            params.append(month_end_date(normalized_month))
+        else:
+            filters.append("transactions.date >= ? AND transactions.date <= ?")
+            params.extend([f"{normalized_month}-01", month_end_date(normalized_month)])
+    if account_id:
+        filters.append("(transactions.account_id = ? OR transactions.destination_account_id = ?)")
+        params.extend([account_id, account_id])
+    where_clause = " AND ".join(filters)
     with get_connection() as conn:
         rows = conn.execute(
-            """
+            f"""
             SELECT
                 transactions.*,
                 source.name AS account_name,
@@ -79,13 +93,27 @@ def list_transactions(user_id: int) -> list[dict]:
             LEFT JOIN tags
                 ON tags.id = transaction_tags.tag_id
                 AND tags.user_id = transactions.user_id
-            WHERE transactions.user_id = ? AND transactions.archived_at IS NULL
+            WHERE {where_clause}
             GROUP BY transactions.id
             ORDER BY transactions.date DESC, transactions.id DESC
             """,
-            (user_id,),
+            params,
         ).fetchall()
     return [format_transaction(row_to_dict(row)) for row in rows]
+
+
+def normalize_month_filter(value: str) -> str:
+    raw = str(value or "").strip()
+    try:
+        parsed = date.fromisoformat(f"{raw}-01")
+    except ValueError as exc:
+        raise TransactionError("Informe um mes valido.") from exc
+    return parsed.strftime("%Y-%m")
+
+
+def month_end_date(month: str) -> str:
+    year, month_number = map(int, month.split("-"))
+    return date(year, month_number, days_in_month(year, month_number)).isoformat()
 
 
 def create_transaction(user_id: int, data: dict) -> dict:

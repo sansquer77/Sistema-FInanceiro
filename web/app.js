@@ -11,6 +11,8 @@ const state = {
   selectedCreditCardId: "",
   selectedAccountId: "",
   transactions: [],
+  accountTransactions: [],
+  cockpit: null,
   categories: [],
   tags: [],
   spendingLimits: [],
@@ -54,6 +56,7 @@ const accountList = document.querySelector("#accountList");
 const archivedAccountList = document.querySelector("#archivedAccountList");
 const creditCardForm = document.querySelector("#creditCardForm");
 const creditCardFormTitle = document.querySelector("#creditCardFormTitle");
+const creditCardPreferredPaymentAccount = document.querySelector("#creditCardPreferredPaymentAccount");
 const creditCardMessage = document.querySelector("#creditCardMessage");
 const creditCardList = document.querySelector("#creditCardList");
 const archivedCreditCardList = document.querySelector("#archivedCreditCardList");
@@ -80,6 +83,9 @@ const cardTransactionSubcategory = document.querySelector("#cardTransactionSubca
 const cardSeriesKind = document.querySelector("#cardSeriesKind");
 const cardInstallmentCount = document.querySelector("#cardInstallmentCount");
 const cardInstallmentCountLabel = document.querySelector("#cardInstallmentCountLabel");
+const cardRecurrenceFields = document.querySelector("#cardRecurrenceFields");
+const cardRecurrenceFrequency = document.querySelector("#cardRecurrenceFrequency");
+const cardRecurrenceCount = document.querySelector("#cardRecurrenceCount");
 const cardInvoiceList = document.querySelector("#cardInvoiceList");
 const cancelCardTransactionEditButton = document.querySelector("#cancelCardTransactionEditButton");
 const transactionForm = document.querySelector("#transactionForm");
@@ -262,6 +268,7 @@ backToLoginFromConfirm.addEventListener("click", () => switchAuthMode("login"));
 accountForm.addEventListener("submit", handleAccountSubmit);
 accountForm.elements.account_type.addEventListener("change", updateAccountTypeState);
 creditCardForm.addEventListener("submit", handleCreditCardSubmit);
+creditCardForm.elements.currency.addEventListener("change", renderCreditCardPreferredPaymentAccounts);
 cardInvoiceCard.addEventListener("change", handleCardInvoiceCardChange);
 previousCardInvoiceButton.addEventListener("click", () => shiftCardInvoiceMonth(-1));
 todayCardInvoiceButton.addEventListener("click", () => setCardInvoiceMonth(currentMonthValue()));
@@ -325,6 +332,20 @@ reportTabs.forEach((button) => button.addEventListener("click", () => switchRepo
 reportAccountSelect.addEventListener("change", () => {
   state.reportAccountId = reportAccountSelect.value;
   renderReports();
+});
+reportContent.addEventListener("click", (event) => {
+  const toggle = event.target.closest("[data-report-toggle]");
+  if (!toggle) {
+    return;
+  }
+  const row = toggle.closest("[data-report-row]");
+  const detail = row ? row.querySelector("[data-report-detail]") : null;
+  if (!detail) {
+    return;
+  }
+  const expanded = detail.hidden;
+  detail.hidden = !expanded;
+  toggle.setAttribute("aria-expanded", String(expanded));
 });
 addPortfolioAssetButton.addEventListener("click", showPortfolioAssetForm);
 refreshPortfolioButton.addEventListener("click", () => loadPortfolio({ refreshMessage: true }));
@@ -467,6 +488,8 @@ async function handleLogout() {
   state.cardPayments = [];
   state.selectedCreditCardId = "";
   state.transactions = [];
+  state.accountTransactions = [];
+  state.cockpit = null;
   state.categories = [];
   state.tags = [];
   state.spendingLimits = [];
@@ -493,24 +516,29 @@ async function loadDashboard() {
 
 async function loadAll() {
   try {
-    const [accountsResponse, creditCardsResponse, transactionsResponse, cardTransactionsResponse, cardPaymentsResponse] = await Promise.all([
+    const [accountsResponse, creditCardsResponse, transactionsResponse, cardTransactionsResponse, cardPaymentsResponse, cockpitResponse] = await Promise.all([
       api("/api/checking-accounts"),
       api("/api/credit-cards"),
       api("/api/transactions"),
       api("/api/credit-card-transactions"),
       api("/api/credit-card-payments"),
+      api(`/api/cockpit?month=${encodeURIComponent(currentMonthValue())}`),
     ]);
     state.accounts = accountsResponse.accounts;
     state.creditCards = creditCardsResponse.cards;
     ensureSelectedCreditCard();
+    ensureSelectedAccount();
     state.transactions = transactionsResponse.transactions;
+    state.accountTransactions = [];
     state.cardTransactions = cardTransactionsResponse.transactions;
     state.cardPayments = cardPaymentsResponse.payments || [];
+    state.cockpit = cockpitResponse;
     await loadArchivedAccounts();
     await loadArchivedCreditCards();
     await loadClassifications();
     await loadSpendingLimits();
     await loadCurrentSpendingLimits();
+    await loadTransactionSlice();
     await loadCardInvoice();
   } catch (error) {
     state.accounts = [];
@@ -523,6 +551,8 @@ async function loadAll() {
     state.cardPayments = [];
     state.selectedCreditCardId = "";
     state.transactions = [];
+    state.accountTransactions = [];
+    state.cockpit = null;
     state.categories = [];
     state.tags = [];
     state.spendingLimits = [];
@@ -530,15 +560,20 @@ async function loadAll() {
     state.portfolio = null;
     setMessage(accountMessage, error.message, "error");
   }
-  renderAll();
+  renderBaseViews();
+  renderFinanceViews();
+  renderManagementViews();
 }
 
 async function loadAccounts() {
   const response = await api("/api/checking-accounts");
   state.accounts = response.accounts;
+  ensureSelectedAccount();
   await loadArchivedAccounts();
+  await loadTransactionSlice();
   markPortfolioDirty();
-  renderAll();
+  renderBaseViews();
+  renderFinanceViews();
 }
 
 async function loadCreditCards() {
@@ -548,7 +583,9 @@ async function loadCreditCards() {
   await loadArchivedCreditCards();
   await loadCardTransactions();
   await loadCardInvoice();
-  renderAll();
+  await loadCockpit();
+  renderBaseViews();
+  renderFinanceViews();
 }
 
 async function loadArchivedAccounts() {
@@ -562,19 +599,23 @@ async function loadArchivedCreditCards() {
 }
 
 async function loadTransactionsAndAccounts() {
-  const [accountsResponse, creditCardsResponse, transactionsResponse, cardTransactionsResponse, cardPaymentsResponse] = await Promise.all([
+  const [accountsResponse, creditCardsResponse, transactionsResponse, cardTransactionsResponse, cardPaymentsResponse, cockpitResponse] = await Promise.all([
     api("/api/checking-accounts"),
     api("/api/credit-cards"),
     api("/api/transactions"),
     api("/api/credit-card-transactions"),
     api("/api/credit-card-payments"),
+    api(`/api/cockpit?month=${encodeURIComponent(currentMonthValue())}`),
   ]);
   state.accounts = accountsResponse.accounts;
   state.creditCards = creditCardsResponse.cards;
   ensureSelectedCreditCard();
+  ensureSelectedAccount();
   state.transactions = transactionsResponse.transactions;
+  await loadTransactionSlice();
   state.cardTransactions = cardTransactionsResponse.transactions;
   state.cardPayments = cardPaymentsResponse.payments || [];
+  state.cockpit = cockpitResponse;
   await loadArchivedAccounts();
   await loadArchivedCreditCards();
   await loadClassifications();
@@ -582,7 +623,24 @@ async function loadTransactionsAndAccounts() {
   await loadCurrentSpendingLimits();
   await loadCardInvoice();
   markPortfolioDirty();
-  renderAll();
+  renderBaseViews();
+  renderFinanceViews();
+  renderManagementViews();
+}
+
+async function loadTransactionSlice() {
+  ensureSelectedAccount();
+  if (!state.selectedAccountId) {
+    state.accountTransactions = [];
+    return;
+  }
+  const response = await api(`/api/transactions?month=${encodeURIComponent(state.transactionMonth)}&account_id=${encodeURIComponent(state.selectedAccountId)}`);
+  state.accountTransactions = response.transactions || [];
+}
+
+async function loadCockpit() {
+  const response = await api(`/api/cockpit?month=${encodeURIComponent(currentMonthValue())}`);
+  state.cockpit = response;
 }
 
 async function loadPortfolio(options = {}) {
@@ -711,7 +769,7 @@ function editPortfolioPosition(position) {
 }
 
 function editPortfolioSourceTransaction(transactionId) {
-  const transaction = state.transactions.find((entry) => String(entry.id) === String(transactionId));
+  const transaction = findTransactionById(transactionId);
   if (!transaction) {
     setMessage(portfolioMessage, "Lançamento de origem não encontrado. Atualize os dados e tente novamente.", "error");
     return;
@@ -883,7 +941,7 @@ function showModule(view) {
     ensureSelectedAccount();
     renderTransactionAccounts();
     updateTransactionTypeState();
-    renderTransactions();
+    loadTransactionSlice().then(renderTransactions).catch((error) => setMessage(transactionMessage, error.message, "error"));
   }
   if (view === "limits") {
     renderLimits();
@@ -987,7 +1045,7 @@ async function handleCardTransactionSubmit(event) {
   data.invoice_month = state.cardInvoiceMonth;
   const isEditing = Boolean(data.id);
   if (isEditing && shouldAskFutureCardReplication(data.id)) {
-    data.apply_to_future = window.confirm("Replicar esta alteração nos próximos lançamentos parcelados desta série? Lançamentos passados ou conciliados não serão alterados.");
+    data.apply_to_future = window.confirm("Replicar esta alteração nos próximos lançamentos futuros desta série? Lançamentos passados ou conciliados não serão alterados.");
   }
   try {
     await api(isEditing ? `/api/credit-card-transactions/${data.id}` : "/api/credit-card-transactions", {
@@ -998,6 +1056,8 @@ async function handleCardTransactionSubmit(event) {
     await loadCardInvoice();
     await loadCardTransactions();
     renderCreditCards();
+    renderLimits();
+    renderCockpit();
     setMessage(cardInvoiceMessage, isEditing ? "Lançamento do cartão atualizado." : "Lançamento do cartão salvo.", "success");
   } catch (error) {
     setMessage(cardInvoiceMessage, error.message, "error");
@@ -1056,7 +1116,7 @@ async function handleTransactionSubmit(event) {
       body: data,
     });
     resetTransactionForm();
-    await loadTransactionsAndAccounts();
+    await refreshAfterTransactionChange();
     setMessage(transactionMessage, isEditing ? "Lançamento atualizado." : "Lançamento salvo.", "success");
   } catch (error) {
     setMessage(transactionMessage, error.message, "error");
@@ -1066,7 +1126,7 @@ async function handleTransactionSubmit(event) {
 }
 
 function shouldAskFutureReplication(transactionId) {
-  const transaction = state.transactions.find((entry) => String(entry.id) === String(transactionId));
+  const transaction = findTransactionById(transactionId);
   return Boolean(transaction && transaction.series_id && (transaction.series_kind === "recurring" || isInstallmentTransaction(transaction)));
 }
 
@@ -1395,6 +1455,8 @@ async function deleteCardTransaction(id) {
     await loadCardInvoice();
     await loadCardTransactions();
     renderCreditCards();
+    renderLimits();
+    renderCockpit();
     setMessage(cardInvoiceMessage, "Lançamento do cartão excluído.", "success");
   } catch (error) {
     setMessage(cardInvoiceMessage, error.message, "error");
@@ -1410,6 +1472,8 @@ async function toggleCardTransactionReconciliation(id, reconciled) {
     await loadCardInvoice();
     await loadCardTransactions();
     renderCreditCards();
+    renderLimits();
+    renderCockpit();
   } catch (error) {
     setMessage(cardInvoiceMessage, error.message, "error");
   }
@@ -1417,9 +1481,9 @@ async function toggleCardTransactionReconciliation(id, reconciled) {
 
 async function deleteTransaction(id) {
   try {
-    const scope = deleteSeriesScope(id, state.transactions, "conta");
+    const scope = deleteSeriesScope(id, state.accountTransactions.length ? state.accountTransactions : state.transactions, "conta");
     await api(`/api/transactions/${id}${scope}`, { method: "DELETE" });
-    await loadTransactionsAndAccounts();
+    await refreshAfterTransactionChange();
     setMessage(transactionMessage, "Lançamento excluído.", "success");
   } catch (error) {
     setMessage(transactionMessage, error.message, "error");
@@ -1439,17 +1503,30 @@ function deleteSeriesScope(id, transactions, label) {
   return replicate ? "?scope=future" : "";
 }
 
+function findTransactionById(id) {
+  return [...state.accountTransactions, ...state.transactions].find((entry) => String(entry.id) === String(id));
+}
+
 async function toggleTransactionReconciliation(id, reconciled) {
   try {
     await api(`/api/transactions/${id}/reconciliation`, {
       method: "PUT",
       body: { reconciled },
     });
-    await loadTransactionsAndAccounts();
-    renderTransactions();
+    await refreshAfterTransactionChange();
   } catch (error) {
     setMessage(transactionMessage, error.message, "error");
   }
+}
+
+async function refreshAfterTransactionChange() {
+  await Promise.all([
+    loadTransactionSlice(),
+    loadCockpit(),
+  ]);
+  markPortfolioDirty();
+  renderFinanceViews();
+  renderPortfolio();
 }
 
 function editAccount(account) {
@@ -1478,6 +1555,8 @@ function editCreditCard(card) {
   creditCardForm.elements.limit.value = card.limit.replace(".", ",");
   creditCardForm.elements.closing_day.value = card.closing_day;
   creditCardForm.elements.due_day.value = card.due_day;
+  renderCreditCardPreferredPaymentAccounts();
+  creditCardForm.elements.preferred_payment_account_id.value = card.preferred_payment_account_id || "";
   creditCardForm.elements.notes.value = card.notes || "";
   cancelCreditCardEditButton.hidden = false;
   creditCardForm.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1497,6 +1576,7 @@ function resetCreditCardForm() {
   creditCardForm.elements.id.value = "";
   creditCardFormTitle.textContent = "Novo cartão";
   cancelCreditCardEditButton.hidden = true;
+  renderCreditCardPreferredPaymentAccounts();
   setMessage(creditCardMessage, "");
 }
 
@@ -1508,8 +1588,12 @@ function resetCardTransactionForm() {
   cardTransactionForm.elements.invoice_month.value = state.cardInvoiceMonth;
   cardSeriesKind.disabled = false;
   cardInstallmentCount.disabled = false;
+  cardRecurrenceFrequency.disabled = false;
+  cardRecurrenceCount.disabled = false;
   cardSeriesKind.value = "single";
   cardInstallmentCount.value = "2";
+  cardRecurrenceFrequency.value = "monthly";
+  cardRecurrenceCount.value = "12";
   cardTransactionFormTitle.textContent = "Novo lançamento no cartão";
   cancelCardTransactionEditButton.hidden = true;
   cardTransactionForm.querySelector('button[type="submit"]').textContent = "Salvar lançamento";
@@ -1666,11 +1750,17 @@ function editCardTransaction(transaction) {
   cardTransactionForm.elements.notes.value = transaction.notes || "";
   cardSeriesKind.value = isInstallmentTransaction(transaction) ? "installment" : transaction.series_kind || "single";
   cardInstallmentCount.value = transaction.installment_count || "2";
+  cardRecurrenceFrequency.value = transaction.recurrence_frequency || "monthly";
+  cardRecurrenceCount.value = transaction.installment_count || "12";
   cardSeriesKind.disabled = true;
   cardInstallmentCount.disabled = true;
+  cardRecurrenceFrequency.disabled = true;
+  cardRecurrenceCount.disabled = true;
   updateCardSeriesState();
   cardSeriesKind.disabled = true;
   cardInstallmentCount.disabled = true;
+  cardRecurrenceFrequency.disabled = true;
+  cardRecurrenceCount.disabled = true;
   renderCardTransactionCategories();
   if (transaction.category_name) {
     cardTransactionCategory.value = transaction.category_name;
@@ -1687,32 +1777,45 @@ function editCardTransaction(transaction) {
 
 function updateCardSeriesState() {
   const isInstallment = cardSeriesKind.value === "installment";
+  const isRecurring = cardSeriesKind.value === "recurring";
   cardInstallmentCountLabel.hidden = !isInstallment;
   cardInstallmentCount.disabled = !isInstallment;
+  cardRecurrenceFields.hidden = !isRecurring;
+  cardRecurrenceFrequency.disabled = !isRecurring;
+  cardRecurrenceCount.disabled = !isRecurring;
+  cardInstallmentCount.name = isRecurring ? "unused_installment_count" : "installment_count";
+  cardRecurrenceCount.name = isRecurring ? "installment_count" : "recurrence_count";
 }
 
-function renderAll() {
-  renderCockpit();
+function renderBaseViews() {
   renderAccounts();
   renderCreditCards();
+  renderCreditCardPreferredPaymentAccounts();
   renderTransactionAccounts();
   renderImportTargets();
   renderPortfolioAssetAccounts();
   renderTransactionCategories();
+}
+
+function renderFinanceViews() {
+  renderCockpit();
   renderTransactions();
-  renderClassifications();
   renderLimits();
   renderReports();
+}
+
+function renderManagementViews() {
+  renderClassifications();
   renderPortfolio();
 }
 
 function renderCockpit() {
   const totals = getCurrencyTotals();
-  const monthTotals = getCurrentMonthTotals();
+  const monthTotals = state.cockpit?.month_totals || getCurrentMonthTotals();
   monthIncome.textContent = formatMoney(monthTotals.income, "BRL");
   monthExpense.textContent = formatMoney(monthTotals.expense, "BRL");
   monthInvestment.textContent = formatMoney(monthTotals.investment, "BRL");
-  savingsRate.textContent = formatPercent(monthTotals.savingsRate);
+  savingsRate.textContent = formatPercent(monthTotals.savings_rate ?? monthTotals.savingsRate);
   renderCurrencyTotals(totals);
   renderCockpitPortfolioByType();
   renderMonthlyPlanning();
@@ -1760,6 +1863,15 @@ function exceededCurrentLimitRows() {
 }
 
 function renderMonthlyPlanning() {
+  if (state.cockpit?.planning) {
+    monthlyPlanningList.innerHTML = "";
+    monthlyPlanningList.append(
+      planningSectionFromRows("Receitas recorrentes", state.cockpit.planning.income || []),
+      planningSectionFromRows("Investimentos planejados", state.cockpit.planning.investment || []),
+      planningSectionFromRows("Despesas recorrentes", state.cockpit.planning.expense || []),
+    );
+    return;
+  }
   const prefix = new Date().toISOString().slice(0, 7);
   const sections = [
     ["Receitas recorrentes", (transaction) => transaction.type === "income" && transaction.series_kind === "recurring"],
@@ -1772,6 +1884,28 @@ function renderMonthlyPlanning() {
       transaction.date.startsWith(prefix) && predicate(transaction)
     ))));
   }
+}
+
+function planningSectionFromRows(title, rows) {
+  const section = document.createElement("section");
+  section.className = "planning-section";
+  const total = rows.reduce((sum, item) => sum + Number(item.total || 0), 0);
+  const content = rows.length
+    ? rows.map((item) => `
+      <div class="planning-row">
+        <span>${escapeHtml(item.label)}</span>
+        <strong>${formatMoney(item.total, "BRL")}</strong>
+      </div>
+    `).join("")
+    : '<div class="empty-state compact">Nada previsto neste mês.</div>';
+  section.innerHTML = `
+    <div class="planning-section-header">
+      <h3>${title}</h3>
+      <strong>${formatMoney(total, "BRL")}</strong>
+    </div>
+    ${content}
+  `;
+  return section;
 }
 
 function planningSection(title, transactions) {
@@ -1911,6 +2045,13 @@ function groupTransactionsByCategory(transactions) {
 }
 
 function renderTopExpensesChart() {
+  if (state.cockpit?.top_expenses) {
+    renderDonutListChart(topExpensesChart, state.cockpit.top_expenses, {
+      empty: "Nenhuma despesa neste mês.",
+      totalLabel: "Despesas",
+    });
+    return;
+  }
   const prefix = new Date().toISOString().slice(0, 7);
   const grouped = groupTransactionsByCategory(state.transactions.filter((transaction) => (
     transaction.date.startsWith(prefix) && transaction.type === "expense"
@@ -1922,6 +2063,13 @@ function renderTopExpensesChart() {
 }
 
 function renderTopIncomeChart() {
+  if (state.cockpit?.top_income) {
+    renderDonutListChart(cashDistributionChart, state.cockpit.top_income, {
+      empty: "Nenhuma receita neste mês.",
+      totalLabel: "Receitas",
+    });
+    return;
+  }
   const prefix = new Date().toISOString().slice(0, 7);
   const grouped = groupTransactionsByCategory(state.transactions.filter((transaction) => (
     transaction.date.startsWith(prefix) && transaction.type === "income"
@@ -2096,13 +2244,38 @@ function renderCardInvoiceSelector() {
 
 function renderCardPaymentAccounts() {
   const card = selectedCreditCard();
+  const previousSelection = cardPaymentAccount.value;
+  const previousCardId = cardPaymentAccount.dataset.cardId || "";
   const accounts = card
     ? state.accounts.filter((account) => account.currency === card.currency)
     : [];
   cardPaymentAccount.innerHTML = accounts.map((account) => (
     `<option value="${account.id}">${escapeHtml(account.name)} (${escapeHtml(account.currency)})</option>`
   )).join("") || '<option value="">Cadastre uma conta compatível</option>';
+  if (card && accounts.length) {
+    const preferred = card.preferred_payment_account_id ? String(card.preferred_payment_account_id) : "";
+    const shouldPreserve = previousCardId === String(card.id) && accounts.some((account) => String(account.id) === previousSelection);
+    if (shouldPreserve) {
+      cardPaymentAccount.value = previousSelection;
+    } else if (preferred && accounts.some((account) => String(account.id) === preferred)) {
+      cardPaymentAccount.value = preferred;
+    }
+  }
+  cardPaymentAccount.dataset.cardId = card ? String(card.id) : "";
   cardPaymentAccount.disabled = accounts.length === 0;
+}
+
+function renderCreditCardPreferredPaymentAccounts() {
+  const selected = creditCardPreferredPaymentAccount.value;
+  const currency = creditCardForm.elements.currency.value || "BRL";
+  const accounts = state.accounts.filter((account) => account.currency === currency);
+  creditCardPreferredPaymentAccount.innerHTML = '<option value="">Sem preferência</option>' + accounts.map((account) => (
+    `<option value="${account.id}">${escapeHtml(account.name)} (${escapeHtml(account.currency)})</option>`
+  )).join("");
+  if (accounts.some((account) => String(account.id) === String(selected))) {
+    creditCardPreferredPaymentAccount.value = selected;
+  }
+  creditCardPreferredPaymentAccount.disabled = accounts.length === 0;
 }
 
 function renderCardTransactionCategories() {
@@ -2599,7 +2772,7 @@ function renderTransactions() {
   if (state.selectedAccountId && transactionAccount.value !== state.selectedAccountId) {
     transactionAccount.value = state.selectedAccountId;
   }
-  const accountTransactions = selectedAccountTransactions();
+  const accountTransactions = selectedAccountTransactions(state.accountTransactions);
   
   const monthTransactions = selectedAccountVisibleTransactions(accountTransactions)
     .filter((transaction) => transaction.date.startsWith(state.transactionMonth))
@@ -2614,7 +2787,7 @@ function renderTransactions() {
   renderTransactionCollection(transactionList, monthTransactions, false);
 }
 
-function selectedAccountTransactions(transactions = state.transactions) {
+function selectedAccountTransactions(transactions = state.accountTransactions) {
   if (!state.selectedAccountId) {
     return [];
   }
@@ -2624,7 +2797,7 @@ function selectedAccountTransactions(transactions = state.transactions) {
   ));
 }
 
-function selectedAccountVisibleTransactions(transactions = state.transactions) {
+function selectedAccountVisibleTransactions(transactions = state.accountTransactions) {
   if (!state.selectedAccountId) {
     return [];
   }
@@ -2650,11 +2823,13 @@ function renderReports() {
   renderReportAccountOptions();
   const items = reportItemsForMonth(state.reportMonth);
   const totals = reportTotals(items);
-  reportIncomeSummary.textContent = formatMoney(totals.income, "BRL");
-  reportExpenseSummary.textContent = formatMoney(totals.expense, "BRL");
-  reportInvestmentSummary.textContent = formatMoney(totals.investment, "BRL");
-  reportResultSummary.textContent = formatMoney(totals.income - totals.expense - totals.investment, "BRL");
-  reportResultSummary.classList.toggle("danger-text", totals.income - totals.expense - totals.investment < 0);
+  const resultTotals = reportResultTotals(totals);
+  reportIncomeSummary.innerHTML = formatMoneyTotals(totals.income);
+  reportExpenseSummary.innerHTML = formatMoneyTotals(totals.expense);
+  reportInvestmentSummary.innerHTML = formatMoneyTotals(totals.investment);
+  reportResultSummary.innerHTML = formatMoneyTotals(resultTotals);
+  reportResultSummary.classList.toggle("danger-text", [...resultTotals.values()].some((total) => total < 0));
+  reportResultSummary.classList.toggle("positive-text", [...resultTotals.values()].some((total) => total > 0) && ![...resultTotals.values()].some((total) => total < 0));
   reportAccountFilter.hidden = state.reportTab !== "accounts";
   if (state.reportTab === "cashflow") {
     renderCashflowReport(items);
@@ -2717,25 +2892,26 @@ function renderCashflowReport(items) {
     const income = sumReportItems(dayItems, "income");
     const expense = sumReportItems(dayItems, "expense");
     const investment = sumReportItems(dayItems, "investment");
+    const result = reportResultTotals({ income, expense, investment });
     return {
       date: dateKey,
       income,
       expense,
       investment,
-      result: income - expense - investment,
+      result,
     };
   });
-  let running = 0;
+  const running = new Map();
   const body = rows.map((row) => {
-    running += row.result;
+    mergeMoneyTotals(running, row.result);
     return `
       <tr>
         <td>${formatDate(row.date)}</td>
-        <td class="money-cell positive-text">${formatMoney(row.income, "BRL")}</td>
-        <td class="money-cell negative-text">${formatMoney(row.expense, "BRL")}</td>
-        <td class="money-cell neutral-text">${formatMoney(row.investment, "BRL")}</td>
-        <td class="money-cell ${row.result < 0 ? "negative-text" : "positive-text"}">${formatMoney(row.result, "BRL")}</td>
-        <td class="money-cell">${formatMoney(running, "BRL")}</td>
+        <td class="money-cell positive-text">${formatMoneyTotals(row.income)}</td>
+        <td class="money-cell negative-text">${formatMoneyTotals(row.expense)}</td>
+        <td class="money-cell neutral-text">${formatMoneyTotals(row.investment)}</td>
+        <td class="money-cell ${moneyTotalsSignalClass(row.result)}">${formatMoneyTotals(row.result)}</td>
+        <td class="money-cell">${formatMoneyTotals(running)}</td>
       </tr>
     `;
   }).join("");
@@ -2778,15 +2954,15 @@ function renderAccountsReport() {
       </div>
       <div>
         <span>Receitas</span>
-        <strong>${formatMoney(totals.income, "BRL")}</strong>
+        <strong>${formatMoneyTotals(totals.income)}</strong>
       </div>
       <div>
         <span>Saídas</span>
-        <strong>${formatMoney(totals.expense + totals.investment, "BRL")}</strong>
+        <strong>${formatMoneyTotals(combineMoneyTotals(totals.expense, totals.investment))}</strong>
       </div>
       <div>
         <span>Resultado</span>
-        <strong>${formatMoney(totals.income - totals.expense - totals.investment, "BRL")}</strong>
+        <strong>${formatMoneyTotals(reportResultTotals(totals))}</strong>
       </div>
     </div>
     ${reportRankedSection("Movimentação por categoria", rows, "Nenhum lançamento nesta conta no mês.")}
@@ -2812,19 +2988,12 @@ function renderPortfolio() {
     return;
   }
   const summary = portfolio.summary;
-  const result = Number(summary.result_brl);
-  const dayResult = Number(summary.day_result_brl);
-  portfolioCostSummary.textContent = formatMoney(summary.total_cost_brl, "BRL");
-  portfolioCurrentSummary.textContent = formatMoney(summary.current_value_brl, "BRL");
-  portfolioResultSummary.textContent = formatMoney(summary.result_brl, "BRL");
-  portfolioResultSummary.classList.toggle("danger-text", result < 0);
-  portfolioResultSummary.classList.toggle("positive-text", result > 0);
-  portfolioReturnSummary.textContent = `${Number(summary.result_percent).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
-  portfolioReturnSummary.classList.toggle("danger-text", result < 0);
-  portfolioReturnSummary.classList.toggle("positive-text", result > 0);
-  portfolioDayResultSummary.textContent = `${formatMoney(summary.day_result_brl, "BRL")} · ${Number(summary.day_result_percent).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
-  portfolioDayResultSummary.classList.toggle("danger-text", dayResult < 0);
-  portfolioDayResultSummary.classList.toggle("positive-text", dayResult > 0);
+  const currencyRows = portfolioSummaryCurrencyRows(summary);
+  portfolioCostSummary.innerHTML = portfolioSummaryMetric(currencyRows, (row) => formatMoney(row.cost_brl, row.currency));
+  portfolioCurrentSummary.innerHTML = portfolioSummaryMetric(currencyRows, (row) => formatMoney(row.current_brl, row.currency));
+  portfolioResultSummary.innerHTML = portfolioSummaryMetric(currencyRows, (row) => formatMoney(row.result_brl, row.currency), true);
+  portfolioReturnSummary.innerHTML = portfolioSummaryMetric(currencyRows, (row) => formatPortfolioPercent(row.result_percent), true, (row) => Number(row.result_brl));
+  portfolioDayResultSummary.innerHTML = portfolioSummaryMetric(currencyRows, (row) => `${formatMoney(row.day_result_brl, row.currency)} · ${formatPortfolioPercent(row.day_result_percent)}`, true, (row) => Number(row.day_result_brl));
   portfolioPositionCount.textContent = String(summary.position_count || 0);
   renderPortfolioGroupList(portfolioTypeList, summary.by_type);
   renderPortfolioGroupList(portfolioIndexerList, summary.by_indexer);
@@ -2832,6 +3001,49 @@ function renderPortfolio() {
   renderPortfolioGroupList(portfolioAccountList, summary.by_account);
   renderPortfolioPositions(portfolio.positions || []);
   renderPortfolioHistory(portfolio.history || []);
+}
+
+function portfolioSummaryCurrencyRows(summary) {
+  const rows = summary.by_currency || [];
+  if (rows.length) {
+    return rows;
+  }
+  return [{
+    currency: "BRL",
+    cost_brl: summary.total_cost_brl || "0.00",
+    current_brl: summary.current_value_brl || "0.00",
+    result_brl: summary.result_brl || "0.00",
+    result_percent: summary.result_percent || "0.00",
+    day_result_brl: summary.day_result_brl || "0.00",
+    day_result_percent: summary.day_result_percent || "0.00",
+  }];
+}
+
+function portfolioSummaryMetric(rows, formatter, signed = false, signalValue = null) {
+  return rows.map((row) => {
+    const signal = signalValue ? Number(signalValue(row) || 0) : 0;
+    const signalClass = signed ? signalClassName(signal) : "";
+    return `
+      <span class="portfolio-summary-line ${signalClass}">
+        <b>${escapeHtml(row.currency || "BRL")}</b>
+        <em>${formatter(row)}</em>
+      </span>
+    `;
+  }).join("");
+}
+
+function signalClassName(value) {
+  if (value < 0) {
+    return "danger-text";
+  }
+  if (value > 0) {
+    return "positive-text";
+  }
+  return "";
+}
+
+function formatPortfolioPercent(value) {
+  return `${Number(value || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 }
 
 function renderPortfolioGroupList(container, rows) {
@@ -3377,20 +3589,27 @@ function portfolioClosePayload(position) {
 }
 
 function reportRankedSection(title, rows, emptyText) {
-  const total = rows.reduce((sum, row) => sum + row.total, 0);
+  const total = rows.reduce((sum, row) => {
+    mergeMoneyTotals(sum, row.totals);
+    return sum;
+  }, new Map());
   const content = rows.length ? rows.map((row, index) => {
-    const percent = total > 0 ? row.total / total : 0;
+    const percent = reportRowPercent(row, total);
+    const barPercent = percent ?? 0;
     return `
-      <article class="report-rank-row">
-        <div>
-          <strong><i style="background:${chartColor(index)}"></i>${escapeHtml(row.label)}</strong>
-          <span>${row.count} lançamento(s)</span>
-        </div>
-        <div class="report-rank-value">
-          <strong>${formatMoney(row.total, "BRL")}</strong>
-          <span>${formatPercent(percent)}</span>
-        </div>
-        <div class="report-bar"><span style="width:${Math.max(percent * 100, 2)}%; background:${chartColor(index)}"></span></div>
+      <article class="report-rank-row" data-report-row>
+        <button class="report-rank-main" type="button" data-report-toggle aria-expanded="false">
+          <div>
+            <strong><i style="background:${chartColor(index)}"></i>${escapeHtml(row.label)}</strong>
+            <span>${row.count} lançamento(s)</span>
+          </div>
+          <div class="report-rank-value">
+            <strong>${formatMoneyTotals(row.totals)}</strong>
+            <span>${percent === null ? "Multimoeda" : formatPercent(percent)}</span>
+          </div>
+        </button>
+        <div class="report-bar"><span style="width:${Math.max(barPercent * 100, 2)}%; background:${chartColor(index)}"></span></div>
+        <div class="report-detail" data-report-detail hidden>${reportItemDetails(row.items)}</div>
       </article>
     `;
   }).join("") : `<div class="empty-state compact">${emptyText}</div>`;
@@ -3398,7 +3617,7 @@ function reportRankedSection(title, rows, emptyText) {
     <section class="report-section">
       <div class="section-heading">
         <h2>${escapeHtml(title)}</h2>
-        <strong>${formatMoney(total, "BRL")}</strong>
+        <strong>${formatMoneyTotals(total)}</strong>
       </div>
       <div class="report-rank-list">${content}</div>
     </section>
@@ -3429,7 +3648,9 @@ function accountTransactionReportItem(transaction) {
   return {
     date: transaction.date,
     reportType,
-    amount: Number(transaction.amount_brl || transaction.amount),
+    amount: Number(transaction.amount || 0),
+    currency: transaction.account_currency || "BRL",
+    description: transaction.description || "",
     category: transaction.category_name || "Sem categoria",
     subcategory: transaction.subcategory_name || "",
     tag: "",
@@ -3448,6 +3669,8 @@ function cardTransactionReportItem(transaction) {
     date: transaction.date,
     reportType: transaction.type,
     amount: Number(transaction.amount),
+    currency: transaction.card_currency || "BRL",
+    description: transaction.description || "",
     category: transaction.category_name || "Sem categoria",
     subcategory: transaction.subcategory_name || "",
     tag: "",
@@ -3460,9 +3683,9 @@ function cardTransactionReportItem(transaction) {
 
 function reportTotals(items) {
   return items.reduce((totals, item) => {
-    totals[item.reportType] += item.amount;
+    addMoneyTotal(totals[item.reportType], item.currency, item.amount);
     return totals;
-  }, { income: 0, expense: 0, investment: 0 });
+  }, { income: new Map(), expense: new Map(), investment: new Map() });
 }
 
 function groupReportItems(items, key) {
@@ -3472,16 +3695,116 @@ function groupReportItems(items, key) {
     if (!label) {
       continue;
     }
-    const current = grouped.get(label) || { label, total: 0, count: 0 };
-    current.total += item.amount;
+    const current = grouped.get(label) || { label, totals: new Map(), sortTotal: 0, count: 0, items: [] };
+    addMoneyTotal(current.totals, item.currency, item.amount);
+    current.sortTotal += item.amount;
     current.count += 1;
+    current.items.push(item);
     grouped.set(label, current);
   }
-  return [...grouped.values()].sort((a, b) => b.total - a.total || a.label.localeCompare(b.label));
+  return [...grouped.values()].sort((a, b) => b.sortTotal - a.sortTotal || a.label.localeCompare(b.label));
 }
 
 function sumReportItems(items, type) {
-  return items.reduce((total, item) => item.reportType === type ? total + item.amount : total, 0);
+  return items.reduce((total, item) => {
+    if (item.reportType === type) {
+      addMoneyTotal(total, item.currency, item.amount);
+    }
+    return total;
+  }, new Map());
+}
+
+function addMoneyTotal(totals, currency, amount) {
+  const key = currency || "BRL";
+  totals.set(key, (totals.get(key) || 0) + Number(amount || 0));
+  return totals;
+}
+
+function mergeMoneyTotals(target, source, signal = 1) {
+  for (const [currency, amount] of source.entries()) {
+    addMoneyTotal(target, currency, Number(amount) * signal);
+  }
+  return target;
+}
+
+function combineMoneyTotals(...sources) {
+  return sources.reduce((target, source) => mergeMoneyTotals(target, source), new Map());
+}
+
+function reportResultTotals(totals) {
+  const result = new Map();
+  mergeMoneyTotals(result, totals.income);
+  mergeMoneyTotals(result, totals.expense, -1);
+  mergeMoneyTotals(result, totals.investment, -1);
+  return result;
+}
+
+function formatMoneyTotals(totals) {
+  const rows = [...totals.entries()].filter(([, amount]) => Number(amount) !== 0);
+  if (!rows.length) {
+    return formatMoney(0, "BRL");
+  }
+  return rows
+    .sort(([currencyA], [currencyB]) => currencyA.localeCompare(currencyB))
+    .map(([currency, amount]) => `<span class="money-stack-line"><b>${escapeHtml(currency)}</b><em>${formatMoney(amount, currency)}</em></span>`)
+    .join("");
+}
+
+function moneyTotalsSignalClass(totals) {
+  const values = [...totals.values()];
+  if (values.some((value) => value < 0)) {
+    return "negative-text";
+  }
+  if (values.some((value) => value > 0)) {
+    return "positive-text";
+  }
+  return "";
+}
+
+function reportRowPercent(row, totals) {
+  const rowEntries = [...row.totals.entries()];
+  if (rowEntries.length !== 1) {
+    return null;
+  }
+  const [currency, amount] = rowEntries[0];
+  const total = totals.get(currency) || 0;
+  return total > 0 ? amount / total : 0;
+}
+
+function reportItemDetails(items) {
+  const rows = items
+    .slice()
+    .sort((a, b) => a.date.localeCompare(b.date) || a.description.localeCompare(b.description))
+    .map((item) => `
+      <tr>
+        <td>${formatDate(item.date)}</td>
+        <td>
+          <strong>${escapeHtml(item.description || item.category)}</strong>
+          <span>${escapeHtml(reportItemClassification(item))}</span>
+        </td>
+        <td>${escapeHtml(item.accountName || item.source)}</td>
+        <td class="money-cell">${formatMoney(item.amount, item.currency)}</td>
+      </tr>
+    `).join("");
+  return `
+    <div class="report-table-wrap">
+      <table class="report-table compact-report-table">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Lançamento</th>
+            <th>Origem</th>
+            <th>Valor</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function reportItemClassification(item) {
+  return [item.category, item.subcategory].filter(Boolean).join(" / ") || "Sem categoria";
 }
 
 function monthDayRows(month) {
@@ -3586,7 +3909,7 @@ function spendingLimitRows(limits = state.spendingLimits) {
 }
 
 function spentForLimit(limit) {
-  return state.transactions.reduce((total, transaction) => {
+  const accountSpent = state.transactions.reduce((total, transaction) => {
     if (transaction.type !== "expense" || !transaction.date.startsWith(limit.month)) {
       return total;
     }
@@ -3598,6 +3921,25 @@ function spentForLimit(limit) {
     }
     return total + Number(transaction.amount_brl || transaction.amount);
   }, 0);
+  const cardSpent = state.cardTransactions.reduce((total, transaction) => {
+    if (transaction.type !== "expense" || transaction.invoice_month !== limit.month || isCreditCardInvoicePaid(transaction.credit_card_id, transaction.invoice_month)) {
+      return total;
+    }
+    if (String(transaction.category_id) !== String(limit.category_id)) {
+      return total;
+    }
+    if (limit.subcategory_id && String(transaction.subcategory_id) !== String(limit.subcategory_id)) {
+      return total;
+    }
+    return total + Number(transaction.amount);
+  }, 0);
+  return accountSpent + cardSpent;
+}
+
+function isCreditCardInvoicePaid(cardId, invoiceMonth) {
+  return state.cardPayments.some((payment) => (
+    String(payment.credit_card_id) === String(cardId) && payment.invoice_month === invoiceMonth
+  ));
 }
 
 function renderSubcategoryOptions() {
@@ -3698,7 +4040,7 @@ function renderTransactionCollection(container, transactions, compact) {
     const today = new Date().toISOString().slice(0, 10);
     const monthEnd = monthEndDate(state.transactionMonth);
     
-    const relevantTransactions = selectedAccountTransactions(state.transactions).filter((transaction) => transaction.date <= monthEnd);
+    const relevantTransactions = selectedAccountTransactions(state.accountTransactions).filter((transaction) => transaction.date <= monthEnd);
     
     const reconciledBalance = getBalanceUntil(today, relevantTransactions, true);
     const forecastBalance = getBalanceUntil(monthEnd, relevantTransactions, false);
@@ -3827,11 +4169,12 @@ function updateTransactionTypeState() {
   updateTransferExchangeRateState();
 }
 
-function handleTransactionAccountChange() {
+async function handleTransactionAccountChange() {
   const account = state.accounts.find((entry) => String(entry.id) === transactionAccount.value);
   if (account) {
     state.selectedAccountId = account.id;
   }
+  await loadTransactionSlice();
   applyWalletAccountDefault();
   applyWalletAccountRestrictions();
   updateTransactionTypeState();
@@ -3903,11 +4246,12 @@ function shiftTransactionMonth(delta) {
   setTransactionMonth(shiftMonth(state.transactionMonth, delta));
 }
 
-function setTransactionMonth(month) {
+async function setTransactionMonth(month) {
   if (!isValidMonthValue(month)) {
     return;
   }
   state.transactionMonth = month;
+  await loadTransactionSlice();
   renderTransactions();
 }
 

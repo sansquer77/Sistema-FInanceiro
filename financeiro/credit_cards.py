@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from http import HTTPStatus
 import re
 from uuid import uuid4
@@ -11,6 +11,8 @@ from financeiro.database import get_connection, row_to_dict
 from financeiro.transactions import create_transaction, normalize_optional_tags
 
 CARD_TRANSACTION_TYPES = {"income", "expense"}
+CARD_SERIES_KINDS = {"single", "installment", "recurring"}
+CARD_RECURRENCE_FREQUENCIES = {"weekly", "monthly", "quarterly", "semiannual", "annual"}
 MONTH_PATTERN = re.compile(r"^\d{4}-\d{2}$")
 
 class CreditCardError(Exception):
@@ -172,12 +174,13 @@ def create_credit_card(user_id: int, data: dict) -> dict:
     card = normalize_credit_card_payload(data)
     try:
         with get_connection() as conn:
+            validate_preferred_payment_account(conn, user_id, card["preferred_payment_account_id"], card["currency"])
             cursor = conn.execute(
                 """
                 INSERT INTO credit_cards (
                     user_id, name, issuer, network, currency, limit_cents,
-                    closing_day, due_day, notes
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    closing_day, due_day, preferred_payment_account_id, notes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     user_id,
@@ -188,6 +191,7 @@ def create_credit_card(user_id: int, data: dict) -> dict:
                     card["limit_cents"],
                     card["closing_day"],
                     card["due_day"],
+                    card["preferred_payment_account_id"],
                     card["notes"],
                 ),
             )
@@ -204,6 +208,7 @@ def create_credit_card_transaction(user_id: int, data: dict) -> dict:
     with get_connection() as conn:
         card = get_active_credit_card(conn, user_id, transaction["credit_card_id"])
         ensure_invoice_is_open(conn, user_id, card["id"], transaction["invoice_month"])
+        ensure_not_before_previous_closed_invoice(conn, user_id, card, transaction["invoice_month"], transaction["date"])
         category_id = get_or_create_category(conn, user_id, transaction["category"], transaction["type"])
         subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
         tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
@@ -212,6 +217,7 @@ def create_credit_card_transaction(user_id: int, data: dict) -> dict:
         first_transaction_id = None
         for occurrence in occurrences:
             ensure_invoice_is_open(conn, user_id, card["id"], occurrence["invoice_month"])
+            ensure_not_before_previous_closed_invoice(conn, user_id, card, occurrence["invoice_month"], occurrence["date"])
             cursor = conn.execute(
                 """
                 INSERT INTO credit_card_transactions (
@@ -266,6 +272,7 @@ def update_credit_card_transaction(user_id: int, transaction_id: str, data: dict
             raise CreditCardError("Nao e possivel mover lancamento entre cartoes.")
         if transaction["invoice_month"] != existing["invoice_month"]:
             raise CreditCardError("Nao e possivel mover lancamento entre faturas.")
+        ensure_not_before_previous_closed_invoice(conn, user_id, card, existing["invoice_month"], transaction["date"])
         category_id = get_or_create_category(conn, user_id, transaction["category"], transaction["type"])
         subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
         tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
@@ -290,12 +297,12 @@ def update_credit_card_transaction(user_id: int, transaction_id: str, data: dict
         )
         replace_credit_card_transaction_tags(conn, normalized_id, tag_ids)
         if apply_to_future:
-            update_future_card_installments(conn, user_id, existing, transaction, category_id, subcategory_id, tag_ids)
+            update_future_card_series(conn, user_id, existing, transaction, category_id, subcategory_id, tag_ids)
         row = fetch_card_transaction(conn, user_id, normalized_id)
     return format_card_transaction(row, card["currency"])
 
 
-def update_future_card_installments(
+def update_future_card_series(
     conn,
     user_id: int,
     existing,
@@ -306,14 +313,11 @@ def update_future_card_installments(
 ) -> None:
     if not existing["series_id"]:
         return
-    is_installment = existing["series_kind"] == "installment" or (
-        existing["installment_index"] and existing["installment_count"]
-    )
-    if not is_installment:
+    if not is_card_series(existing):
         return
     date_delta = date.fromisoformat(transaction["date"]) - date.fromisoformat(existing["date"])
-    future_filter = "installment_index > ?" if existing["installment_index"] else "date > ?"
-    future_marker = existing["installment_index"] if existing["installment_index"] else existing["date"]
+    future_filter = "installment_index > ?" if is_installment_card_series(existing) and existing["installment_index"] else "date > ?"
+    future_marker = existing["installment_index"] if is_installment_card_series(existing) and existing["installment_index"] else existing["date"]
     future_rows = conn.execute(
         f"""
         SELECT *
@@ -328,6 +332,8 @@ def update_future_card_installments(
     for row in future_rows:
         ensure_invoice_is_open(conn, user_id, row["credit_card_id"], row["invoice_month"])
         shifted_date = (date.fromisoformat(row["date"]) + date_delta).isoformat()
+        card = get_active_credit_card(conn, user_id, row["credit_card_id"])
+        ensure_not_before_previous_closed_invoice(conn, user_id, card, row["invoice_month"], shifted_date)
         conn.execute(
             """
             UPDATE credit_card_transactions
@@ -383,13 +389,10 @@ def delete_credit_card_transaction(user_id: int, transaction_id: str, apply_to_f
 def future_card_transactions_to_delete(conn, user_id: int, transaction, apply_to_future: bool):
     if not apply_to_future or not transaction["series_id"]:
         return []
-    is_installment = transaction["series_kind"] == "installment" or (
-        transaction["installment_index"] and transaction["installment_count"]
-    )
-    if not is_installment:
+    if not is_card_series(transaction):
         return []
-    future_filter = "installment_index > ?" if transaction["installment_index"] else "date > ?"
-    future_marker = transaction["installment_index"] if transaction["installment_index"] else transaction["date"]
+    future_filter = "installment_index > ?" if is_installment_card_series(transaction) and transaction["installment_index"] else "date > ?"
+    future_marker = transaction["installment_index"] if is_installment_card_series(transaction) and transaction["installment_index"] else transaction["date"]
     return conn.execute(
         f"""
         SELECT credit_card_transactions.*
@@ -409,6 +412,16 @@ def future_card_transactions_to_delete(conn, user_id: int, transaction, apply_to
         """,
         (user_id, transaction["series_id"], transaction["id"], future_marker),
     ).fetchall()
+
+
+def is_installment_card_series(transaction) -> bool:
+    return transaction["series_kind"] == "installment" or (
+        transaction["installment_index"] and transaction["installment_count"]
+    )
+
+
+def is_card_series(transaction) -> bool:
+    return transaction["series_kind"] == "recurring" or is_installment_card_series(transaction)
 
 
 def set_credit_card_transaction_reconciled(user_id: int, transaction_id: str, reconciled: bool) -> dict:
@@ -490,6 +503,7 @@ def pay_credit_card_invoice(user_id: int, data: dict) -> dict:
     )
     try:
         with get_connection() as conn:
+            validate_preferred_payment_account(conn, user_id, card["preferred_payment_account_id"], card["currency"])
             cursor = conn.execute(
                 """
                 INSERT INTO credit_card_payments (
@@ -539,7 +553,8 @@ def update_credit_card(user_id: int, card_id: str, data: dict) -> dict:
                 """
                 UPDATE credit_cards
                 SET name = ?, issuer = ?, network = ?, currency = ?, limit_cents = ?,
-                    closing_day = ?, due_day = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+                    closing_day = ?, due_day = ?, preferred_payment_account_id = ?, notes = ?,
+                    updated_at = CURRENT_TIMESTAMP
                 WHERE id = ? AND user_id = ? AND archived_at IS NULL
                 """,
                 (
@@ -550,6 +565,7 @@ def update_credit_card(user_id: int, card_id: str, data: dict) -> dict:
                     card["limit_cents"],
                     card["closing_day"],
                     card["due_day"],
+                    card["preferred_payment_account_id"],
                     card["notes"],
                     normalized_id,
                     user_id,
@@ -618,6 +634,7 @@ def normalize_credit_card_payload(data: dict) -> dict:
         raise CreditCardError("Moeda nao suportada neste modulo inicial.")
     if limit_cents <= 0:
         raise CreditCardError("Informe um limite maior que zero.")
+    preferred_payment_account_id = normalize_optional_card_id(data.get("preferred_payment_account_id"))
     return {
         "name": name,
         "issuer": issuer,
@@ -626,6 +643,7 @@ def normalize_credit_card_payload(data: dict) -> dict:
         "limit_cents": limit_cents,
         "closing_day": normalize_day(data.get("closing_day"), "Informe o dia de fechamento."),
         "due_day": normalize_day(data.get("due_day"), "Informe o dia de vencimento."),
+        "preferred_payment_account_id": preferred_payment_account_id,
         "notes": empty_to_none(data.get("notes")),
     }
 
@@ -643,6 +661,8 @@ def normalize_card_transaction_payload(data: dict) -> dict:
         raise CreditCardError("Informe a descricao do lancamento.")
     if amount_cents <= 0:
         raise CreditCardError("Informe um valor maior que zero.")
+    series_kind = normalize_card_series_kind(data)
+    installment_count = normalize_card_repeat_count(data.get("installment_count"), series_kind)
     return {
         "credit_card_id": normalize_card_id(data.get("credit_card_id")),
         "type": transaction_type,
@@ -654,30 +674,44 @@ def normalize_card_transaction_payload(data: dict) -> dict:
         "subcategory": normalize_optional_name(data.get("subcategory")),
         "tags": normalize_optional_tags(data.get("tags") or data.get("tag")),
         "notes": empty_to_none(data.get("notes")),
-        "series_kind": normalize_card_series_kind(data),
-        "installment_count": normalize_installment_count(data.get("installment_count")),
-        "recurrence_frequency": None,
+        "series_kind": series_kind,
+        "installment_count": installment_count,
+        "recurrence_frequency": normalize_card_recurrence_frequency(data),
     }
 
 
 def normalize_card_series_kind(data: dict) -> str:
     series_kind = str(data.get("series_kind") or "single").strip().lower()
-    if series_kind not in {"single", "installment"}:
-        raise CreditCardError("Cartao aceita lançamentos a vista ou parcelados.")
+    if series_kind not in CARD_SERIES_KINDS:
+        raise CreditCardError("Tipo de repeticao invalido.")
     return series_kind
 
 
-def normalize_installment_count(value: object) -> int | None:
-    raw = str(value or "").strip()
-    if not raw:
+def normalize_card_repeat_count(value: object, series_kind: str) -> int | None:
+    if series_kind == "single":
         return None
+    raw = str(value or "").strip()
+    if not raw and series_kind == "installment":
+        return None
+    if not raw:
+        raise CreditCardError("Informe a quantidade de ocorrencias.")
     try:
         count = int(raw)
     except ValueError as exc:
-        raise CreditCardError("Informe a quantidade de parcelas.") from exc
-    if count < 2 or count > 120:
-        raise CreditCardError("Informe entre 2 e 120 parcelas.")
+        raise CreditCardError("Informe a quantidade de repeticoes.") from exc
+    maximum = 240 if series_kind == "recurring" else 120
+    if count < 2 or count > maximum:
+        raise CreditCardError(f"Informe entre 2 e {maximum} repeticoes.")
     return count
+
+
+def normalize_card_recurrence_frequency(data: dict) -> str | None:
+    if str(data.get("series_kind") or "single").strip().lower() != "recurring":
+        return None
+    frequency = str(data.get("recurrence_frequency") or "").strip().lower()
+    if frequency not in CARD_RECURRENCE_FREQUENCIES:
+        raise CreditCardError("Informe a frequencia da recorrencia.")
+    return frequency
 
 
 def should_apply_to_future_card(data: dict) -> bool:
@@ -685,6 +719,19 @@ def should_apply_to_future_card(data: dict) -> bool:
 
 
 def build_card_transaction_occurrences(transaction: dict) -> list[dict]:
+    start_date = date.fromisoformat(transaction["date"])
+    if transaction["series_kind"] == "recurring":
+        count = transaction["installment_count"] or 12
+        return [
+            {
+                "date": add_recurrence(start_date, transaction["recurrence_frequency"], index).isoformat(),
+                "invoice_month": add_recurrence(date.fromisoformat(f"{transaction['invoice_month']}-01"), transaction["recurrence_frequency"], index).strftime("%Y-%m"),
+                "description": transaction["description"],
+                "installment_index": None,
+                "installment_count": count,
+            }
+            for index in range(count)
+        ]
     if transaction["series_kind"] != "installment":
         return [{
             "date": transaction["date"],
@@ -694,7 +741,6 @@ def build_card_transaction_occurrences(transaction: dict) -> list[dict]:
             "installment_count": None,
         }]
     count = transaction["installment_count"] or 2
-    start_date = date.fromisoformat(transaction["date"])
     return [
         {
             "date": add_months(start_date, index).isoformat(),
@@ -705,6 +751,18 @@ def build_card_transaction_occurrences(transaction: dict) -> list[dict]:
         }
         for index in range(count)
     ]
+
+
+def add_recurrence(start_date: date, frequency: str, index: int) -> date:
+    if frequency == "weekly":
+        return start_date + timedelta(days=7 * index)
+    months = {
+        "monthly": 1,
+        "quarterly": 3,
+        "semiannual": 6,
+        "annual": 12,
+    }[frequency]
+    return add_months(start_date, months * index)
 
 
 def shift_month(value: str, delta: int) -> str:
@@ -770,6 +828,30 @@ def normalize_card_id(value: object) -> int:
     if normalized <= 0:
         raise CreditCardError("Cartao nao encontrado.", HTTPStatus.NOT_FOUND)
     return normalized
+
+
+def normalize_optional_card_id(value: object) -> int | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    return normalize_card_id(raw)
+
+
+def validate_preferred_payment_account(conn, user_id: int, account_id: int | None, currency: str) -> None:
+    if not account_id:
+        return
+    account = conn.execute(
+        """
+        SELECT id, currency
+        FROM checking_accounts
+        WHERE id = ? AND user_id = ? AND archived_at IS NULL
+        """,
+        (account_id, user_id),
+    ).fetchone()
+    if not account:
+        raise CreditCardError("Conta preferencial de pagamento nao encontrada.")
+    if account["currency"] != currency:
+        raise CreditCardError("A conta preferencial deve ter a mesma moeda do cartao.")
 
 
 def get_active_credit_card(conn, user_id: int, card_id: int):
@@ -851,6 +933,41 @@ def ensure_invoice_is_open(conn, user_id: int, card_id: int, invoice_month: str)
     ).fetchone()
     if row:
         raise CreditCardError("Esta fatura ja foi paga e esta fechada.", HTTPStatus.CONFLICT)
+
+
+def ensure_not_before_previous_closed_invoice(conn, user_id: int, card, invoice_month: str, transaction_date: str) -> None:
+    previous_month = shift_month(invoice_month, -1)
+    if not is_invoice_paid(conn, user_id, card["id"], previous_month):
+        return
+    previous_closing_date = card_invoice_date(previous_month, card["closing_day"])
+    if transaction_date <= previous_closing_date:
+        raise CreditCardError(
+            f"A data do lancamento ({format_date_br(transaction_date)}) e anterior ou igual ao fechamento da fatura anterior ja fechada ({format_date_br(previous_closing_date)}). Ajuste a data ou use a fatura correta.",
+            HTTPStatus.CONFLICT,
+        )
+
+
+def is_invoice_paid(conn, user_id: int, card_id: int, invoice_month: str) -> bool:
+    row = conn.execute(
+        """
+        SELECT id
+        FROM credit_card_payments
+        WHERE user_id = ? AND credit_card_id = ? AND invoice_month = ?
+        """,
+        (user_id, card_id, invoice_month),
+    ).fetchone()
+    return bool(row)
+
+
+def card_invoice_date(month: str, day: int) -> str:
+    year, month_number = map(int, month.split("-"))
+    normalized_day = min(int(day), days_in_month(year, month_number))
+    return date(year, month_number, normalized_day).isoformat()
+
+
+def format_date_br(value: str) -> str:
+    parsed = date.fromisoformat(value)
+    return parsed.strftime("%d/%m/%Y")
 
 
 def format_invoice_month(value: str) -> str:
