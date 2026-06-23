@@ -6,7 +6,7 @@
     <title>Sistema Financeiro</title>
     <link rel="icon" href="/assets/app-icon.png">
     <link rel="apple-touch-icon" href="/assets/app-icon.png">
-    <link rel="stylesheet" href="/styles.css?v=58">
+    <link rel="stylesheet" href="/styles.css?v=65">
   </head>
   <body>
     <main class="app-shell">
@@ -187,7 +187,7 @@
 
             <section class="panel">
               <div class="section-heading">
-                <h2>Distribuição do caixa mensal</h2>
+                <h2>Maiores receitas do mês</h2>
               </div>
               <div class="chart-panel" id="cashDistributionChart"></div>
             </section>
@@ -592,8 +592,8 @@
                     <input name="transfer_exchange_rate" id="transferExchangeRate" type="text" inputmode="decimal" placeholder="Ex.: 0,180000">
                   </label>
                 </div>
-                <label id="exchangeRateLabel" hidden>Cotação para BRL
-                  <input name="exchange_rate_to_brl" id="exchangeRate" type="text" inputmode="decimal" placeholder="1,000000">
+                <label id="exchangeRateLabel" hidden>
+                  <input name="exchange_rate_to_brl" id="exchangeRate" type="hidden" value="1,000000">
                 </label>
 
                 <div class="field-row">
@@ -785,9 +785,7 @@
                   <input name="unit_price" type="text" inputmode="decimal" placeholder="0,00">
                 </label>
               </div>
-              <label>Cotação para BRL
-                <input name="exchange_rate_to_brl" type="text" inputmode="decimal" placeholder="Opcional para carteira em moeda estrangeira">
-              </label>
+              <input name="exchange_rate_to_brl" type="hidden" value="1,000000">
               <label>Observações
                 <textarea name="notes" rows="3"></textarea>
               </label>
@@ -800,13 +798,6 @@
           </section>
 
           <div class="portfolio-grid">
-            <section class="panel">
-              <div class="section-heading">
-                <h2>Por mercado</h2>
-              </div>
-              <div class="portfolio-group-list" id="portfolioMarketList"></div>
-            </section>
-
             <section class="panel">
               <div class="section-heading">
                 <h2>Por classe</h2>
@@ -842,7 +833,6 @@
               <label class="compact-filter">Agrupar
                 <select id="portfolioGroupFilter">
                   <option value="none">Ativo</option>
-                  <option value="market_label">Mercado</option>
                   <option value="asset_type_label">Tipo</option>
                   <option value="fixed_income_indexer">Indexador</option>
                   <option value="account_name">Carteira</option>
@@ -1108,6 +1098,6 @@
         </div>
       </section>
     </main>
-    <script src="/app.js?v=58"></script>
+    <script src="/app.js?v=65"></script>
   </body>
 </html>

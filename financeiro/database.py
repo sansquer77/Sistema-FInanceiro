@@ -309,6 +309,14 @@ def initialize_database() -> None:
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
+            CREATE TABLE IF NOT EXISTS quote_cache (
+                cache_key TEXT PRIMARY KEY,
+                payload_json TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
             CREATE UNIQUE INDEX IF NOT EXISTS idx_spending_limits_category
             ON spending_limits (user_id, month, category_id)
             WHERE subcategory_id IS NULL;
@@ -343,6 +351,9 @@ def initialize_database() -> None:
 
             CREATE INDEX IF NOT EXISTS idx_password_resets_token
             ON password_resets (token_hash, used_at, expires_at);
+
+            CREATE INDEX IF NOT EXISTS idx_quote_cache_expires_at
+            ON quote_cache (expires_at);
             """
         )
         ensure_column(conn, "transactions", "category_id", "INTEGER REFERENCES categories(id)")
@@ -380,6 +391,7 @@ def initialize_database() -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_investment_redemptions_source ON investment_redemptions (user_id, source_type, source_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_investment_value_overrides_user ON investment_value_overrides (user_id, account_id, asset_type)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_investment_closed_positions_user ON investment_closed_positions (user_id, account_id, asset_type, closed_at)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_quote_cache_expires_at ON quote_cache (expires_at)")
 
 
 def row_to_dict(row: sqlite3.Row | None) -> dict | None:

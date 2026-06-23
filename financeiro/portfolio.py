@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from http import HTTPStatus
 import json
@@ -20,6 +20,9 @@ YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?ra
 COINGECKO_SIMPLE_PRICE_URL = "https://api.coingecko.com/api/v3/simple/price?ids={ids}&vs_currencies={currency}&include_24hr_change=true"
 BCB_SERIES_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{series}/dados/ultimos/1?formato=json"
 BCB_SERIES_RANGE_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{series}/dados?formato=json&dataInicial={start}&dataFinal={end}"
+MARKET_QUOTE_TTL_SECONDS = 6 * 60 * 60
+INDEXER_QUOTE_TTL_SECONDS = 24 * 60 * 60
+QUOTE_MEMORY_CACHE: dict[str, tuple[datetime, dict | list]] = {}
 
 ASSET_TYPE_LABELS = {
     "stock": "Renda variável",
@@ -89,7 +92,7 @@ class PortfolioError(Exception):
         super().__init__(message)
 
 
-def get_portfolio(user_id: int) -> dict:
+def get_portfolio(user_id: int, force_refresh: bool = False) -> dict:
     with get_connection() as conn:
         operation_rows_raw = conn.execute(
             """
@@ -207,7 +210,7 @@ def get_portfolio(user_id: int) -> dict:
     rows = filter_closed_portfolio_rows([*operation_rows, *opening_rows], closed_positions)
     rows = sorted(rows, key=lambda row: (row["date"], row["id"]))
     positions = build_positions(rows)
-    quote_positions(positions)
+    quote_positions(positions, force_refresh=force_refresh)
     apply_value_overrides(user_id, positions)
     summary = summarize_positions(positions)
     positions = [format_quoted_position(position) for position in positions]
@@ -425,7 +428,7 @@ def redeem_position(user_id: int, data: dict) -> dict:
         available_cents = sum(int(position["current_value_cents"] or 0) for position in candidates)
         if redemption_value_cents > available_cents:
             raise PortfolioError("Valor de resgate maior que o valor disponivel para este ativo.")
-        exchange_rate_micros = rate_to_micros(get_exchange_rate_to_brl(account["currency"], redemption_date))
+        exchange_rate_micros = rate_to_micros(Decimal("1"))
         amount_brl_cents = convert_to_brl_cents(redemption_value_cents, exchange_rate_micros)
         description = f"Resgate - {selector['asset_name'] or selector['asset_identifier'] or 'Investimento'}"
         cursor = conn.execute(
@@ -517,7 +520,7 @@ def close_position(user_id: int, data: dict) -> dict:
         if not matches:
             raise PortfolioError("Posicao nao encontrada para encerramento.", HTTPStatus.NOT_FOUND)
         position = aggregate_backend_positions(matches)
-        exchange_rate_micros = rate_to_micros(get_exchange_rate_to_brl(account["currency"], closed_at))
+        exchange_rate_micros = rate_to_micros(Decimal("1"))
         closing_value_brl_cents = convert_to_brl_cents(closing_value_cents, exchange_rate_micros)
         total_cost_brl_cents = int(position["total_cost_brl_cents"] or 0)
         result_brl_cents = closing_value_brl_cents - total_cost_brl_cents
@@ -586,7 +589,7 @@ def close_position(user_id: int, data: dict) -> dict:
     return get_portfolio(user_id)
 
 
-def current_portfolio_positions(user_id: int) -> list[dict]:
+def current_portfolio_positions(user_id: int, force_refresh: bool = False) -> list[dict]:
     with get_connection() as conn:
         operation_rows_raw = conn.execute(
             """
@@ -653,7 +656,7 @@ def current_portfolio_positions(user_id: int) -> list[dict]:
     rows = [portfolio_row_with_redemptions(row_to_dict(row), redemption_totals) for row in [*operation_rows_raw, *opening_rows_raw]]
     rows = filter_closed_portfolio_rows(rows, closed_positions)
     positions = build_positions(sorted(rows, key=lambda row: (row["date"], row["id"])))
-    quote_positions(positions)
+    quote_positions(positions, force_refresh=force_refresh)
     apply_value_overrides(user_id, positions)
     return positions
 
@@ -888,7 +891,7 @@ def resolve_position_exchange_rate(currency: str, acquisition_date: str, raw_rat
         return rate_to_micros(Decimal("1"))
     if str(raw_rate or "").strip():
         return rate_to_micros(parse_exchange_rate(raw_rate))
-    return rate_to_micros(get_exchange_rate_to_brl(currency, acquisition_date))
+    return rate_to_micros(Decimal("1"))
 
 
 def normalize_id(value: object, message: str) -> int:
@@ -954,6 +957,19 @@ def build_positions(rows) -> list[dict]:
         position["costs_cents"] += costs_cents
         position["total_cost_cents"] += total_cost_cents
         position["total_cost_brl_cents"] += convert_to_brl_cents(total_cost_cents, int(row["exchange_rate_micros"] or 1000000))
+        position["sources"].append({
+            "source_type": row["source_type"],
+            "source_id": row["source_id"],
+            "source_transaction_id": row["transaction_id"],
+            "description": row["description"],
+            "date": row["date"],
+            "quantity": quantity,
+            "invested_cents": invested_cents,
+            "costs_cents": costs_cents,
+            "total_cost_cents": total_cost_cents,
+            "total_cost_brl_cents": convert_to_brl_cents(total_cost_cents, int(row["exchange_rate_micros"] or 1000000)),
+            "unit_price_cents": int(row["unit_price_cents"] or 0),
+        })
         position["operations_count"] += 1
         if position["operations_count"] == 1:
             position["source_type"] = row["source_type"]
@@ -1022,6 +1038,7 @@ def empty_position(row, asset_type: str, identifier: str) -> dict:
         "source_type": None,
         "source_id": None,
         "source_transaction_id": None,
+        "sources": [],
         "operations_count": 0,
         "first_operation_date": row["date"],
         "last_operation_date": row["date"],
@@ -1029,26 +1046,26 @@ def empty_position(row, asset_type: str, identifier: str) -> dict:
     }
 
 
-def quote_positions(positions: list[dict]) -> None:
+def quote_positions(positions: list[dict], force_refresh: bool = False) -> None:
     for position in positions:
         if position["asset_type"] in {"stock", "crypto"}:
-            apply_market_quote(position)
+            apply_market_quote(position, force_refresh=force_refresh)
         elif position["asset_type"] == "fixed_income":
-            apply_fixed_income_value(position)
+            apply_fixed_income_value(position, force_refresh=force_refresh)
         else:
             apply_cost_value(position, "Cotacao manual pendente")
 
 
-def apply_market_quote(position: dict) -> None:
+def apply_market_quote(position: dict, force_refresh: bool = False) -> None:
     symbol = yahoo_symbol(position)
     if not symbol:
         apply_cost_value(position, "Ativo sem codigo")
         return
     try:
         if position["asset_type"] == "crypto":
-            quote = fetch_crypto_quote(position["asset_identifier"], position["currency"])
+            quote = fetch_crypto_quote(position["asset_identifier"], position["currency"], force_refresh=force_refresh)
         else:
-            quote = fetch_yahoo_quote(symbol)
+            quote = fetch_yahoo_quote(symbol, force_refresh=force_refresh)
         position["quote"] = cents_to_money(quote["price_cents"])
         position["quote_source"] = quote.get("source") or f"Yahoo Finance ({symbol})"
         position["quote_status"] = "ok"
@@ -1061,7 +1078,7 @@ def apply_market_quote(position: dict) -> None:
         apply_cost_value(position, exc.message)
 
 
-def apply_fixed_income_value(position: dict) -> None:
+def apply_fixed_income_value(position: dict, force_refresh: bool = False) -> None:
     start_date = date.fromisoformat(position["first_operation_date"])
     maturity_date = parse_optional_iso_date(position.get("fixed_income_maturity_date"))
     end_date = min(date.today(), maturity_date) if maturity_date else date.today()
@@ -1080,10 +1097,10 @@ def apply_fixed_income_value(position: dict) -> None:
             gross_factor = compound_annual_factor(rate_factor, days)
         else:
             multiplier = annual_rate / Decimal("100") if annual_rate else Decimal("1")
-            indexer_factor = fetch_accumulated_indexer_factor(indexer, start_date, end_date, multiplier)
+            indexer_factor = fetch_accumulated_indexer_factor(indexer, start_date, end_date, multiplier, force_refresh=force_refresh)
             source = f"Banco Central SGS ({indexer} acumulado)"
             if mode == "hybrid":
-                indexer_factor = fetch_accumulated_indexer_factor(indexer, start_date, end_date)
+                indexer_factor = fetch_accumulated_indexer_factor(indexer, start_date, end_date, force_refresh=force_refresh)
                 rate_factor = indexer_factor - Decimal("1") + annual_rate / Decimal("100")
                 gross_factor = indexer_factor * compound_annual_factor(annual_rate / Decimal("100"), days)
             else:
@@ -1228,9 +1245,15 @@ def apply_cost_value(position: dict, status: str) -> None:
     position["quote_status"] = status
 
 
-def fetch_yahoo_quote(symbol: str) -> dict:
+def fetch_yahoo_quote(symbol: str, force_refresh: bool = False) -> dict:
     url = YAHOO_CHART_URL.format(symbol=quote(symbol))
-    payload = read_json_url(url, "Nao foi possivel consultar a cotacao do ativo.")
+    payload = cached_json_url(
+        url,
+        "Nao foi possivel consultar a cotacao do ativo.",
+        f"yahoo:{symbol}:5d:1d",
+        MARKET_QUOTE_TTL_SECONDS,
+        force_refresh=force_refresh,
+    )
     try:
         result = payload["chart"]["result"][0]
         meta = result["meta"]
@@ -1246,26 +1269,32 @@ def fetch_yahoo_quote(symbol: str) -> dict:
     }
 
 
-def fetch_crypto_quote(identifier: str, currency: str) -> dict:
+def fetch_crypto_quote(identifier: str, currency: str, force_refresh: bool = False) -> dict:
     normalized_identifier = normalize_asset_identifier(identifier, "crypto")
     normalized_currency = str(currency or "USD").strip().upper()
     coin_id = CRYPTO_COINGECKO_IDS.get(normalized_identifier)
     if not coin_id or normalized_currency not in {"BRL", "USD"}:
         symbol = crypto_yahoo_symbol(normalized_identifier, normalized_currency)
-        yahoo_quote = fetch_yahoo_quote(symbol)
+        yahoo_quote = fetch_yahoo_quote(symbol, force_refresh=force_refresh)
         yahoo_quote["source"] = f"Yahoo Finance ({symbol})"
         return yahoo_quote
     vs_currency = normalized_currency.lower()
     url = COINGECKO_SIMPLE_PRICE_URL.format(ids=quote(coin_id), currency=vs_currency)
     try:
-        payload = read_json_url(url, "Nao foi possivel consultar a cotacao do criptoativo.")
+        payload = cached_json_url(
+            url,
+            "Nao foi possivel consultar a cotacao do criptoativo.",
+            f"coingecko:{normalized_identifier}:{normalized_currency}",
+            MARKET_QUOTE_TTL_SECONDS,
+            force_refresh=force_refresh,
+        )
         coin_payload = payload[coin_id]
         price = Decimal(str(coin_payload[vs_currency]))
         change_percent = Decimal(str(coin_payload.get(f"{vs_currency}_24h_change") or 0))
         previous_price = price / (Decimal("1") + change_percent / Decimal("100")) if change_percent > Decimal("-100") else price
     except (PortfolioError, KeyError, TypeError, InvalidOperation, ZeroDivisionError):
         symbol = crypto_yahoo_symbol(normalized_identifier, normalized_currency)
-        yahoo_quote = fetch_yahoo_quote(symbol)
+        yahoo_quote = fetch_yahoo_quote(symbol, force_refresh=force_refresh)
         yahoo_quote["source"] = f"Yahoo Finance ({symbol}); CoinGecko indisponivel"
         return yahoo_quote
     return {
@@ -1276,12 +1305,18 @@ def fetch_crypto_quote(identifier: str, currency: str) -> dict:
     }
 
 
-def fetch_indexer_rate(indexer: str) -> Decimal:
+def fetch_indexer_rate(indexer: str, force_refresh: bool = False) -> Decimal:
     normalized = normalize_indexer(indexer)
     series = INDEXER_SERIES.get(normalized)
     if not series:
         raise PortfolioError("Indexador sem serie automatica")
-    payload = read_json_url(BCB_SERIES_URL.format(series=series), "Nao foi possivel consultar o indexador.")
+    payload = cached_json_url(
+        BCB_SERIES_URL.format(series=series),
+        "Nao foi possivel consultar o indexador.",
+        f"bcb:last:{normalized}",
+        INDEXER_QUOTE_TTL_SECONDS,
+        force_refresh=force_refresh,
+    )
     try:
         daily_percent = Decimal(str(payload[-1]["valor"]).replace(",", "."))
     except (IndexError, KeyError, InvalidOperation, TypeError) as exc:
@@ -1291,23 +1326,33 @@ def fetch_indexer_rate(indexer: str) -> Decimal:
     return daily_percent / Decimal("100")
 
 
-def fetch_accumulated_indexer_factor(indexer: str, start_date: date, end_date: date, multiplier: Decimal = Decimal("1")) -> Decimal:
+def fetch_accumulated_indexer_factor(
+    indexer: str,
+    start_date: date,
+    end_date: date,
+    multiplier: Decimal = Decimal("1"),
+    force_refresh: bool = False,
+) -> Decimal:
     normalized = normalize_indexer(indexer)
     series = INDEXER_SERIES.get(normalized)
     if not series:
         raise PortfolioError("Indexador sem serie automatica")
     if end_date < start_date:
         return Decimal("1")
-    payload = read_json_url(
-        BCB_SERIES_RANGE_URL.format(
-            series=series,
-            start=format_bcb_date(start_date),
-            end=format_bcb_date(end_date),
-        ),
+    url = BCB_SERIES_RANGE_URL.format(
+        series=series,
+        start=format_bcb_date(start_date),
+        end=format_bcb_date(end_date),
+    )
+    payload = cached_json_url(
+        url,
         "Nao foi possivel consultar o indexador.",
+        f"bcb:range:{normalized}:{start_date.isoformat()}:{end_date.isoformat()}",
+        bcb_range_ttl_seconds(end_date),
+        force_refresh=force_refresh,
     )
     if not payload:
-        latest_rate = fetch_indexer_rate(indexer)
+        latest_rate = fetch_indexer_rate(indexer, force_refresh=force_refresh)
         return compound_annual_factor(latest_rate, max((end_date - start_date).days, 0))
     factor = Decimal("1")
     try:
@@ -1363,6 +1408,90 @@ def format_bcb_date(value: date) -> str:
     return value.strftime("%d/%m/%Y")
 
 
+def bcb_range_ttl_seconds(end_date: date) -> int:
+    if end_date < date.today():
+        return 30 * 24 * 60 * 60
+    return INDEXER_QUOTE_TTL_SECONDS
+
+
+def cached_json_url(
+    url: str,
+    message: str,
+    cache_key: str,
+    ttl_seconds: int,
+    force_refresh: bool = False,
+) -> dict | list:
+    now = datetime.now()
+    if not force_refresh:
+        memory_payload = get_memory_cached_payload(cache_key, now)
+        if memory_payload is not None:
+            return memory_payload
+        persistent_payload = get_persistent_cached_payload(cache_key, now)
+        if persistent_payload is not None:
+            return persistent_payload
+    try:
+        payload = read_json_url(url, message)
+        store_cached_payload(cache_key, payload, now + timedelta(seconds=ttl_seconds))
+        return payload
+    except PortfolioError:
+        stale_payload = get_persistent_cached_payload(cache_key, now, allow_stale=True)
+        if stale_payload is not None:
+            return stale_payload
+        raise
+
+
+def get_memory_cached_payload(cache_key: str, now: datetime) -> dict | list | None:
+    cached = QUOTE_MEMORY_CACHE.get(cache_key)
+    if not cached:
+        return None
+    expires_at, payload = cached
+    if expires_at > now:
+        return payload
+    QUOTE_MEMORY_CACHE.pop(cache_key, None)
+    return None
+
+
+def get_persistent_cached_payload(cache_key: str, now: datetime, allow_stale: bool = False) -> dict | list | None:
+    try:
+        with get_connection() as conn:
+            row = conn.execute(
+                "SELECT payload_json, expires_at FROM quote_cache WHERE cache_key = ?",
+                (cache_key,),
+            ).fetchone()
+    except Exception:
+        return None
+    if not row:
+        return None
+    try:
+        expires_at = datetime.fromisoformat(row["expires_at"])
+        payload = json.loads(row["payload_json"])
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None
+    if not allow_stale and expires_at <= now:
+        return None
+    QUOTE_MEMORY_CACHE[cache_key] = (expires_at, payload)
+    return payload
+
+
+def store_cached_payload(cache_key: str, payload: dict | list, expires_at: datetime) -> None:
+    QUOTE_MEMORY_CACHE[cache_key] = (expires_at, payload)
+    try:
+        with get_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO quote_cache (cache_key, payload_json, expires_at, updated_at)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(cache_key) DO UPDATE SET
+                    payload_json = excluded.payload_json,
+                    expires_at = excluded.expires_at,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (cache_key, json.dumps(payload, ensure_ascii=True), expires_at.isoformat()),
+            )
+    except Exception:
+        return
+
+
 def read_json_url(url: str, message: str) -> dict | list:
     request = Request(url, headers={"User-Agent": "SistemaFinanceiro/0.1"})
     try:
@@ -1414,7 +1543,6 @@ def summarize_positions(positions: list[dict]) -> dict:
     by_type = group_positions(positions, "asset_type_label")
     by_indexer = group_positions(positions, "fixed_income_indexer")
     by_currency = group_positions(positions, "currency")
-    by_market = group_positions(positions, "market_label")
     by_account = group_positions(positions, "account_name")
     return {
         "total_cost_brl": cents_to_money(total_cost),
@@ -1427,7 +1555,6 @@ def summarize_positions(positions: list[dict]) -> dict:
         "by_type": by_type,
         "by_indexer": by_indexer,
         "by_currency": by_currency,
-        "by_market": by_market,
         "by_account": by_account,
     }
 
@@ -1448,11 +1575,13 @@ def format_quoted_position(position: dict) -> dict:
 
 
 def group_positions(positions: list[dict], key: str) -> list[dict]:
-    totals = defaultdict(lambda: {"label": "", "cost_brl_cents": 0, "current_brl_cents": 0, "count": 0})
+    totals = defaultdict(lambda: {"label": "", "currency": "BRL", "cost_brl_cents": 0, "current_brl_cents": 0, "count": 0})
     for position in positions:
-        label = position.get(key) or "Nao informado"
-        row = totals[label]
+        label = portfolio_group_label(position, key)
+        currency = position.get("currency") or "BRL"
+        row = totals[(label, currency)]
         row["label"] = label
+        row["currency"] = currency
         row["cost_brl_cents"] += position["total_cost_brl_cents"]
         row["current_brl_cents"] += position["current_value_brl_cents"]
         row["count"] += 1
@@ -1464,13 +1593,22 @@ def group_positions(positions: list[dict], key: str) -> list[dict]:
             "result_brl": cents_to_money(row["current_brl_cents"] - row["cost_brl_cents"]),
             "result_percent": percent(row["current_brl_cents"] - row["cost_brl_cents"], row["cost_brl_cents"]),
             "count": row["count"],
+            "currency": row["currency"],
         }
         for row in sorted(totals.values(), key=lambda item: item["current_brl_cents"], reverse=True)
     ]
 
 
+def portfolio_group_label(position: dict, key: str) -> str:
+    label = position.get(key)
+    if key == "fixed_income_indexer" and not label and position.get("currency") != "BRL":
+        return position.get("currency") or "Nao informado"
+    return label or "Nao informado"
+
+
 def format_position(position: dict) -> dict:
     average_cents = decimal_to_cents(Decimal(position["total_cost_cents"]) / position["quantity"] / MONEY_SCALE) if position["quantity"] else position["last_unit_price_cents"]
+    position["sources"] = format_position_sources(position)
     position["quantity"] = decimal_to_string(position["quantity"])
     position["fixed_income_rate"] = format_decimal_percent(position["fixed_income_rate"])
     position["average_price"] = cents_to_money(average_cents)
@@ -1479,6 +1617,43 @@ def format_position(position: dict) -> dict:
     position["total_cost"] = cents_to_money(position["total_cost_cents"])
     position["total_cost_brl"] = cents_to_money(position["total_cost_brl_cents"])
     return position
+
+
+def format_position_sources(position: dict) -> list[dict]:
+    sources = position.get("sources") or []
+    total_cost_cents = int(position.get("total_cost_cents") or 0)
+    current_value_cents = int(position.get("current_value_cents") or 0)
+    current_value_brl_cents = int(position.get("current_value_brl_cents") or 0)
+    formatted = []
+    for index, source in enumerate(sources, start=1):
+        source_cost_cents = int(source.get("total_cost_cents") or 0)
+        if total_cost_cents > 0:
+            ratio = Decimal(source_cost_cents) / Decimal(total_cost_cents)
+            source_current_value_cents = int((Decimal(current_value_cents) * ratio).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+            source_current_value_brl_cents = int((Decimal(current_value_brl_cents) * ratio).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+        else:
+            source_current_value_cents = 0
+            source_current_value_brl_cents = 0
+        quantity = Decimal(source.get("quantity") or 0)
+        average_cents = decimal_to_cents(Decimal(source_cost_cents) / quantity / MONEY_SCALE) if quantity else int(source.get("unit_price_cents") or 0)
+        formatted.append({
+            "source_type": source.get("source_type"),
+            "source_id": source.get("source_id"),
+            "source_transaction_id": source.get("source_transaction_id"),
+            "description": source.get("description") or f"Lancamento {index}",
+            "date": source.get("date"),
+            "quantity": decimal_to_string(quantity),
+            "average_price": cents_to_money(average_cents),
+            "invested": cents_to_money(source.get("invested_cents") or 0),
+            "costs": cents_to_money(source.get("costs_cents") or 0),
+            "total_cost": cents_to_money(source_cost_cents),
+            "total_cost_brl": cents_to_money(source.get("total_cost_brl_cents") or 0),
+            "current_value": cents_to_money(source_current_value_cents),
+            "current_value_brl": cents_to_money(source_current_value_brl_cents),
+            "current_value_cents": source_current_value_cents,
+            "current_value_brl_cents": source_current_value_brl_cents,
+        })
+    return formatted
 
 
 def indexer_catalog() -> list[dict]:
@@ -1547,13 +1722,7 @@ def format_decimal_percent(value: Decimal) -> str:
 
 
 def value_to_brl(amount_cents: int, currency: str) -> int:
-    if currency == "BRL":
-        return amount_cents
-    try:
-        rate = get_exchange_rate_to_brl(currency, date.today().isoformat())
-    except Exception:
-        return 0
-    return convert_to_brl_cents(amount_cents, int((rate * MICRO_SCALE).quantize(Decimal("1"), rounding=ROUND_HALF_UP)))
+    return amount_cents
 
 
 def percent(delta: int, base: int) -> str:

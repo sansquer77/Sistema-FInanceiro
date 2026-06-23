@@ -637,7 +637,7 @@ def resolve_exchange_rate_micros(currency: str, transaction_date: str, raw_rate:
         return rate_to_micros(Decimal("1"))
     if str(raw_rate or "").strip():
         return rate_to_micros(parse_exchange_rate(raw_rate))
-    return rate_to_micros(get_exchange_rate_to_brl(normalized_currency, transaction_date))
+    return rate_to_micros(Decimal("1"))
 
 
 def parse_exchange_rate(value: object) -> Decimal:

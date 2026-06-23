@@ -144,7 +144,6 @@ const portfolioReturnSummary = document.querySelector("#portfolioReturnSummary")
 const portfolioDayResultSummary = document.querySelector("#portfolioDayResultSummary");
 const portfolioPositionCount = document.querySelector("#portfolioPositionCount");
 const portfolioMessage = document.querySelector("#portfolioMessage");
-const portfolioMarketList = document.querySelector("#portfolioMarketList");
 const portfolioTypeList = document.querySelector("#portfolioTypeList");
 const portfolioIndexerList = document.querySelector("#portfolioIndexerList");
 const portfolioCurrencyList = document.querySelector("#portfolioCurrencyList");
@@ -601,7 +600,8 @@ async function loadPortfolio(options = {}) {
     setMessage(portfolioMessage, "Atualizando cotações...");
   }
   try {
-    state.portfolio = await api("/api/portfolio");
+    const endpoint = options.refreshMessage || options.force ? "/api/portfolio?refresh=1" : "/api/portfolio";
+    state.portfolio = await api(endpoint);
     state.portfolioDirty = false;
     if (options.refreshMessage) {
       setMessage(portfolioMessage, "Portfólio atualizado.", "success");
@@ -1719,7 +1719,7 @@ function renderCockpit() {
   renderInstallmentDebts();
   renderLimitAlerts();
   renderTopExpensesChart();
-  renderCashDistributionChart(monthTotals);
+  renderTopIncomeChart();
 }
 
 function renderLimitAlerts() {
@@ -1914,27 +1914,35 @@ function renderTopExpensesChart() {
   const prefix = new Date().toISOString().slice(0, 7);
   const grouped = groupTransactionsByCategory(state.transactions.filter((transaction) => (
     transaction.date.startsWith(prefix) && transaction.type === "expense"
-  ))).slice(0, 6);
-  renderDonutListChart(topExpensesChart, grouped, {
+  )));
+  renderDonutListChart(topExpensesChart, rankedChartItems(grouped, 5), {
     empty: "Nenhuma despesa neste mês.",
     totalLabel: "Despesas",
   });
 }
 
-function renderCashDistributionChart(monthTotals) {
-  const items = [
-    { label: "Despesas", total: monthTotals.expense },
-    { label: "Investimentos", total: monthTotals.investment },
-  ];
-  const remainder = Math.max(monthTotals.income - monthTotals.expense - monthTotals.investment, 0);
-  if (remainder > 0) {
-    items.push({ label: "Não alocado", total: remainder });
-  }
-  renderDonutListChart(cashDistributionChart, items.filter((item) => item.total > 0), {
-    empty: "Sem receitas no mês para distribuir.",
-    total: monthTotals.income,
+function renderTopIncomeChart() {
+  const prefix = new Date().toISOString().slice(0, 7);
+  const grouped = groupTransactionsByCategory(state.transactions.filter((transaction) => (
+    transaction.date.startsWith(prefix) && transaction.type === "income"
+  )));
+  renderDonutListChart(cashDistributionChart, rankedChartItems(grouped, 3), {
+    empty: "Nenhuma receita neste mês.",
     totalLabel: "Receitas",
   });
+}
+
+function rankedChartItems(items, visibleCount) {
+  const validItems = items.filter((item) => item.total > 0);
+  if (validItems.length <= visibleCount) {
+    return validItems;
+  }
+  const visible = validItems.slice(0, visibleCount);
+  const othersTotal = validItems.slice(visibleCount).reduce((sum, item) => sum + item.total, 0);
+  if (othersTotal > 0) {
+    visible.push({ label: "Outros", total: othersTotal });
+  }
+  return visible;
 }
 
 function renderDonutListChart(container, items, options) {
@@ -2795,7 +2803,6 @@ function renderPortfolio() {
     portfolioReturnSummary.textContent = "0,00%";
     portfolioDayResultSummary.textContent = formatMoney(0, "BRL");
     portfolioPositionCount.textContent = "0";
-    portfolioMarketList.innerHTML = "";
     portfolioTypeList.innerHTML = "";
     portfolioIndexerList.innerHTML = "";
     portfolioCurrencyList.innerHTML = "";
@@ -2819,7 +2826,6 @@ function renderPortfolio() {
   portfolioDayResultSummary.classList.toggle("danger-text", dayResult < 0);
   portfolioDayResultSummary.classList.toggle("positive-text", dayResult > 0);
   portfolioPositionCount.textContent = String(summary.position_count || 0);
-  renderPortfolioGroupList(portfolioMarketList, summary.by_market);
   renderPortfolioGroupList(portfolioTypeList, summary.by_type);
   renderPortfolioGroupList(portfolioIndexerList, summary.by_indexer);
   renderPortfolioGroupList(portfolioCurrencyList, summary.by_currency);
@@ -2837,6 +2843,7 @@ function renderPortfolioGroupList(container, rows) {
   container.innerHTML = rows.map((row, index) => {
     const current = Number(row.current_brl);
     const result = Number(row.result_brl);
+    const currency = row.currency || "BRL";
     const percent = total > 0 ? current / total : 0;
     return `
       <article class="portfolio-group-row">
@@ -2845,8 +2852,8 @@ function renderPortfolioGroupList(container, rows) {
           <span>${row.count} posição(ões)</span>
         </div>
         <div>
-          <strong>${formatMoney(row.current_brl, "BRL")}</strong>
-          <span class="${result < 0 ? "danger-text" : "positive-text"}">${formatMoney(row.result_brl, "BRL")} · ${Number(row.result_percent).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%</span>
+          <strong>${formatMoney(row.current_brl, currency)}</strong>
+          <span class="${result < 0 ? "danger-text" : "positive-text"}">${formatMoney(row.result_brl, currency)} · ${Number(row.result_percent).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%</span>
         </div>
         <div class="report-bar"><span style="width:${Math.max(percent * 100, 2)}%; background:${chartColor(index)}"></span></div>
       </article>
@@ -2934,6 +2941,7 @@ function portfolioGroupHeader(group, collapsed) {
   const result = currentValue - totalCost;
   const resultPercent = totalCost > 0 ? result / totalCost : 0;
   const groupKind = state.portfolioGroup === "account_name" ? "Carteira" : "Grupo";
+  const groupCurrency = portfolioGroupCurrency(group.positions);
   return `
     <button class="portfolio-group-title" type="button" data-toggle-portfolio-section="${escapeHtml(group.key)}" aria-expanded="${String(!collapsed)}">
       <span class="portfolio-group-toggle">${collapsed ? "+" : "-"}</span>
@@ -2943,11 +2951,16 @@ function portfolioGroupHeader(group, collapsed) {
         <em>${group.positions.length} posição(ões)</em>
       </span>
       <span class="portfolio-group-total">
-        <strong>${formatMoney(currentValue, "BRL")}</strong>
-        <em class="${result < 0 ? "danger-text" : "positive-text"}">${formatMoney(result, "BRL")} · ${formatPercent(resultPercent)}</em>
+        <strong>${formatMoney(currentValue, groupCurrency)}</strong>
+        <em class="${result < 0 ? "danger-text" : "positive-text"}">${formatMoney(result, groupCurrency)} · ${formatPercent(resultPercent)}</em>
       </span>
     </button>
   `;
+}
+
+function portfolioGroupCurrency(positions) {
+  const currencies = new Set(positions.map((position) => position.currency || "BRL"));
+  return currencies.size === 1 ? [...currencies][0] : "BRL";
 }
 
 function renderPortfolioHistory(history) {
@@ -3025,7 +3038,25 @@ function portfolioSectionGroupKey(label) {
 function portfolioPositionRows(positions) {
   return portfolioAssetGroups(positions).flatMap((group) => {
     if (group.positions.length === 1) {
-      return [portfolioPositionRow(group.positions[0])];
+      const position = group.positions[0];
+      const sources = Array.isArray(position.sources) ? position.sources : [];
+      if (sources.length <= 1) {
+        return [portfolioPositionRow(position)];
+      }
+      const expanded = state.portfolioExpandedGroups.has(group.key);
+      const rows = [portfolioPositionRow(position, {
+        parent: true,
+        expanded,
+        childCount: sources.length,
+        groupKey: group.key,
+      })];
+      if (expanded) {
+        rows.push(...sources.map((source, index) => portfolioPositionRow(portfolioSourcePosition(position, source), {
+          child: true,
+          childLabel: source.description || `Lançamento ${index + 1}`,
+        })));
+      }
+      return rows;
     }
     const expanded = state.portfolioExpandedGroups.has(group.key);
     const parent = aggregatePortfolioPositions(group.positions, group.key);
@@ -3043,6 +3074,30 @@ function portfolioPositionRows(positions) {
     }
     return rows;
   });
+}
+
+function portfolioSourcePosition(position, source) {
+  return {
+    ...position,
+    ...source,
+    asset_name: position.asset_name,
+    asset_identifier: position.asset_identifier,
+    current_value_cents: Number(source.current_value_cents || 0),
+    current_value_brl_cents: Number(source.current_value_brl_cents || 0),
+    day_result: "0.00",
+    day_result_brl: "0.00",
+    fixed_income_gross_value: "0.00",
+    fixed_income_iof_tax: "0.00",
+    fixed_income_income_tax: "0.00",
+    fixed_income_net_value: source.current_value,
+    first_operation_date: source.date || position.first_operation_date,
+    last_operation_date: source.date || position.last_operation_date,
+    source_type: source.source_type,
+    source_id: source.source_id,
+    source_transaction_id: source.source_transaction_id,
+    operations_count: 1,
+    sources: [],
+  };
 }
 
 function portfolioAssetGroups(positions) {
@@ -3140,7 +3195,7 @@ function portfolioPositionRow(position, options = {}) {
   const hasFixedIncomeTax = position.asset_type === "fixed_income" && (fixedIncomeIof > 0 || fixedIncomeTax > 0);
   const valueDetail = hasFixedIncomeTax
     ? `<span>Bruto ${formatMoney(position.fixed_income_gross_value || position.current_value, position.currency)}</span>${fixedIncomeIof > 0 ? `<span>IOF estimado -${formatMoney(position.fixed_income_iof_tax, position.currency)}</span>` : ""}<span>IR estimado -${formatMoney(position.fixed_income_income_tax, position.currency)}</span><span>Líquido ${formatMoney(position.fixed_income_net_value, position.currency)}</span>`
-    : `<span>${formatMoney(position.current_value_brl, "BRL")}</span>`;
+    : portfolioSecondaryMoney(position.current_value, position.current_value_brl, position.currency);
   const actions = position.source_type === "opening" && position.source_id
     ? portfolioIconButton("edit-position", "Editar ativo", `data-edit-portfolio-position-id="${position.source_id}"`)
     : position.source_type === "operation" && position.source_transaction_id
@@ -3159,14 +3214,21 @@ function portfolioPositionRow(position, options = {}) {
       <td>${escapeHtml(position.account_name)}<span>${escapeHtml(position.currency)}</span></td>
       <td class="money-cell">${formatDecimal(position.quantity, 6)}</td>
       <td class="money-cell">${formatMoney(position.average_price, position.currency)}</td>
-      <td class="money-cell">${formatMoney(position.total_cost, position.currency)}<span>${formatMoney(position.total_cost_brl, "BRL")}</span></td>
+      <td class="money-cell">${formatMoney(position.total_cost, position.currency)}${portfolioSecondaryMoney(position.total_cost, position.total_cost_brl, position.currency)}</td>
       <td class="money-cell">${quoteText}<span>${escapeHtml(quoteStatus || "Pendente")}</span></td>
       <td class="money-cell">${formatMoney(position.current_value_cents / 100, position.currency)}${valueDetail}</td>
-      <td class="money-cell ${dayResult < 0 ? "danger-text" : "positive-text"}">${formatMoney(position.day_result_brl, "BRL")}<span>${formatPercent(dayPercent)}</span></td>
-      <td class="money-cell ${result < 0 ? "danger-text" : "positive-text"}">${formatMoney(result, "BRL")}<span>${formatPercent(resultPercent)}</span></td>
+      <td class="money-cell ${dayResult < 0 ? "danger-text" : "positive-text"}">${formatMoney(position.day_result_brl, position.currency)}<span>${formatPercent(dayPercent)}</span></td>
+      <td class="money-cell ${result < 0 ? "danger-text" : "positive-text"}">${formatMoney(result, position.currency)}<span>${formatPercent(resultPercent)}</span></td>
       <td><div class="portfolio-actions">${redeemAction}${valueAction}${closeAction}${actions}</div></td>
     </tr>
   `;
+}
+
+function portfolioSecondaryMoney(primaryValue, secondaryValue, currency) {
+  if (Number(primaryValue || 0) === Number(secondaryValue || 0)) {
+    return "";
+  }
+  return `<span>${formatMoney(secondaryValue, "BRL")}</span>`;
 }
 
 function portfolioMaturityAlert(position) {
@@ -3902,26 +3964,9 @@ function selectedTransactionCategory() {
 }
 
 async function updateExchangeRateState() {
-  const account = state.accounts.find((entry) => String(entry.id) === transactionAccount.value);
-  const currency = account ? account.currency : "BRL";
-  const isBrl = currency === "BRL";
-  exchangeRateLabel.hidden = isBrl;
-  exchangeRate.disabled = isBrl;
-  if (isBrl) {
-    exchangeRate.value = "1,000000";
-    return;
-  }
-  if (!transactionForm.elements.date.value) {
-    return;
-  }
-  exchangeRate.placeholder = "Buscando cotação...";
-  try {
-    const response = await api(`/api/exchange-rate?currency=${encodeURIComponent(currency)}&date=${encodeURIComponent(transactionForm.elements.date.value)}`);
-    exchangeRate.value = response.rate.replace(".", ",");
-  } catch (error) {
-    exchangeRate.value = "";
-    exchangeRate.placeholder = "Informe a cotação manual";
-  }
+  exchangeRateLabel.hidden = true;
+  exchangeRate.disabled = false;
+  exchangeRate.value = "1,000000";
 }
 
 async function updateTransferExchangeRateState() {
