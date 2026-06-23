@@ -3,11 +3,12 @@ from __future__ import annotations
 from datetime import date
 from http import HTTPStatus
 import re
+from uuid import uuid4
 
 from financeiro.accounts import SUPPORTED_CURRENCIES, cents_to_money, empty_to_none, money_to_cents
 from financeiro.categories import get_or_create_category, get_or_create_subcategory, get_or_create_tag, normalize_name
 from financeiro.database import get_connection, row_to_dict
-from financeiro.transactions import create_transaction
+from financeiro.transactions import create_transaction, normalize_optional_tags
 
 CARD_TRANSACTION_TYPES = {"income", "expense"}
 MONTH_PATTERN = re.compile(r"^\d{4}-\d{2}$")
@@ -52,7 +53,8 @@ def list_credit_card_invoice(user_id: int, card_id: object, month: object) -> di
             SELECT
                 credit_card_transactions.*,
                 categories.name AS category_name,
-                subcategories.name AS subcategory_name
+                subcategories.name AS subcategory_name,
+                GROUP_CONCAT(tags.name, '||') AS tag_names
             FROM credit_card_transactions
             LEFT JOIN categories
                 ON categories.id = credit_card_transactions.category_id
@@ -60,10 +62,16 @@ def list_credit_card_invoice(user_id: int, card_id: object, month: object) -> di
             LEFT JOIN subcategories
                 ON subcategories.id = credit_card_transactions.subcategory_id
                 AND subcategories.user_id = credit_card_transactions.user_id
+            LEFT JOIN credit_card_transaction_tags
+                ON credit_card_transaction_tags.credit_card_transaction_id = credit_card_transactions.id
+            LEFT JOIN tags
+                ON tags.id = credit_card_transaction_tags.tag_id
+                AND tags.user_id = credit_card_transactions.user_id
             WHERE credit_card_transactions.user_id = ?
                 AND credit_card_transactions.credit_card_id = ?
                 AND credit_card_transactions.invoice_month = ?
                 AND credit_card_transactions.archived_at IS NULL
+            GROUP BY credit_card_transactions.id
             ORDER BY credit_card_transactions.date DESC, credit_card_transactions.id DESC
             """,
             (user_id, normalized_card_id, normalized_month),
@@ -104,7 +112,8 @@ def list_credit_card_transactions(user_id: int) -> list[dict]:
                 credit_cards.issuer AS credit_card_issuer,
                 credit_cards.currency AS card_currency,
                 categories.name AS category_name,
-                subcategories.name AS subcategory_name
+                subcategories.name AS subcategory_name,
+                GROUP_CONCAT(tags.name, '||') AS tag_names
             FROM credit_card_transactions
             JOIN credit_cards
                 ON credit_cards.id = credit_card_transactions.credit_card_id
@@ -115,8 +124,14 @@ def list_credit_card_transactions(user_id: int) -> list[dict]:
             LEFT JOIN subcategories
                 ON subcategories.id = credit_card_transactions.subcategory_id
                 AND subcategories.user_id = credit_card_transactions.user_id
+            LEFT JOIN credit_card_transaction_tags
+                ON credit_card_transaction_tags.credit_card_transaction_id = credit_card_transactions.id
+            LEFT JOIN tags
+                ON tags.id = credit_card_transaction_tags.tag_id
+                AND tags.user_id = credit_card_transactions.user_id
             WHERE credit_card_transactions.user_id = ?
                 AND credit_card_transactions.archived_at IS NULL
+            GROUP BY credit_card_transactions.id
             ORDER BY credit_card_transactions.date DESC, credit_card_transactions.id DESC
             """,
             (user_id,),
@@ -191,27 +206,42 @@ def create_credit_card_transaction(user_id: int, data: dict) -> dict:
         ensure_invoice_is_open(conn, user_id, card["id"], transaction["invoice_month"])
         category_id = get_or_create_category(conn, user_id, transaction["category"], transaction["type"])
         subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
-        cursor = conn.execute(
-            """
-            INSERT INTO credit_card_transactions (
-                user_id, credit_card_id, type, description, amount_cents, date,
-                invoice_month, category_id, subcategory_id, notes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                user_id,
-                card["id"],
-                transaction["type"],
-                transaction["description"],
-                transaction["amount_cents"],
-                transaction["date"],
-                transaction["invoice_month"],
-                category_id,
-                subcategory_id,
-                transaction["notes"],
-            ),
-        )
-        row = fetch_card_transaction(conn, user_id, cursor.lastrowid)
+        tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
+        occurrences = build_card_transaction_occurrences(transaction)
+        series_id = str(uuid4()) if transaction["series_kind"] != "single" else None
+        first_transaction_id = None
+        for occurrence in occurrences:
+            ensure_invoice_is_open(conn, user_id, card["id"], occurrence["invoice_month"])
+            cursor = conn.execute(
+                """
+                INSERT INTO credit_card_transactions (
+                    user_id, credit_card_id, type, description, amount_cents, date,
+                    invoice_month, series_id, series_kind, installment_index,
+                    installment_count, recurrence_frequency, category_id, subcategory_id, notes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    user_id,
+                    card["id"],
+                    transaction["type"],
+                    occurrence["description"],
+                    transaction["amount_cents"],
+                    occurrence["date"],
+                    occurrence["invoice_month"],
+                    series_id,
+                    transaction["series_kind"],
+                    occurrence["installment_index"],
+                    occurrence["installment_count"],
+                    transaction["recurrence_frequency"],
+                    category_id,
+                    subcategory_id,
+                    transaction["notes"],
+                ),
+            )
+            if first_transaction_id is None:
+                first_transaction_id = cursor.lastrowid
+            replace_credit_card_transaction_tags(conn, cursor.lastrowid, tag_ids)
+        row = fetch_card_transaction(conn, user_id, first_transaction_id)
     return format_card_transaction(row, card["currency"])
 
 
@@ -237,6 +267,7 @@ def update_credit_card_transaction(user_id: int, transaction_id: str, data: dict
             raise CreditCardError("Nao e possivel mover lancamento entre faturas.")
         category_id = get_or_create_category(conn, user_id, transaction["category"], transaction["type"])
         subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
+        tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
         conn.execute(
             """
             UPDATE credit_card_transactions
@@ -256,6 +287,7 @@ def update_credit_card_transaction(user_id: int, transaction_id: str, data: dict
                 user_id,
             ),
         )
+        replace_credit_card_transaction_tags(conn, normalized_id, tag_ids)
         row = fetch_card_transaction(conn, user_id, normalized_id)
     return format_card_transaction(row, card["currency"])
 
@@ -527,8 +559,75 @@ def normalize_card_transaction_payload(data: dict) -> dict:
         "invoice_month": normalize_month(data.get("invoice_month")),
         "category": normalize_name(data.get("category"), "Informe a categoria."),
         "subcategory": normalize_optional_name(data.get("subcategory")),
+        "tags": normalize_optional_tags(data.get("tags") or data.get("tag")),
         "notes": empty_to_none(data.get("notes")),
+        "series_kind": normalize_card_series_kind(data),
+        "installment_count": normalize_installment_count(data.get("installment_count")),
+        "recurrence_frequency": None,
     }
+
+
+def normalize_card_series_kind(data: dict) -> str:
+    series_kind = str(data.get("series_kind") or "single").strip().lower()
+    if series_kind not in {"single", "installment"}:
+        raise CreditCardError("Cartao aceita lançamentos a vista ou parcelados.")
+    return series_kind
+
+
+def normalize_installment_count(value: object) -> int | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    try:
+        count = int(raw)
+    except ValueError as exc:
+        raise CreditCardError("Informe a quantidade de parcelas.") from exc
+    if count < 2 or count > 120:
+        raise CreditCardError("Informe entre 2 e 120 parcelas.")
+    return count
+
+
+def build_card_transaction_occurrences(transaction: dict) -> list[dict]:
+    if transaction["series_kind"] != "installment":
+        return [{
+            "date": transaction["date"],
+            "invoice_month": transaction["invoice_month"],
+            "description": transaction["description"],
+            "installment_index": None,
+            "installment_count": None,
+        }]
+    count = transaction["installment_count"] or 2
+    start_date = date.fromisoformat(transaction["date"])
+    return [
+        {
+            "date": add_months(start_date, index).isoformat(),
+            "invoice_month": shift_month(transaction["invoice_month"], index),
+            "description": transaction["description"],
+            "installment_index": index + 1,
+            "installment_count": count,
+        }
+        for index in range(count)
+    ]
+
+
+def shift_month(value: str, delta: int) -> str:
+    year, month = value.split("-")
+    shifted = add_months(date(int(year), int(month), 1), delta)
+    return f"{shifted.year}-{shifted.month:02d}"
+
+
+def add_months(start_date: date, months: int) -> date:
+    target_month = start_date.month - 1 + months
+    year = start_date.year + target_month // 12
+    month = target_month % 12 + 1
+    day = min(start_date.day, days_in_month(year, month))
+    return date(year, month, day)
+
+
+def days_in_month(year: int, month: int) -> int:
+    if month == 12:
+        return 31
+    return (date(year, month + 1, 1) - date.resolution).day
 
 
 def normalize_day(value: object, message: str) -> int:
@@ -597,7 +696,8 @@ def fetch_card_transaction(conn, user_id: int, transaction_id: int) -> dict:
             credit_card_transactions.*,
             credit_cards.currency AS card_currency,
             categories.name AS category_name,
-            subcategories.name AS subcategory_name
+            subcategories.name AS subcategory_name,
+            GROUP_CONCAT(tags.name, '||') AS tag_names
         FROM credit_card_transactions
         JOIN credit_cards
             ON credit_cards.id = credit_card_transactions.credit_card_id
@@ -608,7 +708,13 @@ def fetch_card_transaction(conn, user_id: int, transaction_id: int) -> dict:
         LEFT JOIN subcategories
             ON subcategories.id = credit_card_transactions.subcategory_id
             AND subcategories.user_id = credit_card_transactions.user_id
+        LEFT JOIN credit_card_transaction_tags
+            ON credit_card_transaction_tags.credit_card_transaction_id = credit_card_transactions.id
+        LEFT JOIN tags
+            ON tags.id = credit_card_transaction_tags.tag_id
+            AND tags.user_id = credit_card_transactions.user_id
         WHERE credit_card_transactions.id = ? AND credit_card_transactions.user_id = ?
+        GROUP BY credit_card_transactions.id
         """,
         (transaction_id, user_id),
     ).fetchone()
@@ -663,7 +769,18 @@ def format_credit_card(card: dict) -> dict:
 def format_card_transaction(transaction: dict, currency: str) -> dict:
     transaction["amount"] = cents_to_money(transaction.pop("amount_cents"))
     transaction["card_currency"] = transaction.pop("card_currency", currency) or currency
+    raw_tags = transaction.pop("tag_names", "") or ""
+    transaction["tags"] = [tag for tag in raw_tags.split("||") if tag]
+    transaction["tag_name"] = ", ".join(transaction["tags"])
     return transaction
+
+
+def replace_credit_card_transaction_tags(conn, transaction_id: int, tag_ids: list[int]) -> None:
+    conn.execute("DELETE FROM credit_card_transaction_tags WHERE credit_card_transaction_id = ?", (transaction_id,))
+    conn.executemany(
+        "INSERT OR IGNORE INTO credit_card_transaction_tags (credit_card_transaction_id, tag_id) VALUES (?, ?)",
+        [(transaction_id, tag_id) for tag_id in tag_ids],
+    )
 
 
 def format_card_payment(payment: dict, currency: str) -> dict:

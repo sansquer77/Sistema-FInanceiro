@@ -86,6 +86,11 @@ def initialize_database() -> None:
                 amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
                 date TEXT NOT NULL,
                 invoice_month TEXT NOT NULL,
+                series_id TEXT,
+                series_kind TEXT NOT NULL DEFAULT 'single',
+                installment_index INTEGER,
+                installment_count INTEGER,
+                recurrence_frequency TEXT,
                 category_id INTEGER REFERENCES categories(id),
                 subcategory_id INTEGER REFERENCES subcategories(id),
                 reconciled_at TEXT,
@@ -205,15 +210,37 @@ def initialize_database() -> None:
                 fixed_income_indexer TEXT,
                 fixed_income_rate_micros INTEGER NOT NULL DEFAULT 0 CHECK (fixed_income_rate_micros >= 0),
                 fixed_income_maturity_date TEXT,
+                apply_tax_estimate INTEGER NOT NULL DEFAULT 0 CHECK (apply_tax_estimate IN (0, 1)),
                 notes TEXT,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS investment_redemptions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                account_id INTEGER NOT NULL REFERENCES checking_accounts(id) ON DELETE CASCADE,
+                transaction_id INTEGER REFERENCES transactions(id) ON DELETE SET NULL,
+                source_type TEXT NOT NULL CHECK (source_type IN ('operation', 'opening')),
+                source_id INTEGER NOT NULL,
+                redeemed_value_cents INTEGER NOT NULL CHECK (redeemed_value_cents > 0),
+                redeemed_cost_cents INTEGER NOT NULL CHECK (redeemed_cost_cents >= 0),
+                redeemed_quantity_micros INTEGER NOT NULL DEFAULT 0 CHECK (redeemed_quantity_micros >= 0),
+                date TEXT NOT NULL,
+                notes TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
             CREATE TABLE IF NOT EXISTS transaction_tags (
                 transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
                 tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
                 PRIMARY KEY (transaction_id, tag_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS credit_card_transaction_tags (
+                credit_card_transaction_id INTEGER NOT NULL REFERENCES credit_card_transactions(id) ON DELETE CASCADE,
+                tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+                PRIMARY KEY (credit_card_transaction_id, tag_id)
             );
 
             CREATE TABLE IF NOT EXISTS spending_limits (
@@ -257,6 +284,9 @@ def initialize_database() -> None:
             CREATE INDEX IF NOT EXISTS idx_transaction_tags_tag
             ON transaction_tags (tag_id);
 
+            CREATE INDEX IF NOT EXISTS idx_credit_card_transaction_tags_tag
+            ON credit_card_transaction_tags (tag_id);
+
             CREATE INDEX IF NOT EXISTS idx_password_resets_token
             ON password_resets (token_hash, used_at, expires_at);
             """
@@ -275,8 +305,14 @@ def initialize_database() -> None:
         ensure_column(conn, "transactions", "recurrence_frequency", "TEXT")
         ensure_column(conn, "transactions", "reconciled_at", "TEXT")
         ensure_column(conn, "credit_card_transactions", "reconciled_at", "TEXT")
+        ensure_column(conn, "credit_card_transactions", "series_id", "TEXT")
+        ensure_column(conn, "credit_card_transactions", "series_kind", "TEXT NOT NULL DEFAULT 'single'")
+        ensure_column(conn, "credit_card_transactions", "installment_index", "INTEGER")
+        ensure_column(conn, "credit_card_transactions", "installment_count", "INTEGER")
+        ensure_column(conn, "credit_card_transactions", "recurrence_frequency", "TEXT")
         ensure_column(conn, "investment_operations", "fixed_income_maturity_date", "TEXT")
         ensure_column(conn, "investment_opening_positions", "fixed_income_maturity_date", "TEXT")
+        ensure_column(conn, "investment_opening_positions", "apply_tax_estimate", "INTEGER NOT NULL DEFAULT 0")
         ensure_column(conn, "checking_accounts", "account_type", "TEXT NOT NULL DEFAULT 'liquidity'")
         ensure_column(conn, "categories", "group_type", "TEXT NOT NULL DEFAULT 'expense'")
         migrate_category_unique_constraint(conn)
@@ -287,6 +323,7 @@ def initialize_database() -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_transactions_account ON transactions (account_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_investment_operations_user ON investment_operations (user_id, account_id, asset_type)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_investment_opening_positions_user ON investment_opening_positions (user_id, account_id, asset_type)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_investment_redemptions_source ON investment_redemptions (user_id, source_type, source_id)")
 
 
 def row_to_dict(row: sqlite3.Row | None) -> dict | None:

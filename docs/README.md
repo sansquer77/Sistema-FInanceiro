@@ -18,6 +18,8 @@ Esta pasta e a fonte principal de requisitos, arquitetura e especificacoes do Si
 - [Importacao Organizze](./specs/importacao-organizze.md)
 - [Recuperacao de senha](./specs/recuperacao-senha.md)
 - [Cartoes](./specs/cartoes.md)
+- [Limites de gastos](./specs/limites-gastos.md)
+- [Investimentos e Portfólio](./specs/investimentos-portfolio.md)
 - [Relatorios](./specs/relatorios.md)
 
 ## Referencias

@@ -519,6 +519,7 @@ DEFAULT_CATEGORIES = {
         "Serviços Financeiros e Impostos": [
             "Anuidade de Cartão de Crédito",
             "Imposto de Renda a Pagar (IRPF)",
+            "IOF",
             "Juros, Empréstimos e Financiamentos",
             "Seguro de Vida / Previdência do Estado",
             "Tarifas e Taxas de Conta Corrente",
@@ -529,11 +530,15 @@ DEFAULT_CATEGORIES = {
         "Transporte": [
             "Aplicativos de Transporte (Uber, 99)",
             "Combustível",
-            "Estacionamento e Pedágio",
+            "Estacionamento",
             "IPVA / Licenciamento / DPVAT",
             "Lavagem e Cuidados com o Carro",
             "Manutenção, Revisão e Troca de Óleo",
+            "Parcela do carro",
+            "Pedágio",
+            "Recarga",
             "Seguro Auto",
+            "Tag",
             "Transporte Público (Ônibus, Metrô, Trem)",
         ],
     },
@@ -545,6 +550,7 @@ DEFAULT_CATEGORIES = {
             "Projetos / Serviços Prestados",
         ],
         "Outras Receitas": [
+            "Estornos",
             "Presentes / Doações Recebidas",
             "Prêmios / Sorteios / Loterias",
             "Reembolso médico",
@@ -598,6 +604,7 @@ DEFAULT_CATEGORIES = {
             "ETFs (Exchange Traded Funds)",
             "Fundos de Investimento Imobiliário (FIIs)",
             "Mercado de Opções / Contratos Futuros",
+            "Real Estate Investment Trust (REIT)",
         ],
     },
 }

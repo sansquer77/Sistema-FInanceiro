@@ -1166,6 +1166,44 @@ textarea:focus {
   vertical-align: top;
 }
 
+.portfolio-parent-row {
+  background: #f8fbfa;
+}
+
+.portfolio-child-row {
+  background: #fff;
+}
+
+.portfolio-child-row td:first-child {
+  padding-left: 34px;
+}
+
+.portfolio-asset-name {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.portfolio-toggle {
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--accent-dark);
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.portfolio-child-marker {
+  width: 24px;
+  height: 1px;
+  background: var(--line);
+}
+
 .money-cell {
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -1284,6 +1322,14 @@ textarea:focus {
 
 .limit-item-main strong {
   display: block;
+}
+
+.limit-subcategory {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .limit-item-main span,

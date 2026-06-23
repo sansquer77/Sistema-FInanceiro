@@ -163,6 +163,13 @@
               </div>
               <div class="planning-list" id="monthlyPlanningList"></div>
             </section>
+
+            <section class="panel">
+              <div class="section-heading">
+                <h2>Dívidas</h2>
+              </div>
+              <div class="planning-list" id="installmentDebtList"></div>
+            </section>
           </div>
 
           <div class="cockpit-grid analytics-grid">
@@ -396,6 +403,17 @@
                   <input name="amount" type="text" inputmode="decimal" placeholder="0,00" required>
                 </label>
                 <div class="field-row">
+                  <label>Repetição
+                    <select name="series_kind" id="cardSeriesKind">
+                      <option value="single">À vista</option>
+                      <option value="installment">Parcelado</option>
+                    </select>
+                  </label>
+                  <label id="cardInstallmentCountLabel" hidden>Parcelas
+                    <input name="installment_count" id="cardInstallmentCount" type="number" min="2" max="120" value="2">
+                  </label>
+                </div>
+                <div class="field-row">
                   <label>Categoria
                     <select name="category" id="cardTransactionCategory" required></select>
                   </label>
@@ -574,7 +592,8 @@
 
                 <div class="field-row">
                   <label>Tag
-                    <input name="tags" type="text" placeholder="Ex.: Mercado, Cartão">
+                    <input name="tags" id="transactionTags" type="text" list="transactionTagOptions" placeholder="Selecione ou digite uma tag">
+                    <datalist id="transactionTagOptions"></datalist>
                   </label>
                 </div>
                 <label>Observações
@@ -669,7 +688,7 @@
                 </label>
               </div>
               <div class="field-row">
-                <label>Tipo
+                <label>Categoria
                   <select name="asset_type" id="portfolioAssetType">
                     <option value="stock">Ações / ETFs / BDRs</option>
                     <option value="crypto">Cripto</option>
@@ -683,8 +702,8 @@
                 </label>
               </div>
               <div class="field-row">
-                <label>Ativo
-                  <input name="asset_identifier" type="text" placeholder="Ex.: PETR4, IVVB11, BTC">
+                <label id="portfolioAssetIdentifierLabel">Ativo
+                  <input name="asset_identifier" id="portfolioAssetIdentifier" type="text" placeholder="Ex.: PETR4, IVVB11, BTC">
                 </label>
                 <label>Nome do ativo
                   <input name="asset_name" type="text" placeholder="Ex.: Petrobras PN">
@@ -696,6 +715,23 @@
                 </label>
               </div>
               <div class="field-row" id="portfolioFixedFields" hidden>
+                <label>Subcategoria
+                  <select id="portfolioFixedIncomeSubtype">
+                    <option value="">Selecione</option>
+                    <option value="CDB">CDB</option>
+                    <option value="LCI">LCI</option>
+                    <option value="LCA">LCA</option>
+                    <option value="LC">LC</option>
+                    <option value="Tesouro Selic">Tesouro Selic</option>
+                    <option value="Tesouro Prefixado">Tesouro Prefixado</option>
+                    <option value="Tesouro IPCA+">Tesouro IPCA+</option>
+                    <option value="Debenture">Debenture</option>
+                    <option value="CRI">CRI</option>
+                    <option value="CRA">CRA</option>
+                    <option value="Poupança">Poupança</option>
+                    <option value="Cofrinho">Cofrinho</option>
+                  </select>
+                </label>
                 <label>Modalidade
                   <select name="fixed_income_mode">
                     <option value="">Selecione</option>
@@ -720,6 +756,9 @@
                 <label>Vencimento
                   <input name="fixed_income_maturity_date" type="date">
                 </label>
+                <label class="checkbox-label">Aplicar estimativa de IR/IOF nesta posição inicial
+                  <input name="apply_tax_estimate" type="checkbox" value="1">
+                </label>
               </div>
               <div class="field-row">
                 <label>Quantidade
@@ -737,6 +776,7 @@
               </label>
               <div class="actions">
                 <button class="primary" type="submit">Salvar ativo</button>
+                <button class="danger" id="deletePortfolioAssetButton" type="button" hidden>Excluir ativo</button>
                 <button class="ghost" id="cancelPortfolioAssetButton" type="button">Cancelar</button>
               </div>
             </form>
@@ -961,7 +1001,7 @@
                   <select id="importCreditCard"></select>
                 </label>
                 <label>Modelo preenchido
-                  <input name="file" type="file" accept=".csv" required>
+                  <input name="file" type="file" accept=".xlsx,.csv" required>
                 </label>
                 <button class="ghost" id="downloadImportTemplateButton" type="button">Baixar modelo</button>
                 <button class="primary" type="submit">Importar lançamentos</button>
@@ -1044,6 +1084,6 @@
         </div>
       </section>
     </main>
-    <script src="/app.js?v=15"></script>
+    <script src="/app.js?v=35"></script>
   </body>
 </html>

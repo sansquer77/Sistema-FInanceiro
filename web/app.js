@@ -15,7 +15,11 @@ const state = {
   tags: [],
   spendingLimits: [],
   portfolio: null,
+  portfolioDirty: true,
+  portfolioLoading: false,
+  portfolioError: "",
   portfolioGroup: "none",
+  portfolioExpandedGroups: new Set(),
   view: "cockpit",
   transactionMonth: new Date().toISOString().slice(0, 7),
   limitMonth: new Date().toISOString().slice(0, 7),
@@ -67,12 +71,16 @@ const cardTransactionFormTitle = document.querySelector("#cardTransactionFormTit
 const cardTransactionType = document.querySelector("#cardTransactionType");
 const cardTransactionCategory = document.querySelector("#cardTransactionCategory");
 const cardTransactionSubcategory = document.querySelector("#cardTransactionSubcategory");
+const cardSeriesKind = document.querySelector("#cardSeriesKind");
+const cardInstallmentCount = document.querySelector("#cardInstallmentCount");
+const cardInstallmentCountLabel = document.querySelector("#cardInstallmentCountLabel");
 const cardInvoiceList = document.querySelector("#cardInvoiceList");
 const cancelCardTransactionEditButton = document.querySelector("#cancelCardTransactionEditButton");
 const transactionForm = document.querySelector("#transactionForm");
 const transactionFormTitle = document.querySelector("#transactionFormTitle");
 const transactionMessage = document.querySelector("#transactionMessage");
 const transactionList = document.querySelector("#transactionList");
+const transactionTagOptions = document.querySelector("#transactionTagOptions");
 const categoryForm = document.querySelector("#categoryForm");
 const categoryGroup = document.querySelector("#categoryGroup");
 const subcategoryForm = document.querySelector("#subcategoryForm");
@@ -114,9 +122,13 @@ const portfolioAssetForm = document.querySelector("#portfolioAssetForm");
 const portfolioAssetFormTitle = document.querySelector("#portfolioAssetFormTitle");
 const portfolioAssetAccount = document.querySelector("#portfolioAssetAccount");
 const portfolioAssetType = document.querySelector("#portfolioAssetType");
+const portfolioAssetIdentifier = document.querySelector("#portfolioAssetIdentifier");
+const portfolioAssetIdentifierLabel = document.querySelector("#portfolioAssetIdentifierLabel");
 const portfolioFundFields = document.querySelector("#portfolioFundFields");
 const portfolioFixedFields = document.querySelector("#portfolioFixedFields");
+const portfolioFixedIncomeSubtype = document.querySelector("#portfolioFixedIncomeSubtype");
 const cancelPortfolioAssetButton = document.querySelector("#cancelPortfolioAssetButton");
+const deletePortfolioAssetButton = document.querySelector("#deletePortfolioAssetButton");
 const portfolioCostSummary = document.querySelector("#portfolioCostSummary");
 const portfolioCurrentSummary = document.querySelector("#portfolioCurrentSummary");
 const portfolioResultSummary = document.querySelector("#portfolioResultSummary");
@@ -149,6 +161,7 @@ const passwordMessage = document.querySelector("#passwordMessage");
 const clearLaunchesMessage = document.querySelector("#clearLaunchesMessage");
 const deleteUserMessage = document.querySelector("#deleteUserMessage");
 const monthlyPlanningList = document.querySelector("#monthlyPlanningList");
+const installmentDebtList = document.querySelector("#installmentDebtList");
 const transactionType = document.querySelector("#transactionType");
 const transactionAccount = document.querySelector("#transactionAccount");
 const transactionAmount = document.querySelector("#transactionAmount");
@@ -245,6 +258,7 @@ cardPaymentAccount.addEventListener("change", renderCardInvoice);
 cardTransactionForm.addEventListener("submit", handleCardTransactionSubmit);
 cardTransactionType.addEventListener("change", renderCardTransactionCategories);
 cardTransactionCategory.addEventListener("change", renderCardTransactionSubcategories);
+cardSeriesKind.addEventListener("change", updateCardSeriesState);
 transactionForm.addEventListener("submit", handleTransactionSubmit);
 categoryForm.addEventListener("submit", handleCategorySubmit);
 categoryGroup.addEventListener("change", handleCategoryGroupChange);
@@ -294,7 +308,9 @@ addPortfolioAssetButton.addEventListener("click", showPortfolioAssetForm);
 refreshPortfolioButton.addEventListener("click", () => loadPortfolio({ refreshMessage: true }));
 portfolioAssetForm.addEventListener("submit", handlePortfolioAssetSubmit);
 portfolioAssetType.addEventListener("change", updatePortfolioAssetTypeState);
+portfolioFixedIncomeSubtype.addEventListener("change", syncPortfolioFixedIncomeSubtype);
 cancelPortfolioAssetButton.addEventListener("click", resetPortfolioAssetForm);
+deletePortfolioAssetButton.addEventListener("click", deletePortfolioAsset);
 portfolioGroupFilter.addEventListener("change", () => {
   state.portfolioGroup = portfolioGroupFilter.value;
   renderPortfolio();
@@ -469,7 +485,6 @@ async function loadAll() {
     await loadClassifications();
     await loadSpendingLimits();
     await loadCardInvoice();
-    await loadPortfolio();
   } catch (error) {
     state.accounts = [];
     state.archivedAccounts = [];
@@ -494,7 +509,7 @@ async function loadAccounts() {
   const response = await api("/api/checking-accounts");
   state.accounts = response.accounts;
   await loadArchivedAccounts();
-  await loadPortfolio();
+  markPortfolioDirty();
   renderAll();
 }
 
@@ -537,30 +552,52 @@ async function loadTransactionsAndAccounts() {
   await loadClassifications();
   await loadSpendingLimits();
   await loadCardInvoice();
-  await loadPortfolio();
+  markPortfolioDirty();
   renderAll();
 }
 
 async function loadPortfolio(options = {}) {
+  if (state.portfolio && !state.portfolioDirty && !options.force && !options.refreshMessage) {
+    renderPortfolio();
+    renderCockpitPortfolioByType();
+    return;
+  }
+  if (state.portfolioLoading) {
+    return;
+  }
+  state.portfolioLoading = true;
+  state.portfolioError = "";
   if (options.refreshMessage) {
     setMessage(portfolioMessage, "Atualizando cotações...");
   }
   try {
     state.portfolio = await api("/api/portfolio");
+    state.portfolioDirty = false;
     if (options.refreshMessage) {
       setMessage(portfolioMessage, "Portfólio atualizado.", "success");
     }
   } catch (error) {
     state.portfolio = null;
-    setMessage(portfolioMessage, error.message, "error");
+    state.portfolioError = error.message;
+    if (options.refreshMessage || state.view === "portfolio") {
+      setMessage(portfolioMessage, error.message, "error");
+    }
+  } finally {
+    state.portfolioLoading = false;
   }
   renderPortfolio();
+  renderCockpitPortfolioByType();
+}
+
+function markPortfolioDirty() {
+  state.portfolioDirty = true;
 }
 
 async function handlePortfolioAssetSubmit(event) {
   event.preventDefault();
   setMessage(portfolioMessage, "");
   try {
+    syncPortfolioFixedIncomeSubtype();
     const data = formData(portfolioAssetForm);
     const isEditing = Boolean(data.id);
     const response = await api(isEditing ? `/api/portfolio/positions/${data.id}` : "/api/portfolio/positions", {
@@ -568,6 +605,7 @@ async function handlePortfolioAssetSubmit(event) {
       body: data,
     });
     state.portfolio = response;
+    state.portfolioDirty = false;
     resetPortfolioAssetForm();
     renderPortfolio();
     setMessage(portfolioMessage, isEditing ? "Ativo atualizado no portfólio." : "Ativo incluído no portfólio sem movimentar conta.", "success");
@@ -579,6 +617,7 @@ async function handlePortfolioAssetSubmit(event) {
 function showPortfolioAssetForm() {
   portfolioAssetForm.elements.id.value = "";
   portfolioAssetFormTitle.textContent = "Ativo em carteira";
+  deletePortfolioAssetButton.hidden = true;
   renderPortfolioAssetAccounts();
   portfolioAssetFormPanel.hidden = false;
   if (!portfolioAssetForm.elements.acquisition_date.value) {
@@ -592,6 +631,7 @@ function resetPortfolioAssetForm() {
   portfolioAssetForm.reset();
   portfolioAssetForm.elements.id.value = "";
   portfolioAssetFormTitle.textContent = "Ativo em carteira";
+  deletePortfolioAssetButton.hidden = true;
   portfolioAssetForm.elements.acquisition_date.value = new Date().toISOString().slice(0, 10);
   portfolioAssetFormPanel.hidden = true;
   updatePortfolioAssetTypeState();
@@ -616,20 +656,107 @@ function editPortfolioPosition(position) {
   portfolioAssetForm.elements.fixed_income_indexer.value = position.fixed_income_indexer || "";
   portfolioAssetForm.elements.fixed_income_rate.value = decimalInputValue(position.fixed_income_rate);
   portfolioAssetForm.elements.fixed_income_maturity_date.value = position.fixed_income_maturity_date || "";
+  portfolioAssetForm.elements.apply_tax_estimate.checked = Boolean(position.apply_tax_estimate);
   portfolioAssetForm.elements.quantity.value = decimalInputValue(position.quantity);
   portfolioAssetForm.elements.unit_price.value = moneyInputValue(position.average_price);
   portfolioAssetForm.elements.exchange_rate_to_brl.value = "";
   portfolioAssetForm.elements.notes.value = "";
   portfolioAssetFormTitle.textContent = "Editar ativo em carteira";
+  deletePortfolioAssetButton.hidden = false;
   portfolioAssetFormPanel.hidden = false;
   updatePortfolioAssetTypeState();
   portfolioAssetFormPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function editPortfolioSourceTransaction(transactionId) {
+  const transaction = state.transactions.find((entry) => String(entry.id) === String(transactionId));
+  if (!transaction) {
+    setMessage(portfolioMessage, "Lançamento de origem não encontrado. Atualize os dados e tente novamente.", "error");
+    return;
+  }
+  showModule("transactions");
+  transactionAccount.value = String(transaction.account_id);
+  state.selectedAccountId = transaction.account_id;
+  renderTransactions();
+  editTransaction(transaction);
+}
+
+async function deletePortfolioAsset() {
+  const positionId = portfolioAssetForm.elements.id.value;
+  if (!positionId) {
+    return;
+  }
+  const confirmed = window.confirm("Excluir este ativo do portfólio? Esta ação remove apenas a posição inicial cadastrada diretamente no Portfólio.");
+  if (!confirmed) {
+    return;
+  }
+  setMessage(portfolioMessage, "");
+  try {
+    const response = await api(`/api/portfolio/positions/${positionId}`, { method: "DELETE" });
+    state.portfolio = response;
+    state.portfolioDirty = false;
+    resetPortfolioAssetForm();
+    renderPortfolio();
+    setMessage(portfolioMessage, "Ativo excluído do portfólio.", "success");
+  } catch (error) {
+    setMessage(portfolioMessage, error.message, "error");
+  }
+}
+
+async function redeemPortfolioPosition(position) {
+  const rawAmount = window.prompt("Valor do resgate", moneyInputValue(position.current_value));
+  if (rawAmount === null) {
+    return;
+  }
+  const rawDate = window.prompt("Data do resgate", new Date().toISOString().slice(0, 10));
+  if (rawDate === null) {
+    return;
+  }
+  setMessage(portfolioMessage, "Efetuando resgate...");
+  try {
+    const response = await api("/api/portfolio/redeem", {
+      method: "POST",
+      body: {
+        account_id: position.account_id,
+        currency: position.currency,
+        asset_type: position.asset_type,
+        asset_identifier: position.asset_identifier || "",
+        asset_name: position.asset_name || "",
+        cnpj: position.cnpj || "",
+        amount: rawAmount,
+        date: rawDate,
+      },
+    });
+    state.portfolio = response;
+    state.portfolioDirty = false;
+    await loadTransactionsAndAccounts();
+    renderPortfolio();
+    setMessage(portfolioMessage, "Resgate registrado e valor retornado para a conta da carteira.", "success");
+  } catch (error) {
+    setMessage(portfolioMessage, error.message, "error");
+  }
 }
 
 function updatePortfolioAssetTypeState() {
   const assetType = portfolioAssetType.value;
   portfolioFundFields.hidden = assetType !== "fund";
   portfolioFixedFields.hidden = assetType !== "fixed_income";
+  if (assetType === "fixed_income") {
+    portfolioAssetIdentifierLabel.hidden = true;
+    const matchedSubtype = [...portfolioFixedIncomeSubtype.options].find((option) => option.value === portfolioAssetIdentifier.value);
+    portfolioFixedIncomeSubtype.value = matchedSubtype ? matchedSubtype.value : "";
+  } else {
+    portfolioAssetIdentifierLabel.hidden = false;
+    portfolioAssetIdentifierLabel.childNodes[0].textContent = "Ativo ";
+    portfolioAssetIdentifier.placeholder = "Ex.: PETR4, IVVB11, BTC";
+    portfolioFixedIncomeSubtype.value = "";
+  }
+}
+
+function syncPortfolioFixedIncomeSubtype() {
+  if (portfolioAssetType.value === "fixed_income" && portfolioFixedIncomeSubtype.value) {
+    portfolioAssetIdentifier.value = portfolioFixedIncomeSubtype.value;
+  }
 }
 
 async function loadClassifications() {
@@ -639,6 +766,7 @@ async function loadClassifications() {
   ]);
   state.categories = categoriesResponse.categories;
   state.tags = tagsResponse.tags;
+  renderTransactionTagOptions();
 }
 
 async function loadSpendingLimits() {
@@ -700,6 +828,10 @@ function showModule(view) {
   }
   if (view === "reports") {
     renderReports();
+  }
+  if (view === "portfolio") {
+    renderPortfolio();
+    loadPortfolio();
   }
   if (view === "creditCards") {
     renderCreditCards();
@@ -766,6 +898,7 @@ async function handleCardTransactionSubmit(event) {
     return;
   }
   const data = formData(cardTransactionForm);
+  setFormBusy(cardTransactionForm, true);
   data.credit_card_id = state.selectedCreditCardId;
   data.invoice_month = state.cardInvoiceMonth;
   const isEditing = Boolean(data.id);
@@ -781,6 +914,8 @@ async function handleCardTransactionSubmit(event) {
     setMessage(cardInvoiceMessage, isEditing ? "Lançamento do cartão atualizado." : "Lançamento do cartão salvo.", "success");
   } catch (error) {
     setMessage(cardInvoiceMessage, error.message, "error");
+  } finally {
+    setFormBusy(cardTransactionForm, false);
   }
 }
 
@@ -808,9 +943,9 @@ async function handleTransactionSubmit(event) {
   }
   try {
     const data = formData(transactionForm);
+    setFormBusy(transactionForm, true);
     if (data.type === "investment") {
       data.amount = data.investment_amount || data.amount;
-      data.tags = data.tags || "Investimento";
     }
     if (data.type === "exchange") {
       data.type = "transfer";
@@ -838,6 +973,8 @@ async function handleTransactionSubmit(event) {
     setMessage(transactionMessage, isEditing ? "Lançamento atualizado." : "Lançamento salvo.", "success");
   } catch (error) {
     setMessage(transactionMessage, error.message, "error");
+  } finally {
+    setFormBusy(transactionForm, false);
   }
 }
 
@@ -1258,9 +1395,14 @@ function resetCardTransactionForm() {
   cardTransactionForm.elements.date.value = new Date().toISOString().slice(0, 10);
   cardTransactionForm.elements.credit_card_id.value = state.selectedCreditCardId;
   cardTransactionForm.elements.invoice_month.value = state.cardInvoiceMonth;
+  cardSeriesKind.disabled = false;
+  cardInstallmentCount.disabled = false;
+  cardSeriesKind.value = "single";
+  cardInstallmentCount.value = "2";
   cardTransactionFormTitle.textContent = "Novo lançamento no cartão";
   cancelCardTransactionEditButton.hidden = true;
   cardTransactionForm.querySelector('button[type="submit"]').textContent = "Salvar lançamento";
+  updateCardSeriesState();
   renderCardTransactionCategories();
 }
 
@@ -1405,6 +1547,11 @@ function editCardTransaction(transaction) {
   cardTransactionForm.elements.description.value = transaction.description;
   cardTransactionForm.elements.amount.value = moneyInputValue(transaction.amount);
   cardTransactionForm.elements.notes.value = transaction.notes || "";
+  cardSeriesKind.value = transaction.series_kind || "single";
+  cardInstallmentCount.value = transaction.installment_count || "2";
+  cardSeriesKind.disabled = true;
+  cardInstallmentCount.disabled = true;
+  updateCardSeriesState();
   renderCardTransactionCategories();
   if (transaction.category_name) {
     cardTransactionCategory.value = transaction.category_name;
@@ -1417,6 +1564,12 @@ function editCardTransaction(transaction) {
   cancelCardTransactionEditButton.hidden = false;
   cardTransactionForm.querySelector('button[type="submit"]').textContent = "Salvar alterações";
   cardTransactionForm.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function updateCardSeriesState() {
+  const isInstallment = cardSeriesKind.value === "installment";
+  cardInstallmentCountLabel.hidden = !isInstallment;
+  cardInstallmentCount.disabled = !isInstallment;
 }
 
 function renderAll() {
@@ -1445,6 +1598,7 @@ function renderCockpit() {
   renderCurrencyTotals(totals);
   renderCockpitPortfolioByType();
   renderMonthlyPlanning();
+  renderInstallmentDebts();
   renderTopExpensesChart();
   renderCashDistributionChart(monthTotals);
 }
@@ -1478,6 +1632,52 @@ function planningSection(title, transactions) {
     : '<div class="empty-state compact">Nada previsto neste mês.</div>';
   section.innerHTML = `<h3>${title}</h3>${rows}`;
   return section;
+}
+
+function renderInstallmentDebts() {
+  if (!installmentDebtList) {
+    return;
+  }
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const rows = new Map();
+  for (const transaction of state.transactions) {
+    if (transaction.series_kind !== "installment" || transaction.type !== "expense" || transaction.date.slice(0, 7) < currentMonth) {
+      continue;
+    }
+    const key = `account:${transaction.account_id}`;
+    const row = rows.get(key) || { label: transaction.account_name || "Conta", detail: "Conta", currency: transaction.account_currency || "BRL", total: 0, count: 0 };
+    row.total += Number(transaction.amount || 0);
+    row.count += 1;
+    rows.set(key, row);
+  }
+  for (const transaction of state.cardTransactions) {
+    if (transaction.series_kind !== "installment" || transaction.type !== "expense" || transaction.invoice_month < currentMonth) {
+      continue;
+    }
+    const key = `card:${transaction.credit_card_id}`;
+    const row = rows.get(key) || { label: transaction.credit_card_name || "Cartão", detail: "Cartão", currency: transaction.card_currency || "BRL", total: 0, count: 0 };
+    row.total += Number(transaction.amount || 0);
+    row.count += 1;
+    rows.set(key, row);
+  }
+  const debts = [...rows.values()].sort((a, b) => b.total - a.total);
+  if (debts.length === 0) {
+    installmentDebtList.innerHTML = '<section class="planning-section"><div class="empty-state compact">Nenhuma compra parcelada em aberto.</div></section>';
+    return;
+  }
+  installmentDebtList.innerHTML = `
+    <section class="planning-section">
+      ${debts.map((row) => `
+        <div class="planning-row">
+          <div>
+            <strong>${escapeHtml(row.label)}</strong>
+            <span>${escapeHtml(row.detail)} · ${row.count} parcela(s) restante(s)</span>
+          </div>
+          <strong>${formatMoney(row.total, row.currency)}</strong>
+        </div>
+      `).join("")}
+    </section>
+  `;
 }
 
 function groupTransactionsByCategory(transactions) {
@@ -1741,6 +1941,7 @@ function renderCardInvoiceList(card) {
         <div class="account-meta">
           <span>${formatDate(transaction.date)}</span>
           <span>${cardTransactionTypeLabel(transaction.type)}</span>
+          ${transactionSeriesLabel(transaction) ? `<span>${transactionSeriesLabel(transaction)}</span>` : ""}
           ${transaction.category_name ? `<span>${escapeHtml(cardCategoryPath(transaction))}</span>` : ""}
         </div>
       </div>
@@ -2112,12 +2313,12 @@ function renderImportTargets() {
 }
 
 function renderPortfolioAssetAccounts() {
-  const investmentAccounts = state.accounts.filter((account) => account.account_type === "investment");
-  portfolioAssetAccount.innerHTML = investmentAccounts.map((account) => (
+  const portfolioAccounts = state.accounts.filter((account) => ["liquidity", "investment"].includes(account.account_type));
+  portfolioAssetAccount.innerHTML = portfolioAccounts.map((account) => (
     `<option value="${account.id}">${escapeHtml(account.name)} (${escapeHtml(account.currency)})</option>`
-  )).join("") || '<option value="">Cadastre uma conta de investimento</option>';
-  portfolioAssetAccount.disabled = investmentAccounts.length === 0;
-  portfolioAssetForm.querySelector('button[type="submit"]').disabled = investmentAccounts.length === 0;
+  )).join("") || '<option value="">Cadastre uma conta de liquidez ou investimento</option>';
+  portfolioAssetAccount.disabled = portfolioAccounts.length === 0;
+  portfolioAssetForm.querySelector('button[type="submit"]').disabled = portfolioAccounts.length === 0;
 }
 
 function renderTransactionCategories() {
@@ -2148,6 +2349,15 @@ function renderTransactionSubcategories() {
     `<option value="${escapeHtml(subcategory.name)}">${escapeHtml(subcategory.name)}</option>`
   )).join("");
   transactionSubcategory.disabled = subcategories.length === 0;
+}
+
+function renderTransactionTagOptions() {
+  if (!transactionTagOptions) {
+    return;
+  }
+  transactionTagOptions.innerHTML = state.tags
+    .map((tag) => `<option value="${escapeHtml(tag.name)}"></option>`)
+    .join("");
 }
 
 function renderTransactions() {
@@ -2446,14 +2656,31 @@ function renderPortfolioPositions(positions) {
           </tr>
         </thead>
         <tbody>
-          ${group.positions.map(portfolioPositionRow).join("")}
+          ${portfolioPositionRows(group.positions).join("")}
         </tbody>
       </table>
     </div>
   `).join("");
+  portfolioPositions.querySelectorAll("[data-toggle-portfolio-group]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const key = button.dataset.togglePortfolioGroup;
+      if (state.portfolioExpandedGroups.has(key)) {
+        state.portfolioExpandedGroups.delete(key);
+      } else {
+        state.portfolioExpandedGroups.add(key);
+      }
+      renderPortfolioPositions(positions);
+    });
+  });
   portfolioPositions.querySelectorAll("[data-edit-portfolio-position-id]").forEach((button) => {
     const position = positions.find((entry) => String(entry.source_id) === String(button.dataset.editPortfolioPositionId));
     button.addEventListener("click", () => editPortfolioPosition(position));
+  });
+  portfolioPositions.querySelectorAll("[data-edit-portfolio-transaction-id]").forEach((button) => {
+    button.addEventListener("click", () => editPortfolioSourceTransaction(button.dataset.editPortfolioTransactionId));
+  });
+  portfolioPositions.querySelectorAll("[data-redeem-portfolio-payload]").forEach((button) => {
+    button.addEventListener("click", () => redeemPortfolioPosition(JSON.parse(button.dataset.redeemPortfolioPayload)));
   });
 }
 
@@ -2474,45 +2701,157 @@ function groupPortfolioPositions(positions) {
     .map(([label, groupPositions]) => ({ label, positions: groupPositions }));
 }
 
-function portfolioPositionRow(position) {
+function portfolioPositionRows(positions) {
+  return portfolioAssetGroups(positions).flatMap((group) => {
+    if (group.positions.length === 1) {
+      return [portfolioPositionRow(group.positions[0])];
+    }
+    const expanded = state.portfolioExpandedGroups.has(group.key);
+    const parent = aggregatePortfolioPositions(group.positions, group.key);
+    const rows = [portfolioPositionRow(parent, {
+      parent: true,
+      expanded,
+      childCount: group.positions.length,
+      groupKey: group.key,
+    })];
+    if (expanded) {
+      rows.push(...group.positions.map((position, index) => portfolioPositionRow(position, {
+        child: true,
+        childLabel: `Lançamento ${index + 1}`,
+      })));
+    }
+    return rows;
+  });
+}
+
+function portfolioAssetGroups(positions) {
+  const groups = new Map();
+  for (const position of positions) {
+    const key = portfolioAssetGroupKey(position);
+    if (!groups.has(key)) {
+      groups.set(key, []);
+    }
+    groups.get(key).push(position);
+  }
+  return [...groups.entries()].map(([key, groupPositions]) => ({ key, positions: groupPositions }));
+}
+
+function portfolioAssetGroupKey(position) {
+  const assetName = position.asset_name || position.asset_identifier || "Sem nome";
+  return JSON.stringify([
+    position.account_id,
+    position.currency,
+    position.asset_type,
+    assetName,
+    position.cnpj || "",
+  ]);
+}
+
+function aggregatePortfolioPositions(positions, groupKey) {
+  const base = { ...positions[0] };
+  const sum = (field) => positions.reduce((total, position) => total + Number(position[field] || 0), 0);
+  const quantity = sum("quantity");
+  const totalCost = sum("total_cost");
+  const totalCostBrl = sum("total_cost_brl");
+  const currentValue = sum("current_value");
+  const currentValueBrl = sum("current_value_brl");
+  const dayResult = sum("day_result");
+  const dayResultBrl = sum("day_result_brl");
+  const fixedIncomeGross = sum("fixed_income_gross_value");
+  const fixedIncomeIof = sum("fixed_income_iof_tax");
+  const fixedIncomeTax = sum("fixed_income_income_tax");
+  const fixedIncomeNet = sum("fixed_income_net_value");
+  base.quantity = quantity;
+  base.average_price = quantity > 0 ? totalCost / quantity : Number(base.average_price || 0);
+  base.invested = sum("invested");
+  base.costs = sum("costs");
+  base.total_cost = totalCost;
+  base.total_cost_brl = totalCostBrl;
+  base.current_value = currentValue;
+  base.current_value_brl = currentValueBrl;
+  base.current_value_cents = Math.round(currentValue * 100);
+  base.current_value_brl_cents = Math.round(currentValueBrl * 100);
+  base.day_result = dayResult;
+  base.day_result_brl = dayResultBrl;
+  base.fixed_income_gross_value = fixedIncomeGross;
+  base.fixed_income_iof_tax = fixedIncomeIof;
+  base.fixed_income_income_tax = fixedIncomeTax;
+  base.fixed_income_net_value = fixedIncomeNet;
+  base.apply_tax_estimate = positions.every((position) => Boolean(position.apply_tax_estimate));
+  base.source_type = "aggregate";
+  base.source_id = null;
+  base.source_transaction_id = null;
+  base.operations_count = positions.length;
+  base.portfolio_group_key = groupKey;
+  return base;
+}
+
+function portfolioPositionRow(position, options = {}) {
   const result = Number(position.current_value_brl || 0) - Number(position.total_cost_brl || 0);
   const resultPercent = Number(position.total_cost_brl) > 0 ? result / Number(position.total_cost_brl) : 0;
   const dayResult = Number(position.day_result_brl || 0);
   const dayBase = Number(position.current_value_brl || 0) - dayResult;
   const dayPercent = dayBase > 0 ? dayResult / dayBase : 0;
   const quoteStatus = position.quote_status === "ok" ? position.quote_source : position.quote_status;
+  const quoteText = portfolioQuoteText(position);
   const identifier = position.asset_identifier || position.asset_name || "Sem codigo";
+  const assetName = position.asset_name || identifier;
+  const rowLabel = options.parent ? assetName : options.child ? options.childLabel : identifier;
   const assetDetail = [
-    position.asset_name && position.asset_name !== identifier ? position.asset_name : "",
+    options.parent ? `${options.childCount} lançamentos` : "",
+    options.parent && position.asset_identifier && position.asset_identifier !== assetName ? position.asset_identifier : "",
+    options.child ? identifier : "",
+    options.child ? formatDate(position.first_operation_date) : "",
+    !options.parent && !options.child && position.asset_name && position.asset_name !== identifier ? position.asset_name : "",
     position.cnpj ? `CNPJ ${position.cnpj}` : "",
     position.fixed_income_indexer ? `${position.fixed_income_indexer}${position.fixed_income_rate ? ` · ${position.fixed_income_rate}%` : ""}` : "",
     position.fixed_income_maturity_date ? `Venc. ${formatDate(position.fixed_income_maturity_date)}` : "",
   ].filter(Boolean).join(" · ");
-  const hasFixedIncomeTax = position.asset_type === "fixed_income" && Number(position.fixed_income_income_tax || 0) > 0;
+  const toggle = options.parent
+    ? `<button class="portfolio-toggle" type="button" data-toggle-portfolio-group="${escapeHtml(options.groupKey)}" aria-label="${options.expanded ? "Recolher" : "Abrir"} ${escapeHtml(identifier)}">${options.expanded ? "-" : "+"}</button>`
+    : options.child ? '<span class="portfolio-child-marker"></span>' : "";
+  const fixedIncomeIof = Number(position.fixed_income_iof_tax || 0);
+  const fixedIncomeTax = Number(position.fixed_income_income_tax || 0);
+  const hasFixedIncomeTax = position.asset_type === "fixed_income" && (fixedIncomeIof > 0 || fixedIncomeTax > 0);
   const valueDetail = hasFixedIncomeTax
-    ? `<span>Bruto ${formatMoney(position.current_value, position.currency)}</span><span>IR estimado -${formatMoney(position.fixed_income_income_tax, position.currency)}</span><span>Líquido ${formatMoney(position.fixed_income_net_value, position.currency)}</span>`
+    ? `<span>Bruto ${formatMoney(position.fixed_income_gross_value || position.current_value, position.currency)}</span>${fixedIncomeIof > 0 ? `<span>IOF estimado -${formatMoney(position.fixed_income_iof_tax, position.currency)}</span>` : ""}<span>IR estimado -${formatMoney(position.fixed_income_income_tax, position.currency)}</span><span>Líquido ${formatMoney(position.fixed_income_net_value, position.currency)}</span>`
     : `<span>${formatMoney(position.current_value_brl, "BRL")}</span>`;
   const actions = position.source_type === "opening" && position.source_id
     ? `<button class="ghost small-button" type="button" data-edit-portfolio-position-id="${position.source_id}">Editar</button>`
-    : `<span class="muted-row">Pelo lançamento</span>`;
+    : position.source_type === "operation" && position.source_transaction_id
+      ? `<button class="ghost small-button" type="button" data-edit-portfolio-transaction-id="${position.source_transaction_id}">Editar lançamento</button>`
+      : `<span class="muted-row">Múltiplas origens</span>`;
+  const redeemAction = `<button class="ghost small-button" type="button" data-redeem-portfolio-payload="${escapeHtml(JSON.stringify(portfolioRedemptionPayload(position)))}">Resgatar</button>`;
   return `
-    <tr>
+    <tr class="${options.parent ? "portfolio-parent-row" : ""} ${options.child ? "portfolio-child-row" : ""}">
       <td>
-        <strong>${escapeHtml(identifier)}</strong>
+        <div class="portfolio-asset-name">${toggle}<strong>${escapeHtml(rowLabel)}</strong></div>
         <span>${escapeHtml(assetDetail || "Sem detalhe adicional")}</span>
       </td>
       <td>${escapeHtml(position.asset_type_label)}<span>${escapeHtml(position.market_label || "Brasil")}</span></td>
       <td>${escapeHtml(position.account_name)}<span>${escapeHtml(position.currency)}</span></td>
-      <td class="money-cell">${escapeHtml(position.quantity)}</td>
+      <td class="money-cell">${formatDecimal(position.quantity, 6)}</td>
       <td class="money-cell">${formatMoney(position.average_price, position.currency)}</td>
       <td class="money-cell">${formatMoney(position.total_cost, position.currency)}<span>${formatMoney(position.total_cost_brl, "BRL")}</span></td>
-      <td>${position.quote ? escapeHtml(position.quote) : "--"}<span>${escapeHtml(quoteStatus || "Pendente")}</span></td>
+      <td class="money-cell">${quoteText}<span>${escapeHtml(quoteStatus || "Pendente")}</span></td>
       <td class="money-cell">${formatMoney(position.current_value_cents / 100, position.currency)}${valueDetail}</td>
       <td class="money-cell ${dayResult < 0 ? "danger-text" : "positive-text"}">${formatMoney(position.day_result_brl, "BRL")}<span>${formatPercent(dayPercent)}</span></td>
       <td class="money-cell ${result < 0 ? "danger-text" : "positive-text"}">${formatMoney(result, "BRL")}<span>${formatPercent(resultPercent)}</span></td>
-      <td>${actions}</td>
+      <td>${redeemAction}${actions}</td>
     </tr>
   `;
+}
+
+function portfolioRedemptionPayload(position) {
+  return {
+    account_id: position.account_id,
+    currency: position.currency,
+    asset_type: position.asset_type,
+    asset_identifier: position.asset_identifier || "",
+    asset_name: position.asset_name || "",
+    cnpj: position.cnpj || "",
+    current_value: position.current_value,
+  };
 }
 
 function reportRankedSection(title, rows, emptyText) {
@@ -2672,7 +3011,8 @@ function renderSpendingLimitList() {
     item.innerHTML = `
       <div class="limit-item-main">
         <div>
-          <strong>${escapeHtml(row.label)}</strong>
+          <strong>${escapeHtml(row.categoryLabel)}</strong>
+          ${row.subcategoryLabel ? `<small class="limit-subcategory">${escapeHtml(row.subcategoryLabel)}</small>` : '<small class="limit-subcategory">Categoria inteira</small>'}
           <span>${formatMoney(row.spent, "BRL")} de ${formatMoney(row.limit, "BRL")}</span>
         </div>
         <strong>${formatPercent(row.percent)}</strong>
@@ -2713,6 +3053,8 @@ function spendingLimitRows() {
     return {
       limitRecord: limit,
       label: limit.subcategory_name ? `${limit.category_name} / ${limit.subcategory_name}` : limit.category_name,
+      categoryLabel: limit.category_name,
+      subcategoryLabel: limit.subcategory_name || "",
       spent,
       limit: limitAmount,
       percent: limitAmount > 0 ? spent / limitAmount : 0,
@@ -2856,9 +3198,18 @@ function renderTransactionCollection(container, transactions, compact) {
 }
 
 function transactionTemplate(transaction, compact) {
-  const signal = transaction.type === "income" ? "positive" : transaction.type === "expense" || transaction.type === "investment" ? "negative" : "neutral";
-  const amountPrefix = transaction.type === "income" ? "" : transaction.type === "expense" || transaction.type === "transfer" || transaction.type === "investment" ? "-" : "";
+  const isDestinationView = transaction.type === "transfer"
+    && state.selectedAccountId
+    && String(transaction.destination_account_id || "") === String(state.selectedAccountId)
+    && String(transaction.account_id) !== String(state.selectedAccountId);
+  const signal = isDestinationView ? "positive" : transaction.type === "income" ? "positive" : transaction.type === "expense" || transaction.type === "investment" ? "negative" : "neutral";
+  const amountPrefix = isDestinationView ? "+" : transaction.type === "income" ? "" : transaction.type === "expense" || transaction.type === "transfer" || transaction.type === "investment" ? "-" : "";
+  const displayAmount = isDestinationView && transaction.destination_amount && Number(transaction.destination_amount) > 0 ? transaction.destination_amount : transaction.amount;
+  const displayCurrency = isDestinationView ? transaction.destination_account_currency || transaction.account_currency : transaction.account_currency;
   const destination = transaction.destination_account_name ? ` para ${escapeHtml(transaction.destination_account_name)}` : "";
+  const accountRoute = isDestinationView
+    ? `${escapeHtml(transaction.account_name)} para ${escapeHtml(transaction.destination_account_name || "Conta destino")}`
+    : `${escapeHtml(transaction.account_name)}${destination}`;
   const typeLabel = isExchangeTransfer(transaction) ? "Câmbio" : isInvestmentTransaction(transaction) ? "Investimento" : transactionTypeLabel(transaction.type);
   const isReconciled = Boolean(transaction.reconciled_at);
   const convertedAmount = transaction.account_currency === "BRL" ? "" : `
@@ -2867,22 +3218,22 @@ function transactionTemplate(transaction, compact) {
   const destinationConvertedAmount = isExchangeTransfer(transaction) ? `
         <span>+${formatMoney(transaction.destination_amount, transaction.destination_account_currency)}</span>
       ` : "";
+  const conversionDetails = isDestinationView ? convertedAmount : `${destinationConvertedAmount}${convertedAmount}`;
   return `
     <article class="transaction-row ${signal}">
       <div>
         <strong>${escapeHtml(transaction.description)}</strong>
         <div class="account-meta">
           <span>${typeLabel}</span>
-          <span>${escapeHtml(transaction.account_name)}${destination}</span>
+          <span>${accountRoute}</span>
           ${transactionSeriesLabel(transaction) ? `<span>${transactionSeriesLabel(transaction)}</span>` : ""}
           ${transaction.category_name ? `<span>${escapeHtml(formatCategoryPath(transaction))}</span>` : ""}
           ${transaction.tags && transaction.tags.length ? `<span>${transaction.tags.map((tag) => `#${escapeHtml(tag)}`).join(" ")}</span>` : ""}
         </div>
       </div>
       <div class="transaction-amount">
-        <strong>${amountPrefix}${formatMoney(transaction.amount, transaction.account_currency)}</strong>
-        ${destinationConvertedAmount}
-        ${convertedAmount}
+        <strong>${amountPrefix}${formatMoney(displayAmount, displayCurrency)}</strong>
+        ${conversionDetails}
         ${compact ? "" : `
           <div class="transaction-actions">
             <button class="ghost small-button" type="button" data-edit-transaction-id="${transaction.id}">Editar</button>
@@ -2947,9 +3298,6 @@ function updateTransactionTypeState() {
   transactionCategory.disabled = !needsCategory;
   transactionCategory.required = needsCategory;
   transactionSubcategory.disabled = !needsCategory;
-  if (isInvestment && !transactionForm.elements.tags.value.trim()) {
-    transactionForm.elements.tags.value = "Investimento";
-  }
   renderTransactionCategories();
   updateSeriesState();
   updateInvestmentFieldState();
@@ -3170,6 +3518,7 @@ function groupTransactionsByDate(transactions) {
 
 function getCurrencyTotals() {
   const totals = new Map();
+  const reconciledTotals = getBalanceUntil(currentMonthEndDate(), state.transactions, true);
   for (const account of state.accounts) {
     const row = currencyTotalRow(totals, account.currency);
     const amount = Number(account.current_balance);
@@ -3193,6 +3542,13 @@ function getCurrencyTotals() {
       amount: signedAmount,
     });
   }
+  for (const [currency, amount] of reconciledTotals.entries()) {
+    currencyTotalRow(totals, currency).reconciled = amount;
+  }
+  for (const card of state.creditCards) {
+    const row = currencyTotalRow(totals, card.currency);
+    row.reconciled -= cardReconciledBalance(card.id);
+  }
   return new Map([...totals.entries()].sort(([currencyA], [currencyB]) => currencyA.localeCompare(currencyB)));
 }
 
@@ -3201,11 +3557,33 @@ function currencyTotalRow(totals, currency) {
   if (!totals.has(normalizedCurrency)) {
     totals.set(normalizedCurrency, {
       current: 0,
+      reconciled: 0,
       accounts: [],
       cards: [],
     });
   }
   return totals.get(normalizedCurrency);
+}
+
+function currentMonthEndDate() {
+  const now = new Date();
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}-${String(end.getDate()).padStart(2, "0")}`;
+}
+
+function cardReconciledBalance(cardId) {
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const transactionTotal = state.cardTransactions.reduce((total, transaction) => {
+    if (String(transaction.credit_card_id) !== String(cardId) || !transaction.reconciled_at || transaction.invoice_month > currentMonth) {
+      return total;
+    }
+    const amount = Number(transaction.amount);
+    return total + (transaction.type === "expense" ? amount : -amount);
+  }, 0);
+  const paidTotal = state.cardPayments.reduce((total, payment) => (
+    String(payment.credit_card_id) === String(cardId) && payment.invoice_month <= currentMonth ? total + Number(payment.amount) : total
+  ), 0);
+  return transactionTotal - paidTotal;
 }
 
 function cardOpenBalance(cardId) {
@@ -3352,6 +3730,8 @@ function renderCurrencyTotals(totals) {
       <div class="currency-breakdown">
         ${accountRows || '<span class="muted-row">Nenhuma conta ativa nesta moeda.</span>'}
         ${cardRows ? `<div class="currency-section-label">Cartões</div>${cardRows}` : ""}
+        <div class="currency-section-label">Saldo conciliado do mês</div>
+        ${currencyDetailRow("Consolidado", "Contas e cartões conciliados", amounts.reconciled, currency)}
       </div>
     `;
     currencyList.append(item);
@@ -3374,6 +3754,22 @@ function currencyDetailRow(name, detail, amount, currency, kind = "account") {
 function renderCockpitPortfolioByType() {
   if (!cockpitPortfolioByType) {
     return;
+  }
+  if (!state.portfolio && state.portfolioDirty) {
+    cockpitPortfolioByType.innerHTML = '<div class="empty-state compact">Atualizando portfólio...</div>';
+    loadPortfolio();
+    return;
+  }
+  if (state.portfolioLoading) {
+    cockpitPortfolioByType.innerHTML = '<div class="empty-state compact">Atualizando portfólio...</div>';
+    return;
+  }
+  if (state.portfolioError) {
+    cockpitPortfolioByType.innerHTML = `<div class="empty-state compact">${escapeHtml(state.portfolioError)}</div>`;
+    return;
+  }
+  if (state.portfolio && state.portfolioDirty && !state.portfolioLoading) {
+    loadPortfolio();
   }
   const rows = state.portfolio && state.portfolio.summary ? state.portfolio.summary.by_type || [] : [];
   if (rows.length === 0) {
@@ -3564,6 +3960,27 @@ function cardCategoryPath(transaction) {
 function formatMoney(value, currency) {
   const amount = Number(value);
   return amount.toLocaleString("pt-BR", { style: "currency", currency });
+}
+
+function portfolioQuoteText(position) {
+  if (position.asset_type === "fixed_income") {
+    return "-";
+  }
+  if (!position.quote) {
+    return "-";
+  }
+  const quote = Number(position.quote);
+  if (!Number.isFinite(quote)) {
+    return "-";
+  }
+  return formatMoney(quote, position.currency);
+}
+
+function formatDecimal(value, maximumFractionDigits = 2) {
+  return Number(value || 0).toLocaleString("pt-BR", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits,
+  });
 }
 
 function moneyInputValue(value) {

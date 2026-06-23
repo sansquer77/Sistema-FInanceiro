@@ -21,21 +21,23 @@ O Organizze serve como referencia de clareza: modulos financeiros separados, sal
 
 ### Implementados
 
-- Autenticacao e conta do usuario.
-- Contas-correntes manuais.
+- Autenticação e conta do usuário.
+- Contas-correntes manuais (liquidez, carteira, investimentos) em múltiplas moedas.
 - Categorias, subcategorias e tags.
-- Lancamentos de receita, despesa e transferencia.
-- Importacao de lancamentos do Organizze.
-- Recuperacao de senha por email SMTP localmente configurado.
+- Lançamentos de receita, despesa, transferência e investimento.
+- Lançamentos recorrentes e parcelamento de transações.
+- Cartões de crédito, limites, faturas e fluxo de pagamentos de fatura.
+- Limites e metas de gastos mensais por categoria e subcategoria.
+- Portfólio de investimentos com cotações integradas de mercado (ações, FIIs, criptos) e indexadores do Banco Central (SGS para renda fixa).
+- Importação de lançamentos do Organizze e planilhas modelo do próprio sistema (.xlsx).
+- Recuperação de senha por e-mail SMTP localmente configurado.
 
 ### Planejados
 
-- Cartoes de credito, faturas, limites e pagamento.
-- Relatorios por periodo, categoria, conta e tag.
-- Recorrencia, parcelamento e lancamentos previstos.
-- Limites de gastos por categoria.
-- Visao geral consolidada.
+- Relatórios gráficos e analíticos completos por período, categoria, conta e tag na interface web.
+- Integração ou exportação direta de dados em outros formatos.
+- Conciliação automática de arquivos OFX bancários.
 
 ## Estado atual
 
-O app ja cobre o ciclo basico de controle financeiro local: usuario entra, cadastra contas, cria categorias/tags, registra lancamentos e acompanha o saldo atualizado. As proximas evolucoes devem priorizar relatorios e cartoes, pois dependem dos dados ja existentes.
+O app já cobre todo o ciclo avançado de controle financeiro local: usuário entra, cadastra contas e cartões, define limites, cria categorias/tags, registra lançamentos normais ou parcelados, realiza o acompanhamento de investimentos com precificação e valorização automática de ativos, e importa dados de planilhas locais. As próximas evoluções devem priorizar a exibição de relatórios avançados na interface web.

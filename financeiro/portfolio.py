@@ -5,17 +5,19 @@ from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from http import HTTPStatus
 import json
+import ssl
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 from financeiro.accounts import cents_to_money, empty_to_none, money_to_cents
-from financeiro.database import get_connection
+from financeiro.database import get_connection, row_to_dict
 from financeiro.transactions import convert_to_brl_cents, get_exchange_rate_to_brl, parse_exchange_rate, rate_to_micros
 
 MONEY_SCALE = Decimal("100")
 MICRO_SCALE = Decimal("1000000")
 YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=5d&interval=1d"
+COINGECKO_SIMPLE_PRICE_URL = "https://api.coingecko.com/api/v3/simple/price?ids={ids}&vs_currencies={currency}&include_24hr_change=true"
 BCB_SERIES_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{series}/dados/ultimos/1?formato=json"
 BCB_SERIES_RANGE_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{series}/dados?formato=json&dataInicial={start}&dataFinal={end}"
 
@@ -26,6 +28,7 @@ ASSET_TYPE_LABELS = {
     "fixed_income": "Renda fixa",
     "other": "Outros",
 }
+PORTFOLIO_ACCOUNT_TYPES = {"liquidity", "investment"}
 
 INDEXER_SERIES = {
     "CDI": "12",
@@ -37,6 +40,45 @@ INDEXER_SERIES = {
 }
 
 MONTHLY_INDEXERS = {"IPCA", "IGP-M"}
+INDEXER_FALLBACK_ANNUAL_RATES = {
+    "CDI": Decimal("0.1490"),
+    "SELIC": Decimal("0.1500"),
+    "IPCA": Decimal("0.0450"),
+    "IGP-M": Decimal("0.0400"),
+    "TR": Decimal("0.0100"),
+}
+CRYPTO_ASSETS = {"BTC", "ETH", "SOL", "USDC", "USDT"}
+CRYPTO_ALIASES = {
+    "BITCOIN": "BTC",
+    "ETHEREUM": "ETH",
+    "SOLANA": "SOL",
+    "USD COIN": "USDC",
+    "TETHER": "USDT",
+}
+CRYPTO_COINGECKO_IDS = {
+    "BTC": "bitcoin",
+    "ETH": "ethereum",
+    "SOL": "solana",
+    "USDC": "usd-coin",
+    "USDT": "tether",
+}
+CRYPTO_QUOTE_SYMBOLS = {
+    "BRL": {
+        "BTC": "BTC-BRL",
+        "ETH": "ETH-BRL",
+        "SOL": "SOL-BRL",
+        "USDC": "USDC-BRL",
+        "USDT": "USDT-BRL",
+    },
+    "USD": {
+        "BTC": "BTC-USD",
+        "ETH": "ETH-USD",
+        "SOL": "SOL-USD",
+        "USDC": "USDC-USD",
+        "USDT": "USDT-USD",
+    },
+}
+CRYPTO_QUOTE_SUFFIXES = ("BRL", "USD", "USDT", "USDC")
 
 
 class PortfolioError(Exception):
@@ -48,12 +90,13 @@ class PortfolioError(Exception):
 
 def get_portfolio(user_id: int) -> dict:
     with get_connection() as conn:
-        operation_rows = conn.execute(
+        operation_rows_raw = conn.execute(
             """
             SELECT
                 investment_operations.*,
                 'operation' AS source_type,
                 investment_operations.id AS source_id,
+                1 AS apply_tax_estimate,
                 transactions.date,
                 transactions.description,
                 transactions.amount_cents,
@@ -74,7 +117,7 @@ def get_portfolio(user_id: int) -> dict:
             """,
             (user_id,),
         ).fetchall()
-        opening_rows = conn.execute(
+        opening_rows_raw = conn.execute(
             """
             SELECT
                 investment_opening_positions.id,
@@ -98,6 +141,7 @@ def get_portfolio(user_id: int) -> dict:
                 investment_opening_positions.fixed_income_indexer,
                 investment_opening_positions.fixed_income_rate_micros,
                 investment_opening_positions.fixed_income_maturity_date,
+                investment_opening_positions.apply_tax_estimate,
                 investment_opening_positions.acquisition_date AS date,
                 'Posicao inicial' AS description,
                 investment_opening_positions.total_cost_cents AS amount_cents,
@@ -116,7 +160,29 @@ def get_portfolio(user_id: int) -> dict:
             """,
             (user_id,),
         ).fetchall()
+        redemption_rows = conn.execute(
+            """
+            SELECT
+                source_type,
+                source_id,
+                SUM(redeemed_cost_cents) AS redeemed_cost_cents,
+                SUM(redeemed_quantity_micros) AS redeemed_quantity_micros
+            FROM investment_redemptions
+            WHERE user_id = ?
+            GROUP BY source_type, source_id
+            """,
+            (user_id,),
+        ).fetchall()
 
+    redemption_totals = {
+        (row["source_type"], row["source_id"]): {
+            "redeemed_cost_cents": int(row["redeemed_cost_cents"] or 0),
+            "redeemed_quantity_micros": int(row["redeemed_quantity_micros"] or 0),
+        }
+        for row in redemption_rows
+    }
+    operation_rows = [portfolio_row_with_redemptions(row_to_dict(row), redemption_totals) for row in operation_rows_raw]
+    opening_rows = [portfolio_row_with_redemptions(row_to_dict(row), redemption_totals) for row in opening_rows_raw]
     rows = sorted([*operation_rows, *opening_rows], key=lambda row: (row["date"], row["id"]))
     positions = build_positions(rows)
     quote_positions(positions)
@@ -127,6 +193,13 @@ def get_portfolio(user_id: int) -> dict:
         "summary": summary,
         "indexers": indexer_catalog(),
     }
+
+
+def portfolio_row_with_redemptions(row: dict, redemption_totals: dict[tuple, dict]) -> dict:
+    totals = redemption_totals.get((row["source_type"], row["source_id"]), {})
+    row["redeemed_cost_cents"] = int(totals.get("redeemed_cost_cents") or 0)
+    row["redeemed_quantity_micros"] = int(totals.get("redeemed_quantity_micros") or 0)
+    return row
 
 
 def create_opening_position(user_id: int, data: dict) -> dict:
@@ -142,8 +215,7 @@ def create_opening_position(user_id: int, data: dict) -> dict:
         ).fetchone()
         if not account:
             raise PortfolioError("Conta nao encontrada.", HTTPStatus.NOT_FOUND)
-        if account["account_type"] != "investment":
-            raise PortfolioError("Selecione uma conta de investimento para a posicao inicial.")
+        ensure_portfolio_account(account)
         exchange_rate_micros = resolve_position_exchange_rate(account["currency"], position["acquisition_date"], position["exchange_rate"])
         conn.execute(
             """
@@ -151,8 +223,9 @@ def create_opening_position(user_id: int, data: dict) -> dict:
                 user_id, account_id, asset_type, asset_identifier, asset_name, cnpj,
                 acquisition_date, quantity_micros, unit_price_cents, total_cost_cents,
                 exchange_rate_micros, fixed_income_mode, fixed_income_indexer,
-                fixed_income_rate_micros, fixed_income_maturity_date, notes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                fixed_income_rate_micros, fixed_income_maturity_date,
+                apply_tax_estimate, notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 user_id,
@@ -170,6 +243,7 @@ def create_opening_position(user_id: int, data: dict) -> dict:
                 position["fixed_income_indexer"],
                 position["fixed_income_rate_micros"],
                 position["fixed_income_maturity_date"],
+                position["apply_tax_estimate"],
                 position["notes"],
             ),
         )
@@ -200,8 +274,7 @@ def update_opening_position(user_id: int, position_id: object, data: dict) -> di
         ).fetchone()
         if not account:
             raise PortfolioError("Conta nao encontrada.", HTTPStatus.NOT_FOUND)
-        if account["account_type"] != "investment":
-            raise PortfolioError("Selecione uma conta de investimento para a posicao inicial.")
+        ensure_portfolio_account(account)
         exchange_rate_micros = resolve_position_exchange_rate(account["currency"], position["acquisition_date"], position["exchange_rate"])
         conn.execute(
             """
@@ -209,7 +282,8 @@ def update_opening_position(user_id: int, position_id: object, data: dict) -> di
             SET account_id = ?, asset_type = ?, asset_identifier = ?, asset_name = ?, cnpj = ?,
                 acquisition_date = ?, quantity_micros = ?, unit_price_cents = ?, total_cost_cents = ?,
                 exchange_rate_micros = ?, fixed_income_mode = ?, fixed_income_indexer = ?,
-                fixed_income_rate_micros = ?, fixed_income_maturity_date = ?, notes = ?,
+                fixed_income_rate_micros = ?, fixed_income_maturity_date = ?,
+                apply_tax_estimate = ?, notes = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND user_id = ?
             """,
@@ -228,12 +302,207 @@ def update_opening_position(user_id: int, position_id: object, data: dict) -> di
                 position["fixed_income_indexer"],
                 position["fixed_income_rate_micros"],
                 position["fixed_income_maturity_date"],
+                position["apply_tax_estimate"],
                 position["notes"],
                 normalized_id,
                 user_id,
             ),
         )
     return get_portfolio(user_id)
+
+
+def delete_opening_position(user_id: int, position_id: object) -> dict:
+    normalized_id = normalize_id(position_id, "Posicao nao encontrada.")
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            DELETE FROM investment_opening_positions
+            WHERE id = ? AND user_id = ?
+            """,
+            (normalized_id, user_id),
+        )
+        if cursor.rowcount == 0:
+            raise PortfolioError("Posicao nao encontrada.", HTTPStatus.NOT_FOUND)
+    return get_portfolio(user_id)
+
+
+def redeem_position(user_id: int, data: dict) -> dict:
+    selector = normalize_redemption_selector(data)
+    redemption_value_cents = money_to_cents(data.get("amount", "0"))
+    if redemption_value_cents <= 0:
+        raise PortfolioError("Informe o valor do resgate.")
+    redemption_date = normalize_date(data.get("date") or date.today().isoformat())
+    with get_connection() as conn:
+        account = conn.execute(
+            """
+            SELECT id, currency
+            FROM checking_accounts
+            WHERE id = ? AND user_id = ? AND archived_at IS NULL
+            """,
+            (selector["account_id"], user_id),
+        ).fetchone()
+        if not account:
+            raise PortfolioError("Conta da carteira nao encontrada.", HTTPStatus.NOT_FOUND)
+        positions = current_portfolio_positions(user_id)
+        candidates = [
+            position for position in positions
+            if matches_redemption_selector(position, selector)
+            and position["source_type"] in {"operation", "opening"}
+            and int(position["current_value_cents"] or 0) > 0
+            and int(position["total_cost_cents"] or 0) > 0
+        ]
+        candidates.sort(key=lambda position: (position["first_operation_date"], 0 if position["source_type"] == "operation" else 1, position["source_id"] or 0))
+        available_cents = sum(int(position["current_value_cents"] or 0) for position in candidates)
+        if redemption_value_cents > available_cents:
+            raise PortfolioError("Valor de resgate maior que o valor disponivel para este ativo.")
+        exchange_rate_micros = rate_to_micros(get_exchange_rate_to_brl(account["currency"], redemption_date))
+        amount_brl_cents = convert_to_brl_cents(redemption_value_cents, exchange_rate_micros)
+        description = f"Resgate - {selector['asset_name'] or selector['asset_identifier'] or 'Investimento'}"
+        cursor = conn.execute(
+            """
+            INSERT INTO transactions (
+                user_id, type, description, amount_cents, destination_amount_cents,
+                exchange_rate_micros, transfer_exchange_rate_micros, amount_brl_cents,
+                date, account_id, series_kind, notes
+            ) VALUES (?, 'income', ?, ?, 0, ?, 0, ?, ?, ?, 'single', ?)
+            """,
+            (
+                user_id,
+                description,
+                redemption_value_cents,
+                exchange_rate_micros,
+                amount_brl_cents,
+                redemption_date,
+                account["id"],
+                empty_to_none(data.get("notes")),
+            ),
+        )
+        conn.execute(
+            """
+            UPDATE checking_accounts
+            SET current_balance_cents = current_balance_cents + ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND user_id = ?
+            """,
+            (redemption_value_cents, account["id"], user_id),
+        )
+        remaining_cents = redemption_value_cents
+        redemptions = []
+        for position in candidates:
+            if remaining_cents <= 0:
+                break
+            current_cents = int(position["current_value_cents"] or 0)
+            take_cents = min(remaining_cents, current_cents)
+            ratio = Decimal(take_cents) / Decimal(current_cents)
+            cost_cents = int((Decimal(position["total_cost_cents"]) * ratio).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+            quantity_micros = int((Decimal(str(position["quantity"])) * MICRO_SCALE * ratio).quantize(Decimal("1"), rounding=ROUND_HALF_UP)) if Decimal(str(position["quantity"] or "0")) > 0 else 0
+            redemptions.append((
+                user_id,
+                account["id"],
+                cursor.lastrowid,
+                position["source_type"],
+                position["source_id"],
+                take_cents,
+                cost_cents,
+                quantity_micros,
+                redemption_date,
+                empty_to_none(data.get("notes")),
+            ))
+            remaining_cents -= take_cents
+        conn.executemany(
+            """
+            INSERT INTO investment_redemptions (
+                user_id, account_id, transaction_id, source_type, source_id,
+                redeemed_value_cents, redeemed_cost_cents, redeemed_quantity_micros,
+                date, notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            redemptions,
+        )
+    return get_portfolio(user_id)
+
+
+def current_portfolio_positions(user_id: int) -> list[dict]:
+    with get_connection() as conn:
+        operation_rows_raw = conn.execute(
+            """
+            SELECT investment_operations.*, 'operation' AS source_type, investment_operations.id AS source_id,
+                1 AS apply_tax_estimate, transactions.date, transactions.description, transactions.amount_cents,
+                transactions.exchange_rate_micros, transactions.amount_brl_cents,
+                checking_accounts.name AS account_name, checking_accounts.currency AS account_currency
+            FROM investment_operations
+            JOIN transactions ON transactions.id = investment_operations.transaction_id
+                AND transactions.user_id = investment_operations.user_id
+                AND transactions.archived_at IS NULL
+            JOIN checking_accounts ON checking_accounts.id = investment_operations.account_id
+                AND checking_accounts.user_id = investment_operations.user_id
+            WHERE investment_operations.user_id = ?
+            """,
+            (user_id,),
+        ).fetchall()
+        opening_rows_raw = conn.execute(
+            """
+            SELECT investment_opening_positions.id, 'opening' AS source_type,
+                investment_opening_positions.id AS source_id, investment_opening_positions.user_id,
+                NULL AS transaction_id, investment_opening_positions.account_id,
+                investment_opening_positions.asset_type, investment_opening_positions.asset_identifier,
+                investment_opening_positions.asset_name, investment_opening_positions.cnpj,
+                investment_opening_positions.quantity_micros, investment_opening_positions.unit_price_cents,
+                investment_opening_positions.total_cost_cents AS invested_amount_cents,
+                0 AS brokerage_fee_cents, 0 AS exchange_fee_cents, 0 AS tax_cents, 0 AS other_costs_cents,
+                investment_opening_positions.fixed_income_mode, investment_opening_positions.fixed_income_indexer,
+                investment_opening_positions.fixed_income_rate_micros, investment_opening_positions.fixed_income_maturity_date,
+                investment_opening_positions.apply_tax_estimate, investment_opening_positions.acquisition_date AS date,
+                'Posicao inicial' AS description, investment_opening_positions.total_cost_cents AS amount_cents,
+                investment_opening_positions.exchange_rate_micros, 0 AS amount_brl_cents,
+                checking_accounts.name AS account_name, checking_accounts.currency AS account_currency
+            FROM investment_opening_positions
+            JOIN checking_accounts ON checking_accounts.id = investment_opening_positions.account_id
+                AND checking_accounts.user_id = investment_opening_positions.user_id
+            WHERE investment_opening_positions.user_id = ?
+            """,
+            (user_id,),
+        ).fetchall()
+        redemption_rows = conn.execute(
+            """
+            SELECT source_type, source_id, SUM(redeemed_cost_cents) AS redeemed_cost_cents,
+                SUM(redeemed_quantity_micros) AS redeemed_quantity_micros
+            FROM investment_redemptions
+            WHERE user_id = ?
+            GROUP BY source_type, source_id
+            """,
+            (user_id,),
+        ).fetchall()
+    redemption_totals = {(row["source_type"], row["source_id"]): {"redeemed_cost_cents": int(row["redeemed_cost_cents"] or 0), "redeemed_quantity_micros": int(row["redeemed_quantity_micros"] or 0)} for row in redemption_rows}
+    rows = [portfolio_row_with_redemptions(row_to_dict(row), redemption_totals) for row in [*operation_rows_raw, *opening_rows_raw]]
+    positions = build_positions(sorted(rows, key=lambda row: (row["date"], row["id"])))
+    quote_positions(positions)
+    return positions
+
+
+def normalize_redemption_selector(data: dict) -> dict:
+    return {
+        "account_id": normalize_id(data.get("account_id"), "Carteira nao encontrada."),
+        "currency": str(data.get("currency") or "").strip().upper(),
+        "asset_type": str(data.get("asset_type") or "").strip(),
+        "asset_identifier": str(data.get("asset_identifier") or "").strip(),
+        "asset_name": str(data.get("asset_name") or "").strip(),
+        "cnpj": str(data.get("cnpj") or "").strip(),
+    }
+
+
+def matches_redemption_selector(position: dict, selector: dict) -> bool:
+    return (
+        int(position["account_id"]) == selector["account_id"]
+        and str(position["currency"] or "").upper() == selector["currency"]
+        and str(position["asset_type"] or "") == selector["asset_type"]
+        and str(position.get("asset_name") or "").strip() == selector["asset_name"]
+        and str(position.get("cnpj") or "").strip() == selector["cnpj"]
+    )
+
+
+def ensure_portfolio_account(account) -> None:
+    if account["account_type"] not in PORTFOLIO_ACCOUNT_TYPES:
+        raise PortfolioError("Selecione uma conta de liquidez ou investimento para a posicao inicial.")
 
 
 def normalize_opening_position_payload(data: dict) -> dict:
@@ -267,6 +536,7 @@ def normalize_opening_position_payload(data: dict) -> dict:
         "fixed_income_indexer": empty_to_none(data.get("fixed_income_indexer")),
         "fixed_income_rate_micros": decimal_to_micros(data.get("fixed_income_rate")),
         "fixed_income_maturity_date": normalize_optional_date(data.get("fixed_income_maturity_date")),
+        "apply_tax_estimate": 1 if str(data.get("apply_tax_estimate") or "").strip().lower() in {"1", "true", "on", "yes"} else 0,
         "notes": empty_to_none(data.get("notes")),
     }
 
@@ -317,18 +587,11 @@ def build_positions(rows) -> list[dict]:
     for row in rows:
         asset_type = row["asset_type"] or "other"
         identifier = normalize_asset_identifier(row["asset_identifier"], asset_type)
-        key = (
-            row["account_id"],
-            row["account_currency"],
-            asset_type,
-            identifier,
-            row["asset_name"] or "",
-            row["cnpj"] or "",
-            row["fixed_income_indexer"] or "",
-            row["fixed_income_maturity_date"] or "",
-        )
+        key = portfolio_position_key(row, asset_type, identifier)
         position = grouped.setdefault(key, empty_position(row, asset_type, identifier))
-        quantity = micros_to_decimal(row["quantity_micros"])
+        original_quantity_micros = int(row["quantity_micros"] or 0)
+        redeemed_quantity_micros = min(int(row.get("redeemed_quantity_micros") or 0), original_quantity_micros)
+        quantity = micros_to_decimal(max(original_quantity_micros - redeemed_quantity_micros, 0))
         invested_cents = int(row["invested_amount_cents"] or row["amount_cents"] or 0)
         costs_cents = sum(int(row[field] or 0) for field in (
             "brokerage_fee_cents",
@@ -336,7 +599,14 @@ def build_positions(rows) -> list[dict]:
             "tax_cents",
             "other_costs_cents",
         ))
-        total_cost_cents = invested_cents + costs_cents
+        original_total_cost_cents = invested_cents + costs_cents
+        redeemed_cost_cents = min(int(row.get("redeemed_cost_cents") or 0), original_total_cost_cents)
+        total_cost_cents = max(original_total_cost_cents - redeemed_cost_cents, 0)
+        if original_total_cost_cents > 0 and redeemed_cost_cents > 0:
+            invested_cents = int((Decimal(invested_cents) * Decimal(total_cost_cents) / Decimal(original_total_cost_cents)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+            costs_cents = total_cost_cents - invested_cents
+        if total_cost_cents <= 0 and quantity <= 0:
+            continue
         position["quantity"] += quantity
         position["invested_cents"] += invested_cents
         position["costs_cents"] += costs_cents
@@ -346,14 +616,32 @@ def build_positions(rows) -> list[dict]:
         if position["operations_count"] == 1:
             position["source_type"] = row["source_type"]
             position["source_id"] = row["source_id"]
+            position["source_transaction_id"] = row["transaction_id"]
         else:
             position["source_type"] = "mixed"
             position["source_id"] = None
+            position["source_transaction_id"] = None
         position["last_operation_date"] = row["date"]
         position["first_operation_date"] = min(position["first_operation_date"], row["date"])
         if row["unit_price_cents"]:
             position["last_unit_price_cents"] = int(row["unit_price_cents"])
     return list(grouped.values())
+
+
+def portfolio_position_key(row, asset_type: str, identifier: str) -> tuple:
+    base_key = (
+        row["account_id"],
+        row["account_currency"],
+        asset_type,
+        identifier,
+        row["asset_name"] or "",
+        row["cnpj"] or "",
+        row["fixed_income_indexer"] or "",
+        row["fixed_income_maturity_date"] or "",
+    )
+    if asset_type == "fixed_income":
+        return (*base_key, row["source_type"], row["source_id"])
+    return base_key
 
 
 def empty_position(row, asset_type: str, identifier: str) -> dict:
@@ -370,6 +658,7 @@ def empty_position(row, asset_type: str, identifier: str) -> dict:
         "fixed_income_indexer": normalize_indexer(row["fixed_income_indexer"]),
         "fixed_income_rate": micros_to_decimal(row["fixed_income_rate_micros"]),
         "fixed_income_maturity_date": row["fixed_income_maturity_date"],
+        "apply_tax_estimate": bool(row["apply_tax_estimate"] or 0),
         "market_label": "Brasil" if row["account_currency"] == "BRL" else "Exterior",
         "quantity": Decimal("0"),
         "invested_cents": 0,
@@ -378,6 +667,8 @@ def empty_position(row, asset_type: str, identifier: str) -> dict:
         "total_cost_brl_cents": 0,
         "current_value_cents": 0,
         "current_value_brl_cents": 0,
+        "fixed_income_gross_value_cents": 0,
+        "fixed_income_iof_tax_cents": 0,
         "fixed_income_income_tax_cents": 0,
         "fixed_income_net_value_cents": 0,
         "day_result_cents": 0,
@@ -388,6 +679,7 @@ def empty_position(row, asset_type: str, identifier: str) -> dict:
         "quote_date": None,
         "source_type": None,
         "source_id": None,
+        "source_transaction_id": None,
         "operations_count": 0,
         "first_operation_date": row["date"],
         "last_operation_date": row["date"],
@@ -411,9 +703,12 @@ def apply_market_quote(position: dict) -> None:
         apply_cost_value(position, "Ativo sem codigo")
         return
     try:
-        quote = fetch_yahoo_quote(symbol)
+        if position["asset_type"] == "crypto":
+            quote = fetch_crypto_quote(position["asset_identifier"], position["currency"])
+        else:
+            quote = fetch_yahoo_quote(symbol)
         position["quote"] = cents_to_money(quote["price_cents"])
-        position["quote_source"] = f"Yahoo Finance ({symbol})"
+        position["quote_source"] = quote.get("source") or f"Yahoo Finance ({symbol})"
         position["quote_status"] = "ok"
         position["quote_date"] = quote["date"]
         position["current_value_cents"] = decimal_to_cents(position["quantity"] * cents_to_decimal(quote["price_cents"]))
@@ -436,6 +731,7 @@ def apply_fixed_income_value(position: dict) -> None:
     gross_factor = Decimal("1")
     status = "ok"
     source = "Taxa cadastrada"
+    fallback_source = ""
     try:
         if mode == "pre":
             rate_factor = annual_rate / Decimal("100")
@@ -451,20 +747,42 @@ def apply_fixed_income_value(position: dict) -> None:
                 rate_factor = (indexer_factor - Decimal("1")) * multiplier
                 gross_factor = Decimal("1") + rate_factor
     except PortfolioError as exc:
-        status = exc.message
-        rate_factor = annual_rate / Decimal("100")
-        gross_factor = compound_annual_factor(rate_factor, days)
-    current = Decimal(position["total_cost_cents"]) * gross_factor
-    current_cents = int(current.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
-    income_tax_cents = fixed_income_income_tax_cents(max(current_cents - position["total_cost_cents"], 0), days)
+        if mode == "pre":
+            status = exc.message
+            rate_factor = annual_rate / Decimal("100")
+            gross_factor = compound_annual_factor(rate_factor, days)
+        else:
+            fallback_indexer_rate = fallback_indexer_annual_rate(indexer)
+            fallback_indexer_factor = compound_annual_factor(fallback_indexer_rate, days)
+            fallback_source = f"Estimativa local ({indexer}); Banco Central indisponivel"
+            status = "ok"
+            if mode == "hybrid":
+                rate_factor = fallback_indexer_factor - Decimal("1") + annual_rate / Decimal("100")
+                gross_factor = fallback_indexer_factor * compound_annual_factor(annual_rate / Decimal("100"), days)
+            else:
+                multiplier = annual_rate / Decimal("100") if annual_rate else Decimal("1")
+                rate_factor = (fallback_indexer_factor - Decimal("1")) * multiplier
+                gross_factor = Decimal("1") + rate_factor
+    gross = Decimal(position["total_cost_cents"]) * gross_factor
+    gross_cents = int(gross.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    iof_tax_cents = 0
+    income_tax_cents = 0
+    net_cents = gross_cents
+    if should_apply_fixed_income_taxes(position):
+        gross_profit_cents = max(gross_cents - position["total_cost_cents"], 0)
+        iof_tax_cents = fixed_income_iof_tax_cents(gross_profit_cents, days)
+        income_tax_cents = fixed_income_income_tax_cents(max(gross_profit_cents - iof_tax_cents, 0), days)
+        net_cents = max(gross_cents - iof_tax_cents - income_tax_cents, 0)
     position["quote"] = fixed_income_quote_label(mode, indexer, annual_rate, rate_factor)
-    position["quote_source"] = source
+    position["quote_source"] = fallback_source or source
     position["quote_status"] = status
     position["quote_date"] = date.today().isoformat()
-    position["current_value_cents"] = current_cents
+    position["current_value_cents"] = net_cents
     position["current_value_brl_cents"] = value_to_brl(position["current_value_cents"], position["currency"])
+    position["fixed_income_gross_value_cents"] = gross_cents
+    position["fixed_income_iof_tax_cents"] = iof_tax_cents
     position["fixed_income_income_tax_cents"] = income_tax_cents
-    position["fixed_income_net_value_cents"] = max(current_cents - income_tax_cents, 0)
+    position["fixed_income_net_value_cents"] = net_cents
     position["day_result_cents"] = 0
     position["day_result_brl_cents"] = 0
 
@@ -495,6 +813,16 @@ def fixed_income_quote_label(mode: str, indexer: str, annual_rate: Decimal, rate
     return f"{format_decimal_percent(rate_factor * Decimal('100'))}% acumulado"
 
 
+def should_apply_fixed_income_taxes(position: dict) -> bool:
+    return position["source_type"] == "operation" or (
+        position["source_type"] == "opening" and bool(position.get("apply_tax_estimate"))
+    )
+
+
+def fallback_indexer_annual_rate(indexer: str) -> Decimal:
+    return INDEXER_FALLBACK_ANNUAL_RATES.get(normalize_indexer(indexer), Decimal("0"))
+
+
 def fixed_income_income_tax_cents(gross_profit_cents: int, days: int) -> int:
     if gross_profit_cents <= 0:
         return 0
@@ -506,6 +834,45 @@ def fixed_income_income_tax_cents(gross_profit_cents: int, days: int) -> int:
         tax_rate = Decimal("0.175")
     else:
         tax_rate = Decimal("0.15")
+    return int((Decimal(gross_profit_cents) * tax_rate).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
+def fixed_income_iof_tax_cents(gross_profit_cents: int, days: int) -> int:
+    if gross_profit_cents <= 0 or days >= 30:
+        return 0
+    daily_rates = {
+        0: Decimal("1"),
+        1: Decimal("0.96"),
+        2: Decimal("0.93"),
+        3: Decimal("0.90"),
+        4: Decimal("0.86"),
+        5: Decimal("0.83"),
+        6: Decimal("0.80"),
+        7: Decimal("0.76"),
+        8: Decimal("0.73"),
+        9: Decimal("0.70"),
+        10: Decimal("0.66"),
+        11: Decimal("0.63"),
+        12: Decimal("0.60"),
+        13: Decimal("0.56"),
+        14: Decimal("0.53"),
+        15: Decimal("0.50"),
+        16: Decimal("0.46"),
+        17: Decimal("0.43"),
+        18: Decimal("0.40"),
+        19: Decimal("0.36"),
+        20: Decimal("0.33"),
+        21: Decimal("0.30"),
+        22: Decimal("0.26"),
+        23: Decimal("0.23"),
+        24: Decimal("0.20"),
+        25: Decimal("0.16"),
+        26: Decimal("0.13"),
+        27: Decimal("0.10"),
+        28: Decimal("0.06"),
+        29: Decimal("0.03"),
+    }
+    tax_rate = daily_rates.get(max(days, 0), Decimal("0"))
     return int((Decimal(gross_profit_cents) * tax_rate).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
@@ -532,6 +899,36 @@ def fetch_yahoo_quote(symbol: str) -> dict:
         "price_cents": decimal_to_cents(price),
         "day_change_cents": decimal_to_cents(price - previous_close),
         "date": date.fromtimestamp(timestamp).isoformat(),
+    }
+
+
+def fetch_crypto_quote(identifier: str, currency: str) -> dict:
+    normalized_identifier = normalize_asset_identifier(identifier, "crypto")
+    normalized_currency = str(currency or "USD").strip().upper()
+    coin_id = CRYPTO_COINGECKO_IDS.get(normalized_identifier)
+    if not coin_id or normalized_currency not in {"BRL", "USD"}:
+        symbol = crypto_yahoo_symbol(normalized_identifier, normalized_currency)
+        yahoo_quote = fetch_yahoo_quote(symbol)
+        yahoo_quote["source"] = f"Yahoo Finance ({symbol})"
+        return yahoo_quote
+    vs_currency = normalized_currency.lower()
+    url = COINGECKO_SIMPLE_PRICE_URL.format(ids=quote(coin_id), currency=vs_currency)
+    try:
+        payload = read_json_url(url, "Nao foi possivel consultar a cotacao do criptoativo.")
+        coin_payload = payload[coin_id]
+        price = Decimal(str(coin_payload[vs_currency]))
+        change_percent = Decimal(str(coin_payload.get(f"{vs_currency}_24h_change") or 0))
+        previous_price = price / (Decimal("1") + change_percent / Decimal("100")) if change_percent > Decimal("-100") else price
+    except (PortfolioError, KeyError, TypeError, InvalidOperation, ZeroDivisionError):
+        symbol = crypto_yahoo_symbol(normalized_identifier, normalized_currency)
+        yahoo_quote = fetch_yahoo_quote(symbol)
+        yahoo_quote["source"] = f"Yahoo Finance ({symbol}); CoinGecko indisponivel"
+        return yahoo_quote
+    return {
+        "price_cents": decimal_to_cents(price),
+        "day_change_cents": decimal_to_cents(price - previous_price),
+        "date": date.today().isoformat(),
+        "source": f"CoinGecko ({normalized_identifier}/{normalized_currency})",
     }
 
 
@@ -626,8 +1023,21 @@ def read_json_url(url: str, message: str) -> dict | list:
     try:
         with urlopen(request, timeout=6) as response:
             return json.loads(response.read().decode("utf-8"))
-    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
+    except URLError as exc:
+        if is_ssl_certificate_error(exc):
+            try:
+                with urlopen(request, timeout=6, context=ssl._create_unverified_context()) as response:
+                    return json.loads(response.read().decode("utf-8"))
+            except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as retry_exc:
+                raise PortfolioError(message) from retry_exc
         raise PortfolioError(message) from exc
+    except (HTTPError, TimeoutError, json.JSONDecodeError) as exc:
+        raise PortfolioError(message) from exc
+
+
+def is_ssl_certificate_error(exc: URLError) -> bool:
+    reason = getattr(exc, "reason", None)
+    return isinstance(reason, ssl.SSLError) and "CERTIFICATE_VERIFY_FAILED" in str(reason)
 
 
 def yahoo_symbol(position: dict) -> str:
@@ -635,10 +1045,21 @@ def yahoo_symbol(position: dict) -> str:
     if not identifier:
         return ""
     if position["asset_type"] == "crypto":
-        return identifier if "-" in identifier else f"{identifier}-USD"
+        return crypto_yahoo_symbol(identifier, position["currency"])
     if "." in identifier or position["currency"] != "BRL":
         return identifier
     return f"{identifier}.SA"
+
+
+def crypto_yahoo_symbol(identifier: str, currency: str) -> str:
+    normalized_identifier = normalize_asset_identifier(identifier, "crypto")
+    normalized_currency = str(currency or "USD").strip().upper()
+    currency_pairs = CRYPTO_QUOTE_SYMBOLS.get(normalized_currency)
+    if currency_pairs and normalized_identifier in currency_pairs:
+        return currency_pairs[normalized_identifier]
+    if "-" in identifier:
+        return identifier
+    return f"{normalized_identifier}-{normalized_currency if normalized_currency in {'BRL', 'USD'} else 'USD'}"
 
 
 def summarize_positions(positions: list[dict]) -> dict:
@@ -670,9 +1091,12 @@ def format_quoted_position(position: dict) -> dict:
     position = format_position(position)
     position["current_value"] = cents_to_money(position["current_value_cents"])
     position["current_value_brl"] = cents_to_money(position["current_value_brl_cents"])
+    position["fixed_income_gross_value"] = cents_to_money(position["fixed_income_gross_value_cents"])
+    position["fixed_income_iof_tax"] = cents_to_money(position["fixed_income_iof_tax_cents"])
     position["fixed_income_income_tax"] = cents_to_money(position["fixed_income_income_tax_cents"])
     position["fixed_income_net_value"] = cents_to_money(position["fixed_income_net_value_cents"])
     position["fixed_income_maturity_date"] = position.get("fixed_income_maturity_date")
+    position["apply_tax_estimate"] = bool(position.get("apply_tax_estimate"))
     position["day_result"] = cents_to_money(position["day_result_cents"])
     position["day_result_brl"] = cents_to_money(position["day_result_brl_cents"])
     return position
@@ -718,8 +1142,19 @@ def indexer_catalog() -> list[dict]:
 
 def normalize_asset_identifier(value: object, asset_type: str) -> str:
     identifier = str(value or "").strip().upper()
-    if asset_type == "crypto" and identifier.endswith("USDT"):
-        return identifier[:-4]
+    if asset_type == "crypto":
+        identifier = CRYPTO_ALIASES.get(identifier, identifier)
+        compact = identifier.replace("/", "-")
+        if "-" in compact:
+            base, quote_currency = compact.split("-", 1)
+            if base and quote_currency in CRYPTO_QUOTE_SUFFIXES:
+                return base
+            return compact
+        if identifier in CRYPTO_ASSETS:
+            return identifier
+        for suffix in CRYPTO_QUOTE_SUFFIXES:
+            if identifier.endswith(suffix) and len(identifier) > len(suffix):
+                return identifier[:-len(suffix)]
     return identifier
 
 

@@ -62,7 +62,7 @@ from financeiro.credit_cards import (
 )
 from financeiro.database import initialize_database
 from financeiro.imports import import_organizze_transactions, import_system_template, system_import_template
-from financeiro.portfolio import create_opening_position, get_portfolio, update_opening_position
+from financeiro.portfolio import create_opening_position, delete_opening_position, get_portfolio, redeem_position, update_opening_position
 from financeiro.spending_limits import (
     create_spending_limit,
     delete_spending_limit,
@@ -181,6 +181,9 @@ class AppHandler(BaseHTTPRequestHandler):
         if path == "/api/portfolio/positions":
             self.handle_create_portfolio_position()
             return
+        if path == "/api/portfolio/redeem":
+            self.handle_redeem_portfolio_position()
+            return
         if path == "/api/import/organizze-transactions":
             self.handle_import_organizze_transactions()
             return
@@ -254,6 +257,9 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path.startswith("/api/spending-limits/"):
             self.handle_delete_spending_limit()
+            return
+        if path.startswith("/api/portfolio/positions/"):
+            self.handle_delete_portfolio_position()
             return
         if path.startswith("/api/checking-accounts/"):
             self.handle_archive_account()
@@ -405,6 +411,16 @@ class AppHandler(BaseHTTPRequestHandler):
         position_id = self.route_path().rsplit("/", 1)[-1]
         data = self.read_json()
         self.send_json(update_opening_position(user["id"], position_id, data))
+
+    def handle_delete_portfolio_position(self) -> None:
+        user = self.require_user()
+        position_id = self.route_path().rsplit("/", 1)[-1]
+        self.send_json(delete_opening_position(user["id"], position_id))
+
+    def handle_redeem_portfolio_position(self) -> None:
+        user = self.require_user()
+        data = self.read_json()
+        self.send_json(redeem_position(user["id"], data), status=HTTPStatus.CREATED)
 
     def handle_create_account(self) -> None:
         user = self.require_user()
@@ -624,9 +640,9 @@ class AppHandler(BaseHTTPRequestHandler):
         query = parse_qs(urlsplit(self.path).query)
         target = (query.get("target") or ["account"])[0]
         body = system_import_template(user["id"], target)
-        filename = "modelo_importacao_cartao.csv" if target in {"card", "cartao"} else "modelo_importacao_conta.csv"
+        filename = "modelo_importacao_cartao.xlsx" if target in {"card", "cartao"} else "modelo_importacao_conta.xlsx"
         self.send_response(HTTPStatus.OK)
-        self.send_header("Content-Type", "text/csv; charset=utf-8")
+        self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(body)))
