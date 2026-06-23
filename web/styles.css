@@ -1582,6 +1582,36 @@ textarea:focus {
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
+}
+
+.portfolio-maturity-row.due-today {
+  background: #fff8e1;
+}
+
+.portfolio-maturity-row.overdue {
+  background: #fff1f1;
+}
+
+.portfolio-maturity-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.portfolio-maturity-pill.due-today {
+  color: #8a4b00;
+  background: #ffe8a3;
+}
+
+.portfolio-maturity-pill.overdue {
+  color: #9b1c1c;
+  background: #ffd2d2;
 }
 
 .portfolio-toggle {

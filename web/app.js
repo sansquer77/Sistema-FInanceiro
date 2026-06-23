@@ -3023,9 +3023,13 @@ function portfolioPositionRow(position, options = {}) {
   const dayPercent = dayBase > 0 ? dayResult / dayBase : 0;
   const quoteStatus = position.quote_status === "ok" ? position.quote_source : position.quote_status;
   const quoteText = portfolioQuoteText(position);
+  const maturityAlert = portfolioMaturityAlert(position);
   const identifier = position.asset_identifier || position.asset_name || "Sem codigo";
   const assetName = position.asset_name || identifier;
   const rowLabel = options.parent ? assetName : options.child ? options.childLabel : identifier;
+  const maturityDetail = maturityAlert
+    ? `<span class="portfolio-maturity-pill ${maturityAlert.status}" title="${escapeHtml(maturityAlert.title)}">${escapeHtml(maturityAlert.label)}</span>`
+    : "";
   const assetDetail = [
     options.parent ? `${options.childCount} lançamentos` : "",
     options.parent && position.asset_identifier && position.asset_identifier !== assetName ? position.asset_identifier : "",
@@ -3054,9 +3058,9 @@ function portfolioPositionRow(position, options = {}) {
   const valueAction = portfolioIconButton("edit-value", "Atualizar valor atual", `data-edit-portfolio-value-payload="${escapeHtml(JSON.stringify(portfolioValuePayload(position)))}"`);
   const closeAction = portfolioIconButton("close-position", "Encerrar posição", `data-close-portfolio-payload="${escapeHtml(JSON.stringify(portfolioClosePayload(position)))}"`);
   return `
-    <tr class="${options.parent ? "portfolio-parent-row" : ""} ${options.child ? "portfolio-child-row" : ""}">
+    <tr class="${options.parent ? "portfolio-parent-row" : ""} ${options.child ? "portfolio-child-row" : ""} ${maturityAlert ? `portfolio-maturity-row ${maturityAlert.status}` : ""}">
       <td>
-        <div class="portfolio-asset-name">${toggle}<strong>${escapeHtml(rowLabel)}</strong></div>
+        <div class="portfolio-asset-name">${toggle}<strong>${escapeHtml(rowLabel)}</strong>${maturityDetail}</div>
         <span>${escapeHtml(assetDetail || "Sem detalhe adicional")}</span>
       </td>
       <td>${escapeHtml(position.asset_type_label)}<span>${escapeHtml(position.market_label || "Brasil")}</span></td>
@@ -3071,6 +3075,29 @@ function portfolioPositionRow(position, options = {}) {
       <td><div class="portfolio-actions">${redeemAction}${valueAction}${closeAction}${actions}</div></td>
     </tr>
   `;
+}
+
+function portfolioMaturityAlert(position) {
+  const maturityDate = String(position.fixed_income_maturity_date || "").trim();
+  if (!maturityDate) {
+    return null;
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  if (maturityDate < today) {
+    return {
+      status: "overdue",
+      label: "Vencido",
+      title: `Venceu em ${formatDate(maturityDate)}. Avalie resgate ou encerramento da posição.`,
+    };
+  }
+  if (maturityDate === today) {
+    return {
+      status: "due-today",
+      label: "Vence hoje",
+      title: "Vence hoje. Avalie resgate ou encerramento da posição.",
+    };
+  }
+  return null;
 }
 
 function portfolioIconButton(icon, label, attributes) {
