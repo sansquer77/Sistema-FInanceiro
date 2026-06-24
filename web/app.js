@@ -1,3 +1,47 @@
+import { api, upload } from "./modules/api.js";
+import {
+  currentMonthValue,
+  formatDate,
+  formatMonthLabel,
+  isValidMonthValue,
+  monthEndDate,
+  shiftMonth,
+  todayLocalDateValue,
+} from "./modules/date-utils.js";
+import {
+  formatCurrencySummary,
+  formatDecimal,
+  formatMoney,
+  formatPercent,
+  moneyInputValue,
+  parseDecimalInput,
+  portfolioQuoteText,
+} from "./modules/money-utils.js";
+import {
+  emptyState,
+  escapeHtml,
+  formData,
+  normalizeSearch,
+  setFormBusy,
+  setMessage,
+} from "./modules/dom-utils.js";
+import {
+  accountTypeLabel,
+  cardCategoryPath,
+  cardTransactionTypeLabel,
+  classificationGroupLabel,
+  formatCategoryPath,
+  transactionSeriesLabel,
+  transactionTypeLabel,
+} from "./modules/labels.js";
+import {
+  isExchangeTransfer,
+  isInstallmentTransaction,
+  isInvestmentTransaction,
+  isInvestmentTransfer,
+} from "./modules/transaction-kind.js";
+import { openMonthPicker } from "./modules/month-picker.js";
+
 const state = {
   user: null,
   accounts: [],
@@ -258,7 +302,6 @@ const viewTitles = {
 };
 
 const SIDEBAR_COLLAPSED_KEY = "financeiro.sidebar.collapsed";
-const monthPickerPopover = createMonthPickerPopover();
 
 loginTab.addEventListener("click", () => switchAuthMode("login"));
 registerTab.addEventListener("click", () => switchAuthMode("register"));
@@ -4607,12 +4650,6 @@ function updateDestinationAmountFromRate() {
   });
 }
 
-function parseDecimalInput(value) {
-  const normalized = String(value || "").replace(/\./g, "").replace(",", ".");
-  const parsed = Number(normalized);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
 function groupTransactionsByDate(transactions) {
   const groups = new Map();
   for (const transaction of transactions) {
@@ -4970,346 +5007,4 @@ function renderImportResult(result) {
       </div>
     ` : '<div class="empty-state compact">Nenhuma linha ignorada.</div>'}
   `;
-}
-
-async function api(path, options = {}) {
-  let response;
-  try {
-    response = await fetch(path, {
-      credentials: "same-origin",
-      method: options.method || "GET",
-      headers: options.body ? { "Content-Type": "application/json" } : {},
-      body: options.body ? JSON.stringify(options.body) : undefined,
-    });
-  } catch (error) {
-    throw new Error(`Nao foi possivel falar com o servidor local. Abra pelo endereco ${window.location.origin}.`);
-  }
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(payload.error || "Algo nao saiu como esperado.");
-  }
-  return payload;
-}
-
-async function upload(path, body) {
-  let response;
-  try {
-    response = await fetch(path, {
-      credentials: "same-origin",
-      method: "POST",
-      body,
-    });
-  } catch (error) {
-    throw new Error(`Nao foi possivel falar com o servidor local. Abra pelo endereco ${window.location.origin}.`);
-  }
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(payload.error || "Algo nao saiu como esperado.");
-  }
-  return payload;
-}
-
-function setFormBusy(form, busy) {
-  const button = form.querySelector('button[type="submit"]');
-  if (button && !button.dataset.label) {
-    button.dataset.label = button.textContent;
-  }
-  for (const element of form.elements) {
-    element.disabled = busy;
-  }
-  if (button) {
-    button.textContent = busy ? "Aguarde..." : button.dataset.label;
-  }
-}
-
-function formData(form) {
-  return Object.fromEntries(new FormData(form).entries());
-}
-
-function setMessage(element, text, tone = "") {
-  element.textContent = text;
-  element.className = `message ${tone}`.trim();
-}
-
-function emptyState(text, compact = false) {
-  const empty = document.createElement("div");
-  empty.className = compact ? "empty-state compact" : "empty-state";
-  empty.textContent = text;
-  return empty;
-}
-
-function transactionTypeLabel(type) {
-  return {
-    income: "Receita",
-    expense: "Despesa",
-    transfer: "Transferência",
-    investment: "Investimento",
-  }[type] || type;
-}
-
-function cardTransactionTypeLabel(type) {
-  return {
-    income: "Receita",
-    expense: "Despesa",
-  }[type] || type;
-}
-
-function accountTypeLabel(type) {
-  return {
-    liquidity: "Liquidez",
-    wallet: "Carteira",
-    investment: "Investimento",
-  }[type] || "Liquidez";
-}
-
-function classificationGroupLabel(type) {
-  return {
-    income: "Receitas",
-    expense: "Despesas",
-    investment: "Investimentos",
-  }[type] || "Despesas";
-}
-
-function isInvestmentTransfer(transaction) {
-  return transaction.type === "transfer" && transaction.destination_account_type === "investment";
-}
-
-function isInvestmentTransaction(transaction) {
-  return transaction.type === "investment" || isInvestmentTransfer(transaction);
-}
-
-function isExchangeTransfer(transaction) {
-  return transaction.type === "transfer"
-    && transaction.destination_account_id
-    && transaction.destination_account_currency
-    && transaction.account_currency !== transaction.destination_account_currency;
-}
-
-function formatCategoryPath(transaction) {
-  if (!transaction.category_name) {
-    return "Sem categoria";
-  }
-  if (!transaction.subcategory_name) {
-    return transaction.category_name;
-  }
-  return `${transaction.category_name} / ${transaction.subcategory_name}`;
-}
-
-function cardCategoryPath(transaction) {
-  if (!transaction.category_name) {
-    return "Sem categoria";
-  }
-  if (!transaction.subcategory_name) {
-    return transaction.category_name;
-  }
-  return `${transaction.category_name} / ${transaction.subcategory_name}`;
-}
-
-function formatMoney(value, currency) {
-  const amount = Number(value);
-  return amount.toLocaleString("pt-BR", { style: "currency", currency });
-}
-
-function portfolioQuoteText(position) {
-  if (position.asset_type === "fixed_income") {
-    return "-";
-  }
-  if (!position.quote) {
-    return "-";
-  }
-  const quote = Number(position.quote);
-  if (!Number.isFinite(quote)) {
-    return "-";
-  }
-  return formatMoney(quote, position.currency);
-}
-
-function formatDecimal(value, maximumFractionDigits = 2) {
-  return Number(value || 0).toLocaleString("pt-BR", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits,
-  });
-}
-
-function moneyInputValue(value) {
-  return Number(value).toLocaleString("pt-BR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
-
-function formatPercent(value) {
-  return Number(value).toLocaleString("pt-BR", { style: "percent", maximumFractionDigits: 1 });
-}
-
-function formatMonthLabel(value) {
-  const [year, month] = value.split("-").map(Number);
-  return new Date(year, month - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
-}
-
-function currentMonthValue() {
-  return currentLocalMonthValue();
-}
-
-function todayLocalDateValue(date = new Date()) {
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("-");
-}
-
-function currentLocalMonthValue(date = new Date()) {
-  return todayLocalDateValue(date).slice(0, 7);
-}
-
-function isValidMonthValue(value) {
-  return /^\d{4}-\d{2}$/.test(String(value || ""));
-}
-
-function createMonthPickerPopover() {
-  const popover = document.createElement("div");
-  popover.className = "month-popover";
-  popover.hidden = true;
-  popover.innerHTML = `
-    <label>Mês
-      <select data-month-select>
-        <option value="01">Janeiro</option>
-        <option value="02">Fevereiro</option>
-        <option value="03">Março</option>
-        <option value="04">Abril</option>
-        <option value="05">Maio</option>
-        <option value="06">Junho</option>
-        <option value="07">Julho</option>
-        <option value="08">Agosto</option>
-        <option value="09">Setembro</option>
-        <option value="10">Outubro</option>
-        <option value="11">Novembro</option>
-        <option value="12">Dezembro</option>
-      </select>
-    </label>
-    <label>Ano
-      <input data-year-input type="number" min="1900" max="2200" step="1">
-    </label>
-    <div class="month-popover-actions">
-      <button class="ghost small-button" type="button" data-month-cancel>Cancelar</button>
-      <button class="primary small-button" type="button" data-month-apply>Aplicar</button>
-    </div>
-  `;
-  document.body.append(popover);
-  const monthSelect = popover.querySelector("[data-month-select]");
-  const yearInput = popover.querySelector("[data-year-input]");
-  const applyButton = popover.querySelector("[data-month-apply]");
-  const cancelButton = popover.querySelector("[data-month-cancel]");
-  const picker = { popover, monthSelect, yearInput, applyButton, cancelButton, onSelect: null };
-  popover.addEventListener("click", (event) => event.stopPropagation());
-  cancelButton.addEventListener("click", closeMonthPicker);
-  applyButton.addEventListener("click", () => {
-    const value = `${String(yearInput.value || "").padStart(4, "0")}-${monthSelect.value}`;
-    if (isValidMonthValue(value) && picker.onSelect) {
-      picker.onSelect(value);
-    }
-    closeMonthPicker();
-  });
-  document.addEventListener("click", closeMonthPicker);
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") {
-      closeMonthPicker();
-    }
-  });
-  return picker;
-}
-
-function openMonthPicker(anchor, value, onSelect) {
-  if (!anchor || !isValidMonthValue(value)) {
-    return;
-  }
-  const [year, month] = value.split("-");
-  monthPickerPopover.monthSelect.value = month;
-  monthPickerPopover.yearInput.value = year;
-  monthPickerPopover.onSelect = onSelect;
-  const rect = anchor.getBoundingClientRect();
-  monthPickerPopover.popover.style.top = `${window.scrollY + rect.bottom + 6}px`;
-  monthPickerPopover.popover.style.left = `${window.scrollX + rect.left}px`;
-  monthPickerPopover.popover.hidden = false;
-  anchor.setAttribute("aria-expanded", "true");
-  monthPickerPopover.anchor = anchor;
-  monthPickerPopover.monthSelect.focus();
-}
-
-function closeMonthPicker() {
-  if (monthPickerPopover.anchor) {
-    monthPickerPopover.anchor.setAttribute("aria-expanded", "false");
-  }
-  monthPickerPopover.popover.hidden = true;
-  monthPickerPopover.onSelect = null;
-  monthPickerPopover.anchor = null;
-}
-
-function monthEndDate(value) {
-  const [year, month] = value.split("-").map(Number);
-  const date = new Date(year, month, 0);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
-function formatCurrencySummary(totals) {
-  if (!totals.size) {
-    return formatMoney(0, "BRL");
-  }
-  return [...totals.entries()].map(([currency, amount]) => formatMoney(amount, currency)).join(" · ");
-}
-
-function shiftMonth(value, delta) {
-  const [year, month] = value.split("-").map(Number);
-  const date = new Date(year, month - 1 + delta, 1);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function transactionSeriesLabel(transaction) {
-  if (isInstallmentTransaction(transaction) && transaction.installment_index && transaction.installment_count) {
-    return `Parcela ${transaction.installment_index}/${transaction.installment_count}`;
-  }
-  if (transaction.series_kind === "recurring") {
-    return `Recorrente · ${recurrenceFrequencyLabel(transaction.recurrence_frequency)}`;
-  }
-  return "";
-}
-
-function isInstallmentTransaction(transaction) {
-  return Boolean(transaction && (
-    transaction.series_kind === "installment" ||
-    (Number(transaction.installment_index) > 0 && Number(transaction.installment_count) > 0)
-  ));
-}
-
-function recurrenceFrequencyLabel(frequency) {
-  return {
-    weekly: "Semanal",
-    monthly: "Mensal",
-    quarterly: "Trimestral",
-    semiannual: "Semestral",
-    annual: "Anual",
-  }[frequency] || "Recorrente";
-}
-
-function formatDate(value) {
-  const [year, month, day] = value.split("-");
-  return `${day}/${month}/${year}`;
-}
-
-function normalizeSearch(value) {
-  return String(value || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
-}
-
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
 }

@@ -21,6 +21,7 @@ Esta pasta e a fonte principal de requisitos, arquitetura e especificacoes do Si
 - [Limites de gastos](./specs/limites-gastos.md)
 - [Investimentos e Portfólio](./specs/investimentos-portfolio.md)
 - [Relatorios](./specs/relatorios.md)
+- [Modularizacao do frontend](./specs/frontend-modularizacao.md)
 
 ## Referencias
 

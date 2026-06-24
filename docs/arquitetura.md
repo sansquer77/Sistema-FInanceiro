@@ -20,7 +20,8 @@ Arquivos em `web/`.
 
 - `index.html`: estrutura das telas.
 - `styles.css`: aparencia e responsividade.
-- `app.js`: estado da interface, chamadas `fetch` e renderizacao.
+- `app.js`: ponto de entrada da interface, estado geral e orquestracao dos modulos de tela.
+- `web/modules/`: modulos ES nativos sem etapa de build para API, utilitarios, formatacao, componentes pequenos e futuras views funcionais.
 
 A interface deve orquestrar formularios, listas e navegacao. Regras financeiras, validacoes de propriedade e calculo de saldo ficam no nucleo Python.
 
