@@ -22,6 +22,7 @@ Esta pasta e a fonte principal de requisitos, arquitetura e especificacoes do Si
 - [Investimentos e Portfólio](./specs/investimentos-portfolio.md)
 - [Relatorios](./specs/relatorios.md)
 - [Modularizacao do frontend](./specs/frontend-modularizacao.md)
+- [Seguranca de autenticacao](./specs/seguranca-autenticacao.md)
 
 ## Referencias
 

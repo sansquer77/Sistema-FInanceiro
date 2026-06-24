@@ -136,6 +136,7 @@ Tabelas atuais:
 - `users`: cadastro de usuários locais.
 - `sessions`: tokens de login ativos.
 - `password_resets`: tokens para recuperação de senha.
+- `auth_attempts`: contadores persistentes de tentativas de login e recuperação de senha.
 - `checking_accounts`: contas-correntes manuais com moeda, saldo e natureza.
 - `credit_cards`: cartões de crédito ativos ou arquivados e seus limites.
 - `credit_card_transactions`: despesas e receitas feitas em faturas de cartões.

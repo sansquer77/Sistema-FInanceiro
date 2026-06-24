@@ -307,7 +307,7 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def handle_login(self) -> None:
         data = self.read_json()
-        user = login_user(data.get("email", ""), data.get("password", ""))
+        user = login_user(data.get("email", ""), data.get("password", ""), source_key=self.client_source_key())
         token = create_session(user["id"])
         self.send_json({"user": user}, headers=self.session_cookie(token))
 
@@ -315,16 +315,16 @@ class AppHandler(BaseHTTPRequestHandler):
         token = self.get_cookie("session")
         if token:
             logout_session(token)
-        self.send_json({"ok": True}, headers={"Set-Cookie": "session=; Path=/; Max-Age=0; SameSite=Lax; HttpOnly"})
+        self.send_json({"ok": True}, headers={"Set-Cookie": self.expired_session_cookie()})
 
     def handle_password_reset_request(self) -> None:
         data = self.read_json()
-        result = request_password_reset(data.get("email", ""))
+        result = request_password_reset(data.get("email", ""), source_key=self.client_source_key())
         self.send_json(result)
 
     def handle_password_reset_confirm(self) -> None:
         data = self.read_json()
-        reset_password(data.get("token", ""), data.get("new_password", ""))
+        reset_password(data.get("token", ""), data.get("new_password", ""), source_key=self.client_source_key())
         self.send_json({"ok": True})
 
     def handle_update_email(self) -> None:
@@ -343,7 +343,7 @@ class AppHandler(BaseHTTPRequestHandler):
         user = self.require_user()
         data = self.read_json()
         delete_user_account(user["id"], data.get("current_password", ""))
-        self.send_json({"ok": True}, headers={"Set-Cookie": "session=; Path=/; Max-Age=0; SameSite=Lax; HttpOnly"})
+        self.send_json({"ok": True}, headers={"Set-Cookie": self.expired_session_cookie()})
 
     def handle_clear_launches(self) -> None:
         user = self.require_user()
@@ -798,7 +798,19 @@ class AppHandler(BaseHTTPRequestHandler):
         return None
 
     def session_cookie(self, token: str) -> dict:
-        return {"Set-Cookie": f"session={token}; Path=/; SameSite=Lax; HttpOnly"}
+        return {"Set-Cookie": self.cookie_header(f"session={token}")}
+
+    def expired_session_cookie(self) -> str:
+        return self.cookie_header("session=; Max-Age=0")
+
+    def cookie_header(self, value: str) -> str:
+        attributes = [value, "Path=/", "SameSite=Lax", "HttpOnly"]
+        if PUBLIC_URL.startswith("https://"):
+            attributes.append("Secure")
+        return "; ".join(attributes)
+
+    def client_source_key(self) -> str:
+        return str(self.client_address[0])
 
     def handle_one_request(self) -> None:
         try:

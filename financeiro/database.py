@@ -43,6 +43,17 @@ def initialize_database() -> None:
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
+            CREATE TABLE IF NOT EXISTS auth_attempts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                action TEXT NOT NULL,
+                identifier TEXT NOT NULL,
+                attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+                locked_until TEXT,
+                last_attempt_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (action, identifier)
+            );
+
             CREATE TABLE IF NOT EXISTS checking_accounts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -354,6 +365,9 @@ def initialize_database() -> None:
 
             CREATE INDEX IF NOT EXISTS idx_password_resets_token
             ON password_resets (token_hash, used_at, expires_at);
+
+            CREATE INDEX IF NOT EXISTS idx_auth_attempts_locked_until
+            ON auth_attempts (locked_until);
 
             CREATE INDEX IF NOT EXISTS idx_quote_cache_expires_at
             ON quote_cache (expires_at);

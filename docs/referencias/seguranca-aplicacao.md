@@ -34,6 +34,7 @@ Riscos principais:
 - Em ambiente HTTPS, cookie deve usar `Secure`.
 - Logout deve invalidar a sessão no servidor.
 - Mensagens de erro de login não devem revelar se email existe.
+- Login, pedido de recuperacao e confirmacao de token devem ter limite de tentativas persistente.
 
 ### Autorização
 
@@ -110,6 +111,12 @@ sort_column = allowed_sorts.get(requested_sort, "date")
 - Sessões antigas devem poder ser invalidadas.
 - Futuramente, considerar expiração por inatividade.
 - Não registrar token de sessão em logs.
+
+Decisao atual:
+
+- A sessao usa token opaco armazenado no servidor em `sessions`; o cookie guarda apenas esse identificador.
+- JWE nao e adotado nesta fase porque nao reduz IDOR, SQL Injection ou brute-force, e adicionaria gestao de chave/rotacao a um app local sem necessidade imediata.
+- Caso o app deixe de ser local e passe a ser exposto em ambiente web multiusuario, reavaliar expiracao de sessao, rotacao de token, CSRF token e, se houver necessidade de claims cliente-side, tokens assinados ou JWE.
 
 ### CSRF
 

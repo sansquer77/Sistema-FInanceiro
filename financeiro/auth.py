@@ -12,6 +12,12 @@ from financeiro.database import get_connection, row_to_dict
 from financeiro.emailer import send_password_reset_email
 
 RESET_TOKEN_MINUTES = 15
+LOGIN_MAX_FAILURES = 5
+LOGIN_LOCK_MINUTES = 15
+PASSWORD_RESET_MAX_REQUESTS = 3
+PASSWORD_RESET_LOCK_MINUTES = 30
+PASSWORD_RESET_CONFIRM_MAX_FAILURES = 5
+PASSWORD_RESET_CONFIRM_LOCK_MINUTES = 30
 
 
 class AuthError(Exception):
@@ -42,12 +48,18 @@ def create_user(name: str, email: str, password: str) -> dict:
         raise
 
 
-def login_user(email: str, password: str) -> dict:
+def login_user(email: str, password: str, source_key: str | None = None) -> dict:
     email = email.strip().lower()
+    login_identifiers = auth_identifiers("login", email, source_key)
     with get_connection() as conn:
+        ensure_not_locked(conn, "login", login_identifiers, LOGIN_MAX_FAILURES, LOGIN_LOCK_MINUTES)
         row = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
     if not row or not verify_password(password, row["password_hash"]):
+        with get_connection() as conn:
+            record_auth_failure(conn, "login", login_identifiers, LOGIN_MAX_FAILURES, LOGIN_LOCK_MINUTES)
         raise AuthError("Email ou senha invalidos.", HTTPStatus.UNAUTHORIZED)
+    with get_connection() as conn:
+        clear_auth_attempts(conn, "login", login_identifiers)
     return {"id": row["id"], "name": row["name"], "email": row["email"], "created_at": row["created_at"]}
 
 
@@ -109,11 +121,14 @@ def clear_user_launches(user_id: int, current_password: str) -> None:
         )
 
 
-def request_password_reset(email: str) -> dict:
+def request_password_reset(email: str, source_key: str | None = None) -> dict:
     normalized_email = email.strip().lower()
     validate_email(normalized_email)
     token = None
+    identifiers = auth_identifiers("password-reset-request", normalized_email, source_key)
     with get_connection() as conn:
+        ensure_not_locked(conn, "password-reset-request", identifiers, PASSWORD_RESET_MAX_REQUESTS, PASSWORD_RESET_LOCK_MINUTES)
+        record_auth_failure(conn, "password-reset-request", identifiers, PASSWORD_RESET_MAX_REQUESTS, PASSWORD_RESET_LOCK_MINUTES)
         user = conn.execute("SELECT id FROM users WHERE email = ?", (normalized_email,)).fetchone()
         if user:
             token = secrets.token_urlsafe(24)
@@ -139,15 +154,17 @@ def request_password_reset(email: str) -> dict:
     }
 
 
-def reset_password(token: str, new_password: str) -> None:
+def reset_password(token: str, new_password: str, source_key: str | None = None) -> None:
     normalized_token = str(token or "").strip()
     if len(new_password) < 8:
         raise AuthError("A nova senha precisa ter pelo menos 8 caracteres.")
     if not normalized_token:
         raise AuthError("Informe o codigo de recuperacao.")
     token_hash = hash_reset_token(normalized_token)
+    identifiers = auth_identifiers("password-reset-confirm", token_hash, source_key)
     now = current_timestamp()
     with get_connection() as conn:
+        ensure_not_locked(conn, "password-reset-confirm", identifiers, PASSWORD_RESET_CONFIRM_MAX_FAILURES, PASSWORD_RESET_CONFIRM_LOCK_MINUTES)
         reset = conn.execute(
             """
             SELECT *
@@ -159,6 +176,7 @@ def reset_password(token: str, new_password: str) -> None:
             (token_hash, now),
         ).fetchone()
         if not reset:
+            record_auth_failure(conn, "password-reset-confirm", identifiers, PASSWORD_RESET_CONFIRM_MAX_FAILURES, PASSWORD_RESET_CONFIRM_LOCK_MINUTES)
             raise AuthError("Codigo de recuperacao invalido ou expirado.", HTTPStatus.UNAUTHORIZED)
         conn.execute(
             "UPDATE users SET password_hash = ? WHERE id = ?",
@@ -169,6 +187,7 @@ def reset_password(token: str, new_password: str) -> None:
             (reset["id"],),
         )
         conn.execute("DELETE FROM sessions WHERE user_id = ?", (reset["user_id"],))
+        clear_auth_attempts(conn, "password-reset-confirm", identifiers)
 
 
 def create_session(user_id: int) -> str:
@@ -197,6 +216,82 @@ def get_current_user(token: str | None) -> dict | None:
 def logout_session(token: str) -> None:
     with get_connection() as conn:
         conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
+
+
+def auth_identifiers(action: str, primary: str, source_key: str | None = None) -> list[str]:
+    identifiers = [f"{action}:primary:{primary}"]
+    if source_key:
+        identifiers.append(f"{action}:source:{source_key}")
+    return identifiers
+
+
+def ensure_not_locked(conn, action: str, identifiers: list[str], max_attempts: int, lock_minutes: int) -> None:
+    now = current_timestamp()
+    placeholders = ",".join("?" for _ in identifiers)
+    rows = conn.execute(
+        f"""
+        SELECT identifier, locked_until
+        FROM auth_attempts
+        WHERE action = ? AND identifier IN ({placeholders}) AND locked_until IS NOT NULL AND locked_until > ?
+        """,
+        (action, *identifiers, now),
+    ).fetchall()
+    if rows:
+        raise AuthError(
+            f"Muitas tentativas. Aguarde {lock_minutes} minutos e tente novamente.",
+            HTTPStatus.TOO_MANY_REQUESTS,
+        )
+
+
+def record_auth_failure(conn, action: str, identifiers: list[str], max_attempts: int, lock_minutes: int) -> None:
+    now = current_timestamp()
+    window_start = datetime.now(timezone.utc) - timedelta(minutes=lock_minutes)
+    locked_until = (datetime.now(timezone.utc) + timedelta(minutes=lock_minutes)).replace(microsecond=0).isoformat()
+    for identifier in identifiers:
+        row = conn.execute(
+            "SELECT attempt_count, locked_until, last_attempt_at FROM auth_attempts WHERE action = ? AND identifier = ?",
+            (action, identifier),
+        ).fetchone()
+        previous_count = 0
+        if row and timestamp_is_after(row["last_attempt_at"], window_start):
+            previous_count = int(row["attempt_count"] or 0)
+        next_count = previous_count + 1
+        next_locked_until = locked_until if next_count >= max_attempts else None
+        conn.execute(
+            """
+            INSERT INTO auth_attempts (action, identifier, attempt_count, locked_until, last_attempt_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(action, identifier) DO UPDATE SET
+                attempt_count = excluded.attempt_count,
+                locked_until = excluded.locked_until,
+                last_attempt_at = excluded.last_attempt_at,
+                updated_at = excluded.updated_at
+            """,
+            (action, identifier, next_count, next_locked_until, now, now),
+        )
+
+
+def clear_auth_attempts(conn, action: str, identifiers: list[str]) -> None:
+    placeholders = ",".join("?" for _ in identifiers)
+    conn.execute(
+        f"DELETE FROM auth_attempts WHERE action = ? AND identifier IN ({placeholders})",
+        (action, *identifiers),
+    )
+
+
+def timestamp_is_after(raw: str | None, threshold: datetime) -> bool:
+    if not raw:
+        return False
+    try:
+        normalized = str(raw).replace("Z", "+00:00")
+        if "T" not in normalized and " " in normalized:
+            normalized = normalized.replace(" ", "T")
+        parsed = datetime.fromisoformat(normalized)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed > threshold
+    except ValueError:
+        return False
 
 
 def validate_user_input(name: str, email: str, password: str) -> None:
