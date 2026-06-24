@@ -41,6 +41,8 @@ import {
   isInvestmentTransfer,
 } from "./modules/transaction-kind.js";
 import { openMonthPicker } from "./modules/month-picker.js";
+import { registerAuthView } from "./modules/auth-view.js";
+import { registerUserAdminView } from "./modules/user-admin-view.js";
 
 const state = {
   user: null,
@@ -303,15 +305,6 @@ const viewTitles = {
 
 const SIDEBAR_COLLAPSED_KEY = "financeiro.sidebar.collapsed";
 
-loginTab.addEventListener("click", () => switchAuthMode("login"));
-registerTab.addEventListener("click", () => switchAuthMode("register"));
-loginForm.addEventListener("submit", handleLogin);
-registerForm.addEventListener("submit", handleRegister);
-passwordResetRequestForm.addEventListener("submit", handlePasswordResetRequest);
-passwordResetConfirmForm.addEventListener("submit", handlePasswordResetConfirm);
-forgotPasswordButton.addEventListener("click", () => switchAuthMode("reset-request"));
-backToLoginFromRequest.addEventListener("click", () => switchAuthMode("login"));
-backToLoginFromConfirm.addEventListener("click", () => switchAuthMode("login"));
 accountForm.addEventListener("submit", handleAccountSubmit);
 accountForm.elements.account_type.addEventListener("change", updateAccountTypeState);
 creditCardForm.addEventListener("submit", handleCreditCardSubmit);
@@ -341,10 +334,6 @@ limitCategory.addEventListener("change", renderLimitSubcategories);
 importForm.addEventListener("submit", handleImportSubmit);
 importTarget.addEventListener("change", renderImportTargets);
 downloadImportTemplateButton.addEventListener("click", downloadImportTemplate);
-emailForm.addEventListener("submit", handleEmailSubmit);
-passwordForm.addEventListener("submit", handlePasswordSubmit);
-clearLaunchesForm.addEventListener("submit", handleClearLaunchesSubmit);
-deleteUserForm.addEventListener("submit", handleDeleteUserSubmit);
 transactionType.addEventListener("change", () => {
   applyWalletAccountRestrictions();
   updateTransactionTypeState();
@@ -410,7 +399,6 @@ portfolioGroupFilter.addEventListener("change", () => {
 });
 transactionSearch.addEventListener("input", renderTransactions);
 transactionList.addEventListener("click", handleTransactionListClick);
-logoutButton.addEventListener("click", handleLogout);
 cancelEditButton.addEventListener("click", resetAccountForm);
 cancelTransactionEditButton.addEventListener("click", resetTransactionForm);
 cancelCreditCardEditButton.addEventListener("click", resetCreditCardForm);
@@ -421,6 +409,49 @@ sidebarToggle.addEventListener("click", () => toggleSidebar());
 
 updateAccountTypeState();
 initializeSidebar();
+const authViewController = registerAuthView({
+  api,
+  elements: {
+    loginTab,
+    registerTab,
+    loginForm,
+    registerForm,
+    passwordResetRequestForm,
+    passwordResetConfirmForm,
+    forgotPasswordButton,
+    backToLoginFromRequest,
+    backToLoginFromConfirm,
+    authMessage,
+    logoutButton,
+  },
+  formData,
+  resetSessionState,
+  setFormBusy,
+  setMessage,
+  state,
+  onAuthenticated: loadDashboard,
+  onShowAuth: showAuth,
+});
+registerUserAdminView({
+  api,
+  elements: {
+    emailForm,
+    passwordForm,
+    clearLaunchesForm,
+    deleteUserForm,
+    emailMessage,
+    passwordMessage,
+    clearLaunchesMessage,
+    deleteUserMessage,
+    userName,
+  },
+  formData,
+  loadAll,
+  resetSessionState,
+  setMessage,
+  state,
+  onShowAuth: showAuth,
+});
 boot();
 
 async function boot() {
@@ -437,96 +468,7 @@ async function boot() {
   await loadDashboard();
 }
 
-function switchAuthMode(mode) {
-  const isLogin = mode === "login";
-  const isRegister = mode === "register";
-  const isResetRequest = mode === "reset-request";
-  const isResetConfirm = mode === "reset-confirm";
-  loginTab.classList.toggle("active", isLogin);
-  registerTab.classList.toggle("active", isRegister);
-  loginForm.hidden = !isLogin;
-  registerForm.hidden = !isRegister;
-  passwordResetRequestForm.hidden = !isResetRequest;
-  passwordResetConfirmForm.hidden = !isResetConfirm;
-  setMessage(authMessage, "");
-}
-
-async function handleLogin(event) {
-  event.preventDefault();
-  setMessage(authMessage, "");
-  const data = formData(loginForm);
-  setFormBusy(loginForm, true);
-  try {
-    const response = await api("/api/login", { method: "POST", body: data });
-    state.user = response.user;
-    await loadDashboard();
-  } catch (error) {
-    setMessage(authMessage, error.message, "error");
-  } finally {
-    setFormBusy(loginForm, false);
-  }
-}
-
-async function handleRegister(event) {
-  event.preventDefault();
-  setMessage(authMessage, "");
-  const data = formData(registerForm);
-  setFormBusy(registerForm, true);
-  try {
-    const response = await api("/api/register", { method: "POST", body: data });
-    state.user = response.user;
-    await loadDashboard();
-  } catch (error) {
-    setMessage(authMessage, error.message, "error");
-  } finally {
-    setFormBusy(registerForm, false);
-  }
-}
-
-async function handlePasswordResetRequest(event) {
-  event.preventDefault();
-  setMessage(authMessage, "");
-  const data = formData(passwordResetRequestForm);
-  setFormBusy(passwordResetRequestForm, true);
-  try {
-    const response = await api("/api/password-reset/request", {
-      method: "POST",
-      body: data,
-    });
-    passwordResetConfirmForm.elements.token.value = "";
-    switchAuthMode("reset-confirm");
-    const message = `Se o email existir, o codigo de recuperacao sera enviado. Ele expira em ${response.expires_in_minutes} minutos.`;
-    setMessage(authMessage, message, "success");
-  } catch (error) {
-    setMessage(authMessage, error.message, "error");
-  } finally {
-    setFormBusy(passwordResetRequestForm, false);
-  }
-}
-
-async function handlePasswordResetConfirm(event) {
-  event.preventDefault();
-  setMessage(authMessage, "");
-  const data = formData(passwordResetConfirmForm);
-  setFormBusy(passwordResetConfirmForm, true);
-  try {
-    await api("/api/password-reset/confirm", {
-      method: "POST",
-      body: data,
-    });
-    passwordResetRequestForm.reset();
-    passwordResetConfirmForm.reset();
-    switchAuthMode("login");
-    setMessage(authMessage, "Senha redefinida. Entre com a nova senha.", "success");
-  } catch (error) {
-    setMessage(authMessage, error.message, "error");
-  } finally {
-    setFormBusy(passwordResetConfirmForm, false);
-  }
-}
-
-async function handleLogout() {
-  await api("/api/logout", { method: "POST" });
+function resetSessionState() {
   state.user = null;
   state.accounts = [];
   state.archivedAccounts = [];
@@ -545,13 +487,10 @@ async function handleLogout() {
   state.spendingLimits = [];
   state.currentSpendingLimits = [];
   state.portfolio = null;
-  loginForm.reset();
-  registerForm.reset();
   resetAccountForm();
   resetCreditCardForm();
   resetCardTransactionForm();
   resetTransactionForm();
-  showAuth();
 }
 
 async function loadDashboard() {
@@ -1424,86 +1363,6 @@ async function deleteSubcategory(item) {
     setMessage(categoryMessage, "Subcategoria excluída.", "success");
   } catch (error) {
     setMessage(categoryMessage, error.message, "error");
-  }
-}
-
-async function handleEmailSubmit(event) {
-  event.preventDefault();
-  setMessage(emailMessage, "");
-  try {
-    const response = await api("/api/me/email", { method: "POST", body: formData(emailForm) });
-    state.user = response.user;
-    userName.textContent = state.user.name;
-    emailForm.elements.current_password.value = "";
-    setMessage(emailMessage, "Email atualizado.", "success");
-  } catch (error) {
-    setMessage(emailMessage, error.message, "error");
-  }
-}
-
-async function handlePasswordSubmit(event) {
-  event.preventDefault();
-  setMessage(passwordMessage, "");
-  try {
-    await api("/api/me/password", { method: "POST", body: formData(passwordForm) });
-    passwordForm.reset();
-    setMessage(passwordMessage, "Senha atualizada.", "success");
-  } catch (error) {
-    setMessage(passwordMessage, error.message, "error");
-  }
-}
-
-async function handleClearLaunchesSubmit(event) {
-  event.preventDefault();
-  setMessage(clearLaunchesMessage, "");
-  const data = formData(clearLaunchesForm);
-  if (data.confirm_clear !== "yes") {
-    setMessage(clearLaunchesMessage, "Confirme que entende a exclusao dos lancamentos.", "error");
-    return;
-  }
-  try {
-    await api("/api/me/clear-launches", { method: "POST", body: { current_password: data.current_password } });
-    clearLaunchesForm.reset();
-    state.selectedAccountId = "";
-    state.transactions = [];
-    state.cardTransactions = [];
-    state.cardPayments = [];
-    state.cardInvoiceTransactions = [];
-    state.cardInvoicePayments = [];
-    state.portfolio = null;
-    await loadAll();
-    setMessage(clearLaunchesMessage, "Lançamentos apagados. Categorias, subcategorias e tags foram preservadas.", "success");
-  } catch (error) {
-    setMessage(clearLaunchesMessage, error.message, "error");
-  }
-}
-
-async function handleDeleteUserSubmit(event) {
-  event.preventDefault();
-  setMessage(deleteUserMessage, "");
-  const data = formData(deleteUserForm);
-  if (data.confirm_delete !== "yes") {
-    setMessage(deleteUserMessage, "Confirme que entende a exclusao permanente dos dados.", "error");
-    return;
-  }
-  try {
-    await api("/api/me", { method: "DELETE", body: { current_password: data.current_password } });
-    state.user = null;
-    state.accounts = [];
-    state.archivedAccounts = [];
-    state.creditCards = [];
-    state.archivedCreditCards = [];
-    state.transactions = [];
-    state.cardTransactions = [];
-    state.cardPayments = [];
-    state.cardInvoiceTransactions = [];
-    state.cardInvoicePayments = [];
-    state.categories = [];
-    state.tags = [];
-    deleteUserForm.reset();
-    showAuth();
-  } catch (error) {
-    setMessage(deleteUserMessage, error.message, "error");
   }
 }
 
@@ -4984,7 +4843,7 @@ function renderCockpitPortfolioByType() {
 function showAuth() {
   authView.hidden = false;
   dashboardView.hidden = true;
-  switchAuthMode("login");
+  authViewController.switchAuthMode("login");
 }
 
 function renderImportResult(result) {

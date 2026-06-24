@@ -45,11 +45,11 @@ Analistas e mantenedores do Sistema Financeiro que precisam evoluir a interface 
 - `transaction-kind`: predicados reutilizados por relatorios, cockpit e lancamentos.
 - `labels`: labels e caminhos de categoria.
 - `month-picker`: componente pequeno compartilhado entre lancamentos, cartoes, limites e relatorios.
+- `auth-view`: login, cadastro, logout e recuperacao de senha.
+- `user-admin-view`: troca de email/senha, limpeza de lancamentos e exclusao de usuario autenticado.
 
 ### Proximos modulos funcionais
 
-- `auth-view`: login, cadastro, logout e recuperacao de senha. E uma boa extracao porque tem formulario, mensagens e endpoints proprios.
-- `user-admin-view`: troca de email/senha, limpeza de lancamentos e exclusao de usuario. Deve ficar separado de `auth-view`, pois opera somente depois de autenticado e tem acoes destrutivas.
 - `accounts-view`: cadastro, edicao, arquivamento, restauracao e logos de contas.
 - `cards-view`: cadastro de cartoes, faturas, pagamento de fatura, lancamentos de cartao e conciliacao.
 - `transactions-view`: formulario de lancamentos, busca, agrupamento por data, recorrencia, parcelas, cambio e investimento.
