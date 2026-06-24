@@ -28,16 +28,17 @@ O Organizze serve como referencia de clareza: modulos financeiros separados, sal
 - Lançamentos recorrentes e parcelamento de transações.
 - Cartões de crédito, limites, faturas e fluxo de pagamentos de fatura.
 - Limites e metas de gastos mensais por categoria e subcategoria.
-- Portfólio de investimentos com cotações integradas de mercado (ações, FIIs, criptos) e indexadores do Banco Central (SGS para renda fixa).
+- Cockpit com saldos por moeda, planejamento recorrente, dívidas parceladas, maiores receitas/despesas e portfólio por tipo.
+- Relatórios por categoria, subcategoria, conta, tag e fluxo diário, com detalhamento dos lançamentos.
+- Portfólio de investimentos com cotações integradas de mercado (ações, FIIs, criptos), indexadores do Banco Central (SGS para renda fixa), poupança, previdência privada, resgate, encerramento e ajuste manual de valor.
 - Importação de lançamentos do Organizze e planilhas modelo do próprio sistema (.xlsx).
 - Recuperação de senha por e-mail SMTP localmente configurado.
 
 ### Planejados
 
-- Relatórios gráficos e analíticos completos por período, categoria, conta e tag na interface web.
 - Integração ou exportação direta de dados em outros formatos.
 - Conciliação automática de arquivos OFX bancários.
 
 ## Estado atual
 
-O app já cobre todo o ciclo avançado de controle financeiro local: usuário entra, cadastra contas e cartões, define limites, cria categorias/tags, registra lançamentos normais ou parcelados, realiza o acompanhamento de investimentos com precificação e valorização automática de ativos, e importa dados de planilhas locais. As próximas evoluções devem priorizar a exibição de relatórios avançados na interface web.
+O app já cobre todo o ciclo avançado de controle financeiro local: usuário entra, cadastra contas e cartões, define limites, cria categorias/tags, registra lançamentos normais, parcelados ou recorrentes, acompanha faturas, relatórios e Cockpit, realiza o acompanhamento de investimentos com precificação, valorização automática ou ajuste manual de ativos, e importa dados de planilhas locais. As próximas evoluções devem priorizar automações de conciliação/importação e refinamentos de precisão para classes específicas de ativos.

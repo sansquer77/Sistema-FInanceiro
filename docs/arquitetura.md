@@ -76,6 +76,7 @@ Rotas atuais:
   - `POST /api/credit-card-transactions`
   - `PUT /api/credit-card-transactions/{id}`
   - `DELETE /api/credit-card-transactions/{id}`
+  - `PUT /api/credit-card-transactions/{id}/invoice`
   - `PUT /api/credit-card-transactions/{id}/reconciliation`
   - `GET /api/credit-card-payments`
   - `POST /api/credit-card-invoice/pay`
@@ -101,6 +102,9 @@ Rotas atuais:
   - `POST /api/portfolio/positions`
   - `PUT /api/portfolio/positions/{id}`
   - `DELETE /api/portfolio/positions/{id}`
+  - `POST /api/portfolio/redeem`
+  - `POST /api/portfolio/close`
+  - `POST /api/portfolio/value`
 - **Importação**:
   - `POST /api/import/organizze-transactions`
   - `POST /api/import/system-template`
@@ -141,6 +145,10 @@ Tabelas atuais:
 - `transactions`: lançamentos normais e de investimento, incluindo recorrências e parcelas.
 - `investment_opening_positions`: posições históricas iniciais de investimentos cadastrados.
 - `investment_operations`: operações de compras/vendas de investimentos detalhadas.
+- `investment_redemptions`: resgates associados a posições/operações de investimento.
+- `investment_closed_positions`: histórico de posições encerradas.
+- `investment_value_overrides`: ajustes manuais de valor atual para posições sem cotação/indexador confiável.
+- `quote_cache`: cache persistente de cotações e indicadores externos.
 - `transaction_tags`: relação N:M entre transações e tags.
 - `credit_card_transaction_tags`: relação N:M entre transações de cartão e tags.
 - `spending_limits`: limites e metas de gastos definidos por mês/categoria/subcategoria.
@@ -186,15 +194,27 @@ Tabelas atuais:
 ### Cartões de Crédito e Fatura
 
 1. Lançamentos em cartões são associados a um cartão específico e a uma fatura mensal (`AAAA-MM`).
-2. Faturas acumulam despesas e receitas.
-3. O pagamento de fatura deduz o saldo da conta-corrente do usuário e marca a fatura e seus pagamentos no banco de dados.
+2. A fatura é calculada pela data do lançamento e pelo dia de fechamento do cartão. Compras após o fechamento entram na fatura posterior.
+3. Faturas acumulam despesas e receitas, exibem total atual, total conciliado e contador de lançamentos não conciliados.
+4. Lançamentos de fatura podem ser movidos para fatura anterior/posterior se a fatura de destino estiver aberta.
+5. O pagamento de fatura deduz o saldo da conta-corrente do usuário, respeita moeda e conta preferencial de pagamento, e marca a fatura no banco de dados.
 
 ### Portfólio de Investimentos
 
 1. A carteira é consolidada unindo posições iniciais e operações em contas de investimento.
-2. Cotações para Renda Variável e Cripto ativos são buscadas de APIs externas (Yahoo Finance / CoinGecko) e cacheadas em runtime.
-3. Rendimentos de Renda Fixa pós-fixados ou híbridos são indexados via APIs do Banco Central (SGS).
-4. O valor líquido é projetado aplicando a tributação regressiva de IOF e IR baseada no tempo decorrido desde a aquisição.
+2. Cotações para Renda Variável e Cripto ativos são buscadas de APIs externas (Yahoo Finance / CoinGecko) e cacheadas em memória e em `quote_cache`.
+3. Rendimentos de Renda Fixa pós-fixados ou híbridos são indexados via APIs do Banco Central (SGS), com fallback local.
+4. O valor líquido é projetado aplicando a tributação regressiva de IOF e IR baseada no tempo decorrido desde a aquisição quando aplicável.
+5. Poupança é tratada como ativo próprio com aniversários; Previdência Privada é tratada como `private_pension`.
+6. Resgates usam FIFO em múltiplas origens e encerramentos movem posições para histórico.
+7. Valores de ativos em moeda estrangeira são mantidos e exibidos na moeda da carteira; conversão ocorre via lançamentos de câmbio.
+
+### Cockpit e Relatórios
+
+1. `GET /api/cockpit` consolida lançamentos de conta pelo mês e lançamentos de cartão pela fatura (`invoice_month`).
+2. Planejamento do mês considera receitas recorrentes, investimentos planejados e despesas recorrentes, incluindo recorrências de cartão.
+3. Relatórios no frontend agrupam por categoria, subcategoria, conta, tag e fluxo diário.
+4. Lançamentos de cartão entram em relatórios e limites pela competência da fatura.
 
 ### Importação de Arquivos
 

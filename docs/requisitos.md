@@ -10,16 +10,17 @@ Manter um sistema financeiro local, privado e simples para controlar contas, sal
 - **Gestão de Perfil**: alteração de e-mail, alteração de senha e exclusão da conta do usuário autenticado.
 - **Recuperação de senha**: código temporário enviado por e-mail SMTP configurado localmente de forma segura.
 - **Contas-correntes**: cadastro, edição, listagem, arquivamento e restauração de contas com suporte a naturezas distintas (`liquidity` - liquidez, `wallet` - carteira física, `investment` - investimento) e moedas múltiplas (`BRL`, `USD`, `EUR`, `GBP`).
-- **Lançamentos normais**: receitas, despesas e transferências manuais com impacto em saldo e suporte a taxas de câmbio históricas para conversão de moedas estrangeiras para BRL.
+- **Lançamentos normais**: receitas, despesas, transferências, câmbio e investimentos manuais com impacto em saldo e suporte a taxas de câmbio históricas quando houver conversão entre moedas.
 - **Recorrência e Parcelamento**: suporte a séries de lançamentos periódicos ou parcelados com acompanhamento de índice de parcelas e conciliação bancária (`reconciled_at`).
-- **Cartões de Crédito**: cadastro de cartões com limite, emissor, bandeira, fechamento e vencimento. Lançamentos de despesas e receitas no cartão por fatura mensal (formato `AAAA-MM`), conciliação de lançamentos e fluxo de pagamento de fatura integrado às contas-correntes.
+- **Cartões de Crédito**: cadastro de cartões com limite, emissor, bandeira, fechamento, vencimento e conta preferencial de pagamento. Lançamentos de despesas e receitas no cartão por fatura mensal (formato `AAAA-MM`), conciliação de lançamentos, compras parceladas/recorrentes, movimentação entre faturas e fluxo de pagamento de fatura integrado às contas-correntes.
 - **Limites de Gastos (Metas/Budgets)**: estabelecimento de limites de despesas mensais por categoria e subcategoria.
-- **Portfólio de Investimentos**: posições iniciais (`opening positions`) e operações de investimento. Suporte a tipos de ativos como ações (`stock`), cripto (`crypto`), fundos (`fund`), renda fixa (`fixed_income`), poupança (`savings`) e outros (`other`).
+- **Portfólio de Investimentos**: posições iniciais (`opening positions`) e operações de investimento. Suporte a tipos de ativos como ações/ETFs/BDRs (`stock`), cripto (`crypto`), fundos (`fund`), renda fixa (`fixed_income`), previdência privada (`private_pension`), poupança (`savings`) e outros (`other`).
 - **Precificação e Validação de Ativos**:
   - Integração com Yahoo Finance (ações e fundos) e CoinGecko/Yahoo (criptoativos) para cotações automáticas.
   - Integração com o Sistema Gerenciador de Séries Temporais (SGS) do Banco Central para obter CDI, SELIC, IPCA, IGP-M e TR para o cálculo do rendimento acumulado de renda fixa (com fallback local seguro).
   - Cálculo de impostos de renda fixa: IOF (tabela regressiva até 30 dias) e Imposto de Renda (tabela regressiva de 22,5% a 15% por prazo de retenção).
 - **Categorias e Tags**: cadastro, edição, listagem e exclusão de categorias (tipo receita, despesa, investimento), subcategorias e múltiplos marcadores (tags) por transação.
+- **Cockpit e Relatórios**: resumo financeiro mensal, saldos por moeda, planejamento recorrente, dívidas parceladas, portfólio por tipo, maiores receitas/despesas, relatórios por categoria, subcategoria, conta, tag e fluxo diário.
 - **Importação de Dados**:
   - Leitura e importação de extratos do Organizze em formato `.csv` ou `.xls`.
   - Importação de lançamentos por meio de planilhas de modelo do sistema (`.xlsx`) para contas e cartões.
@@ -39,12 +40,14 @@ Manter um sistema financeiro local, privado e simples para controlar contas, sal
 - Receitas aumentam o saldo da conta de origem.
 - Despesas reduzem o saldo da conta de origem.
 - Transferências reduzem o saldo da conta de origem e aumentam o saldo da conta de destino.
-- Transferências exigem contas diferentes e com a mesma moeda (conversões e taxas de câmbio são aplicadas para fins de valorização em BRL, mas transferências diretas exigem mesma moeda).
-- Cada lançamento exige descrição, data válida, valor maior que zero, conta/cartão, categoria e ao menos uma tag.
+- Transferências exigem contas diferentes e com a mesma moeda. Câmbio entre contas de moedas diferentes é registrado como tipo próprio, com valor de destino e taxa de câmbio.
+- Cada lançamento exige descrição, data válida, valor maior que zero, conta/cartão e categoria quando o tipo exigir classificação. Tags são opcionais.
 - Categorias, subcategorias e tags em uso por lançamentos não podem ser excluídas.
 - Importações podem criar categorias, subcategorias e tags inexistentes para o usuário autenticado.
 - Linhas importadas com situação diferente de `Pago` são ignoradas e reportadas.
 - Pagamento de fatura de cartão de crédito só é permitido em contas da mesma moeda do cartão e gera uma transação de despesa automática na conta escolhida.
+- Relatórios e limites consideram lançamentos de cartão pela competência da fatura (`invoice_month`), não pela data da compra.
+- Cockpit considera receitas/despesas/aportes em múltiplas moedas, e o planejamento recorrente inclui lançamentos recorrentes de cartões.
 
 ## Regras de segurança
 

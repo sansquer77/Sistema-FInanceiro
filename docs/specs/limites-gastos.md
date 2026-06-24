@@ -22,8 +22,12 @@ Qualquer usuário autenticado localmente que queira controlar seu orçamento de 
 
 - Os limites aplicam-se apenas a categorias cujo `group_type` seja `expense` (despesa).
 - Se uma subcategoria for selecionada, o limite é específico para ela. Caso contrário, aplica-se a toda a categoria.
+- O consumo considera despesas em contas pelo mês da data do lançamento.
+- O consumo considera despesas em cartões pela fatura aberta do mês (`invoice_month`), mesmo quando a data da compra pertence ao mês anterior.
+- Pagamentos de fatura não removem o consumo do limite; o limite mede competência/gasto da fatura, não a quitação.
 - É permitida apenas uma única meta por período (`AAAA-MM`), categoria e subcategoria (garantido por restrição UNIQUE no banco de dados).
 - O limite deve ser um valor monetário positivo maior que zero.
+- Quando algum limite do mês corrente é ultrapassado, o menu de Limites recebe alerta visual e o Cockpit exibe um farol com link direto para a função.
 
 ## API e Dados
 
@@ -39,3 +43,4 @@ Qualquer usuário autenticado localmente que queira controlar seu orçamento de 
 - O usuário consegue definir e salvar uma meta de despesa de R$ 500,00 para a categoria "Alimentação" no mês "2026-06".
 - Ao tentar cadastrar uma meta duplicada para o mesmo mês/categoria, o sistema atualiza a meta existente ou retorna um erro de conflito.
 - A exclusão de um limite de gastos não altera nenhuma transação financeira do usuário.
+- Despesas de cartão na fatura aberta do mês impactam o limite da categoria/subcategoria correspondente.

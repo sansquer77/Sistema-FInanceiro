@@ -16,10 +16,10 @@ Este roteiro organiza a evolucao do Sistema Financeiro para reproduzir localment
 1. Contas: contas manuais, contas arquivadas e saldo por moeda. Naturezas de contas (liquidez, carteira, investimentos). Implementado.
 2. Categorias e tags: taxonomia financeira e classificação transversal (múltiplas tags). Implementado.
 3. Lançamentos: despesas, receitas, transferências, recorrência, parcelamento e conciliação bancária. Implementado.
-4. Cartões de crédito: cartões manuais, limite, fechamento, vencimento, pagamento e faturas mensais. Implementado.
+4. Cartões de crédito: cartões manuais, limite, fechamento, vencimento, conta preferencial de pagamento, recorrência/parcelamento, conciliação, movimentação entre faturas, pagamento e faturas mensais. Implementado.
 5. Limites de gastos: metas por categoria e subcategoria mensais. Implementado.
-6. Investimentos e Portfólio: consolidação de ativos, cotações integradas de mercado e indexadores de renda fixa (SGS/BCB) com impostos. Implementado.
-7. Relatórios avançados e Visão Geral: relatórios dinâmicos integrando os módulos na interface web. Planejado.
+6. Investimentos e Portfólio: consolidação de ativos, cotações integradas de mercado, indexadores de renda fixa (SGS/BCB), poupança, previdência privada, resgate, encerramento e ajuste manual de valor. Implementado.
+7. Relatórios avançados e Visão Geral: relatórios dinâmicos e Cockpit integrando contas, cartões, limites, dívidas e portfólio. Implementado.
 
 ## Sequencia recomendada de evolucao
 
@@ -28,7 +28,7 @@ Este roteiro organiza a evolucao do Sistema Financeiro para reproduzir localment
 3. Implementar limites de gastos (budgets). (Concluído)
 4. Implementar portfólio de investimentos e precificação automática. (Concluído)
 5. Implementar conciliação e recorrência. (Concluído)
-6. Implementar relatórios sintéticos/analíticos interativos de despesas/receitas e evolução patrimonial no frontend web. (Pendente)
+6. Implementar relatórios sintéticos/analíticos interativos de despesas/receitas e evolução patrimonial no frontend web. (Concluído)
 
 ## Modelo de dados conceitual
 
@@ -49,6 +49,10 @@ credit_card_transaction_tags
 spending_limits
 investment_opening_positions
 investment_operations
+investment_redemptions
+investment_closed_positions
+investment_value_overrides
+quote_cache
 ```
 
 ## Criterio de fidelidade
@@ -61,5 +65,7 @@ A replica local nao precisa copiar a interface de nenhum produto externo. Ela de
 - Acompanhar saldo realizado.
 - Acompanhar faturas e limites de cartao.
 - Acompanhar portfólio de investimentos de renda variável, renda fixa e criptoativos com valorização real.
+- Acompanhar poupança, previdência privada e ativos multimoeda na moeda da carteira.
 - Acompanhar limites de gastos.
-- Gerar relatorios por periodo e dimensao.
+- Gerar relatorios por periodo, categoria, subcategoria, conta, tag e fluxo diário.
+- Usar Cockpit para visualizar saldos por moeda, planejamento recorrente, dívidas, maiores receitas/despesas e portfólio por tipo.

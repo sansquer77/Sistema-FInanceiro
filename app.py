@@ -399,7 +399,12 @@ class AppHandler(BaseHTTPRequestHandler):
         query = parse_qs(urlsplit(self.path).query)
         month = (query.get("month") or [date.today().strftime("%Y-%m")])[0]
         transactions = list_transactions(user["id"], month=month)
-        self.send_json(cockpit_payload(transactions))
+        card_transactions = [
+            transaction
+            for transaction in list_credit_card_transactions(user["id"])
+            if transaction.get("invoice_month") == month
+        ]
+        self.send_json(cockpit_payload([*transactions, *card_transactions]))
 
     def handle_exchange_rate(self) -> None:
         self.require_user()
