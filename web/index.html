@@ -6,7 +6,7 @@
     <title>Sistema Financeiro</title>
     <link rel="icon" href="/assets/app-icon.png">
     <link rel="apple-touch-icon" href="/assets/app-icon.png">
-    <link rel="stylesheet" href="/styles.css?v=90">
+    <link rel="stylesheet" href="/styles.css?v=91">
   </head>
   <body>
     <main class="app-shell">
@@ -822,6 +822,22 @@
             </form>
           </section>
 
+          <section class="panel report-content-panel">
+            <div class="section-heading">
+              <h2>Posição atual</h2>
+              <label class="compact-filter">Agrupar
+                <select id="portfolioGroupFilter">
+                  <option value="none">Ativo</option>
+                  <option value="asset_type_label">Tipo</option>
+                  <option value="fixed_income_indexer">Indexador</option>
+                  <option value="account_name">Carteira</option>
+                  <option value="currency">Moeda</option>
+                </select>
+              </label>
+            </div>
+            <div id="portfolioPositions" class="portfolio-positions"></div>
+          </section>
+
           <div class="portfolio-grid">
             <section class="panel">
               <div class="section-heading">
@@ -851,22 +867,6 @@
               <div class="portfolio-group-list" id="portfolioAccountList"></div>
             </section>
           </div>
-
-          <section class="panel report-content-panel">
-            <div class="section-heading">
-              <h2>Posição atual</h2>
-              <label class="compact-filter">Agrupar
-                <select id="portfolioGroupFilter">
-                  <option value="none">Ativo</option>
-                  <option value="asset_type_label">Tipo</option>
-                  <option value="fixed_income_indexer">Indexador</option>
-                  <option value="account_name">Carteira</option>
-                  <option value="currency">Moeda</option>
-                </select>
-              </label>
-            </div>
-            <div id="portfolioPositions" class="portfolio-positions"></div>
-          </section>
 
           <section class="panel report-content-panel">
             <div class="section-heading">
@@ -1124,6 +1124,6 @@
         </div>
       </section>
     </main>
-    <script src="/app.js?v=90"></script>
+    <script src="/app.js?v=91"></script>
   </body>
 </html>

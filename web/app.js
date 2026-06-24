@@ -3208,6 +3208,7 @@ function renderPortfolioPositions(positions) {
     ${group.label ? portfolioGroupHeader(group, collapsed) : ""}
     <div class="report-table-wrap ${collapsed ? "portfolio-group-collapsed" : ""}">
       <table class="report-table portfolio-table">
+        ${portfolioPositionColgroup()}
         <thead>
           <tr>
             <th>Ativo</th>
@@ -3520,6 +3521,7 @@ function portfolioPositionRow(position, options = {}) {
   const dayPercent = dayBase > 0 ? dayResult / dayBase : 0;
   const quoteStatus = position.quote_status === "ok" ? position.quote_source : position.quote_status;
   const quoteText = portfolioQuoteText(position);
+  const quoteStatusLabel = quoteStatus || "Pendente";
   const maturityAlert = portfolioMaturityAlert(position);
   const identifier = position.asset_identifier || position.asset_name || "Sem codigo";
   const assetName = position.asset_name || identifier;
@@ -3544,7 +3546,12 @@ function portfolioPositionRow(position, options = {}) {
   const fixedIncomeTax = Number(position.fixed_income_income_tax || 0);
   const hasFixedIncomeTax = position.asset_type === "fixed_income" && (fixedIncomeIof > 0 || fixedIncomeTax > 0);
   const valueDetail = hasFixedIncomeTax
-    ? `<span>Bruto ${formatMoney(position.fixed_income_gross_value || position.current_value, position.currency)}</span>${fixedIncomeIof > 0 ? `<span>IOF estimado -${formatMoney(position.fixed_income_iof_tax, position.currency)}</span>` : ""}<span>IR estimado -${formatMoney(position.fixed_income_income_tax, position.currency)}</span><span>Líquido ${formatMoney(position.fixed_income_net_value, position.currency)}</span>`
+    ? `<span title="${escapeHtml([
+      `Bruto ${formatMoney(position.fixed_income_gross_value || position.current_value, position.currency)}`,
+      fixedIncomeIof > 0 ? `IOF estimado -${formatMoney(position.fixed_income_iof_tax, position.currency)}` : "",
+      `IR estimado -${formatMoney(position.fixed_income_income_tax, position.currency)}`,
+      `Líquido ${formatMoney(position.fixed_income_net_value, position.currency)}`,
+    ].filter(Boolean).join(" · "))}">Líquido ${formatMoney(position.fixed_income_net_value, position.currency)}</span>`
     : portfolioSecondaryMoney(position.current_value, position.current_value_brl, position.currency);
   const actions = position.source_type === "opening" && position.source_id
     ? portfolioIconButton("edit-position", "Editar ativo", `data-edit-portfolio-position-id="${position.source_id}"`)
@@ -3558,19 +3565,37 @@ function portfolioPositionRow(position, options = {}) {
     <tr class="${options.parent ? "portfolio-parent-row" : ""} ${options.child ? "portfolio-child-row" : ""} ${maturityAlert ? `portfolio-maturity-row ${maturityAlert.status}` : ""}">
       <td>
         <div class="portfolio-asset-name">${toggle}<strong>${escapeHtml(rowLabel)}</strong>${maturityDetail}</div>
-        <span>${escapeHtml(assetDetail || "Sem detalhe adicional")}</span>
+        <span class="portfolio-detail" title="${escapeHtml(assetDetail || "Sem detalhe adicional")}">${escapeHtml(assetDetail || "Sem detalhe adicional")}</span>
       </td>
-      <td>${escapeHtml(position.asset_type_label)}<span>${escapeHtml(position.market_label || "Brasil")}</span></td>
-      <td>${escapeHtml(position.account_name)}<span>${escapeHtml(position.currency)}</span></td>
+      <td><span class="portfolio-primary">${escapeHtml(position.asset_type_label)}</span><span>${escapeHtml(position.market_label || "Brasil")}</span></td>
+      <td><span class="portfolio-primary">${escapeHtml(position.account_name)}</span><span>${escapeHtml(position.currency)}</span></td>
       <td class="money-cell">${formatDecimal(position.quantity, 6)}</td>
       <td class="money-cell">${formatMoney(position.average_price, position.currency)}</td>
       <td class="money-cell">${formatMoney(position.total_cost, position.currency)}${portfolioSecondaryMoney(position.total_cost, position.total_cost_brl, position.currency)}</td>
-      <td class="money-cell">${quoteText}<span>${escapeHtml(quoteStatus || "Pendente")}</span></td>
+      <td class="money-cell portfolio-quote-cell"><span class="portfolio-primary">${quoteText}</span><span title="${escapeHtml(quoteStatusLabel)}">${escapeHtml(quoteStatusLabel)}</span></td>
       <td class="money-cell">${formatMoney(position.current_value_cents / 100, position.currency)}${valueDetail}</td>
       <td class="money-cell ${dayResult < 0 ? "danger-text" : "positive-text"}">${formatMoney(position.day_result_brl, position.currency)}<span>${formatPercent(dayPercent)}</span></td>
       <td class="money-cell ${result < 0 ? "danger-text" : "positive-text"}">${formatMoney(result, position.currency)}<span>${formatPercent(resultPercent)}</span></td>
       <td><div class="portfolio-actions">${redeemAction}${valueAction}${closeAction}${actions}</div></td>
     </tr>
+  `;
+}
+
+function portfolioPositionColgroup() {
+  return `
+    <colgroup>
+      <col class="portfolio-col-asset">
+      <col class="portfolio-col-type">
+      <col class="portfolio-col-account">
+      <col class="portfolio-col-quantity">
+      <col class="portfolio-col-price">
+      <col class="portfolio-col-cost">
+      <col class="portfolio-col-quote">
+      <col class="portfolio-col-value">
+      <col class="portfolio-col-day">
+      <col class="portfolio-col-result">
+      <col class="portfolio-col-actions">
+    </colgroup>
   `;
 }
 
