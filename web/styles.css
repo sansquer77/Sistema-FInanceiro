@@ -1387,8 +1387,8 @@ textarea:focus {
 
 .report-tabs {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
   padding: 4px;
   margin-bottom: 16px;
   border-radius: 8px;
@@ -1396,12 +1396,15 @@ textarea:focus {
 }
 
 .report-tab {
-  min-height: 40px;
+  min-height: 34px;
   border: 0;
   border-radius: 6px;
   background: transparent;
   color: var(--muted);
+  font-size: 0.82rem;
   font-weight: 900;
+  line-height: 1.1;
+  padding: 0 6px;
 }
 
 .report-tab.active {

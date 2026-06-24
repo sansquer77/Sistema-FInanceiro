@@ -25,6 +25,7 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 - **Renda Fixa**:
   - Pós-fixados ou híbridos utilizam indexadores (CDI, SELIC, IPCA, IGP-M, TR) cujas taxas acumuladas são buscadas dinamicamente das APIs do Banco Central (SGS).
   - Pré-fixados utilizam a taxa acordada anual.
+  - Na tabela do portfólio, o resumo de ativos pré-fixados deve exibir a modalidade `Préfixado` e a taxa anual cadastrada antes do vencimento.
   - O sistema calcula e deduz estimativas de IOF (até 30 dias de retenção) e de Imposto de Renda (tabela regressiva de 22,5% a 15% por dias de retenção).
 - **Poupança**:
   - Posições iniciais podem informar uma lista de aniversários no formato data/valor.
@@ -46,5 +47,6 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 ## Critérios de Aceite
 
 - O usuário visualiza seus ativos agrupados por classe com as respectivas cotações atualizadas.
+- O resumo da linha de Renda Fixa exibe indexador e taxa para pós-fixados/híbridos, e exibe `Préfixado` com a taxa para pré-fixados.
 - O rendimento bruto e líquido de Renda Fixa reflete a incidência regressiva de impostos com base na data de aquisição.
 - Ativos com moedas estrangeiras exibem os valores convertidos para BRL com base na taxa de câmbio informada ou obtida automaticamente.

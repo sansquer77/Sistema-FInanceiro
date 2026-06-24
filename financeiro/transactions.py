@@ -13,7 +13,7 @@ from financeiro.categories import ClassificationError, get_or_create_category, g
 from financeiro.database import get_connection, row_to_dict
 
 TRANSACTION_TYPES = {"income", "expense", "transfer", "investment"}
-INVESTMENT_ASSET_TYPES = {"stock", "crypto", "fund", "fixed_income", "savings", "other"}
+INVESTMENT_ASSET_TYPES = {"stock", "crypto", "fund", "fixed_income", "private_pension", "savings", "other"}
 FIXED_INCOME_MODES = {"pre", "post", "hybrid"}
 SERIES_KINDS = {"single", "installment", "recurring"}
 RECURRENCE_FREQUENCIES = {"weekly", "monthly", "quarterly", "semiannual", "annual"}
@@ -495,6 +495,8 @@ def normalize_investment_operation(data: dict, amount_cents: int, transaction_ty
     normalized_asset_hint = normalize_investment_asset_hint(category, subcategory, data.get("investment_asset_identifier"))
     if "poupanca" in normalized_asset_hint:
         asset_type = "savings"
+    elif category == "Previdência Privada" or "previdencia privada" in normalized_asset_hint or "pgbl" in normalized_asset_hint or "vgbl" in normalized_asset_hint:
+        asset_type = "private_pension"
     elif category == "Renda Variável":
         asset_type = "stock"
     elif category == "Criptoativos":

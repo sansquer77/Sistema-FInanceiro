@@ -741,6 +741,10 @@ function resetPortfolioAssetForm() {
 }
 
 function editPortfolioPosition(position) {
+  if (!position) {
+    setMessage(portfolioMessage, "Posição inicial não encontrada. Atualize os dados e tente novamente.", "error");
+    return;
+  }
   if (position.source_type !== "opening" || !position.source_id) {
     setMessage(portfolioMessage, "Edite esta posição pelo lançamento de origem.", "error");
     return;
@@ -2904,6 +2908,10 @@ function renderReports() {
     renderTagsReport(items);
     return;
   }
+  if (state.reportTab === "subcategories") {
+    renderSubcategoriesReport(items);
+    return;
+  }
   renderCategoriesReport(items);
 }
 
@@ -2927,6 +2935,17 @@ function renderCategoriesReport(items) {
   ];
   reportContent.innerHTML = sections.map(([title, type]) => (
     reportRankedSection(title, groupReportItems(items.filter((item) => item.reportType === type), "category"), `Nenhum item em ${title.toLowerCase()} neste mês.`)
+  )).join("");
+}
+
+function renderSubcategoriesReport(items) {
+  const sections = [
+    ["Despesas", "expense"],
+    ["Receitas", "income"],
+    ["Investimentos", "investment"],
+  ];
+  reportContent.innerHTML = sections.map(([title, type]) => (
+    reportRankedSection(title, groupReportItems(items.filter((item) => item.reportType === type), "subcategory"), `Nenhuma subcategoria em ${title.toLowerCase()} neste mês.`)
   )).join("");
 }
 
@@ -3112,11 +3131,12 @@ function renderPortfolioGroupList(container, rows) {
     container.innerHTML = '<div class="empty-state compact">Sem dados para consolidar.</div>';
     return;
   }
-  const total = rows.reduce((sum, row) => sum + Number(row.current_brl), 0);
+  const totalsByCurrency = portfolioTotalsByCurrency(rows);
   container.innerHTML = rows.map((row, index) => {
     const current = Number(row.current_brl);
     const result = Number(row.result_brl);
     const currency = row.currency || "BRL";
+    const total = totalsByCurrency.get(currency) || 0;
     const percent = total > 0 ? current / total : 0;
     return `
       <article class="portfolio-group-row">
@@ -3132,6 +3152,15 @@ function renderPortfolioGroupList(container, rows) {
       </article>
     `;
   }).join("");
+}
+
+function portfolioTotalsByCurrency(rows) {
+  const totals = new Map();
+  rows.forEach((row) => {
+    const currency = row.currency || "BRL";
+    totals.set(currency, (totals.get(currency) || 0) + Number(row.current_brl || 0));
+  });
+  return totals;
 }
 
 function renderPortfolioPositions(positions) {
@@ -3191,7 +3220,7 @@ function renderPortfolioPositions(positions) {
     });
   });
   portfolioPositions.querySelectorAll("[data-edit-portfolio-position-id]").forEach((button) => {
-    const position = positions.find((entry) => String(entry.source_id) === String(button.dataset.editPortfolioPositionId));
+    const position = findPortfolioOpeningPosition(positions, button.dataset.editPortfolioPositionId);
     button.addEventListener("click", () => editPortfolioPosition(position));
   });
   portfolioPositions.querySelectorAll("[data-edit-portfolio-transaction-id]").forEach((button) => {
@@ -3206,6 +3235,21 @@ function renderPortfolioPositions(positions) {
   portfolioPositions.querySelectorAll("[data-close-portfolio-payload]").forEach((button) => {
     button.addEventListener("click", () => closePortfolioPosition(JSON.parse(button.dataset.closePortfolioPayload)));
   });
+}
+
+function findPortfolioOpeningPosition(positions, openingId) {
+  for (const position of positions) {
+    if (position.source_type === "opening" && String(position.source_id) === String(openingId)) {
+      return position;
+    }
+    const source = (position.sources || []).find((entry) => (
+      entry.source_type === "opening" && String(entry.source_id) === String(openingId)
+    ));
+    if (source) {
+      return portfolioSourcePosition(position, source);
+    }
+  }
+  return null;
 }
 
 function portfolioGroupHeader(group, collapsed) {
@@ -3457,7 +3501,7 @@ function portfolioPositionRow(position, options = {}) {
     options.child ? formatDate(position.first_operation_date) : "",
     !options.parent && !options.child && position.asset_name && position.asset_name !== identifier ? position.asset_name : "",
     position.cnpj ? `CNPJ ${position.cnpj}` : "",
-    position.fixed_income_indexer ? `${position.fixed_income_indexer}${position.fixed_income_rate ? ` · ${position.fixed_income_rate}%` : ""}` : "",
+    portfolioFixedIncomeDetail(position),
     position.fixed_income_maturity_date ? `Venc. ${formatDate(position.fixed_income_maturity_date)}` : "",
   ].filter(Boolean).join(" · ");
   const toggle = options.parent
@@ -3502,6 +3546,18 @@ function portfolioSecondaryMoney(primaryValue, secondaryValue, currency) {
     return "";
   }
   return `<span>${formatMoney(secondaryValue, "BRL")}</span>`;
+}
+
+function portfolioFixedIncomeDetail(position) {
+  if (position.asset_type !== "fixed_income") {
+    return "";
+  }
+  if (position.fixed_income_mode === "pre") {
+    return ["Préfixado", position.fixed_income_rate ? `${position.fixed_income_rate}%` : ""].filter(Boolean).join(" · ");
+  }
+  return position.fixed_income_indexer
+    ? `${position.fixed_income_indexer}${position.fixed_income_rate ? ` · ${position.fixed_income_rate}%` : ""}`
+    : "";
 }
 
 function portfolioMaturityAlert(position) {
@@ -3691,7 +3747,7 @@ function reportItemsForMonth(month) {
     .map(accountTransactionReportItem)
     .filter(Boolean);
   const cardItems = state.cardTransactions
-    .filter((transaction) => transaction.date.startsWith(month))
+    .filter((transaction) => (transaction.invoice_month || transaction.date.slice(0, 7)) === month)
     .map(cardTransactionReportItem)
     .filter(Boolean);
   return [...accountItems, ...cardItems];
@@ -3735,7 +3791,7 @@ function cardTransactionReportItem(transaction) {
     category: transaction.category_name || "Sem categoria",
     subcategory: transaction.subcategory_name || "",
     tag: "",
-    tags: [],
+    tags: Array.isArray(transaction.tags) ? transaction.tags : transaction.tag_name ? [transaction.tag_name] : [],
     accountId: "",
     accountName: transaction.credit_card_name || "Cartão",
     source: "Cartão",
@@ -3752,7 +3808,7 @@ function reportTotals(items) {
 function groupReportItems(items, key) {
   const grouped = new Map();
   for (const item of items) {
-    const label = key === "tag" ? item.tag : item.category;
+    const label = reportGroupLabel(item, key);
     if (!label) {
       continue;
     }
@@ -3764,6 +3820,16 @@ function groupReportItems(items, key) {
     grouped.set(label, current);
   }
   return [...grouped.values()].sort((a, b) => b.sortTotal - a.sortTotal || a.label.localeCompare(b.label));
+}
+
+function reportGroupLabel(item, key) {
+  if (key === "tag") {
+    return item.tag;
+  }
+  if (key === "subcategory") {
+    return `${item.category || "Sem categoria"} / ${item.subcategory || "Sem subcategoria"}`;
+  }
+  return item.category || "Sem categoria";
 }
 
 function sumReportItems(items, type) {
@@ -4760,10 +4826,12 @@ function renderCockpitPortfolioByType() {
     cockpitPortfolioByType.innerHTML = '<div class="empty-state compact">Nenhum investimento em carteira.</div>';
     return;
   }
-  const total = rows.reduce((sum, row) => sum + Number(row.current_brl || 0), 0);
+  const totalsByCurrency = portfolioTotalsByCurrency(rows);
   cockpitPortfolioByType.innerHTML = rows.map((row, index) => {
     const current = Number(row.current_brl || 0);
     const result = Number(row.result_brl || 0);
+    const currency = row.currency || "BRL";
+    const total = totalsByCurrency.get(currency) || 0;
     const percent = total > 0 ? current / total : 0;
     return `
       <article class="portfolio-cockpit-row">
@@ -4772,8 +4840,8 @@ function renderCockpitPortfolioByType() {
           <span>${row.count} posição(ões) · ${formatPercent(percent)}</span>
         </div>
         <div>
-          <strong>${formatMoney(current, "BRL")}</strong>
-          <span class="${result < 0 ? "danger-text" : "positive-text"}">${formatMoney(result, "BRL")}</span>
+          <strong>${formatMoney(current, currency)}</strong>
+          <span class="${result < 0 ? "danger-text" : "positive-text"}">${formatMoney(result, currency)}</span>
         </div>
       </article>
     `;
