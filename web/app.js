@@ -3983,7 +3983,7 @@ function spentForLimit(limit) {
     return total + Number(transaction.amount_brl || transaction.amount);
   }, 0);
   const cardSpent = state.cardTransactions.reduce((total, transaction) => {
-    if (transaction.type !== "expense" || transaction.invoice_month !== limit.month || isCreditCardInvoicePaid(transaction.credit_card_id, transaction.invoice_month)) {
+    if (transaction.type !== "expense" || transaction.invoice_month !== limit.month) {
       return total;
     }
     if (String(transaction.category_id) !== String(limit.category_id)) {
