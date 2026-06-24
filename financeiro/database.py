@@ -189,6 +189,7 @@ def initialize_database() -> None:
                 fixed_income_indexer TEXT,
                 fixed_income_rate_micros INTEGER NOT NULL DEFAULT 0 CHECK (fixed_income_rate_micros >= 0),
                 fixed_income_maturity_date TEXT,
+                savings_anniversaries_json TEXT,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE (transaction_id)
@@ -212,6 +213,7 @@ def initialize_database() -> None:
                 fixed_income_rate_micros INTEGER NOT NULL DEFAULT 0 CHECK (fixed_income_rate_micros >= 0),
                 fixed_income_maturity_date TEXT,
                 apply_tax_estimate INTEGER NOT NULL DEFAULT 0 CHECK (apply_tax_estimate IN (0, 1)),
+                savings_anniversaries_json TEXT,
                 notes TEXT,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -378,8 +380,10 @@ def initialize_database() -> None:
         ensure_column(conn, "credit_card_transactions", "recurrence_frequency", "TEXT")
         ensure_column(conn, "credit_cards", "preferred_payment_account_id", "INTEGER REFERENCES checking_accounts(id)")
         ensure_column(conn, "investment_operations", "fixed_income_maturity_date", "TEXT")
+        ensure_column(conn, "investment_operations", "savings_anniversaries_json", "TEXT")
         ensure_column(conn, "investment_opening_positions", "fixed_income_maturity_date", "TEXT")
         ensure_column(conn, "investment_opening_positions", "apply_tax_estimate", "INTEGER NOT NULL DEFAULT 0")
+        ensure_column(conn, "investment_opening_positions", "savings_anniversaries_json", "TEXT")
         ensure_column(conn, "checking_accounts", "account_type", "TEXT NOT NULL DEFAULT 'liquidity'")
         ensure_column(conn, "categories", "group_type", "TEXT NOT NULL DEFAULT 'expense'")
         migrate_category_unique_constraint(conn)

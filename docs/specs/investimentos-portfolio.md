@@ -20,12 +20,17 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 
 ## Regras
 
-- **Tipos de ativos**: Ações (`stock`), Criptoativos (`crypto`), Fundos (`fund`), Renda Fixa (`fixed_income`) e Outros (`other`).
+- **Tipos de ativos**: Ações (`stock`), Criptoativos (`crypto`), Fundos (`fund`), Renda Fixa (`fixed_income`), Poupança (`savings`) e Outros (`other`).
 - **Moedas**: Contas de investimento podem ser em moedas estrangeiras (`USD`, `EUR`, `GBP`). O portfólio calcula a conversão histórica e atual para BRL.
 - **Renda Fixa**:
   - Pós-fixados ou híbridos utilizam indexadores (CDI, SELIC, IPCA, IGP-M, TR) cujas taxas acumuladas são buscadas dinamicamente das APIs do Banco Central (SGS).
   - Pré-fixados utilizam a taxa acordada anual.
   - O sistema calcula e deduz estimativas de IOF (até 30 dias de retenção) e de Imposto de Renda (tabela regressiva de 22,5% a 15% por dias de retenção).
+- **Poupança**:
+  - Posições iniciais podem informar uma lista de aniversários no formato data/valor.
+  - Lançamentos de conta do tipo Investimento classificados como Poupança geram automaticamente um aniversário na data do lançamento, somando o valor a um aniversário existente quando a data for a mesma.
+  - O cálculo considera apenas ciclos mensais completos e aplica TR + 0,5% a.m. quando a Selic estiver acima de 8,5% a.a.; quando a Selic estiver em 8,5% a.a. ou abaixo, aplica TR + 70% da Selic em equivalente mensal.
+  - Não há cálculo de IR/IOF para Poupança.
 - **Renda Variável / Criptos**:
   - Busca cotações de mercado automáticas via APIs públicas (Yahoo Finance para ações/fundos e CoinGecko/Yahoo para criptoativos).
 

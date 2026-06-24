@@ -55,6 +55,7 @@ from financeiro.credit_cards import (
     list_credit_card_payments,
     list_credit_card_transactions,
     list_credit_cards,
+    move_credit_card_transaction_invoice,
     pay_credit_card_invoice,
     restore_credit_card,
     set_credit_card_transaction_reconciled,
@@ -218,6 +219,9 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path.startswith("/api/credit-card-transactions/") and path.endswith("/reconciliation"):
             self.handle_reconcile_credit_card_transaction()
+            return
+        if path.startswith("/api/credit-card-transactions/") and path.endswith("/invoice"):
+            self.handle_move_credit_card_transaction_invoice()
             return
         if path.startswith("/api/credit-card-transactions/"):
             self.handle_update_credit_card_transaction()
@@ -481,6 +485,14 @@ class AppHandler(BaseHTTPRequestHandler):
         transaction_id = self.path.split("?", 1)[0].split("/")[-1]
         data = self.read_json()
         transaction = update_credit_card_transaction(user["id"], transaction_id, data)
+        self.send_json({"transaction": transaction})
+
+    def handle_move_credit_card_transaction_invoice(self) -> None:
+        user = self.require_user()
+        path_parts = self.path.split("?", 1)[0].split("/")
+        transaction_id = path_parts[-2]
+        data = self.read_json()
+        transaction = move_credit_card_transaction_invoice(user["id"], transaction_id, data.get("direction"))
         self.send_json({"transaction": transaction})
 
     def handle_pay_credit_card_invoice(self) -> None:

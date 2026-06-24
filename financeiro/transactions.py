@@ -13,7 +13,7 @@ from financeiro.categories import ClassificationError, get_or_create_category, g
 from financeiro.database import get_connection, row_to_dict
 
 TRANSACTION_TYPES = {"income", "expense", "transfer", "investment"}
-INVESTMENT_ASSET_TYPES = {"stock", "crypto", "fund", "fixed_income", "other"}
+INVESTMENT_ASSET_TYPES = {"stock", "crypto", "fund", "fixed_income", "savings", "other"}
 FIXED_INCOME_MODES = {"pre", "post", "hybrid"}
 SERIES_KINDS = {"single", "installment", "recurring"}
 RECURRENCE_FREQUENCIES = {"weekly", "monthly", "quarterly", "semiannual", "annual"}
@@ -71,6 +71,7 @@ def list_transactions(user_id: int, month: str | None = None, account_id: int | 
                 investment_operations.fixed_income_indexer AS investment_fixed_income_indexer,
                 investment_operations.fixed_income_rate_micros AS investment_fixed_income_rate_micros,
                 investment_operations.fixed_income_maturity_date AS investment_fixed_income_maturity_date,
+                investment_operations.savings_anniversaries_json AS investment_savings_anniversaries_json,
                 GROUP_CONCAT(tags.name, '||') AS tag_names
             FROM transactions
             JOIN checking_accounts AS source
@@ -490,7 +491,11 @@ def normalize_investment_operation(data: dict, amount_cents: int, transaction_ty
     if transaction_type != "investment":
         return None
     category = str(data.get("category") or "").strip()
-    if category == "Renda Variável":
+    subcategory = str(data.get("subcategory") or "").strip()
+    normalized_asset_hint = normalize_investment_asset_hint(category, subcategory, data.get("investment_asset_identifier"))
+    if "poupanca" in normalized_asset_hint:
+        asset_type = "savings"
+    elif category == "Renda Variável":
         asset_type = "stock"
     elif category == "Criptoativos":
         asset_type = "crypto"
@@ -504,9 +509,12 @@ def normalize_investment_operation(data: dict, amount_cents: int, transaction_ty
     if fixed_income_mode and fixed_income_mode not in FIXED_INCOME_MODES:
         raise TransactionError("Modalidade de renda fixa invalida.")
     invested_amount_cents = money_to_cents(data.get("investment_amount", "0")) if str(data.get("investment_amount") or "").strip() else amount_cents
+    asset_identifier = empty_to_none(data.get("investment_asset_identifier"))
+    if asset_type == "savings":
+        asset_identifier = "POUPANCA"
     return {
         "asset_type": asset_type,
-        "asset_identifier": empty_to_none(data.get("investment_asset_identifier")),
+        "asset_identifier": asset_identifier,
         "asset_name": empty_to_none(data.get("investment_asset_name")),
         "cnpj": empty_to_none(data.get("investment_cnpj")),
         "quantity_micros": decimal_to_micros(data.get("investment_quantity")),
@@ -520,7 +528,25 @@ def normalize_investment_operation(data: dict, amount_cents: int, transaction_ty
         "fixed_income_indexer": empty_to_none(data.get("investment_fixed_income_indexer")),
         "fixed_income_rate_micros": decimal_to_micros(data.get("investment_fixed_income_rate")),
         "fixed_income_maturity_date": normalize_optional_date(data.get("investment_fixed_income_maturity_date")),
+        "savings_anniversaries_json": serialize_savings_anniversary(data.get("date"), invested_amount_cents) if asset_type == "savings" else None,
     }
+
+
+def normalize_investment_asset_hint(category: str, subcategory: str, asset_identifier: object) -> str:
+    raw = " ".join(
+        str(value or "").strip().lower()
+        for value in (category, subcategory, asset_identifier)
+        if str(value or "").strip()
+    )
+    replacements = str.maketrans("áàâãéêíóôõúç", "aaaaeeiooouc")
+    return raw.translate(replacements)
+
+
+def serialize_savings_anniversary(transaction_date: object, amount_cents: int) -> str | None:
+    if amount_cents <= 0:
+        return None
+    anniversary_date = normalize_date(transaction_date)
+    return json.dumps([{"date": anniversary_date, "amount_cents": amount_cents}], ensure_ascii=True)
 
 
 def normalize_optional_key(value: object) -> str | None:
@@ -799,8 +825,9 @@ def upsert_investment_operation(conn, user_id: int, transaction_id: int, account
             user_id, transaction_id, account_id, asset_type, asset_identifier, asset_name, cnpj,
             quantity_micros, unit_price_cents, invested_amount_cents, brokerage_fee_cents,
             exchange_fee_cents, tax_cents, other_costs_cents, fixed_income_mode,
-            fixed_income_indexer, fixed_income_rate_micros, fixed_income_maturity_date
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            fixed_income_indexer, fixed_income_rate_micros, fixed_income_maturity_date,
+            savings_anniversaries_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(transaction_id) DO UPDATE SET
             account_id = excluded.account_id,
             asset_type = excluded.asset_type,
@@ -818,6 +845,7 @@ def upsert_investment_operation(conn, user_id: int, transaction_id: int, account
             fixed_income_indexer = excluded.fixed_income_indexer,
             fixed_income_rate_micros = excluded.fixed_income_rate_micros,
             fixed_income_maturity_date = excluded.fixed_income_maturity_date,
+            savings_anniversaries_json = excluded.savings_anniversaries_json,
             updated_at = CURRENT_TIMESTAMP
         """,
         (
@@ -839,6 +867,7 @@ def upsert_investment_operation(conn, user_id: int, transaction_id: int, account
             operation["fixed_income_indexer"],
             operation["fixed_income_rate_micros"],
             operation["fixed_income_maturity_date"],
+            operation["savings_anniversaries_json"],
         ),
     )
 
@@ -871,6 +900,7 @@ def fetch_transaction(conn, user_id: int, transaction_id: int) -> dict:
                 investment_operations.fixed_income_indexer AS investment_fixed_income_indexer,
                 investment_operations.fixed_income_rate_micros AS investment_fixed_income_rate_micros,
                 investment_operations.fixed_income_maturity_date AS investment_fixed_income_maturity_date,
+                investment_operations.savings_anniversaries_json AS investment_savings_anniversaries_json,
                 GROUP_CONCAT(tags.name, '||') AS tag_names
             FROM transactions
             JOIN checking_accounts AS source
@@ -932,10 +962,32 @@ def extract_investment_operation(transaction: dict) -> dict | None:
         "fixed_income_indexer": transaction.pop("investment_fixed_income_indexer", None),
         "fixed_income_rate": micros_to_decimal(transaction.pop("investment_fixed_income_rate_micros", 0) or 0),
         "fixed_income_maturity_date": transaction.pop("investment_fixed_income_maturity_date", None),
+        "savings_anniversaries": parse_savings_anniversaries(transaction.pop("investment_savings_anniversaries_json", None)),
     }
     if not asset_type:
         return None
     return {"asset_type": asset_type, **fields}
+
+
+def parse_savings_anniversaries(value: object) -> list[dict]:
+    raw = str(value or "").strip()
+    if not raw:
+        return []
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(payload, list):
+        return []
+    return [
+        {
+            "date": str(item.get("date") or ""),
+            "amount": cents_to_money(int(item.get("amount_cents") or 0)),
+            "amount_cents": int(item.get("amount_cents") or 0),
+        }
+        for item in payload
+        if isinstance(item, dict)
+    ]
 
 
 def micros_to_decimal(micros: int) -> str:

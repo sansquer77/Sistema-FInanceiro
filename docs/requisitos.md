@@ -14,7 +14,7 @@ Manter um sistema financeiro local, privado e simples para controlar contas, sal
 - **Recorrência e Parcelamento**: suporte a séries de lançamentos periódicos ou parcelados com acompanhamento de índice de parcelas e conciliação bancária (`reconciled_at`).
 - **Cartões de Crédito**: cadastro de cartões com limite, emissor, bandeira, fechamento e vencimento. Lançamentos de despesas e receitas no cartão por fatura mensal (formato `AAAA-MM`), conciliação de lançamentos e fluxo de pagamento de fatura integrado às contas-correntes.
 - **Limites de Gastos (Metas/Budgets)**: estabelecimento de limites de despesas mensais por categoria e subcategoria.
-- **Portfólio de Investimentos**: posições iniciais (`opening positions`) e operações de investimento. Suporte a tipos de ativos como ações (`stock`), cripto (`crypto`), fundos (`fund`), renda fixa (`fixed_income`) e outros (`other`).
+- **Portfólio de Investimentos**: posições iniciais (`opening positions`) e operações de investimento. Suporte a tipos de ativos como ações (`stock`), cripto (`crypto`), fundos (`fund`), renda fixa (`fixed_income`), poupança (`savings`) e outros (`other`).
 - **Precificação e Validação de Ativos**:
   - Integração com Yahoo Finance (ações e fundos) e CoinGecko/Yahoo (criptoativos) para cotações automáticas.
   - Integração com o Sistema Gerenciador de Séries Temporais (SGS) do Banco Central para obter CDI, SELIC, IPCA, IGP-M e TR para o cálculo do rendimento acumulado de renda fixa (com fallback local seguro).

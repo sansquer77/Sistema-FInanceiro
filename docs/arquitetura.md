@@ -117,7 +117,7 @@ Pacote `financeiro/`.
 - `categories.py`: categorias, subcategorias, tags e bloqueios de exclusão.
 - `credit_cards.py`: controle de cartões de crédito, faturas mensais, transações em faturas e fluxos de pagamentos.
 - `spending_limits.py`: gestão de metas e orçamentos mensais por categoria/subcategoria.
-- `portfolio.py`: consolidação de investimentos (ações, criptos, fundos, renda fixa), precificação integrada com Yahoo/CoinGecko, rendimento de renda fixa via SGS do Banco Central e aplicação de impostos regresivos (IOF/IR).
+- `portfolio.py`: consolidação de investimentos (ações, criptos, fundos, renda fixa, poupança), precificação integrada com Yahoo/CoinGecko, rendimento de renda fixa e poupança via SGS do Banco Central e aplicação de impostos regressivos (IOF/IR) quando aplicável.
 - `imports.py`: leitura de exportações Organizze e planilhas modelo do próprio sistema.
 - `emailer.py`: envio SMTP do código de recuperação de senha.
 - `secure_config.py`: armazenamento criptografado da configuração SMTP local.

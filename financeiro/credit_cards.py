@@ -207,6 +207,7 @@ def create_credit_card_transaction(user_id: int, data: dict) -> dict:
     transaction = normalize_card_transaction_payload(data)
     with get_connection() as conn:
         card = get_active_credit_card(conn, user_id, transaction["credit_card_id"])
+        transaction["invoice_month"] = invoice_month_for_transaction_date(card, transaction["date"])
         ensure_invoice_is_open(conn, user_id, card["id"], transaction["invoice_month"])
         ensure_not_before_previous_closed_invoice(conn, user_id, card, transaction["invoice_month"], transaction["date"])
         category_id = get_or_create_category(conn, user_id, transaction["category"], transaction["type"])
@@ -270,16 +271,17 @@ def update_credit_card_transaction(user_id: int, transaction_id: str, data: dict
         card = get_active_credit_card(conn, user_id, transaction["credit_card_id"])
         if card["id"] != existing["credit_card_id"]:
             raise CreditCardError("Nao e possivel mover lancamento entre cartoes.")
+        transaction["invoice_month"] = invoice_month_for_transaction_date(card, transaction["date"])
         if transaction["invoice_month"] != existing["invoice_month"]:
-            raise CreditCardError("Nao e possivel mover lancamento entre faturas.")
-        ensure_not_before_previous_closed_invoice(conn, user_id, card, existing["invoice_month"], transaction["date"])
+            ensure_invoice_is_open(conn, user_id, existing["credit_card_id"], transaction["invoice_month"])
+        ensure_not_before_previous_closed_invoice(conn, user_id, card, transaction["invoice_month"], transaction["date"])
         category_id = get_or_create_category(conn, user_id, transaction["category"], transaction["type"])
         subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
         tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
         conn.execute(
             """
             UPDATE credit_card_transactions
-            SET type = ?, description = ?, amount_cents = ?, date = ?, category_id = ?,
+            SET type = ?, description = ?, amount_cents = ?, date = ?, invoice_month = ?, category_id = ?,
                 subcategory_id = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND user_id = ? AND archived_at IS NULL
             """,
@@ -288,6 +290,7 @@ def update_credit_card_transaction(user_id: int, transaction_id: str, data: dict
                 transaction["description"],
                 transaction["amount_cents"],
                 transaction["date"],
+                transaction["invoice_month"],
                 category_id,
                 subcategory_id,
                 transaction["notes"],
@@ -298,6 +301,37 @@ def update_credit_card_transaction(user_id: int, transaction_id: str, data: dict
         replace_credit_card_transaction_tags(conn, normalized_id, tag_ids)
         if apply_to_future:
             update_future_card_series(conn, user_id, existing, transaction, category_id, subcategory_id, tag_ids)
+        row = fetch_card_transaction(conn, user_id, normalized_id)
+    return format_card_transaction(row, card["currency"])
+
+
+def move_credit_card_transaction_invoice(user_id: int, transaction_id: str, direction: object) -> dict:
+    normalized_id = normalize_card_id(transaction_id)
+    delta = normalize_invoice_move_direction(direction)
+    with get_connection() as conn:
+        existing = conn.execute(
+            """
+            SELECT *
+            FROM credit_card_transactions
+            WHERE id = ? AND user_id = ? AND archived_at IS NULL
+            """,
+            (normalized_id, user_id),
+        ).fetchone()
+        if not existing:
+            raise CreditCardError("Lancamento do cartao nao encontrado.", HTTPStatus.NOT_FOUND)
+        ensure_invoice_is_open(conn, user_id, existing["credit_card_id"], existing["invoice_month"])
+        target_month = shift_month(existing["invoice_month"], delta)
+        ensure_invoice_is_open(conn, user_id, existing["credit_card_id"], target_month)
+        card = get_active_credit_card(conn, user_id, existing["credit_card_id"])
+        ensure_not_before_previous_closed_invoice(conn, user_id, card, target_month, existing["date"])
+        conn.execute(
+            """
+            UPDATE credit_card_transactions
+            SET invoice_month = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND user_id = ? AND archived_at IS NULL
+            """,
+            (target_month, normalized_id, user_id),
+        )
         row = fetch_card_transaction(conn, user_id, normalized_id)
     return format_card_transaction(row, card["currency"])
 
@@ -714,6 +748,15 @@ def normalize_card_recurrence_frequency(data: dict) -> str | None:
     return frequency
 
 
+def normalize_invoice_move_direction(value: object) -> int:
+    direction = str(value or "").strip().lower()
+    if direction in {"next", "proxima", "posterior", "1", "+1"}:
+        return 1
+    if direction in {"previous", "anterior", "prev", "-1"}:
+        return -1
+    raise CreditCardError("Informe a direcao para mover a fatura.")
+
+
 def should_apply_to_future_card(data: dict) -> bool:
     return str(data.get("apply_to_future") or "").strip().lower() in {"1", "true", "yes", "sim"}
 
@@ -769,6 +812,15 @@ def shift_month(value: str, delta: int) -> str:
     year, month = value.split("-")
     shifted = add_months(date(int(year), int(month), 1), delta)
     return f"{shifted.year}-{shifted.month:02d}"
+
+
+def invoice_month_for_transaction_date(card, transaction_date: str) -> str:
+    parsed_date = date.fromisoformat(transaction_date)
+    base_month = f"{parsed_date.year}-{parsed_date.month:02d}"
+    closing_date = date.fromisoformat(card_invoice_date(base_month, card["closing_day"]))
+    if parsed_date > closing_date:
+        return shift_month(base_month, 1)
+    return base_month
 
 
 def add_months(start_date: date, months: int) -> date:

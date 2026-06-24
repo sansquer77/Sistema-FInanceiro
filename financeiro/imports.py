@@ -4,7 +4,7 @@ import csv
 import struct
 import unicodedata
 import zipfile
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from difflib import SequenceMatcher
 from http import HTTPStatus
@@ -282,12 +282,12 @@ def normalize_system_account_row(row: dict, account_id: object) -> dict:
         "type": transaction_type,
         "date": normalize_import_date(row.get("data") or row.get("date")),
         "description": row.get("descricao") or row.get("description"),
-        "amount": row.get("valor") or row.get("amount"),
+        "amount": normalize_import_money_for_form(row.get("valor") or row.get("amount")),
         "category": row.get("categoria") or row.get("category"),
         "subcategory": row.get("subcategoria") or row.get("subcategory"),
         "tags": row.get("tags") or row.get("tag"),
         "destination_account_id": row.get("conta_destino_id") or row.get("destination_account_id"),
-        "destination_amount": row.get("valor_destino") or row.get("destination_amount"),
+        "destination_amount": normalize_optional_import_money_for_form(row.get("valor_destino") or row.get("destination_amount")),
         "transfer_exchange_rate": row.get("cotacao_cambio") or row.get("transfer_exchange_rate"),
         "exchange_rate_to_brl": row.get("cotacao_brl") or row.get("exchange_rate_to_brl"),
         "notes": row.get("observacoes") or row.get("notes"),
@@ -307,7 +307,7 @@ def normalize_system_card_row(row: dict, card_id: object) -> dict:
         "date": transaction_date,
         "invoice_month": normalize_import_month(row.get("competencia_fatura") or row.get("invoice_month") or transaction_date),
         "description": row.get("descricao") or row.get("description"),
-        "amount": row.get("valor") or row.get("amount"),
+        "amount": normalize_import_money_for_form(row.get("valor") or row.get("amount")),
         "category": row.get("categoria") or row.get("category"),
         "subcategory": row.get("subcategoria") or row.get("subcategory"),
         "tags": row.get("tags") or row.get("tag"),
@@ -504,6 +504,8 @@ def parse_xlsx_rows(file_bytes: bytes, sheet_name: str) -> list[list[str]]:
     try:
         with zipfile.ZipFile(BytesIO(file_bytes)) as archive:
             shared_strings = xlsx_shared_strings(archive)
+            date_style_indexes = xlsx_date_style_indexes(archive)
+            date_base = date(1904, 1, 1) if xlsx_uses_1904_date_system(archive) else date(1899, 12, 30)
             sheet_path = xlsx_sheet_path(archive, sheet_name)
             root = ElementTree.fromstring(archive.read(sheet_path))
     except (KeyError, zipfile.BadZipFile, ElementTree.ParseError) as exc:
@@ -517,7 +519,7 @@ def parse_xlsx_rows(file_bytes: bytes, sheet_name: str) -> list[list[str]]:
             column = xlsx_column_index(cell_ref)
             while len(row_values) < column - 1:
                 row_values.append("")
-            row_values.append(xlsx_cell_text(cell_node, shared_strings, ns))
+            row_values.append(xlsx_cell_text(cell_node, shared_strings, ns, date_style_indexes, date_base))
         parsed_rows.append(row_values)
     return parsed_rows
 
@@ -563,19 +565,82 @@ def xlsx_normalize_target(target: str) -> str:
     return f"xl/{target}"
 
 
-def xlsx_cell_text(cell_node, shared_strings: list[str], ns: dict[str, str]) -> str:
+def xlsx_date_style_indexes(archive: zipfile.ZipFile) -> set[int]:
+    try:
+        root = ElementTree.fromstring(archive.read("xl/styles.xml"))
+    except (KeyError, ElementTree.ParseError):
+        return set()
+    ns = {"main": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+    date_num_fmt_ids = {
+        14, 15, 16, 17, 22, 27, 30, 36, 45, 46, 47, 50, 57,
+        165,
+    }
+    for num_fmt in root.findall("main:numFmts/main:numFmt", ns):
+        try:
+            num_fmt_id = int(num_fmt.attrib.get("numFmtId", "0"))
+        except ValueError:
+            continue
+        format_code = normalize_key(num_fmt.attrib.get("formatCode", ""))
+        if any(token in format_code for token in ("yyyy", "yy", "dd")) and "mm" in format_code:
+            date_num_fmt_ids.add(num_fmt_id)
+    date_style_indexes = set()
+    for index, xf in enumerate(root.findall("main:cellXfs/main:xf", ns)):
+        try:
+            num_fmt_id = int(xf.attrib.get("numFmtId", "0"))
+        except ValueError:
+            continue
+        if num_fmt_id in date_num_fmt_ids:
+            date_style_indexes.add(index)
+    return date_style_indexes
+
+
+def xlsx_uses_1904_date_system(archive: zipfile.ZipFile) -> bool:
+    try:
+        root = ElementTree.fromstring(archive.read("xl/workbook.xml"))
+    except (KeyError, ElementTree.ParseError):
+        return False
+    ns = {"main": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+    workbook_pr = root.find("main:workbookPr", ns)
+    return workbook_pr is not None and workbook_pr.attrib.get("date1904") in {"1", "true", "True"}
+
+
+def xlsx_cell_text(cell_node, shared_strings: list[str], ns: dict[str, str], date_style_indexes: set[int], date_base: date) -> str:
     cell_type = cell_node.attrib.get("t")
     if cell_type == "inlineStr":
         return "".join(node.text or "" for node in cell_node.findall(".//main:t", ns))
     value = cell_node.find("main:v", ns)
     if value is None or value.text is None:
         return ""
+    if cell_type == "d":
+        return normalize_import_date(value.text)
     if cell_type == "s":
         try:
             return shared_strings[int(value.text)]
         except (ValueError, IndexError):
             return ""
+    if xlsx_cell_is_date(cell_node, date_style_indexes):
+        parsed_date = excel_serial_to_date(value.text, date_base)
+        if parsed_date:
+            return parsed_date.isoformat()
     return value.text
+
+
+def xlsx_cell_is_date(cell_node, date_style_indexes: set[int]) -> bool:
+    try:
+        style_index = int(cell_node.attrib.get("s", "-1"))
+    except ValueError:
+        return False
+    return style_index in date_style_indexes
+
+
+def excel_serial_to_date(value: object, date_base: date = date(1899, 12, 30)) -> date | None:
+    try:
+        serial = Decimal(str(value).strip())
+    except InvalidOperation:
+        return None
+    if serial < 1:
+        return None
+    return date_base + timedelta(days=int(serial))
 
 
 def xlsx_column_index(cell_ref: str) -> int:
@@ -889,12 +954,25 @@ def normalize_import_date(value: object) -> str:
     if isinstance(value, date):
         return value.isoformat()
     raw = str(value or "").strip()
+    serial_date = excel_serial_to_date(raw)
+    if serial_date and 2000 <= serial_date.year <= 2100:
+        return serial_date.isoformat()
     for fmt in ("%d.%m.%Y", "%d/%m/%Y", "%Y-%m-%d"):
         try:
             return datetime.strptime(raw, fmt).date().isoformat()
         except ValueError:
             pass
     raise ImportError("Data invalida.")
+
+
+def normalize_import_money_for_form(value: object) -> str:
+    return f"{normalize_amount(value):.2f}".replace(".", ",")
+
+
+def normalize_optional_import_money_for_form(value: object) -> str:
+    if str(value or "").strip() == "":
+        return ""
+    return normalize_import_money_for_form(value)
 
 
 def normalize_amount(value: object) -> Decimal:

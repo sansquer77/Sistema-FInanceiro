@@ -30,6 +30,7 @@ ASSET_TYPE_LABELS = {
     "fund": "Fundos",
     "fixed_income": "Renda fixa",
     "private_pension": "Previdência privada",
+    "savings": "Poupança",
     "other": "Outros",
 }
 PORTFOLIO_ACCOUNT_TYPES = {"liquidity", "investment"}
@@ -153,6 +154,7 @@ def get_portfolio(user_id: int, force_refresh: bool = False) -> dict:
                 investment_opening_positions.fixed_income_rate_micros,
                 investment_opening_positions.fixed_income_maturity_date,
                 investment_opening_positions.apply_tax_estimate,
+                investment_opening_positions.savings_anniversaries_json,
                 investment_opening_positions.acquisition_date AS date,
                 'Posicao inicial' AS description,
                 investment_opening_positions.total_cost_cents AS amount_cents,
@@ -251,8 +253,8 @@ def create_opening_position(user_id: int, data: dict) -> dict:
                 acquisition_date, quantity_micros, unit_price_cents, total_cost_cents,
                 exchange_rate_micros, fixed_income_mode, fixed_income_indexer,
                 fixed_income_rate_micros, fixed_income_maturity_date,
-                apply_tax_estimate, notes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                apply_tax_estimate, savings_anniversaries_json, notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 user_id,
@@ -271,6 +273,7 @@ def create_opening_position(user_id: int, data: dict) -> dict:
                 position["fixed_income_rate_micros"],
                 position["fixed_income_maturity_date"],
                 position["apply_tax_estimate"],
+                position["savings_anniversaries_json"],
                 position["notes"],
             ),
         )
@@ -310,7 +313,7 @@ def update_opening_position(user_id: int, position_id: object, data: dict) -> di
                 acquisition_date = ?, quantity_micros = ?, unit_price_cents = ?, total_cost_cents = ?,
                 exchange_rate_micros = ?, fixed_income_mode = ?, fixed_income_indexer = ?,
                 fixed_income_rate_micros = ?, fixed_income_maturity_date = ?,
-                apply_tax_estimate = ?, notes = ?,
+                apply_tax_estimate = ?, savings_anniversaries_json = ?, notes = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND user_id = ?
             """,
@@ -330,6 +333,7 @@ def update_opening_position(user_id: int, position_id: object, data: dict) -> di
                 position["fixed_income_rate_micros"],
                 position["fixed_income_maturity_date"],
                 position["apply_tax_estimate"],
+                position["savings_anniversaries_json"],
                 position["notes"],
                 normalized_id,
                 user_id,
@@ -626,7 +630,8 @@ def current_portfolio_positions(user_id: int, force_refresh: bool = False) -> li
                 0 AS brokerage_fee_cents, 0 AS exchange_fee_cents, 0 AS tax_cents, 0 AS other_costs_cents,
                 investment_opening_positions.fixed_income_mode, investment_opening_positions.fixed_income_indexer,
                 investment_opening_positions.fixed_income_rate_micros, investment_opening_positions.fixed_income_maturity_date,
-                investment_opening_positions.apply_tax_estimate, investment_opening_positions.acquisition_date AS date,
+                investment_opening_positions.apply_tax_estimate, investment_opening_positions.savings_anniversaries_json,
+                investment_opening_positions.acquisition_date AS date,
                 'Posicao inicial' AS description, investment_opening_positions.total_cost_cents AS amount_cents,
                 investment_opening_positions.exchange_rate_micros, 0 AS amount_brl_cents,
                 checking_accounts.name AS account_name, checking_accounts.currency AS account_currency
@@ -799,6 +804,15 @@ def normalize_opening_position_payload(data: dict) -> dict:
     fixed_income_mode = optional_key(data.get("fixed_income_mode"))
     if fixed_income_mode and fixed_income_mode not in {"pre", "post", "hybrid"}:
         raise PortfolioError("Modalidade de renda fixa invalida.")
+    savings_anniversaries = normalize_savings_anniversaries(data.get("savings_anniversaries"), acquisition_date)
+    if asset_type == "savings":
+        if not savings_anniversaries:
+            savings_anniversaries = [{"date": acquisition_date, "amount_cents": total_cost_cents}]
+        anniversary_total_cents = sum(int(item["amount_cents"]) for item in savings_anniversaries)
+        if anniversary_total_cents > 0:
+            total_cost_cents = anniversary_total_cents
+        if not empty_to_none(data.get("asset_identifier")):
+            data["asset_identifier"] = "POUPANCA"
     return {
         "account_id": account_id,
         "asset_type": asset_type,
@@ -815,8 +829,90 @@ def normalize_opening_position_payload(data: dict) -> dict:
         "fixed_income_rate_micros": decimal_to_micros(data.get("fixed_income_rate")),
         "fixed_income_maturity_date": normalize_optional_date(data.get("fixed_income_maturity_date")),
         "apply_tax_estimate": 1 if str(data.get("apply_tax_estimate") or "").strip().lower() in {"1", "true", "on", "yes"} else 0,
+        "savings_anniversaries_json": serialize_savings_anniversaries(savings_anniversaries),
         "notes": empty_to_none(data.get("notes")),
     }
+
+
+def normalize_savings_anniversaries(value: object, default_date: str) -> list[dict]:
+    raw = str(value or "").strip()
+    if not raw:
+        return []
+    entries = []
+    if raw.startswith("["):
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise PortfolioError("Informe aniversarios da poupanca validos.") from exc
+        for item in payload:
+            if not isinstance(item, dict):
+                raise PortfolioError("Informe aniversarios da poupanca validos.")
+            if "amount_cents" in item:
+                entries.append(normalize_savings_anniversary_item(item.get("date") or default_date, item.get("amount_cents")))
+            else:
+                entries.append(normalize_savings_anniversary_money_item(item.get("date") or default_date, item.get("amount")))
+        return entries
+    for line in raw.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if ";" in stripped:
+            raw_date, raw_amount = stripped.split(";", 1)
+        else:
+            parts = stripped.rsplit(None, 1)
+            if len(parts) != 2:
+                raise PortfolioError("Use uma linha por aniversario no formato AAAA-MM-DD; valor.")
+            raw_date, raw_amount = parts
+        entries.append(normalize_savings_anniversary_money_item(raw_date, raw_amount))
+    return entries
+
+
+def normalize_savings_anniversary_item(raw_date: object, raw_amount: object) -> dict:
+    anniversary_date = normalize_date(raw_date)
+    if isinstance(raw_amount, dict):
+        raise PortfolioError("Informe aniversarios da poupanca validos.")
+    if str(raw_amount or "").strip().isdigit() and not any(char in str(raw_amount) for char in ",."):
+        amount_cents = int(raw_amount)
+    else:
+        amount_cents = money_to_cents(raw_amount)
+    if amount_cents <= 0:
+        raise PortfolioError("Informe valores positivos para os aniversarios da poupanca.")
+    return {"date": anniversary_date, "amount_cents": amount_cents}
+
+
+def normalize_savings_anniversary_money_item(raw_date: object, raw_amount: object) -> dict:
+    anniversary_date = normalize_date(raw_date)
+    amount_cents = money_to_cents(raw_amount)
+    if amount_cents <= 0:
+        raise PortfolioError("Informe valores positivos para os aniversarios da poupanca.")
+    return {"date": anniversary_date, "amount_cents": amount_cents}
+
+
+def serialize_savings_anniversaries(entries: list[dict]) -> str | None:
+    if not entries:
+        return None
+    ordered = sorted(entries, key=lambda item: item["date"])
+    return json.dumps(ordered, ensure_ascii=True)
+
+
+def parse_savings_anniversaries(value: object, fallback_date: object, fallback_amount_cents: int) -> list[dict]:
+    raw = str(value or "").strip()
+    entries = []
+    if raw:
+        try:
+            payload = json.loads(raw)
+            for item in payload:
+                if not isinstance(item, dict):
+                    continue
+                amount_cents = int(item.get("amount_cents") or 0)
+                anniversary_date = str(item.get("date") or "").strip()
+                if amount_cents > 0 and parse_optional_iso_date(anniversary_date):
+                    entries.append({"date": anniversary_date, "amount_cents": amount_cents})
+        except (TypeError, ValueError, json.JSONDecodeError):
+            entries = []
+    if not entries and fallback_amount_cents > 0:
+        entries.append({"date": str(fallback_date), "amount_cents": int(fallback_amount_cents)})
+    return entries
 
 
 def normalize_position_value_override_payload(data: dict) -> dict:
@@ -952,11 +1048,17 @@ def build_positions(rows) -> list[dict]:
             costs_cents = total_cost_cents - invested_cents
         if total_cost_cents <= 0 and quantity <= 0:
             continue
+        source_savings_anniversaries = parse_savings_anniversaries(
+            row.get("savings_anniversaries_json"),
+            row["date"],
+            total_cost_cents,
+        ) if asset_type == "savings" else []
         position["quantity"] += quantity
         position["invested_cents"] += invested_cents
         position["costs_cents"] += costs_cents
         position["total_cost_cents"] += total_cost_cents
         position["total_cost_brl_cents"] += convert_to_brl_cents(total_cost_cents, int(row["exchange_rate_micros"] or 1000000))
+        position["savings_anniversaries"].extend(source_savings_anniversaries)
         position["sources"].append({
             "source_type": row["source_type"],
             "source_id": row["source_id"],
@@ -969,6 +1071,7 @@ def build_positions(rows) -> list[dict]:
             "total_cost_cents": total_cost_cents,
             "total_cost_brl_cents": convert_to_brl_cents(total_cost_cents, int(row["exchange_rate_micros"] or 1000000)),
             "unit_price_cents": int(row["unit_price_cents"] or 0),
+            "savings_anniversaries": source_savings_anniversaries,
         })
         position["operations_count"] += 1
         if position["operations_count"] == 1:
@@ -1029,6 +1132,7 @@ def empty_position(row, asset_type: str, identifier: str) -> dict:
         "fixed_income_iof_tax_cents": 0,
         "fixed_income_income_tax_cents": 0,
         "fixed_income_net_value_cents": 0,
+        "savings_anniversaries": [],
         "day_result_cents": 0,
         "day_result_brl_cents": 0,
         "quote": None,
@@ -1052,6 +1156,8 @@ def quote_positions(positions: list[dict], force_refresh: bool = False) -> None:
             apply_market_quote(position, force_refresh=force_refresh)
         elif position["asset_type"] == "fixed_income":
             apply_fixed_income_value(position, force_refresh=force_refresh)
+        elif position["asset_type"] == "savings":
+            apply_savings_value(position, force_refresh=force_refresh)
         else:
             apply_cost_value(position, "Cotacao manual pendente")
 
@@ -1146,6 +1252,108 @@ def apply_fixed_income_value(position: dict, force_refresh: bool = False) -> Non
     position["fixed_income_net_value_cents"] = net_cents
     position["day_result_cents"] = 0
     position["day_result_brl_cents"] = 0
+
+
+def apply_savings_value(position: dict, force_refresh: bool = False) -> None:
+    today = date.today()
+    anniversaries = aggregate_savings_anniversaries(position.get("savings_anniversaries") or [])
+    if not anniversaries:
+        anniversaries = [{"date": position["first_operation_date"], "amount_cents": position["total_cost_cents"]}]
+    current_value = Decimal("0")
+    status = "ok"
+    source = "Banco Central SGS (TR/SELIC); aniversarios mensais"
+    try:
+        additional_monthly_rate = savings_additional_monthly_rate(force_refresh=force_refresh)
+        for anniversary in anniversaries:
+            start_date = parse_optional_iso_date(anniversary.get("date"))
+            amount_cents = int(anniversary.get("amount_cents") or 0)
+            if not start_date or amount_cents <= 0:
+                continue
+            current_value += Decimal(amount_cents) * savings_factor_for_anniversary(
+                start_date,
+                today,
+                additional_monthly_rate,
+                force_refresh=force_refresh,
+            )
+    except PortfolioError as exc:
+        status = exc.message
+        source = "Estimativa local; Banco Central indisponivel"
+        fallback_rate = fallback_indexer_annual_rate("SELIC")
+        additional_monthly_rate = savings_additional_monthly_rate_from_selic(fallback_rate)
+        for anniversary in anniversaries:
+            start_date = parse_optional_iso_date(anniversary.get("date"))
+            amount_cents = int(anniversary.get("amount_cents") or 0)
+            if not start_date or amount_cents <= 0:
+                continue
+            completed_months = completed_savings_anniversaries(start_date, today)
+            current_value += Decimal(amount_cents) * ((Decimal("1") + additional_monthly_rate) ** completed_months)
+    current_cents = int(current_value.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    position["quote"] = savings_quote_label(additional_monthly_rate)
+    position["quote_source"] = source
+    position["quote_status"] = status
+    position["quote_date"] = today.isoformat()
+    position["current_value_cents"] = current_cents
+    position["current_value_brl_cents"] = value_to_brl(current_cents, position["currency"])
+    position["fixed_income_gross_value_cents"] = current_cents
+    position["fixed_income_iof_tax_cents"] = 0
+    position["fixed_income_income_tax_cents"] = 0
+    position["fixed_income_net_value_cents"] = current_cents
+    position["day_result_cents"] = 0
+    position["day_result_brl_cents"] = 0
+
+
+def savings_factor_for_anniversary(
+    start_date: date,
+    end_date: date,
+    additional_monthly_rate: Decimal,
+    force_refresh: bool = False,
+) -> Decimal:
+    factor = Decimal("1")
+    completed_months = completed_savings_anniversaries(start_date, end_date)
+    for month_index in range(1, completed_months + 1):
+        period_start = add_months(start_date, month_index - 1)
+        period_end = add_months(start_date, month_index)
+        tr_factor = fetch_accumulated_indexer_factor("TR", period_start, period_end, force_refresh=force_refresh)
+        factor *= tr_factor * (Decimal("1") + additional_monthly_rate)
+    return factor
+
+
+def aggregate_savings_anniversaries(entries: list[dict]) -> list[dict]:
+    totals: dict[str, int] = {}
+    for entry in entries:
+        anniversary_date = str(entry.get("date") or "").strip()
+        if not parse_optional_iso_date(anniversary_date):
+            continue
+        totals[anniversary_date] = totals.get(anniversary_date, 0) + int(entry.get("amount_cents") or 0)
+    return [
+        {"date": anniversary_date, "amount_cents": amount_cents}
+        for anniversary_date, amount_cents in sorted(totals.items())
+        if amount_cents > 0
+    ]
+
+
+def completed_savings_anniversaries(start_date: date, end_date: date) -> int:
+    if end_date < add_months(start_date, 1):
+        return 0
+    completed = 0
+    while add_months(start_date, completed + 1) <= end_date:
+        completed += 1
+    return completed
+
+
+def savings_additional_monthly_rate(force_refresh: bool = False) -> Decimal:
+    selic_annual = fetch_indexer_rate("SELIC", force_refresh=force_refresh)
+    return savings_additional_monthly_rate_from_selic(selic_annual)
+
+
+def savings_additional_monthly_rate_from_selic(selic_annual: Decimal) -> Decimal:
+    if selic_annual > Decimal("0.085"):
+        return Decimal("0.005")
+    return (Decimal("1") + selic_annual * Decimal("0.70")) ** (Decimal("1") / Decimal("12")) - Decimal("1")
+
+
+def savings_quote_label(additional_monthly_rate: Decimal) -> str:
+    return f"TR + {format_decimal_percent(additional_monthly_rate * Decimal('100'))}% a.m."
 
 
 def parse_optional_iso_date(value: object) -> date | None:
@@ -1604,6 +1812,8 @@ def group_positions(positions: list[dict], key: str) -> list[dict]:
 
 def portfolio_group_label(position: dict, key: str) -> str:
     label = position.get(key)
+    if key == "fixed_income_indexer" and position.get("asset_type") == "savings":
+        return "Poupança"
     if key == "fixed_income_indexer" and not label and position.get("currency") != "BRL":
         return position.get("currency") or "Nao informado"
     return label or "Nao informado"
@@ -1612,6 +1822,7 @@ def portfolio_group_label(position: dict, key: str) -> str:
 def format_position(position: dict) -> dict:
     average_cents = decimal_to_cents(Decimal(position["total_cost_cents"]) / position["quantity"] / MONEY_SCALE) if position["quantity"] else position["last_unit_price_cents"]
     position["sources"] = format_position_sources(position)
+    position["savings_anniversaries"] = format_savings_anniversaries(aggregate_savings_anniversaries(position.get("savings_anniversaries") or []))
     position["quantity"] = decimal_to_string(position["quantity"])
     position["fixed_income_rate"] = format_decimal_percent(position["fixed_income_rate"])
     position["average_price"] = cents_to_money(average_cents)
@@ -1655,8 +1866,20 @@ def format_position_sources(position: dict) -> list[dict]:
             "current_value_brl": cents_to_money(source_current_value_brl_cents),
             "current_value_cents": source_current_value_cents,
             "current_value_brl_cents": source_current_value_brl_cents,
+            "savings_anniversaries": format_savings_anniversaries(source.get("savings_anniversaries") or []),
         })
     return formatted
+
+
+def format_savings_anniversaries(entries: list[dict]) -> list[dict]:
+    return [
+        {
+            "date": entry.get("date"),
+            "amount": cents_to_money(entry.get("amount_cents") or 0),
+            "amount_cents": int(entry.get("amount_cents") or 0),
+        }
+        for entry in sorted(entries, key=lambda item: str(item.get("date") or ""))
+    ]
 
 
 def indexer_catalog() -> list[dict]:

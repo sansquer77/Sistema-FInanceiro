@@ -136,16 +136,10 @@ def delete_category(user_id: int, item_id: str) -> None:
 def delete_subcategory(user_id: int, item_id: str) -> None:
     normalized_id = normalize_item_id(item_id, "Subcategoria nao encontrada.")
     with get_connection() as conn:
-        used = conn.execute(
-            """
-            SELECT COUNT(*) AS total
-            FROM transactions
-            WHERE subcategory_id = ? AND user_id = ?
-            """,
-            (normalized_id, user_id),
-        ).fetchone()["total"]
+        used = subcategory_usage_count(conn, user_id, normalized_id)
         if used:
             raise ClassificationError("Nao e possivel excluir uma subcategoria usada em lancamentos.")
+        clear_archived_subcategory_references(conn, user_id, normalized_id)
         cursor = conn.execute(
             """
             DELETE FROM subcategories
@@ -165,21 +159,31 @@ def list_named_items(table: str, user_id: int, group_type: object | None = None)
     ensure_allowed_table(table)
     normalized_group = normalize_group_type(group_type, required=False) if table == "categories" else None
     category_group_filter = "AND items.group_type = ?" if normalized_group else ""
-    params = [user_id, user_id]
+    params = [user_id, user_id, user_id] if table == "categories" else [user_id, user_id]
     if normalized_group:
         params.append(normalized_group)
     usage_sql = {
-        "categories": """
-            SELECT COUNT(*) FROM transactions
-            WHERE transactions.category_id = items.id AND transactions.user_id = ?
-        """,
+        "categories": category_usage_count_sql("items.id"),
         "tags": """
-            SELECT COUNT(*)
-            FROM transaction_tags
-            JOIN transactions ON transactions.id = transaction_tags.transaction_id
-            WHERE transaction_tags.tag_id = items.id AND transactions.user_id = ?
+            SELECT (
+                SELECT COUNT(*)
+                FROM transaction_tags
+                JOIN transactions ON transactions.id = transaction_tags.transaction_id
+                WHERE transaction_tags.tag_id = items.id
+                    AND transactions.user_id = ?
+                    AND transactions.archived_at IS NULL
+            ) + (
+                SELECT COUNT(*)
+                FROM credit_card_transaction_tags
+                JOIN credit_card_transactions
+                    ON credit_card_transactions.id = credit_card_transaction_tags.credit_card_transaction_id
+                WHERE credit_card_transaction_tags.tag_id = items.id
+                    AND credit_card_transactions.user_id = ?
+                    AND credit_card_transactions.archived_at IS NULL
+            )
         """,
     }[table]
+    params = [user_id, user_id, user_id] if table == "tags" else params
     with get_connection() as conn:
         rows = conn.execute(
             f"""
@@ -211,13 +215,21 @@ def attach_subcategories(conn, user_id: int, categories: list[dict]) -> None:
             subcategories.category_id,
             subcategories.name,
             subcategories.created_at,
-            COUNT(transactions.id) AS transaction_count
+            (
+                SELECT COUNT(*)
+                FROM transactions
+                WHERE transactions.subcategory_id = subcategories.id
+                    AND transactions.user_id = subcategories.user_id
+                    AND transactions.archived_at IS NULL
+            ) + (
+                SELECT COUNT(*)
+                FROM credit_card_transactions
+                WHERE credit_card_transactions.subcategory_id = subcategories.id
+                    AND credit_card_transactions.user_id = subcategories.user_id
+                    AND credit_card_transactions.archived_at IS NULL
+            ) AS transaction_count
         FROM subcategories
-        LEFT JOIN transactions
-            ON transactions.subcategory_id = subcategories.id
-            AND transactions.user_id = subcategories.user_id
         WHERE subcategories.user_id = ?
-        GROUP BY subcategories.id
         ORDER BY subcategories.name COLLATE NOCASE
         """,
         (user_id,),
@@ -310,25 +322,109 @@ def delete_named_item(table: str, user_id: int, item_id: str) -> None:
     ensure_allowed_table(table)
     normalized_id = normalize_item_id(item_id, "Item nao encontrado.")
     usage_query = {
-        "categories": """
-            SELECT COUNT(*) AS total
-            FROM transactions
-            WHERE category_id = ? AND user_id = ?
-        """,
+        "categories": f"SELECT ({category_usage_count_sql('?')}) AS total",
         "tags": """
-            SELECT COUNT(*) AS total
-            FROM transaction_tags
-            JOIN transactions ON transactions.id = transaction_tags.transaction_id
-            WHERE transaction_tags.tag_id = ? AND transactions.user_id = ?
+            SELECT (
+                SELECT COUNT(*)
+                FROM transaction_tags
+                JOIN transactions ON transactions.id = transaction_tags.transaction_id
+                WHERE transaction_tags.tag_id = ?
+                    AND transactions.user_id = ?
+                    AND transactions.archived_at IS NULL
+            ) + (
+                SELECT COUNT(*)
+                FROM credit_card_transaction_tags
+                JOIN credit_card_transactions
+                    ON credit_card_transactions.id = credit_card_transaction_tags.credit_card_transaction_id
+                WHERE credit_card_transaction_tags.tag_id = ?
+                    AND credit_card_transactions.user_id = ?
+                    AND credit_card_transactions.archived_at IS NULL
+            ) AS total
         """,
     }[table]
     with get_connection() as conn:
-        used = conn.execute(usage_query, (normalized_id, user_id)).fetchone()["total"]
+        usage_params = (normalized_id, user_id, normalized_id, user_id) if table == "tags" else (normalized_id, user_id, normalized_id, user_id)
+        used = conn.execute(usage_query, usage_params).fetchone()["total"]
         if used:
             raise ClassificationError("Nao e possivel excluir um item usado em lancamentos.")
+        if table == "categories":
+            clear_archived_category_references(conn, user_id, normalized_id)
         cursor = conn.execute(f"DELETE FROM {table} WHERE id = ? AND user_id = ?", (normalized_id, user_id))
         if cursor.rowcount == 0:
             raise ClassificationError("Item nao encontrado.", HTTPStatus.NOT_FOUND)
+
+
+def category_usage_count_sql(category_expression: str) -> str:
+    return f"""
+        (
+            SELECT COUNT(*)
+            FROM transactions
+            WHERE transactions.category_id = {category_expression}
+                AND transactions.user_id = ?
+                AND transactions.archived_at IS NULL
+        ) + (
+            SELECT COUNT(*)
+            FROM credit_card_transactions
+            WHERE credit_card_transactions.category_id = {category_expression}
+                AND credit_card_transactions.user_id = ?
+                AND credit_card_transactions.archived_at IS NULL
+        )
+    """
+
+
+def subcategory_usage_count(conn, user_id: int, subcategory_id: int) -> int:
+    return conn.execute(
+        """
+        SELECT (
+            SELECT COUNT(*)
+            FROM transactions
+            WHERE subcategory_id = ? AND user_id = ? AND archived_at IS NULL
+        ) + (
+            SELECT COUNT(*)
+            FROM credit_card_transactions
+            WHERE subcategory_id = ? AND user_id = ? AND archived_at IS NULL
+        ) AS total
+        """,
+        (subcategory_id, user_id, subcategory_id, user_id),
+    ).fetchone()["total"]
+
+
+def clear_archived_category_references(conn, user_id: int, category_id: int) -> None:
+    conn.execute(
+        """
+        UPDATE transactions
+        SET category_id = NULL, subcategory_id = NULL
+        WHERE user_id = ? AND category_id = ? AND archived_at IS NOT NULL
+        """,
+        (user_id, category_id),
+    )
+    conn.execute(
+        """
+        UPDATE credit_card_transactions
+        SET category_id = NULL, subcategory_id = NULL
+        WHERE user_id = ? AND category_id = ? AND archived_at IS NOT NULL
+        """,
+        (user_id, category_id),
+    )
+
+
+def clear_archived_subcategory_references(conn, user_id: int, subcategory_id: int) -> None:
+    conn.execute(
+        """
+        UPDATE transactions
+        SET subcategory_id = NULL
+        WHERE user_id = ? AND subcategory_id = ? AND archived_at IS NOT NULL
+        """,
+        (user_id, subcategory_id),
+    )
+    conn.execute(
+        """
+        UPDATE credit_card_transactions
+        SET subcategory_id = NULL
+        WHERE user_id = ? AND subcategory_id = ? AND archived_at IS NOT NULL
+        """,
+        (user_id, subcategory_id),
+    )
 
 
 def ensure_category_exists(conn, user_id: int, category_id: int) -> None:
@@ -353,13 +449,21 @@ def fetch_subcategory(conn, user_id: int, subcategory_id: int) -> dict:
             subcategories.category_id,
             subcategories.name,
             subcategories.created_at,
-            COUNT(transactions.id) AS transaction_count
+            (
+                SELECT COUNT(*)
+                FROM transactions
+                WHERE transactions.subcategory_id = subcategories.id
+                    AND transactions.user_id = subcategories.user_id
+                    AND transactions.archived_at IS NULL
+            ) + (
+                SELECT COUNT(*)
+                FROM credit_card_transactions
+                WHERE credit_card_transactions.subcategory_id = subcategories.id
+                    AND credit_card_transactions.user_id = subcategories.user_id
+                    AND credit_card_transactions.archived_at IS NULL
+            ) AS transaction_count
         FROM subcategories
-        LEFT JOIN transactions
-            ON transactions.subcategory_id = subcategories.id
-            AND transactions.user_id = subcategories.user_id
         WHERE subcategories.id = ? AND subcategories.user_id = ?
-        GROUP BY subcategories.id
         """,
         (subcategory_id, user_id),
     ).fetchone()

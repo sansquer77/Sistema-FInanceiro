@@ -6,7 +6,7 @@
     <title>Sistema Financeiro</title>
     <link rel="icon" href="/assets/app-icon.png">
     <link rel="apple-touch-icon" href="/assets/app-icon.png">
-    <link rel="stylesheet" href="/styles.css?v=72">
+    <link rel="stylesheet" href="/styles.css?v=75">
   </head>
   <body>
     <main class="app-shell">
@@ -459,7 +459,7 @@
 
             <section class="panel">
               <div class="section-heading">
-                <h2>Lançamentos da fatura</h2>
+                <h2>Lançamentos da fatura <span class="invoice-open-count ok" id="cardInvoiceOpenCount">0 não conciliados</span></h2>
               </div>
               <div class="card-invoice-list" id="cardInvoiceList"></div>
             </section>
@@ -722,6 +722,7 @@
                     <option value="fund">Fundo de investimento</option>
                     <option value="fixed_income">Renda fixa</option>
                     <option value="private_pension">Previdência privada</option>
+                    <option value="savings">Poupança</option>
                     <option value="other">Outro</option>
                   </select>
                 </label>
@@ -749,6 +750,11 @@
                     <option value="PGBL">PGBL</option>
                     <option value="VGBL">VGBL</option>
                   </select>
+                </label>
+              </div>
+              <div id="portfolioSavingsFields" hidden>
+                <label>Aniversários da poupança
+                  <textarea name="savings_anniversaries" rows="4" placeholder="2026-01-05; 1000,00&#10;2026-01-20; 500,00"></textarea>
                 </label>
               </div>
               <div class="field-row" id="portfolioFixedFields" hidden>
@@ -1118,6 +1124,6 @@
         </div>
       </section>
     </main>
-    <script src="/app.js?v=72"></script>
+    <script src="/app.js?v=75"></script>
   </body>
 </html>

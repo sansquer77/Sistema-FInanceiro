@@ -75,6 +75,7 @@ const cardPaymentAccount = document.querySelector("#cardPaymentAccount");
 const cardPaymentDate = document.querySelector("#cardPaymentDate");
 const payCardInvoiceButton = document.querySelector("#payCardInvoiceButton");
 const cardInvoiceMessage = document.querySelector("#cardInvoiceMessage");
+const cardInvoiceOpenCount = document.querySelector("#cardInvoiceOpenCount");
 const cardTransactionForm = document.querySelector("#cardTransactionForm");
 const cardTransactionFormTitle = document.querySelector("#cardTransactionFormTitle");
 const cardTransactionType = document.querySelector("#cardTransactionType");
@@ -139,6 +140,7 @@ const portfolioAssetIdentifierLabel = document.querySelector("#portfolioAssetIde
 const portfolioFundFields = document.querySelector("#portfolioFundFields");
 const portfolioPensionFields = document.querySelector("#portfolioPensionFields");
 const portfolioPensionSubtype = document.querySelector("#portfolioPensionSubtype");
+const portfolioSavingsFields = document.querySelector("#portfolioSavingsFields");
 const portfolioFixedFields = document.querySelector("#portfolioFixedFields");
 const portfolioFixedIncomeSubtype = document.querySelector("#portfolioFixedIncomeSubtype");
 const cancelPortfolioAssetButton = document.querySelector("#cancelPortfolioAssetButton");
@@ -312,6 +314,7 @@ transactionCategory.addEventListener("change", () => {
   renderTransactionSubcategories();
   updateInvestmentFieldState();
 });
+transactionSubcategory.addEventListener("change", updateInvestmentFieldState);
 seriesKind.addEventListener("change", updateSeriesState);
 transactionForm.elements.date.addEventListener("change", updateExchangeRateState);
 transactionForm.elements.date.addEventListener("change", updateTransferExchangeRateState);
@@ -757,6 +760,7 @@ function editPortfolioPosition(position) {
   portfolioAssetForm.elements.fixed_income_rate.value = decimalInputValue(position.fixed_income_rate);
   portfolioAssetForm.elements.fixed_income_maturity_date.value = position.fixed_income_maturity_date || "";
   portfolioAssetForm.elements.apply_tax_estimate.checked = Boolean(position.apply_tax_estimate);
+  portfolioAssetForm.elements.savings_anniversaries.value = savingsAnniversariesInputValue(position.savings_anniversaries);
   portfolioAssetForm.elements.quantity.value = decimalInputValue(position.quantity);
   portfolioAssetForm.elements.unit_price.value = moneyInputValue(position.average_price);
   portfolioAssetForm.elements.exchange_rate_to_brl.value = "";
@@ -842,6 +846,7 @@ function updatePortfolioAssetTypeState() {
   portfolioFundFields.hidden = assetType !== "fund";
   portfolioFixedFields.hidden = assetType !== "fixed_income";
   portfolioPensionFields.hidden = assetType !== "private_pension";
+  portfolioSavingsFields.hidden = assetType !== "savings";
   if (assetType === "fixed_income") {
     portfolioAssetIdentifierLabel.hidden = true;
     const matchedSubtype = [...portfolioFixedIncomeSubtype.options].find((option) => option.value === portfolioAssetIdentifier.value);
@@ -852,10 +857,18 @@ function updatePortfolioAssetTypeState() {
     const matchedSubtype = [...portfolioPensionSubtype.options].find((option) => option.value === portfolioAssetIdentifier.value);
     portfolioPensionSubtype.value = matchedSubtype ? matchedSubtype.value : "";
     portfolioFixedIncomeSubtype.value = "";
+  } else if (assetType === "savings") {
+    portfolioAssetIdentifierLabel.hidden = true;
+    portfolioAssetIdentifier.value = "POUPANCA";
+    portfolioFixedIncomeSubtype.value = "";
+    portfolioPensionSubtype.value = "";
   } else {
     portfolioAssetIdentifierLabel.hidden = false;
     portfolioAssetIdentifierLabel.childNodes[0].textContent = "Ativo ";
     portfolioAssetIdentifier.placeholder = "Ex.: PETR4, IVVB11, BTC";
+    if (portfolioAssetIdentifier.value === "POUPANCA") {
+      portfolioAssetIdentifier.value = "";
+    }
     portfolioFixedIncomeSubtype.value = "";
     portfolioPensionSubtype.value = "";
   }
@@ -871,6 +884,16 @@ function syncPortfolioPensionSubtype() {
   if (portfolioAssetType.value === "private_pension" && portfolioPensionSubtype.value) {
     portfolioAssetIdentifier.value = portfolioPensionSubtype.value;
   }
+}
+
+function savingsAnniversariesInputValue(entries) {
+  if (!Array.isArray(entries)) {
+    return "";
+  }
+  return entries
+    .map((entry) => `${entry.date || ""}; ${moneyInputValue(entry.amount)}`)
+    .filter((line) => !line.startsWith(";"))
+    .join("\n");
 }
 
 async function loadClassifications() {
@@ -1122,6 +1145,7 @@ async function handleTransactionSubmit(event) {
     setMessage(transactionMessage, error.message, "error");
   } finally {
     setFormBusy(transactionForm, false);
+    updateInvestmentFieldState();
   }
 }
 
@@ -1474,6 +1498,23 @@ async function toggleCardTransactionReconciliation(id, reconciled) {
     renderCreditCards();
     renderLimits();
     renderCockpit();
+  } catch (error) {
+    setMessage(cardInvoiceMessage, error.message, "error");
+  }
+}
+
+async function moveCardTransactionInvoice(id, direction) {
+  try {
+    await api(`/api/credit-card-transactions/${id}/invoice`, {
+      method: "PUT",
+      body: { direction },
+    });
+    await loadCardInvoice();
+    await loadCardTransactions();
+    renderCreditCards();
+    renderLimits();
+    renderCockpit();
+    setMessage(cardInvoiceMessage, direction === "next" ? "Lançamento movido para a próxima fatura." : "Lançamento movido para a fatura anterior.", "success");
   } catch (error) {
     setMessage(cardInvoiceMessage, error.message, "error");
   }
@@ -2209,6 +2250,7 @@ function renderCardInvoice() {
     cardPaymentDate.value = "";
     cardTransactionForm.querySelector('button[type="submit"]').disabled = true;
     payCardInvoiceButton.disabled = true;
+    updateCardInvoiceOpenCount();
     cardInvoiceList.innerHTML = "";
     cardInvoiceList.append(emptyState("Cadastre um cartão para lançar faturas."));
     return;
@@ -2228,7 +2270,18 @@ function renderCardInvoice() {
   cardTransactionForm.querySelector('button[type="submit"]').disabled = alreadyPaid;
   payCardInvoiceButton.disabled = total <= 0 || alreadyPaid || !cardPaymentAccount.value;
   payCardInvoiceButton.textContent = alreadyPaid ? "Fatura paga" : "Pagar fatura";
+  updateCardInvoiceOpenCount();
   renderCardInvoiceList(card);
+}
+
+function updateCardInvoiceOpenCount() {
+  if (!cardInvoiceOpenCount) {
+    return;
+  }
+  const pending = state.cardInvoiceTransactions.filter((transaction) => !transaction.reconciled_at).length;
+  cardInvoiceOpenCount.textContent = `${pending} não conciliado${pending === 1 ? "" : "s"}`;
+  cardInvoiceOpenCount.classList.toggle("danger", pending > 0);
+  cardInvoiceOpenCount.classList.toggle("ok", pending === 0);
 }
 
 function renderCardInvoiceSelector() {
@@ -2349,6 +2402,8 @@ function renderCardInvoiceList(card) {
         <strong>${sign}${formatMoney(transaction.amount, card.currency)}</strong>
         ${state.cardInvoicePayments.length ? "" : `
           <div class="transaction-actions">
+            <button class="icon-button" type="button" data-card-move-id="${transaction.id}" data-card-move-direction="previous" title="Mover para a fatura anterior" aria-label="Mover para a fatura anterior">←</button>
+            <button class="icon-button" type="button" data-card-move-id="${transaction.id}" data-card-move-direction="next" title="Mover para a próxima fatura" aria-label="Mover para a próxima fatura">→</button>
             <button class="ghost small-button" type="button" data-card-edit-id="${transaction.id}">Editar</button>
             <button class="reconcile-button ${isReconciled ? "active" : ""}" type="button" data-card-reconcile-id="${transaction.id}" data-reconciled="${isReconciled}" title="${isReconciled ? "Desmarcar conciliação" : "Marcar como conciliado"}">OK</button>
             <button class="danger small-button" type="button" data-card-transaction-id="${transaction.id}">Excluir</button>
@@ -2371,6 +2426,12 @@ function renderCardInvoiceList(card) {
     if (deleteButton) {
       deleteButton.addEventListener("click", () => deleteCardTransaction(transaction.id));
     }
+    item.querySelectorAll("[data-card-move-id]").forEach((button) => {
+      button.addEventListener("click", () => moveCardTransactionInvoice(
+        button.dataset.cardMoveId,
+        button.dataset.cardMoveDirection,
+      ));
+    });
     cardInvoiceList.append(item);
   });
 }
@@ -4217,12 +4278,34 @@ function applyWalletAccountRestrictions() {
 function updateInvestmentFieldState() {
   const isInvestment = transactionType.value === "investment";
   const cat = transactionCategory.value;
+  const isSavings = isInvestmentSavingsSelection();
   investmentFundFields.hidden = !isInvestment || cat !== "Fundos de Investimentos";
-  investmentFixedFields.hidden = !isInvestment || cat !== "Renda Fixa";
+  investmentFixedFields.hidden = !isInvestment || cat !== "Renda Fixa" || isSavings;
   for (const field of investmentOperationFields.querySelectorAll("input, select")) {
     field.disabled = !isInvestment;
   }
+  for (const field of investmentFundFields.querySelectorAll("input, select")) {
+    field.disabled = !isInvestment || investmentFundFields.hidden;
+  }
+  for (const field of investmentFixedFields.querySelectorAll("input, select")) {
+    field.disabled = !isInvestment || investmentFixedFields.hidden;
+  }
+  if (isSavings) {
+    transactionForm.elements.investment_asset_identifier.value = "POUPANCA";
+    if (!transactionForm.elements.investment_asset_name.value) {
+      transactionForm.elements.investment_asset_name.value = "Poupança";
+    }
+  } else if (transactionForm.elements.investment_asset_identifier.value === "POUPANCA") {
+    transactionForm.elements.investment_asset_identifier.value = "";
+  }
   investmentAmount.required = isInvestment;
+}
+
+function isInvestmentSavingsSelection() {
+  if (transactionType.value !== "investment") {
+    return false;
+  }
+  return normalizeSearch([transactionCategory.value, transactionSubcategory.value, investmentAssetIdentifier.value].join(" ")).includes("poupanca");
 }
 
 function updateSeriesState() {

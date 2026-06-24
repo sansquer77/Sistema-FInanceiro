@@ -1887,6 +1887,27 @@ textarea:focus {
   font-size: 19px;
 }
 
+.invoice-open-count {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+  vertical-align: middle;
+}
+
+.invoice-open-count.ok {
+  background: #dcfce7;
+  color: #047857;
+}
+
+.invoice-open-count.danger {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
 .invoice-payment-form {
   padding-top: 2px;
 }
@@ -2132,6 +2153,24 @@ textarea:focus {
   gap: 8px;
   justify-content: flex-end;
   align-items: center;
+}
+
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.icon-button:hover {
+  border-color: var(--accent);
+  color: var(--accent-strong);
 }
 
 .reconcile-button {
