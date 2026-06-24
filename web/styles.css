@@ -3,11 +3,14 @@
   --bg: #f6f7f9;
   --panel: #ffffff;
   --ink: #1f2933;
+  --text: #1f2933;
   --muted: #657282;
   --line: #dce2e8;
   --accent: #0f766e;
   --accent-dark: #115e59;
+  --accent-strong: #115e59;
   --danger: #b42318;
+  --bg-alt: #fbfcfd;
   --soft: #e7f5f3;
   --shadow: 0 18px 48px rgba(31, 41, 51, 0.08);
 }
@@ -88,7 +91,7 @@ p {
 .brand h1,
 .topbar h1 {
   margin-bottom: 8px;
-  font-size: 36px;
+  font-size: 34px;
   line-height: 1.05;
 }
 
@@ -359,18 +362,24 @@ textarea:focus {
 .topbar {
   display: flex;
   justify-content: space-between;
-  gap: 18px;
+  gap: 16px;
   align-items: center;
-  min-height: 76px;
-  margin-bottom: 18px;
+  min-height: 58px;
+  margin-bottom: 14px;
 }
 
 .eyebrow {
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   font-size: 12px;
   font-weight: 900;
   letter-spacing: 0;
   text-transform: uppercase;
+}
+
+.topbar h1 {
+  margin-bottom: 0;
+  font-size: 28px;
+  line-height: 1.1;
 }
 
 .user-area {
@@ -470,22 +479,22 @@ textarea:focus {
 .summary-strip {
   display: grid;
   grid-template-columns: repeat(4, minmax(170px, 1fr));
-  gap: 12px;
-  margin-bottom: 18px;
+  gap: 10px;
+  margin-bottom: 14px;
 }
 
 .summary-strip > div {
   display: grid;
-  gap: 6px;
-  min-height: 86px;
-  padding: 16px;
+  gap: 4px;
+  min-height: 68px;
+  padding: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
 }
 
 .summary-strip strong {
-  font-size: 24px;
+  font-size: 20px;
 }
 
 .summary-strip > div {
@@ -526,8 +535,8 @@ textarea:focus {
 }
 
 .currency-panel {
-  padding: 18px 20px;
-  margin-bottom: 18px;
+  padding: 16px;
+  margin-bottom: 16px;
 }
 
 .cockpit-stack {
@@ -608,7 +617,7 @@ textarea:focus {
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fbfcfd;
+  background: var(--bg-alt);
 }
 
 .currency-section-header {
@@ -885,7 +894,7 @@ textarea:focus {
   padding: 12px 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fbfcfd;
+  background: var(--bg-alt);
 }
 
 .currency-item span {
@@ -1110,18 +1119,18 @@ textarea:focus {
 .import-summary {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin-bottom: 14px;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
 .import-summary > div {
   display: grid;
   gap: 4px;
-  min-height: 72px;
-  padding: 12px;
+  min-height: 60px;
+  padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fbfcfd;
+  background: var(--bg-alt);
 }
 
 .import-summary span,
@@ -1137,7 +1146,7 @@ textarea:focus {
 }
 
 .import-summary strong {
-  font-size: 22px;
+  font-size: 18px;
 }
 
 .import-errors {
@@ -1188,12 +1197,15 @@ textarea:focus {
 }
 
 .account-form-panel,
-.accounts-panel,
 .card-form-panel,
-.cards-panel,
-.panel,
 .transaction-form-panel {
-  padding: 20px;
+  padding: 18px;
+}
+
+.accounts-panel,
+.cards-panel,
+.panel {
+  padding: 16px;
 }
 
 .field-row {
@@ -1286,75 +1298,75 @@ textarea:focus {
 .month-balance-summary {
   display: grid;
   grid-template-columns: repeat(2, minmax(180px, 1fr));
-  gap: 10px;
-  margin-bottom: 16px;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
 .limit-summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(180px, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .report-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(150px, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .month-balance-summary > div {
   display: grid;
-  gap: 5px;
-  min-height: 72px;
-  padding: 14px;
+  gap: 4px;
+  min-height: 60px;
+  padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fbfcfd;
+  background: var(--bg-alt);
 }
 
 .limit-summary > div {
   display: grid;
-  gap: 5px;
-  min-height: 72px;
-  padding: 14px;
+  gap: 4px;
+  min-height: 60px;
+  padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fbfcfd;
+  background: var(--bg-alt);
 }
 
 .report-summary > div,
 .account-report-header > div {
   display: grid;
-  gap: 5px;
-  min-height: 72px;
-  padding: 14px;
+  gap: 4px;
+  min-height: 60px;
+  padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fbfcfd;
+  background: var(--bg-alt);
 }
 
 .month-balance-summary span,
 .limit-summary span {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 900;
 }
 
 .report-summary span,
 .account-report-header span {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 900;
 }
 
 .month-balance-summary strong,
 .limit-summary strong {
-  font-size: 19px;
+  font-size: 17px;
 }
 
 .report-summary strong,
 .account-report-header strong {
-  font-size: 19px;
+  font-size: 17px;
 }
 
 .money-stack-line {
@@ -1541,21 +1553,21 @@ textarea:focus {
 .portfolio-summary {
   display: grid;
   grid-template-columns: repeat(6, minmax(140px, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .portfolio-summary > div,
 .portfolio-group-row {
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fbfcfd;
+  background: var(--bg-alt);
 }
 
 .portfolio-summary > div {
   display: grid;
-  gap: 5px;
-  min-height: 72px;
-  padding: 14px;
+  gap: 4px;
+  min-height: 60px;
+  padding: 10px 12px;
 }
 
 .portfolio-summary span,
@@ -1568,7 +1580,7 @@ textarea:focus {
 }
 
 .portfolio-summary strong {
-  font-size: 19px;
+  font-size: 17px;
 }
 
 .portfolio-summary strong:has(.portfolio-summary-line) {
@@ -1866,28 +1878,28 @@ textarea:focus {
 .card-invoice-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(160px, 1fr));
-  gap: 10px;
-  margin-bottom: 16px;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
 .card-invoice-summary > div {
   display: grid;
-  gap: 5px;
-  min-height: 72px;
-  padding: 14px;
+  gap: 4px;
+  min-height: 60px;
+  padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fbfcfd;
+  background: var(--bg-alt);
 }
 
 .card-invoice-summary span {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 900;
 }
 
 .card-invoice-summary strong {
-  font-size: 19px;
+  font-size: 17px;
 }
 
 .invoice-open-count {
@@ -1917,18 +1929,69 @@ textarea:focus {
 
 .card-invoice-list {
   display: grid;
-  gap: 10px;
+  gap: 6px;
 }
 
 .card-invoice-row,
 .card-invoice-payment {
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 14px;
-  padding: 16px;
+  gap: 10px 14px;
+  align-items: center;
+  padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fff;
+}
+
+.card-invoice-row {
+  grid-template-columns: minmax(180px, 1.2fr) minmax(180px, 1fr) minmax(110px, auto) auto;
+}
+
+.card-invoice-payment {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.invoice-entry-main,
+.invoice-entry-category {
+  min-width: 0;
+}
+
+.invoice-entry-main {
+  display: grid;
+  gap: 4px;
+}
+
+.invoice-entry-main strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.invoice-entry-meta {
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+.invoice-entry-meta span {
+  flex: 0 0 auto;
+}
+
+.invoice-entry-category {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.invoice-entry-amount strong {
+  margin-bottom: 0;
+}
+
+.invoice-entry-actions {
+  min-width: 166px;
 }
 
 .card-invoice-row.negative {
@@ -2093,16 +2156,16 @@ textarea:focus {
 .transaction-list,
 .transaction-rows {
   display: grid;
-  gap: 10px;
+  gap: 6px;
 }
 
 .transaction-group {
   display: grid;
-  gap: 10px;
+  gap: 6px;
 }
 
 .transaction-group + .transaction-group {
-  margin-top: 16px;
+  margin-top: 12px;
 }
 
 .transaction-group h3 {
@@ -2132,8 +2195,9 @@ textarea:focus {
 .account-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 14px;
-  font-size: 13px;
+  gap: 4px 10px;
+  font-size: 12px;
+  line-height: 1.25;
 }
 
 .balance {
@@ -2147,46 +2211,109 @@ textarea:focus {
   font-size: 20px;
 }
 
+.transaction-row {
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+}
+
+.transaction-row > div:first-child,
+.card-invoice-payment > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.transaction-row > div:first-child > strong,
+.card-invoice-payment > div:first-child > strong {
+  line-height: 1.2;
+}
+
+.transaction-amount strong {
+  margin-bottom: 4px;
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+
 .transaction-amount {
   text-align: right;
 }
 
 .transaction-actions {
   display: flex;
-  gap: 8px;
+  gap: 4px;
   justify-content: flex-end;
   align-items: center;
 }
 
-.icon-button {
+.icon-button,
+.launch-action-button {
+  position: relative;
   display: inline-grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: #fff;
   color: var(--text);
-  font-size: 16px;
-  font-weight: 900;
 }
 
-.icon-button:hover {
+.icon-button:hover,
+.launch-action-button:hover {
   border-color: var(--accent);
   color: var(--accent-strong);
+  background: var(--soft);
+}
+
+.launch-action-button svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.launch-action-button.danger-action {
+  color: var(--danger);
+}
+
+.launch-action-button.danger-action:hover {
+  border-color: #f0c7c2;
+  background: #fff1ef;
+}
+
+.launch-action-button[data-tooltip]::after {
+  position: absolute;
+  right: 50%;
+  bottom: calc(100% + 8px);
+  z-index: 30;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: #1f2933;
+  color: #fff;
+  content: attr(data-tooltip);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(50%) translateY(2px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  white-space: nowrap;
+}
+
+.launch-action-button[data-tooltip]:hover::after,
+.launch-action-button[data-tooltip]:focus-visible::after {
+  opacity: 1;
+  transform: translateX(50%) translateY(0);
 }
 
 .reconcile-button {
-  display: inline-grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: #fff;
   color: var(--muted);
-  font-size: 12px;
-  font-weight: 900;
 }
 
 .reconcile-button.active {
@@ -2239,9 +2366,9 @@ textarea:focus {
 
 .transaction-amount span {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
 }
 
@@ -2367,6 +2494,19 @@ textarea:focus {
     justify-content: space-between;
     text-align: left;
   }
+
+  .invoice-entry-meta {
+    flex-wrap: wrap;
+  }
+
+  .invoice-entry-actions {
+    min-width: 0;
+  }
+
+  .invoice-entry-category,
+  .invoice-entry-main strong {
+    white-space: normal;
+  }
 }
 
 @media (max-width: 520px) {
@@ -2376,7 +2516,11 @@ textarea:focus {
 
   .brand h1,
   .topbar h1 {
-    font-size: 30px;
+    font-size: 28px;
+  }
+
+  .topbar h1 {
+    font-size: 24px;
   }
 
   .field-row {

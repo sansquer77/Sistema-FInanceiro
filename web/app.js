@@ -26,12 +26,14 @@ const state = {
   portfolioCollapsedGroups: new Set(),
   portfolioAssetSaving: false,
   view: "cockpit",
-  transactionMonth: new Date().toISOString().slice(0, 7),
-  limitMonth: new Date().toISOString().slice(0, 7),
-  cardInvoiceMonth: new Date().toISOString().slice(0, 7),
-  reportMonth: new Date().toISOString().slice(0, 7),
+  transactionMonth: currentMonthValue(),
+  limitMonth: currentMonthValue(),
+  cardInvoiceMonth: currentMonthValue(),
+  reportMonth: currentMonthValue(),
   reportTab: "categories",
   reportAccountId: "",
+  transactionSliceRequestId: 0,
+  cardInvoiceRequestId: 0,
 };
 
 const authView = document.querySelector("#authView");
@@ -272,6 +274,7 @@ accountForm.elements.account_type.addEventListener("change", updateAccountTypeSt
 creditCardForm.addEventListener("submit", handleCreditCardSubmit);
 creditCardForm.elements.currency.addEventListener("change", renderCreditCardPreferredPaymentAccounts);
 cardInvoiceCard.addEventListener("change", handleCardInvoiceCardChange);
+cardInvoiceList.addEventListener("click", handleCardInvoiceListClick);
 previousCardInvoiceButton.addEventListener("click", () => shiftCardInvoiceMonth(-1));
 todayCardInvoiceButton.addEventListener("click", () => setCardInvoiceMonth(currentMonthValue()));
 cardInvoiceMonthLabel.addEventListener("click", (event) => {
@@ -363,6 +366,7 @@ portfolioGroupFilter.addEventListener("change", () => {
   renderPortfolio();
 });
 transactionSearch.addEventListener("input", renderTransactions);
+transactionList.addEventListener("click", handleTransactionListClick);
 logoutButton.addEventListener("click", handleLogout);
 cancelEditButton.addEventListener("click", resetAccountForm);
 cancelTransactionEditButton.addEventListener("click", resetTransactionForm);
@@ -633,11 +637,21 @@ async function loadTransactionsAndAccounts() {
 
 async function loadTransactionSlice() {
   ensureSelectedAccount();
+  const requestId = ++state.transactionSliceRequestId;
+  const accountId = String(state.selectedAccountId || "");
+  const month = state.transactionMonth;
   if (!state.selectedAccountId) {
     state.accountTransactions = [];
     return;
   }
-  const response = await api(`/api/transactions?month=${encodeURIComponent(state.transactionMonth)}&account_id=${encodeURIComponent(state.selectedAccountId)}`);
+  const response = await api(`/api/transactions?month=${encodeURIComponent(month)}&account_id=${encodeURIComponent(accountId)}`);
+  if (
+    requestId !== state.transactionSliceRequestId
+    || month !== state.transactionMonth
+    || accountId !== String(state.selectedAccountId || "")
+  ) {
+    return;
+  }
   state.accountTransactions = response.transactions || [];
 }
 
@@ -724,7 +738,7 @@ function showPortfolioAssetForm() {
   renderPortfolioAssetAccounts();
   portfolioAssetFormPanel.hidden = false;
   if (!portfolioAssetForm.elements.acquisition_date.value) {
-    portfolioAssetForm.elements.acquisition_date.value = new Date().toISOString().slice(0, 10);
+    portfolioAssetForm.elements.acquisition_date.value = todayLocalDateValue();
   }
   updatePortfolioAssetTypeState();
   portfolioAssetFormPanel.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -735,7 +749,7 @@ function resetPortfolioAssetForm() {
   portfolioAssetForm.elements.id.value = "";
   portfolioAssetFormTitle.textContent = "Ativo em carteira";
   deletePortfolioAssetButton.hidden = true;
-  portfolioAssetForm.elements.acquisition_date.value = new Date().toISOString().slice(0, 10);
+  portfolioAssetForm.elements.acquisition_date.value = todayLocalDateValue();
   portfolioAssetFormPanel.hidden = true;
   updatePortfolioAssetTypeState();
 }
@@ -753,7 +767,7 @@ function editPortfolioPosition(position) {
   portfolioAssetForm.reset();
   portfolioAssetForm.elements.id.value = position.source_id;
   portfolioAssetForm.elements.account_id.value = position.account_id;
-  portfolioAssetForm.elements.acquisition_date.value = position.first_operation_date || new Date().toISOString().slice(0, 10);
+  portfolioAssetForm.elements.acquisition_date.value = position.first_operation_date || todayLocalDateValue();
   portfolioAssetForm.elements.asset_type.value = position.asset_type || "other";
   portfolioAssetForm.elements.total_cost.value = moneyInputValue(position.total_cost);
   portfolioAssetForm.elements.asset_identifier.value = position.asset_identifier || "";
@@ -816,7 +830,7 @@ async function redeemPortfolioPosition(position) {
   if (rawAmount === null) {
     return;
   }
-  const rawDate = window.prompt("Data do resgate", new Date().toISOString().slice(0, 10));
+  const rawDate = window.prompt("Data do resgate", todayLocalDateValue());
   if (rawDate === null) {
     return;
   }
@@ -921,12 +935,22 @@ async function loadCurrentSpendingLimits() {
 }
 
 async function loadCardInvoice() {
+  const requestId = ++state.cardInvoiceRequestId;
+  const cardId = String(state.selectedCreditCardId || "");
+  const month = state.cardInvoiceMonth;
   if (!state.selectedCreditCardId) {
     state.cardInvoiceTransactions = [];
     state.cardInvoicePayments = [];
     return;
   }
-  const response = await api(`/api/credit-card-invoice?card_id=${encodeURIComponent(state.selectedCreditCardId)}&month=${encodeURIComponent(state.cardInvoiceMonth)}`);
+  const response = await api(`/api/credit-card-invoice?card_id=${encodeURIComponent(cardId)}&month=${encodeURIComponent(month)}`);
+  if (
+    requestId !== state.cardInvoiceRequestId
+    || month !== state.cardInvoiceMonth
+    || cardId !== String(state.selectedCreditCardId || "")
+  ) {
+    return;
+  }
   state.cardInvoiceTransactions = response.transactions || [];
   state.cardInvoicePayments = response.payments || [];
 }
@@ -1628,7 +1652,7 @@ function resetCreditCardForm() {
 function resetCardTransactionForm() {
   cardTransactionForm.reset();
   cardTransactionForm.elements.id.value = "";
-  cardTransactionForm.elements.date.value = new Date().toISOString().slice(0, 10);
+  cardTransactionForm.elements.date.value = todayLocalDateValue();
   cardTransactionForm.elements.credit_card_id.value = state.selectedCreditCardId;
   cardTransactionForm.elements.invoice_month.value = state.cardInvoiceMonth;
   cardSeriesKind.disabled = false;
@@ -1664,7 +1688,7 @@ function updateAccountTypeState() {
 function resetTransactionForm() {
   transactionForm.reset();
   transactionForm.elements.id.value = "";
-  transactionForm.elements.date.value = new Date().toISOString().slice(0, 10);
+  transactionForm.elements.date.value = todayLocalDateValue();
   installmentCount.value = "2";
   recurrenceFrequency.value = "monthly";
   recurrenceCount.value = "12";
@@ -1917,7 +1941,7 @@ function renderMonthlyPlanning() {
     );
     return;
   }
-  const prefix = new Date().toISOString().slice(0, 7);
+  const prefix = currentMonthValue();
   const sections = [
     ["Receitas recorrentes", (transaction) => transaction.type === "income" && transaction.series_kind === "recurring"],
     ["Investimentos planejados", (transaction) => isInvestmentTransaction(transaction) && transaction.series_kind !== "single"],
@@ -1980,7 +2004,7 @@ function renderInstallmentDebts() {
   if (!installmentDebtList) {
     return;
   }
-  const currentMonth = new Date().toISOString().slice(0, 7);
+  const currentMonth = currentMonthValue();
   const rows = new Map();
   for (const transaction of state.transactions) {
     const transactionMonth = transaction.date.slice(0, 7);
@@ -2097,7 +2121,7 @@ function renderTopExpensesChart() {
     });
     return;
   }
-  const prefix = new Date().toISOString().slice(0, 7);
+  const prefix = currentMonthValue();
   const grouped = groupTransactionsByCategory(state.transactions.filter((transaction) => (
     transaction.date.startsWith(prefix) && transaction.type === "expense"
   )));
@@ -2115,7 +2139,7 @@ function renderTopIncomeChart() {
     });
     return;
   }
-  const prefix = new Date().toISOString().slice(0, 7);
+  const prefix = currentMonthValue();
   const grouped = groupTransactionsByCategory(state.transactions.filter((transaction) => (
     transaction.date.startsWith(prefix) && transaction.type === "income"
   )));
@@ -2393,51 +2417,60 @@ function renderCardInvoiceList(card) {
     const sign = transaction.type === "income" ? "+" : "-";
     const isReconciled = Boolean(transaction.reconciled_at);
     item.innerHTML = `
-      <div>
+      <div class="invoice-entry-main">
         <strong>${escapeHtml(transaction.description)}</strong>
-        <div class="account-meta">
+        <div class="account-meta invoice-entry-meta">
           <span>${formatDate(transaction.date)}</span>
           <span>${cardTransactionTypeLabel(transaction.type)}</span>
           ${transactionSeriesLabel(transaction) ? `<span>${transactionSeriesLabel(transaction)}</span>` : ""}
-          ${transaction.category_name ? `<span>${escapeHtml(cardCategoryPath(transaction))}</span>` : ""}
         </div>
       </div>
-      <div class="transaction-amount">
-        <strong>${sign}${formatMoney(transaction.amount, card.currency)}</strong>
-        ${state.cardInvoicePayments.length ? "" : `
-          <div class="transaction-actions">
-            <button class="icon-button" type="button" data-card-move-id="${transaction.id}" data-card-move-direction="previous" title="Mover para a fatura anterior" aria-label="Mover para a fatura anterior">←</button>
-            <button class="icon-button" type="button" data-card-move-id="${transaction.id}" data-card-move-direction="next" title="Mover para a próxima fatura" aria-label="Mover para a próxima fatura">→</button>
-            <button class="ghost small-button" type="button" data-card-edit-id="${transaction.id}">Editar</button>
-            <button class="reconcile-button ${isReconciled ? "active" : ""}" type="button" data-card-reconcile-id="${transaction.id}" data-reconciled="${isReconciled}" title="${isReconciled ? "Desmarcar conciliação" : "Marcar como conciliado"}">OK</button>
-            <button class="danger small-button" type="button" data-card-transaction-id="${transaction.id}">Excluir</button>
-          </div>
-        `}
+      <div class="invoice-entry-category">
+        ${transaction.category_name ? escapeHtml(cardCategoryPath(transaction)) : "Sem categoria"}
       </div>
+      <div class="transaction-amount invoice-entry-amount">
+        <strong>${sign}${formatMoney(transaction.amount, card.currency)}</strong>
+      </div>
+      ${state.cardInvoicePayments.length ? "" : `
+        <div class="transaction-actions invoice-entry-actions">
+          ${launchActionButton("arrow-left", "Mover para a fatura anterior", `data-card-move-id="${transaction.id}" data-card-move-direction="previous"`)}
+          ${launchActionButton("arrow-right", "Mover para a próxima fatura", `data-card-move-id="${transaction.id}" data-card-move-direction="next"`)}
+          ${launchActionButton("edit", "Editar lançamento", `data-card-edit-id="${transaction.id}"`)}
+          ${launchActionButton("check", isReconciled ? "Desmarcar conciliação" : "Marcar como conciliado", `data-card-reconcile-id="${transaction.id}" data-reconciled="${isReconciled}"`, `reconcile-button ${isReconciled ? "active" : ""}`)}
+          ${launchActionButton("trash", "Excluir lançamento", `data-card-transaction-id="${transaction.id}"`, "danger-action")}
+        </div>
+      `}
     `;
-    const reconcileButton = item.querySelector("[data-card-reconcile-id]");
-    const editButton = item.querySelector("[data-card-edit-id]");
-    if (editButton) {
-      editButton.addEventListener("click", () => editCardTransaction(transaction));
-    }
-    if (reconcileButton) {
-      reconcileButton.addEventListener("click", () => toggleCardTransactionReconciliation(
-        reconcileButton.dataset.cardReconcileId,
-        reconcileButton.dataset.reconciled !== "true",
-      ));
-    }
-    const deleteButton = item.querySelector("[data-card-transaction-id]");
-    if (deleteButton) {
-      deleteButton.addEventListener("click", () => deleteCardTransaction(transaction.id));
-    }
-    item.querySelectorAll("[data-card-move-id]").forEach((button) => {
-      button.addEventListener("click", () => moveCardTransactionInvoice(
-        button.dataset.cardMoveId,
-        button.dataset.cardMoveDirection,
-      ));
-    });
     cardInvoiceList.append(item);
   });
+}
+
+function handleCardInvoiceListClick(event) {
+  const moveButton = event.target.closest("[data-card-move-id]");
+  if (moveButton) {
+    moveCardTransactionInvoice(moveButton.dataset.cardMoveId, moveButton.dataset.cardMoveDirection);
+    return;
+  }
+  const editButton = event.target.closest("[data-card-edit-id]");
+  if (editButton) {
+    const transaction = state.cardInvoiceTransactions.find((entry) => String(entry.id) === String(editButton.dataset.cardEditId));
+    if (transaction) {
+      editCardTransaction(transaction);
+    }
+    return;
+  }
+  const reconcileButton = event.target.closest("[data-card-reconcile-id]");
+  if (reconcileButton) {
+    toggleCardTransactionReconciliation(
+      reconcileButton.dataset.cardReconcileId,
+      reconcileButton.dataset.reconciled !== "true",
+    );
+    return;
+  }
+  const deleteButton = event.target.closest("[data-card-transaction-id]");
+  if (deleteButton) {
+    deleteCardTransaction(deleteButton.dataset.cardTransactionId);
+  }
 }
 
 function selectedCreditCard() {
@@ -2845,7 +2878,7 @@ function renderTransactions() {
   
   // Calculate balances considering only the filtered transactions
   // Saldo Atual: apenas lançamentos conciliados até hoje
-  currentBalanceSummary.textContent = formatCurrencySummary(getBalanceUntil(new Date().toISOString().slice(0, 10), accountTransactions, true));
+  currentBalanceSummary.textContent = formatCurrencySummary(getBalanceUntil(todayLocalDateValue(), accountTransactions, true));
   // Saldo Previsto: todos os lançamentos até o fim do mês
   forecastBalanceSummary.textContent = formatCurrencySummary(getBalanceUntil(monthEndDate(state.transactionMonth), accountTransactions, false));
   
@@ -3565,7 +3598,7 @@ function portfolioMaturityAlert(position) {
   if (!maturityDate) {
     return null;
   }
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalDateValue();
   if (maturityDate < today) {
     return {
       status: "overdue",
@@ -3612,7 +3645,7 @@ function portfolioIconSvg(icon) {
 }
 
 async function closePortfolioPosition(position) {
-  const rawDate = window.prompt("Data de encerramento", new Date().toISOString().slice(0, 10));
+  const rawDate = window.prompt("Data de encerramento", todayLocalDateValue());
   if (rawDate === null) {
     return;
   }
@@ -3648,7 +3681,7 @@ async function editPortfolioCurrentValue(position) {
   if (rawAmount === null) {
     return;
   }
-  const rawDate = window.prompt("Data da atualização", new Date().toISOString().slice(0, 10));
+  const rawDate = window.prompt("Data da atualização", todayLocalDateValue());
   if (rawDate === null) {
     return;
   }
@@ -4019,8 +4052,9 @@ function renderLimitSummary(rows) {
 }
 
 function spendingLimitRows(limits = state.spendingLimits) {
+  const spentIndex = buildSpendingLimitSpentIndex(limits);
   return limits.map((limit) => {
-    const spent = spentForLimit(limit);
+    const spent = spendingLimitSpentFromIndex(spentIndex, limit);
     const limitAmount = Number(limit.limit_amount);
     return {
       limitRecord: limit,
@@ -4035,32 +4069,40 @@ function spendingLimitRows(limits = state.spendingLimits) {
   }).sort((a, b) => b.percent - a.percent || b.spent - a.spent);
 }
 
-function spentForLimit(limit) {
-  const accountSpent = state.transactions.reduce((total, transaction) => {
-    if (transaction.type !== "expense" || !transaction.date.startsWith(limit.month)) {
-      return total;
+function buildSpendingLimitSpentIndex(limits = state.spendingLimits) {
+  const months = new Set(limits.map((limit) => limit.month).filter(Boolean));
+  const index = new Map();
+  const addSpent = (month, categoryId, subcategoryId, amount) => {
+    const categoryKey = spendingLimitSpentKey(month, categoryId, "");
+    index.set(categoryKey, (index.get(categoryKey) || 0) + amount);
+    if (subcategoryId) {
+      const subcategoryKey = spendingLimitSpentKey(month, categoryId, subcategoryId);
+      index.set(subcategoryKey, (index.get(subcategoryKey) || 0) + amount);
     }
-    if (String(transaction.category_id) !== String(limit.category_id)) {
-      return total;
+  };
+  state.transactions.forEach((transaction) => {
+    const month = transaction.date ? transaction.date.slice(0, 7) : "";
+    if (transaction.type !== "expense" || (months.size && !months.has(month))) {
+      return;
     }
-    if (limit.subcategory_id && String(transaction.subcategory_id) !== String(limit.subcategory_id)) {
-      return total;
+    addSpent(month, transaction.category_id, transaction.subcategory_id, Number(transaction.amount_brl || transaction.amount));
+  });
+  state.cardTransactions.forEach((transaction) => {
+    const month = transaction.invoice_month || (transaction.date ? transaction.date.slice(0, 7) : "");
+    if (transaction.type !== "expense" || (months.size && !months.has(month))) {
+      return;
     }
-    return total + Number(transaction.amount_brl || transaction.amount);
-  }, 0);
-  const cardSpent = state.cardTransactions.reduce((total, transaction) => {
-    if (transaction.type !== "expense" || transaction.invoice_month !== limit.month) {
-      return total;
-    }
-    if (String(transaction.category_id) !== String(limit.category_id)) {
-      return total;
-    }
-    if (limit.subcategory_id && String(transaction.subcategory_id) !== String(limit.subcategory_id)) {
-      return total;
-    }
-    return total + Number(transaction.amount);
-  }, 0);
-  return accountSpent + cardSpent;
+    addSpent(month, transaction.category_id, transaction.subcategory_id, Number(transaction.amount_brl || transaction.amount));
+  });
+  return index;
+}
+
+function spendingLimitSpentFromIndex(index, limit) {
+  return index.get(spendingLimitSpentKey(limit.month, limit.category_id, limit.subcategory_id || "")) || 0;
+}
+
+function spendingLimitSpentKey(month, categoryId, subcategoryId) {
+  return `${month || ""}|${categoryId || ""}|${subcategoryId || ""}`;
 }
 
 function isCreditCardInvoicePaid(cardId, invoiceMonth) {
@@ -4142,21 +4184,6 @@ function renderTransactionCollection(container, transactions, compact) {
       <div class="transaction-rows">${rows}</div>
     `;
     if (!compact) {
-      group.querySelectorAll("[data-transaction-id]").forEach((button) => {
-        button.addEventListener("click", () => deleteTransaction(button.dataset.transactionId));
-      });
-      group.querySelectorAll("[data-edit-transaction-id]").forEach((button) => {
-        const transaction = items.find((entry) => String(entry.id) === String(button.dataset.editTransactionId));
-        button.addEventListener("click", () => editTransaction(transaction));
-      });
-      group.querySelectorAll("[data-reconcile-id]").forEach((button) => {
-        button.addEventListener("click", () => toggleTransactionReconciliation(
-          button.dataset.reconcileId,
-          button.dataset.reconciled !== "true",
-        ));
-      });
-    }
-    if (!compact) {
       group.append(dailyBalance(dateKey));
     }
     container.append(group);
@@ -4164,7 +4191,7 @@ function renderTransactionCollection(container, transactions, compact) {
   
   // Add subtotal lines at the end: Current Balance (Reconciled) and Forecast Balance
   if (!compact) {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayLocalDateValue();
     const monthEnd = monthEndDate(state.transactionMonth);
     
     const relevantTransactions = selectedAccountTransactions(state.accountTransactions).filter((transaction) => transaction.date <= monthEnd);
@@ -4185,6 +4212,30 @@ function renderTransactionCollection(container, transactions, compact) {
       </div>
     `;
     container.append(subtotalSection);
+  }
+}
+
+function handleTransactionListClick(event) {
+  const editButton = event.target.closest("[data-edit-transaction-id]");
+  if (editButton) {
+    const transaction = selectedAccountTransactions(state.accountTransactions)
+      .find((entry) => String(entry.id) === String(editButton.dataset.editTransactionId));
+    if (transaction) {
+      editTransaction(transaction);
+    }
+    return;
+  }
+  const reconcileButton = event.target.closest("[data-reconcile-id]");
+  if (reconcileButton) {
+    toggleTransactionReconciliation(
+      reconcileButton.dataset.reconcileId,
+      reconcileButton.dataset.reconciled !== "true",
+    );
+    return;
+  }
+  const deleteButton = event.target.closest("[data-transaction-id]");
+  if (deleteButton) {
+    deleteTransaction(deleteButton.dataset.transactionId);
   }
 }
 
@@ -4227,14 +4278,34 @@ function transactionTemplate(transaction, compact) {
         ${conversionDetails}
         ${compact ? "" : `
           <div class="transaction-actions">
-            <button class="ghost small-button" type="button" data-edit-transaction-id="${transaction.id}">Editar</button>
-            <button class="reconcile-button ${isReconciled ? "active" : ""}" type="button" data-reconcile-id="${transaction.id}" data-reconciled="${isReconciled}" title="${isReconciled ? "Desmarcar conciliação" : "Marcar como conciliado"}">OK</button>
-            <button class="danger small-button" type="button" data-transaction-id="${transaction.id}">Excluir</button>
+            ${launchActionButton("edit", "Editar lançamento", `data-edit-transaction-id="${transaction.id}"`)}
+            ${launchActionButton("check", isReconciled ? "Desmarcar conciliação" : "Marcar como conciliado", `data-reconcile-id="${transaction.id}" data-reconciled="${isReconciled}"`, `reconcile-button ${isReconciled ? "active" : ""}`)}
+            ${launchActionButton("trash", "Excluir lançamento", `data-transaction-id="${transaction.id}"`, "danger-action")}
           </div>
         `}
       </div>
     </article>
   `;
+}
+
+function launchActionButton(icon, label, attributes, extraClass = "") {
+  const safeLabel = escapeHtml(label);
+  return `
+    <button class="launch-action-button ${extraClass}" type="button" ${attributes} title="${safeLabel}" aria-label="${safeLabel}" data-tooltip="${safeLabel}">
+      ${launchActionIconSvg(icon)}
+    </button>
+  `;
+}
+
+function launchActionIconSvg(icon) {
+  const icons = {
+    "arrow-left": '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/><path d="M20 12H9"/></svg>',
+    "arrow-right": '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18l6-6-6-6"/><path d="M4 12h11"/></svg>',
+    check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>',
+    edit: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l11-11a2.8 2.8 0 0 0-4-4L4 16v4z"/><path d="M13 6l5 5"/></svg>',
+    trash: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 15h10l1-15"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>',
+  };
+  return icons[icon] || icons.edit;
 }
 
 function dailyBalance(dateKey) {
@@ -4544,7 +4615,7 @@ function getCurrencyTotals() {
   }
   for (const card of state.creditCards) {
     const row = currencyTotalRow(totals, card.currency);
-    const openAmount = cardOpenBalance(card.id, new Date().toISOString().slice(0, 7));
+    const openAmount = cardOpenBalance(card.id, currentMonthValue());
     const signedAmount = -openAmount;
     row.current += signedAmount;
     row.cards.push({
@@ -4607,7 +4678,7 @@ function currentMonthEndDate() {
 }
 
 function cardReconciledBalance(cardId) {
-  const currentMonth = new Date().toISOString().slice(0, 7);
+  const currentMonth = currentMonthValue();
   const transactionTotal = state.cardTransactions.reduce((total, transaction) => {
     if (String(transaction.credit_card_id) !== String(cardId) || !transaction.reconciled_at || transaction.invoice_month > currentMonth) {
       return total;
@@ -5052,7 +5123,19 @@ function formatMonthLabel(value) {
 }
 
 function currentMonthValue() {
-  return new Date().toISOString().slice(0, 7);
+  return currentLocalMonthValue();
+}
+
+function todayLocalDateValue(date = new Date()) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function currentLocalMonthValue(date = new Date()) {
+  return todayLocalDateValue(date).slice(0, 7);
 }
 
 function isValidMonthValue(value) {
