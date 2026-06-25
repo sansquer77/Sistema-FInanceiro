@@ -47,15 +47,15 @@ Analistas e mantenedores do Sistema Financeiro que precisam evoluir a interface 
 - `month-picker`: componente pequeno compartilhado entre lancamentos, cartoes, limites e relatorios.
 - `auth-view`: login, cadastro, logout e recuperacao de senha.
 - `user-admin-view`: troca de email/senha, limpeza de lancamentos e exclusao de usuario autenticado.
+- `classifications-view`: categorias, subcategorias, tags, formularios, mensagens e CRUD.
+- `limits-view`: limites de gastos, resumo mensal, indice de consumo e alerta de limite do cockpit.
+- `reports-view`: filtros, abas, agrupamentos, totais multimoeda e tabelas de relatorio.
 
 ### Proximos modulos funcionais
 
 - `accounts-view`: cadastro, edicao, arquivamento, restauracao e logos de contas.
 - `cards-view`: cadastro de cartoes, faturas, pagamento de fatura, lancamentos de cartao e conciliacao.
 - `transactions-view`: formulario de lancamentos, busca, agrupamento por data, recorrencia, parcelas, cambio e investimento.
-- `classifications-view`: categorias, subcategorias e tags.
-- `limits-view`: limites de gastos, resumo mensal e indice de consumo.
-- `reports-view`: filtros, abas, agrupamentos e tabelas de relatorio.
 - `portfolio-view`: cadastro de ativos, posicoes, historico, agrupamentos, resgate, encerramento e atualizacao de valor.
 - `imports-view`: upload, download de modelo e apresentacao do resultado.
 - `cockpit-view`: resumo financeiro, graficos, planejamento, dividas parceladas e alerta de limites.
@@ -83,6 +83,7 @@ Esse contrato evita imports circulares e deixa claro o que cada modulo toca.
 - Dado o app carregado, quando o navegador busca `app.js`, entao seus imports de `web/modules/` resolvem sem erro.
 - Dado um fluxo existente de login, navegacao, lancamentos, cartoes, relatorios e portfolio, quando usado, entao as chamadas de API e formatacoes continuam iguais.
 - Dado um mantenedor lendo o frontend, quando busca formatacao monetaria, datas ou API, entao encontra essas responsabilidades fora do arquivo principal.
+- Dado um mantenedor lendo categorias, limites ou relatorios, quando busca seus formularios, handlers e renderizacao, entao encontra esses fluxos em `classifications-view`, `limits-view` e `reports-view`.
 
 ## Fora de escopo
 

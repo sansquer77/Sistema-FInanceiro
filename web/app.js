@@ -43,6 +43,9 @@ import {
 import { openMonthPicker } from "./modules/month-picker.js";
 import { registerAuthView } from "./modules/auth-view.js";
 import { registerUserAdminView } from "./modules/user-admin-view.js";
+import { registerClassificationsView } from "./modules/classifications-view.js";
+import { registerLimitsView } from "./modules/limits-view.js";
+import { registerReportsView } from "./modules/reports-view.js";
 
 const state = {
   user: null,
@@ -305,6 +308,91 @@ const viewTitles = {
 
 const SIDEBAR_COLLAPSED_KEY = "financeiro.sidebar.collapsed";
 
+const classificationsView = registerClassificationsView({
+  state,
+  elements: {
+    categoryForm,
+    categoryGroup,
+    subcategoryForm,
+    subcategoryCategory,
+    tagForm,
+    categoryMessage,
+    tagMessage,
+    categoryList,
+    tagList,
+  },
+  api,
+  formData,
+  setMessage,
+  emptyState,
+  escapeHtml,
+  classificationGroupLabel,
+  onClassificationsChanged: () => {
+    renderTransactionTagOptions();
+    renderTransactionCategories();
+    renderCardTransactionCategories();
+  },
+});
+
+const limitsView = registerLimitsView({
+  state,
+  elements: {
+    limitForm,
+    limitFormTitle,
+    limitCategory,
+    limitSubcategory,
+    limitMonthInput,
+    limitMonthLabel,
+    limitConsumedSummary,
+    limitDefinedSummary,
+    limitAvailableSummary,
+    limitMessage,
+    spendingLimitList,
+    previousLimitMonthButton,
+    nextLimitMonthButton,
+    cancelLimitEditButton,
+    cockpitLimitAlert,
+  },
+  navButtons,
+  api,
+  currentMonthValue,
+  shiftMonth,
+  formatMonthLabel,
+  formatMoney,
+  formatPercent,
+  formData,
+  setMessage,
+  emptyState,
+  escapeHtml,
+  onLimitsChanged: renderCockpit,
+  goToLimits: () => showModule("limits"),
+});
+
+const reportsView = registerReportsView({
+  state,
+  elements: {
+    reportMonthLabel,
+    previousReportMonthButton,
+    nextReportMonthButton,
+    reportTabs,
+    reportIncomeSummary,
+    reportExpenseSummary,
+    reportInvestmentSummary,
+    reportResultSummary,
+    reportAccountFilter,
+    reportAccountSelect,
+    reportContent,
+  },
+  shiftMonth,
+  formatDate,
+  formatMonthLabel,
+  formatMoney,
+  formatPercent,
+  escapeHtml,
+  isInvestmentTransaction,
+  chartColor,
+});
+
 accountForm.addEventListener("submit", handleAccountSubmit);
 accountForm.elements.account_type.addEventListener("change", updateAccountTypeState);
 creditCardForm.addEventListener("submit", handleCreditCardSubmit);
@@ -325,12 +413,6 @@ cardTransactionType.addEventListener("change", renderCardTransactionCategories);
 cardTransactionCategory.addEventListener("change", renderCardTransactionSubcategories);
 cardSeriesKind.addEventListener("change", updateCardSeriesState);
 transactionForm.addEventListener("submit", handleTransactionSubmit);
-categoryForm.addEventListener("submit", handleCategorySubmit);
-categoryGroup.addEventListener("change", handleCategoryGroupChange);
-subcategoryForm.addEventListener("submit", handleSubcategorySubmit);
-tagForm.addEventListener("submit", handleTagSubmit);
-limitForm.addEventListener("submit", handleLimitSubmit);
-limitCategory.addEventListener("change", renderLimitSubcategories);
 importForm.addEventListener("submit", handleImportSubmit);
 importTarget.addEventListener("change", renderImportTargets);
 downloadImportTemplateButton.addEventListener("click", downloadImportTemplate);
@@ -362,29 +444,6 @@ transactionMonthLabel.addEventListener("click", (event) => {
   openMonthPicker(event.currentTarget, state.transactionMonth, setTransactionMonth);
 });
 nextMonthButton.addEventListener("click", () => shiftTransactionMonth(1));
-previousLimitMonthButton.addEventListener("click", () => shiftLimitMonth(-1));
-nextLimitMonthButton.addEventListener("click", () => shiftLimitMonth(1));
-previousReportMonthButton.addEventListener("click", () => shiftReportMonth(-1));
-nextReportMonthButton.addEventListener("click", () => shiftReportMonth(1));
-reportTabs.forEach((button) => button.addEventListener("click", () => switchReportTab(button.dataset.reportTab)));
-reportAccountSelect.addEventListener("change", () => {
-  state.reportAccountId = reportAccountSelect.value;
-  renderReports();
-});
-reportContent.addEventListener("click", (event) => {
-  const toggle = event.target.closest("[data-report-toggle]");
-  if (!toggle) {
-    return;
-  }
-  const row = toggle.closest("[data-report-row]");
-  const detail = row ? row.querySelector("[data-report-detail]") : null;
-  if (!detail) {
-    return;
-  }
-  const expanded = detail.hidden;
-  detail.hidden = !expanded;
-  toggle.setAttribute("aria-expanded", String(expanded));
-});
 addPortfolioAssetButton.addEventListener("click", showPortfolioAssetForm);
 refreshPortfolioButton.addEventListener("click", () => loadPortfolio({ refreshMessage: true }));
 portfolioAssetForm.addEventListener("submit", handlePortfolioAssetSubmit);
@@ -403,7 +462,6 @@ cancelEditButton.addEventListener("click", resetAccountForm);
 cancelTransactionEditButton.addEventListener("click", resetTransactionForm);
 cancelCreditCardEditButton.addEventListener("click", resetCreditCardForm);
 cancelCardTransactionEditButton.addEventListener("click", resetCardTransactionForm);
-cancelLimitEditButton.addEventListener("click", resetLimitForm);
 navButtons.forEach((button) => button.addEventListener("click", () => showModule(button.dataset.view)));
 sidebarToggle.addEventListener("click", () => toggleSidebar());
 
@@ -897,23 +955,15 @@ function savingsAnniversariesInputValue(entries) {
 }
 
 async function loadClassifications() {
-  const [categoriesResponse, tagsResponse] = await Promise.all([
-    api("/api/categories"),
-    api("/api/tags"),
-  ]);
-  state.categories = categoriesResponse.categories;
-  state.tags = tagsResponse.tags;
-  renderTransactionTagOptions();
+  await classificationsView.loadClassifications();
 }
 
 async function loadSpendingLimits() {
-  const response = await api(`/api/spending-limits?month=${encodeURIComponent(state.limitMonth)}`);
-  state.spendingLimits = response.limits;
+  await limitsView.loadSpendingLimits();
 }
 
 async function loadCurrentSpendingLimits() {
-  const response = await api(`/api/spending-limits?month=${encodeURIComponent(currentMonthValue())}`);
-  state.currentSpendingLimits = response.limits;
+  await limitsView.loadCurrentSpendingLimits();
 }
 
 async function loadCardInvoice() {
@@ -1204,166 +1254,6 @@ async function handleImportSubmit(event) {
 function downloadImportTemplate() {
   const target = importTarget.value || "account";
   window.location.href = `/api/import/template?target=${encodeURIComponent(target)}`;
-}
-
-async function handleCategorySubmit(event) {
-  event.preventDefault();
-  categoryForm.elements.group_type.value = categoryGroup.value;
-  await createClassification("categories", categoryForm, categoryMessage);
-  categoryForm.elements.group_type.value = categoryGroup.value;
-}
-
-function handleCategoryGroupChange() {
-  categoryForm.elements.group_type.value = categoryGroup.value;
-  setMessage(categoryMessage, "");
-  renderClassifications();
-}
-
-async function handleSubcategorySubmit(event) {
-  event.preventDefault();
-  setMessage(categoryMessage, "");
-  if (filteredClassificationCategories().length === 0) {
-    setMessage(categoryMessage, "Cadastre uma categoria antes de adicionar subcategorias.", "error");
-    return;
-  }
-  try {
-    await api("/api/subcategories", { method: "POST", body: formData(subcategoryForm) });
-    subcategoryForm.elements.name.value = "";
-    await loadClassifications();
-    renderClassifications();
-    setMessage(categoryMessage, "Subcategoria salva.", "success");
-  } catch (error) {
-    setMessage(categoryMessage, error.message, "error");
-  }
-}
-
-async function handleTagSubmit(event) {
-  event.preventDefault();
-  await createClassification("tags", tagForm, tagMessage);
-}
-
-async function handleLimitSubmit(event) {
-  event.preventDefault();
-  setMessage(limitMessage, "");
-  const data = formData(limitForm);
-  data.month = state.limitMonth;
-  const isEditing = Boolean(data.id);
-  try {
-    await api(isEditing ? `/api/spending-limits/${data.id}` : "/api/spending-limits", {
-      method: isEditing ? "PUT" : "POST",
-      body: data,
-    });
-    resetLimitForm();
-    await loadSpendingLimits();
-    await loadCurrentSpendingLimits();
-    renderLimits();
-    renderCockpit();
-    setMessage(limitMessage, "Limite salvo.", "success");
-  } catch (error) {
-    setMessage(limitMessage, error.message, "error");
-  }
-}
-
-function editSpendingLimit(limit) {
-  limitFormTitle.textContent = "Editar limite";
-  limitForm.elements.id.value = limit.id;
-  limitForm.elements.limit_amount.value = limit.limit_amount.replace(".", ",");
-  limitForm.elements.notes.value = limit.notes || "";
-  limitCategory.value = String(limit.category_id);
-  renderLimitSubcategories();
-  limitSubcategory.value = limit.subcategory_id ? String(limit.subcategory_id) : "";
-  cancelLimitEditButton.hidden = false;
-  limitForm.scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
-async function deleteSpendingLimit(id) {
-  try {
-    await api(`/api/spending-limits/${id}`, { method: "DELETE" });
-    await loadSpendingLimits();
-    await loadCurrentSpendingLimits();
-    renderLimits();
-    renderCockpit();
-    setMessage(limitMessage, "Limite excluído.", "success");
-  } catch (error) {
-    setMessage(limitMessage, error.message, "error");
-  }
-}
-
-function resetLimitForm() {
-  limitForm.reset();
-  limitForm.elements.id.value = "";
-  limitFormTitle.textContent = "Novo limite";
-  cancelLimitEditButton.hidden = true;
-  limitMonthInput.value = state.limitMonth;
-  renderLimitCategories();
-  setMessage(limitMessage, "");
-}
-
-async function createClassification(type, form, messageElement) {
-  setMessage(messageElement, "");
-  try {
-    await api(`/api/${type}`, { method: "POST", body: formData(form) });
-    form.reset();
-    await loadClassifications();
-    renderClassifications();
-    setMessage(messageElement, "Item salvo.", "success");
-  } catch (error) {
-    setMessage(messageElement, error.message, "error");
-  }
-}
-
-async function renameClassification(type, item) {
-  const label = type === "categories" ? "categoria" : "tag";
-  const name = window.prompt(`Renomear ${label}`, item.name);
-  if (name === null) {
-    return;
-  }
-  try {
-    await api(`/api/${type}/${item.id}`, { method: "PUT", body: { name } });
-    await loadClassifications();
-    renderClassifications();
-  } catch (error) {
-    setMessage(type === "categories" ? categoryMessage : tagMessage, error.message, "error");
-  }
-}
-
-async function deleteClassification(type, item) {
-  const messageElement = type === "categories" ? categoryMessage : tagMessage;
-  setMessage(messageElement, "");
-  try {
-    await api(`/api/${type}/${item.id}`, { method: "DELETE" });
-    await loadClassifications();
-    renderClassifications();
-    setMessage(messageElement, "Item excluído.", "success");
-  } catch (error) {
-    setMessage(messageElement, error.message, "error");
-  }
-}
-
-async function renameSubcategory(item) {
-  const name = window.prompt("Renomear subcategoria", item.name);
-  if (name === null) {
-    return;
-  }
-  try {
-    await api(`/api/subcategories/${item.id}`, { method: "PUT", body: { name } });
-    await loadClassifications();
-    renderClassifications();
-  } catch (error) {
-    setMessage(categoryMessage, error.message, "error");
-  }
-}
-
-async function deleteSubcategory(item) {
-  setMessage(categoryMessage, "");
-  try {
-    await api(`/api/subcategories/${item.id}`, { method: "DELETE" });
-    await loadClassifications();
-    renderClassifications();
-    setMessage(categoryMessage, "Subcategoria excluída.", "success");
-  } catch (error) {
-    setMessage(categoryMessage, error.message, "error");
-  }
 }
 
 async function archiveAccount(id) {
@@ -1797,40 +1687,7 @@ function renderCockpit() {
 }
 
 function renderLimitAlerts() {
-  const exceededRows = exceededCurrentLimitRows();
-  navButtons.forEach((button) => {
-    if (button.dataset.view === "limits") {
-      button.classList.toggle("has-alert", exceededRows.length > 0);
-    }
-  });
-  if (!cockpitLimitAlert) {
-    return;
-  }
-  if (exceededRows.length === 0) {
-    cockpitLimitAlert.hidden = true;
-    cockpitLimitAlert.innerHTML = "";
-    return;
-  }
-  const worst = exceededRows[0];
-  const overflowTotal = exceededRows.reduce((total, row) => total + Math.abs(row.remaining), 0);
-  cockpitLimitAlert.hidden = false;
-  cockpitLimitAlert.innerHTML = `
-    <button class="limit-alert-card" type="button" data-go-limits>
-      <span class="limit-alert-beacon" aria-hidden="true"></span>
-      <span>
-        <strong>${exceededRows.length} limite(s) estourado(s)</strong>
-        <small>Maior desvio: ${escapeHtml(worst.label)} em ${formatMoney(Math.abs(worst.remaining), "BRL")}. Total excedido: ${formatMoney(overflowTotal, "BRL")}.</small>
-      </span>
-      <b>Ver limites</b>
-    </button>
-  `;
-  cockpitLimitAlert.querySelector("[data-go-limits]").addEventListener("click", () => showModule("limits"));
-}
-
-function exceededCurrentLimitRows() {
-  return spendingLimitRows(state.currentSpendingLimits)
-    .filter((row) => row.percent > 1)
-    .sort((a, b) => Math.abs(b.remaining) - Math.abs(a.remaining));
+  limitsView.renderLimitAlerts();
 }
 
 function renderMonthlyPlanning() {
@@ -2805,183 +2662,15 @@ function selectedAccountVisibleTransactions(transactions = state.accountTransact
 }
 
 function renderClassifications() {
-  renderSubcategoryOptions();
-  renderClassificationList(categoryList, filteredClassificationCategories(), "categories");
-  renderClassificationList(tagList, state.tags, "tags");
+  classificationsView.renderClassifications();
 }
 
 function renderLimits() {
-  limitMonthLabel.textContent = formatMonthLabel(state.limitMonth);
-  limitMonthInput.value = state.limitMonth;
-  renderLimitCategories();
-  renderSpendingLimitList();
+  limitsView.renderLimits();
 }
 
 function renderReports() {
-  reportMonthLabel.textContent = formatMonthLabel(state.reportMonth);
-  reportTabs.forEach((button) => button.classList.toggle("active", button.dataset.reportTab === state.reportTab));
-  renderReportAccountOptions();
-  const items = reportItemsForMonth(state.reportMonth);
-  const totals = reportTotals(items);
-  const resultTotals = reportResultTotals(totals);
-  reportIncomeSummary.innerHTML = formatMoneyTotals(totals.income);
-  reportExpenseSummary.innerHTML = formatMoneyTotals(totals.expense);
-  reportInvestmentSummary.innerHTML = formatMoneyTotals(totals.investment);
-  reportResultSummary.innerHTML = formatMoneyTotals(resultTotals);
-  reportResultSummary.classList.toggle("danger-text", [...resultTotals.values()].some((total) => total < 0));
-  reportResultSummary.classList.toggle("positive-text", [...resultTotals.values()].some((total) => total > 0) && ![...resultTotals.values()].some((total) => total < 0));
-  reportAccountFilter.hidden = state.reportTab !== "accounts";
-  if (state.reportTab === "cashflow") {
-    renderCashflowReport(items);
-    return;
-  }
-  if (state.reportTab === "accounts") {
-    renderAccountsReport();
-    return;
-  }
-  if (state.reportTab === "tags") {
-    renderTagsReport(items);
-    return;
-  }
-  if (state.reportTab === "subcategories") {
-    renderSubcategoriesReport(items);
-    return;
-  }
-  renderCategoriesReport(items);
-}
-
-function renderReportAccountOptions() {
-  const options = state.accounts.map((account) => (
-    `<option value="${account.id}">${escapeHtml(account.name)} (${escapeHtml(account.currency)})</option>`
-  )).join("");
-  reportAccountSelect.innerHTML = options || '<option value="">Cadastre uma conta</option>';
-  reportAccountSelect.disabled = state.accounts.length === 0;
-  if (!state.accounts.some((account) => String(account.id) === String(state.reportAccountId))) {
-    state.reportAccountId = state.accounts[0] ? String(state.accounts[0].id) : "";
-  }
-  reportAccountSelect.value = state.reportAccountId;
-}
-
-function renderCategoriesReport(items) {
-  const sections = [
-    ["Despesas", "expense"],
-    ["Receitas", "income"],
-    ["Investimentos", "investment"],
-  ];
-  reportContent.innerHTML = sections.map(([title, type]) => (
-    reportRankedSection(title, groupReportItems(items.filter((item) => item.reportType === type), "category"), `Nenhum item em ${title.toLowerCase()} neste mês.`)
-  )).join("");
-}
-
-function renderSubcategoriesReport(items) {
-  const sections = [
-    ["Despesas", "expense"],
-    ["Receitas", "income"],
-    ["Investimentos", "investment"],
-  ];
-  reportContent.innerHTML = sections.map(([title, type]) => (
-    reportRankedSection(title, groupReportItems(items.filter((item) => item.reportType === type), "subcategory"), `Nenhuma subcategoria em ${title.toLowerCase()} neste mês.`)
-  )).join("");
-}
-
-function renderTagsReport(items) {
-  const taggedItems = [];
-  for (const item of items) {
-    for (const tag of item.tags) {
-      taggedItems.push({ ...item, tag });
-    }
-  }
-  const sections = [
-    ["Despesas", "expense"],
-    ["Receitas", "income"],
-    ["Investimentos", "investment"],
-  ];
-  reportContent.innerHTML = sections.map(([title, type]) => (
-    reportRankedSection(title, groupReportItems(taggedItems.filter((item) => item.reportType === type), "tag"), `Nenhuma tag em ${title.toLowerCase()} neste mês.`)
-  )).join("");
-}
-
-function renderCashflowReport(items) {
-  const rows = monthDayRows(state.reportMonth).map((dateKey) => {
-    const dayItems = items.filter((item) => item.date === dateKey);
-    const income = sumReportItems(dayItems, "income");
-    const expense = sumReportItems(dayItems, "expense");
-    const investment = sumReportItems(dayItems, "investment");
-    const result = reportResultTotals({ income, expense, investment });
-    return {
-      date: dateKey,
-      income,
-      expense,
-      investment,
-      result,
-    };
-  });
-  const running = new Map();
-  const body = rows.map((row) => {
-    mergeMoneyTotals(running, row.result);
-    return `
-      <tr>
-        <td>${formatDate(row.date)}</td>
-        <td class="money-cell positive-text">${formatMoneyTotals(row.income)}</td>
-        <td class="money-cell negative-text">${formatMoneyTotals(row.expense)}</td>
-        <td class="money-cell neutral-text">${formatMoneyTotals(row.investment)}</td>
-        <td class="money-cell ${moneyTotalsSignalClass(row.result)}">${formatMoneyTotals(row.result)}</td>
-        <td class="money-cell">${formatMoneyTotals(running)}</td>
-      </tr>
-    `;
-  }).join("");
-  reportContent.innerHTML = `
-    <div class="report-table-wrap">
-      <table class="report-table">
-        <thead>
-          <tr>
-            <th>Dia</th>
-            <th>Entradas</th>
-            <th>Despesas</th>
-            <th>Aportes</th>
-            <th>Resultado</th>
-            <th>Saldo do mês</th>
-          </tr>
-        </thead>
-        <tbody>${body}</tbody>
-      </table>
-    </div>
-  `;
-}
-
-function renderAccountsReport() {
-  const account = state.accounts.find((entry) => String(entry.id) === String(state.reportAccountId));
-  if (!account) {
-    reportContent.innerHTML = '<div class="empty-state">Cadastre uma conta para visualizar este relatório.</div>';
-    return;
-  }
-  const items = state.transactions
-    .filter((transaction) => transaction.date.startsWith(state.reportMonth))
-    .filter((transaction) => String(transaction.account_id) === String(account.id));
-  const reportItems = items.map(accountTransactionReportItem).filter(Boolean);
-  const totals = reportTotals(reportItems);
-  const rows = groupReportItems(reportItems, "category");
-  reportContent.innerHTML = `
-    <div class="account-report-header">
-      <div>
-        <span>Conta selecionada</span>
-        <strong>${escapeHtml(account.name)}</strong>
-      </div>
-      <div>
-        <span>Receitas</span>
-        <strong>${formatMoneyTotals(totals.income)}</strong>
-      </div>
-      <div>
-        <span>Saídas</span>
-        <strong>${formatMoneyTotals(combineMoneyTotals(totals.expense, totals.investment))}</strong>
-      </div>
-      <div>
-        <span>Resultado</span>
-        <strong>${formatMoneyTotals(reportResultTotals(totals))}</strong>
-      </div>
-    </div>
-    ${reportRankedSection("Movimentação por categoria", rows, "Nenhum lançamento nesta conta no mês.")}
-  `;
+  reportsView.renderReports();
 }
 
 function renderPortfolio() {
@@ -3665,436 +3354,6 @@ function portfolioClosePayload(position) {
   };
 }
 
-function reportRankedSection(title, rows, emptyText) {
-  const total = rows.reduce((sum, row) => {
-    mergeMoneyTotals(sum, row.totals);
-    return sum;
-  }, new Map());
-  const content = rows.length ? rows.map((row, index) => {
-    const percent = reportRowPercent(row, total);
-    const barPercent = percent ?? 0;
-    return `
-      <article class="report-rank-row" data-report-row>
-        <button class="report-rank-main" type="button" data-report-toggle aria-expanded="false">
-          <div>
-            <strong><i style="background:${chartColor(index)}"></i>${escapeHtml(row.label)}</strong>
-            <span>${row.count} lançamento(s)</span>
-          </div>
-          <div class="report-rank-value">
-            <strong>${formatMoneyTotals(row.totals)}</strong>
-            <span>${percent === null ? "Multimoeda" : formatPercent(percent)}</span>
-          </div>
-        </button>
-        <div class="report-bar"><span style="width:${Math.max(barPercent * 100, 2)}%; background:${chartColor(index)}"></span></div>
-        <div class="report-detail" data-report-detail hidden>${reportItemDetails(row.items)}</div>
-      </article>
-    `;
-  }).join("") : `<div class="empty-state compact">${emptyText}</div>`;
-  return `
-    <section class="report-section">
-      <div class="section-heading">
-        <h2>${escapeHtml(title)}</h2>
-        <strong>${formatMoneyTotals(total)}</strong>
-      </div>
-      <div class="report-rank-list">${content}</div>
-    </section>
-  `;
-}
-
-function reportItemsForMonth(month) {
-  const accountItems = state.transactions
-    .filter((transaction) => transaction.date.startsWith(month))
-    .map(accountTransactionReportItem)
-    .filter(Boolean);
-  const cardItems = state.cardTransactions
-    .filter((transaction) => (transaction.invoice_month || transaction.date.slice(0, 7)) === month)
-    .map(cardTransactionReportItem)
-    .filter(Boolean);
-  return [...accountItems, ...cardItems];
-}
-
-function accountTransactionReportItem(transaction) {
-  const reportType = isInvestmentTransaction(transaction)
-    ? "investment"
-    : transaction.type === "income" || transaction.type === "expense"
-      ? transaction.type
-      : "";
-  if (!reportType) {
-    return null;
-  }
-  return {
-    date: transaction.date,
-    reportType,
-    amount: Number(transaction.amount || 0),
-    currency: transaction.account_currency || "BRL",
-    description: transaction.description || "",
-    category: transaction.category_name || "Sem categoria",
-    subcategory: transaction.subcategory_name || "",
-    tag: "",
-    tags: Array.isArray(transaction.tags) ? transaction.tags : transaction.tag_name ? [transaction.tag_name] : [],
-    accountId: transaction.account_id,
-    accountName: transaction.account_name,
-    source: "Conta",
-  };
-}
-
-function cardTransactionReportItem(transaction) {
-  if (transaction.type !== "income" && transaction.type !== "expense") {
-    return null;
-  }
-  return {
-    date: transaction.date,
-    reportType: transaction.type,
-    amount: Number(transaction.amount),
-    currency: transaction.card_currency || "BRL",
-    description: transaction.description || "",
-    category: transaction.category_name || "Sem categoria",
-    subcategory: transaction.subcategory_name || "",
-    tag: "",
-    tags: Array.isArray(transaction.tags) ? transaction.tags : transaction.tag_name ? [transaction.tag_name] : [],
-    accountId: "",
-    accountName: transaction.credit_card_name || "Cartão",
-    source: "Cartão",
-  };
-}
-
-function reportTotals(items) {
-  return items.reduce((totals, item) => {
-    addMoneyTotal(totals[item.reportType], item.currency, item.amount);
-    return totals;
-  }, { income: new Map(), expense: new Map(), investment: new Map() });
-}
-
-function groupReportItems(items, key) {
-  const grouped = new Map();
-  for (const item of items) {
-    const label = reportGroupLabel(item, key);
-    if (!label) {
-      continue;
-    }
-    const current = grouped.get(label) || { label, totals: new Map(), sortTotal: 0, count: 0, items: [] };
-    addMoneyTotal(current.totals, item.currency, item.amount);
-    current.sortTotal += item.amount;
-    current.count += 1;
-    current.items.push(item);
-    grouped.set(label, current);
-  }
-  return [...grouped.values()].sort((a, b) => b.sortTotal - a.sortTotal || a.label.localeCompare(b.label));
-}
-
-function reportGroupLabel(item, key) {
-  if (key === "tag") {
-    return item.tag;
-  }
-  if (key === "subcategory") {
-    return `${item.category || "Sem categoria"} / ${item.subcategory || "Sem subcategoria"}`;
-  }
-  return item.category || "Sem categoria";
-}
-
-function sumReportItems(items, type) {
-  return items.reduce((total, item) => {
-    if (item.reportType === type) {
-      addMoneyTotal(total, item.currency, item.amount);
-    }
-    return total;
-  }, new Map());
-}
-
-function addMoneyTotal(totals, currency, amount) {
-  const key = currency || "BRL";
-  totals.set(key, (totals.get(key) || 0) + Number(amount || 0));
-  return totals;
-}
-
-function mergeMoneyTotals(target, source, signal = 1) {
-  for (const [currency, amount] of source.entries()) {
-    addMoneyTotal(target, currency, Number(amount) * signal);
-  }
-  return target;
-}
-
-function combineMoneyTotals(...sources) {
-  return sources.reduce((target, source) => mergeMoneyTotals(target, source), new Map());
-}
-
-function reportResultTotals(totals) {
-  const result = new Map();
-  mergeMoneyTotals(result, totals.income);
-  mergeMoneyTotals(result, totals.expense, -1);
-  mergeMoneyTotals(result, totals.investment, -1);
-  return result;
-}
-
-function formatMoneyTotals(totals) {
-  const rows = [...totals.entries()].filter(([, amount]) => Number(amount) !== 0);
-  if (!rows.length) {
-    return formatMoney(0, "BRL");
-  }
-  return rows
-    .sort(([currencyA], [currencyB]) => currencyA.localeCompare(currencyB))
-    .map(([currency, amount]) => `<span class="money-stack-line"><b>${escapeHtml(currency)}</b><em>${formatMoney(amount, currency)}</em></span>`)
-    .join("");
-}
-
-function moneyTotalsSignalClass(totals) {
-  const values = [...totals.values()];
-  if (values.some((value) => value < 0)) {
-    return "negative-text";
-  }
-  if (values.some((value) => value > 0)) {
-    return "positive-text";
-  }
-  return "";
-}
-
-function reportRowPercent(row, totals) {
-  const rowEntries = [...row.totals.entries()];
-  if (rowEntries.length !== 1) {
-    return null;
-  }
-  const [currency, amount] = rowEntries[0];
-  const total = totals.get(currency) || 0;
-  return total > 0 ? amount / total : 0;
-}
-
-function reportItemDetails(items) {
-  const rows = items
-    .slice()
-    .sort((a, b) => a.date.localeCompare(b.date) || a.description.localeCompare(b.description))
-    .map((item) => `
-      <tr>
-        <td>${formatDate(item.date)}</td>
-        <td>
-          <strong>${escapeHtml(item.description || item.category)}</strong>
-          <span>${escapeHtml(reportItemClassification(item))}</span>
-        </td>
-        <td>${escapeHtml(item.accountName || item.source)}</td>
-        <td class="money-cell">${formatMoney(item.amount, item.currency)}</td>
-      </tr>
-    `).join("");
-  return `
-    <div class="report-table-wrap">
-      <table class="report-table compact-report-table">
-        <thead>
-          <tr>
-            <th>Data</th>
-            <th>Lançamento</th>
-            <th>Origem</th>
-            <th>Valor</th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>
-  `;
-}
-
-function reportItemClassification(item) {
-  return [item.category, item.subcategory].filter(Boolean).join(" / ") || "Sem categoria";
-}
-
-function monthDayRows(month) {
-  const [year, monthNumber] = month.split("-").map(Number);
-  const lastDay = new Date(year, monthNumber, 0).getDate();
-  return Array.from({ length: lastDay }, (_, index) => (
-    `${year}-${String(monthNumber).padStart(2, "0")}-${String(index + 1).padStart(2, "0")}`
-  ));
-}
-
-function renderLimitCategories() {
-  const selectedCategory = limitCategory.value;
-  const expenseCategories = state.categories.filter((category) => category.group_type === "expense");
-  limitCategory.innerHTML = expenseCategories.map((category) => (
-    `<option value="${category.id}">${escapeHtml(category.name)}</option>`
-  )).join("") || '<option value="">Cadastre uma categoria de despesa</option>';
-  if (expenseCategories.some((category) => String(category.id) === selectedCategory)) {
-    limitCategory.value = selectedCategory;
-  }
-  limitCategory.disabled = expenseCategories.length === 0;
-  limitForm.querySelector('button[type="submit"]').disabled = expenseCategories.length === 0;
-  renderLimitSubcategories();
-}
-
-function renderLimitSubcategories() {
-  const category = state.categories.find((entry) => String(entry.id) === limitCategory.value);
-  const subcategories = category ? category.subcategories || [] : [];
-  const selectedSubcategory = limitSubcategory.value;
-  limitSubcategory.innerHTML = '<option value="">Categoria inteira</option>' + subcategories.map((subcategory) => (
-    `<option value="${subcategory.id}">${escapeHtml(subcategory.name)}</option>`
-  )).join("");
-  if (subcategories.some((subcategory) => String(subcategory.id) === selectedSubcategory)) {
-    limitSubcategory.value = selectedSubcategory;
-  }
-  limitSubcategory.disabled = subcategories.length === 0;
-}
-
-function renderSpendingLimitList() {
-  spendingLimitList.innerHTML = "";
-  const rows = spendingLimitRows();
-  renderLimitSummary(rows);
-  if (rows.length === 0) {
-    spendingLimitList.append(emptyState("Nenhum limite definido para este mês."));
-    return;
-  }
-  rows.forEach((row) => {
-    const item = document.createElement("article");
-    item.className = `spending-limit-item ${row.percent > 1 ? "over-limit" : ""}`;
-    item.innerHTML = `
-      <div class="limit-item-main">
-        <div>
-          <strong>${escapeHtml(row.categoryLabel)}</strong>
-          ${row.subcategoryLabel ? `<small class="limit-subcategory">${escapeHtml(row.subcategoryLabel)}</small>` : '<small class="limit-subcategory">Categoria inteira</small>'}
-          <span>${formatMoney(row.spent, "BRL")} de ${formatMoney(row.limit, "BRL")}</span>
-        </div>
-        <strong>${formatPercent(row.percent)}</strong>
-      </div>
-      <div class="limit-progress" aria-label="${escapeHtml(row.label)} consumido">
-        <span style="width:${Math.min(row.percent * 100, 100)}%"></span>
-      </div>
-      <div class="limit-item-footer">
-        <span>${row.remaining >= 0 ? "Disponível" : "Excedido"}: ${formatMoney(Math.abs(row.remaining), "BRL")}</span>
-        <div class="card-actions">
-          <button class="ghost small-button" type="button" data-action="edit">Editar</button>
-          <button class="danger small-button" type="button" data-action="delete">Excluir</button>
-        </div>
-      </div>
-    `;
-    item.querySelector('[data-action="edit"]').addEventListener("click", () => editSpendingLimit(row.limitRecord));
-    item.querySelector('[data-action="delete"]').addEventListener("click", () => deleteSpendingLimit(row.limitRecord.id));
-    spendingLimitList.append(item);
-  });
-}
-
-function renderLimitSummary(rows) {
-  const totals = rows.reduce((summary, row) => {
-    summary.spent += row.spent;
-    summary.limit += row.limit;
-    return summary;
-  }, { spent: 0, limit: 0 });
-  limitConsumedSummary.textContent = formatMoney(totals.spent, "BRL");
-  limitDefinedSummary.textContent = formatMoney(totals.limit, "BRL");
-  limitAvailableSummary.textContent = formatMoney(totals.limit - totals.spent, "BRL");
-  limitAvailableSummary.classList.toggle("danger-text", totals.spent > totals.limit && totals.limit > 0);
-}
-
-function spendingLimitRows(limits = state.spendingLimits) {
-  const spentIndex = buildSpendingLimitSpentIndex(limits);
-  return limits.map((limit) => {
-    const spent = spendingLimitSpentFromIndex(spentIndex, limit);
-    const limitAmount = Number(limit.limit_amount);
-    return {
-      limitRecord: limit,
-      label: limit.subcategory_name ? `${limit.category_name} / ${limit.subcategory_name}` : limit.category_name,
-      categoryLabel: limit.category_name,
-      subcategoryLabel: limit.subcategory_name || "",
-      spent,
-      limit: limitAmount,
-      percent: limitAmount > 0 ? spent / limitAmount : 0,
-      remaining: limitAmount - spent,
-    };
-  }).sort((a, b) => b.percent - a.percent || b.spent - a.spent);
-}
-
-function buildSpendingLimitSpentIndex(limits = state.spendingLimits) {
-  const months = new Set(limits.map((limit) => limit.month).filter(Boolean));
-  const index = new Map();
-  const addSpent = (month, categoryId, subcategoryId, amount) => {
-    const categoryKey = spendingLimitSpentKey(month, categoryId, "");
-    index.set(categoryKey, (index.get(categoryKey) || 0) + amount);
-    if (subcategoryId) {
-      const subcategoryKey = spendingLimitSpentKey(month, categoryId, subcategoryId);
-      index.set(subcategoryKey, (index.get(subcategoryKey) || 0) + amount);
-    }
-  };
-  state.transactions.forEach((transaction) => {
-    const month = transaction.date ? transaction.date.slice(0, 7) : "";
-    if (transaction.type !== "expense" || (months.size && !months.has(month))) {
-      return;
-    }
-    addSpent(month, transaction.category_id, transaction.subcategory_id, Number(transaction.amount_brl || transaction.amount));
-  });
-  state.cardTransactions.forEach((transaction) => {
-    const month = transaction.invoice_month || (transaction.date ? transaction.date.slice(0, 7) : "");
-    if (transaction.type !== "expense" || (months.size && !months.has(month))) {
-      return;
-    }
-    addSpent(month, transaction.category_id, transaction.subcategory_id, Number(transaction.amount_brl || transaction.amount));
-  });
-  return index;
-}
-
-function spendingLimitSpentFromIndex(index, limit) {
-  return index.get(spendingLimitSpentKey(limit.month, limit.category_id, limit.subcategory_id || "")) || 0;
-}
-
-function spendingLimitSpentKey(month, categoryId, subcategoryId) {
-  return `${month || ""}|${categoryId || ""}|${subcategoryId || ""}`;
-}
-
-function isCreditCardInvoicePaid(cardId, invoiceMonth) {
-  return state.cardPayments.some((payment) => (
-    String(payment.credit_card_id) === String(cardId) && payment.invoice_month === invoiceMonth
-  ));
-}
-
-function renderSubcategoryOptions() {
-  const categories = filteredClassificationCategories();
-  const options = categories.map((category) => (
-    `<option value="${category.id}">${escapeHtml(category.name)}</option>`
-  )).join("");
-  subcategoryCategory.innerHTML = options || '<option value="">Cadastre uma categoria neste grupo</option>';
-  subcategoryForm.querySelector('button[type="submit"]').disabled = categories.length === 0;
-}
-
-function filteredClassificationCategories() {
-  return state.categories.filter((category) => category.group_type === categoryGroup.value);
-}
-
-function renderClassificationList(container, items, type) {
-  container.innerHTML = "";
-  if (items.length === 0) {
-    container.append(emptyState(type === "categories" ? "Nenhuma categoria cadastrada." : "Nenhuma tag cadastrada."));
-    return;
-  }
-  items.forEach((item) => {
-    const row = document.createElement("article");
-    row.className = "classification-item";
-    const subcategories = type === "categories" ? item.subcategories || [] : [];
-    row.innerHTML = `
-      <div>
-        <strong>${escapeHtml(item.name)}</strong>
-        <span>${type === "categories" ? `${classificationGroupLabel(item.group_type)} · ` : ""}${item.transaction_count} lançamento(s)</span>
-      </div>
-      <div class="card-actions">
-        <button class="ghost small-button" type="button" data-action="rename">Renomear</button>
-        <button class="danger small-button" type="button" data-action="delete">Excluir</button>
-      </div>
-      ${subcategories.length ? `
-        <div class="subcategory-list">
-          ${subcategories.map((subcategory) => `
-            <div class="subcategory-item" data-subcategory-id="${subcategory.id}">
-              <span>${escapeHtml(subcategory.name)} · ${subcategory.transaction_count} lançamento(s)</span>
-              <div class="card-actions">
-                <button class="ghost small-button" type="button" data-action="rename-subcategory">Renomear</button>
-                <button class="danger small-button" type="button" data-action="delete-subcategory">Excluir</button>
-              </div>
-            </div>
-          `).join("")}
-        </div>
-      ` : ""}
-    `;
-    row.querySelector('[data-action="rename"]').addEventListener("click", () => renameClassification(type, item));
-    row.querySelector('[data-action="delete"]').addEventListener("click", () => deleteClassification(type, item));
-    row.querySelectorAll("[data-subcategory-id]").forEach((element) => {
-      const subcategory = subcategories.find((entry) => String(entry.id) === element.dataset.subcategoryId);
-      element.querySelector('[data-action="rename-subcategory"]').addEventListener("click", () => renameSubcategory(subcategory));
-      element.querySelector('[data-action="delete-subcategory"]').addEventListener("click", () => deleteSubcategory(subcategory));
-    });
-    container.append(row);
-  });
-}
-
 function renderTransactionCollection(container, transactions, compact) {
   container.innerHTML = "";
   if (transactions.length === 0) {
@@ -4400,23 +3659,6 @@ async function setTransactionMonth(month) {
   state.transactionMonth = month;
   await loadTransactionSlice();
   renderTransactions();
-}
-
-async function shiftLimitMonth(delta) {
-  state.limitMonth = shiftMonth(state.limitMonth, delta);
-  resetLimitForm();
-  await loadSpendingLimits();
-  renderLimits();
-}
-
-function shiftReportMonth(delta) {
-  state.reportMonth = shiftMonth(state.reportMonth, delta);
-  renderReports();
-}
-
-function switchReportTab(tab) {
-  state.reportTab = tab;
-  renderReports();
 }
 
 async function shiftCardInvoiceMonth(delta) {
