@@ -1,9 +1,0 @@
-{
-  "ciphertext": "HlNEVRBZLlODYvQ1Yj6ZrJD7HRwhQFksrXUJ1fj7S73jA9ad+f8C37FZFjZbnXI3BBx+Mafwigk5imaQvjEI42SIISrGTQExM+3134fs+4BqvtrQbbTh9oXB7TlhJRAeQ39IBk6LkqwPjFOm301k1IDMgvTDh2axD7iq3dx4+TE5S6TX",
-  "iterations": 310000,
-  "kdf": "pbkdf2_hmac_sha256",
-  "nonce": "Fomfy4N33KaoEKiUmzVMPA==",
-  "salt": "0ZF84jW+zSyjDkh9b94rFg==",
-  "tag": "DRALO10rjx9F1I5JZxDoA+KmTJkF9uj1zMe/HAdR5Ms=",
-  "version": 1
-}

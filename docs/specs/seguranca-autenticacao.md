@@ -15,6 +15,7 @@ Usuarios locais do Sistema Financeiro que protegem dados financeiros sensiveis p
 3. Apos repetidas falhas, novas tentativas recebem bloqueio temporario.
 4. Pedidos e confirmacoes de recuperacao de senha tambem respeitam limite persistente.
 5. Quando o app roda em HTTPS, o cookie de sessao recebe `Secure`.
+6. Requisicoes mutaveis sao aceitas apenas a partir dos hosts/origens locais esperados.
 
 ## Dados
 
@@ -33,6 +34,10 @@ Usuarios locais do Sistema Financeiro que protegem dados financeiros sensiveis p
 - Cookie de sessao usa `HttpOnly` e `SameSite=Lax`.
 - Cookie de sessao usa `Secure` somente quando `APP_URL`/URL publica estiver em HTTPS, para nao quebrar o app local em HTTP.
 - JWE nao sera adotado nesta entrega porque a sessao ja e opaca e validada no servidor.
+- Metodos mutaveis (`POST`, `PUT`, `DELETE`) validam `Host` e, quando enviado, `Origin`.
+- Hosts locais permitidos: `sistema-financeiro.localhost` e `127.0.0.1` na porta configurada em `APP_PORT`.
+- A origem definida em `APP_URL` tambem e aceita para permitir execucoes locais customizadas.
+- Respostas JSON e arquivos estaticos enviam headers defensivos: CSP com `frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin` e `Permissions-Policy` restritiva.
 
 ## API e dados
 
@@ -49,6 +54,9 @@ Usuarios locais do Sistema Financeiro que protegem dados financeiros sensiveis p
 - Dado um email valido em formato, quando pedidos de recuperacao excedem o limite, entao a proxima tentativa retorna `429 Too Many Requests`.
 - Dado `APP_URL` HTTP, o cookie nao contem `Secure`.
 - Dado `APP_URL` HTTPS, o cookie contem `Secure`.
+- Dado um `Origin` desconhecido em requisicao mutavel, a API retorna `403 Forbidden`.
+- Dado um `Host` fora da lista permitida em requisicao mutavel, a API retorna `403 Forbidden`.
+- Dado uma resposta JSON ou arquivo estatico, os headers defensivos sao enviados.
 - Tentativas de alterar recursos de outro usuario continuam retornando `404` nos dominios cobertos por teste.
 
 ## Fora de escopo

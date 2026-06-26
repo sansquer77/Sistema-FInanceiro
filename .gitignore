@@ -1,4 +1,3 @@
-```
 # Python
 __pycache__/
 *.pyc
@@ -17,6 +16,10 @@ __pycache__/
 # Editors
 .vscode/
 .idea/
-```
-*.db
+
+# Local runtime data
+data/*
+!data/.gitkeep
+
+# Local databases
 *.db

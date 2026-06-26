@@ -125,5 +125,28 @@ class SessionCookieTest(unittest.TestCase):
         self.assertIn("Secure", cookie)
 
 
+class RequestSourceProtectionTest(unittest.TestCase):
+    def test_allowed_hosts_include_local_hosts_on_expected_port(self) -> None:
+        with (
+            mock.patch.object(app, "PORT", 8020),
+            mock.patch.object(app, "PUBLIC_URL", "http://sistema-financeiro.localhost:8020"),
+        ):
+            self.assertIn("sistema-financeiro.localhost:8020", app.allowed_host_values())
+            self.assertIn("127.0.0.1:8020", app.allowed_host_values())
+
+    def test_disallows_unknown_origin(self) -> None:
+        handler = object.__new__(app.AppHandler)
+        with (
+            mock.patch.object(app, "PORT", 8020),
+            mock.patch.object(app, "PUBLIC_URL", "http://sistema-financeiro.localhost:8020"),
+        ):
+            self.assertTrue(handler.is_allowed_origin("http://sistema-financeiro.localhost:8020"))
+            self.assertFalse(handler.is_allowed_origin("http://evil.example:8020"))
+
+    def test_invalid_host_is_rejected_without_exception(self) -> None:
+        handler = object.__new__(app.AppHandler)
+        self.assertFalse(handler.is_allowed_host("sistema-financeiro.localhost:not-a-port"))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1088,6 +1088,41 @@
               <p class="message" id="passwordMessage" role="alert"></p>
             </section>
 
+            <section class="panel">
+              <h2>Recuperação por email</h2>
+              <p class="form-help">Configure o envio do código de recuperação neste Mac. Para Gmail ou Outlook, use uma senha de app.</p>
+              <form id="emailConfigForm" class="form">
+                <label>Provedor
+                  <select name="provider" id="emailConfigProvider">
+                    <option value="gmail">Gmail</option>
+                    <option value="outlook">Outlook / Microsoft</option>
+                    <option value="manual">Manual</option>
+                  </select>
+                </label>
+                <label>Email remetente
+                  <input name="sender" type="email" autocomplete="email" placeholder="seu-email@gmail.com" required>
+                </label>
+                <label>Senha de app
+                  <input name="password" type="password" autocomplete="new-password" placeholder="Senha de app do provedor" required>
+                </label>
+                <div class="email-config-manual-fields" id="emailConfigManualFields" hidden>
+                  <label>Servidor SMTP
+                    <input name="smtp_server" type="text" placeholder="smtp.exemplo.com">
+                  </label>
+                  <label>Porta
+                    <input name="smtp_port" type="number" min="1" max="65535" value="587">
+                  </label>
+                  <label class="checkbox-field">
+                    <input name="use_tls" type="checkbox" value="yes" checked>
+                    <span>Usar STARTTLS</span>
+                  </label>
+                </div>
+                <div class="email-config-preset" id="emailConfigPreset"></div>
+                <button class="primary" type="submit">Salvar configuração</button>
+              </form>
+              <p class="message" id="emailConfigMessage" role="alert"></p>
+            </section>
+
             <section class="panel danger-zone">
               <h2>Apagar lançamentos</h2>
               <p>Remove lançamentos de contas, cartões, pagamentos de faturas e posições do portfólio. Categorias, subcategorias, tags, contas e cartões serão preservados.</p>
@@ -1124,6 +1159,6 @@
         </div>
       </section>
     </main>
-    <script type="module" src="/app.js?v=94"></script>
+    <script type="module" src="/app.js?v=101"></script>
   </body>
 </html>

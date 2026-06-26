@@ -32,7 +32,7 @@ O Organizze serve como referencia de clareza: modulos financeiros separados, sal
 - Relatórios por categoria, subcategoria, conta, tag e fluxo diário, com detalhamento dos lançamentos.
 - Portfólio de investimentos com cotações integradas de mercado (ações, FIIs, criptos), indexadores do Banco Central (SGS para renda fixa), poupança, previdência privada, resgate, encerramento e ajuste manual de valor.
 - Importação de lançamentos do Organizze e planilhas modelo do próprio sistema (.xlsx).
-- Recuperação de senha por e-mail SMTP localmente configurado.
+- Recuperação de senha por e-mail SMTP localmente configurado, com assistente para Gmail e Outlook/Microsoft usando senha de app.
 
 ### Planejados
 
@@ -41,4 +41,4 @@ O Organizze serve como referencia de clareza: modulos financeiros separados, sal
 
 ## Estado atual
 
-O app já cobre todo o ciclo avançado de controle financeiro local: usuário entra, cadastra contas e cartões, define limites, cria categorias/tags, registra lançamentos normais, parcelados ou recorrentes, acompanha faturas, relatórios e Cockpit, realiza o acompanhamento de investimentos com precificação, valorização automática ou ajuste manual de ativos, e importa dados de planilhas locais. As próximas evoluções devem priorizar automações de conciliação/importação e refinamentos de precisão para classes específicas de ativos.
+O app já cobre todo o ciclo avançado de controle financeiro local: usuário entra, configura recuperação de senha por e-mail quando desejar, cadastra contas e cartões, define limites, cria categorias/tags, registra lançamentos normais, parcelados ou recorrentes, acompanha faturas, relatórios e Cockpit, realiza o acompanhamento de investimentos com precificação, valorização automática ou ajuste manual de ativos, e importa dados de planilhas locais. As próximas evoluções devem priorizar automações de conciliação/importação e refinamentos de precisão para classes específicas de ativos.

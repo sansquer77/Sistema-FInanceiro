@@ -20,6 +20,7 @@ Este roteiro organiza a evolucao do Sistema Financeiro para reproduzir localment
 5. Limites de gastos: metas por categoria e subcategoria mensais. Implementado.
 6. Investimentos e Portfólio: consolidação de ativos, cotações integradas de mercado, indexadores de renda fixa (SGS/BCB), poupança, previdência privada, resgate, encerramento e ajuste manual de valor. Implementado.
 7. Relatórios avançados e Visão Geral: relatórios dinâmicos e Cockpit integrando contas, cartões, limites, dívidas e portfólio. Implementado.
+8. Preferências e segurança: recuperação de senha com configuração SMTP local criptografada e assistente para Gmail/Outlook. Implementado.
 
 ## Sequencia recomendada de evolucao
 
@@ -69,3 +70,4 @@ A replica local nao precisa copiar a interface de nenhum produto externo. Ela de
 - Acompanhar limites de gastos.
 - Gerar relatorios por periodo, categoria, subcategoria, conta, tag e fluxo diário.
 - Usar Cockpit para visualizar saldos por moeda, planejamento recorrente, dívidas, maiores receitas/despesas e portfólio por tipo.
+- Distribuir o app sem banco, logs, chaves ou credenciais SMTP; cada instalação configura sua própria recuperação por e-mail.

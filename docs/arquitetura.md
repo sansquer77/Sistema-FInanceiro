@@ -51,6 +51,8 @@ Rotas atuais:
   - `POST /api/me/password`
   - `POST /api/me/clear-launches`
   - `DELETE /api/me`
+  - `GET /api/email-config`
+  - `POST /api/email-config`
 - **Contas-correntes**:
   - `GET /api/checking-accounts`
   - `GET /api/checking-accounts?status=archived`
@@ -125,7 +127,7 @@ Pacote `financeiro/`.
 - `portfolio.py`: consolidação de investimentos (ações, criptos, fundos, renda fixa, poupança), precificação integrada com Yahoo/CoinGecko, rendimento de renda fixa e poupança via SGS do Banco Central e aplicação de impostos regressivos (IOF/IR) quando aplicável.
 - `imports.py`: leitura de exportações Organizze e planilhas modelo do próprio sistema.
 - `emailer.py`: envio SMTP do código de recuperação de senha.
-- `secure_config.py`: armazenamento criptografado da configuração SMTP local.
+- `secure_config.py`: armazenamento criptografado da configuração SMTP local e presets assistidos para Gmail/Outlook.
 
 ## Persistência
 
@@ -177,6 +179,14 @@ Tabelas atuais:
 3. A senha é validada contra hash PBKDF2.
 4. Uma sessão é criada em `sessions`.
 5. A API grava cookie `session` com `HttpOnly` e `SameSite=Lax`.
+
+### Configuração de E-mail
+
+1. O usuário autenticado abre Preferências > Recuperação por email.
+2. `GET /api/email-config` retorna status, remetente configurado e presets disponíveis, sem expor senha de app.
+3. `POST /api/email-config` salva a configuração criptografada em `data/email_config.enc`.
+4. Presets conhecidos: Gmail (`smtp.gmail.com:587`) e Outlook/Microsoft (`smtp.office365.com:587`), ambos com STARTTLS.
+5. Configuração manual permite servidor SMTP, porta e uso de STARTTLS.
 
 ### Operação financeira
 
@@ -237,6 +247,6 @@ Tabelas atuais:
 - Sem framework web para manter o app simples e portável.
 - Sem dependências de frontend ou etapa de build.
 - SQLite como fonte de verdade local.
-- Configuração SMTP criptografada no próprio ambiente local.
+- Configuração SMTP criptografada no próprio ambiente local; pacotes distribuíveis nunca incluem credenciais SMTP e cada instalação configura seu próprio remetente.
 - Importador `.xls` implementado sem pacote externo para reduzir requisitos de instalação.
 - Integração de mercado leve em Python via chamadas de rede diretas a APIs públicas (Yahoo, CoinGecko, BCB).
