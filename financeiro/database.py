@@ -6,11 +6,70 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "data"
 DB_PATH = DATA_DIR / "finance.db"
+PERFORMANCE_INDEXES = (
+    "CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions (user_id, date)",
+    "CREATE INDEX IF NOT EXISTS idx_transactions_account ON transactions (account_id)",
+    "CREATE INDEX IF NOT EXISTS idx_transactions_user_account_date ON transactions (user_id, account_id, date)",
+    (
+        "CREATE INDEX IF NOT EXISTS idx_transactions_user_destination_date "
+        "ON transactions (user_id, destination_account_id, date)"
+    ),
+    "CREATE INDEX IF NOT EXISTS idx_transactions_user_series_date ON transactions (user_id, series_id, date)",
+    (
+        "CREATE INDEX IF NOT EXISTS idx_credit_card_transactions_user_card_invoice_date "
+        "ON credit_card_transactions (user_id, credit_card_id, invoice_month, date)"
+    ),
+    (
+        "CREATE INDEX IF NOT EXISTS idx_credit_card_transactions_user_invoice_date "
+        "ON credit_card_transactions (user_id, invoice_month, date)"
+    ),
+    (
+        "CREATE INDEX IF NOT EXISTS idx_credit_card_transactions_user_series_invoice_date "
+        "ON credit_card_transactions (user_id, series_id, invoice_month, date)"
+    ),
+    (
+        "CREATE INDEX IF NOT EXISTS idx_credit_card_payments_user_card_invoice "
+        "ON credit_card_payments (user_id, credit_card_id, invoice_month)"
+    ),
+    (
+        "CREATE INDEX IF NOT EXISTS idx_credit_card_payments_user_date "
+        "ON credit_card_payments (user_id, payment_date)"
+    ),
+    (
+        "CREATE INDEX IF NOT EXISTS idx_investment_operations_user "
+        "ON investment_operations (user_id, account_id, asset_type)"
+    ),
+    (
+        "CREATE INDEX IF NOT EXISTS idx_investment_opening_positions_user "
+        "ON investment_opening_positions (user_id, account_id, asset_type)"
+    ),
+    (
+        "CREATE INDEX IF NOT EXISTS idx_investment_redemptions_source "
+        "ON investment_redemptions (user_id, source_type, source_id)"
+    ),
+    (
+        "CREATE INDEX IF NOT EXISTS idx_investment_value_overrides_user "
+        "ON investment_value_overrides (user_id, account_id, asset_type)"
+    ),
+    (
+        "CREATE INDEX IF NOT EXISTS idx_investment_closed_positions_user "
+        "ON investment_closed_positions (user_id, account_id, asset_type, closed_at)"
+    ),
+    "CREATE INDEX IF NOT EXISTS idx_quote_cache_expires_at ON quote_cache (expires_at)",
+)
+
+
+class ManagedConnection(sqlite3.Connection):
+    def __exit__(self, exc_type, exc_value, traceback) -> bool:
+        try:
+            return super().__exit__(exc_type, exc_value, traceback)
+        finally:
+            self.close()
 
 
 def get_connection() -> sqlite3.Connection:
     DATA_DIR.mkdir(exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, factory=ManagedConnection)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
@@ -404,14 +463,12 @@ def initialize_database() -> None:
         migrate_transaction_type_constraint(conn)
         migrate_transaction_tags(conn)
         migrate_transaction_brl_values(conn)
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions (user_id, date)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_transactions_account ON transactions (account_id)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_investment_operations_user ON investment_operations (user_id, account_id, asset_type)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_investment_opening_positions_user ON investment_opening_positions (user_id, account_id, asset_type)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_investment_redemptions_source ON investment_redemptions (user_id, source_type, source_id)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_investment_value_overrides_user ON investment_value_overrides (user_id, account_id, asset_type)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_investment_closed_positions_user ON investment_closed_positions (user_id, account_id, asset_type, closed_at)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_quote_cache_expires_at ON quote_cache (expires_at)")
+        ensure_performance_indexes(conn)
+
+
+def ensure_performance_indexes(conn: sqlite3.Connection) -> None:
+    for statement in PERFORMANCE_INDEXES:
+        conn.execute(statement)
 
 
 def row_to_dict(row: sqlite3.Row | None) -> dict | None:

@@ -3,12 +3,13 @@ from __future__ import annotations
 from datetime import date, timedelta
 from http import HTTPStatus
 import re
+import sqlite3
 from uuid import uuid4
 
 from financeiro.accounts import SUPPORTED_CURRENCIES, cents_to_money, empty_to_none, money_to_cents
 from financeiro.categories import get_or_create_category, get_or_create_subcategory, get_or_create_tag, normalize_name
 from financeiro.database import get_connection, row_to_dict
-from financeiro.transactions import create_transaction, normalize_optional_tags
+from financeiro.transactions import create_transaction_with_conn, normalize_optional_tags
 
 CARD_TRANSACTION_TYPES = {"income", "expense"}
 CARD_SERIES_KINDS = {"single", "installment", "recurring"}
@@ -204,51 +205,55 @@ def create_credit_card(user_id: int, data: dict) -> dict:
 
 
 def create_credit_card_transaction(user_id: int, data: dict) -> dict:
-    transaction = normalize_card_transaction_payload(data)
     with get_connection() as conn:
-        card = get_active_credit_card(conn, user_id, transaction["credit_card_id"])
-        transaction["invoice_month"] = invoice_month_for_transaction_date(card, transaction["date"])
-        ensure_invoice_is_open(conn, user_id, card["id"], transaction["invoice_month"])
-        ensure_not_before_previous_closed_invoice(conn, user_id, card, transaction["invoice_month"], transaction["date"])
-        category_id = get_or_create_category(conn, user_id, transaction["category"], transaction["type"])
-        subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
-        tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
-        occurrences = build_card_transaction_occurrences(transaction)
-        series_id = str(uuid4()) if transaction["series_kind"] != "single" else None
-        first_transaction_id = None
-        for occurrence in occurrences:
-            ensure_invoice_is_open(conn, user_id, card["id"], occurrence["invoice_month"])
-            ensure_not_before_previous_closed_invoice(conn, user_id, card, occurrence["invoice_month"], occurrence["date"])
-            cursor = conn.execute(
-                """
-                INSERT INTO credit_card_transactions (
-                    user_id, credit_card_id, type, description, amount_cents, date,
-                    invoice_month, series_id, series_kind, installment_index,
-                    installment_count, recurrence_frequency, category_id, subcategory_id, notes
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    user_id,
-                    card["id"],
-                    transaction["type"],
-                    occurrence["description"],
-                    transaction["amount_cents"],
-                    occurrence["date"],
-                    occurrence["invoice_month"],
-                    series_id,
-                    transaction["series_kind"],
-                    occurrence["installment_index"],
-                    occurrence["installment_count"],
-                    transaction["recurrence_frequency"],
-                    category_id,
-                    subcategory_id,
-                    transaction["notes"],
-                ),
-            )
-            if first_transaction_id is None:
-                first_transaction_id = cursor.lastrowid
-            replace_credit_card_transaction_tags(conn, cursor.lastrowid, tag_ids)
-        row = fetch_card_transaction(conn, user_id, first_transaction_id)
+        return create_credit_card_transaction_with_conn(conn, user_id, data)
+
+
+def create_credit_card_transaction_with_conn(conn: sqlite3.Connection, user_id: int, data: dict) -> dict:
+    transaction = normalize_card_transaction_payload(data)
+    card = get_active_credit_card(conn, user_id, transaction["credit_card_id"])
+    transaction["invoice_month"] = invoice_month_for_transaction_date(card, transaction["date"])
+    ensure_invoice_is_open(conn, user_id, card["id"], transaction["invoice_month"])
+    ensure_not_before_previous_closed_invoice(conn, user_id, card, transaction["invoice_month"], transaction["date"])
+    category_id = get_or_create_category(conn, user_id, transaction["category"], transaction["type"])
+    subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
+    tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
+    occurrences = build_card_transaction_occurrences(transaction)
+    series_id = str(uuid4()) if transaction["series_kind"] != "single" else None
+    first_transaction_id = None
+    for occurrence in occurrences:
+        ensure_invoice_is_open(conn, user_id, card["id"], occurrence["invoice_month"])
+        ensure_not_before_previous_closed_invoice(conn, user_id, card, occurrence["invoice_month"], occurrence["date"])
+        cursor = conn.execute(
+            """
+            INSERT INTO credit_card_transactions (
+                user_id, credit_card_id, type, description, amount_cents, date,
+                invoice_month, series_id, series_kind, installment_index,
+                installment_count, recurrence_frequency, category_id, subcategory_id, notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                user_id,
+                card["id"],
+                transaction["type"],
+                occurrence["description"],
+                transaction["amount_cents"],
+                occurrence["date"],
+                occurrence["invoice_month"],
+                series_id,
+                transaction["series_kind"],
+                occurrence["installment_index"],
+                occurrence["installment_count"],
+                transaction["recurrence_frequency"],
+                category_id,
+                subcategory_id,
+                transaction["notes"],
+            ),
+        )
+        if first_transaction_id is None:
+            first_transaction_id = cursor.lastrowid
+        replace_credit_card_transaction_tags(conn, cursor.lastrowid, tag_ids)
+    row = fetch_card_transaction(conn, user_id, first_transaction_id)
     return format_card_transaction(row, card["currency"])
 
 
@@ -494,49 +499,49 @@ def pay_credit_card_invoice(user_id: int, data: dict) -> dict:
     account_id = normalize_card_id(data.get("account_id"))
     payment_date = normalize_date(data.get("payment_date"))
     notes = empty_to_none(data.get("notes"))
-    with get_connection() as conn:
-        card = get_active_credit_card(conn, user_id, card_id)
-        account = conn.execute(
-            """
-            SELECT id, name, currency
-            FROM checking_accounts
-            WHERE id = ? AND user_id = ? AND archived_at IS NULL
-            """,
-            (account_id, user_id),
-        ).fetchone()
-        if not account:
-            raise CreditCardError("Conta de pagamento nao encontrada.", HTTPStatus.NOT_FOUND)
-        if account["currency"] != card["currency"]:
-            raise CreditCardError("A conta de pagamento deve ter a mesma moeda do cartao.")
-        existing = conn.execute(
-            """
-            SELECT id
-            FROM credit_card_payments
-            WHERE user_id = ? AND credit_card_id = ? AND invoice_month = ?
-            """,
-            (user_id, card_id, invoice_month),
-        ).fetchone()
-        if existing:
-            raise CreditCardError("Esta fatura ja foi paga.", HTTPStatus.CONFLICT)
-        amount_cents = invoice_balance_cents(conn, user_id, card_id, invoice_month)
-    if amount_cents <= 0:
-        raise CreditCardError("Nao ha valor em aberto para pagar nesta fatura.")
-    payment_transaction = create_transaction(
-        user_id,
-        {
-            "type": "expense",
-            "description": f"Pagamento fatura {card['name']} {format_invoice_month(invoice_month)}",
-            "amount": cents_to_money(amount_cents).replace(".", ","),
-            "date": payment_date,
-            "account_id": str(account_id),
-            "category": "Serviços Financeiros e Impostos",
-            "subcategory": "Pagamento de Fatura de Cartão",
-            "tags": "Cartão de Crédito",
-            "notes": notes or f"Pagamento da fatura {invoice_month}.",
-        },
-    )
     try:
         with get_connection() as conn:
+            card = get_active_credit_card(conn, user_id, card_id)
+            account = conn.execute(
+                """
+                SELECT id, name, currency
+                FROM checking_accounts
+                WHERE id = ? AND user_id = ? AND archived_at IS NULL
+                """,
+                (account_id, user_id),
+            ).fetchone()
+            if not account:
+                raise CreditCardError("Conta de pagamento nao encontrada.", HTTPStatus.NOT_FOUND)
+            if account["currency"] != card["currency"]:
+                raise CreditCardError("A conta de pagamento deve ter a mesma moeda do cartao.")
+            existing = conn.execute(
+                """
+                SELECT id
+                FROM credit_card_payments
+                WHERE user_id = ? AND credit_card_id = ? AND invoice_month = ?
+                """,
+                (user_id, card_id, invoice_month),
+            ).fetchone()
+            if existing:
+                raise CreditCardError("Esta fatura ja foi paga.", HTTPStatus.CONFLICT)
+            amount_cents = invoice_balance_cents(conn, user_id, card_id, invoice_month)
+            if amount_cents <= 0:
+                raise CreditCardError("Nao ha valor em aberto para pagar nesta fatura.")
+            payment_transaction = create_transaction_with_conn(
+                conn,
+                user_id,
+                {
+                    "type": "expense",
+                    "description": f"Pagamento fatura {card['name']} {format_invoice_month(invoice_month)}",
+                    "amount": cents_to_money(amount_cents).replace(".", ","),
+                    "date": payment_date,
+                    "account_id": str(account_id),
+                    "category": "Serviços Financeiros e Impostos",
+                    "subcategory": "Pagamento de Fatura de Cartão",
+                    "tags": "Cartão de Crédito",
+                    "notes": notes or f"Pagamento da fatura {invoice_month}.",
+                },
+            )
             validate_preferred_payment_account(conn, user_id, card["preferred_payment_account_id"], card["currency"])
             cursor = conn.execute(
                 """
@@ -568,6 +573,8 @@ def pay_credit_card_invoice(user_id: int, data: dict) -> dict:
                 """,
                 (cursor.lastrowid, user_id),
             ).fetchone()
+    except CreditCardError:
+        raise
     except Exception as exc:
         if "UNIQUE constraint failed" in str(exc):
             raise CreditCardError("Esta fatura ja foi paga.", HTTPStatus.CONFLICT) from exc

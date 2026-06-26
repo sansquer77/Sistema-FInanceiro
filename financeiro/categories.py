@@ -157,51 +157,104 @@ def delete_tag(user_id: int, item_id: str) -> None:
 
 def list_named_items(table: str, user_id: int, group_type: object | None = None) -> list[dict]:
     ensure_allowed_table(table)
-    normalized_group = normalize_group_type(group_type, required=False) if table == "categories" else None
-    category_group_filter = "AND items.group_type = ?" if normalized_group else ""
-    params = [user_id, user_id, user_id] if table == "categories" else [user_id, user_id]
-    if normalized_group:
-        params.append(normalized_group)
-    usage_sql = {
-        "categories": category_usage_count_sql("items.id"),
-        "tags": """
-            SELECT (
-                SELECT COUNT(*)
-                FROM transaction_tags
-                JOIN transactions ON transactions.id = transaction_tags.transaction_id
-                WHERE transaction_tags.tag_id = items.id
-                    AND transactions.user_id = ?
-                    AND transactions.archived_at IS NULL
-            ) + (
-                SELECT COUNT(*)
-                FROM credit_card_transaction_tags
-                JOIN credit_card_transactions
-                    ON credit_card_transactions.id = credit_card_transaction_tags.credit_card_transaction_id
-                WHERE credit_card_transaction_tags.tag_id = items.id
-                    AND credit_card_transactions.user_id = ?
-                    AND credit_card_transactions.archived_at IS NULL
-            )
-        """,
-    }[table]
-    params = [user_id, user_id, user_id] if table == "tags" else params
+    if table == "categories":
+        return list_category_items(user_id, group_type)
+    return list_tag_items(user_id)
+
+
+def list_category_items(user_id: int, group_type: object | None = None) -> list[dict]:
+    normalized_group = normalize_group_type(group_type, required=False)
+    with get_connection() as conn:
+        if normalized_group:
+            rows = conn.execute(
+                """
+                SELECT
+                    categories.id,
+                    categories.name,
+                    categories.group_type,
+                    categories.created_at,
+                    (
+                        SELECT COUNT(*)
+                        FROM transactions
+                        WHERE transactions.category_id = categories.id
+                            AND transactions.user_id = ?
+                            AND transactions.archived_at IS NULL
+                    ) + (
+                        SELECT COUNT(*)
+                        FROM credit_card_transactions
+                        WHERE credit_card_transactions.category_id = categories.id
+                            AND credit_card_transactions.user_id = ?
+                            AND credit_card_transactions.archived_at IS NULL
+                    ) AS transaction_count
+                FROM categories
+                WHERE categories.user_id = ? AND categories.group_type = ?
+                ORDER BY categories.name COLLATE NOCASE
+                """,
+                (user_id, user_id, user_id, normalized_group),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT
+                    categories.id,
+                    categories.name,
+                    categories.group_type,
+                    categories.created_at,
+                    (
+                        SELECT COUNT(*)
+                        FROM transactions
+                        WHERE transactions.category_id = categories.id
+                            AND transactions.user_id = ?
+                            AND transactions.archived_at IS NULL
+                    ) + (
+                        SELECT COUNT(*)
+                        FROM credit_card_transactions
+                        WHERE credit_card_transactions.category_id = categories.id
+                            AND credit_card_transactions.user_id = ?
+                            AND credit_card_transactions.archived_at IS NULL
+                    ) AS transaction_count
+                FROM categories
+                WHERE categories.user_id = ?
+                ORDER BY categories.name COLLATE NOCASE
+                """,
+                (user_id, user_id, user_id),
+            ).fetchall()
+        items = [row_to_dict(row) for row in rows]
+        attach_subcategories(conn, user_id, items)
+    return items
+
+
+def list_tag_items(user_id: int) -> list[dict]:
     with get_connection() as conn:
         rows = conn.execute(
-            f"""
+            """
             SELECT
-                items.id,
-                items.name,
-                {"items.group_type," if table == "categories" else ""}
-                items.created_at,
-                ({usage_sql}) AS transaction_count
-            FROM {table} AS items
-            WHERE items.user_id = ? {category_group_filter}
-            ORDER BY items.name COLLATE NOCASE
+                tags.id,
+                tags.name,
+                tags.created_at,
+                (
+                    SELECT COUNT(*)
+                    FROM transaction_tags
+                    JOIN transactions ON transactions.id = transaction_tags.transaction_id
+                    WHERE transaction_tags.tag_id = tags.id
+                        AND transactions.user_id = ?
+                        AND transactions.archived_at IS NULL
+                ) + (
+                    SELECT COUNT(*)
+                    FROM credit_card_transaction_tags
+                    JOIN credit_card_transactions
+                        ON credit_card_transactions.id = credit_card_transaction_tags.credit_card_transaction_id
+                    WHERE credit_card_transaction_tags.tag_id = tags.id
+                        AND credit_card_transactions.user_id = ?
+                        AND credit_card_transactions.archived_at IS NULL
+                ) AS transaction_count
+            FROM tags
+            WHERE tags.user_id = ?
+            ORDER BY tags.name COLLATE NOCASE
             """,
-            tuple(params),
+            (user_id, user_id, user_id),
         ).fetchall()
         items = [row_to_dict(row) for row in rows]
-        if table == "categories":
-            attach_subcategories(conn, user_id, items)
     return items
 
 
@@ -257,10 +310,10 @@ def create_named_item(table: str, user_id: int, name: str, required_message: str
                 row = conn.execute("SELECT * FROM categories WHERE id = ? AND user_id = ?", (cursor.lastrowid, user_id)).fetchone()
                 return row_to_dict(row)
             cursor = conn.execute(
-                f"INSERT INTO {table} (user_id, name) VALUES (?, ?)",
+                "INSERT INTO tags (user_id, name) VALUES (?, ?)",
                 (user_id, normalized),
             )
-            row = conn.execute(f"SELECT * FROM {table} WHERE id = ? AND user_id = ?", (cursor.lastrowid, user_id)).fetchone()
+            row = conn.execute("SELECT * FROM tags WHERE id = ? AND user_id = ?", (cursor.lastrowid, user_id)).fetchone()
             return row_to_dict(row)
     except Exception as exc:
         if "UNIQUE constraint failed" in str(exc):
@@ -300,15 +353,17 @@ def update_category_name(user_id: int, item_id: str, name: str) -> dict:
 def update_named_item(table: str, user_id: int, item_id: str, name: str, required_message: str) -> dict:
     ensure_allowed_table(table)
     normalized = normalize_name(name, required_message)
+    if table == "categories":
+        return update_category_name(user_id, item_id, name)
     try:
         with get_connection() as conn:
             cursor = conn.execute(
-                f"UPDATE {table} SET name = ? WHERE id = ? AND user_id = ?",
+                "UPDATE tags SET name = ? WHERE id = ? AND user_id = ?",
                 (normalized, item_id, user_id),
             )
             if cursor.rowcount == 0:
                 raise ClassificationError("Item nao encontrado.", HTTPStatus.NOT_FOUND)
-            row = conn.execute(f"SELECT * FROM {table} WHERE id = ? AND user_id = ?", (item_id, user_id)).fetchone()
+            row = conn.execute("SELECT * FROM tags WHERE id = ? AND user_id = ?", (item_id, user_id)).fetchone()
             return row_to_dict(row)
     except ClassificationError:
         raise
@@ -349,7 +404,9 @@ def delete_named_item(table: str, user_id: int, item_id: str) -> None:
             raise ClassificationError("Nao e possivel excluir um item usado em lancamentos.")
         if table == "categories":
             clear_archived_category_references(conn, user_id, normalized_id)
-        cursor = conn.execute(f"DELETE FROM {table} WHERE id = ? AND user_id = ?", (normalized_id, user_id))
+            cursor = conn.execute("DELETE FROM categories WHERE id = ? AND user_id = ?", (normalized_id, user_id))
+        else:
+            cursor = conn.execute("DELETE FROM tags WHERE id = ? AND user_id = ?", (normalized_id, user_id))
         if cursor.rowcount == 0:
             raise ClassificationError("Item nao encontrado.", HTTPStatus.NOT_FOUND)
 
@@ -488,16 +545,10 @@ def get_or_create_named_item(conn, table: str, user_id: int, name: str, required
             (user_id, normalized, normalized_group),
         )
         return cursor.lastrowid
-    row = conn.execute(
-        f"SELECT id FROM {table} WHERE user_id = ? AND name = ?",
-        (user_id, normalized),
-    ).fetchone()
+    row = conn.execute("SELECT id FROM tags WHERE user_id = ? AND name = ?", (user_id, normalized)).fetchone()
     if row:
         return row["id"]
-    cursor = conn.execute(
-        f"INSERT INTO {table} (user_id, name) VALUES (?, ?)",
-        (user_id, normalized),
-    )
+    cursor = conn.execute("INSERT INTO tags (user_id, name) VALUES (?, ?)", (user_id, normalized))
     return cursor.lastrowid
 
 

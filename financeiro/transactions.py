@@ -4,6 +4,7 @@ from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from http import HTTPStatus
 import json
+import sqlite3
 from uuid import uuid4
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -118,64 +119,79 @@ def month_end_date(month: str) -> str:
 
 
 def create_transaction(user_id: int, data: dict) -> dict:
-    transaction = normalize_transaction_payload(data)
     with get_connection() as conn:
-        source = get_active_account(conn, user_id, transaction["account_id"])
-        if source["account_type"] == "wallet":
-            force_single_transaction(transaction)
-        occurrences = build_transaction_occurrences(transaction)
-        destination = None
-        if transaction["type"] == "transfer":
-            destination = get_active_account(conn, user_id, transaction["destination_account_id"])
-            ensure_transfer_accounts(source, destination)
-            normalize_transfer_amounts(transaction, source, destination)
-        exchange_rate_micros = resolve_exchange_rate_micros(source["currency"], transaction["date"], transaction["exchange_rate"])
-        amount_brl_cents = convert_to_brl_cents(transaction["amount_cents"], exchange_rate_micros)
-        category_id, subcategory_id = resolve_transaction_category(conn, user_id, transaction, destination)
-        tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
-        first_transaction_id = None
-        series_id = str(uuid4()) if transaction["series_kind"] != "single" else None
-        for occurrence in occurrences:
-            apply_balance_delta(conn, source["id"], balance_delta(transaction["type"], transaction["amount_cents"], "source"))
-            if destination:
-                apply_balance_delta(conn, destination["id"], balance_delta(transaction["type"], destination_balance_amount(transaction), "destination"))
-            cursor = conn.execute(
-                """
-                INSERT INTO transactions (
-                    user_id, type, description, amount_cents, destination_amount_cents,
-                    exchange_rate_micros, transfer_exchange_rate_micros, amount_brl_cents, date, account_id,
-                    destination_account_id, category_id, subcategory_id, series_id, series_kind, installment_index,
-                    installment_count, recurrence_frequency, notes
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    user_id,
-                    transaction["type"],
-                    occurrence["description"],
-                    transaction["amount_cents"],
-                    transaction["destination_amount_cents"],
-                    exchange_rate_micros,
-                    transaction["transfer_exchange_rate_micros"],
-                    amount_brl_cents,
-                    occurrence["date"],
-                    source["id"],
-                    destination["id"] if destination else None,
-                    category_id,
-                    subcategory_id,
-                    series_id,
-                    transaction["series_kind"],
-                    occurrence["installment_index"],
-                    occurrence["installment_count"],
-                    transaction["recurrence_frequency"],
-                    transaction["notes"],
-                ),
+        return create_transaction_with_conn(conn, user_id, data)
+
+
+def create_transaction_with_conn(conn: sqlite3.Connection, user_id: int, data: dict) -> dict:
+    transaction = normalize_transaction_payload(data)
+    source = get_active_account(conn, user_id, transaction["account_id"])
+    if source["account_type"] == "wallet":
+        force_single_transaction(transaction)
+    occurrences = build_transaction_occurrences(transaction)
+    destination = None
+    if transaction["type"] == "transfer":
+        destination = get_active_account(conn, user_id, transaction["destination_account_id"])
+        ensure_transfer_accounts(source, destination)
+        normalize_transfer_amounts(transaction, source, destination)
+    exchange_rate_micros = resolve_exchange_rate_micros(
+        source["currency"],
+        transaction["date"],
+        transaction["exchange_rate"],
+    )
+    amount_brl_cents = convert_to_brl_cents(transaction["amount_cents"], exchange_rate_micros)
+    category_id, subcategory_id = resolve_transaction_category(conn, user_id, transaction, destination)
+    tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
+    first_transaction_id = None
+    series_id = str(uuid4()) if transaction["series_kind"] != "single" else None
+    for occurrence in occurrences:
+        apply_balance_delta(
+            conn,
+            source["id"],
+            balance_delta(transaction["type"], transaction["amount_cents"], "source"),
+        )
+        if destination:
+            apply_balance_delta(
+                conn,
+                destination["id"],
+                balance_delta(transaction["type"], destination_balance_amount(transaction), "destination"),
             )
-            if first_transaction_id is None:
-                first_transaction_id = cursor.lastrowid
-            replace_transaction_tags(conn, cursor.lastrowid, tag_ids)
-            upsert_investment_operation(conn, user_id, cursor.lastrowid, source["id"], transaction)
-        row = fetch_transaction(conn, user_id, first_transaction_id)
-    return format_transaction(row)
+        cursor = conn.execute(
+            """
+            INSERT INTO transactions (
+                user_id, type, description, amount_cents, destination_amount_cents,
+                exchange_rate_micros, transfer_exchange_rate_micros, amount_brl_cents, date, account_id,
+                destination_account_id, category_id, subcategory_id, series_id, series_kind, installment_index,
+                installment_count, recurrence_frequency, notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                user_id,
+                transaction["type"],
+                occurrence["description"],
+                transaction["amount_cents"],
+                transaction["destination_amount_cents"],
+                exchange_rate_micros,
+                transaction["transfer_exchange_rate_micros"],
+                amount_brl_cents,
+                occurrence["date"],
+                source["id"],
+                destination["id"] if destination else None,
+                category_id,
+                subcategory_id,
+                series_id,
+                transaction["series_kind"],
+                occurrence["installment_index"],
+                occurrence["installment_count"],
+                transaction["recurrence_frequency"],
+                transaction["notes"],
+            ),
+        )
+        if first_transaction_id is None:
+            first_transaction_id = cursor.lastrowid
+        replace_transaction_tags(conn, cursor.lastrowid, tag_ids)
+        upsert_investment_operation(conn, user_id, cursor.lastrowid, source["id"], transaction)
+    return format_transaction(fetch_transaction(conn, user_id, first_transaction_id))
 
 
 def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
@@ -271,25 +287,83 @@ def update_future_series_transactions(conn, user_id: int, existing, transaction:
         """,
         (user_id, existing["series_id"], existing["id"], future_marker),
     ).fetchall()
+    if not future_rows:
+        return
+    source = get_active_account(conn, user_id, transaction["account_id"])
+    destination = None
+    if transaction["type"] == "transfer":
+        destination = get_active_account(conn, user_id, transaction["destination_account_id"])
+        ensure_transfer_accounts(source, destination)
+        normalize_transfer_amounts(transaction, source, destination)
+    exchange_rate_micros = resolve_exchange_rate_micros(
+        source["currency"],
+        transaction["date"],
+        transaction["exchange_rate"],
+    )
+    amount_brl_cents = convert_to_brl_cents(transaction["amount_cents"], exchange_rate_micros)
+    category_id, subcategory_id = resolve_transaction_category(conn, user_id, transaction, destination)
+    tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
+    source_balance_delta = balance_delta(transaction["type"], transaction["amount_cents"], "source")
+    destination_id = destination["id"] if destination else None
+    destination_balance_delta = (
+        balance_delta(transaction["type"], destination_balance_amount(transaction), "destination")
+        if destination
+        else 0
+    )
+    conn.execute("SAVEPOINT future_series_update")
+    try:
+        apply_future_series_updates(
+            conn,
+            user_id,
+            future_rows,
+            transaction,
+            date_delta,
+            source,
+            destination_id,
+            source_balance_delta,
+            destination_balance_delta,
+            exchange_rate_micros,
+            amount_brl_cents,
+            category_id,
+            subcategory_id,
+            tag_ids,
+        )
+    except Exception:
+        conn.execute("ROLLBACK TO SAVEPOINT future_series_update")
+        raise
+    finally:
+        conn.execute("RELEASE SAVEPOINT future_series_update")
+
+
+def apply_future_series_updates(
+    conn,
+    user_id: int,
+    future_rows,
+    transaction: dict,
+    date_delta: timedelta,
+    source,
+    destination_id: int | None,
+    source_balance_delta: int,
+    destination_balance_delta: int,
+    exchange_rate_micros: int,
+    amount_brl_cents: int,
+    category_id: int | None,
+    subcategory_id: int | None,
+    tag_ids: list[int],
+) -> None:
     for row in future_rows:
         row_date = date.fromisoformat(row["date"])
         future_transaction = {**transaction, "date": (row_date + date_delta).isoformat()}
-        source = get_active_account(conn, user_id, transaction["account_id"])
-        destination = None
-        if future_transaction["type"] == "transfer":
-            destination = get_active_account(conn, user_id, future_transaction["destination_account_id"])
-            ensure_transfer_accounts(source, destination)
-            normalize_transfer_amounts(future_transaction, source, destination)
-        exchange_rate_micros = resolve_exchange_rate_micros(source["currency"], future_transaction["date"], future_transaction["exchange_rate"])
-        amount_brl_cents = convert_to_brl_cents(future_transaction["amount_cents"], exchange_rate_micros)
-        category_id, subcategory_id = resolve_transaction_category(conn, user_id, future_transaction, destination)
-        tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in future_transaction["tags"]]
         apply_balance_delta(conn, row["account_id"], -balance_delta(row["type"], row["amount_cents"], "source"))
         if row["destination_account_id"]:
-            apply_balance_delta(conn, row["destination_account_id"], -balance_delta(row["type"], existing_destination_balance_amount(row), "destination"))
-        apply_balance_delta(conn, source["id"], balance_delta(future_transaction["type"], future_transaction["amount_cents"], "source"))
-        if destination:
-            apply_balance_delta(conn, destination["id"], balance_delta(future_transaction["type"], destination_balance_amount(future_transaction), "destination"))
+            apply_balance_delta(
+                conn,
+                row["destination_account_id"],
+                -balance_delta(row["type"], existing_destination_balance_amount(row), "destination"),
+            )
+        apply_balance_delta(conn, source["id"], source_balance_delta)
+        if destination_id:
+            apply_balance_delta(conn, destination_id, destination_balance_delta)
         conn.execute(
             """
             UPDATE transactions
@@ -309,7 +383,7 @@ def update_future_series_transactions(conn, user_id: int, existing, transaction:
                 amount_brl_cents,
                 future_transaction["date"],
                 source["id"],
-                destination["id"] if destination else None,
+                destination_id,
                 category_id,
                 subcategory_id,
                 future_transaction["notes"],

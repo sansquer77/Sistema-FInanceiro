@@ -87,6 +87,7 @@ HOST = os.environ.get("APP_HOST", "127.0.0.1")
 PORT = int(os.environ.get("APP_PORT", "8010"))
 PUBLIC_URL = os.environ.get("APP_URL", f"http://sistema-financeiro.localhost:{PORT}")
 LOCAL_ALLOWED_HOSTS = frozenset({"sistema-financeiro.localhost", "127.0.0.1"})
+MAX_JSON_BODY_BYTES = 1 * 1024 * 1024
 SECURITY_HEADERS = {
     "Content-Security-Policy": (
         "default-src 'self'; "
@@ -817,7 +818,14 @@ class AppHandler(BaseHTTPRequestHandler):
         return user
 
     def read_json(self) -> dict:
-        length = int(self.headers.get("Content-Length", 0))
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+        except ValueError as exc:
+            raise ApiError("Content-Length invalido.", HTTPStatus.BAD_REQUEST) from exc
+        if length < 0:
+            raise ApiError("Content-Length invalido.", HTTPStatus.BAD_REQUEST)
+        if length > MAX_JSON_BODY_BYTES:
+            raise ApiError("JSON muito grande. Envie ate 1 MB.", HTTPStatus.REQUEST_ENTITY_TOO_LARGE)
         if length == 0:
             return {}
         try:

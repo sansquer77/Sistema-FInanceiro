@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from io import BytesIO
 import tempfile
 import unittest
 from http import HTTPStatus
@@ -146,6 +147,37 @@ class RequestSourceProtectionTest(unittest.TestCase):
     def test_invalid_host_is_rejected_without_exception(self) -> None:
         handler = object.__new__(app.AppHandler)
         self.assertFalse(handler.is_allowed_host("sistema-financeiro.localhost:not-a-port"))
+
+
+class JsonBodyLimitTest(unittest.TestCase):
+    def test_read_json_rejects_invalid_content_length(self) -> None:
+        handler = json_handler("invalid", b"")
+
+        with self.assertRaises(app.ApiError) as error:
+            handler.read_json()
+
+        self.assertEqual(error.exception.status, HTTPStatus.BAD_REQUEST)
+
+    def test_read_json_rejects_oversized_body_before_reading(self) -> None:
+        handler = json_handler(str(app.MAX_JSON_BODY_BYTES + 1), b"")
+
+        with self.assertRaises(app.ApiError) as error:
+            handler.read_json()
+
+        self.assertEqual(error.exception.status, HTTPStatus.REQUEST_ENTITY_TOO_LARGE)
+
+    def test_read_json_accepts_body_at_configured_limit(self) -> None:
+        body = b'{"ok":true}'
+        handler = json_handler(str(len(body)), body)
+
+        self.assertEqual(handler.read_json(), {"ok": True})
+
+
+def json_handler(content_length: str, body: bytes):
+    handler = object.__new__(app.AppHandler)
+    handler.headers = {"Content-Length": content_length}
+    handler.rfile = BytesIO(body)
+    return handler
 
 
 if __name__ == "__main__":
