@@ -6,7 +6,7 @@
     <title>Sistema Financeiro</title>
     <link rel="icon" href="/assets/app-icon.png">
     <link rel="apple-touch-icon" href="/assets/app-icon.png">
-    <link rel="stylesheet" href="/styles.css?v=92">
+    <link rel="stylesheet" href="/styles.css?v=93">
   </head>
   <body>
     <main class="app-shell">
@@ -90,30 +90,66 @@
           <nav class="app-nav" aria-label="Modulos">
             <div class="nav-group">
               <span>Visão geral</span>
-              <button class="nav-button active" type="button" data-view="cockpit" data-short="CP" title="Cockpit">Cockpit</button>
+              <button class="nav-button active" type="button" data-view="cockpit" data-short="CP" title="Cockpit">
+                <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="8" rx="1.5"></rect><rect x="14" y="3" width="7" height="5" rx="1.5"></rect><rect x="14" y="12" width="7" height="9" rx="1.5"></rect><rect x="3" y="15" width="7" height="6" rx="1.5"></rect></svg>
+                <span class="nav-label">Cockpit</span>
+              </button>
             </div>
             <div class="nav-group">
               <span>Cadastro</span>
-              <button class="nav-button" type="button" data-view="accounts" data-short="CT" title="Contas">Contas</button>
-              <button class="nav-button" type="button" data-view="creditCards" data-short="CC" title="Cartões">Cartões</button>
+              <button class="nav-button" type="button" data-view="accounts" data-short="CT" title="Contas">
+                <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10h18"></path><path d="M5 10v9"></path><path d="M9 10v9"></path><path d="M15 10v9"></path><path d="M19 10v9"></path><path d="M3 19h18"></path><path d="M12 3 3 8h18Z"></path></svg>
+                <span class="nav-label">Contas</span>
+              </button>
+              <button class="nav-button" type="button" data-view="creditCards" data-short="CC" title="Cartões">
+                <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M3 10h18"></path><path d="M7 15h4"></path></svg>
+                <span class="nav-label">Cartões</span>
+              </button>
             </div>
             <div class="nav-group">
               <span>Lançamentos</span>
-              <button class="nav-button" type="button" data-view="transactions" data-short="LC" title="Lançamentos de contas">Contas</button>
-              <button class="nav-button" type="button" data-view="cardLaunches" data-short="LA" title="Lançamentos de cartões">Cartões</button>
+              <button class="nav-button" type="button" data-view="transactions" data-short="LC" title="Lançamentos de contas">
+                <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h14"></path><path d="m17 3 4 4-4 4"></path><path d="M17 17H3"></path><path d="m7 13-4 4 4 4"></path></svg>
+                <span class="nav-label">Contas</span>
+              </button>
+              <button class="nav-button" type="button" data-view="cardLaunches" data-short="LA" title="Lançamentos de cartões">
+                <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18H6z"></path><path d="M9 7h6"></path><path d="M9 11h6"></path><path d="M9 15h3"></path></svg>
+                <span class="nav-label">Cartões</span>
+              </button>
             </div>
             <div class="nav-group">
               <span>Gestão</span>
-              <button class="nav-button" type="button" data-view="portfolio" data-short="PF" title="Portfólio">Portfólio</button>
-              <button class="nav-button" type="button" data-view="limits" data-short="LM" title="Limites">Limites</button>
-              <button class="nav-button" type="button" data-view="reports" data-short="RL" title="Relatórios">Relatórios</button>
-              <button class="nav-button" type="button" data-view="classifications" data-short="CG" title="Categorias">Categorias</button>
-              <button class="nav-button" type="button" data-view="imports" data-short="IM" title="Importação">Importação</button>
+              <button class="nav-button" type="button" data-view="portfolio" data-short="PF" title="Portfólio">
+                <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"></rect><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path><path d="M3 12h18"></path></svg>
+                <span class="nav-label">Portfólio</span>
+              </button>
+              <button class="nav-button" type="button" data-view="limits" data-short="LM" title="Limites">
+                <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3"></path><path d="M12 19v3"></path><path d="M2 12h3"></path><path d="M19 12h3"></path></svg>
+                <span class="nav-label">Limites</span>
+              </button>
+              <button class="nav-button" type="button" data-view="reports" data-short="RL" title="Relatórios">
+                <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5"></path><path d="M4 19h17"></path><rect x="7" y="11" width="3" height="5" rx="1"></rect><rect x="12" y="7" width="3" height="9" rx="1"></rect><rect x="17" y="9" width="3" height="7" rx="1"></rect></svg>
+                <span class="nav-label">Relatórios</span>
+              </button>
+              <button class="nav-button" type="button" data-view="classifications" data-short="CG" title="Categorias">
+                <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h6v6H4z"></path><path d="M14 5h6v6h-6z"></path><path d="M4 15h6v4H4z"></path><path d="M14 15h6v4h-6z"></path></svg>
+                <span class="nav-label">Categorias</span>
+              </button>
+              <button class="nav-button" type="button" data-view="imports" data-short="IM" title="Importação">
+                <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4"></path><path d="m8 8 4-4 4 4"></path><path d="M20 16.5A3.5 3.5 0 0 0 16.5 13H16a5 5 0 0 0-9.6-1.8A4 4 0 0 0 8 19h10a3 3 0 0 0 2-5.2"></path></svg>
+                <span class="nav-label">Importação</span>
+              </button>
             </div>
             <div class="nav-group">
               <span>Usuário</span>
-              <button class="nav-button" type="button" data-view="user" data-short="PR" title="Preferências">Preferências</button>
-              <button class="nav-button logout-nav-button" id="logoutButton" type="button" data-short="SA" title="Sair">Sair</button>
+              <button class="nav-button" type="button" data-view="user" data-short="PR" title="Preferências">
+                <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.1 2.1-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V20h-3v-.2a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1-2.1-2.1.1-.1A1.7 1.7 0 0 0 5 15a1.7 1.7 0 0 0-1.6-1H3v-3h.4A1.7 1.7 0 0 0 5 10a1.7 1.7 0 0 0-.3-1.9l-.1-.1 2.1-2.1.1.1A1.7 1.7 0 0 0 8.7 6a1.7 1.7 0 0 0 1-1.6V4h3v.4a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1 2.1 2.1-.1.1A1.7 1.7 0 0 0 19 10a1.7 1.7 0 0 0 1.6 1h.4v3h-.4A1.7 1.7 0 0 0 19.4 15Z"></path></svg>
+                <span class="nav-label">Preferências</span>
+              </button>
+              <button class="nav-button logout-nav-button" id="logoutButton" type="button" data-short="SA" title="Sair">
+                <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5"></path><path d="M15 12H3"></path><path d="M13 4h6a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6"></path></svg>
+                <span class="nav-label">Sair</span>
+              </button>
             </div>
           </nav>
         </aside>

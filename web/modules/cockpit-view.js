@@ -97,7 +97,7 @@ export function registerCockpitView({
             <span>${escapeHtml(currency)}</span>
             <em>Previsto</em>
           </div>
-          <strong>${formatMoney(amounts.current, currency)}</strong>
+          <strong class="${amounts.current < 0 ? "danger-text" : ""}">${formatMoney(amounts.current, currency)}</strong>
         </div>
         <div class="currency-table" role="table" aria-label="Saldos em ${escapeHtml(currency)}">
           <div class="currency-table-head" role="row">
@@ -115,8 +115,8 @@ export function registerCockpitView({
   }
 
   function currencyTableRow(name, detail, amount, reconciled, currency, kind = "account") {
-    const amountClass = amount < 0 ? "danger-text" : amount > 0 ? "positive-text" : "";
-    const reconciledClass = reconciled < 0 ? "danger-text" : reconciled > 0 ? "positive-text" : "";
+    const amountClass = amount < 0 ? "danger-text" : "";
+    const reconciledClass = reconciled < 0 ? "danger-text" : "";
     return `
       <div class="currency-table-row ${kind}" role="row">
         <span><b>${escapeHtml(name)}</b></span>

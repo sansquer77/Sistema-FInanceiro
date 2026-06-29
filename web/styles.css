@@ -1,18 +1,25 @@
 :root {
   color-scheme: light;
-  --bg: #f6f7f9;
+  --bg: #faf8ff;
   --panel: #ffffff;
-  --ink: #1f2933;
-  --text: #1f2933;
-  --muted: #657282;
-  --line: #dce2e8;
-  --accent: #0f766e;
-  --accent-dark: #115e59;
-  --accent-strong: #115e59;
-  --danger: #b42318;
-  --bg-alt: #fbfcfd;
-  --soft: #e7f5f3;
-  --shadow: 0 18px 48px rgba(31, 41, 51, 0.08);
+  --surface-low: #f2f3ff;
+  --surface-container: #eaedff;
+  --surface-high: #e2e7ff;
+  --ink: #131b2e;
+  --text: #131b2e;
+  --muted: #434653;
+  --line: #c3c6d6;
+  --accent: #00328a;
+  --accent-dark: #00328a;
+  --accent-strong: #0047bb;
+  --secondary: #fe6b00;
+  --secondary-dark: #a04100;
+  --positive: #10b981;
+  --danger: #ef4444;
+  --bg-alt: #f2f3ff;
+  --soft: #dbe1ff;
+  --shadow: none;
+  --ambient-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
 }
 
 * {
@@ -25,6 +32,7 @@ body {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: var(--bg);
   color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
 
 button,
@@ -70,9 +78,10 @@ button:disabled {
   height: 56px;
   flex: 0 0 auto;
   overflow: hidden;
-  border-radius: 12px;
-  background: #071742;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: var(--accent);
+  box-shadow: var(--ambient-shadow);
 }
 
 .brand-mark img {
@@ -112,7 +121,7 @@ p {
 .transaction-form-panel {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 16px;
   box-shadow: var(--shadow);
 }
 
@@ -126,7 +135,7 @@ p {
   gap: 6px;
   padding: 4px;
   margin-bottom: 22px;
-  background: #eef2f4;
+  background: var(--surface-container);
   border-radius: 8px;
 }
 
@@ -172,7 +181,7 @@ textarea {
   width: 100%;
   min-height: 42px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 10px 12px;
   color: var(--ink);
   background: #fff;
@@ -194,7 +203,7 @@ textarea {
 input:focus,
 select:focus,
 textarea:focus {
-  outline: 3px solid rgba(15, 118, 110, 0.18);
+  outline: 2px solid rgba(0, 50, 138, 0.18);
   border-color: var(--accent);
 }
 
@@ -214,7 +223,7 @@ textarea:focus {
 }
 
 .primary:hover {
-  background: var(--accent-dark);
+  background: var(--accent-strong);
 }
 
 .ghost {
@@ -257,7 +266,7 @@ textarea:focus {
   display: grid;
   grid-template-columns: 236px minmax(0, 1fr);
   gap: 24px;
-  width: calc(100% - 32px);
+  width: min(1280px, calc(100% - 64px));
   margin: 0 auto;
   padding: 24px 0 48px;
   align-items: start;
@@ -280,7 +289,7 @@ textarea:focus {
   min-height: calc(100vh - 48px);
   padding: 18px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.92);
   box-shadow: var(--shadow);
   align-content: start;
@@ -347,7 +356,7 @@ textarea:focus {
 }
 
 .sidebar-toggle:hover {
-  border-color: rgba(15, 118, 110, 0.35);
+  border-color: rgba(0, 50, 138, 0.35);
   color: var(--accent-dark);
   background: var(--soft);
 }
@@ -420,15 +429,35 @@ textarea:focus {
   display: flex;
   align-items: center;
   justify-content: flex-start;
+  gap: 10px;
   min-height: 38px;
   width: 100%;
   padding: 0 12px;
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
-  color: #394756;
+  color: var(--muted);
   font-weight: 800;
   text-align: left;
+}
+
+.nav-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  color: var(--secondary);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.nav-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .app-sidebar.is-collapsed .app-nav {
@@ -443,24 +472,31 @@ textarea:focus {
   justify-content: center;
   min-height: 42px;
   padding: 0;
-  font-size: 0;
   text-align: center;
 }
 
-.app-sidebar.is-collapsed .nav-button::after {
-  content: attr(data-short);
-  font-size: 12px;
-  font-weight: 900;
+.app-sidebar.is-collapsed .nav-label {
+  display: none;
+}
+
+.app-sidebar.is-collapsed .nav-icon {
+  width: 20px;
+  height: 20px;
 }
 
 .nav-button:hover {
-  background: #eef2f4;
+  background: var(--surface-container);
+  color: var(--ink);
 }
 
 .nav-button.active {
-  color: var(--accent-dark);
-  background: var(--soft);
-  border-color: rgba(15, 118, 110, 0.2);
+  color: #ffffff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.nav-button.active .nav-icon {
+  color: #ffffff;
 }
 
 .nav-button.has-alert {
@@ -476,6 +512,10 @@ textarea:focus {
 }
 
 .logout-nav-button {
+  color: var(--danger);
+}
+
+.logout-nav-button .nav-icon {
   color: var(--danger);
 }
 
@@ -510,28 +550,28 @@ textarea:focus {
 }
 
 .summary-strip .kpi-income {
-  border-left-color: #0f766e;
+  border-left-color: var(--positive);
 }
 
 .summary-strip .kpi-income strong,
 .positive-text {
-  color: #0f766e;
+  color: var(--positive);
 }
 
 .summary-strip .kpi-expense {
-  border-left-color: #d97706;
+  border-left-color: var(--danger);
 }
 
 .summary-strip .kpi-expense strong {
-  color: #b45309;
+  color: var(--danger);
 }
 
 .summary-strip .kpi-investment {
-  border-left-color: #059669;
+  border-left-color: var(--positive);
 }
 
 .summary-strip .kpi-investment strong {
-  color: #047857;
+  color: var(--positive);
 }
 
 .summary-strip .kpi-rate {
@@ -624,7 +664,7 @@ textarea:focus {
 .currency-section {
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 12px;
   background: var(--bg-alt);
 }
 
@@ -635,7 +675,7 @@ textarea:focus {
   align-items: center;
   padding: 12px 14px;
   border-bottom: 1px solid var(--line);
-  background: #f8fbfa;
+  background: var(--surface-low);
 }
 
 .currency-section-header span {
@@ -676,7 +716,7 @@ textarea:focus {
 
 .currency-table-head {
   color: var(--ink);
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 900;
   letter-spacing: 0;
   text-transform: uppercase;
@@ -688,7 +728,7 @@ textarea:focus {
 }
 
 .currency-table-row.card {
-  background: #fffaf5;
+  background: #fff7ed;
 }
 
 .currency-table-row span {
@@ -832,7 +872,7 @@ textarea:focus {
 
 .planning-section-income .planning-section-header strong,
 .planning-section-income .planning-row strong {
-  color: #0f766e;
+  color: var(--positive);
 }
 
 .planning-section-expense .planning-section-header strong,
@@ -1220,7 +1260,7 @@ textarea:focus {
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 6px;
-  background: #f8fafc;
+  background: var(--surface-low);
 }
 
 .email-config-manual-fields[hidden] {
@@ -1233,7 +1273,7 @@ textarea:focus {
   padding: 10px 12px;
   border-left: 4px solid var(--accent);
   border-radius: 6px;
-  background: #f8fafc;
+  background: var(--surface-low);
   color: var(--muted);
   font-size: 13px;
   font-weight: 800;
@@ -1323,7 +1363,7 @@ textarea:focus {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fff;
-  box-shadow: var(--shadow);
+  box-shadow: var(--ambient-shadow);
 }
 
 .month-popover label {
@@ -1452,7 +1492,7 @@ textarea:focus {
   padding: 4px;
   margin-bottom: 16px;
   border-radius: 8px;
-  background: #eef2f4;
+  background: var(--surface-container);
 }
 
 .report-tab {
@@ -2053,7 +2093,7 @@ textarea:focus {
 
 .invoice-open-count.ok {
   background: #dcfce7;
-  color: #047857;
+  color: var(--positive);
 }
 
 .invoice-open-count.danger {
@@ -2455,9 +2495,9 @@ textarea:focus {
 }
 
 .reconcile-button.active {
-  border-color: #0f9f6e;
+  border-color: var(--positive);
   background: #dcfce7;
-  color: #047857;
+  color: var(--positive);
 }
 
 .daily-balance {
@@ -2476,7 +2516,7 @@ textarea:focus {
 }
 
 .daily-balance strong.positive-text {
-  color: #0f766e;
+  color: var(--positive);
 }
 
 .daily-balance strong.danger-text {
