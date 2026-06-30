@@ -81,6 +81,7 @@ const state = {
   portfolioCollapsedGroups: new Set(),
   portfolioAssetSaving: false,
   view: "cockpit",
+  cockpitRefreshRequestId: 0,
   transactionMonth: currentMonthValue(),
   limitMonth: currentMonthValue(),
   cardInvoiceMonth: currentMonthValue(),
@@ -901,6 +902,37 @@ async function loadCockpit() {
   state.cockpit = response;
 }
 
+async function refreshCockpitData() {
+  const requestId = ++state.cockpitRefreshRequestId;
+  const month = currentMonthValue();
+  const [
+    accountsResponse,
+    transactionsResponse,
+    cardTransactionsResponse,
+    cardPaymentsResponse,
+    cockpitResponse,
+  ] = await Promise.all([
+    api("/api/checking-accounts"),
+    api("/api/transactions"),
+    api("/api/credit-card-transactions"),
+    api("/api/credit-card-payments"),
+    api(`/api/cockpit?month=${encodeURIComponent(month)}`),
+  ]);
+  if (requestId !== state.cockpitRefreshRequestId) {
+    return;
+  }
+  state.accounts = accountsResponse.accounts || [];
+  ensureSelectedAccount();
+  state.transactions = transactionsResponse.transactions || [];
+  state.cardTransactions = cardTransactionsResponse.transactions || [];
+  state.cardPayments = cardPaymentsResponse.payments || [];
+  state.cockpit = cockpitResponse;
+  renderBaseViews();
+  if (state.view === "cockpit") {
+    renderCockpit();
+  }
+}
+
 async function loadPortfolio(options = {}) {
   await portfolioView.loadPortfolio(options);
 }
@@ -971,6 +1003,10 @@ function showModule(view) {
   renderLimitAlerts();
   moduleEyebrow.textContent = viewTitles[view][0];
   pageTitle.textContent = viewTitles[view][1];
+  if (view === "cockpit") {
+    renderCockpit();
+    refreshCockpitData().catch((error) => console.error(error));
+  }
   if (view === "transactions") {
     ensureSelectedAccount();
     renderTransactionAccounts();
