@@ -491,8 +491,75 @@ export function registerReportsView({
       const res = await api(url.pathname + url.search);
       drawEvolutionChart(res.evolution || [], context.color);
     } catch (err) {
+      const fallback = localCategoryEvolution(context, period);
+      if (fallback.length) {
+        drawEvolutionChart(fallback, context.color);
+        chartTrend.textContent = [chartTrend.textContent, "Dados locais"].filter(Boolean).join(" · ");
+        return;
+      }
       chartTotal.textContent = "Erro ao carregar";
+      chartTrend.textContent = err.message || "Nao foi possivel carregar a evolucao.";
     }
+  }
+
+  function localCategoryEvolution(context, period) {
+    if (!context.categoryId) {
+      return [];
+    }
+    const months = evolutionMonths(period);
+    const allowedMonths = new Set(months);
+    const totals = new Map(months.map((month) => [month, 0]));
+    for (const transaction of state.transactions) {
+      addLocalEvolutionTransaction(totals, allowedMonths, context, transaction, transaction.date?.slice(0, 7));
+    }
+    for (const transaction of state.cardTransactions) {
+      addLocalEvolutionTransaction(totals, allowedMonths, context, transaction, transaction.invoice_month || transaction.date?.slice(0, 7));
+    }
+    if (period === "all") {
+      return [...totals.entries()]
+        .filter(([, total]) => total !== 0)
+        .sort(([monthA], [monthB]) => monthA.localeCompare(monthB))
+        .map(([month, total_cents]) => ({ month, total_cents }));
+    }
+    return months.map((month) => ({ month, total_cents: totals.get(month) || 0 }));
+  }
+
+  function addLocalEvolutionTransaction(totals, allowedMonths, context, transaction, month) {
+    if (!month || String(transaction.category_id || "") !== String(context.categoryId || "")) {
+      return;
+    }
+    if (context.subcategoryId && String(transaction.subcategory_id || "") !== String(context.subcategoryId)) {
+      return;
+    }
+    if (!totals.has(month)) {
+      if (!allowedMonths.size) {
+        totals.set(month, 0);
+      } else {
+        return;
+      }
+    }
+    totals.set(month, (totals.get(month) || 0) + moneyToCents(transaction.amount));
+  }
+
+  function evolutionMonths(period) {
+    if (period === "all") {
+      return [];
+    }
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    if (period === "ytd") {
+      const months = [];
+      for (let index = 1; index <= now.getMonth() + 1; index += 1) {
+        months.push(`${now.getFullYear()}-${String(index).padStart(2, "0")}`);
+      }
+      return months;
+    }
+    const count = period === "3m" ? 3 : period === "6m" ? 6 : 12;
+    return Array.from({ length: count }, (_, index) => shiftMonth(currentMonth, index - count + 1));
+  }
+
+  function moneyToCents(value) {
+    return Math.round(Number(value || 0) * 100);
   }
 
   function drawEvolutionChart(data, color) {

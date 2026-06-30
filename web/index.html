@@ -6,7 +6,7 @@
     <title>Sistema Financeiro</title>
     <link rel="icon" href="/assets/app-icon.png">
     <link rel="apple-touch-icon" href="/assets/app-icon.png">
-    <link rel="stylesheet" href="/styles.css?v=101">
+    <link rel="stylesheet" href="/styles.css?v=102">
   </head>
   <body>
     <main class="app-shell">
@@ -1197,6 +1197,40 @@
         </div>
       </section>
 
+      <!-- Cockpit Forecast Drawer -->
+      <aside id="forecastDrawer" class="drawer" hidden aria-hidden="true">
+        <div class="drawer-overlay" id="forecastDrawerCloseOverlay"></div>
+        <div class="drawer-content">
+          <header class="drawer-header">
+            <div>
+              <p class="eyebrow">Previsão</p>
+              <h2 id="forecastDrawerTitle">Conta</h2>
+            </div>
+            <button class="drawer-close-button" id="forecastDrawerCloseBtn" type="button" aria-label="Fechar gráfico" title="Fechar">
+              <span aria-hidden="true">×</span>
+            </button>
+          </header>
+          <div class="drawer-body">
+            <div class="evolution-trend-controls">
+              <label class="evolution-forecast-select">Período
+                <select id="forecastMonthsSelect">
+                  <option value="3">3 meses</option>
+                  <option value="6">6 meses</option>
+                  <option value="12">12 meses</option>
+                </select>
+              </label>
+            </div>
+            <div class="evolution-chart-container">
+              <div class="evolution-chart-header">
+                <span class="trend-text">Projeção de saldo</span>
+              </div>
+              <svg id="forecastSvg" class="evolution-svg" viewBox="0 0 100 50" preserveAspectRatio="none"></svg>
+              <div id="forecastXLabels" class="evolution-x-labels"></div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
       <!-- Category Evolution Drawer -->
       <aside id="evolutionDrawer" class="drawer" hidden aria-hidden="true">
         <div class="drawer-overlay" id="evolutionDrawerCloseOverlay"></div>
@@ -1243,6 +1277,6 @@
         </div>
       </aside>
     </main>
-    <script type="module" src="/app.js?v=101"></script>
+    <script type="module" src="/app.js?v=102"></script>
   </body>
 </html>
