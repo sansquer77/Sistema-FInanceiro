@@ -6,7 +6,7 @@
     <title>Sistema Financeiro</title>
     <link rel="icon" href="/assets/app-icon.png">
     <link rel="apple-touch-icon" href="/assets/app-icon.png">
-    <link rel="stylesheet" href="/styles.css?v=99">
+    <link rel="stylesheet" href="/styles.css?v=101">
   </head>
   <body>
     <main class="app-shell">
@@ -1206,8 +1206,8 @@
               <p class="eyebrow">Evolução</p>
               <h2 id="evolutionDrawerTitle">Categoria</h2>
             </div>
-            <button class="icon-btn" id="evolutionDrawerCloseBtn" aria-label="Fechar" title="Fechar">
-              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <button class="drawer-close-button" id="evolutionDrawerCloseBtn" type="button" aria-label="Fechar gráfico" title="Fechar">
+              <span aria-hidden="true">×</span>
             </button>
           </header>
           <div class="drawer-body">
@@ -1217,6 +1217,19 @@
               <button type="button" class="evolution-filter-btn active" data-period="12m">12M</button>
               <button type="button" class="evolution-filter-btn" data-period="ytd">YTD</button>
               <button type="button" class="evolution-filter-btn" data-period="all">All</button>
+            </div>
+            <div class="evolution-trend-controls">
+              <label class="evolution-trend-toggle">
+                <input id="evolutionSmaToggle" type="checkbox">
+                <span>Tendência SMA</span>
+              </label>
+              <label class="evolution-forecast-select">Projetar
+                <select id="evolutionForecastMonths">
+                  <option value="3">3 meses</option>
+                  <option value="6">6 meses</option>
+                  <option value="12">12 meses</option>
+                </select>
+              </label>
             </div>
             <div class="evolution-chart-container">
               <div class="evolution-chart-header">
