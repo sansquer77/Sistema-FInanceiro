@@ -5,7 +5,8 @@ export function parseDecimalInput(value) {
 }
 
 export function formatMoney(value, currency) {
-  const amount = Number(value);
+  const parsed = Number(value);
+  const amount = Math.abs(parsed) < 0.005 ? 0 : parsed;
   return amount.toLocaleString("pt-BR", { style: "currency", currency });
 }
 

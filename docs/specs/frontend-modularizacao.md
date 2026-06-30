@@ -2,8 +2,8 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 1.0
-atualizado: 2026-06-29
+versao: 1.1
+atualizado: 2026-06-30
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
   - "[[arquitetura]]"
@@ -14,7 +14,7 @@ aliases: ["Modularização Frontend", "ES Modules"]
 # Modularização do Frontend
 
 > [!info] Status
-> **implementado** · área: `frontend` · atualizado em 2026-06-29 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]]
+> **implementado** · área: `frontend` · atualizado em 2026-06-30 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]]
 
 ## Problema
 
@@ -55,7 +55,7 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `imports-view.js` | Upload, download de modelo e resultado da importação. |
 | `cockpit-view.js` | Resumo, saldos, planejamento, dívidas, portfólio e alertas. |
 | `accounts-view.js` | Contas: cadastro, edição, arquivamento e restauração. |
-| `cards-view.js` | Cartões: cadastro, faturas, pagamento e conciliação. |
+| `cards-view.js` | Cartões: cadastro, faturas, busca/filtro da fatura, pagamento e conciliação. |
 | `portfolio-view.js` | Ativos: posições, histórico, resgate e encerramento. |
 | `transactions-view.js` | Lançamentos: formulário, recorrência, parcelas e câmbio. |
 
@@ -101,6 +101,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 ## Changelog
 
 - `1.0` — 2026-06-29 — Frontmatter e critérios formalizados; referência cruzada com ADR.
+- `1.1` — 2026-06-30 — Responsabilidade de busca/filtro da fatura registrada em `cards-view.js`.
 
 ## Relacionados
 

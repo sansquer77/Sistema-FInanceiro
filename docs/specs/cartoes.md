@@ -2,8 +2,8 @@
 tipo: spec
 area: cartoes
 status: implementado
-versao: 1.0
-atualizado: 2026-06-29
+versao: 1.1
+atualizado: 2026-06-30
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -18,7 +18,7 @@ aliases: ["Cartões de Crédito", "Faturas"]
 # Cartões de Crédito
 
 > [!info] Status
-> **implementado** · área: `cartoes` · atualizado em 2026-06-29 · relacionados: [[contas-correntes]], [[lancamentos]], [[limites-gastos]], [[relatorios]]
+> **implementado** · área: `cartoes` · atualizado em 2026-06-30 · relacionados: [[contas-correntes]], [[lancamentos]], [[limites-gastos]], [[relatorios]]
 
 ## Problema
 
@@ -34,8 +34,9 @@ Qualquer usuário autenticado localmente que utilize cartões de crédito para d
 2. Registra despesas e receitas no cartão, associadas a uma fatura mensal (`AAAA-MM`).
 3. Acompanha a fatura em aberto com lançamentos e saldo consolidado.
 4. Realiza a conciliação (`reconciled_at`) de transações contra a fatura oficial.
-5. Move lançamentos entre faturas anterior/próxima quando necessário.
-6. Paga a fatura escolhendo uma conta-corrente de mesma moeda; o sistema gera automaticamente uma despesa na conta de pagamento.
+5. Filtra a lista da fatura por todos, não conciliados ou conciliados, e busca lançamentos por texto.
+6. Move lançamentos entre faturas anterior/próxima quando necessário.
+7. Paga a fatura escolhendo uma conta-corrente de mesma moeda; o sistema gera automaticamente uma despesa na conta de pagamento.
 
 ## Dados
 
@@ -77,6 +78,8 @@ Qualquer usuário autenticado localmente que utilize cartões de crédito para d
 - A conta preferencial de pagamento, quando informada, deve ter a mesma moeda do cartão.
 - Lançamentos de cartão podem ser únicos, parcelados ou recorrentes.
 - A fatura exibe total atual, total conciliado e contador de lançamentos não conciliados.
+- A lista de lançamentos da fatura permite busca por descrição, categoria, subcategoria, tag, observação, data, tipo ou valor.
+- O filtro de conciliação da fatura alterna entre todos, não conciliados e conciliados sem alterar os totais da fatura.
 - Cartões arquivados não podem receber novos lançamentos, mas podem ser restaurados.
 - Lançamentos de cartão entram em relatórios e limites pela competência da fatura (`invoice_month`), não pela data da compra. Ver [[relatorios]], [[limites-gastos]].
 
@@ -108,12 +111,15 @@ Tabelas: `credit_cards`, `credit_card_transactions`, `credit_card_payments`, `cr
 - Dado uma fatura em aberto, quando consultada, o total soma seus lançamentos.
 - Dado uma fatura paga, quando o usuário tenta adicionar um lançamento a ela, a operação é bloqueada.
 - Dado um lançamento conciliado, quando exibido, o status de verificado persiste.
+- Dado uma fatura com lançamentos, quando o usuário busca por texto, a lista exibe apenas os lançamentos correspondentes sem alterar o total da fatura.
+- Dado uma fatura com lançamentos conciliados e não conciliados, quando o usuário troca o filtro de conciliação, a lista exibe apenas o status escolhido.
 - Dado o pagamento de uma fatura, quando executado, o saldo da conta escolhida é reduzido pelo valor da fatura e a fatura é marcada como paga.
 - Dado lançamentos recorrentes de cartão, quando listados no Cockpit, aparecem pela competência da fatura.
 
 ## Changelog
 
 - `1.0` — 2026-06-29 — Frontmatter e critérios formalizados.
+- `1.1` — 2026-06-30 — Busca textual e filtro de conciliação na lista da fatura.
 
 ## Relacionados
 

@@ -2305,6 +2305,51 @@ textarea:focus {
   font-size: 17px;
 }
 
+.invoice-list-toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 12px;
+}
+
+.invoice-list-toolbar .transaction-search {
+  margin-bottom: 0;
+}
+
+.segmented-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 38px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-low);
+}
+
+.segmented-control button {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.segmented-control button:hover {
+  background: var(--surface-container);
+  color: var(--text);
+}
+
+.segmented-control button.active {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
 .invoice-open-count {
   display: inline-flex;
   align-items: center;
@@ -2829,12 +2874,21 @@ textarea:focus {
   .portfolio-summary,
   .portfolio-grid,
   .account-report-header,
+  .invoice-list-toolbar,
   .card-invoice-summary,
   .cockpit-grid,
   .classification-grid,
   .import-summary,
   .user-settings-grid {
     grid-template-columns: 1fr;
+  }
+
+  .invoice-status-filter {
+    justify-self: stretch;
+  }
+
+  .invoice-status-filter button {
+    flex: 1;
   }
 
   .dashboard {

@@ -7,6 +7,7 @@ export function registerCardsView({
   setMessage,
   emptyState,
   escapeHtml,
+  normalizeSearch,
   formatMoney,
   formatDate,
   formatMonthLabel,
@@ -50,6 +51,8 @@ export function registerCardsView({
     payCardInvoiceButton,
     cardInvoiceMessage,
     cardInvoiceOpenCount,
+    cardInvoiceSearch,
+    cardInvoiceStatusFilterButtons,
     cardTransactionForm,
     cardTransactionFormTitle,
     cardTransactionType,
@@ -69,6 +72,19 @@ export function registerCardsView({
   creditCardForm.elements.currency.addEventListener("change", renderCreditCardPreferredPaymentAccounts);
   cardInvoiceCard.addEventListener("change", handleCardInvoiceCardChange);
   cardInvoiceList.addEventListener("click", handleCardInvoiceListClick);
+  if (cardInvoiceSearch) {
+    cardInvoiceSearch.addEventListener("input", () => {
+      state.cardInvoiceSearch = cardInvoiceSearch.value;
+      renderCardInvoiceList(selectedCreditCard());
+    });
+  }
+  cardInvoiceStatusFilterButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      state.cardInvoiceStatusFilter = button.dataset.cardInvoiceStatusFilter || "all";
+      renderCardInvoiceFilters();
+      renderCardInvoiceList(selectedCreditCard());
+    });
+  });
   if (cardInvoiceHistoryChart) {
     cardInvoiceHistoryChart.addEventListener("click", handleCardInvoiceHistoryClick);
   }
@@ -439,6 +455,7 @@ export function registerCardsView({
     payCardInvoiceButton.disabled = total <= 0 || alreadyPaid || !cardPaymentAccount.value;
     payCardInvoiceButton.textContent = alreadyPaid ? "Fatura paga" : "Pagar fatura";
     updateCardInvoiceOpenCount();
+    renderCardInvoiceFilters();
     renderCardInvoiceList(card);
   }
 
@@ -551,7 +568,12 @@ export function registerCardsView({
       cardInvoiceList.append(emptyState("Nenhum lançamento nesta fatura."));
       return;
     }
-    state.cardInvoiceTransactions.forEach((transaction) => {
+    const transactions = filteredCardInvoiceTransactions();
+    if (transactions.length === 0) {
+      cardInvoiceList.append(emptyState("Nenhum lançamento encontrado para este filtro."));
+      return;
+    }
+    transactions.forEach((transaction) => {
       const item = document.createElement("article");
       item.className = `card-invoice-row ${transaction.type === "income" ? "positive" : "negative"}`;
       const sign = transaction.type === "income" ? "+" : "-";
@@ -583,6 +605,55 @@ export function registerCardsView({
       `;
       cardInvoiceList.append(item);
     });
+  }
+
+  function renderCardInvoiceFilters() {
+    if (cardInvoiceSearch && cardInvoiceSearch.value !== state.cardInvoiceSearch) {
+      cardInvoiceSearch.value = state.cardInvoiceSearch || "";
+    }
+    cardInvoiceStatusFilterButtons.forEach((button) => {
+      const filter = button.dataset.cardInvoiceStatusFilter || "all";
+      const active = filter === (state.cardInvoiceStatusFilter || "all");
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+  }
+
+  function filteredCardInvoiceTransactions() {
+    const statusFilter = state.cardInvoiceStatusFilter || "all";
+    const search = normalizeSearch(state.cardInvoiceSearch || "");
+    return state.cardInvoiceTransactions.filter((transaction) => {
+      const isReconciled = Boolean(transaction.reconciled_at);
+      if (statusFilter === "pending" && isReconciled) {
+        return false;
+      }
+      if (statusFilter === "reconciled" && !isReconciled) {
+        return false;
+      }
+      if (!search) {
+        return true;
+      }
+      return normalizeSearch(cardInvoiceSearchText(transaction)).includes(search);
+    });
+  }
+
+  function cardInvoiceSearchText(transaction) {
+    const card = selectedCreditCard();
+    return [
+      transaction.description,
+      transaction.date,
+      formatDate(transaction.date),
+      cardTransactionTypeLabel(transaction.type),
+      transactionSeriesLabel(transaction),
+      transaction.category_name,
+      transaction.subcategory_name,
+      cardCategoryPath(transaction),
+      transaction.tag_name,
+      ...(transaction.tags || []),
+      transaction.notes,
+      transaction.amount,
+      formatMoney(transaction.amount, card ? card.currency : "BRL"),
+    ].filter(Boolean).join(" ");
   }
 
   function renderCardInvoiceHistory(card) {

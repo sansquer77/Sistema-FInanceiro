@@ -65,6 +65,8 @@ const state = {
   cardPayments: [],
   selectedCreditCardId: "",
   selectedAccountId: "",
+  cardInvoiceSearch: "",
+  cardInvoiceStatusFilter: "all",
   transactions: [],
   accountTransactions: [],
   cockpit: null,
@@ -147,6 +149,8 @@ const cardRecurrenceFields = document.querySelector("#cardRecurrenceFields");
 const cardRecurrenceFrequency = document.querySelector("#cardRecurrenceFrequency");
 const cardRecurrenceCount = document.querySelector("#cardRecurrenceCount");
 const cardInvoiceList = document.querySelector("#cardInvoiceList");
+const cardInvoiceSearch = document.querySelector("#cardInvoiceSearch");
+const cardInvoiceStatusFilterButtons = document.querySelectorAll("[data-card-invoice-status-filter]");
 const cancelCardTransactionEditButton = document.querySelector("#cancelCardTransactionEditButton");
 const transactionForm = document.querySelector("#transactionForm");
 const transactionFormTitle = document.querySelector("#transactionFormTitle");
@@ -510,6 +514,8 @@ const cardsView = registerCardsView({
     payCardInvoiceButton,
     cardInvoiceMessage,
     cardInvoiceOpenCount,
+    cardInvoiceSearch,
+    cardInvoiceStatusFilterButtons,
     cardTransactionForm,
     cardTransactionFormTitle,
     cardTransactionType,
@@ -530,6 +536,7 @@ const cardsView = registerCardsView({
   setMessage,
   emptyState,
   escapeHtml,
+  normalizeSearch,
   formatMoney,
   formatDate,
   formatMonthLabel,

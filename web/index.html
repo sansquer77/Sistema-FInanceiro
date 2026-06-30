@@ -6,7 +6,7 @@
     <title>Sistema Financeiro</title>
     <link rel="icon" href="/assets/app-icon.png">
     <link rel="apple-touch-icon" href="/assets/app-icon.png">
-    <link rel="stylesheet" href="/styles.css?v=107">
+    <link rel="stylesheet" href="/styles.css?v=109">
   </head>
   <body>
     <main class="app-shell">
@@ -498,6 +498,16 @@
             <section class="panel">
               <div class="section-heading">
                 <h2>Lançamentos da fatura <span class="invoice-open-count ok" id="cardInvoiceOpenCount">0 não conciliados</span></h2>
+              </div>
+              <div class="invoice-list-toolbar">
+                <label class="transaction-search">Buscar lançamento
+                  <input id="cardInvoiceSearch" type="search" placeholder="Descrição, categoria, tag, valor...">
+                </label>
+                <div class="segmented-control invoice-status-filter" role="group" aria-label="Filtrar conciliação da fatura">
+                  <button class="active" type="button" data-card-invoice-status-filter="all">Todos</button>
+                  <button type="button" data-card-invoice-status-filter="pending">Não conciliados</button>
+                  <button type="button" data-card-invoice-status-filter="reconciled">Conciliados</button>
+                </div>
               </div>
               <div class="card-invoice-list" id="cardInvoiceList"></div>
             </section>
@@ -1278,6 +1288,6 @@
         </div>
       </aside>
     </main>
-    <script type="module" src="/app.js?v=107"></script>
+    <script type="module" src="/app.js?v=109"></script>
   </body>
 </html>
