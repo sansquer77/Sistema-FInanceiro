@@ -2,8 +2,8 @@
 tipo: spec
 area: relatorios
 status: implementado
-versao: 1.0
-atualizado: 2026-06-29
+versao: 1.1
+atualizado: 2026-06-30
 relacionados:
   - "[[lancamentos]]"
   - "[[cartoes]]"
@@ -17,7 +17,7 @@ aliases: ["Relatórios", "Cockpit"]
 # Relatórios
 
 > [!info] Status
-> **implementado** · área: `relatorios` · atualizado em 2026-06-29 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[limites-gastos]]
+> **implementado** · área: `relatorios` · atualizado em 2026-06-30 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[limites-gastos]]
 
 ## Problema
 
@@ -34,6 +34,7 @@ Qualquer usuário autenticado localmente que queira analisar seus gastos e recei
 3. Seleciona período e filtros.
 4. Visualiza totais, percentuais e detalhes.
 5. Imprime ou exporta quando necessário.
+6. Acompanha a evolução temporal de categorias/subcategorias por meio de gráfico (sob demanda).
 
 ## Tipos de relatório
 
@@ -57,6 +58,8 @@ Qualquer usuário autenticado localmente que queira analisar seus gastos e recei
 - Percentuais são calculados contra o total da seção.
 - Relatório **detalhado** mostra lançamentos individuais.
 - Relatório **sintético** mostra apenas agregados.
+- Nos cartões de categoria e subcategoria, o usuário pode acionar a visualização da **evolução temporal** daquele agrupamento.
+- A evolução temporal busca agregados mensais sob demanda (3m, 6m, 12m, ytd, all), garantindo que não sobrecarregue o processamento inicial.
 
 ## Critérios de aceite
 
@@ -66,9 +69,11 @@ Qualquer usuário autenticado localmente que queira analisar seus gastos e recei
 - Dado o relatório de subcategorias, quando exibido, mostra total e percentual por categoria/subcategoria.
 - Dado o relatório de tags, quando exibido, agrega lançamentos por tag, incluindo lançamentos de cartão.
 - Dado movimentações em múltiplas moedas, quando exibidas, os totais são separados por moeda.
+- Dado um cartão de categoria ou subcategoria, ao solicitar evolução temporal (ex: 6m), exibe um gráfico de linha contendo o somatório mês a mês (inclusive lançamentos de faturas).
 
 ## Changelog
 
+- `1.1` — 2026-06-30 — Adição da regra de evolução temporal (gráfico de linha sob demanda) para categorias/subcategorias.
 - `1.0` — 2026-06-29 — Frontmatter e critérios formalizados.
 
 ## Relacionados

@@ -1,3 +1,5 @@
+import { api } from "./api.js";
+
 export function registerReportsView({
   state,
   elements,
@@ -215,9 +217,14 @@ export function registerReportsView({
               <strong><i style="background:${chartColor(index)}"></i>${escapeHtml(row.label)}</strong>
               <span>${row.count} lançamento(s)</span>
             </div>
-            <div class="report-rank-value">
-              <strong>${formatMoneyTotals(row.totals)}</strong>
-              <span>${percent === null ? "Multimoeda" : formatPercent(percent)}</span>
+            <div class="report-rank-actions">
+              <div class="report-rank-value">
+                <strong>${formatMoneyTotals(row.totals)}</strong>
+                <span>${percent === null ? "Multimoeda" : formatPercent(percent)}</span>
+              </div>
+              ${row.type !== 'account' ? `<button class="report-rank-evolution-btn" type="button" aria-label="Evolução" title="Evolução temporal" data-evolution-category="${escapeHtml(row.categoryId || '')}" data-evolution-subcategory="${escapeHtml(row.subcategoryId || '')}" data-evolution-name="${escapeHtml(row.label)}" data-evolution-color="${chartColor(index)}">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M3 17l6-6 4 4 8-8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>` : ''}
             </div>
           </button>
           <div class="report-bar"><span style="width:${Math.max(barPercent * 100, 2)}%; background:${chartColor(index)}"></span></div>
@@ -300,21 +307,29 @@ export function registerReportsView({
     }, { income: new Map(), expense: new Map(), investment: new Map() });
   }
 
-  function groupReportItems(items, key) {
-    const grouped = new Map();
+  function groupReportItems(items, dimension) {
+    const groups = new Map();
     for (const item of items) {
-      const label = reportGroupLabel(item, key);
-      if (!label) {
-        continue;
+      const key = dimension === "tag" ? item.tag : (dimension === "subcategory" ? item.subcategory : item.category) || "Sem categoria";
+      if (!groups.has(key)) {
+        groups.set(key, {
+          label: dimension === "subcategory" ? `${item.category || "Sem categoria"} / ${item.subcategory || "Sem subcategoria"}` : key,
+          categoryId: item.categoryId || "",
+          subcategoryId: item.subcategoryId || "",
+          type: dimension,
+          count: 0,
+          totals: new Map(),
+          items: [],
+          sortTotal: 0
+        });
       }
-      const current = grouped.get(label) || { label, totals: new Map(), sortTotal: 0, count: 0, items: [] };
-      addMoneyTotal(current.totals, item.currency, item.amount);
-      current.sortTotal += item.amount;
-      current.count += 1;
-      current.items.push(item);
-      grouped.set(label, current);
+      const group = groups.get(key);
+      addMoneyTotal(group.totals, item.currency, item.amount);
+      group.sortTotal += item.amount;
+      group.count += 1;
+      group.items.push(item);
     }
-    return [...grouped.values()].sort((a, b) => b.sortTotal - a.sortTotal || a.label.localeCompare(b.label));
+    return [...groups.values()].sort((a, b) => b.sortTotal - a.sortTotal || a.label.localeCompare(b.label));
   }
 
   function reportGroupLabel(item, key) {
@@ -370,6 +385,149 @@ export function registerReportsView({
       .sort(([currencyA], [currencyB]) => currencyA.localeCompare(currencyB))
       .map(([currency, amount]) => `<span class="money-stack-line"><b>${escapeHtml(currency)}</b><em>${formatMoney(amount, currency)}</em></span>`)
       .join("");
+  }
+
+  // --- Evolution Drawer Logic ---
+  
+  const drawer = document.getElementById("evolutionDrawer");
+  const drawerOverlay = document.getElementById("evolutionDrawerCloseOverlay");
+  const drawerCloseBtn = document.getElementById("evolutionDrawerCloseBtn");
+  const drawerTitle = document.getElementById("evolutionDrawerTitle");
+  const chartTrend = document.getElementById("evolutionChartTrend");
+  const chartTotal = document.getElementById("evolutionChartTotal");
+  const svgEl = document.getElementById("evolutionSvg");
+  const xLabelsEl = document.getElementById("evolutionXLabels");
+  const filterBtns = document.querySelectorAll(".evolution-filter-btn");
+  
+  let currentEvolutionContext = null;
+
+  if (drawerOverlay && drawerCloseBtn) {
+    drawerOverlay.addEventListener("click", closeEvolutionDrawer);
+    drawerCloseBtn.addEventListener("click", closeEvolutionDrawer);
+  }
+
+  filterBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      filterBtns.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      if (currentEvolutionContext) {
+        loadEvolutionChart(currentEvolutionContext, btn.dataset.period);
+      }
+    });
+  });
+
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest(".report-rank-evolution-btn");
+    if (btn) {
+      e.stopPropagation();
+      openEvolutionDrawer({
+        categoryId: btn.dataset.evolutionCategory,
+        subcategoryId: btn.dataset.evolutionSubcategory,
+        name: btn.dataset.evolutionName,
+        color: btn.dataset.evolutionColor
+      });
+    }
+  });
+
+  function openEvolutionDrawer(context) {
+    currentEvolutionContext = context;
+    drawerTitle.textContent = context.name;
+    drawer.hidden = false;
+    
+    const activeBtn = document.querySelector(".evolution-filter-btn.active");
+    loadEvolutionChart(context, activeBtn ? activeBtn.dataset.period : "12m");
+  }
+
+  function closeEvolutionDrawer() {
+    drawer.hidden = true;
+  }
+
+  async function loadEvolutionChart(context, period) {
+    svgEl.innerHTML = "";
+    xLabelsEl.innerHTML = "";
+    chartTotal.textContent = "Carregando...";
+    chartTrend.textContent = "";
+
+    try {
+      const url = new URL("/api/reports/category-evolution", window.location.origin);
+      if (context.categoryId) url.searchParams.set("category_id", context.categoryId);
+      if (context.subcategoryId) url.searchParams.set("subcategory_id", context.subcategoryId);
+      url.searchParams.set("period", period);
+      
+      const res = await api(url.pathname + url.search);
+      drawEvolutionChart(res.evolution || [], context.color);
+    } catch (err) {
+      chartTotal.textContent = "Erro ao carregar";
+    }
+  }
+
+  function drawEvolutionChart(data, color) {
+    if (data.length === 0) {
+      chartTotal.textContent = "Sem dados";
+      return;
+    }
+
+    const totalAmount = data.reduce((acc, pt) => acc + pt.total_cents, 0);
+    chartTotal.textContent = formatMoney(totalAmount / 100, "BRL");
+    
+    if (data.length > 1) {
+      const first = data[0].total_cents;
+      const last = data[data.length - 1].total_cents;
+      if (first !== 0) {
+        const diff = ((last - first) / Math.abs(first)) * 100;
+        chartTrend.textContent = `${diff > 0 ? '+' : ''}${diff.toFixed(1)}% em relação ao início`;
+      }
+    }
+
+    const w = 100;
+    const h = 50;
+    const maxVal = Math.max(...data.map(d => d.total_cents), 1);
+    const minVal = 0;
+    const range = maxVal - minVal;
+
+    const points = data.map((d, i) => {
+      const x = (i / Math.max(data.length - 1, 1)) * w;
+      const y = h - ((d.total_cents - minVal) / range) * (h * 0.9);
+      return { x, y };
+    });
+
+    const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(" ");
+    const areaD = `${pathD} L ${w},${h} L 0,${h} Z`;
+    const gradientId = "grad" + Math.random().toString(36).substring(2);
+    
+    svgEl.innerHTML = `
+      <defs>
+        <linearGradient id="${gradientId}" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="${color}" stop-opacity="0.3" />
+          <stop offset="100%" stop-color="${color}" stop-opacity="0.0" />
+        </linearGradient>
+      </defs>
+      <path d="${areaD}" fill="url(#${gradientId})" />
+      <path d="${pathD}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+    `;
+    
+    points.forEach((p) => {
+      svgEl.innerHTML += `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="1.5" fill="${color}" />`;
+    });
+
+    if (data.length > 0) {
+      const formatMonth = (m) => {
+        const [yy, mm] = m.split("-");
+        const date = new Date(parseInt(yy), parseInt(mm) - 1, 1);
+        return date.toLocaleString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', '');
+      };
+      
+      const labels = [];
+      labels.push(`<span>${formatMonth(data[0].month)}</span>`);
+      if (data.length > 2) {
+        const mid = Math.floor(data.length / 2);
+        labels.push(`<span>${formatMonth(data[mid].month)}</span>`);
+      }
+      if (data.length > 1) {
+        labels.push(`<span>${formatMonth(data[data.length - 1].month)}</span>`);
+      }
+      xLabelsEl.innerHTML = labels.join("");
+    }
   }
 
   function moneyTotalsSignalClass(totals) {

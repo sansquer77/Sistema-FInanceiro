@@ -44,6 +44,7 @@ from financeiro.categories import (
     update_category,
     update_subcategory,
     update_tag,
+    get_category_evolution,
 )
 from financeiro.credit_cards import (
     archive_credit_card,
@@ -193,6 +194,9 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/portfolio":
             self.handle_portfolio()
+            return
+        if path == "/api/reports/category-evolution":
+            self.handle_category_evolution()
             return
         self.serve_static()
 
@@ -500,6 +504,23 @@ class AppHandler(BaseHTTPRequestHandler):
         query = parse_qs(urlsplit(self.path).query)
         group_type = (query.get("group") or [None])[0]
         self.send_json({"categories": list_categories(user["id"], group_type)})
+
+    def handle_category_evolution(self) -> None:
+        user = self.require_user()
+        query = parse_qs(urlsplit(self.path).query)
+        category_id_str = (query.get("category_id") or [""])[0]
+        subcategory_id_str = (query.get("subcategory_id") or [""])[0]
+        period = (query.get("period") or ["12m"])[0]
+        
+        if not category_id_str.isdigit():
+            self.send_error(HTTPStatus.BAD_REQUEST, "ID da categoria invalido.")
+            return
+            
+        category_id = int(category_id_str)
+        subcategory_id = int(subcategory_id_str) if subcategory_id_str.isdigit() else None
+        
+        evolution = get_category_evolution(user["id"], category_id, subcategory_id, period)
+        self.send_json({"evolution": evolution})
 
     def handle_list_tags(self) -> None:
         user = self.require_user()

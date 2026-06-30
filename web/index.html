@@ -1196,6 +1196,39 @@
         </section>
         </div>
       </section>
+
+      <!-- Category Evolution Drawer -->
+      <aside id="evolutionDrawer" class="drawer" hidden aria-hidden="true">
+        <div class="drawer-overlay" id="evolutionDrawerCloseOverlay"></div>
+        <div class="drawer-content">
+          <header class="drawer-header">
+            <div>
+              <p class="eyebrow">Evolução</p>
+              <h2 id="evolutionDrawerTitle">Categoria</h2>
+            </div>
+            <button class="icon-btn" id="evolutionDrawerCloseBtn" aria-label="Fechar" title="Fechar">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+          </header>
+          <div class="drawer-body">
+            <div class="evolution-filters">
+              <button type="button" class="evolution-filter-btn" data-period="3m">3M</button>
+              <button type="button" class="evolution-filter-btn" data-period="6m">6M</button>
+              <button type="button" class="evolution-filter-btn active" data-period="12m">12M</button>
+              <button type="button" class="evolution-filter-btn" data-period="ytd">YTD</button>
+              <button type="button" class="evolution-filter-btn" data-period="all">All</button>
+            </div>
+            <div class="evolution-chart-container">
+              <div class="evolution-chart-header">
+                <span id="evolutionChartTrend" class="trend-text"></span>
+                <strong id="evolutionChartTotal" class="total-text"></strong>
+              </div>
+              <svg id="evolutionSvg" class="evolution-svg" viewBox="0 0 100 50" preserveAspectRatio="none"></svg>
+              <div id="evolutionXLabels" class="evolution-x-labels"></div>
+            </div>
+          </div>
+        </div>
+      </aside>
     </main>
     <script type="module" src="/app.js?v=101"></script>
   </body>

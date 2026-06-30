@@ -2840,6 +2840,168 @@ textarea:focus {
   }
 }
 
+@media (min-width: 768px) {
+  .dashboard-main {
+    padding: 2rem 3rem;
+  }
+}
+
+/* Drawer / Side Panel */
+.drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  justify-content: flex-end;
+  visibility: visible;
+  transition: visibility 0s linear 0s;
+}
+.drawer[hidden] {
+  visibility: hidden;
+  transition: visibility 0s linear 0.3s;
+  display: flex !important; /* Override generic [hidden] display:none to allow animation */
+}
+.drawer-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+.drawer[hidden] .drawer-overlay {
+  opacity: 0;
+}
+.drawer-content {
+  position: relative;
+  background: var(--surface);
+  width: 100%;
+  max-width: 500px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -4px 0 24px rgba(0,0,0,0.1);
+  transform: translateX(0);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.drawer[hidden] .drawer-content {
+  transform: translateX(100%);
+}
+.drawer-header {
+  padding: 1.5rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+}
+.drawer-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--text);
+}
+.drawer-body {
+  padding: 1.5rem;
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Evolution Filters */
+.evolution-filters {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  background: var(--surface-hover);
+  padding: 0.25rem;
+  border-radius: 0.5rem;
+}
+.evolution-filter-btn {
+  flex: 1;
+  padding: 0.5rem;
+  border: none;
+  background: transparent;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.evolution-filter-btn:hover {
+  color: var(--text);
+}
+.evolution-filter-btn.active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Evolution Chart Container */
+.evolution-chart-container {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+.evolution-chart-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.evolution-chart-header .total-text {
+  font-size: 2rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--text);
+}
+.evolution-chart-header .trend-text {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+.evolution-svg {
+  width: 100%;
+  height: 200px;
+  overflow: visible;
+}
+.evolution-x-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.5rem;
+}
+
+/* Add an icon style for the cards */
+.report-rank-evolution-btn {
+  padding: 0.5rem;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 0.375rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.report-rank-evolution-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+.report-rank-evolution-btn svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+/* Drawer button container in ranked row */
+.report-rank-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
 @media (max-width: 520px) {
   .brand {
     display: grid;

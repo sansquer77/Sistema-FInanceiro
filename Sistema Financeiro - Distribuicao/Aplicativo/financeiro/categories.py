@@ -777,3 +777,111 @@ def seed_default_categories(conn, user_id: int) -> None:
                     "INSERT INTO subcategories (user_id, category_id, name) VALUES (?, ?, ?)",
                     (user_id, category_id, subcategory_name)
                 )
+
+def generate_month_series(period: str) -> list[str]:
+    import datetime
+    today = datetime.date.today()
+    if period == "all":
+        return []
+    
+    if period == "3m":
+        months_back = 2
+    elif period == "6m":
+        months_back = 5
+    elif period == "12m":
+        months_back = 11
+    elif period == "ytd":
+        months_back = today.month - 1
+    else:
+        months_back = 11
+
+    year = today.year
+    month = today.month
+    for _ in range(months_back):
+        month -= 1
+        if month == 0:
+            month = 12
+            year -= 1
+    
+    months = []
+    current_year = year
+    current_month = month
+    for _ in range(months_back + 1):
+        months.append(f"{current_year:04d}-{current_month:02d}")
+        current_month += 1
+        if current_month > 12:
+            current_month = 1
+            current_year += 1
+            
+    return months
+
+def get_category_evolution(user_id: int, category_id: int, subcategory_id: int | None = None, period: str = "12m") -> list[dict]:
+    with get_connection() as conn:
+        row = conn.execute("SELECT id FROM categories WHERE id = ? AND user_id = ?", (category_id, user_id)).fetchone()
+        if not row:
+            raise ClassificationError("Categoria não encontrada.", HTTPStatus.NOT_FOUND)
+        
+        if subcategory_id:
+            row = conn.execute("SELECT id FROM subcategories WHERE id = ? AND user_id = ?", (subcategory_id, user_id)).fetchone()
+            if not row:
+                raise ClassificationError("Subcategoria não encontrada.", HTTPStatus.NOT_FOUND)
+
+        date_filter = ""
+        if period == "3m":
+            date_filter = "AND period_month >= strftime('%Y-%m', 'now', 'start of month', '-2 months')"
+        elif period == "6m":
+            date_filter = "AND period_month >= strftime('%Y-%m', 'now', 'start of month', '-5 months')"
+        elif period == "12m":
+            date_filter = "AND period_month >= strftime('%Y-%m', 'now', 'start of month', '-11 months')"
+        elif period == "ytd":
+            date_filter = "AND period_month >= strftime('%Y-01', 'now')"
+        
+        subcat_filter_t = "AND subcategory_id = ?" if subcategory_id else ""
+        subcat_filter_c = "AND subcategory_id = ?" if subcategory_id else ""
+        
+        params = [user_id, category_id]
+        if subcategory_id:
+            params.append(subcategory_id)
+        params.extend([user_id, category_id])
+        if subcategory_id:
+            params.append(subcategory_id)
+        
+        query = f"""
+            WITH combined AS (
+                SELECT 
+                    strftime('%Y-%m', date) AS period_month,
+                    amount_cents
+                FROM transactions
+                WHERE user_id = ? 
+                  AND category_id = ?
+                  {subcat_filter_t}
+                  AND archived_at IS NULL
+                  
+                UNION ALL
+                
+                SELECT 
+                    invoice_month AS period_month,
+                    amount_cents
+                FROM credit_card_transactions
+                WHERE user_id = ?
+                  AND category_id = ?
+                  {subcat_filter_c}
+                  AND archived_at IS NULL
+            )
+            SELECT 
+                period_month AS month,
+                SUM(amount_cents) AS total_cents
+            FROM combined
+            WHERE period_month IS NOT NULL {date_filter}
+            GROUP BY period_month
+            ORDER BY period_month ASC
+        """
+        rows = conn.execute(query, params).fetchall()
+        
+        data = {row["month"]: row["total_cents"] for row in rows}
+        
+        if period == "all":
+            return [{"month": k, "total_cents": v} for k, v in sorted(data.items())]
+        
+        series = generate_month_series(period)
+        return [{"month": m, "total_cents": data.get(m, 0)} for m in series]
