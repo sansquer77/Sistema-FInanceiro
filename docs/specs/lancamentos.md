@@ -17,6 +17,7 @@ Permitir que o usuario registre movimentacoes financeiras manuais e mantenha os 
 5. Para transferencia ou cambio, informa tambem a conta de destino.
 6. Para lançamentos recorrentes ou parcelados, define a frequência de recorrência ou a quantidade total de parcelas.
 7. O sistema grava o lancamento e atualiza os saldos das contas afetadas.
+8. A listagem exibe a evolução mensal de saldo da conta selecionada, usando o saldo conciliado do mês anterior e os saldos previstos do mês atual e dos três meses seguintes.
 
 ## Regras de Negócio
 
@@ -39,6 +40,7 @@ Permitir que o usuario registre movimentacoes financeiras manuais e mantenha os 
 - **Exclusão em cascata**: Ao excluir um lançamento de uma série com o parâmetro `scope=future`, o sistema remove recursivamente todos os lançamentos futuros da mesma série que não estejam conciliados, revertendo seus respectivos impactos nos saldos das contas.
 - Lançamentos parcelados devem exibir a parcela atual e o total da serie (`1/36`, `2/36`, etc.) sem reiniciar a contagem em edicoes pontuais.
 - Lançamentos recorrentes e parcelados podem compor o planejamento do mes e a secao de dividas do Cockpit.
+- O gráfico de saldo da área de lançamentos usa a mesma base do saldo previsto: lançamentos existentes da conta, incluindo ocorrências recorrentes e parceladas já materializadas, acumulados até o fim de cada mês.
 
 ## API e dados
 
@@ -58,3 +60,4 @@ Permitir que o usuario registre movimentacoes financeiras manuais e mantenha os 
 - A exclusão com `scope=future` remove as parcelas/recorrências futuras não conciliadas.
 - A edição com `apply_to_future` atualiza os dados e recalcula o saldo e câmbio das ocorrências futuras não conciliadas.
 - A listagem exibe conta, tipo, valor, data, categoria, subcategoria, tags e se o lançamento é recorrente ou parcelado.
+- O gráfico de saldo exibe o mês anterior como saldo conciliado no último dia do mês e o mês atual mais três meses futuros como saldo previsto no fim de cada mês.

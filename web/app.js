@@ -289,6 +289,7 @@ const nextMonthButton = document.querySelector("#nextMonthButton");
 const transactionMonthLabel = document.querySelector("#transactionMonthLabel");
 const currentBalanceSummary = document.querySelector("#currentBalanceSummary");
 const forecastBalanceSummary = document.querySelector("#forecastBalanceSummary");
+const transactionBalanceHistoryChart = document.querySelector("#transactionBalanceHistoryChart");
 const transactionSearch = document.querySelector("#transactionSearch");
 const navButtons = document.querySelectorAll("[data-view]");
 const moduleViews = {
@@ -596,6 +597,7 @@ const transactionsView = registerTransactionsView({
     nextMonthButton,
     currentBalanceSummary,
     forecastBalanceSummary,
+    transactionBalanceHistoryChart,
     transactionSearch,
   },
   api,

@@ -55,7 +55,7 @@ Analistas e mantenedores do Sistema Financeiro que precisam evoluir a interface 
 - `accounts-view`: cadastro, edicao, arquivamento, restauracao, estado de formulario por tipo de conta e logos de contas.
 - `cards-view`: cadastro de cartoes, arquivamento, restauracao, faturas, pagamento de fatura, lancamentos de cartao, conciliacao e navegacao de competencia.
 - `portfolio-view`: cadastro de ativos, posicoes, historico, agrupamentos, resgate, encerramento e atualizacao de valor.
-- `transactions-view`: formulario de lancamentos, busca, agrupamento por data, recorrencia, parcelas, cambio e investimento.
+- `transactions-view`: formulario de lancamentos, busca, agrupamento por data, grafico de saldo previsto, recorrencia, parcelas, cambio e investimento.
 
 ### Proximos modulos funcionais
 
@@ -90,7 +90,7 @@ Esse contrato evita imports circulares e deixa claro o que cada modulo toca.
 - Dado um mantenedor lendo contas, quando busca cadastro, edicao, arquivamento, restauracao ou logos, entao encontra esse fluxo em `accounts-view`.
 - Dado um mantenedor lendo cartoes, quando busca cadastro, faturas, pagamento, lancamentos ou conciliacao, entao encontra esse fluxo em `cards-view`.
 - Dado um mantenedor lendo portfolio, quando busca cadastro de ativos, posicoes, historico, agrupamentos, resgate, encerramento ou atualizacao de valor, entao encontra esse fluxo em `portfolio-view`.
-- Dado um mantenedor lendo lancamentos, quando busca formulario, busca, agrupamento por data, recorrencia, parcelas, cambio ou investimento, entao encontra esse fluxo em `transactions-view`.
+- Dado um mantenedor lendo lancamentos, quando busca formulario, busca, agrupamento por data, grafico de saldo previsto, recorrencia, parcelas, cambio ou investimento, entao encontra esse fluxo em `transactions-view`.
 
 ## Fora de escopo
 

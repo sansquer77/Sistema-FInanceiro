@@ -2173,6 +2173,17 @@ textarea:focus {
   text-transform: capitalize;
 }
 
+.invoice-history-card em {
+  align-self: end;
+  color: var(--muted);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
 .invoice-history-card strong {
   font-size: 16px;
   font-weight: 900;
@@ -2194,6 +2205,47 @@ textarea:focus {
 .invoice-history-area {
   fill: url("#invoiceHistoryAreaGradient");
   pointer-events: none;
+}
+
+.account-balance-history-area {
+  fill: url("#accountBalanceHistoryAreaGradient");
+}
+
+.account-balance-history-chart .invoice-history-card {
+  display: block;
+  padding-bottom: 14px;
+}
+
+.account-balance-history-chart .invoice-history-card span,
+.account-balance-history-chart .invoice-history-card em {
+  position: absolute;
+  right: 12px;
+  left: 12px;
+}
+
+.account-balance-history-chart .invoice-history-card span {
+  bottom: 56px;
+}
+
+.account-balance-history-chart .invoice-history-card em {
+  bottom: 38px;
+  margin-top: 0;
+}
+
+.account-balance-history-chart .invoice-history-card strong {
+  position: absolute;
+  right: 12px;
+  bottom: 14px;
+  left: 12px;
+  font-size: 14px;
+}
+
+.account-balance-history-chart .positive-text {
+  color: var(--positive);
+}
+
+.account-balance-history-chart .danger-text {
+  color: var(--danger);
 }
 
 .invoice-history-line {
