@@ -35,6 +35,10 @@ export function registerTransactionsView({
   renderPortfolio,
   renderImportTargets,
 }) {
+  const balanceHistoryChartTop = 24;
+  const balanceHistoryChartBottom = 48;
+  const balanceHistoryChartBaseline = 54;
+  const balanceHistoryChartFlat = 36;
   const {
     transactionForm,
     transactionFormTitle,
@@ -73,6 +77,7 @@ export function registerTransactionsView({
     nextMonthButton,
     currentBalanceSummary,
     forecastBalanceSummary,
+    transactionBalanceHistoryChart,
     transactionSearch,
   } = elements;
 
@@ -107,6 +112,9 @@ export function registerTransactionsView({
   nextMonthButton.addEventListener("click", () => shiftTransactionMonth(1));
   transactionSearch.addEventListener("input", renderTransactions);
   transactionList.addEventListener("click", handleTransactionListClick);
+  if (transactionBalanceHistoryChart) {
+    transactionBalanceHistoryChart.addEventListener("click", handleBalanceHistoryClick);
+  }
   cancelTransactionEditButton.addEventListener("click", resetTransactionForm);
 
   async function loadTransactionSlice() {
@@ -220,10 +228,12 @@ export function registerTransactionsView({
   }
 
   async function refreshAfterTransactionChange() {
-    await Promise.all([
+    const [, transactionsResponse] = await Promise.all([
       loadTransactionSlice(),
+      api("/api/transactions"),
       loadCockpit(),
     ]);
+    state.transactions = transactionsResponse.transactions || [];
     markPortfolioDirty();
     renderFinanceViews();
     renderPortfolio();
@@ -421,7 +431,136 @@ export function registerTransactionsView({
 
     currentBalanceSummary.textContent = formatCurrencySummary(getBalanceUntil(todayLocalDateValue(), accountTransactions, true));
     forecastBalanceSummary.textContent = formatCurrencySummary(getBalanceUntil(monthEndDate(state.transactionMonth), accountTransactions, false));
+    renderBalanceHistory();
     renderTransactionCollection(transactionList, monthTransactions, false, accountTransactions);
+  }
+
+  function renderBalanceHistory() {
+    if (!transactionBalanceHistoryChart) {
+      return;
+    }
+    const account = state.accounts.find((entry) => String(entry.id) === String(state.selectedAccountId));
+    if (!account) {
+      transactionBalanceHistoryChart.innerHTML = '<div class="empty-state compact">Selecione uma conta para ver a projeção de saldo.</div>';
+      return;
+    }
+    const transactions = selectedAccountTransactions(state.transactions.length ? state.transactions : state.accountTransactions);
+    const rows = balanceHistoryRows(account, transactions);
+    const path = balanceHistoryPath(rows, "past");
+    const futurePath = balanceHistoryPath(rows, "future");
+    const areaPath = balanceHistoryAreaPath(rows);
+    const points = rows.map((row) => `
+      <span class="invoice-history-point ${row.isCurrent ? "current" : ""} ${row.offset > 0 ? "future" : ""}" style="left: ${row.x}%; top: ${row.y}%"></span>
+    `).join("");
+    transactionBalanceHistoryChart.innerHTML = `
+      <div class="invoice-history-rail" role="list">
+        <svg class="invoice-history-svg" viewBox="0 0 100 100" aria-hidden="true" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="accountBalanceHistoryAreaGradient" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.18"></stop>
+              <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"></stop>
+            </linearGradient>
+          </defs>
+          <path class="invoice-history-area account-balance-history-area" d="${areaPath}"></path>
+          <path class="invoice-history-line" d="${path}"></path>
+          <path class="invoice-history-line future" d="${futurePath}"></path>
+        </svg>
+        ${points}
+        ${rows.map((row) => `
+          <button class="invoice-history-card ${row.isCurrent ? "current" : ""}" type="button" data-transaction-balance-month="${escapeHtml(row.month)}" role="listitem" aria-current="${row.isCurrent ? "true" : "false"}">
+            <span>${escapeHtml(row.label)}</span>
+            <em>${escapeHtml(row.description)}</em>
+            <strong class="${row.amount < 0 ? "danger-text" : row.amount > 0 ? "positive-text" : ""}">${formatMoney(Math.abs(row.amount), row.currency)}</strong>
+          </button>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  function balanceHistoryRows(account, transactions) {
+    const rawRows = [-1, 0, 1, 2, 3].map((offset) => {
+      const month = shiftMonth(state.transactionMonth, offset);
+      const balance = getBalanceUntil(monthEndDate(month), transactions, offset < 0);
+      const amount = balanceAmountForCurrency(balance, account.currency);
+      return {
+        offset,
+        month,
+        label: shortMonthLabel(month),
+        description: offset < 0 ? "Conciliado" : "Previsto",
+        amount,
+        currency: account.currency,
+        isCurrent: offset === 0,
+      };
+    });
+    const values = rawRows.map((row) => row.amount);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min;
+    const xPositions = [10, 30, 50, 70, 90];
+    return rawRows.map((row, index) => ({
+      ...row,
+      x: xPositions[index],
+      y: range === 0
+        ? balanceHistoryChartFlat
+        : balanceHistoryChartBottom - ((row.amount - min) / range) * (balanceHistoryChartBottom - balanceHistoryChartTop),
+    }));
+  }
+
+  function balanceAmountForCurrency(balance, currency) {
+    if (balance instanceof Map) {
+      if (balance.has(currency)) {
+        return Number(balance.get(currency) || 0);
+      }
+      return [...balance.values()].reduce((total, value) => total + Number(value || 0), 0);
+    }
+    return Number(balance || 0);
+  }
+
+  function balanceHistoryPath(rows, mode = "all") {
+    const visibleRows = mode === "future" ? rows.slice(1) : mode === "past" ? rows.slice(0, 2) : rows;
+    if (visibleRows.length < 2) {
+      return "";
+    }
+    return smoothBalancePath(visibleRows.map((row) => ({ x: row.x, y: row.y })));
+  }
+
+  function balanceHistoryAreaPath(rows) {
+    const points = rows.map((row) => ({ x: row.x, y: row.y }));
+    if (points.length < 2) {
+      return "";
+    }
+    const line = smoothBalancePath(points);
+    const first = points[0];
+    const last = points[points.length - 1];
+    return `${line} L ${last.x} ${balanceHistoryChartBaseline} L ${first.x} ${balanceHistoryChartBaseline} Z`;
+  }
+
+  function smoothBalancePath(points) {
+    return points.reduce((path, point, index) => {
+      if (index === 0) {
+        return `M ${point.x} ${point.y}`;
+      }
+      const previous = points[index - 1];
+      const midX = (previous.x + point.x) / 2;
+      return `${path} C ${midX} ${previous.y}, ${midX} ${point.y}, ${point.x} ${point.y}`;
+    }, "");
+  }
+
+  function shortMonthLabel(month) {
+    const [year, monthNumber] = String(month).split("-").map(Number);
+    if (!year || !monthNumber) {
+      return month;
+    }
+    const date = new Date(year, monthNumber - 1, 1);
+    return date.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
+  }
+
+  async function handleBalanceHistoryClick(event) {
+    const button = event.target.closest("[data-transaction-balance-month]");
+    if (!button) {
+      return;
+    }
+    await setTransactionMonth(button.dataset.transactionBalanceMonth);
   }
 
   function selectedAccountTransactions(transactions = state.accountTransactions) {

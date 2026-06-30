@@ -55,6 +55,8 @@
   --control-shadow-sm: 0 1px 3px rgba(31, 41, 51, 0.12);
   --tooltip-surface: #1f2933;
   --tooltip-text: #ffffff;
+  --drawer-overlay: rgba(15, 23, 42, 0.42);
+  --drawer-shadow: -4px 0 24px rgba(15, 23, 42, 0.12);
 }
 
 * {
@@ -1584,6 +1586,19 @@ textarea:focus {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px 16px;
   width: 100%;
+  color: inherit;
+  text-align: left;
+}
+
+.report-rank-title-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.report-rank-toggle,
+.report-rank-value {
   padding: 0;
   border: 0;
   background: transparent;
@@ -1592,14 +1607,27 @@ textarea:focus {
   cursor: pointer;
 }
 
-.report-rank-main:hover strong {
-  color: var(--accent-dark);
+.report-rank-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-weight: 900;
 }
 
-.report-rank-main > div:first-child strong {
-  display: flex;
-  gap: 8px;
-  align-items: center;
+.report-rank-toggle span {
+  min-width: 0;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.report-rank-toggle:hover,
+.report-rank-value:hover strong {
+  color: var(--accent-dark);
 }
 
 .report-rank-row i {
@@ -2145,6 +2173,17 @@ textarea:focus {
   text-transform: capitalize;
 }
 
+.invoice-history-card em {
+  align-self: end;
+  color: var(--muted);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
 .invoice-history-card strong {
   font-size: 16px;
   font-weight: 900;
@@ -2166,6 +2205,47 @@ textarea:focus {
 .invoice-history-area {
   fill: url("#invoiceHistoryAreaGradient");
   pointer-events: none;
+}
+
+.account-balance-history-area {
+  fill: url("#accountBalanceHistoryAreaGradient");
+}
+
+.account-balance-history-chart .invoice-history-card {
+  display: block;
+  padding-bottom: 14px;
+}
+
+.account-balance-history-chart .invoice-history-card span,
+.account-balance-history-chart .invoice-history-card em {
+  position: absolute;
+  right: 12px;
+  left: 12px;
+}
+
+.account-balance-history-chart .invoice-history-card span {
+  bottom: 56px;
+}
+
+.account-balance-history-chart .invoice-history-card em {
+  bottom: 38px;
+  margin-top: 0;
+}
+
+.account-balance-history-chart .invoice-history-card strong {
+  position: absolute;
+  right: 12px;
+  bottom: 14px;
+  left: 12px;
+  font-size: 14px;
+}
+
+.account-balance-history-chart .positive-text {
+  color: var(--positive);
+}
+
+.account-balance-history-chart .danger-text {
+  color: var(--danger);
 }
 
 .invoice-history-line {
@@ -2864,7 +2944,7 @@ textarea:focus {
 .drawer-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--drawer-overlay);
   backdrop-filter: blur(2px);
   opacity: 1;
   transition: opacity 0.3s ease;
@@ -2874,13 +2954,13 @@ textarea:focus {
 }
 .drawer-content {
   position: relative;
-  background: var(--surface);
+  background: var(--panel);
   width: 100%;
   max-width: 500px;
   height: 100%;
   display: flex;
   flex-direction: column;
-  box-shadow: -4px 0 24px rgba(0,0,0,0.1);
+  box-shadow: var(--drawer-shadow);
   transform: translateX(0);
   transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -2892,13 +2972,40 @@ textarea:focus {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--line);
 }
 .drawer-header h2 {
   margin: 0;
   font-size: 1.25rem;
-  color: var(--text);
+  color: var(--ink);
 }
+
+.drawer-close-button {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.drawer-close-button:hover {
+  border-color: var(--focus-border-soft);
+  background: var(--surface-container);
+  color: var(--ink);
+}
+
+.drawer-close-button span {
+  transform: translateY(-1px);
+}
+
 .drawer-body {
   padding: 1.5rem;
   flex: 1;
@@ -2910,7 +3017,7 @@ textarea:focus {
   display: flex;
   gap: 0.5rem;
   margin-bottom: 1.5rem;
-  background: var(--surface-hover);
+  background: var(--surface-container);
   padding: 0.25rem;
   border-radius: 0.5rem;
 }
@@ -2922,23 +3029,72 @@ textarea:focus {
   border-radius: 0.375rem;
   font-size: 0.875rem;
   font-weight: 500;
-  color: var(--text-muted);
+  color: var(--muted);
   cursor: pointer;
   transition: all 0.2s;
 }
 .evolution-filter-btn:hover {
-  color: var(--text);
+  color: var(--ink);
 }
 .evolution-filter-btn.active {
-  background: var(--surface);
-  color: var(--text);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: var(--control-shadow-sm);
+}
+
+.evolution-trend-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  margin: -0.75rem 0 1.5rem;
+}
+
+.evolution-trend-toggle,
+.evolution-forecast-select {
+  display: flex;
+  align-items: center;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.evolution-trend-toggle {
+  gap: 8px;
+  padding: 0 12px;
+}
+
+.evolution-trend-toggle input {
+  width: 16px;
+  min-height: 16px;
+  accent-color: var(--accent);
+}
+
+.evolution-forecast-select {
+  gap: 8px;
+  justify-content: space-between;
+  padding: 0 8px 0 12px;
+}
+
+.evolution-forecast-select select {
+  width: auto;
+  min-height: 30px;
+  padding: 4px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
 }
 
 /* Evolution Chart Container */
 .evolution-chart-container {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--panel);
+  border: 1px solid var(--line);
   border-radius: 0.75rem;
   padding: 1.5rem;
   display: flex;
@@ -2954,55 +3110,63 @@ textarea:focus {
   font-size: 2rem;
   font-weight: 600;
   line-height: 1;
-  color: var(--text);
+  color: var(--ink);
 }
 .evolution-chart-header .trend-text {
   font-size: 0.875rem;
-  color: var(--text-muted);
+  color: var(--muted);
 }
 .evolution-svg {
   width: 100%;
   height: 200px;
   overflow: visible;
 }
+
+.evolution-sma-line {
+  stroke-dasharray: 1 4;
+  opacity: 0.78;
+  vector-effect: non-scaling-stroke;
+}
 .evolution-x-labels {
   display: flex;
   justify-content: space-between;
   font-size: 0.75rem;
-  color: var(--text-muted);
+  color: var(--muted);
   margin-top: 0.5rem;
 }
 
 /* Add an icon style for the cards */
 .report-rank-evolution-btn {
-  padding: 0.5rem;
-  border: none;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--muted);
   cursor: pointer;
-  border-radius: 0.375rem;
-  display: flex;
+  border-radius: 6px;
+  display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
 }
 .report-rank-evolution-btn:hover {
-  background: var(--surface-hover);
-  color: var(--text);
+  border-color: var(--focus-border-soft);
+  background: var(--surface-container);
+  color: var(--accent-dark);
 }
 .report-rank-evolution-btn svg {
-  width: 1.25rem;
-  height: 1.25rem;
-}
-
-/* Drawer button container in ranked row */
-.report-rank-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
+  width: 16px;
+  height: 16px;
 }
 
 @media (max-width: 520px) {
+  .evolution-trend-controls {
+    grid-template-columns: 1fr;
+  }
+
   .brand {
     display: grid;
   }

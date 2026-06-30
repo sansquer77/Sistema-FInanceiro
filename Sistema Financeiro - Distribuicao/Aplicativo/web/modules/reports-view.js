@@ -210,23 +210,29 @@ export function registerReportsView({
     const content = rows.length ? rows.map((row, index) => {
       const percent = reportRowPercent(row, total);
       const barPercent = percent ?? 0;
+      const evolutionButton = row.type !== "account" && row.categoryId ? `
+        <button class="report-rank-evolution-btn" type="button" aria-label="Ver evolução de ${escapeHtml(row.label)}" title="Evolução temporal" data-evolution-category="${escapeHtml(row.categoryId || "")}" data-evolution-subcategory="${escapeHtml(row.subcategoryId || "")}" data-evolution-name="${escapeHtml(row.label)}" data-evolution-color="${chartColor(index)}">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      ` : "";
       return `
         <article class="report-rank-row" data-report-row>
-          <button class="report-rank-main" type="button" data-report-toggle aria-expanded="false">
+          <div class="report-rank-main">
             <div>
-              <strong><i style="background:${chartColor(index)}"></i>${escapeHtml(row.label)}</strong>
+              <div class="report-rank-title-line">
+                <button class="report-rank-toggle" type="button" data-report-toggle aria-expanded="false">
+                  <i style="background:${chartColor(index)}"></i>
+                  <span>${escapeHtml(row.label)}</span>
+                </button>
+                ${evolutionButton}
+              </div>
               <span>${row.count} lançamento(s)</span>
             </div>
-            <div class="report-rank-actions">
-              <div class="report-rank-value">
-                <strong>${formatMoneyTotals(row.totals)}</strong>
-                <span>${percent === null ? "Multimoeda" : formatPercent(percent)}</span>
-              </div>
-              ${row.type !== 'account' ? `<button class="report-rank-evolution-btn" type="button" aria-label="Evolução" title="Evolução temporal" data-evolution-category="${escapeHtml(row.categoryId || '')}" data-evolution-subcategory="${escapeHtml(row.subcategoryId || '')}" data-evolution-name="${escapeHtml(row.label)}" data-evolution-color="${chartColor(index)}">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M3 17l6-6 4 4 8-8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              </button>` : ''}
-            </div>
-          </button>
+            <button class="report-rank-value" type="button" data-report-toggle aria-expanded="false">
+              <strong>${formatMoneyTotals(row.totals)}</strong>
+              <span>${percent === null ? "Multimoeda" : formatPercent(percent)}</span>
+            </button>
+          </div>
           <div class="report-bar"><span style="width:${Math.max(barPercent * 100, 2)}%; background:${chartColor(index)}"></span></div>
           <div class="report-detail" data-report-detail hidden>${reportItemDetails(row.items)}</div>
         </article>
@@ -274,6 +280,8 @@ export function registerReportsView({
       subcategory: transaction.subcategory_name || "",
       tag: "",
       tags: Array.isArray(transaction.tags) ? transaction.tags : transaction.tag_name ? [transaction.tag_name] : [],
+      categoryId: transaction.category_id || "",
+      subcategoryId: transaction.subcategory_id || "",
       accountId: transaction.account_id,
       accountName: transaction.account_name,
       source: "Conta",
@@ -294,6 +302,8 @@ export function registerReportsView({
       subcategory: transaction.subcategory_name || "",
       tag: "",
       tags: Array.isArray(transaction.tags) ? transaction.tags : transaction.tag_name ? [transaction.tag_name] : [],
+      categoryId: transaction.category_id || "",
+      subcategoryId: transaction.subcategory_id || "",
       accountId: "",
       accountName: transaction.credit_card_name || "Cartão",
       source: "Cartão",
@@ -315,7 +325,7 @@ export function registerReportsView({
         groups.set(key, {
           label: dimension === "subcategory" ? `${item.category || "Sem categoria"} / ${item.subcategory || "Sem subcategoria"}` : key,
           categoryId: item.categoryId || "",
-          subcategoryId: item.subcategoryId || "",
+          subcategoryId: dimension === "subcategory" ? item.subcategoryId || "" : "",
           type: dimension,
           count: 0,
           totals: new Map(),
@@ -398,8 +408,12 @@ export function registerReportsView({
   const svgEl = document.getElementById("evolutionSvg");
   const xLabelsEl = document.getElementById("evolutionXLabels");
   const filterBtns = document.querySelectorAll(".evolution-filter-btn");
+  const smaToggle = document.getElementById("evolutionSmaToggle");
+  const forecastMonthsSelect = document.getElementById("evolutionForecastMonths");
   
   let currentEvolutionContext = null;
+  let currentEvolutionData = [];
+  let currentEvolutionColor = "";
 
   if (drawerOverlay && drawerCloseBtn) {
     drawerOverlay.addEventListener("click", closeEvolutionDrawer);
@@ -416,9 +430,18 @@ export function registerReportsView({
     });
   });
 
-  document.addEventListener("click", (e) => {
+  if (smaToggle) {
+    smaToggle.addEventListener("change", redrawCurrentEvolutionChart);
+  }
+
+  if (forecastMonthsSelect) {
+    forecastMonthsSelect.addEventListener("change", redrawCurrentEvolutionChart);
+  }
+
+  reportContent.addEventListener("click", (e) => {
     const btn = e.target.closest(".report-rank-evolution-btn");
     if (btn) {
+      e.preventDefault();
       e.stopPropagation();
       openEvolutionDrawer({
         categoryId: btn.dataset.evolutionCategory,
@@ -430,19 +453,30 @@ export function registerReportsView({
   });
 
   function openEvolutionDrawer(context) {
+    if (!drawer || !drawerTitle) {
+      return;
+    }
     currentEvolutionContext = context;
     drawerTitle.textContent = context.name;
     drawer.hidden = false;
+    drawer.setAttribute("aria-hidden", "false");
     
     const activeBtn = document.querySelector(".evolution-filter-btn.active");
     loadEvolutionChart(context, activeBtn ? activeBtn.dataset.period : "12m");
   }
 
   function closeEvolutionDrawer() {
+    if (!drawer) {
+      return;
+    }
     drawer.hidden = true;
+    drawer.setAttribute("aria-hidden", "true");
   }
 
   async function loadEvolutionChart(context, period) {
+    if (!svgEl || !xLabelsEl || !chartTotal || !chartTrend) {
+      return;
+    }
     svgEl.innerHTML = "";
     xLabelsEl.innerHTML = "";
     chartTotal.textContent = "Carregando...";
@@ -457,11 +491,81 @@ export function registerReportsView({
       const res = await api(url.pathname + url.search);
       drawEvolutionChart(res.evolution || [], context.color);
     } catch (err) {
+      const fallback = localCategoryEvolution(context, period);
+      if (fallback.length) {
+        drawEvolutionChart(fallback, context.color);
+        chartTrend.textContent = [chartTrend.textContent, "Dados locais"].filter(Boolean).join(" · ");
+        return;
+      }
       chartTotal.textContent = "Erro ao carregar";
+      chartTrend.textContent = err.message || "Nao foi possivel carregar a evolucao.";
     }
   }
 
+  function localCategoryEvolution(context, period) {
+    if (!context.categoryId) {
+      return [];
+    }
+    const months = evolutionMonths(period);
+    const allowedMonths = new Set(months);
+    const totals = new Map(months.map((month) => [month, 0]));
+    for (const transaction of state.transactions) {
+      addLocalEvolutionTransaction(totals, allowedMonths, context, transaction, transaction.date?.slice(0, 7));
+    }
+    for (const transaction of state.cardTransactions) {
+      addLocalEvolutionTransaction(totals, allowedMonths, context, transaction, transaction.invoice_month || transaction.date?.slice(0, 7));
+    }
+    if (period === "all") {
+      return [...totals.entries()]
+        .filter(([, total]) => total !== 0)
+        .sort(([monthA], [monthB]) => monthA.localeCompare(monthB))
+        .map(([month, total_cents]) => ({ month, total_cents }));
+    }
+    return months.map((month) => ({ month, total_cents: totals.get(month) || 0 }));
+  }
+
+  function addLocalEvolutionTransaction(totals, allowedMonths, context, transaction, month) {
+    if (!month || String(transaction.category_id || "") !== String(context.categoryId || "")) {
+      return;
+    }
+    if (context.subcategoryId && String(transaction.subcategory_id || "") !== String(context.subcategoryId)) {
+      return;
+    }
+    if (!totals.has(month)) {
+      if (!allowedMonths.size) {
+        totals.set(month, 0);
+      } else {
+        return;
+      }
+    }
+    totals.set(month, (totals.get(month) || 0) + moneyToCents(transaction.amount));
+  }
+
+  function evolutionMonths(period) {
+    if (period === "all") {
+      return [];
+    }
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    if (period === "ytd") {
+      const months = [];
+      for (let index = 1; index <= now.getMonth() + 1; index += 1) {
+        months.push(`${now.getFullYear()}-${String(index).padStart(2, "0")}`);
+      }
+      return months;
+    }
+    const count = period === "3m" ? 3 : period === "6m" ? 6 : 12;
+    return Array.from({ length: count }, (_, index) => shiftMonth(currentMonth, index - count + 1));
+  }
+
+  function moneyToCents(value) {
+    return Math.round(Number(value || 0) * 100);
+  }
+
   function drawEvolutionChart(data, color) {
+    currentEvolutionData = data;
+    currentEvolutionColor = color;
+    chartTrend.textContent = "";
     if (data.length === 0) {
       chartTotal.textContent = "Sem dados";
       return;
@@ -479,21 +583,28 @@ export function registerReportsView({
       }
     }
 
+    const forecastMonths = Number(forecastMonthsSelect?.value || 3);
+    const forecast = smaToggle?.checked ? smaForecast(data, forecastMonths) : [];
+    if (forecast.length) {
+      chartTrend.textContent = [chartTrend.textContent, `SMA projetando ${forecastMonths} meses`].filter(Boolean).join(" · ");
+    }
+    const allValues = [...data, ...forecast].map((entry) => Number(entry.total_cents || 0));
     const w = 100;
     const h = 50;
-    const maxVal = Math.max(...data.map(d => d.total_cents), 1);
-    const minVal = 0;
-    const range = maxVal - minVal;
+    const maxVal = Math.max(...allValues, 1);
+    const minVal = Math.min(0, ...allValues);
+    const range = Math.max(maxVal - minVal, 1);
+    const denominator = Math.max(data.length + forecast.length - 1, 1);
 
-    const points = data.map((d, i) => {
-      const x = (i / Math.max(data.length - 1, 1)) * w;
-      const y = h - ((d.total_cents - minVal) / range) * (h * 0.9);
-      return { x, y };
-    });
+    const points = data.map((d, i) => pointForEvolutionValue(d.total_cents, i, denominator, minVal, range, w, h));
+    const forecastPoints = forecast.map((d, i) => pointForEvolutionValue(d.total_cents, data.length + i, denominator, minVal, range, w, h));
 
     const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(" ");
     const areaD = `${pathD} L ${w},${h} L 0,${h} Z`;
     const gradientId = "grad" + Math.random().toString(36).substring(2);
+    const forecastPath = forecastPoints.length && points.length
+      ? [points[points.length - 1], ...forecastPoints].map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(" ")
+      : "";
     
     svgEl.innerHTML = `
       <defs>
@@ -504,10 +615,14 @@ export function registerReportsView({
       </defs>
       <path d="${areaD}" fill="url(#${gradientId})" />
       <path d="${pathD}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+      ${forecastPath ? `<path d="${forecastPath}" class="evolution-sma-line" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />` : ""}
     `;
     
     points.forEach((p) => {
       svgEl.innerHTML += `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="1.5" fill="${color}" />`;
+    });
+    forecastPoints.forEach((p) => {
+      svgEl.innerHTML += `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="1.2" fill="var(--panel)" stroke="${color}" stroke-width="0.8" />`;
     });
 
     if (data.length > 0) {
@@ -526,8 +641,43 @@ export function registerReportsView({
       if (data.length > 1) {
         labels.push(`<span>${formatMonth(data[data.length - 1].month)}</span>`);
       }
+      if (forecast.length > 0) {
+        labels.push(`<span>${formatMonth(forecast[forecast.length - 1].month)}</span>`);
+      }
       xLabelsEl.innerHTML = labels.join("");
     }
+  }
+
+  function redrawCurrentEvolutionChart() {
+    if (!currentEvolutionData.length || !currentEvolutionColor) {
+      return;
+    }
+    drawEvolutionChart(currentEvolutionData, currentEvolutionColor);
+  }
+
+  function pointForEvolutionValue(value, index, denominator, minVal, range, width, height) {
+    const x = (index / denominator) * width;
+    const y = height - ((Number(value || 0) - minVal) / range) * (height * 0.9);
+    return { x, y };
+  }
+
+  function smaForecast(data, months) {
+    const values = data.map((entry) => Number(entry.total_cents || 0));
+    if (!values.length || months <= 0) {
+      return [];
+    }
+    const windowSize = Math.min(3, values.length);
+    const projected = [];
+    for (let index = 0; index < months; index += 1) {
+      const base = [...values, ...projected.map((entry) => entry.total_cents)];
+      const averageSource = base.slice(-windowSize);
+      const total = Math.round(averageSource.reduce((sum, value) => sum + value, 0) / averageSource.length);
+      projected.push({
+        month: shiftMonth(data[data.length - 1].month, index + 1),
+        total_cents: total,
+      });
+    }
+    return projected;
   }
 
   function moneyTotalsSignalClass(totals) {
@@ -617,7 +767,9 @@ export function registerReportsView({
     }
     const expanded = detail.hidden;
     detail.hidden = !expanded;
-    toggle.setAttribute("aria-expanded", String(expanded));
+    row.querySelectorAll("[data-report-toggle]").forEach((entry) => {
+      entry.setAttribute("aria-expanded", String(expanded));
+    });
   }
 
   return {

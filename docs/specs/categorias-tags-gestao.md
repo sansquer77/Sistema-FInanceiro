@@ -1,51 +1,93 @@
-# Gestao de Categorias e Tags
+---
+tipo: spec
+area: classificacao
+status: implementado
+versao: 1.1
+atualizado: 2026-06-30
+relacionados:
+  - "[[lancamentos]]"
+  - "[[importacao-organizze]]"
+  - "[[relatorios]]"
+  - "[[limites-gastos]]"
+  - "[[arquitetura]]"
+tags: [spec, "area/classificacao"]
+aliases: ["Categorias e Tags", "Classificações"]
+---
 
-## Objetivo
+# Categorias e Tags
 
-Permitir que o usuario mantenha a taxonomia usada nos lancamentos financeiros.
+> [!info] Status
+> **implementado** · área: `classificacao` · atualizado em 2026-06-30 · relacionados: [[lancamentos]], [[importacao-organizze]], [[relatorios]], [[limites-gastos]]
 
-## Estado
+## Problema
 
-Implementado para categorias, subcategorias e tags.
+O usuário precisa manter a taxonomia usada nos lançamentos financeiros — categorias, subcategorias e tags — e ser protegido de exclusões acidentais que quebrariam a classificação de lançamentos existentes.
 
-## Regras funcionais
+## Usuário
 
-- Toda transacao deve ter exatamente uma categoria.
-- Toda transacao pode ter uma subcategoria opcional.
-- Toda transacao deve ter uma ou mais tags.
-- Categorias, subcategorias e tags pertencem ao usuario autenticado.
-- O usuario pode listar, criar, renomear e excluir itens nao utilizados.
-- Categorias, subcategorias e tags usadas em lancamentos nao podem ser excluidas.
-- Importacoes do Organizze podem criar automaticamente categorias, subcategorias e tags inexistentes.
-- Tags informadas em uma mesma celula devem ser separadas quando houver separadores suportados.
+Qualquer usuário autenticado localmente que classifique seus lançamentos por natureza e marcadores personalizados.
 
-## Modelo de dados
+## Jornada
 
-- `categories`: cadastro de categorias por usuario.
-- `subcategories`: subcategorias vinculadas a uma categoria do mesmo usuario.
-- `tags`: cadastro de tags por usuario.
-- `transactions.category_id`: categoria unica do lancamento.
-- `transactions.subcategory_id`: subcategoria opcional.
-- `transaction_tags`: vinculo muitos-para-muitos entre lancamentos e tags.
+1. Usuário acessa a área de Classificações.
+2. Lista categorias (com contagem de lançamentos em uso) e cria, renomeia ou exclui as que não estão em uso.
+3. Associa subcategorias a categorias existentes.
+4. Gerencia tags de forma independente das categorias.
+5. Ao criar um lançamento, seleciona categoria, subcategoria opcional e uma ou mais tags.
 
-## API
+## Dados
 
-- `GET /api/categories`
-- `POST /api/categories`
-- `PUT /api/categories/{id}`
-- `DELETE /api/categories/{id}`
-- `POST /api/subcategories`
-- `PUT /api/subcategories/{id}`
-- `DELETE /api/subcategories/{id}`
-- `GET /api/tags`
-- `POST /api/tags`
-- `PUT /api/tags/{id}`
-- `DELETE /api/tags/{id}`
+| Campo | Tipo | Regra |
+|---|---|---|
+| `categoria.nome` | texto | Obrigatório, único por usuário. |
+| `categoria.group_type` | enum | `income`, `expense` ou `investment`. |
+| `subcategoria.nome` | texto | Obrigatório. |
+| `subcategoria.categoria_id` | FK | Obrigatório. Deve pertencer ao mesmo usuário. |
+| `tag.nome` | texto | Obrigatório, único por usuário. |
 
-## Criterios de aceite
+## Regras
 
-- O modulo exibe categorias e tags com contagem de lancamentos em uso.
-- Renomear uma categoria, subcategoria ou tag reflete nos lancamentos relacionados.
-- Excluir item em uso e bloqueado com mensagem clara.
-- Um lancamento manual aceita varias tags separadas por virgula.
-- Um lancamento importado persiste todas as tags reconhecidas.
+- Toda transação deve ter exatamente uma categoria.
+- Toda transação pode ter uma subcategoria opcional.
+- Toda transação pode ter uma ou mais tags (N:M via `transaction_tags` / `credit_card_transaction_tags`).
+- Categorias, subcategorias e tags pertencem ao usuário autenticado.
+- O usuário pode listar, criar, renomear e excluir itens **não utilizados**.
+- Categorias, subcategorias e tags **em uso** em lançamentos não podem ser excluídas.
+- Importações podem criar automaticamente categorias, subcategorias e tags inexistentes para o usuário autenticado. Ver [[importacao-organizze]].
+- Tags informadas em uma mesma célula devem ser separadas quando houver separadores suportados (vírgula, ponto-e-vírgula).
+- Categorias e subcategorias podem alimentar a evolução temporal dos relatórios por meio de séries mensais. Ver [[relatorios]].
+
+## API e dados
+
+| Método | Rota |
+|---|---|
+| `GET/POST` | `/api/categories` |
+| `PUT/DELETE` | `/api/categories/{id}` |
+| `POST` | `/api/subcategories` |
+| `PUT/DELETE` | `/api/subcategories/{id}` |
+| `GET/POST` | `/api/tags` |
+| `PUT/DELETE` | `/api/tags/{id}` |
+| `GET` | `/api/reports/category-evolution?category_id={id}&subcategory_id={id}&period={periodo}` |
+
+Tabelas: `categories`, `subcategories`, `tags`, `transaction_tags`, `credit_card_transaction_tags`.
+
+## Critérios de aceite
+
+- Dado a listagem de categorias, quando exibida, mostra cada categoria com a contagem de lançamentos em uso.
+- Dado uma categoria renomeada, quando listada, o novo nome reflete em todos os lançamentos relacionados.
+- Dado uma tentativa de excluir item em uso, quando executada, a operação é bloqueada com mensagem clara.
+- Dado um lançamento manual, quando criado com múltiplas tags separadas por vírgula, todas as tags são vinculadas.
+- Dado um lançamento importado, quando processado, todas as tags reconhecidas são persistidas.
+
+## Changelog
+
+- `1.1` — 2026-06-30 — Relação com evolução temporal de categorias/subcategorias documentada.
+- `1.0` — 2026-06-29 — Frontmatter e critérios formalizados.
+
+## Relacionados
+
+- [[lancamentos]]
+- [[importacao-organizze]]
+- [[relatorios]]
+- [[limites-gastos]]
+- [[arquitetura]]

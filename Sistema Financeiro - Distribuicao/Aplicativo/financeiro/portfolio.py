@@ -1033,19 +1033,19 @@ def build_positions(rows) -> list[dict]:
         original_quantity_micros = int(row["quantity_micros"] or 0)
         redeemed_quantity_micros = min(int(row.get("redeemed_quantity_micros") or 0), original_quantity_micros)
         quantity = micros_to_decimal(max(original_quantity_micros - redeemed_quantity_micros, 0))
-        invested_cents = int(row["invested_amount_cents"] or row["amount_cents"] or 0)
         costs_cents = sum(int(row[field] or 0) for field in (
             "brokerage_fee_cents",
             "exchange_fee_cents",
             "tax_cents",
             "other_costs_cents",
         ))
-        original_total_cost_cents = invested_cents + costs_cents
+        original_total_cost_cents = investment_operation_total_cost_cents(row, costs_cents)
+        invested_cents = original_total_cost_cents
         redeemed_cost_cents = min(int(row.get("redeemed_cost_cents") or 0), original_total_cost_cents)
         total_cost_cents = max(original_total_cost_cents - redeemed_cost_cents, 0)
         if original_total_cost_cents > 0 and redeemed_cost_cents > 0:
-            invested_cents = int((Decimal(invested_cents) * Decimal(total_cost_cents) / Decimal(original_total_cost_cents)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
-            costs_cents = total_cost_cents - invested_cents
+            invested_cents = total_cost_cents
+            costs_cents = int((Decimal(costs_cents) * Decimal(total_cost_cents) / Decimal(original_total_cost_cents)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
         if total_cost_cents <= 0 and quantity <= 0:
             continue
         source_savings_anniversaries = parse_savings_anniversaries(
@@ -1087,6 +1087,19 @@ def build_positions(rows) -> list[dict]:
         if row["unit_price_cents"]:
             position["last_unit_price_cents"] = int(row["unit_price_cents"])
     return list(grouped.values())
+
+
+def investment_operation_total_cost_cents(row: dict, costs_cents: int) -> int:
+    invested_cents = int(row["invested_amount_cents"] or 0)
+    if invested_cents > 0:
+        return invested_cents
+    amount_cents = int(row["amount_cents"] or 0)
+    if amount_cents > 0:
+        return amount_cents
+    quantity_micros = int(row["quantity_micros"] or 0)
+    unit_price_cents = int(row["unit_price_cents"] or 0)
+    gross_cents = int((Decimal(quantity_micros) * Decimal(unit_price_cents) / MICRO_SCALE).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    return gross_cents + costs_cents
 
 
 def portfolio_position_key(row, asset_type: str, identifier: str) -> tuple:
