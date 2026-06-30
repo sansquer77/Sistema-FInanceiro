@@ -13,12 +13,12 @@ from xml.etree import ElementTree
 from xml.sax.saxutils import escape as xml_escape
 
 from financeiro.categories import ClassificationError, get_or_create_category, get_or_create_subcategory, get_or_create_tag, normalize_name
-from financeiro.credit_cards import create_credit_card_transaction
+from financeiro.credit_cards import create_credit_card_transaction_with_conn
 from financeiro.transactions import (
     apply_balance_delta,
     balance_delta,
     convert_to_brl_cents,
-    create_transaction,
+    create_transaction_with_conn,
     get_active_account,
     normalize_tags,
     replace_transaction_tags,
@@ -221,21 +221,26 @@ def import_system_template(user_id: int, target: str, target_id: object, file_by
     rows = parse_system_template_file(file_bytes, filename)
     imported = []
     skipped = []
-    for raw in rows:
-        try:
-            if normalized_target == "card":
-                payload = normalize_system_card_row(raw, target_id)
-                created = create_credit_card_transaction(user_id, payload)
-            else:
-                payload = normalize_system_account_row(raw, target_id)
-                created = create_transaction(user_id, payload)
-            imported.append({"row": raw["row"], "id": created["id"], "description": payload["description"]})
-        except Exception as exc:
-            skipped.append({
-                "row": raw.get("row", ""),
-                "description": raw.get("descricao") or raw.get("description") or "",
-                "reason": getattr(exc, "message", str(exc) or "Nao foi possivel importar a linha."),
-            })
+    with get_connection() as conn:
+        for raw in rows:
+            conn.execute("SAVEPOINT import_row")
+            try:
+                if normalized_target == "card":
+                    payload = normalize_system_card_row(raw, target_id)
+                    created = create_credit_card_transaction_with_conn(conn, user_id, payload)
+                else:
+                    payload = normalize_system_account_row(raw, target_id)
+                    created = create_transaction_with_conn(conn, user_id, payload)
+                conn.execute("RELEASE SAVEPOINT import_row")
+                imported.append({"row": raw["row"], "id": created["id"], "description": payload["description"]})
+            except Exception as exc:
+                conn.execute("ROLLBACK TO SAVEPOINT import_row")
+                conn.execute("RELEASE SAVEPOINT import_row")
+                skipped.append({
+                    "row": raw.get("row", ""),
+                    "description": raw.get("descricao") or raw.get("description") or "",
+                    "reason": getattr(exc, "message", str(exc) or "Nao foi possivel importar a linha."),
+                })
     return {
         "imported": len(imported),
         "skipped": len(skipped),

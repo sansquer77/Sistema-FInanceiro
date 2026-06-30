@@ -106,7 +106,7 @@ spacing:
   md: 16px
   lg: 24px
   xl: 32px
-  container-max: 1280px
+  container-max: none
   gutter: 24px
 ---
 
@@ -138,9 +138,9 @@ Este sistema de design utiliza a fonte **Inter** em todos os níveis para aprove
 
 ## Layout e Espaçamento
 
-O sistema emprega uma filosofia de **Grade Fixa** para desktop para manter o controle da densidade de dados, fazendo a transição para um modelo fluido em dispositivos móveis.
+O sistema emprega uma filosofia de **Grade Fluida** para desktop para aproveitar monitores largos e reduzir espaços vazios artificiais, fazendo a transição para grades mais simples em dispositivos menores.
 
-* **Desktop:** Grade de 12 colunas com largura máxima de 1280px, calhas (gutters) de 24px e margens laterais de 32px.
+* **Desktop:** Grade de 12 colunas em largura total (`100%`), sem contêiner máximo centralizado. Use padding lateral de 24px, calhas (gutters) de 24px e permita que os módulos internos ocupem o espaço horizontal disponível.
 * **Tablet:** Grade de 8 colunas com margens laterais de 24px.
 * **Mobile:** Grade fluida de 4 colunas com margens laterais de 16px.
 

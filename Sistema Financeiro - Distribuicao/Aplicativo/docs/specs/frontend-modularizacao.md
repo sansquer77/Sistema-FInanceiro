@@ -1,93 +1,108 @@
-# Modularizacao do frontend
+---
+tipo: spec
+area: frontend
+status: implementado
+versao: 1.0
+atualizado: 2026-06-29
+relacionados:
+  - "[[adr/0002-modularizacao-frontend]]"
+  - "[[arquitetura]]"
+tags: [spec, "area/frontend"]
+aliases: ["Modularização Frontend", "ES Modules"]
+---
+
+# Modularização do Frontend
+
+> [!info] Status
+> **implementado** · área: `frontend` · atualizado em 2026-06-29 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]]
 
 ## Problema
 
-O arquivo `web/app.js` concentra estado de tela, chamadas de API, formatadores, renderizacao, regras auxiliares e handlers de todos os modulos. Isso dificulta leitura, revisao e evolucao sem regressao.
+O arquivo `web/app.js` concentrava estado de tela, chamadas de API, formatadores, renderização, regras auxiliares e handlers de todos os módulos. Isso dificultava leitura, revisão e evolução sem risco de regressão.
 
-## Usuario
+## Usuário
 
-Analistas e mantenedores do Sistema Financeiro que precisam evoluir a interface local com seguranca, mantendo o app simples e sem etapa de build.
+Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com segurança, mantendo o app simples e sem etapa de build.
 
 ## Jornada
 
 1. O mantenedor abre a pasta `web/`.
-2. Ele encontra responsabilidades comuns em `web/modules/`.
-3. Ele evolui uma area funcional sem precisar percorrer todo o `app.js`.
+2. Encontra responsabilidades comuns em `web/modules/`.
+3. Evolui uma área funcional sem precisar percorrer todo o `app.js`.
 4. O navegador carrega a interface por ES Modules nativos.
 
-## Dados
+## Módulos utilitários
 
-- `web/app.js`: ponto de entrada e orquestracao geral.
-- `web/modules/api.js`: chamadas HTTP JSON e upload.
-- `web/modules/date-utils.js`: datas locais, meses e exibicao de datas.
-- `web/modules/money-utils.js`: formatacao e parsing numerico/monetario.
-- `web/modules/dom-utils.js`: helpers pequenos de formulario, mensagens, empty state e escaping.
-- `web/modules/transaction-kind.js`: predicados de tipo de lancamento.
-- `web/modules/labels.js`: labels de dominio usados pela interface.
-- `web/modules/month-picker.js`: popover reutilizavel de selecao de mes.
+| Arquivo | Responsabilidade |
+|---|---|
+| `api.js` | Chamadas HTTP JSON e upload. |
+| `date-utils.js` | Datas locais, meses e exibição. |
+| `money-utils.js` | Formatação e parsing numérico/monetário. |
+| `dom-utils.js` | Helpers de formulário, mensagens e empty state. |
+| `transaction-kind.js` | Predicados de tipo de lançamento. |
+| `labels.js` | Labels de domínio usados pela interface. |
+| `month-picker.js` | Popover reutilizável de seleção de mês. |
+
+## Views funcionais
+
+| Arquivo | Responsabilidade |
+|---|---|
+| `auth-view.js` | Login, cadastro, logout e recuperação de senha. |
+| `user-admin-view.js` | Troca de email/senha, config. SMTP, limpeza e exclusão. |
+| `classifications-view.js` | Categorias, subcategorias e tags. |
+| `limits-view.js` | Limites de gastos e índice de consumo. |
+| `reports-view.js` | Filtros, abas, agrupamentos e tabelas. |
+| `imports-view.js` | Upload, download de modelo e resultado da importação. |
+| `cockpit-view.js` | Resumo, saldos, planejamento, dívidas, portfólio e alertas. |
+| `accounts-view.js` | Contas: cadastro, edição, arquivamento e restauração. |
+| `cards-view.js` | Cartões: cadastro, faturas, pagamento e conciliação. |
+| `portfolio-view.js` | Ativos: posições, histórico, resgate e encerramento. |
+| `transactions-view.js` | Lançamentos: formulário, recorrência, parcelas e câmbio. |
+
+## Contrato de fábrica para views
+
+```js
+export function createXxxView({ state, elements, services, formatters, actions }) {
+  // state    → estado centralizado da tela
+  // elements → referências DOM daquela área
+  // services → api, upload e carregadores compartilhados
+  // formatters → funções de data, dinheiro e labels
+  // actions  → callbacks de navegação ou refresh global
+}
+```
 
 ## Regras
 
-- Nao alterar comportamento observavel da interface nesta entrega.
-- Nao introduzir framework, bundler ou dependencias de frontend.
-- Modulos devem ter nomes em ingles e funcoes pequenas.
-- Regras financeiras permanecem no dominio Python; o frontend apenas formata e orquestra.
-- Novos modulos funcionais devem receber dependencias explicitamente quando forem extraidos.
-
-## Fronteiras recomendadas
-
-### Modulos ja extraidos
-
-- `api`: comunicacao com o servidor local.
-- `date-utils`: datas locais, competencia mensal e exibicao.
-- `money-utils`: parsing e formatacao de valores.
-- `dom-utils`: helpers pequenos e sem regra financeira.
-- `transaction-kind`: predicados reutilizados por relatorios, cockpit e lancamentos.
-- `labels`: labels e caminhos de categoria.
-- `month-picker`: componente pequeno compartilhado entre lancamentos, cartoes, limites e relatorios.
-- `auth-view`: login, cadastro, logout e recuperacao de senha.
-- `user-admin-view`: troca de email/senha, limpeza de lancamentos e exclusao de usuario autenticado.
-- `classifications-view`: categorias, subcategorias, tags, formularios, mensagens e CRUD.
-- `limits-view`: limites de gastos, resumo mensal, indice de consumo e alerta de limite do cockpit.
-- `reports-view`: filtros, abas, agrupamentos, totais multimoeda e tabelas de relatorio.
-
-### Proximos modulos funcionais
-
-- `accounts-view`: cadastro, edicao, arquivamento, restauracao e logos de contas.
-- `cards-view`: cadastro de cartoes, faturas, pagamento de fatura, lancamentos de cartao e conciliacao.
-- `transactions-view`: formulario de lancamentos, busca, agrupamento por data, recorrencia, parcelas, cambio e investimento.
-- `portfolio-view`: cadastro de ativos, posicoes, historico, agrupamentos, resgate, encerramento e atualizacao de valor.
-- `imports-view`: upload, download de modelo e apresentacao do resultado.
-- `cockpit-view`: resumo financeiro, graficos, planejamento, dividas parceladas e alerta de limites.
-
-### Contrato sugerido para views
-
-Cada view deve exportar uma funcao `create*View(context)` ou `register*View(context)` recebendo somente as dependencias que usa:
-
-- `state`: estado centralizado da tela.
-- `elements`: referencias DOM daquela area.
-- `services`: `api`, `upload` e carregadores compartilhados.
-- `formatters`: funcoes de data, dinheiro e labels.
-- `actions`: callbacks de navegacao ou refresh global.
-
-Esse contrato evita imports circulares e deixa claro o que cada modulo toca.
+- Não alterar comportamento observável da interface.
+- Não introduzir framework, bundler ou dependências de frontend.
+- Módulos têm nomes em inglês e funções pequenas.
+- Regras financeiras permanecem no domínio Python; o frontend apenas formata e orquestra.
+- Novos módulos recebem dependências explicitamente via contrato de fábrica.
 
 ## API e dados
 
 - Nenhum endpoint novo.
 - Nenhuma tabela nova.
-- `index.html` passa a carregar `app.js` como `type="module"`.
+- `index.html` carrega `app.js` como `type="module"`.
 
-## Criterios de aceite
+## Critérios de aceite
 
-- Dado o app carregado, quando o navegador busca `app.js`, entao seus imports de `web/modules/` resolvem sem erro.
-- Dado um fluxo existente de login, navegacao, lancamentos, cartoes, relatorios e portfolio, quando usado, entao as chamadas de API e formatacoes continuam iguais.
-- Dado um mantenedor lendo o frontend, quando busca formatacao monetaria, datas ou API, entao encontra essas responsabilidades fora do arquivo principal.
-- Dado um mantenedor lendo categorias, limites ou relatorios, quando busca seus formularios, handlers e renderizacao, entao encontra esses fluxos em `classifications-view`, `limits-view` e `reports-view`.
+- Dado o app carregado, quando o navegador busca `app.js`, todos os imports de `web/modules/` resolvem sem erro.
+- Dado um fluxo existente (login, navegação, lançamentos, cartões, relatórios, portfólio), quando usado, as chamadas de API e formatações continuam iguais ao comportamento anterior.
+- Dado um mantenedor buscando formatação monetária ou de datas, quando procura, encontra em `money-utils.js` e `date-utils.js`.
+- Dado um mantenedor buscando qualquer área funcional, quando procura, encontra no arquivo de view correspondente.
 
 ## Fora de escopo
 
 - Reescrever HTML/CSS.
 - Criar build step.
 - Alterar regras financeiras, endpoints ou banco.
-- Extrair completamente todas as views nesta primeira entrega; isso deve acontecer em passos menores por area funcional.
+
+## Changelog
+
+- `1.0` — 2026-06-29 — Frontmatter e critérios formalizados; referência cruzada com ADR.
+
+## Relacionados
+
+- [[adr/0002-modularizacao-frontend]]
+- [[arquitetura]]

@@ -1,60 +1,110 @@
-# Lancamentos
+---
+tipo: spec
+area: lancamentos
+status: implementado
+versao: 1.1
+atualizado: 2026-06-29
+relacionados:
+  - "[[contas-correntes]]"
+  - "[[categorias-tags-gestao]]"
+  - "[[cartoes]]"
+  - "[[investimentos-portfolio]]"
+  - "[[arquitetura]]"
+tags: [spec, "area/lancamentos"]
+aliases: ["Lançamentos", "Transações"]
+---
 
-## Objetivo
+# Lançamentos
 
-Permitir que o usuario registre movimentacoes financeiras manuais e mantenha os saldos das contas atualizados.
+> [!info] Status
+> **implementado** · área: `lancamentos` · atualizado em 2026-06-29 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]]
 
-## Estado
+## Problema
 
-**Implementado** (com suporte a lançamentos simples, transferências, conciliação bancária, recorrência periódica, parcelamentos e operações em cascata de edição/exclusão).
+O usuário precisa registrar movimentações financeiras manuais e manter os saldos das contas atualizados em tempo real.
+
+## Usuário
+
+Qualquer usuário autenticado localmente que registre receitas, despesas, transferências, câmbio ou aportes de investimento.
 
 ## Jornada
 
-1. Usuario abre a area de lancamentos.
-2. Escolhe a conta no topo do formulario.
-3. Escolhe tipo: receita, despesa, investimento, transferencia ou cambio, conforme a natureza da conta.
-4. Informa valor, data, descricao e, quando aplicavel, categoria, subcategoria e tags.
-5. Para transferencia ou cambio, informa tambem a conta de destino.
-6. Para lançamentos recorrentes ou parcelados, define a frequência de recorrência ou a quantidade total de parcelas.
-7. O sistema grava o lancamento e atualiza os saldos das contas afetadas.
+1. Usuário abre a área de Lançamentos.
+2. Escolhe a conta no topo do formulário.
+3. Escolhe o tipo conforme a natureza da conta: receita, despesa, investimento, transferência ou câmbio.
+4. Informa valor, data, descrição e, quando aplicável, categoria, subcategoria e tags.
+5. Para transferência ou câmbio, informa também a conta de destino.
+6. Para lançamentos recorrentes ou parcelados, define a frequência ou a quantidade total de parcelas.
+7. O sistema grava o lançamento e atualiza os saldos das contas afetadas.
 
-## Regras de Negócio
+## Dados
 
-- Despesa reduz o saldo da conta de origem.
-- Receita aumenta o saldo da conta de origem.
-- Investimento reduz a liquidez da conta quando for aporte e pode criar/atualizar a posicao correspondente no portfolio.
-- Transferencia reduz o saldo da origem e aumenta o saldo do destino.
-- Transferencia exige contas diferentes e com a mesma moeda.
-- Cambio deve ser usado para movimentacoes entre contas de moedas diferentes, registrando valor de origem, valor de destino e cotacao ajustavel.
-- Na conta de origem, transferencia/cambio aparece como saida; na conta de destino, aparece como entrada positiva.
+| Campo | Tipo | Regra |
+|---|---|---|
+| `tipo` | enum | Obrigatório. `income`, `expense`, `investment`, `transfer`, `exchange`. |
+| `valor` | inteiro (centavos) | Obrigatório. Deve ser maior que zero. |
+| `data` | ISO `YYYY-MM-DD` | Obrigatório. |
+| `descricao` | texto | Obrigatório. |
+| `conta_id` | FK | Obrigatório. |
+| `conta_destino_id` | FK | Obrigatório para transferência e câmbio. |
+| `categoria_id` | FK | Obrigatório para receita, despesa e investimento. |
+| `subcategoria_id` | FK | Opcional. |
+| `tags` | lista de FK | Opcional. N:M via `transaction_tags`. |
+| `observacoes` | texto | Opcional. |
+| `recorrente` | booleano + frequência | Opcional. |
+| `parcelas` | inteiro | Opcional. Gera série com índice `1/N`. |
+| `reconciled_at` | timestamp | Opcional. Marcado na conciliação bancária. |
+
+## Regras de negócio
+
+- **Despesa**: reduz o saldo da conta de origem.
+- **Receita**: aumenta o saldo da conta de origem.
+- **Investimento**: reduz a liquidez da conta quando for aporte e pode criar/atualizar a posição no portfólio. Ver [[investimentos-portfolio]].
+- **Transferência**: reduz saldo da origem, aumenta saldo do destino. Exige contas diferentes com a mesma moeda.
+- **Câmbio**: movimentação entre contas de moedas diferentes; registra valor de origem, valor de destino e cotação ajustável.
 - Valor deve ser maior que zero.
-- Data deve ser valida em formato ISO.
-- Categoria e obrigatoria para receitas, despesas e investimentos.
-- Transferencias e cambio nao exigem categoria nem subcategoria.
-- Subcategoria, tags e observacoes sao opcionais.
-- Ao selecionar uma conta de investimento, o tipo padrao deve ser investimento.
-- Contas do tipo carteira (`wallet`) aceitam apenas receitas, despesas e transferencias; nao exibem repeticao, pois os lancamentos sao sempre a vista.
-- Excluir lancamento reverte o impacto no saldo.
-- **Edição em cascata**: Ao editar um lançamento que faz parte de uma recorrência ou parcelamento, o usuário pode optar por aplicar as alterações apenas ao lançamento atual ou também a todos os lançamentos futuros da série que ainda não foram conciliados (`reconciled_at IS NULL`).
-- **Exclusão em cascata**: Ao excluir um lançamento de uma série com o parâmetro `scope=future`, o sistema remove recursivamente todos os lançamentos futuros da mesma série que não estejam conciliados, revertendo seus respectivos impactos nos saldos das contas.
-- Lançamentos parcelados devem exibir a parcela atual e o total da serie (`1/36`, `2/36`, etc.) sem reiniciar a contagem em edicoes pontuais.
-- Lançamentos recorrentes e parcelados podem compor o planejamento do mes e a secao de dividas do Cockpit.
+- Categoria é obrigatória para receitas, despesas e investimentos. Transferências e câmbio não exigem categoria.
+- Subcategoria, tags e observações são opcionais.
+- Contas do tipo `wallet` aceitam apenas receitas, despesas e transferências à vista — sem recorrência. Ver [[contas-correntes]].
+- Ao selecionar uma conta de investimento, o tipo padrão sugerido é `investment`.
+- Excluir um lançamento reverte o impacto no saldo.
+- **Edição em cascata** (`apply_to_future`): ao editar um lançamento de uma série, o usuário pode aplicar as alterações ao lançamento atual ou a todos os futuros da série que ainda não foram conciliados (`reconciled_at IS NULL`).
+- **Exclusão em cascata** (`scope=future`): remove recursivamente todos os lançamentos futuros não conciliados da mesma série, revertendo os respectivos impactos nos saldos.
+- Lançamentos parcelados exibem índice e total (`1/36`, `2/36`...) sem reiniciar a contagem em edições pontuais.
 
 ## API e dados
 
-- `GET /api/transactions`
-- `POST /api/transactions`
-- `PUT /api/transactions/{id}` (aceita parâmetro `apply_to_future` para cascata)
-- `DELETE /api/transactions/{id}` (aceita query `scope=future` para cascata)
-- `PUT /api/transactions/{id}/reconciliation` (atualiza status de conciliação)
-- Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, `subcategories`, `tags`.
+| Método | Rota |
+|---|---|
+| `GET` | `/api/transactions` |
+| `POST` | `/api/transactions` |
+| `PUT` | `/api/transactions/{id}` |
+| `DELETE` | `/api/transactions/{id}` |
+| `PUT` | `/api/transactions/{id}/reconciliation` |
+| `GET` | `/api/exchange-rate` |
 
-## Criterios de aceite
+Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, `subcategories`, `tags`.
 
-- Ao criar receita, o saldo da conta aumenta.
-- Ao criar despesa, o saldo da conta diminui.
-- Ao criar transferencia, origem e destino sao atualizados corretamente.
-- Ao excluir lancamento, o saldo volta ao estado anterior.
-- A exclusão com `scope=future` remove as parcelas/recorrências futuras não conciliadas.
-- A edição com `apply_to_future` atualiza os dados e recalcula o saldo e câmbio das ocorrências futuras não conciliadas.
-- A listagem exibe conta, tipo, valor, data, categoria, subcategoria, tags e se o lançamento é recorrente ou parcelado.
+## Critérios de aceite
+
+- Dado uma receita criada, quando listado, o saldo da conta aumenta pelo valor informado.
+- Dado uma despesa criada, quando listada, o saldo da conta diminui pelo valor informado.
+- Dado uma transferência criada, quando listada, origem e destino são atualizados corretamente.
+- Dado um câmbio criado, quando listado, origem reduz pelo valor de origem e destino aumenta pelo valor de destino.
+- Dado um lançamento excluído, quando consultado, o saldo volta ao estado anterior.
+- Dado `scope=future` na exclusão, quando executado, as parcelas/recorrências futuras não conciliadas são removidas e os saldos revertidos.
+- Dado `apply_to_future` na edição, quando executado, os dados e saldos das ocorrências futuras não conciliadas são atualizados.
+- Dado um lançamento listado, quando exibido, mostra conta, tipo, valor, data, categoria, subcategoria, tags e indicação de recorrente/parcelado.
+
+## Changelog
+
+- `1.1` — 2026-06-29 — Frontmatter, tabela de dados e critérios formalizados; wikilinks adicionados.
+- `1.0` — versão original.
+
+## Relacionados
+
+- [[contas-correntes]]
+- [[categorias-tags-gestao]]
+- [[cartoes]]
+- [[investimentos-portfolio]]
+- [[arquitetura]]

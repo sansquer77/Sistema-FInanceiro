@@ -86,6 +86,62 @@ WEB_ROOT = ROOT / "web"
 HOST = os.environ.get("APP_HOST", "127.0.0.1")
 PORT = int(os.environ.get("APP_PORT", "8010"))
 PUBLIC_URL = os.environ.get("APP_URL", f"http://sistema-financeiro.localhost:{PORT}")
+LOCAL_ALLOWED_HOSTS = frozenset({"sistema-financeiro.localhost", "127.0.0.1"})
+MAX_JSON_BODY_BYTES = 1 * 1024 * 1024
+SECURITY_HEADERS = {
+    "Content-Security-Policy": (
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: blob:; "
+        "font-src 'self' data:; "
+        "connect-src 'self'; "
+        "base-uri 'self'; "
+        "form-action 'self'; "
+        "frame-ancestors 'none'; "
+        "object-src 'none'"
+    ),
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "same-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+}
+
+
+def normalize_netloc(value: str) -> str:
+    parsed = urlsplit(f"//{value.strip().lower()}")
+    host = (parsed.hostname or "").rstrip(".")
+    if not host:
+        return ""
+    try:
+        port = parsed.port
+    except ValueError:
+        return ""
+    if port is None:
+        return host
+    return f"{host}:{port}"
+
+
+def public_url_origin() -> str:
+    public_url = urlsplit(PUBLIC_URL)
+    if not public_url.scheme or not public_url.netloc:
+        return ""
+    return f"{public_url.scheme.lower()}://{normalize_netloc(public_url.netloc)}"
+
+
+def allowed_host_values() -> set[str]:
+    hosts = {f"{host}:{PORT}" for host in LOCAL_ALLOWED_HOSTS}
+    public_host = normalize_netloc(urlsplit(PUBLIC_URL).netloc)
+    if public_host:
+        hosts.add(public_host)
+    return hosts
+
+
+def allowed_origin_values() -> set[str]:
+    origins = {f"http://{host}:{PORT}" for host in LOCAL_ALLOWED_HOSTS}
+    public_origin = public_url_origin()
+    if public_origin:
+        origins.add(public_origin)
+    return origins
 
 
 class AppHandler(BaseHTTPRequestHandler):
@@ -141,6 +197,8 @@ class AppHandler(BaseHTTPRequestHandler):
         self.serve_static()
 
     def do_POST(self) -> None:
+        if not self.validate_mutation_source():
+            return
         path = self.route_path()
         if path == "/api/register":
             self.handle_register()
@@ -220,6 +278,8 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_json({"error": "Rota nao encontrada."}, HTTPStatus.NOT_FOUND)
 
     def do_PUT(self) -> None:
+        if not self.validate_mutation_source():
+            return
         path = self.route_path()
         if path.startswith("/api/transactions/") and path.endswith("/reconciliation"):
             self.handle_reconcile_transaction()
@@ -263,6 +323,8 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_json({"error": "Rota nao encontrada."}, HTTPStatus.NOT_FOUND)
 
     def do_DELETE(self) -> None:
+        if not self.validate_mutation_source():
+            return
         path = self.route_path()
         if path == "/api/me":
             self.handle_delete_user()
@@ -722,6 +784,7 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(body)))
+        self.send_security_headers()
         self.end_headers()
         self.wfile.write(body)
 
@@ -743,6 +806,7 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", content_type)
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(body)))
+        self.send_security_headers()
         self.end_headers()
         self.wfile.write(body)
 
@@ -754,7 +818,14 @@ class AppHandler(BaseHTTPRequestHandler):
         return user
 
     def read_json(self) -> dict:
-        length = int(self.headers.get("Content-Length", 0))
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+        except ValueError as exc:
+            raise ApiError("Content-Length invalido.", HTTPStatus.BAD_REQUEST) from exc
+        if length < 0:
+            raise ApiError("Content-Length invalido.", HTTPStatus.BAD_REQUEST)
+        if length > MAX_JSON_BODY_BYTES:
+            raise ApiError("JSON muito grande. Envie ate 1 MB.", HTTPStatus.REQUEST_ENTITY_TOO_LARGE)
         if length == 0:
             return {}
         try:
@@ -803,10 +874,34 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        self.send_security_headers()
         for key, value in (headers or {}).items():
             self.send_header(key, value)
         self.end_headers()
         self.wfile.write(body)
+
+    def send_security_headers(self) -> None:
+        for key, value in SECURITY_HEADERS.items():
+            self.send_header(key, value)
+
+    def validate_mutation_source(self) -> bool:
+        if not self.is_allowed_host(self.headers.get("Host", "")):
+            self.send_json({"error": "Origem da requisicao nao permitida."}, HTTPStatus.FORBIDDEN)
+            return False
+        origin = self.headers.get("Origin")
+        if origin and not self.is_allowed_origin(origin):
+            self.send_json({"error": "Origem da requisicao nao permitida."}, HTTPStatus.FORBIDDEN)
+            return False
+        return True
+
+    def is_allowed_host(self, host_header: str) -> bool:
+        return normalize_netloc(host_header) in allowed_host_values()
+
+    def is_allowed_origin(self, origin_header: str) -> bool:
+        origin = urlsplit(origin_header)
+        if not origin.scheme or not origin.netloc or origin.path not in {"", "/"}:
+            return False
+        return f"{origin.scheme.lower()}://{normalize_netloc(origin.netloc)}" in allowed_origin_values()
 
     def get_cookie(self, name: str) -> str | None:
         raw_cookie = self.headers.get("Cookie", "")

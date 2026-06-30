@@ -123,6 +123,7 @@ const cardInvoiceMonthLabel = document.querySelector("#cardInvoiceMonthLabel");
 const previousCardInvoiceButton = document.querySelector("#previousCardInvoiceButton");
 const todayCardInvoiceButton = document.querySelector("#todayCardInvoiceButton");
 const nextCardInvoiceButton = document.querySelector("#nextCardInvoiceButton");
+const cardInvoiceHistoryChart = document.querySelector("#cardInvoiceHistoryChart");
 const cardInvoiceTotal = document.querySelector("#cardInvoiceTotal");
 const cardInvoiceReconciledTotal = document.querySelector("#cardInvoiceReconciledTotal");
 const cardInvoiceClosingDate = document.querySelector("#cardInvoiceClosingDate");
@@ -496,6 +497,7 @@ const cardsView = registerCardsView({
     previousCardInvoiceButton,
     todayCardInvoiceButton,
     nextCardInvoiceButton,
+    cardInvoiceHistoryChart,
     cardInvoiceTotal,
     cardInvoiceReconciledTotal,
     cardInvoiceClosingDate,
