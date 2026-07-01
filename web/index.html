@@ -6,7 +6,22 @@
     <title>Sistema Financeiro</title>
     <link rel="icon" href="/assets/app-icon.png">
     <link rel="apple-touch-icon" href="/assets/app-icon.png">
-    <link rel="stylesheet" href="/styles.css?v=109">
+    <script>
+      (() => {
+        const storageKey = "sistemaFinanceiro.theme";
+        const themes = new Set(["light", "dark"]);
+        let theme = "light";
+        try {
+          const storedTheme = localStorage.getItem(storageKey);
+          theme = themes.has(storedTheme) ? storedTheme : "light";
+        } catch (error) {
+          theme = "light";
+        }
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+      })();
+    </script>
+    <link rel="stylesheet" href="/styles.css?v=111">
   </head>
   <body>
     <main class="app-shell">
@@ -1288,6 +1303,6 @@
         </div>
       </aside>
     </main>
-    <script type="module" src="/app.js?v=109"></script>
+    <script type="module" src="/app.js?v=111"></script>
   </body>
 </html>

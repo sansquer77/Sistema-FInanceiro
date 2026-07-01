@@ -2,7 +2,7 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 1.1
+versao: 1.2
 atualizado: 2026-06-30
 relacionados:
   - "[[contas-correntes]]"
@@ -51,6 +51,8 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 **Geral:**
 - Cada ativo é mantido e exibido na moeda da conta/carteira onde está custodiado.
 - Conversões entre moedas ocorrem nos lançamentos de câmbio, não dentro do ativo. Ver [[lancamentos]].
+- Cards de consolidação por classe, indexador, moeda e carteira exibem valores na moeda original do grupo.
+- As barras dos cards de consolidação usam sempre o valor atual normalizado para BRL apenas para escala visual; para moedas diferentes de BRL, a normalização usa a cotação do fechamento anterior.
 - Posição inicial cadastrada no Portfólio não movimenta conta.
 - Operação de investimento criada por lançamento de conta afeta o saldo da conta.
 
@@ -95,6 +97,7 @@ Tabelas: `investment_opening_positions`, `investment_operations`, `investment_re
 ## Critérios de aceite
 
 - Dado ativos de diferentes classes cadastrados, quando o portfólio é exibido, aparecem agrupados por classe com cotações atualizadas.
+- Dado consolidações por classe, indexador, moeda ou carteira com moedas distintas, quando as barras são exibidas, seu tamanho é calculado pelo valor atual convertido para BRL, enquanto o texto mantém a moeda original.
 - Dado um ativo de renda fixa pós-fixado, quando listado, exibe indexador, taxa e rendimento bruto/líquido com impostos regressivos.
 - Dado um ativo pré-fixado, quando listado, exibe `Pré-fixado` e a taxa anual.
 - Dado um ativo em moeda estrangeira, quando listado, é exibido na própria moeda sem conversão visual redundante.
@@ -103,6 +106,7 @@ Tabelas: `investment_opening_positions`, `investment_operations`, `investment_re
 
 ## Changelog
 
+- `1.2` — 2026-06-30 — Regra das barras de consolidação documentada: escala por valor atual normalizado em BRL e exibição na moeda original.
 - `1.1` — 2026-06-30 — Método do ajuste manual de valor corrigido para refletir a API real (`PUT /api/portfolio/value`).
 - `1.0` — 2026-06-29 — Frontmatter e critérios formalizados.
 

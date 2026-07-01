@@ -2,8 +2,8 @@
 tipo: design
 area: meta
 status: implementado
-versao: 1.0
-atualizado: 2026-06-29
+versao: 1.2
+atualizado: 2026-06-30
 relacionados:
   - "[[arquitetura]]"
   - "[[specs/frontend-modularizacao]]"
@@ -14,7 +14,7 @@ aliases: ["Design System", "Tokens Visuais", "Precisão Institucional"]
 # Design System — Precisão Institucional
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-06-29 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]]
+> **implementado** · área: `meta` · atualizado em 2026-06-30 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]]
 
 ## Personalidade da marca
 
@@ -71,6 +71,17 @@ Autoritária, sistemática e altamente técnica. A interface deve evocar confiab
 |---|---|
 | `--error` | `#ba1a1a` |
 | `--error-container` | `#ffdad6` |
+
+### Preparação para tema escuro
+
+- Cores de UI devem ser aplicadas por tokens CSS, nunca como literais espalhados em componentes.
+- Gráficos e barras de distribuição devem consumir tokens de paleta (`--chart-*`) para permitir troca de tema sem alterar módulos funcionais.
+- Logos e cores institucionais de bancos podem permanecer literais quando representam marca ou ativo visual externo.
+- Novos componentes devem reutilizar tokens existentes antes de criar novos aliases.
+- A primeira etapa de implantação de tema escuro deve preservar o modo claro sem mudança visual perceptível.
+- O tema ativo é aplicado em `document.documentElement.dataset.theme` com valores `light` ou `dark`.
+- A preferência visual é local ao navegador e persistida em `localStorage` pela chave `sistemaFinanceiro.theme`.
+- O `index.html` deve aplicar o tema antes do carregamento do CSS para evitar flash visual.
 
 ---
 
@@ -190,6 +201,8 @@ Grade de linha de base: **4px** (todos os valores são múltiplos de 4px).
 ## Changelog
 
 - `1.0` — 2026-06-29 — Consolidação do design original em tokens tabulados com frontmatter e wikilinks.
+- `1.1` — 2026-06-30 — Regras de tokenização para preparação do modo escuro e paleta de gráficos documentadas.
+- `1.2` — 2026-06-30 — Infraestrutura de aplicação de tema com `data-theme` e preferência local documentada.
 
 ## Relacionados
 

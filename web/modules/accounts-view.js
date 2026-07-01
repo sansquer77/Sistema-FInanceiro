@@ -192,8 +192,8 @@ export function registerAccountsView({
 
   function getBankLogo(bankName, accountType) {
     if (accountType === "wallet") {
-      return `<div class="bank-logo-badge" style="background-color: #e2e8f0;" title="Carteira / Dinheiro">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      return `<div class="bank-logo-badge" style="background-color: var(--bank-logo-wallet-surface);" title="Carteira / Dinheiro">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--bank-logo-generic-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
           <path d="M16 11h6v2h-6z"></path>
           <path d="M12 4v16"></path>
@@ -329,8 +329,8 @@ export function registerAccountsView({
       </div>`;
     }
 
-    return `<div class="bank-logo-badge" style="background-color: #f1f5f9;" title="Banco / Outro">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    return `<div class="bank-logo-badge" style="background-color: var(--bank-logo-generic-surface);" title="Banco / Outro">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--bank-logo-generic-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <rect x="2" y="10" width="20" height="11" rx="2"></rect>
         <path d="M6 6v4M10 6v4M14 6v4M18 6v4M2 6h20M12 2L2 6h20L12 2z"></path>
       </svg>

@@ -23,6 +23,7 @@ BCB_SERIES_RANGE_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{series}/d
 MARKET_QUOTE_TTL_SECONDS = 6 * 60 * 60
 INDEXER_QUOTE_TTL_SECONDS = 24 * 60 * 60
 QUOTE_MEMORY_CACHE: dict[str, tuple[datetime, dict | list]] = {}
+FX_MEMORY_CACHE: dict[tuple[str, str], int] = {}
 
 ASSET_TYPE_LABELS = {
     "stock": "Renda variável",
@@ -1796,13 +1797,26 @@ def format_quoted_position(position: dict) -> dict:
 
 
 def group_positions(positions: list[dict], key: str) -> list[dict]:
-    totals = defaultdict(lambda: {"label": "", "currency": "BRL", "cost_brl_cents": 0, "current_brl_cents": 0, "day_result_brl_cents": 0, "count": 0})
+    totals = defaultdict(lambda: {
+        "label": "",
+        "currency": "BRL",
+        "cost_cents": 0,
+        "current_cents": 0,
+        "day_result_cents": 0,
+        "cost_brl_cents": 0,
+        "current_brl_cents": 0,
+        "day_result_brl_cents": 0,
+        "count": 0,
+    })
     for position in positions:
         label = portfolio_group_label(position, key)
         currency = position.get("currency") or "BRL"
         row = totals[(label, currency)]
         row["label"] = label
         row["currency"] = currency
+        row["cost_cents"] += position["total_cost_cents"]
+        row["current_cents"] += position["current_value_cents"]
+        row["day_result_cents"] += position["day_result_cents"]
         row["cost_brl_cents"] += position["total_cost_brl_cents"]
         row["current_brl_cents"] += position["current_value_brl_cents"]
         row["day_result_brl_cents"] += position["day_result_brl_cents"]
@@ -1810,12 +1824,13 @@ def group_positions(positions: list[dict], key: str) -> list[dict]:
     return [
         {
             "label": row["label"],
-            "cost_brl": cents_to_money(row["cost_brl_cents"]),
-            "current_brl": cents_to_money(row["current_brl_cents"]),
-            "result_brl": cents_to_money(row["current_brl_cents"] - row["cost_brl_cents"]),
-            "result_percent": percent(row["current_brl_cents"] - row["cost_brl_cents"], row["cost_brl_cents"]),
-            "day_result_brl": cents_to_money(row["day_result_brl_cents"]),
-            "day_result_percent": percent(row["day_result_brl_cents"], row["current_brl_cents"] - row["day_result_brl_cents"]),
+            "cost_brl": cents_to_money(row["cost_cents"]),
+            "current_brl": cents_to_money(row["current_cents"]),
+            "result_brl": cents_to_money(row["current_cents"] - row["cost_cents"]),
+            "result_percent": percent(row["current_cents"] - row["cost_cents"], row["cost_cents"]),
+            "day_result_brl": cents_to_money(row["day_result_cents"]),
+            "day_result_percent": percent(row["day_result_cents"], row["current_cents"] - row["day_result_cents"]),
+            "chart_current_brl": cents_to_money(row["current_brl_cents"]),
             "count": row["count"],
             "currency": row["currency"],
         }
@@ -1961,7 +1976,29 @@ def format_decimal_percent(value: Decimal) -> str:
 
 
 def value_to_brl(amount_cents: int, currency: str) -> int:
-    return amount_cents
+    normalized_currency = str(currency or "BRL").strip().upper()
+    if normalized_currency == "BRL":
+        return amount_cents
+    rate_micros = portfolio_exchange_rate_micros(normalized_currency)
+    return convert_to_brl_cents(amount_cents, rate_micros)
+
+
+def portfolio_exchange_rate_micros(currency: str) -> int:
+    quote_date = previous_business_day(date.today()).isoformat()
+    cache_key = (currency, quote_date)
+    if cache_key not in FX_MEMORY_CACHE:
+        try:
+            FX_MEMORY_CACHE[cache_key] = rate_to_micros(get_exchange_rate_to_brl(currency, quote_date))
+        except Exception:
+            FX_MEMORY_CACHE[cache_key] = rate_to_micros(Decimal("1"))
+    return FX_MEMORY_CACHE[cache_key]
+
+
+def previous_business_day(reference_date: date) -> date:
+    day = reference_date - timedelta(days=1)
+    while day.weekday() >= 5:
+        day -= timedelta(days=1)
+    return day
 
 
 def percent(delta: int, base: int) -> str:

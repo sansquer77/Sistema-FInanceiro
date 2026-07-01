@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from financeiro.portfolio import build_positions, format_position
+from financeiro.portfolio import build_positions, format_position, group_positions
 
 
 class PortfolioCostTest(unittest.TestCase):
@@ -48,6 +48,39 @@ class PortfolioCostTest(unittest.TestCase):
         formatted = format_position(positions[0])
         self.assertEqual(formatted["total_cost"], "20.35")
         self.assertEqual(formatted["average_price"], "6.78")
+
+    def test_group_rows_keep_display_currency_and_expose_brl_chart_value(self) -> None:
+        rows = group_positions([
+            {
+                "asset_type_label": "Renda variável",
+                "fixed_income_indexer": "",
+                "currency": "USD",
+                "account_name": "Exterior",
+                "total_cost_cents": 9000,
+                "current_value_cents": 10000,
+                "day_result_cents": 100,
+                "total_cost_brl_cents": 45000,
+                "current_value_brl_cents": 50000,
+                "day_result_brl_cents": 500,
+            },
+            {
+                "asset_type_label": "Renda variável",
+                "fixed_income_indexer": "",
+                "currency": "USD",
+                "account_name": "Exterior",
+                "total_cost_cents": 1000,
+                "current_value_cents": 2000,
+                "day_result_cents": 20,
+                "total_cost_brl_cents": 5000,
+                "current_value_brl_cents": 10000,
+                "day_result_brl_cents": 100,
+            },
+        ], "asset_type_label")
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["currency"], "USD")
+        self.assertEqual(rows[0]["current_brl"], "120.00")
+        self.assertEqual(rows[0]["chart_current_brl"], "600.00")
 
 
 if __name__ == "__main__":

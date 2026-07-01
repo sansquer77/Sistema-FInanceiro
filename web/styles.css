@@ -57,6 +57,23 @@
   --tooltip-text: #ffffff;
   --drawer-overlay: rgba(15, 23, 42, 0.42);
   --drawer-shadow: -4px 0 24px rgba(15, 23, 42, 0.12);
+  --chart-1: #14b8a6;
+  --chart-2: #6366f1;
+  --chart-3: #f97316;
+  --chart-4: #ec4899;
+  --chart-5: #22c55e;
+  --chart-6: #3b82f6;
+  --bank-logo-generic-surface: #f1f5f9;
+  --bank-logo-wallet-surface: #e2e8f0;
+  --bank-logo-generic-ink: #475569;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 * {
@@ -1778,15 +1795,25 @@ textarea:focus {
 
 .portfolio-group-row {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) minmax(132px, auto);
   gap: 8px;
   padding: 10px 12px;
+}
+
+.portfolio-group-value {
+  display: grid;
+  justify-items: end;
+  text-align: right;
 }
 
 .portfolio-group-row strong {
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+.portfolio-group-value strong {
+  justify-content: flex-end;
 }
 
 .portfolio-group-row i {

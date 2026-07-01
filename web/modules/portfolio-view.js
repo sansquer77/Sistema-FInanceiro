@@ -394,20 +394,19 @@ export function registerPortfolioView({
       container.innerHTML = '<div class="empty-state compact">Sem dados para consolidar.</div>';
       return;
     }
-    const totalsByCurrency = portfolioTotalsByCurrency(rows);
+    const chartTotal = portfolioGroupChartTotal(rows);
     container.innerHTML = rows.map((row, index) => {
-      const current = Number(row.current_brl);
+      const chartValue = Number(row.chart_current_brl || row.current_brl || 0);
       const result = Number(row.result_brl);
       const currency = row.currency || "BRL";
-      const total = totalsByCurrency.get(currency) || 0;
-      const percent = total > 0 ? current / total : 0;
+      const percent = chartTotal > 0 ? chartValue / chartTotal : 0;
       return `
         <article class="portfolio-group-row">
           <div>
             <strong><i style="background:${chartColor(index)}"></i>${escapeHtml(row.label)}</strong>
             <span>${row.count} posição(ões)</span>
           </div>
-          <div>
+          <div class="portfolio-group-value">
             <strong>${formatMoney(row.current_brl, currency)}</strong>
             <span class="${result < 0 ? "danger-text" : "positive-text"}">${formatMoney(row.result_brl, currency)} · ${Number(row.result_percent).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%</span>
           </div>
@@ -415,6 +414,10 @@ export function registerPortfolioView({
         </article>
       `;
     }).join("");
+  }
+
+  function portfolioGroupChartTotal(rows) {
+    return rows.reduce((total, row) => total + Math.max(Number(row.chart_current_brl || row.current_brl || 0), 0), 0);
   }
 
   function portfolioTotalsByCurrency(rows) {

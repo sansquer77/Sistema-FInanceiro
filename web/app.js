@@ -41,6 +41,7 @@ import {
   isInvestmentTransfer,
 } from "./modules/transaction-kind.js";
 import { openMonthPicker } from "./modules/month-picker.js";
+import { applyTheme } from "./modules/theme-utils.js";
 import { registerAuthView } from "./modules/auth-view.js";
 import { registerUserAdminView } from "./modules/user-admin-view.js";
 import { registerClassificationsView } from "./modules/classifications-view.js";
@@ -52,6 +53,8 @@ import { registerAccountsView } from "./modules/accounts-view.js";
 import { registerCardsView } from "./modules/cards-view.js";
 import { registerPortfolioView } from "./modules/portfolio-view.js";
 import { registerTransactionsView } from "./modules/transactions-view.js";
+
+applyTheme();
 
 const state = {
   user: null,
@@ -1140,7 +1143,10 @@ function renderLimitAlerts() {
 }
 
 function chartColor(index) {
-  return ["#14b8a6", "#6366f1", "#f97316", "#ec4899", "#22c55e", "#3b82f6"][index % 6];
+  const fallbackPalette = ["#14b8a6", "#6366f1", "#f97316", "#ec4899", "#22c55e", "#3b82f6"];
+  const tokenName = `--chart-${(index % fallbackPalette.length) + 1}`;
+  const tokenColor = getComputedStyle(document.documentElement).getPropertyValue(tokenName).trim();
+  return tokenColor || fallbackPalette[index % fallbackPalette.length];
 }
 
 function renderAccounts() {

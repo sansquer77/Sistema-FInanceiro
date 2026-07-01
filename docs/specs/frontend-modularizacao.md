@@ -2,7 +2,7 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 1.1
+versao: 1.3
 atualizado: 2026-06-30
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
@@ -42,6 +42,7 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `transaction-kind.js` | Predicados de tipo de lançamento. |
 | `labels.js` | Labels de domínio usados pela interface. |
 | `month-picker.js` | Popover reutilizável de seleção de mês. |
+| `theme-utils.js` | Preferência visual local e aplicação de tema no `documentElement`. |
 
 ## Views funcionais
 
@@ -56,7 +57,7 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `cockpit-view.js` | Resumo, saldos, planejamento, dívidas, portfólio e alertas. |
 | `accounts-view.js` | Contas: cadastro, edição, arquivamento e restauração. |
 | `cards-view.js` | Cartões: cadastro, faturas, busca/filtro da fatura, pagamento e conciliação. |
-| `portfolio-view.js` | Ativos: posições, histórico, resgate e encerramento. |
+| `portfolio-view.js` | Ativos: posições, consolidações com escala BRL, histórico, resgate e encerramento. |
 | `transactions-view.js` | Lançamentos: formulário, recorrência, parcelas e câmbio. |
 
 ## Contrato de fábrica para views
@@ -78,6 +79,8 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Módulos têm nomes em inglês e funções pequenas.
 - Regras financeiras permanecem no domínio Python; o frontend apenas formata e orquestra.
 - Novos módulos recebem dependências explicitamente via contrato de fábrica.
+- Cores de UI e gráficos devem vir de tokens CSS compartilhados; literais ficam restritos a marcas/logos externos.
+- Tema visual é uma preferência local: `theme-utils.js` aplica `data-theme` no elemento raiz e persiste em `localStorage`.
 
 ## API e dados
 
@@ -101,7 +104,9 @@ export function createXxxView({ state, elements, services, formatters, actions }
 ## Changelog
 
 - `1.0` — 2026-06-29 — Frontmatter e critérios formalizados; referência cruzada com ADR.
-- `1.1` — 2026-06-30 — Responsabilidade de busca/filtro da fatura registrada em `cards-view.js`.
+- `1.1` — 2026-06-30 — Responsabilidade de busca/filtro da fatura registrada em `cards-view.js`; consolidações do Portfólio documentadas em `portfolio-view.js`.
+- `1.2` — 2026-06-30 — Regra de tokenização de cores e gráficos registrada para preparação do modo escuro.
+- `1.3` — 2026-06-30 — Infraestrutura local de tema registrada em `theme-utils.js`.
 
 ## Relacionados
 

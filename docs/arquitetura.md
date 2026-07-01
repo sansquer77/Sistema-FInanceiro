@@ -317,6 +317,7 @@ Ver [[cartoes]].
 5. Poupança tratada como ativo próprio com aniversários; Previdência Privada como `private_pension`.
 6. Resgates usam FIFO; encerramentos movem posições para histórico.
 7. Ativos em moeda estrangeira exibidos na moeda da carteira; conversão via lançamentos de câmbio.
+8. Consolidações do Portfólio mantêm valores exibidos na moeda original, mas expõem valor atual normalizado em BRL para a escala das barras visuais, usando cotação do fechamento anterior quando a moeda não é BRL.
 
 Ver [[investimentos-portfolio]].
 
@@ -372,7 +373,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
-- `1.2` — 2026-06-30 — Rotas de Cockpit/relatórios documentadas, método de `/api/portfolio/value` corrigido para `PUT`, índices atuais de performance detalhados e regra de template alinhada ao SDD.
+- `1.2` — 2026-06-30 — Rotas de Cockpit/relatórios documentadas, método de `/api/portfolio/value` corrigido para `PUT`, índices atuais de performance detalhados, regra de template alinhada ao SDD e escala BRL das barras de consolidação do Portfólio documentada.
 - `1.1` — 2026-06-29 — Frontmatter, tabelas de rotas e módulos por área, wikilinks e referência para ADRs.
 - `1.0` — versão original.
 
