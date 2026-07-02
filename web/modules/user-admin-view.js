@@ -6,10 +6,32 @@ export function registerUserAdminView(context) {
     loadAll,
     resetSessionState,
     setMessage,
+    theme,
     state,
     onShowAuth,
   } = context;
   let emailConfigPresets = [];
+
+  function syncThemePreference() {
+    if (!elements.themePreference || !theme) {
+      return;
+    }
+    const currentTheme = theme.storedTheme();
+    elements.themePreference.querySelectorAll("[data-theme-option]").forEach((button) => {
+      const isActive = button.dataset.themeOption === currentTheme;
+      button.classList.toggle("active", isActive);
+      button.setAttribute("aria-pressed", String(isActive));
+    });
+  }
+
+  function handleThemePreferenceClick(event) {
+    const button = event.target.closest("[data-theme-option]");
+    if (!button || !elements.themePreference?.contains(button) || !theme) {
+      return;
+    }
+    theme.setTheme(button.dataset.themeOption);
+    syncThemePreference();
+  }
 
   async function loadEmailConfigStatus() {
     if (!elements.emailConfigForm) {
@@ -152,10 +174,15 @@ export function registerUserAdminView(context) {
     elements.emailConfigForm.addEventListener("submit", handleEmailConfigSubmit);
     elements.emailConfigProvider.addEventListener("change", () => renderEmailConfigHelp());
   }
+  if (elements.themePreference) {
+    elements.themePreference.addEventListener("click", handleThemePreferenceClick);
+    syncThemePreference();
+  }
   elements.clearLaunchesForm.addEventListener("submit", handleClearLaunchesSubmit);
   elements.deleteUserForm.addEventListener("submit", handleDeleteUserSubmit);
 
   return {
     loadEmailConfigStatus,
+    syncThemePreference,
   };
 }

@@ -2,8 +2,8 @@
 tipo: design
 area: meta
 status: implementado
-versao: 1.2
-atualizado: 2026-06-30
+versao: 1.5
+atualizado: 2026-07-01
 relacionados:
   - "[[arquitetura]]"
   - "[[specs/frontend-modularizacao]]"
@@ -14,7 +14,7 @@ aliases: ["Design System", "Tokens Visuais", "Precisão Institucional"]
 # Design System — Precisão Institucional
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-06-30 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]]
+> **implementado** · área: `meta` · atualizado em 2026-07-01 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]]
 
 ## Personalidade da marca
 
@@ -82,6 +82,9 @@ Autoritária, sistemática e altamente técnica. A interface deve evocar confiab
 - O tema ativo é aplicado em `document.documentElement.dataset.theme` com valores `light` ou `dark`.
 - A preferência visual é local ao navegador e persistida em `localStorage` pela chave `sistemaFinanceiro.theme`.
 - O `index.html` deve aplicar o tema antes do carregamento do CSS para evitar flash visual.
+- O tema escuro é implementado somente por overrides de tokens em `[data-theme="dark"]`; componentes não devem criar regras escuras próprias sem necessidade.
+- Cores semânticas mantêm a intenção no escuro: negativos continuam em vermelho, positivos em verde e ações primárias usam o token de destaque com contraste adequado.
+- A alternância entre `light` e `dark` fica no módulo Preferências, em um controle segmentado com estado ativo visível.
 
 ---
 
@@ -198,11 +201,32 @@ Grade de linha de base: **4px** (todos os valores são múltiplos de 4px).
 
 ---
 
+## QA de tema
+
+- Validar os temas `light` e `dark` navegando por Cockpit, Contas, Cartões, Lançamentos de contas, Lançamentos de cartões, Portfólio, Limites, Relatórios, Categorias, Importação e Preferências.
+- Confirmar que o módulo ativo no menu mantém texto branco sobre fundo de destaque.
+- Confirmar que painéis, tabelas, drawers, tooltips, campos e botões mantêm contraste legível nos dois temas.
+- Confirmar que gráficos e barras usam `--chart-*` e permanecem visíveis em superfícies claras e escuras.
+- Confirmar que o controle de Preferências alterna o tema sem recarregar a página e persiste após reload.
+- Validar viewport mobile no módulo Preferências: controle de tema empilhado, sem overflow horizontal.
+
+## Release e rollback
+
+- O modo claro continua sendo o padrão quando não há preferência salva.
+- A preferência fica apenas em `localStorage`; não há migração de banco, endpoint novo ou alteração de autenticação.
+- Rollback visual simples: remover a chave `sistemaFinanceiro.theme` do `localStorage` ou selecionar `Claro` em Preferências.
+- Rollback técnico: remover o bloco `[data-theme="dark"]`, o card de Preferências e o uso de `theme-utils.js`; o restante do app volta ao comportamento claro por tokens.
+
+---
+
 ## Changelog
 
 - `1.0` — 2026-06-29 — Consolidação do design original em tokens tabulados com frontmatter e wikilinks.
 - `1.1` — 2026-06-30 — Regras de tokenização para preparação do modo escuro e paleta de gráficos documentadas.
 - `1.2` — 2026-06-30 — Infraestrutura de aplicação de tema com `data-theme` e preferência local documentada.
+- `1.3` — 2026-06-30 — Paleta de tokens do tema escuro documentada como override centralizado.
+- `1.4` — 2026-07-01 — Controle de alternância claro/escuro em Preferências documentado.
+- `1.5` — 2026-07-01 — Checklist de QA, release e rollback do tema documentados.
 
 ## Relacionados
 

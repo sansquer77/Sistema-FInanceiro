@@ -74,6 +74,72 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
+  --bg: #101114;
+  --panel: #181a20;
+  --surface-low: #1f222a;
+  --surface-container: #252936;
+  --surface-high: #303646;
+  --ink: #f4f6fb;
+  --text: #f4f6fb;
+  --muted: #b8bfcb;
+  --line: #3d4351;
+  --accent: #3b82f6;
+  --accent-dark: #93c5fd;
+  --accent-strong: #2563eb;
+  --secondary: #ff9a45;
+  --secondary-dark: #ffb16b;
+  --positive: #34d399;
+  --danger: #fb7185;
+  --bg-alt: #1f222a;
+  --soft: #273757;
+  --shadow: none;
+  --ambient-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+  --panel-translucent: rgba(24, 26, 32, 0.94);
+  --panel-contrast: #20232b;
+  --panel-subtle: #1c1f26;
+  --panel-muted: #1d2424;
+  --on-accent: #ffffff;
+  --on-accent-border: rgba(255, 255, 255, 0.16);
+  --field-label: #d4d9e3;
+  --focus-ring: rgba(138, 180, 255, 0.24);
+  --focus-border-soft: rgba(138, 180, 255, 0.5);
+  --danger-surface: #35171d;
+  --danger-surface-hover: #461d26;
+  --danger-soft-surface: #311a1d;
+  --danger-line: #74313b;
+  --danger-border-soft: rgba(251, 113, 133, 0.32);
+  --danger-border: rgba(251, 113, 133, 0.42);
+  --danger-border-hover: rgba(251, 113, 133, 0.62);
+  --danger-text-strong: #fecdd3;
+  --danger-badge-surface: #4b1f2a;
+  --danger-badge-text: #fda4af;
+  --danger-pill-surface: #5b2530;
+  --danger-pill-text: #fecdd3;
+  --danger-glow: rgba(251, 113, 133, 0.2);
+  --warning-surface: #332714;
+  --warning-pill-surface: #5a3b12;
+  --warning-pill-text: #fde68a;
+  --positive-badge-surface: #153f31;
+  --accent-neutral: #60a5fa;
+  --info-text: #93c5fd;
+  --progress-track: #2f3541;
+  --card-highlight-surface: #332618;
+  --logo-shadow: 0 2px 8px rgba(0, 0, 0, 0.32);
+  --control-shadow: 0 1px 6px rgba(0, 0, 0, 0.28);
+  --control-shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.24);
+  --tooltip-surface: #f4f6fb;
+  --tooltip-text: #101114;
+  --drawer-overlay: rgba(0, 0, 0, 0.58);
+  --drawer-shadow: -6px 0 28px rgba(0, 0, 0, 0.34);
+  --chart-1: #2dd4bf;
+  --chart-2: #a78bfa;
+  --chart-3: #fb923c;
+  --chart-4: #f472b6;
+  --chart-5: #4ade80;
+  --chart-6: #60a5fa;
+  --bank-logo-generic-surface: #252936;
+  --bank-logo-wallet-surface: #303646;
+  --bank-logo-generic-ink: #d7dde8;
 }
 
 * {
@@ -1158,6 +1224,36 @@ textarea:focus {
   grid-template-columns: repeat(2, minmax(280px, 1fr));
   gap: 18px;
   align-items: start;
+}
+
+.appearance-panel {
+  grid-column: 1 / -1;
+}
+
+.theme-preference-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.theme-preference-row > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.theme-preference-row strong {
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.theme-preference-row span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.theme-segmented-control {
+  flex: 0 0 auto;
 }
 
 .classification-grid {
@@ -2915,6 +3011,19 @@ textarea:focus {
   }
 
   .invoice-status-filter button {
+    flex: 1;
+  }
+
+  .theme-preference-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .theme-segmented-control {
+    width: 100%;
+  }
+
+  .theme-segmented-control button {
     flex: 1;
   }
 

@@ -41,7 +41,7 @@ import {
   isInvestmentTransfer,
 } from "./modules/transaction-kind.js";
 import { openMonthPicker } from "./modules/month-picker.js";
-import { applyTheme } from "./modules/theme-utils.js";
+import { applyTheme, setTheme, storedTheme } from "./modules/theme-utils.js";
 import { registerAuthView } from "./modules/auth-view.js";
 import { registerUserAdminView } from "./modules/user-admin-view.js";
 import { registerClassificationsView } from "./modules/classifications-view.js";
@@ -242,6 +242,7 @@ const emailConfigManualFields = document.querySelector("#emailConfigManualFields
 const emailConfigPreset = document.querySelector("#emailConfigPreset");
 const clearLaunchesForm = document.querySelector("#clearLaunchesForm");
 const deleteUserForm = document.querySelector("#deleteUserForm");
+const themePreference = document.querySelector("#themePreference");
 const emailMessage = document.querySelector("#emailMessage");
 const passwordMessage = document.querySelector("#passwordMessage");
 const emailConfigMessage = document.querySelector("#emailConfigMessage");
@@ -736,6 +737,7 @@ const userAdminViewController = registerUserAdminView({
     emailConfigPreset,
     clearLaunchesForm,
     deleteUserForm,
+    themePreference,
     emailMessage,
     passwordMessage,
     emailConfigMessage,
@@ -747,6 +749,10 @@ const userAdminViewController = registerUserAdminView({
   loadAll,
   resetSessionState,
   setMessage,
+  theme: {
+    setTheme,
+    storedTheme,
+  },
   state,
   onShowAuth: showAuth,
 });
@@ -1046,6 +1052,7 @@ function showModule(view) {
   }
   if (view === "user" && state.user) {
     emailForm.elements.email.value = state.user.email;
+    userAdminViewController.syncThemePreference();
     userAdminViewController.loadEmailConfigStatus();
   }
 }

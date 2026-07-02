@@ -2,8 +2,8 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 1.3
-atualizado: 2026-06-30
+versao: 1.6
+atualizado: 2026-07-01
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
   - "[[arquitetura]]"
@@ -14,7 +14,7 @@ aliases: ["Modularização Frontend", "ES Modules"]
 # Modularização do Frontend
 
 > [!info] Status
-> **implementado** · área: `frontend` · atualizado em 2026-06-30 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]]
+> **implementado** · área: `frontend` · atualizado em 2026-07-01 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]]
 
 ## Problema
 
@@ -49,7 +49,7 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | Arquivo | Responsabilidade |
 |---|---|
 | `auth-view.js` | Login, cadastro, logout e recuperação de senha. |
-| `user-admin-view.js` | Troca de email/senha, config. SMTP, limpeza e exclusão. |
+| `user-admin-view.js` | Preferência visual, troca de email/senha, config. SMTP, limpeza e exclusão. |
 | `classifications-view.js` | Categorias, subcategorias e tags. |
 | `limits-view.js` | Limites de gastos e índice de consumo. |
 | `reports-view.js` | Filtros, abas, agrupamentos e tabelas. |
@@ -81,6 +81,8 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Novos módulos recebem dependências explicitamente via contrato de fábrica.
 - Cores de UI e gráficos devem vir de tokens CSS compartilhados; literais ficam restritos a marcas/logos externos.
 - Tema visual é uma preferência local: `theme-utils.js` aplica `data-theme` no elemento raiz e persiste em `localStorage`.
+- O modo escuro deve ser evoluído por tokens em CSS, mantendo views sem ramificações por tema.
+- `user-admin-view.js` apenas orquestra o controle de Preferências; persistência e aplicação do tema permanecem em `theme-utils.js`.
 
 ## API e dados
 
@@ -94,6 +96,9 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Dado um fluxo existente (login, navegação, lançamentos, cartões, relatórios, portfólio), quando usado, as chamadas de API e formatações continuam iguais ao comportamento anterior.
 - Dado um mantenedor buscando formatação monetária ou de datas, quando procura, encontra em `money-utils.js` e `date-utils.js`.
 - Dado um mantenedor buscando qualquer área funcional, quando procura, encontra no arquivo de view correspondente.
+- Dado o usuário autenticado, quando alterna `Claro` ou `Escuro` em Preferências, o `data-theme` do documento muda imediatamente e persiste após reload.
+- Dado o tema claro ou escuro ativo, quando navega por Cockpit, Contas, Cartões, Lançamentos, Portfólio, Limites, Relatórios, Categorias, Importação e Preferências, os módulos abrem sem erro de console e mantêm contraste legível.
+- Dado viewport mobile, quando abre Preferências, o controle de tema ocupa a largura disponível sem overflow horizontal.
 
 ## Fora de escopo
 
@@ -107,6 +112,9 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - `1.1` — 2026-06-30 — Responsabilidade de busca/filtro da fatura registrada em `cards-view.js`; consolidações do Portfólio documentadas em `portfolio-view.js`.
 - `1.2` — 2026-06-30 — Regra de tokenização de cores e gráficos registrada para preparação do modo escuro.
 - `1.3` — 2026-06-30 — Infraestrutura local de tema registrada em `theme-utils.js`.
+- `1.4` — 2026-06-30 — Regra de evolução do modo escuro por overrides centralizados de tokens registrada.
+- `1.5` — 2026-07-01 — Controle claro/escuro em Preferências registrado em `user-admin-view.js`.
+- `1.6` — 2026-07-01 — Critérios de aceite e cobertura de QA do tema claro/escuro registrados.
 
 ## Relacionados
 

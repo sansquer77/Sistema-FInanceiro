@@ -21,7 +21,7 @@
         document.documentElement.style.colorScheme = theme;
       })();
     </script>
-    <link rel="stylesheet" href="/styles.css?v=111">
+    <link rel="stylesheet" href="/styles.css?v=113">
   </head>
   <body>
     <main class="app-shell">
@@ -1124,6 +1124,20 @@
 
         <section class="module-view" id="userView" hidden>
           <div class="user-settings-grid">
+            <section class="panel appearance-panel">
+              <h2>Aparência</h2>
+              <div class="theme-preference-row">
+                <div>
+                  <strong>Tema do app</strong>
+                  <span>Preferência visual salva neste navegador.</span>
+                </div>
+                <div class="segmented-control theme-segmented-control" id="themePreference" role="group" aria-label="Tema do app">
+                  <button type="button" data-theme-option="light">Claro</button>
+                  <button type="button" data-theme-option="dark">Escuro</button>
+                </div>
+              </div>
+            </section>
+
             <section class="panel">
               <h2>Alterar email</h2>
               <form id="emailForm" class="form">
@@ -1303,6 +1317,6 @@
         </div>
       </aside>
     </main>
-    <script type="module" src="/app.js?v=111"></script>
+    <script type="module" src="/app.js?v=113"></script>
   </body>
 </html>
