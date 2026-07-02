@@ -4,6 +4,7 @@ import json
 import mimetypes
 import os
 import re
+import sys
 from datetime import date
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -82,7 +83,7 @@ from financeiro.transactions import (
     update_transaction,
 )
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 WEB_ROOT = ROOT / "web"
 HOST = os.environ.get("APP_HOST", "127.0.0.1")
 PORT = int(os.environ.get("APP_PORT", "8010"))

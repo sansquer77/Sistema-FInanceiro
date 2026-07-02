@@ -22,6 +22,8 @@ echo "$DEST_DIR"
 
 /usr/bin/rsync -a \
   --exclude 'data/' \
+  --exclude 'tests/' \
+  --exclude 'docs/' \
   --exclude '__pycache__/' \
   --exclude '.DS_Store' \
   --exclude 'launcher_distribuicao.c' \

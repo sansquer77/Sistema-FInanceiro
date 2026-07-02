@@ -12,6 +12,10 @@ __pycache__/
 .env
 .env.local
 *.env.*
+.venv/
+
+# Build artifacts
+build/
 
 # Editors
 .vscode/

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import os
 import sqlite3
+import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-DATA_DIR = ROOT / "data"
+ROOT = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parents[1]
+DATA_DIR = Path(os.environ.get("SISTEMA_FINANCEIRO_DATA_DIR", ROOT / "data"))
 DB_PATH = DATA_DIR / "finance.db"
 PERFORMANCE_INDEXES = (
     "CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions (user_id, date)",

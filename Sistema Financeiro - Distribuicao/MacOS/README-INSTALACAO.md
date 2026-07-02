@@ -4,7 +4,6 @@ Este pacote instala uma copia limpa do Sistema Financeiro em outro Mac.
 
 ## Requisitos
 
-- macOS com Python 3 disponivel pelo sistema.
 - Permissao para instalar um app em `/Applications`.
 - Porta local `8010` livre.
 
@@ -49,6 +48,7 @@ O app preenche automaticamente servidor SMTP, porta e STARTTLS para Gmail e Outl
 
 - Copia os arquivos do sistema para `~/Documents/Sistema Financeiro`.
 - Instala o icone `Sistema Financeiro.app` em `/Applications`.
+- Instala o executavel MacOS gerado por PyInstaller; nao exige Python instalado pelo usuario.
 - Nao leva nenhum banco de dados da maquina original.
 - Cria um banco SQLite vazio no primeiro uso.
 - Cria arquivos locais de configuracao apenas na maquina instalada.
