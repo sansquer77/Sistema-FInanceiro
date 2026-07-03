@@ -48,6 +48,16 @@ class DatabaseIndexTest(unittest.TestCase):
         with self.assertRaises(sqlite3.ProgrammingError):
             conn.execute("SELECT 1").fetchone()
 
+    def test_get_connection_enables_wal_and_busy_timeout(self) -> None:
+        initialize_database()
+
+        with get_connection() as conn:
+            journal_mode = conn.execute("PRAGMA journal_mode").fetchone()[0]
+            busy_timeout = conn.execute("PRAGMA busy_timeout").fetchone()[0]
+
+        self.assertEqual(journal_mode.lower(), "wal")
+        self.assertEqual(busy_timeout, database.SQLITE_BUSY_TIMEOUT_MS)
+
 
 def index_names(conn, table_name: str) -> set[str]:
     return {row["name"] for row in conn.execute(f"PRAGMA index_list({table_name})")}

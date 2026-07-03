@@ -2,8 +2,8 @@
 tipo: spec
 area: importacao
 status: implementado
-versao: 1.0
-atualizado: 2026-06-29
+versao: 1.1
+atualizado: 2026-07-03
 relacionados:
   - "[[contas-correntes]]"
   - "[[cartoes]]"
@@ -18,7 +18,7 @@ aliases: ["Importação", "Importação Organizze"]
 # Importação
 
 > [!info] Status
-> **implementado** · área: `importacao` · atualizado em 2026-06-29 · relacionados: [[contas-correntes]], [[cartoes]], [[categorias-tags-gestao]], [[adr/0004-importador-xls-sem-dependencia]]
+> **implementado** · área: `importacao` · atualizado em 2026-07-03 · relacionados: [[contas-correntes]], [[cartoes]], [[categorias-tags-gestao]], [[adr/0004-importador-xls-sem-dependencia]]
 
 ## Problema
 
@@ -70,6 +70,7 @@ Usuário que está migrando dados de outro sistema ou que deseja lançar movimen
 - Arquivos Excel podem trazer valores numéricos formatados visualmente; o parser usa o valor real da célula sem multiplicações indevidas.
 - Importações de cartão preenchem `invoice_month` e consideram o mês da fatura para relatórios e limites. Ver [[cartoes]].
 - A importação retorna resumo com total lido, total importado, total ignorado e motivos das primeiras linhas rejeitadas.
+- Importações em lote devem processar a leitura/parsing fora da conexão SQLite e persistir cada linha em uma transação curta, preservando sucesso parcial sem segurar lock durante todo o arquivo.
 - O parser `.xls` é implementado sem dependência externa. Ver [[adr/0004-importador-xls-sem-dependencia]].
 
 ## Regras de segurança
@@ -102,6 +103,7 @@ Tabelas: `transactions`, `credit_card_transactions`, `transaction_tags`, `credit
 
 ## Changelog
 
+- `1.1` — 2026-07-03 — Regra de importação em lote atualizada para transações curtas por linha.
 - `1.0` — 2026-06-29 — Frontmatter e critérios formalizados.
 
 ## Relacionados

@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from financeiro.accounts import SUPPORTED_CURRENCIES, cents_to_money, empty_to_none, money_to_cents
 from financeiro.categories import get_or_create_category, get_or_create_subcategory, get_or_create_tag, normalize_name
-from financeiro.database import get_connection, row_to_dict
+from financeiro.database import begin_immediate, get_connection, row_to_dict
 from financeiro.transactions import create_transaction_with_conn, normalize_optional_tags
 
 CARD_TRANSACTION_TYPES = {"income", "expense"}
@@ -211,6 +211,7 @@ def create_credit_card_transaction(user_id: int, data: dict) -> dict:
 
 def create_credit_card_transaction_with_conn(conn: sqlite3.Connection, user_id: int, data: dict) -> dict:
     transaction = normalize_card_transaction_payload(data)
+    begin_immediate(conn)
     card = get_active_credit_card(conn, user_id, transaction["credit_card_id"])
     transaction["invoice_month"] = invoice_month_for_transaction_date(card, transaction["date"])
     ensure_invoice_is_open(conn, user_id, card["id"], transaction["invoice_month"])
@@ -262,6 +263,7 @@ def update_credit_card_transaction(user_id: int, transaction_id: str, data: dict
     transaction = normalize_card_transaction_payload(data)
     apply_to_future = should_apply_to_future_card(data)
     with get_connection() as conn:
+        begin_immediate(conn)
         existing = conn.execute(
             """
             SELECT *
@@ -501,6 +503,7 @@ def pay_credit_card_invoice(user_id: int, data: dict) -> dict:
     notes = empty_to_none(data.get("notes"))
     try:
         with get_connection() as conn:
+            begin_immediate(conn)
             card = get_active_credit_card(conn, user_id, card_id)
             account = conn.execute(
                 """

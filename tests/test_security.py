@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from io import BytesIO
+import sqlite3
 import tempfile
 import unittest
 from http import HTTPStatus
@@ -55,6 +56,20 @@ class BruteForceProtectionTest(IsolatedDatabaseTest):
         with self.assertRaises(AuthError) as locked:
             request_password_reset("missing@example.com", source_key="127.0.0.1")
         self.assertEqual(locked.exception.status, HTTPStatus.TOO_MANY_REQUESTS)
+
+    def test_password_reset_email_failure_invalidates_created_token(self) -> None:
+        create_user("Alice", "alice@example.com", "correct-password")
+
+        with (
+            mock.patch("financeiro.auth.send_password_reset_email", side_effect=RuntimeError("SMTP offline")),
+            self.assertRaises(RuntimeError),
+        ):
+            request_password_reset("alice@example.com", source_key="127.0.0.1")
+
+        with database.get_connection() as conn:
+            reset = conn.execute("SELECT used_at FROM password_resets").fetchone()
+
+        self.assertIsNotNone(reset["used_at"])
 
 
 class IdorProtectionTest(IsolatedDatabaseTest):
@@ -171,6 +186,17 @@ class JsonBodyLimitTest(unittest.TestCase):
         handler = json_handler(str(len(body)), body)
 
         self.assertEqual(handler.read_json(), {"ok": True})
+
+
+class DatabaseBusyErrorTest(unittest.TestCase):
+    def test_detects_sqlite_database_busy_errors(self) -> None:
+        self.assertTrue(app.is_database_busy_error(sqlite3.OperationalError("database is locked")))
+        self.assertTrue(app.is_database_busy_error(sqlite3.OperationalError("database table is locked")))
+        self.assertTrue(app.is_database_busy_error(sqlite3.OperationalError("database is busy")))
+
+    def test_ignores_other_operational_errors(self) -> None:
+        self.assertFalse(app.is_database_busy_error(sqlite3.OperationalError("no such table: users")))
+        self.assertFalse(app.is_database_busy_error(RuntimeError("database is locked")))
 
 
 def json_handler(content_length: str, body: bytes):

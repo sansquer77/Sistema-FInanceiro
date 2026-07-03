@@ -8,6 +8,7 @@ from pathlib import Path
 ROOT = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parents[1]
 DATA_DIR = Path(os.environ.get("SISTEMA_FINANCEIRO_DATA_DIR", ROOT / "data"))
 DB_PATH = DATA_DIR / "finance.db"
+SQLITE_BUSY_TIMEOUT_MS = 5000
 PERFORMANCE_INDEXES = (
     "CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions (user_id, date)",
     "CREATE INDEX IF NOT EXISTS idx_transactions_account ON transactions (account_id)",
@@ -71,10 +72,17 @@ class ManagedConnection(sqlite3.Connection):
 
 def get_connection() -> sqlite3.Connection:
     DATA_DIR.mkdir(exist_ok=True)
-    conn = sqlite3.connect(DB_PATH, factory=ManagedConnection)
+    conn = sqlite3.connect(DB_PATH, timeout=SQLITE_BUSY_TIMEOUT_MS / 1000, factory=ManagedConnection)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS}")
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
+
+
+def begin_immediate(conn: sqlite3.Connection) -> None:
+    if not conn.in_transaction:
+        conn.execute("BEGIN IMMEDIATE")
 
 
 def initialize_database() -> None:

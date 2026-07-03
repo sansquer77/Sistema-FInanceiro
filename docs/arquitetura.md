@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 1.2
-atualizado: 2026-06-30
+versao: 1.3
+atualizado: 2026-07-03
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -16,7 +16,7 @@ tags: [arquitetura, meta]
 # Arquitetura
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-06-30 · relacionados: [[requisitos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
+> **implementado** · área: `meta` · atualizado em 2026-07-03 · relacionados: [[requisitos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
 
 ## Visão geral
 
@@ -214,6 +214,8 @@ Responsabilidades:
 
 Banco local em `data/finance.db`, criado automaticamente na inicialização. Arquivos de `data/` são runtime local e **não devem ser versionados**.
 
+Conexões SQLite são abertas com `journal_mode=WAL`, `busy_timeout` curto e `foreign_keys=ON`. Escritas que dependem de leituras prévias de saldo/fatura usam transações imediatas para serializar a janela crítica; operações potencialmente demoradas, como envio SMTP, cotação externa, consolidação de portfólio e importações em lote, não devem manter uma conexão aberta além do trecho estritamente necessário de leitura ou gravação.
+
 ### Tabelas
 
 | Tabela | Módulo responsável |
@@ -355,6 +357,7 @@ Ver [[recuperacao-senha]].
 - Valores monetários persistidos em centavos.
 - Datas de lançamento em ISO `YYYY-MM-DD`.
 - Registros históricos preferem arquivamento quando houver impacto financeiro.
+- Escritas que alteram saldos devem usar deltas atômicos (`saldo atual = saldo atual + delta`) ou uma transação curta que proteja o cálculo.
 - Erros de domínio expõem mensagem amigável e status HTTP; sem detalhes internos.
 - Novas tabelas e colunas devem ser criadas de forma idempotente.
 - **Novas funcionalidades devem nascer em `docs/specs/` antes da implementação, sempre duplicando [[templates/spec-template|`docs/templates/spec-template.md`]] como base.** Ver [[sdd]].
@@ -373,6 +376,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `1.3` — 2026-07-03 — Persistência documenta WAL, espera por locks, transações imediatas curtas e regra de deltas atômicos para saldos.
 - `1.2` — 2026-06-30 — Rotas de Cockpit/relatórios documentadas, método de `/api/portfolio/value` corrigido para `PUT`, índices atuais de performance detalhados, regra de template alinhada ao SDD e escala BRL das barras de consolidação do Portfólio documentada.
 - `1.1` — 2026-06-29 — Frontmatter, tabelas de rotas e módulos por área, wikilinks e referência para ADRs.
 - `1.0` — versão original.

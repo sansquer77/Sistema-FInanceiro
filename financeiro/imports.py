@@ -24,7 +24,7 @@ from financeiro.transactions import (
     replace_transaction_tags,
     resolve_exchange_rate_micros,
 )
-from financeiro.database import get_connection, row_to_dict
+from financeiro.database import begin_immediate, get_connection, row_to_dict
 
 OLE_MAGIC = bytes.fromhex("D0CF11E0A1B11AE1")
 SYSTEM_IMPORT_ACCOUNT_HEADERS = [
@@ -221,8 +221,9 @@ def import_system_template(user_id: int, target: str, target_id: object, file_by
     rows = parse_system_template_file(file_bytes, filename)
     imported = []
     skipped = []
-    with get_connection() as conn:
-        for raw in rows:
+    for raw in rows:
+        with get_connection() as conn:
+            begin_immediate(conn)
             conn.execute("SAVEPOINT import_row")
             try:
                 if normalized_target == "card":
@@ -665,53 +666,66 @@ def import_organizze_transactions(user_id: int, account_id: object, file_bytes: 
     skipped = []
     with get_connection() as conn:
         account = get_active_account(conn, user_id, normalized_account_id)
-        for raw in raw_rows:
+    for raw in raw_rows:
+        try:
+            transaction = normalize_imported_transaction(raw)
+            exchange_rate_micros = resolve_exchange_rate_micros(account["currency"], transaction["date"], None)
+            amount_brl_cents = convert_to_brl_cents(transaction["amount_cents"], exchange_rate_micros)
+        except ImportError as exc:
+            skipped.append({"row": raw["row"], "description": raw.get("description", ""), "reason": exc.message})
+            continue
+        except Exception as exc:
+            message = getattr(exc, "message", "Nao foi possivel consolidar o valor em reais.")
+            skipped.append({"row": raw["row"], "description": raw.get("description", ""), "reason": message})
+            continue
+        with get_connection() as conn:
+            begin_immediate(conn)
+            conn.execute("SAVEPOINT import_row")
             try:
-                transaction = normalize_imported_transaction(raw)
-                exchange_rate_micros = resolve_exchange_rate_micros(account["currency"], transaction["date"], None)
-                amount_brl_cents = convert_to_brl_cents(transaction["amount_cents"], exchange_rate_micros)
-            except ImportError as exc:
-                skipped.append({"row": raw["row"], "description": raw.get("description", ""), "reason": exc.message})
-                continue
-            except Exception as exc:
-                message = getattr(exc, "message", "Nao foi possivel consolidar o valor em reais.")
-                skipped.append({"row": raw["row"], "description": raw.get("description", ""), "reason": message})
-                continue
-            category_group, category_name, subcategory_name, tags = resolve_import_classification(conn, user_id, transaction)
-            transaction["category"] = category_name
-            transaction["subcategory"] = subcategory_name
-            transaction["tags"] = tags
-            category_id = get_or_create_category(conn, user_id, transaction["category"], category_group)
-            subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
-            tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
-            apply_balance_delta(
-                conn,
-                normalized_account_id,
-                balance_delta(transaction["type"], transaction["amount_cents"], "source"),
-            )
-            cursor = conn.execute(
-                """
-                INSERT INTO transactions (
-                    user_id, type, description, amount_cents, exchange_rate_micros, amount_brl_cents, date, account_id,
-                    category_id, subcategory_id, notes
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    user_id,
-                    transaction["type"],
-                    transaction["description"],
-                    transaction["amount_cents"],
-                    exchange_rate_micros,
-                    amount_brl_cents,
-                    transaction["date"],
+                category_group, category_name, subcategory_name, tags = resolve_import_classification(conn, user_id, transaction)
+                transaction["category"] = category_name
+                transaction["subcategory"] = subcategory_name
+                transaction["tags"] = tags
+                category_id = get_or_create_category(conn, user_id, transaction["category"], category_group)
+                subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
+                tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
+                apply_balance_delta(
+                    conn,
                     normalized_account_id,
-                    category_id,
-                    subcategory_id,
-                    transaction["notes"],
-                ),
-            )
-            replace_transaction_tags(conn, cursor.lastrowid, tag_ids)
-            imported.append({"row": raw["row"], "id": cursor.lastrowid, "description": transaction["description"]})
+                    balance_delta(transaction["type"], transaction["amount_cents"], "source"),
+                )
+                cursor = conn.execute(
+                    """
+                    INSERT INTO transactions (
+                        user_id, type, description, amount_cents, exchange_rate_micros, amount_brl_cents, date, account_id,
+                        category_id, subcategory_id, notes
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        user_id,
+                        transaction["type"],
+                        transaction["description"],
+                        transaction["amount_cents"],
+                        exchange_rate_micros,
+                        amount_brl_cents,
+                        transaction["date"],
+                        normalized_account_id,
+                        category_id,
+                        subcategory_id,
+                        transaction["notes"],
+                    ),
+                )
+                replace_transaction_tags(conn, cursor.lastrowid, tag_ids)
+                conn.execute("RELEASE SAVEPOINT import_row")
+                imported.append({"row": raw["row"], "id": cursor.lastrowid, "description": transaction["description"]})
+            except Exception as exc:
+                conn.execute("ROLLBACK TO SAVEPOINT import_row")
+                conn.execute("RELEASE SAVEPOINT import_row")
+                skipped.append({
+                    "row": raw.get("row", ""),
+                    "description": raw.get("description", ""),
+                    "reason": getattr(exc, "message", str(exc) or "Nao foi possivel importar a linha."),
+                })
     return {
         "imported": len(imported),
         "skipped": len(skipped),

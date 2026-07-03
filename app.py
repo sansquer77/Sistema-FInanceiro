@@ -4,6 +4,7 @@ import json
 import mimetypes
 import os
 import re
+import sqlite3
 import sys
 from datetime import date
 from http import HTTPStatus
@@ -89,6 +90,11 @@ HOST = os.environ.get("APP_HOST", "127.0.0.1")
 PORT = int(os.environ.get("APP_PORT", "8010"))
 PUBLIC_URL = os.environ.get("APP_URL", f"http://sistema-financeiro.localhost:{PORT}")
 LOCAL_ALLOWED_HOSTS = frozenset({"sistema-financeiro.localhost", "127.0.0.1"})
+# Optional additional allowed hosts provided by the environment (comma-separated)
+env_allowed = os.environ.get("APP_ALLOWED_HOSTS", "").strip()
+if env_allowed:
+    extra = {h.strip() for h in env_allowed.split(",") if h.strip()}
+    LOCAL_ALLOWED_HOSTS = frozenset(set(LOCAL_ALLOWED_HOSTS) | extra)
 MAX_JSON_BODY_BYTES = 1 * 1024 * 1024
 SECURITY_HEADERS = {
     "Content-Security-Policy": (
@@ -140,6 +146,11 @@ def allowed_host_values() -> set[str]:
 
 def allowed_origin_values() -> set[str]:
     origins = {f"http://{host}:{PORT}" for host in LOCAL_ALLOWED_HOSTS}
+    # Allow additional explicit origins via environment (comma-separated full origins)
+    env_origins = os.environ.get("APP_ALLOWED_ORIGINS", "").strip()
+    if env_origins:
+        for origin in (o.strip() for o in env_origins.split(",") if o.strip()):
+            origins.add(origin)
     public_origin = public_url_origin()
     if public_origin:
         origins.add(public_origin)
@@ -952,8 +963,12 @@ class AppHandler(BaseHTTPRequestHandler):
         try:
             super().handle_one_request()
         except Exception as exc:
-            message = getattr(exc, "message", "Erro inesperado.")
-            status = getattr(exc, "status", HTTPStatus.INTERNAL_SERVER_ERROR)
+            if is_database_busy_error(exc):
+                message = "O banco esta ocupado por outra operacao. Aguarde alguns segundos e tente novamente."
+                status = HTTPStatus.SERVICE_UNAVAILABLE
+            else:
+                message = getattr(exc, "message", "Erro inesperado.")
+                status = getattr(exc, "status", HTTPStatus.INTERNAL_SERVER_ERROR)
             self.send_json({"error": message}, status)
 
     def log_message(self, format: str, *args: object) -> None:
@@ -965,6 +980,13 @@ class ApiError(Exception):
         self.message = message
         self.status = status
         super().__init__(message)
+
+
+def is_database_busy_error(exc: Exception) -> bool:
+    if not isinstance(exc, sqlite3.OperationalError):
+        return False
+    message = str(exc).lower()
+    return "database is locked" in message or "database table is locked" in message or "database is busy" in message
 
 
 def cockpit_payload(transactions: list[dict]) -> dict:

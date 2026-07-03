@@ -2,8 +2,8 @@
 tipo: spec
 area: contas
 status: implementado
-versao: 1.0
-atualizado: 2026-06-29
+versao: 1.1
+atualizado: 2026-07-03
 relacionados:
   - "[[lancamentos]]"
   - "[[cartoes]]"
@@ -16,7 +16,7 @@ aliases: ["Contas-correntes", "Contas"]
 # Contas-correntes
 
 > [!info] Status
-> **implementado** · área: `contas` · atualizado em 2026-06-29 · relacionados: [[lancamentos]], [[cartoes]], [[investimentos-portfolio]]
+> **implementado** · área: `contas` · atualizado em 2026-07-03 · relacionados: [[lancamentos]], [[cartoes]], [[investimentos-portfolio]]
 
 ## Problema
 
@@ -55,6 +55,7 @@ Qualquer usuário autenticado localmente que mantenha contas em um ou mais banco
 - Contas arquivadas podem ser listadas (`?status=archived`) e restauradas.
 - A moeda de uma conta com lançamentos ativos não pode ser alterada.
 - Alterar o saldo inicial ajusta o saldo atual pela diferença.
+- O ajuste de saldo atual por mudança de saldo inicial deve ser aplicado como delta atômico para preservar lançamentos concorrentes.
 - Contas do tipo `wallet` aceitam apenas receitas, despesas e transferências à vista; não exibem recorrência. Ver [[lancamentos]].
 - Contas do tipo `investment` alimentam o portfólio de investimentos. Ver [[investimentos-portfolio]].
 
@@ -81,6 +82,7 @@ Tabela: `checking_accounts`.
 
 ## Changelog
 
+- `1.1` — 2026-07-03 — Regra de ajuste de saldo inicial explicita delta atômico para uso concorrente leve.
 - `1.0` — 2026-06-29 — Frontmatter e critérios formalizados.
 
 ## Relacionados

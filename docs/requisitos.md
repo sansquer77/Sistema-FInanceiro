@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 1.1
-atualizado: 2026-06-29
+versao: 1.2
+atualizado: 2026-07-03
 relacionados:
   - "[[arquitetura]]"
   - "[[visao-produto]]"
@@ -86,6 +86,8 @@ Manter um sistema financeiro local, privado e simples para controlar contas, sal
 - O frontend deve continuar simples, responsivo e sem build step.
 - Valores monetários devem ser persistidos em centavos.
 - O banco SQLite deve ser criado automaticamente em `data/finance.db`.
+- O SQLite deve operar com WAL e espera curta por locks para tolerar uso local compartilhado leve, sem transformar o app em sistema multiusuário em rede.
+- Operações de escrita devem manter transações curtas e evitar chamadas externas enquanto seguram conexão aberta.
 - Mudanças de schema devem ser idempotentes para preservar bancos locais existentes.
 - Mensagens de erro devem ser claras para o usuário e não expor detalhes internos.
 
@@ -98,6 +100,7 @@ Manter um sistema financeiro local, privado e simples para controlar contas, sal
 
 ## Changelog
 
+- `1.2` — 2026-07-03 — Requisitos não funcionais atualizados para explicitar WAL, espera por locks e transações curtas no SQLite.
 - `1.1` — 2026-06-29 — Adição de frontmatter, wikilinks para specs por módulo e referência cruzada com ADRs.
 - `1.0` — escopo original consolidado.
 
