@@ -229,7 +229,7 @@ class AppHandler(BaseHTTPRequestHandler):
             self.handle_list_spending_limits()
             return
         if path == "/api/simulations/butterfly-effect":
-            self.handle_simulate_butterfly_effect()
+            self.send_json({"error": "Metodo nao permitido."}, HTTPStatus.METHOD_NOT_ALLOWED)
             return
         if path == "/api/cockpit":
             self.handle_cockpit()

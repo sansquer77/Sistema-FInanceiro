@@ -302,10 +302,8 @@ const transactionBalanceHistoryChart = document.querySelector("#transactionBalan
 const transactionSearch = document.querySelector("#transactionSearch");
 const simulationForm = document.querySelector("#simulationForm");
 const simulationType = document.querySelector("#simulationType");
-const simulationAmount = document.querySelector("#simulationAmount");
 const simulationDate = document.querySelector("#simulationDate");
 const simulationAccount = document.querySelector("#simulationAccount");
-const simulationDescription = document.querySelector("#simulationDescription");
 const simulationCategory = document.querySelector("#simulationCategory");
 const simulationSubcategory = document.querySelector("#simulationSubcategory");
 const simulationSeriesKind = document.querySelector("#simulationSeriesKind");
@@ -676,10 +674,8 @@ const simulationsView = registerSimulationsView({
   elements: {
     simulationForm,
     simulationType,
-    simulationAmount,
     simulationDate,
     simulationAccount,
-    simulationDescription,
     simulationCategory,
     simulationSubcategory,
     simulationSeriesKind,
@@ -698,8 +694,6 @@ const simulationsView = registerSimulationsView({
     resetSimulationButton,
   },
   formatMoney,
-  formatDate,
-  onSimulationsChanged: () => {},
 });
 
 const portfolioView = registerPortfolioView({

@@ -3,14 +3,13 @@ from __future__ import annotations
 from datetime import date, timedelta
 from http import HTTPStatus
 
-from financeiro.accounts import AccountError, money_to_cents
-from financeiro.categories import ClassificationError
+from financeiro.accounts import money_to_cents
 from financeiro.database import get_connection, row_to_dict
-from financeiro.transactions import TransactionError, add_months, normalize_date, normalize_id
+from financeiro.transactions import add_months, normalize_date, normalize_id
 
 SIMULATION_TYPES = {"income", "expense"}
 SERIES_KINDS = {"single", "installment", "recurring"}
-RECURRENCE_FREQUENCIES = {"monthly", "quarterly", "semiannual", "annual"}
+RECURRENCE_FREQUENCIES = {"monthly"}
 
 
 class SimulationError(Exception):
@@ -116,7 +115,7 @@ def normalize_optional_id(value: object) -> int | None:
 def fetch_account(conn, user_id: int, account_id: int) -> dict:
     row = conn.execute(
         """
-        SELECT id, currency, current_balance_cents
+        SELECT id, currency
         FROM checking_accounts
         WHERE id = ? AND user_id = ? AND archived_at IS NULL
         """,
@@ -177,7 +176,7 @@ def build_virtual_items(payload: dict) -> list[dict]:
                 "description": f"{payload['description']} ({index + 1}/{item_count})",
                 "occurrence_index": index + 1,
                 "occurrence_total": item_count,
-                "impact_cents": payload["type"] == "income" and current_amount or -current_amount,
+                "impact_cents": signed_impact_cents(payload["type"], current_amount),
                 "impact_sign": "+" if payload["type"] == "income" else "-",
             })
         return items
@@ -191,7 +190,7 @@ def build_virtual_items(payload: dict) -> list[dict]:
                 "description": payload["description"],
                 "occurrence_index": index + 1,
                 "occurrence_total": payload["recurrence_count"],
-                "impact_cents": payload["type"] == "income" and amount_cents or -amount_cents,
+                "impact_cents": signed_impact_cents(payload["type"], amount_cents),
                 "impact_sign": "+" if payload["type"] == "income" else "-",
             })
         return items
@@ -201,58 +200,86 @@ def build_virtual_items(payload: dict) -> list[dict]:
         "description": payload["description"],
         "occurrence_index": 1,
         "occurrence_total": 1,
-        "impact_cents": payload["type"] == "income" and amount_cents or -amount_cents,
+        "impact_cents": signed_impact_cents(payload["type"], amount_cents),
         "impact_sign": "+" if payload["type"] == "income" else "-",
     }]
 
 
+def signed_impact_cents(simulation_type: str, amount_cents: int) -> int:
+    return amount_cents if simulation_type == "income" else -amount_cents
+
+
 def build_account_impact(conn, user_id: int, account: dict, payload: dict, virtual_items: list[dict]) -> dict:
-    current_balance_cents = fetch_reconciled_balance_until(conn, user_id, account["id"], payload["date"])
-    projected_balance_cents = current_balance_cents + sum(item["impact_cents"] for item in virtual_items)
+    base_balance_cents = fetch_account_balance_until(conn, user_id, account["id"], payload["date"], reconciled_only=True)
+    current_month = payload["date"][:7]
+    current_month_impact_cents = sum(item["impact_cents"] for item in virtual_items if item["month"] == current_month)
+    projected_balance_cents = base_balance_cents + sum(item["impact_cents"] for item in virtual_items)
     return {
-        "current_balance_cents": current_balance_cents,
+        "current_balance_cents": base_balance_cents + current_month_impact_cents,
         "projected_balance_cents": projected_balance_cents,
-        "difference_cents": projected_balance_cents - current_balance_cents,
+        "difference_cents": projected_balance_cents - base_balance_cents,
     }
 
 
-def fetch_reconciled_balance_until(conn, user_id: int, account_id: int, limit_date: str) -> int:
-    start_date = None
-    rows = conn.execute(
-        """
-        SELECT amount_cents, type, date, reconciled_at, destination_account_id, destination_amount_cents
-        FROM transactions
-        WHERE user_id = ? AND archived_at IS NULL AND account_id = ? AND date <= ?
-        ORDER BY date ASC, id ASC
-        """,
-        (user_id, account_id, limit_date),
-    ).fetchall()
-    balance_cents = int(conn.execute(
+def fetch_account_balance_until(conn, user_id: int, account_id: int, limit_date: str, reconciled_only: bool) -> int:
+    rows = fetch_account_transactions_until(conn, user_id, account_id, limit_date)
+    balance_cents = fetch_account_initial_balance(conn, user_id, account_id)
+    for row in rows:
+        if reconciled_only and not row["reconciled_at"]:
+            continue
+        balance_cents += transaction_balance_delta(row, account_id)
+    return balance_cents
+
+
+def fetch_account_initial_balance(conn, user_id: int, account_id: int) -> int:
+    row = conn.execute(
         """
         SELECT initial_balance_cents
         FROM checking_accounts
         WHERE id = ? AND user_id = ? AND archived_at IS NULL
         """,
         (account_id, user_id),
-    ).fetchone()["initial_balance_cents"] or 0)
-    for row in rows:
-        if not row["reconciled_at"]:
-            continue
-        amount_cents = int(row["amount_cents"] or 0)
-        if row["type"] == "income":
-            balance_cents += amount_cents
-        elif row["type"] == "expense":
-            balance_cents -= amount_cents
-        elif row["type"] == "transfer":
-            balance_cents -= amount_cents
-            if row["destination_account_id"] and row["destination_amount_cents"]:
-                balance_cents += int(row["destination_amount_cents"] or 0)
-    return balance_cents
+    ).fetchone()
+    return int(row["initial_balance_cents"] or 0)
+
+
+def fetch_account_transactions_until(conn, user_id: int, account_id: int, limit_date: str) -> list:
+    return conn.execute(
+        """
+        SELECT amount_cents, type, date, reconciled_at, destination_account_id, destination_amount_cents
+        FROM transactions
+        WHERE user_id = ? AND archived_at IS NULL AND date <= ?
+            AND (account_id = ? OR destination_account_id = ?)
+        ORDER BY date ASC, id ASC
+        """,
+        (user_id, limit_date, account_id, account_id),
+    ).fetchall()
+
+
+def transaction_balance_delta(row: dict, account_id: int) -> int:
+    amount_cents = int(row["amount_cents"] or 0)
+    if row["type"] in {"transfer", "exchange"} and int(row["destination_account_id"] or 0) == account_id:
+        return int(row["destination_amount_cents"] or amount_cents)
+    if row["type"] == "income":
+        return amount_cents
+    if row["type"] in {"expense", "investment", "transfer", "exchange"}:
+        return -amount_cents
+    return 0
 
 
 def build_month_impact(conn, user_id: int, account: dict, payload: dict, virtual_items: list[dict]) -> dict:
     month = payload["date"][:7]
-    real_total_cents = fetch_month_real_spend(conn, user_id, account["id"], month)
+    projection = build_month_projection(conn, user_id, account, month, virtual_items)
+    return {
+        "month": month,
+        "real_total_cents": projection["real_total_cents"],
+        "simulated_total_cents": projection["simulated_total_cents"],
+        "projected_total_cents": projection["projected_total_cents"],
+    }
+
+
+def build_month_projection(conn, user_id: int, account: dict, month: str, virtual_items: list[dict]) -> dict:
+    real_total_cents = fetch_month_real_balance_delta(conn, user_id, account["id"], month)
     simulated_total_cents = sum(item["impact_cents"] for item in virtual_items if item["month"] == month)
     return {
         "month": month,
@@ -262,41 +289,56 @@ def build_month_impact(conn, user_id: int, account: dict, payload: dict, virtual
     }
 
 
-def fetch_month_real_spend(conn, user_id: int, account_id: int, month: str) -> int:
+def fetch_month_real_balance_delta(conn, user_id: int, account_id: int, month: str) -> int:
     start_date = f"{month}-01"
     end_date = (date.fromisoformat(start_date) + timedelta(days=32)).replace(day=1) - timedelta(days=1)
-    row = conn.execute(
+    rows = conn.execute(
         """
-        SELECT COALESCE(SUM(CASE WHEN type = 'income' THEN amount_cents ELSE amount_cents END), 0) AS spent_cents
+        SELECT type, amount_cents, account_id, destination_account_id, destination_amount_cents
         FROM transactions
-        WHERE user_id = ? AND archived_at IS NULL AND account_id = ? AND date >= ? AND date <= ?
+        WHERE user_id = ? AND archived_at IS NULL
+            AND (account_id = ? OR destination_account_id = ?)
+            AND reconciled_at IS NOT NULL
+            AND date >= ? AND date <= ?
         """,
-        (user_id, account_id, start_date, end_date.isoformat()),
-    ).fetchone()
-    return int(row["spent_cents"] or 0)
+        (user_id, account_id, account_id, start_date, end_date.isoformat()),
+    ).fetchall()
+    return sum(transaction_balance_delta(row, account_id) for row in rows)
 
 
 def build_limit_impact(conn, user_id: int, account: dict, payload: dict, virtual_items: list[dict], category_id: int | None, subcategory_id: int | None) -> dict:
     items = []
     months = sorted({item["month"] for item in virtual_items})
     for month in months:
-        limit_rows = conn.execute(
-            """
-            SELECT id, month, category_id, subcategory_id, limit_amount_cents
-            FROM spending_limits
-            WHERE user_id = ? AND month = ? AND category_id = ?
-            """,
-            (user_id, month, category_id) if category_id is not None else (user_id, month),
-        ).fetchall()
+        if category_id is not None:
+            limit_rows = conn.execute(
+                """
+                SELECT id, month, category_id, subcategory_id, limit_amount_cents
+                FROM spending_limits
+                WHERE user_id = ? AND month = ? AND category_id = ?
+                """,
+                (user_id, month, category_id),
+            ).fetchall()
+        else:
+            limit_rows = conn.execute(
+                """
+                SELECT id, month, category_id, subcategory_id, limit_amount_cents
+                FROM spending_limits
+                WHERE user_id = ? AND month = ?
+                """,
+                (user_id, month),
+            ).fetchall()
         for row in limit_rows:
             if subcategory_id is not None and row["subcategory_id"] not in {None, subcategory_id}:
                 continue
             real_spent_cents = fetch_limit_real_spend(conn, user_id, account["id"], month, row["category_id"], row["subcategory_id"])
-            simulated_spent_cents = sum(
-                item["impact_cents"] * -1 if item["impact_cents"] < 0 else item["impact_cents"]
-                for item in virtual_items
-                if item["month"] == month
-            )
+            simulated_spent_cents = 0
+            if payload["type"] == "expense":
+                simulated_spent_cents = sum(
+                    -item["impact_cents"]
+                    for item in virtual_items
+                    if item["month"] == month and item["impact_cents"] < 0
+                )
             projected_spent_cents = real_spent_cents + simulated_spent_cents
             items.append({
                 "month": month,
@@ -331,18 +373,65 @@ def fetch_limit_real_spend(conn, user_id: int, account_id: int, month: str, cate
 
 
 def build_chart_series(conn, user_id: int, account: dict, payload: dict, virtual_items: list[dict]) -> list[dict]:
-    months = sorted({item["month"] for item in virtual_items})
+    months = build_forecast_months(payload, virtual_items)
+    base_date = (date.fromisoformat(f"{months[0]}-01") - timedelta(days=1)).isoformat()
+    last_month_end_date = month_end_date(months[-1])
+    transactions = fetch_account_transactions_until(conn, user_id, account["id"], last_month_end_date)
+    real_deltas_by_month = account_transaction_deltas_by_month(transactions, account["id"])
+    simulated_deltas_by_month = simulation_deltas_by_month(virtual_items)
     series = []
+    running_real_balance_cents = fetch_account_balance_until(conn, user_id, account["id"], base_date, reconciled_only=False)
+    running_simulated_delta_cents = 0
     for month in months:
-        real_total_cents = fetch_month_real_spend(conn, user_id, account["id"], month)
-        simulated_total_cents = sum(item["impact_cents"] for item in virtual_items if item["month"] == month)
+        real_total_cents = real_deltas_by_month.get(month, 0)
+        simulated_total_cents = simulated_deltas_by_month.get(month, 0)
+        running_real_balance_cents += real_total_cents
+        running_simulated_delta_cents += simulated_total_cents
         series.append({
             "month": month,
             "real_total_cents": real_total_cents,
             "simulated_total_cents": simulated_total_cents,
             "result_cents": real_total_cents + simulated_total_cents,
+            "real_balance_cents": running_real_balance_cents,
+            "projected_balance_cents": running_real_balance_cents + running_simulated_delta_cents,
         })
     return series
+
+
+def account_transaction_deltas_by_month(transactions: list, account_id: int) -> dict[str, int]:
+    deltas: dict[str, int] = {}
+    for row in transactions:
+        month = str(row["date"])[:7]
+        deltas[month] = deltas.get(month, 0) + transaction_balance_delta(row, account_id)
+    return deltas
+
+
+def simulation_deltas_by_month(virtual_items: list[dict]) -> dict[str, int]:
+    deltas: dict[str, int] = {}
+    for item in virtual_items:
+        month = item["month"]
+        deltas[month] = deltas.get(month, 0) + int(item["impact_cents"] or 0)
+    return deltas
+
+
+def build_forecast_months(payload: dict, virtual_items: list[dict]) -> list[str]:
+    start_month = payload["date"][:7]
+    last_virtual_month = max((item["month"] for item in virtual_items), default=start_month)
+    start = date.fromisoformat(f"{start_month}-01")
+    last_virtual = date.fromisoformat(f"{last_virtual_month}-01")
+    months_until_last_virtual = (last_virtual.year - start.year) * 12 + (last_virtual.month - start.month) + 1
+    horizon_months = max(6, months_until_last_virtual)
+    current = date.fromisoformat(f"{start_month}-01")
+    generated = []
+    for offset in range(horizon_months):
+        month_date = add_months(current, offset)
+        generated.append(month_date.strftime("%Y-%m"))
+    return generated
+
+
+def month_end_date(month: str) -> str:
+    start_date = date.fromisoformat(f"{month}-01")
+    return ((start_date + timedelta(days=32)).replace(day=1) - timedelta(days=1)).isoformat()
 
 
 def build_warnings(account_impact: dict, limit_impact: dict) -> list[str]:

@@ -9,7 +9,7 @@ from financeiro.accounts import create_checking_account
 from financeiro.auth import create_user
 from financeiro.categories import create_category
 from financeiro.database import initialize_database
-from financeiro.simulations import simulate_butterfly_effect
+from financeiro.simulations import SimulationError, simulate_butterfly_effect
 from financeiro.spending_limits import create_spending_limit
 from financeiro.transactions import create_transaction, set_transaction_reconciled
 
@@ -52,6 +52,14 @@ class ButterflyEffectSimulationTest(unittest.TestCase):
         self.assertEqual(response["account_impact"]["difference_cents"], -25000)
         self.assertEqual(len(response["virtual_items"]), 1)
         self.assertEqual(response["virtual_items"][0]["impact_cents"], -25000)
+        with database.get_connection() as conn:
+            transaction_count = conn.execute("SELECT COUNT(*) AS total FROM transactions").fetchone()["total"]
+            account_row = conn.execute(
+                "SELECT current_balance_cents FROM checking_accounts WHERE id = ?",
+                (account["id"],),
+            ).fetchone()
+        self.assertEqual(transaction_count, 0)
+        self.assertEqual(account_row["current_balance_cents"], 100000)
 
     def test_simulation_uses_reconciled_balance_as_of_selected_date(self) -> None:
         user = create_user("Alice", "alice@example.com", "correct-password")
@@ -91,8 +99,150 @@ class ButterflyEffectSimulationTest(unittest.TestCase):
             "series_kind": "single",
         })
 
-        self.assertEqual(response["account_impact"]["current_balance_cents"], 110000)
+        self.assertEqual(response["account_impact"]["current_balance_cents"], 85000)
         self.assertEqual(response["account_impact"]["projected_balance_cents"], 85000)
+
+    def test_chart_series_tracks_monthly_projected_balance(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta principal",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "1000,00",
+        })
+
+        response = simulate_butterfly_effect(user["id"], {
+            "type": "income",
+            "amount": "2000,00",
+            "date": "2026-01-15",
+            "description": "Receita simulada",
+            "account_id": str(account["id"]),
+            "series_kind": "installment",
+            "installment_count": 3,
+        })
+
+        self.assertEqual(response["account_impact"]["current_balance_cents"], 166667)
+        self.assertEqual(response["account_impact"]["projected_balance_cents"], 300000)
+        self.assertEqual(
+            [entry["projected_balance_cents"] for entry in response["chart_series"]],
+            [166667, 233334, 300000, 300000, 300000, 300000],
+        )
+
+    def test_chart_series_keeps_previous_real_movements_in_base_balance(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta principal",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "1000,00",
+        })
+        create_transaction(user["id"], {
+            "type": "income",
+            "description": "Receita anterior",
+            "amount": "500,00",
+            "date": "2025-12-20",
+            "account_id": str(account["id"]),
+            "category": "Salário",
+        })
+
+        response = simulate_butterfly_effect(user["id"], {
+            "type": "income",
+            "amount": "100,00",
+            "date": "2026-01-15",
+            "description": "Receita simulada",
+            "account_id": str(account["id"]),
+            "series_kind": "single",
+        })
+
+        self.assertEqual(response["chart_series"][0]["real_balance_cents"], 150000)
+        self.assertEqual(response["chart_series"][0]["projected_balance_cents"], 160000)
+
+    def test_recurring_income_adds_full_amount_to_each_projected_month(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta principal",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "18747,04",
+        })
+
+        response = simulate_butterfly_effect(user["id"], {
+            "type": "income",
+            "amount": "2000,00",
+            "date": "2026-07-05",
+            "description": "Receita extra",
+            "account_id": str(account["id"]),
+            "series_kind": "recurring",
+            "recurrence_frequency": "monthly",
+            "recurrence_count": 3,
+        })
+
+        self.assertEqual(response["account_impact"]["current_balance_cents"], 2074704)
+        self.assertEqual(response["account_impact"]["projected_balance_cents"], 2474704)
+        self.assertEqual([item["impact_cents"] for item in response["virtual_items"]], [200000, 200000, 200000])
+        self.assertEqual(
+            [entry["projected_balance_cents"] for entry in response["chart_series"]],
+            [2074704, 2274704, 2474704, 2474704, 2474704, 2474704],
+        )
+
+    def test_rejects_non_monthly_recurrence_until_supported(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta principal",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "1000,00",
+        })
+
+        with self.assertRaises(SimulationError):
+            simulate_butterfly_effect(user["id"], {
+                "type": "income",
+                "amount": "100,00",
+                "date": "2026-01-15",
+                "description": "Receita trimestral",
+                "account_id": str(account["id"]),
+                "series_kind": "recurring",
+                "recurrence_frequency": "quarterly",
+                "recurrence_count": 3,
+            })
+
+    def test_month_impact_counts_inbound_transfer_for_destination_account(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        origin = create_checking_account(user["id"], {
+            "name": "Origem",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "1000,00",
+        })
+        destination = create_checking_account(user["id"], {
+            "name": "Destino",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "500,00",
+        })
+        transfer = create_transaction(user["id"], {
+            "type": "transfer",
+            "description": "Transferência",
+            "amount": "200,00",
+            "date": "2026-01-05",
+            "account_id": str(origin["id"]),
+            "destination_account_id": str(destination["id"]),
+        })
+        set_transaction_reconciled(user["id"], str(transfer["id"]), True)
+
+        response = simulate_butterfly_effect(user["id"], {
+            "type": "income",
+            "amount": "100,00",
+            "date": "2026-01-15",
+            "description": "Receita simulada",
+            "account_id": str(destination["id"]),
+            "series_kind": "single",
+        })
+
+        self.assertEqual(response["month_impact"]["real_total_cents"], 20000)
+        self.assertEqual(response["month_impact"]["projected_total_cents"], 30000)
+        self.assertEqual(response["chart_series"][0]["real_balance_cents"], 70000)
+        self.assertEqual(response["chart_series"][0]["projected_balance_cents"], 80000)
 
     def test_installment_series_creates_virtual_items_and_limit_impact(self) -> None:
         user = create_user("Alice", "alice@example.com", "correct-password")

@@ -326,6 +326,15 @@ class RequestSourceProtectionTest(unittest.TestCase):
             self.assertIn("sistema-financeiro.localhost:8020", app.allowed_host_values())
             self.assertIn("127.0.0.1:8020", app.allowed_host_values())
 
+    def test_public_https_url_with_port_is_allowed_as_host_and_origin(self) -> None:
+        handler = object.__new__(app.AppHandler)
+        with (
+            mock.patch.object(app, "PORT", 8030),
+            mock.patch.object(app, "PUBLIC_URL", "https://sistema-financeiro.net:8030"),
+        ):
+            self.assertTrue(handler.is_allowed_host("sistema-financeiro.net:8030"))
+            self.assertTrue(handler.is_allowed_origin("https://sistema-financeiro.net:8030"))
+
     def test_disallows_unknown_origin(self) -> None:
         handler = object.__new__(app.AppHandler)
         with (

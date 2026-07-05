@@ -2,7 +2,7 @@
 tipo: spec
 area: simulacoes
 status: rascunho
-versao: 0.2
+versao: 0.3
 atualizado: 2026-07-05
 relacionados:
   - "[[contas-correntes]]"
@@ -53,7 +53,7 @@ Qualquer usuário autenticado localmente que queira testar cenários financeiros
 | `series_kind` | enum | Obrigatório. Valores: `single`, `installment` ou `recurring`. |
 | `installment_count` | inteiro | Obrigatório quando `series_kind = installment`. Deve ser maior que 1. |
 | `recurrence_frequency` | enum | Obrigatório quando `series_kind = recurring`. Valores iniciais: `monthly`. |
-| `recurrence_months` | inteiro | Obrigatório quando `series_kind = recurring`. Define o horizonte da simulação e deve ser maior que 1. |
+| `recurrence_count` | inteiro | Obrigatório quando `series_kind = recurring`. Define a quantidade de ocorrências simuladas e deve ser maior que 1. |
 
 ## Regras
 
@@ -73,6 +73,7 @@ Qualquer usuário autenticado localmente que queira testar cenários financeiros
 - A entrada principal deve ser um formulário estruturado com campos financeiros explícitos.
 - Lançamentos parcelados simulados devem distribuir o impacto em parcelas mensais a partir da data inicial.
 - Lançamentos recorrentes simulados devem distribuir o impacto mensalmente pelo horizonte informado.
+- A primeira entrega aceita apenas recorrência mensal (`monthly`); outras frequências devem ser rejeitadas até serem implementadas explicitamente.
 - Cada parcela ou ocorrência recorrente deve ser tratada como um item virtual independente na projeção.
 - Parcelas e recorrências simuladas devem exibir índice e total (`1/12`, `2/12` etc.) quando aplicável.
 - O impacto de limites de gastos deve considerar a competência mensal de cada parcela ou ocorrência.
@@ -126,6 +127,7 @@ Resposta esperada:
 
 ## Changelog
 
+- `0.3` — 2026-07-05 — Campo de recorrência alinhado à implementação (`recurrence_count`) e recorrência mensal definida como única frequência aceita na primeira entrega.
 - `0.2` — 2026-07-05 — Parcelamento e recorrência entram no escopo principal da simulação por serem cenários de maior impacto financeiro.
 - `0.1` — 2026-07-05 — Spec inicial em rascunho para o módulo Efeito Borboleta, com núcleo determinístico e sem LLM.
 

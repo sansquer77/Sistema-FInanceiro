@@ -1,21 +1,21 @@
 import { api } from "./api.js";
-import { formatMoney, moneyInputValue, parseDecimalInput } from "./money-utils.js";
+import { formatMoney } from "./money-utils.js";
 import { escapeHtml, formData, setMessage } from "./dom-utils.js";
 
 export function registerSimulationsView({
   state,
   elements,
   formatMoney,
-  formatDate,
-  onSimulationsChanged = () => {},
 }) {
+  const balanceHistoryChartTop = 24;
+  const balanceHistoryChartBottom = 48;
+  const balanceHistoryChartBaseline = 54;
+  const balanceHistoryChartFlat = 36;
   const {
     simulationForm,
     simulationType,
-    simulationAmount,
     simulationDate,
     simulationAccount,
-    simulationDescription,
     simulationCategory,
     simulationSubcategory,
     simulationSeriesKind,
@@ -44,7 +44,7 @@ export function registerSimulationsView({
   simulationAccount.addEventListener("change", () => {
     const account = state.accounts.find((entry) => String(entry.id) === simulationAccount.value);
     if (account) {
-      simulationCurrentBalance.textContent = formatMoney(account.current_balance || account.current_balance_cents || 0, account.currency || "BRL");
+      clearSimulationResult();
     }
   });
 
@@ -60,7 +60,7 @@ export function registerSimulationsView({
     }
     const account = state.accounts.find((entry) => String(entry.id) === simulationAccount.value);
     if (account) {
-      simulationCurrentBalance.textContent = formatMoney(account.current_balance || account.current_balance_cents || 0, account.currency || "BRL");
+      clearSimulationResult();
     }
     simulationDate.value = new Date().toISOString().slice(0, 10);
   }
@@ -125,13 +125,17 @@ export function registerSimulationsView({
     simulationDate.value = new Date().toISOString().slice(0, 10);
     simulationSeriesKind.value = "single";
     syncSeriesFields();
-    simulationCurrentBalance.textContent = "R$ 0,00";
-    simulationProjectedBalance.textContent = "R$ 0,00";
-    simulationDifference.textContent = "R$ 0,00";
+    clearSimulationResult();
+    setMessage(simulationMessage, "", "");
+  }
+
+  function clearSimulationResult() {
+    simulationCurrentBalance.textContent = "-";
+    simulationProjectedBalance.textContent = "-";
+    simulationDifference.textContent = "-";
     simulationChart.innerHTML = '<p class="muted-copy">Preencha o formulário e clique em Simular.</p>';
     simulationVirtualItems.innerHTML = "";
     simulationWarnings.innerHTML = "";
-    setMessage(simulationMessage, "", "");
   }
 
   async function handleSubmit(event) {
@@ -143,7 +147,6 @@ export function registerSimulationsView({
       const response = await api("/api/simulations/butterfly-effect", { method: "POST", body: payload });
       renderSimulation(response);
       setMessage(simulationMessage, "Simulação pronta.", "success");
-      onSimulationsChanged();
     } catch (error) {
       setMessage(simulationMessage, error.message, "error");
     }
@@ -153,12 +156,11 @@ export function registerSimulationsView({
     const accountImpact = response.account_impact || {};
     const account = state.accounts.find((entry) => String(entry.id) === String(response.scenario?.account_id));
     const currency = account?.currency || "BRL";
-    simulationCurrentBalance.textContent = formatMoney(accountImpact.current_balance_cents || 0, currency);
-    simulationProjectedBalance.textContent = formatMoney(accountImpact.projected_balance_cents || 0, currency);
-    simulationDifference.textContent = formatMoney(accountImpact.difference_cents || 0, currency);
+    simulationCurrentBalance.textContent = formatMoney((accountImpact.current_balance_cents || 0) / 100, currency);
+    simulationProjectedBalance.textContent = formatMoney((accountImpact.projected_balance_cents || 0) / 100, currency);
+    simulationDifference.textContent = formatMoney((accountImpact.difference_cents || 0) / 100, currency);
 
-    const chartItems = buildSimulationChartItems(accountImpact, currency);
-    simulationChart.innerHTML = chartItems;
+    simulationChart.innerHTML = buildSimulationBalanceHistory(response.chart_series || [], currency);
 
     simulationVirtualItems.innerHTML = (response.virtual_items || []).map((item) => `
       <article class="simulation-item">
@@ -166,7 +168,7 @@ export function registerSimulationsView({
           <strong>${escapeHtml(item.description)}</strong>
           <small>${escapeHtml(item.date)} · ${item.occurrence_index}/${item.occurrence_total}</small>
         </div>
-        <strong>${item.impact_sign}${formatMoney(Math.abs(item.impact_cents || 0), currency)}</strong>
+        <strong>${item.impact_sign}${formatMoney(Math.abs((item.impact_cents || 0) / 100), currency)}</strong>
       </article>
     `).join("");
 
@@ -175,76 +177,107 @@ export function registerSimulationsView({
     `).join("");
   }
 
-  function buildSimulationChartItems(accountImpact, currency) {
-    const currentBalance = Math.abs(accountImpact.current_balance_cents || 0);
-    const difference = Math.abs(accountImpact.difference_cents || 0);
-    const chartParts = [
-      {
-        label: "Saldo atual",
-        total: currentBalance || 1,
-        kind: "base",
-      },
-      {
-        label: accountImpact.difference_cents >= 0 ? "Impacto positivo" : "Impacto negativo",
-        total: difference || 1,
-        kind: accountImpact.difference_cents >= 0 ? "positive" : "negative",
-      },
-    ];
-    const total = chartParts.reduce((sum, item) => sum + item.total, 0);
-    if (!total) {
+  function buildSimulationBalanceHistory(series, currency) {
+    const rows = simulationBalanceHistoryRows(series, currency);
+    if (!rows.length) {
       return '<div class="empty-state compact">Sem dados para exibir no gráfico.</div>';
     }
+    const path = balanceHistoryPath(rows);
+    const areaPath = balanceHistoryAreaPath(rows);
+    const points = rows.map((row) => `
+      <span class="invoice-history-point ${row.index === 0 ? "current" : "future"}" style="left: ${row.x}%; top: ${row.y}%"></span>
+    `).join("");
     return `
-      <div class="donut-chart">
-        ${donutSvg(chartParts, total)}
-        <div class="donut-center">
-          <span>Saldo projetado</span>
-          <strong>${formatMoney(accountImpact.projected_balance_cents || 0, currency)}</strong>
-        </div>
-      </div>
-      <div class="chart-list">
-        ${chartParts.map((item, index) => `
-          <div class="chart-row">
-            <span><i style="background:${impactColor(item.kind, index)}"></i>${escapeHtml(item.label)}</span>
-            <strong>${formatMoney(item.total, currency)}</strong>
-          </div>
+      <div class="invoice-history-rail" role="list">
+        <svg class="invoice-history-svg" viewBox="0 0 100 100" aria-hidden="true" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="simulationBalanceHistoryAreaGradient" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.18"></stop>
+              <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"></stop>
+            </linearGradient>
+          </defs>
+          <path class="invoice-history-area account-balance-history-area" d="${areaPath}"></path>
+          <path class="invoice-history-line future" d="${path}"></path>
+        </svg>
+        ${points}
+        ${rows.map((row) => `
+          <button class="invoice-history-card ${row.index === 0 ? "current" : ""}" type="button" role="listitem" aria-current="${row.index === 0 ? "true" : "false"}">
+            <span>${escapeHtml(row.label)}</span>
+            <em>${escapeHtml(row.description)}</em>
+            <strong class="${row.amount < 0 ? "danger-text" : row.amount > 0 ? "positive-text" : ""}">${formatMoney(Math.abs(row.amount), currency)}</strong>
+          </button>
         `).join("")}
       </div>
     `;
   }
 
-  function donutSvg(items, total) {
-    const radius = 44;
-    const circumference = 2 * Math.PI * radius;
-    let offset = 0;
-    const circles = items.map((item, index) => {
-      const length = total ? (item.total / total) * circumference : 0;
-      const circle = `
-        <circle cx="60" cy="60" r="${radius}" fill="transparent" stroke="${chartColor(index)}"
-          stroke-width="18" stroke-dasharray="${length} ${circumference - length}"
-          stroke-dashoffset="${-offset}" />
-      `;
-      offset += length;
-      return circle;
-    }).join("");
-    return `<svg viewBox="0 0 120 120" role="img" aria-label="Gráfico da simulação">${circles}</svg>`;
+  function simulationBalanceHistoryRows(series, currency) {
+    const rawRows = series.map((entry, index) => ({
+      index,
+      month: entry.month,
+      label: shortMonthLabel(entry.month),
+      description: Number(entry.simulated_total_cents || 0)
+        ? `Simulado ${formatSignedMoney(entry.simulated_total_cents, currency)}`
+        : "Previsto",
+      amount: Number(entry.projected_balance_cents || 0) / 100,
+      currency,
+    }));
+    const values = rawRows.map((row) => row.amount);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min;
+    const denominator = Math.max(rawRows.length - 1, 1);
+    return rawRows.map((row, index) => ({
+      ...row,
+      x: rawRows.length === 1 ? 50 : 8 + (index / denominator) * 84,
+      y: range === 0
+        ? balanceHistoryChartFlat
+        : balanceHistoryChartBottom - ((row.amount - min) / range) * (balanceHistoryChartBottom - balanceHistoryChartTop),
+    }));
   }
 
-  function impactColor(kind, index) {
-    if (kind === "positive") {
-      return "var(--positive)";
+  function balanceHistoryPath(rows) {
+    if (rows.length < 2) {
+      return "";
     }
-    if (kind === "negative") {
-      return "var(--danger)";
-    }
-    return chartColor(index);
+    return smoothBalancePath(rows.map((row) => ({ x: row.x, y: row.y })));
   }
 
-  function chartColor(index) {
-    const fallbackPalette = ["#14b8a6", "#6366f1", "#f97316", "#ec4899", "#22c55e", "#3b82f6"];
-    const tokenName = `--chart-${(index % fallbackPalette.length) + 1}`;
-    const tokenColor = getComputedStyle(document.documentElement).getPropertyValue(tokenName).trim();
-    return tokenColor || fallbackPalette[index % fallbackPalette.length];
+  function balanceHistoryAreaPath(rows) {
+    const points = rows.map((row) => ({ x: row.x, y: row.y }));
+    if (points.length < 2) {
+      return "";
+    }
+    const line = smoothBalancePath(points);
+    const first = points[0];
+    const last = points[points.length - 1];
+    return `${line} L ${last.x} ${balanceHistoryChartBaseline} L ${first.x} ${balanceHistoryChartBaseline} Z`;
+  }
+
+  function smoothBalancePath(points) {
+    return points.reduce((path, point, index) => {
+      if (index === 0) {
+        return `M ${point.x} ${point.y}`;
+      }
+      const previous = points[index - 1];
+      const midX = (previous.x + point.x) / 2;
+      return `${path} C ${midX} ${previous.y}, ${midX} ${point.y}, ${point.x} ${point.y}`;
+    }, "");
+  }
+
+  function shortMonthLabel(month) {
+    const [year, monthNumber] = String(month).split("-").map(Number);
+    if (!year || !monthNumber) {
+      return month;
+    }
+    const date = new Date(year, monthNumber - 1, 1);
+    return date.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
+  }
+
+  function formatSignedMoney(cents, currency) {
+    const amount = Number(cents || 0) / 100;
+    const prefix = amount >= 0 ? "+" : "-";
+    return `${prefix}${formatMoney(Math.abs(amount), currency)}`;
   }
 
   return { loadSimulationFormData, resetForm, renderSimulation };
