@@ -53,6 +53,7 @@ import { registerAccountsView } from "./modules/accounts-view.js";
 import { registerCardsView } from "./modules/cards-view.js";
 import { registerPortfolioView } from "./modules/portfolio-view.js";
 import { registerTransactionsView } from "./modules/transactions-view.js";
+import { registerSimulationsView } from "./modules/simulations-view.js";
 
 applyTheme();
 
@@ -299,6 +300,28 @@ const currentBalanceSummary = document.querySelector("#currentBalanceSummary");
 const forecastBalanceSummary = document.querySelector("#forecastBalanceSummary");
 const transactionBalanceHistoryChart = document.querySelector("#transactionBalanceHistoryChart");
 const transactionSearch = document.querySelector("#transactionSearch");
+const simulationForm = document.querySelector("#simulationForm");
+const simulationType = document.querySelector("#simulationType");
+const simulationAmount = document.querySelector("#simulationAmount");
+const simulationDate = document.querySelector("#simulationDate");
+const simulationAccount = document.querySelector("#simulationAccount");
+const simulationDescription = document.querySelector("#simulationDescription");
+const simulationCategory = document.querySelector("#simulationCategory");
+const simulationSubcategory = document.querySelector("#simulationSubcategory");
+const simulationSeriesKind = document.querySelector("#simulationSeriesKind");
+const simulationInstallmentCountLabel = document.querySelector("#simulationInstallmentCountLabel");
+const simulationInstallmentCount = document.querySelector("#simulationInstallmentCount");
+const simulationRecurrenceGroup = document.querySelector("#simulationRecurrenceGroup");
+const simulationRecurrenceFrequency = document.querySelector("#simulationRecurrenceFrequency");
+const simulationRecurrenceCount = document.querySelector("#simulationRecurrenceCount");
+const simulationMessage = document.querySelector("#simulationMessage");
+const simulationCurrentBalance = document.querySelector("#simulationCurrentBalance");
+const simulationProjectedBalance = document.querySelector("#simulationProjectedBalance");
+const simulationDifference = document.querySelector("#simulationDifference");
+const simulationChart = document.querySelector("#simulationChart");
+const simulationVirtualItems = document.querySelector("#simulationVirtualItems");
+const simulationWarnings = document.querySelector("#simulationWarnings");
+const resetSimulationButton = document.querySelector("#resetSimulationButton");
 const navButtons = document.querySelectorAll("[data-view]");
 const moduleViews = {
   cockpit: document.querySelector("#cockpitView"),
@@ -308,6 +331,7 @@ const moduleViews = {
   transactions: document.querySelector("#transactionsView"),
   portfolio: document.querySelector("#portfolioView"),
   limits: document.querySelector("#limitsView"),
+  simulations: document.querySelector("#simulationsView"),
   reports: document.querySelector("#reportsView"),
   classifications: document.querySelector("#classificationsView"),
   imports: document.querySelector("#importsView"),
@@ -322,6 +346,7 @@ const viewTitles = {
   transactions: ["Lançamentos", "Contas"],
   portfolio: ["Gestão", "Portfólio"],
   limits: ["Gestão", "Limite de gastos"],
+  simulations: ["Gestão", "Efeito Borboleta"],
   reports: ["Gestão", "Relatórios"],
   classifications: ["Gestão", "Categorias e tags"],
   imports: ["Gestão", "Importação"],
@@ -644,6 +669,37 @@ const transactionsView = registerTransactionsView({
   renderFinanceViews,
   renderPortfolio,
   renderImportTargets,
+});
+
+const simulationsView = registerSimulationsView({
+  state,
+  elements: {
+    simulationForm,
+    simulationType,
+    simulationAmount,
+    simulationDate,
+    simulationAccount,
+    simulationDescription,
+    simulationCategory,
+    simulationSubcategory,
+    simulationSeriesKind,
+    simulationInstallmentCountLabel,
+    simulationInstallmentCount,
+    simulationRecurrenceGroup,
+    simulationRecurrenceFrequency,
+    simulationRecurrenceCount,
+    simulationMessage,
+    simulationCurrentBalance,
+    simulationProjectedBalance,
+    simulationDifference,
+    simulationChart,
+    simulationVirtualItems,
+    simulationWarnings,
+    resetSimulationButton,
+  },
+  formatMoney,
+  formatDate,
+  onSimulationsChanged: () => {},
 });
 
 const portfolioView = registerPortfolioView({
@@ -1033,6 +1089,9 @@ function showModule(view) {
   }
   if (view === "limits") {
     renderLimits();
+  }
+  if (view === "simulations") {
+    simulationsView.loadSimulationFormData().catch((error) => setMessage(simulationMessage, error.message, "error"));
   }
   if (view === "reports") {
     renderReports();

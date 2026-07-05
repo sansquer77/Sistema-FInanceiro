@@ -69,6 +69,7 @@ from financeiro.database import initialize_database
 from financeiro.imports import import_organizze_transactions, import_system_template, system_import_template
 from financeiro.portfolio import close_position, create_opening_position, delete_opening_position, get_portfolio, redeem_position, update_opening_position, update_position_value_override
 from financeiro.secure_config import SecureConfigError, email_config_status, save_email_config
+from financeiro.simulations import simulate_butterfly_effect
 from financeiro.spending_limits import (
     create_spending_limit,
     delete_spending_limit,
@@ -227,6 +228,9 @@ class AppHandler(BaseHTTPRequestHandler):
         if path == "/api/spending-limits":
             self.handle_list_spending_limits()
             return
+        if path == "/api/simulations/butterfly-effect":
+            self.handle_simulate_butterfly_effect()
+            return
         if path == "/api/cockpit":
             self.handle_cockpit()
             return
@@ -316,6 +320,9 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/spending-limits":
             self.handle_create_spending_limit()
+            return
+        if path == "/api/simulations/butterfly-effect":
+            self.handle_simulate_butterfly_effect()
             return
         self.send_json({"error": "Rota nao encontrada."}, HTTPStatus.NOT_FOUND)
 
@@ -569,6 +576,11 @@ class AppHandler(BaseHTTPRequestHandler):
         query = parse_qs(urlsplit(self.path).query)
         month = (query.get("month") or [None])[0]
         self.send_json({"limits": list_spending_limits(user["id"], month)})
+
+    def handle_simulate_butterfly_effect(self) -> None:
+        user = self.require_user()
+        data = self.read_json()
+        self.send_json(simulate_butterfly_effect(user["id"], data))
 
     def handle_portfolio(self) -> None:
         user = self.require_user()

@@ -142,6 +142,10 @@
                 <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3"></path><path d="M12 19v3"></path><path d="M2 12h3"></path><path d="M19 12h3"></path></svg>
                 <span class="nav-label">Limites</span>
               </button>
+              <button class="nav-button" type="button" data-view="simulations" data-short="BF" title="Efeito Borboleta">
+                <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18c2-4 4-7 6-9 2 2 4 5 6 9"></path><path d="M6 18c2-2 4-3 6-3 2 0 4 1 6 3"></path><path d="M10 9c1-3 2-5 2-5s1 2 2 5"></path></svg>
+                <span class="nav-label">Simulação</span>
+              </button>
               <button class="nav-button" type="button" data-view="reports" data-short="RL" title="Relatórios">
                 <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5"></path><path d="M4 19h17"></path><rect x="7" y="11" width="3" height="5" rx="1"></rect><rect x="12" y="7" width="3" height="9" rx="1"></rect><rect x="17" y="9" width="3" height="7" rx="1"></rect></svg>
                 <span class="nav-label">Relatórios</span>
@@ -1000,6 +1004,103 @@
               <div class="spending-limit-list" id="spendingLimitList"></div>
             </section>
           </div>
+        </section>
+
+        <section class="module-view" id="simulationsView" hidden>
+          <section class="panel simulation-shell">
+            <div class="section-heading">
+              <h2>Efeito Borboleta</h2>
+              <span class="muted-copy">Simule receitas e despesas sem alterar lançamentos reais.</span>
+            </div>
+
+            <div class="workspace simulations-workspace">
+              <section class="panel simulation-form-panel">
+                <h3>Criar cenário</h3>
+                <form id="simulationForm" class="form">
+                  <div class="field-row">
+                    <label>Tipo
+                      <select name="type" id="simulationType" required>
+                        <option value="income">Receita</option>
+                        <option value="expense">Despesa</option>
+                      </select>
+                    </label>
+                    <label>Valor
+                      <input name="amount" id="simulationAmount" type="text" inputmode="decimal" placeholder="0,00" required>
+                    </label>
+                  </div>
+                  <div class="field-row">
+                    <label>Data inicial
+                      <input name="date" id="simulationDate" type="date" required>
+                    </label>
+                    <label>Conta
+                      <select name="account_id" id="simulationAccount" required></select>
+                    </label>
+                  </div>
+                  <label>Descrição
+                    <input name="description" id="simulationDescription" type="text" placeholder="Ex.: novo contrato" required>
+                  </label>
+                  <div class="field-row">
+                    <label>Categoria
+                      <select name="category_id" id="simulationCategory"></select>
+                    </label>
+                    <label>Subcategoria
+                      <select name="subcategory_id" id="simulationSubcategory"></select>
+                    </label>
+                  </div>
+                  <div class="field-row">
+                    <label>Recorrência
+                      <select name="series_kind" id="simulationSeriesKind">
+                        <option value="single">Única</option>
+                        <option value="installment">Parcelada</option>
+                        <option value="recurring">Recorrente</option>
+                      </select>
+                    </label>
+                    <label id="simulationInstallmentCountLabel" hidden>Parcelas
+                      <input name="installment_count" id="simulationInstallmentCount" type="number" min="2" value="12">
+                    </label>
+                  </div>
+                  <div class="field-row" id="simulationRecurrenceGroup" hidden>
+                    <label>Frequência
+                      <select name="recurrence_frequency" id="simulationRecurrenceFrequency">
+                        <option value="monthly">Mensal</option>
+                      </select>
+                    </label>
+                    <label>Ocorrências
+                      <input name="recurrence_count" id="simulationRecurrenceCount" type="number" min="2" value="6">
+                    </label>
+                  </div>
+                  <div class="actions">
+                    <button class="ghost" id="resetSimulationButton" type="button">Limpar</button>
+                    <button class="primary" type="submit">Simular</button>
+                  </div>
+                </form>
+                <p class="message" id="simulationMessage" role="alert"></p>
+              </section>
+
+              <section class="panel simulation-results-panel">
+                <div class="section-heading">
+                  <h3>Resultados</h3>
+                </div>
+                <div class="simulation-summary-grid">
+                  <div class="summary-card">
+                    <span>Saldo atual</span>
+                    <strong id="simulationCurrentBalance">R$ 0,00</strong>
+                  </div>
+                  <div class="summary-card positive">
+                    <span>Saldo projetado</span>
+                    <strong id="simulationProjectedBalance">R$ 0,00</strong>
+                  </div>
+                  <div class="summary-card">
+                    <span>Diferença</span>
+                    <strong id="simulationDifference">R$ 0,00</strong>
+                  </div>
+                </div>
+                <div class="simulation-chart" id="simulationChart"></div>
+                <div class="simulation-list" id="simulationVirtualItems"></div>
+                <div class="simulation-warnings" id="simulationWarnings"></div>
+              </section>
+            </div>
+          </section>
         </section>
 
         <section class="module-view" id="reportsView" hidden>

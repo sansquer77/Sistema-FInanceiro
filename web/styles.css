@@ -709,6 +709,99 @@ textarea:focus {
   margin-bottom: 16px;
 }
 
+.simulation-shell {
+  display: grid;
+  gap: 16px;
+}
+
+.simulations-workspace {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(320px, 420px) minmax(320px, 1fr);
+  align-items: start;
+}
+
+.simulation-form-panel,
+.simulation-results-panel {
+  padding: 16px;
+}
+
+.simulation-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.summary-card {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-low);
+}
+
+.summary-card.positive {
+  border-color: color-mix(in srgb, var(--positive) 45%, var(--line));
+  background: color-mix(in srgb, var(--positive) 12%, var(--surface-low));
+}
+
+.summary-card strong {
+  font-size: 18px;
+  color: var(--ink);
+}
+
+.summary-card span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.simulation-chart {
+  min-height: 140px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  background: var(--panel-subtle);
+  margin-bottom: 14px;
+}
+
+.simulation-list,
+.simulation-warnings {
+  display: grid;
+  gap: 8px;
+}
+
+.simulation-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.simulation-item strong {
+  font-size: 14px;
+}
+
+.simulation-item small,
+.muted-copy {
+  color: var(--muted);
+}
+
+.simulation-warning {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--danger-border-soft);
+  background: var(--danger-surface);
+  color: var(--danger-text-strong);
+}
+
 .cockpit-stack {
   display: grid;
   gap: 18px;
