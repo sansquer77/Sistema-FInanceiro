@@ -2,7 +2,7 @@
 tipo: spec
 area: simulacoes
 status: rascunho
-versao: 0.1
+versao: 0.2
 atualizado: 2026-07-05
 relacionados:
   - "[[contas-correntes]]"
@@ -31,7 +31,7 @@ Qualquer usuário autenticado localmente que queira testar cenários financeiros
 ## Jornada
 
 1. O usuário abre o módulo Efeito Borboleta a partir do Cockpit, Relatórios ou Lançamentos.
-2. Informa um cenário hipotético com tipo, valor, data, conta e classificação financeira quando aplicável.
+2. Informa um cenário hipotético com tipo, valor, data, conta, classificação financeira e, quando necessário, parcelamento ou recorrência.
 3. O sistema valida os dados usando as mesmas regras de domínio dos lançamentos reais.
 4. O sistema calcula o impacto projetado sem gravar nenhum lançamento.
 5. O usuário visualiza comparativos entre a situação atual e o cenário simulado.
@@ -50,6 +50,10 @@ Qualquer usuário autenticado localmente que queira testar cenários financeiros
 | `subcategory_id` | FK | Opcional. Deve pertencer à categoria informada. |
 | `tags` | lista de FK | Opcional. Usadas apenas para visualização do cenário. |
 | `notes` | texto | Opcional. Não é persistido. |
+| `series_kind` | enum | Obrigatório. Valores: `single`, `installment` ou `recurring`. |
+| `installment_count` | inteiro | Obrigatório quando `series_kind = installment`. Deve ser maior que 1. |
+| `recurrence_frequency` | enum | Obrigatório quando `series_kind = recurring`. Valores iniciais: `monthly`. |
+| `recurrence_months` | inteiro | Obrigatório quando `series_kind = recurring`. Define o horizonte da simulação e deve ser maior que 1. |
 
 ## Regras
 
@@ -67,6 +71,13 @@ Qualquer usuário autenticado localmente que queira testar cenários financeiros
 - O usuário deve conseguir descartar a simulação sem confirmação, pois nenhum dado real foi alterado.
 - O módulo deve funcionar sem qualquer LLM, API externa ou interpretação por linguagem natural.
 - A entrada principal deve ser um formulário estruturado com campos financeiros explícitos.
+- Lançamentos parcelados simulados devem distribuir o impacto em parcelas mensais a partir da data inicial.
+- Lançamentos recorrentes simulados devem distribuir o impacto mensalmente pelo horizonte informado.
+- Cada parcela ou ocorrência recorrente deve ser tratada como um item virtual independente na projeção.
+- Parcelas e recorrências simuladas devem exibir índice e total (`1/12`, `2/12` etc.) quando aplicável.
+- O impacto de limites de gastos deve considerar a competência mensal de cada parcela ou ocorrência.
+- Gráficos e totais devem mostrar o efeito acumulado ao longo dos meses afetados pela série simulada.
+- O horizonte padrão sugerido para visualização deve cobrir todos os meses impactados pelo cenário, respeitando um limite máximo definido pela implementação.
 
 ## API e dados
 
@@ -87,6 +98,7 @@ Resposta esperada:
 | `month_impact` | Totais reais, totais simulados e resultado projetado do mês. |
 | `limit_impact` | Consumo real e consumo simulado de limites relacionados à categoria/subcategoria. |
 | `chart_series` | Série mensal comparando situação atual e cenário simulado. |
+| `virtual_items` | Lista de parcelas ou ocorrências virtuais usadas para calcular a projeção. |
 | `warnings` | Alertas não bloqueantes, como saldo projetado negativo ou limite ultrapassado. |
 
 ## Critérios de aceite
@@ -99,6 +111,9 @@ Resposta esperada:
 - Dado uma simulação com valor inválido, conta inexistente ou categoria incompatível, quando enviada, então a API retorna erro amigável e nenhuma projeção é calculada.
 - Dado uma simulação válida, quando exibida em gráfico, então a série diferencia visualmente valores reais e valores simulados.
 - Dado o app sem internet, quando o usuário abre o módulo, então a criação e visualização da simulação continuam disponíveis.
+- Dado uma despesa parcelada de R$ 1.200,00 em 12 vezes, quando simulada, então o sistema distribui R$ 100,00 por mês na projeção e mostra o impacto acumulado nos meses afetados.
+- Dado uma receita recorrente mensal de R$ 500,00 por 6 meses, quando simulada, então o sistema mostra seis ocorrências virtuais e atualiza o saldo projetado mês a mês.
+- Dado uma despesa recorrente categorizada, quando há limites cadastrados nos meses afetados, então cada ocorrência impacta apenas o limite do seu mês de competência.
 
 ## Fora de escopo
 
@@ -106,11 +121,12 @@ Resposta esperada:
 - Criação automática de lançamentos reais a partir de uma simulação.
 - Persistência de cenários simulados, histórico de simulações ou comparação entre múltiplos cenários salvos.
 - Simulações de transferências, câmbio, investimentos, resgates e encerramentos de posições.
-- Simulações avançadas de cartão de crédito, fatura, recorrência e parcelamento na primeira entrega.
+- Simulações avançadas de cartão de crédito e fatura na primeira entrega.
 - Recomendações financeiras automáticas ou aconselhamento financeiro personalizado.
 
 ## Changelog
 
+- `0.2` — 2026-07-05 — Parcelamento e recorrência entram no escopo principal da simulação por serem cenários de maior impacto financeiro.
 - `0.1` — 2026-07-05 — Spec inicial em rascunho para o módulo Efeito Borboleta, com núcleo determinístico e sem LLM.
 
 ## Relacionados
