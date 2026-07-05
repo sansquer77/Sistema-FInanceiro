@@ -2,8 +2,8 @@
 tipo: metodologia
 area: meta
 status: implementado
-versao: 2.1
-atualizado: 2026-06-30
+versao: 2.2
+atualizado: 2026-07-04
 relacionados:
   - "[[templates/spec-template|Template de spec]]"
   - "[[arquitetura]]"
@@ -16,7 +16,7 @@ aliases: ["SDD", "Spec Driven Development"]
 # SDD: Spec Driven Development
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-06-30 · relacionados: [[templates/spec-template|Template de spec]], [[arquitetura]], [[requisitos]]
+> **implementado** · área: `meta` · atualizado em 2026-07-04 · relacionados: [[templates/spec-template|Template de spec]], [[arquitetura]], [[requisitos]]
 
 SDD significa conduzir o desenvolvimento por especificações. Antes de alterar o app, descrevemos o comportamento esperado em linguagem clara e só então implementamos. Esta documentação é o principal insumo para agentes de IA em IDEs e para qualquer mantenedor humano — por isso precisa ser precisa, navegável e sempre atualizada.
 
@@ -34,7 +34,7 @@ docs/
   roadmap.md                Sequência de evolução
   glossario.md              Vocabulário de domínio com links
   templates/
-    spec-template.md        Modelo obrigatório para novas specs
+    spec-template.md        Modelo obrigatório para novos documentos
   specs/                     Uma spec por módulo funcional
   adr/                       Decisões técnicas/arquiteturais (Architecture Decision Records)
   design/
@@ -71,9 +71,10 @@ Cada spec também exibe um callout `> [!info] Status` logo abaixo do título, re
 
 ## Regra obrigatória para novos arquivos
 
-- Todo novo arquivo de especificação em `docs/specs/` deve ser criado duplicando [[templates/spec-template|`docs/templates/spec-template.md`]] e preenchendo todas as seções obrigatórias antes da implementação.
-- Nenhuma spec nova deve começar como markdown livre: o frontmatter, o callout de status, as seções de problema, usuário, jornada, dados, regras, API/dados, critérios de aceite, changelog e relacionados vêm do template.
-- Se uma mudança exigir outro tipo de documento (`adr/`, `design/`, `roadmap`, `arquitetura`), o arquivo novo deve manter o frontmatter padrão deste vault e linkar a spec correspondente criada a partir do template.
+- Todo novo arquivo de documentação criado neste vault deve começar como duplicata de [[templates/spec-template|`docs/templates/spec-template.md`]].
+- Para specs em `docs/specs/`, o template deve ser preenchido sem remover seções obrigatórias antes da implementação.
+- Para documentos que não sejam specs (`adr/`, `design/`, `roadmap`, `arquitetura`, `produto`, `glossario` ou `metodologia`), use o template como base estrutural e adapte `tipo`, `area`, título e seções, preservando frontmatter, callout de status, `Changelog` e `Relacionados`.
+- Nenhum arquivo novo deve começar como markdown livre.
 
 ## Ciclo de vida de uma spec (`status`)
 
@@ -106,6 +107,7 @@ rascunho ──▶ em-implementacao ──▶ implementado ──▶ em-revisao 
 
 ## Changelog
 
+- `2.2` — 2026-07-04 — Regra de novos arquivos ampliada: qualquer novo documento do vault deve começar a partir de `docs/templates/spec-template.md`, adaptando o tipo quando não for spec.
 - `2.1` — 2026-06-30 — Regra explícita adicionada: toda nova spec deve nascer de `docs/templates/spec-template.md`; documentos não-spec novos devem manter o frontmatter padrão e linkar a spec correspondente.
 - `2.0` — 2026-06-29 — Reestruturação completa do vault: frontmatter padronizado, status por spec, ADRs separados de specs, glossário e template formal adicionados.
 - `1.0` — versão original do fluxo SDD, sem metadados estruturados.

@@ -3,7 +3,7 @@ from __future__ import annotations
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from http import HTTPStatus
 
-from financeiro.database import get_connection, row_to_dict
+from financeiro.database import begin_immediate, get_connection, row_to_dict
 
 SUPPORTED_CURRENCIES = {"BRL", "USD", "EUR", "GBP"}
 ACCOUNT_TYPES = {"liquidity", "wallet", "investment"}
@@ -69,9 +69,10 @@ def create_checking_account(user_id: int, data: dict) -> dict:
 def update_checking_account(user_id: int, account_id: str, data: dict) -> dict:
     account = normalize_account_payload(data)
     with get_connection() as conn:
+        begin_immediate(conn)
         existing = conn.execute(
             """
-            SELECT id, currency, initial_balance_cents, current_balance_cents
+            SELECT id, currency, initial_balance_cents
             FROM checking_accounts
             WHERE id = ? AND user_id = ? AND archived_at IS NULL
             """,
@@ -91,12 +92,13 @@ def update_checking_account(user_id: int, account_id: str, data: dict) -> dict:
         if transaction_count and account["currency"] != existing["currency"]:
             raise AccountError("Nao altere a moeda de uma conta com lancamentos.")
         balance_delta = account["initial_balance_cents"] - existing["initial_balance_cents"]
-        updated_current_balance = existing["current_balance_cents"] + balance_delta
         conn.execute(
             """
             UPDATE checking_accounts
             SET name = ?, bank_name = ?, branch = ?, account_number = ?, account_type = ?, currency = ?,
-                initial_balance_cents = ?, current_balance_cents = ?, notes = ?,
+                initial_balance_cents = ?,
+                current_balance_cents = current_balance_cents + ?,
+                notes = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND user_id = ?
             """,
@@ -108,7 +110,7 @@ def update_checking_account(user_id: int, account_id: str, data: dict) -> dict:
                 account["account_type"],
                 account["currency"],
                 account["initial_balance_cents"],
-                updated_current_balance,
+                balance_delta,
                 account["notes"],
                 account_id,
                 user_id,

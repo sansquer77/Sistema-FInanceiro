@@ -15,7 +15,7 @@ Este pacote instala uma copia limpa do Sistema Financeiro em outro Mac.
 4. Se o macOS pedir senha, informe a senha do usuario do Mac para permitir a copia do icone para `/Applications`.
 5. Ao final, abra `Sistema Financeiro` pela pasta Aplicativos.
 
-## Primeiro uso
+## Primeiro uso local
 
 1. Abra `Sistema Financeiro` em Aplicativos.
 2. O app iniciara o servidor local e abrira:
@@ -24,6 +24,27 @@ Este pacote instala uma copia limpa do Sistema Financeiro em outro Mac.
 
 3. Clique em `Criar acesso` e cadastre o primeiro usuario.
 4. Cadastre suas contas, cartoes, categorias e lancamentos.
+
+## Uso na rede local
+
+Use este modo quando outros computadores ou celulares da mesma rede Wi-Fi/LAN precisarem acessar o sistema.
+
+1. Instale normalmente.
+2. Abra:
+
+   `~/Documents/Sistema Financeiro/Abrir Sistema Financeiro na Rede.command`
+
+3. O terminal mostrara a URL da rede local, por exemplo:
+
+   `http://192.168.1.25:8010`
+
+4. Nos outros dispositivos, abra essa URL no navegador.
+
+Observacoes:
+
+- O Mac pode pedir permissao de firewall para aceitar conexoes de entrada.
+- Todos os dispositivos precisam estar na mesma rede.
+- Use este modo apenas em rede confiavel. Para acesso fora da rede local, prefira reverse-proxy com HTTPS.
 
 ## Recuperacao de senha por email
 
@@ -62,13 +83,17 @@ Este pacote nao inclui:
 - configuracoes SMTP criptografadas
 - usuarios, contas, cartoes, lancamentos, categorias, tags ou posicoes pessoais
 
-## Porta e URL local
+## Porta e URL
 
 O app roda localmente em:
 
 `http://sistema-financeiro.localhost:8010`
 
 Se outro processo estiver usando a porta `8010`, encerre esse processo antes de abrir o app.
+
+No modo rede, a URL usa o IP local detectado do Mac, por exemplo:
+
+`http://192.168.1.25:8010`
 
 ## Onde ficam os dados
 

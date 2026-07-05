@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 1.3
-atualizado: 2026-07-03
+versao: 1.5
+atualizado: 2026-07-05
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -16,7 +16,7 @@ tags: [arquitetura, meta]
 # Arquitetura
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-07-03 · relacionados: [[requisitos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
+> **implementado** · área: `meta` · atualizado em 2026-07-05 · relacionados: [[requisitos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
 
 ## Visão geral
 
@@ -83,6 +83,19 @@ Responsabilidades:
 - Controlar sessão por cookie.
 - Exigir usuário autenticado nas rotas financeiras.
 - Converter erros de domínio em respostas HTTP.
+- Validar `Host` e `Origin` em mutações contra `APP_URL`, hosts locais e listas CSV opcionais em `APP_ALLOWED_HOSTS`/`APP_ALLOWED_ORIGINS`.
+
+#### Configuração de origem e rede
+
+| Variável | Uso |
+|---|---|
+| `APP_HOST` | Interface de escuta do servidor. Padrão: `127.0.0.1`; modo LAN usa `0.0.0.0`. |
+| `APP_PORT` | Porta HTTP local. Padrão: `8010`. |
+| `APP_URL` | URL pública esperada do app; entra na lista de origens/hosts permitidos e define cookie `Secure` quando usa HTTPS. |
+| `APP_ALLOWED_HOSTS` | CSV de hosts adicionais aceitos. Entradas sem porta também aceitam a porta padrão configurada. |
+| `APP_ALLOWED_ORIGINS` | CSV de origens adicionais aceitas. Entradas sem esquema assumem `http://`; entradas sem porta assumem `APP_PORT`. |
+
+O modo local mantém `APP_HOST=127.0.0.1`. O modo rede/LAN dos pacotes usa `APP_HOST=0.0.0.0`, detecta o IP local e preenche `APP_URL`, `APP_ALLOWED_HOSTS` e `APP_ALLOWED_ORIGINS`; esse modo é adequado apenas para redes confiáveis. Acesso remoto deve ficar atrás de reverse-proxy com HTTPS.
 
 #### Rotas — Autenticação e Perfil
 
@@ -98,8 +111,8 @@ Responsabilidades:
 | `POST` | `/api/me/password` | Altera senha do usuário. |
 | `POST` | `/api/me/clear-launches` | Apaga todos os lançamentos do usuário. |
 | `DELETE` | `/api/me` | Exclui conta do usuário autenticado. |
-| `GET` | `/api/email-config` | Retorna status e remetente da configuração SMTP. |
-| `POST` | `/api/email-config` | Salva configuração SMTP criptografada. |
+| `GET` | `/api/email-config` | Retorna status e remetente da configuração SMTP do usuário autenticado. |
+| `POST` | `/api/email-config` | Salva configuração SMTP criptografada do usuário autenticado. |
 
 #### Rotas — Contas-correntes → [[contas-correntes]]
 
@@ -343,8 +356,8 @@ Ver [[importacao-organizze]].
 ### Configuração de E-mail
 
 1. Usuário autenticado abre Preferências > Recuperação por e-mail.
-2. `GET /api/email-config` retorna status e remetente configurado, sem expor senha de app.
-3. `POST /api/email-config` salva a configuração criptografada em `data/email_config.enc`.
+2. `GET /api/email-config` retorna status e remetente configurado do usuário autenticado, sem expor senha de app.
+3. `POST /api/email-config` salva a configuração criptografada em `data/email_config_user_{id}.enc`.
 4. Presets: Gmail (`smtp.gmail.com:587`) e Outlook/Microsoft (`smtp.office365.com:587`), ambos com STARTTLS.
 5. Configuração manual permite servidor SMTP, porta e uso de STARTTLS.
 
@@ -360,7 +373,7 @@ Ver [[recuperacao-senha]].
 - Escritas que alteram saldos devem usar deltas atômicos (`saldo atual = saldo atual + delta`) ou uma transação curta que proteja o cálculo.
 - Erros de domínio expõem mensagem amigável e status HTTP; sem detalhes internos.
 - Novas tabelas e colunas devem ser criadas de forma idempotente.
-- **Novas funcionalidades devem nascer em `docs/specs/` antes da implementação, sempre duplicando [[templates/spec-template|`docs/templates/spec-template.md`]] como base.** Ver [[sdd]].
+- **Novos documentos e funcionalidades devem nascer duplicando [[templates/spec-template|`docs/templates/spec-template.md`]] como base.** Ver [[sdd]].
 
 ---
 
@@ -376,6 +389,8 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `1.5` — 2026-07-05 — Configuração SMTP documentada como preferência criptografada por usuário autenticado.
+- `1.4` — 2026-07-04 — Configuração de origem/rede documentada para `APP_ALLOWED_HOSTS`, `APP_ALLOWED_ORIGINS`, modo LAN e reverse-proxy HTTPS.
 - `1.3` — 2026-07-03 — Persistência documenta WAL, espera por locks, transações imediatas curtas e regra de deltas atômicos para saldos.
 - `1.2` — 2026-06-30 — Rotas de Cockpit/relatórios documentadas, método de `/api/portfolio/value` corrigido para `PUT`, índices atuais de performance detalhados, regra de template alinhada ao SDD e escala BRL das barras de consolidação do Portfólio documentada.
 - `1.1` — 2026-06-29 — Frontmatter, tabelas de rotas e módulos por área, wikilinks e referência para ADRs.

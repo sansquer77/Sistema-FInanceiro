@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 1.1
-atualizado: 2026-06-29
+versao: 1.2
+atualizado: 2026-07-04
 relacionados:
   - "[[requisitos]]"
   - "[[roadmap]]"
@@ -15,7 +15,7 @@ aliases: ["Visão do Produto"]
 # Visão do Produto
 
 > [!info] Status
-> **implementado** (escopo vivo) · área: `meta` · atualizado em 2026-06-29 · relacionados: [[requisitos]], [[roadmap]], [[arquitetura]]
+> **implementado** (escopo vivo) · área: `meta` · atualizado em 2026-07-04 · relacionados: [[requisitos]], [[roadmap]], [[arquitetura]]
 
 ## Objetivo
 
@@ -54,6 +54,7 @@ O Organizze serve como referência de clareza: módulos financeiros separados, s
 | Recuperação de senha por e-mail SMTP com assistente para Gmail e Outlook | [[recuperacao-senha]] |
 | Modularização do frontend em ES Modules nativos | [[adr/0002-modularizacao-frontend]] |
 | Segurança: bloqueio de tentativas, headers defensivos, validação de origem | [[seguranca-autenticacao]] |
+| Distribuição desktop macOS/Windows com instaladores e launchers local/LAN | [[distribuição]] |
 
 ### Planejados
 
@@ -62,12 +63,13 @@ O Organizze serve como referência de clareza: módulos financeiros separados, s
 
 ## Estado atual
 
-O app cobre todo o ciclo avançado de controle financeiro local: usuário entra, configura recuperação de senha por e-mail quando desejar, cadastra contas e cartões, define limites, cria categorias/tags, registra lançamentos normais, parcelados ou recorrentes, acompanha faturas, relatórios e Cockpit, realiza acompanhamento de investimentos com precificação automática ou ajuste manual de ativos, e importa dados de planilhas locais.
+O app cobre todo o ciclo avançado de controle financeiro local: usuário entra, configura recuperação de senha por e-mail quando desejar, cadastra contas e cartões, define limites, cria categorias/tags, registra lançamentos normais, parcelados ou recorrentes, acompanha faturas, relatórios e Cockpit, realiza acompanhamento de investimentos com precificação automática ou ajuste manual de ativos, importa dados de planilhas locais e pode ser entregue por pacotes desktop macOS/Windows.
 
 As próximas evoluções devem priorizar automações de conciliação/importação e refinamentos de precisão para classes específicas de ativos. Ver [[roadmap]].
 
 ## Changelog
 
+- `1.2` — 2026-07-04 — Estado de produto atualizado com distribuição desktop e launchers local/LAN.
 - `1.1` — 2026-06-29 — Frontmatter, tabela de módulos com links para specs e separação de "planejados".
 - `1.0` — versão original.
 

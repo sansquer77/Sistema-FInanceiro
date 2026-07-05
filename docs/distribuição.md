@@ -2,8 +2,8 @@
 tipo: spec
 area: distribuicao
 status: implementado
-versao: 1.3
-atualizado: 2026-07-02
+versao: 1.5
+atualizado: 2026-07-04
 relacionados:
   - "[[sdd]]"
   - "[[templates/spec-template|Template de spec]]"
@@ -16,7 +16,7 @@ aliases: ["Distribuicao", "Pacotes de Distribuicao", "Instalador macOS", "Instal
 # Distribuicao
 
 > [!info] Status
-> **implementado** · área: `distribuicao` · atualizado em 2026-07-02 · relacionados: [[sdd]], [[templates/spec-template|Template de spec]], [[arquitetura]], [[requisitos]]
+> **implementado** · área: `distribuicao` · atualizado em 2026-07-04 · relacionados: [[sdd]], [[templates/spec-template|Template de spec]], [[arquitetura]], [[requisitos]]
 
 ## Problema
 
@@ -32,9 +32,11 @@ Usuario final que vai instalar o Sistema Financeiro em outro computador e manten
 2. O pacote preserva os scripts e instrucoes de instalacao da plataforma, mas substitui os arquivos de aplicacao pelos arquivos atuais.
 3. O pacote exclui dados locais, testes, documentacao tecnica, caches e metadados desnecessarios.
 4. O mantenedor gera o zip final a partir da subpasta da plataforma.
-5. No macOS, o novo usuario descompacta o zip, executa `Instalar Sistema Financeiro.command` e abre `Sistema Financeiro` pela pasta Aplicativos.
-6. No Windows, o novo usuario descompacta o zip, executa `Instalar Sistema Financeiro.bat` e abre o app pelo atalho/script gerado para a plataforma.
-7. No primeiro uso, o app cria um banco SQLite vazio na pasta local de dados definida pelo instalador da plataforma.
+5. No macOS, o novo usuario descompacta o zip, executa `Instalar Sistema Financeiro.command` e abre `Sistema Financeiro` pela pasta Aplicativos em modo local.
+6. No macOS, quando quiser acesso pela LAN, o usuario executa `~/Documents/Sistema Financeiro/Abrir Sistema Financeiro na Rede.command`.
+7. No Windows, o novo usuario descompacta o zip, executa `Instalar Sistema Financeiro.bat` e abre o app pelo atalho `Sistema Financeiro` em modo local.
+8. No Windows, quando quiser acesso pela LAN, o usuario abre o atalho `Sistema Financeiro Rede`.
+9. No primeiro uso, o app cria um banco SQLite vazio na pasta local de dados definida pelo instalador da plataforma.
 
 ## Dados
 
@@ -45,11 +47,14 @@ Usuario final que vai instalar o Sistema Financeiro em outro computador e manten
 | `Sistema Financeiro - Distribuicao/MacOS/Aplicativo/` | diretorio | Runtime macOS gerado por PyInstaller, sem `data/`, `tests/`, `docs/`, caches ou metadados temporarios. |
 | `Sistema Financeiro - Distribuicao/MacOS/Aplicativo/Sistema Financeiro.app` | bundle macOS | App instalado em `/Applications`. Deve usar launcher portatil para `~/Documents/Sistema Financeiro`. |
 | `Sistema Financeiro - Distribuicao/MacOS/Aplicativo/SistemaFinanceiro/` | diretorio | Saida one-folder do PyInstaller para macOS. Deve conter o executavel `SistemaFinanceiro` e seus arquivos internos. |
+| `Sistema Financeiro - Distribuicao/MacOS/Aplicativo/Abrir Sistema Financeiro na Rede.command` | script executavel | Launcher macOS para expor o app na rede local com `APP_HOST=0.0.0.0`. |
 | `Sistema Financeiro - Distribuicao/MacOS/Instalar Sistema Financeiro.command` | script executavel | Copia os arquivos para `~/Documents/Sistema Financeiro` e instala o `.app` em `/Applications`. |
 | `Sistema Financeiro - Distribuicao/MacOS/README-INSTALACAO.md` | documento | Instrui instalacao, primeiro uso, dados nao incluidos, URL local e atualizacao no macOS. |
 | `Sistema Financeiro - Distribuicao/MacOS/Sistema Financeiro - Distribuicao MacOS.zip` | arquivo zip | Zip final do macOS, gerado a partir de `Sistema Financeiro - Distribuicao/MacOS/`. |
 | `Sistema Financeiro - Distribuicao/Windows/` | diretorio | Raiz do pacote Windows a ser compactado. Deve conter somente itens necessarios para instalacao no Windows. |
 | `Sistema Financeiro - Distribuicao/Windows/Aplicativo/` | diretorio | Copia limpa da aplicacao atual para Windows, sem `data/`, `tests/`, `docs/`, caches ou metadados temporarios. |
+| `Sistema Financeiro - Distribuicao/Windows/Aplicativo/Abrir Sistema Financeiro.bat` | script | Launcher Windows local. |
+| `Sistema Financeiro - Distribuicao/Windows/Aplicativo/Abrir Sistema Financeiro na Rede.bat` | script | Launcher Windows para expor o app na rede local via `EXPOSE_LAN=1`. |
 | `Sistema Financeiro - Distribuicao/Windows/Instalar Sistema Financeiro.bat` | script | Instalador Windows. |
 | `Sistema Financeiro - Distribuicao/Windows/README-INSTALACAO-WINDOWS.md` | documento | Instrui instalacao, primeiro uso, dados nao incluidos, URL local e atualizacao no Windows. |
 | `Sistema Financeiro - Distribuicao/Windows/Sistema Financeiro - Distribuicao Windows.zip` | arquivo zip | Zip final do Windows, gerado a partir de `Sistema Financeiro - Distribuicao/Windows/`. |
@@ -73,6 +78,11 @@ Usuario final que vai instalar o Sistema Financeiro em outro computador e manten
 - Builds PyInstaller devem ser gerados no sistema operacional alvo; o build Windows deve ser feito em Windows, nao em macOS.
 - A URL padrao do app distribuido deve ser `http://sistema-financeiro.localhost:8010` quando suportada pela plataforma.
 - A porta padrao deve ser `8010`; conflito de porta deve ser tratado como orientacao operacional no README de instalacao de cada plataforma.
+- O modo local deve manter `APP_HOST=127.0.0.1`.
+- O modo rede deve usar `APP_HOST=0.0.0.0`, detectar o IP local da maquina e preencher `APP_URL`, `APP_ALLOWED_HOSTS` e `APP_ALLOWED_ORIGINS`.
+- `APP_ALLOWED_HOSTS` aceita lista CSV; entradas sem porta tambem aceitam a porta configurada em `APP_PORT`.
+- `APP_ALLOWED_ORIGINS` aceita lista CSV; entradas sem esquema assumem `http://` e entradas sem porta assumem `APP_PORT`.
+- O modo rede deve ser documentado como apropriado apenas para redes confiaveis; acesso remoto deve usar reverse-proxy com HTTPS.
 - A geracao do zip macOS deve ser feita a partir da pasta `Sistema Financeiro - Distribuicao/MacOS`, mantendo `MacOS/` como raiz do arquivo compactado.
 - A geracao do zip Windows deve ser feita a partir da pasta `Sistema Financeiro - Distribuicao/Windows`, mantendo `Windows/` como raiz do arquivo compactado.
 
@@ -100,6 +110,8 @@ Arquivos e diretorios afetados:
 - Dado qualquer pacote gerado, quando o zip for inspecionado, entao nao existem `__pycache__`, `.DS_Store`, `_CodeSignature` ou arquivos `._*`.
 - Dado o bundle `Sistema Financeiro.app` da distribuicao macOS, quando o binario `launcher` for inspecionado, entao ele referencia `$HOME/Documents/Sistema Financeiro` ou formato equivalente portatil, sem caminho absoluto da maquina do mantenedor.
 - Dado o pacote macOS gerado, quando inspecionado, entao o runtime principal e `Aplicativo/SistemaFinanceiro/SistemaFinanceiro` e nao `Aplicativo/app.py`.
+- Dado o pacote macOS instalado, quando o usuario executa `Abrir Sistema Financeiro na Rede.command`, entao o app sobe em `0.0.0.0`, mostra uma URL com IP local e permite acesso de outros dispositivos da mesma rede.
+- Dado o pacote Windows instalado, quando o usuario executa o atalho `Sistema Financeiro Rede`, entao o app sobe em `0.0.0.0`, abre uma URL com IP local e permite acesso de outros dispositivos da mesma rede.
 - Dado o zip final de cada plataforma, quando `zip -T` for executado, entao a integridade do arquivo e confirmada.
 - Dado o zip final macOS, quando os metadados forem inspecionados, entao `Instalar Sistema Financeiro.command` e `Contents/MacOS/launcher` estao executaveis.
 - Dado a pasta `Aplicativo/`, quando os arquivos Python forem compilados com `py_compile`, entao nao ha erro de sintaxe.
@@ -117,6 +129,8 @@ Arquivos e diretorios afetados:
 
 ## Changelog
 
+- `1.5` — 2026-07-04 — Normalizacao de hosts/origens permitidos documentada para modo rede e launchers LAN.
+- `1.4` — 2026-07-04 — Pacotes passam a documentar e entregar launchers separados para modo local e modo rede/LAN.
 - `1.3` — 2026-07-02 — Pacote macOS passa a usar runtime PyInstaller; build Windows PyInstaller documentado como dependente de ambiente Windows.
 - `1.2` — 2026-07-02 — Pacotes finais passam a excluir `docs/` para reduzir superficie de engenharia reversa e entregar somente runtime e instrucoes de instalacao.
 - `1.1` — 2026-07-01 — Spec atualizada para refletir pacotes por plataforma em `MacOS/` e `Windows/`.

@@ -2,8 +2,8 @@
 tipo: roadmap
 area: meta
 status: implementado
-versao: 1.1
-atualizado: 2026-06-29
+versao: 1.2
+atualizado: 2026-07-04
 relacionados:
   - "[[visao-produto]]"
   - "[[requisitos]]"
@@ -15,7 +15,7 @@ aliases: ["Roadmap", "Replicação Local"]
 # Roadmap
 
 > [!info] Status
-> **implementado** (todos os módulos planejados concluídos) · área: `meta` · atualizado em 2026-06-29
+> **implementado** (todos os módulos planejados concluídos) · área: `meta` · atualizado em 2026-07-04
 
 Este documento organiza a evolução do Sistema Financeiro e serve de histórico de decisões de sequenciamento. Módulos planejados que ainda não iniciaram ficam com status `planejado`.
 
@@ -23,7 +23,7 @@ Este documento organiza a evolução do Sistema Financeiro e serve de histórico
 
 - O app local deve funcionar sem internet para operações financeiras básicas.
 - A fonte de verdade é o SQLite local. Ver [[adr/0003-sqlite-fonte-de-verdade]].
-- Cada módulo novo precisa de spec própria em `specs/` antes da implementação. Ver [[sdd]].
+- Cada módulo ou documento novo precisa nascer a partir de [[templates/spec-template|`docs/templates/spec-template.md`]] antes da implementação. Ver [[sdd]].
 - Dados monetários são armazenados em centavos.
 - Registros removidos pelo usuário devem ser arquivados sempre que houver valor histórico.
 - A interface deve separar cadastros, lançamentos, relatórios e visão geral.
@@ -45,8 +45,9 @@ Este documento organiza a evolução do Sistema Financeiro e serve de histórico
 | 9 | Recuperação de senha com configuração SMTP local criptografada e assistente para Gmail/Outlook. | ✅ Implementado | [[recuperacao-senha]] |
 | 10 | Importação Organizze e planilhas modelo do sistema (`.xlsx`). | ✅ Implementado | [[importacao-organizze]] |
 | 11 | Modularização do frontend em ES Modules nativos sem build step. | ✅ Implementado | [[adr/0002-modularizacao-frontend]] |
-| 12 | Conciliação automática de arquivos OFX bancários. | 🔲 Planejado | — |
-| 13 | Exportação direta de dados em outros formatos. | 🔲 Planejado | — |
+| 12 | Distribuição desktop macOS/Windows, instaladores, zips limpos e launchers local/LAN. | ✅ Implementado | [[distribuição]] |
+| 13 | Conciliação automática de arquivos OFX bancários. | 🔲 Planejado | — |
+| 14 | Exportação direta de dados em outros formatos. | 🔲 Planejado | — |
 
 ---
 
@@ -60,6 +61,7 @@ Este documento organiza a evolução do Sistema Financeiro e serve de histórico
 6. ✅ Implementar relatórios sintéticos/analíticos interativos no frontend web.
 7. ✅ Modularizar o frontend em ES Modules nativos.
 8. ✅ Enrijecer autenticação (bloqueio de tentativas, headers defensivos).
+9. ✅ Organizar distribuição desktop por plataforma, com modo local padrão e modo rede/LAN explícito.
 
 ## Próximas prioridades sugeridas
 
@@ -114,10 +116,12 @@ A implementação local não copia a interface de nenhum produto externo. Reprod
 - Acompanhar limites de gastos.
 - Gerar relatórios por período, categoria, subcategoria, conta, tag e fluxo diário.
 - Usar Cockpit para visualizar saldos, planejamento recorrente, dívidas, maiores receitas/despesas e portfólio por tipo.
-- Distribuir o app sem banco, logs, chaves ou credenciais SMTP; cada instalação configura sua própria recuperação por e-mail.
+- Distribuir o app por pacotes macOS e Windows sem banco, logs, chaves, credenciais SMTP, testes ou docs técnicas; cada instalação configura sua própria recuperação por e-mail.
+- Oferecer launchers de rede local apenas para redes confiáveis, mantendo reverse-proxy HTTPS como caminho para acesso remoto.
 
 ## Changelog
 
+- `1.2` — 2026-07-04 — Roadmap inclui distribuição desktop macOS/Windows e regra de criação de documentos a partir do template.
 - `1.1` — 2026-06-29 — Consolidação de `replicacao-local.md` neste arquivo; adição de frontmatter, status por módulo e próximas prioridades.
 - `1.0` — versão original.
 

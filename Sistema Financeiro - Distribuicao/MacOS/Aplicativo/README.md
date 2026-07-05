@@ -12,6 +12,14 @@ O app inicia o servidor local e abre:
 http://sistema-financeiro.localhost:8010
 ```
 
+Para expor na rede local, use:
+
+```text
+Abrir Sistema Financeiro na Rede.command
+```
+
+O comando detecta o IP local do Mac e mostra a URL para acessar de outros dispositivos da mesma rede.
+
 ## Dados locais
 
 Os dados do usuario ficam fora do executavel, em:

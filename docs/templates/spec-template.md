@@ -2,8 +2,8 @@
 tipo: template
 area: meta
 status: implementado
-versao: 1.0
-atualizado: 2026-06-29
+versao: 1.1
+atualizado: 2026-07-04
 relacionados:
   - "[[sdd]]"
   - "[[glossario]]"
@@ -13,7 +13,7 @@ tags: [template, meta]
 # Template de Spec
 
 > [!info] Como usar
-> Duplique este arquivo dentro de `specs/` com o nome `area-da-funcionalidade.md`, preencha o frontmatter e todas as seções. Apague apenas seções marcadas como opcionais quando não houver conteúdo. Veja o processo completo em [[sdd]].
+> Duplique este arquivo para criar qualquer novo documento do vault. Para specs, salve dentro de `specs/` com o nome `area-da-funcionalidade.md` e preencha todas as seções obrigatórias. Para outros tipos (`adr`, `design`, `produto`, `arquitetura`, `roadmap`, `glossario`, `metodologia`), adapte o frontmatter, o título e as seções mantendo status, changelog e relacionados. Veja o processo completo em [[sdd]].
 
 ## Frontmatter obrigatório
 
@@ -78,3 +78,8 @@ O que conscientemente não será feito nesta entrega.
 ### Relacionados
 
 - [[outra-spec]]
+
+## Changelog do template
+
+- `1.1` — 2026-07-04 — Uso ampliado: o template passa a ser a base de qualquer novo documento do vault, não apenas specs.
+- `1.0` — 2026-06-29 — Template inicial para specs.

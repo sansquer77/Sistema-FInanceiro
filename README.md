@@ -64,10 +64,10 @@ A documentação oficial fica em `docs/`:
 
 ## Configuração segura de email
 
-As credenciais SMTP não ficam no código fonte. O app lê a configuração criptografada em:
+As credenciais SMTP não ficam no código fonte. O app lê a configuração criptografada por usuário em:
 
 ```text
-data/email_config.enc
+data/email_config_user_{id}.enc
 ```
 
 A chave local usada para descriptografar fica em:
@@ -76,7 +76,7 @@ A chave local usada para descriptografar fica em:
 data/email_config.key
 ```
 
-Ambos são arquivos locais de runtime e estão ignorados pelo Git. Para trocar a conta ou senha de aplicativo, gere novamente a configuração chamando `financeiro.secure_config.save_encrypted_config(...)` em um ambiente local seguro.
+Esses arquivos são locais de runtime e estão ignorados pelo Git. Para trocar a conta ou senha de aplicativo, use Preferências no usuário autenticado correspondente.
 
 ## Estrutura
 

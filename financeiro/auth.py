@@ -152,7 +152,7 @@ def request_password_reset(email: str, source_key: str | None = None) -> dict:
             reset_id = cursor.lastrowid
     if token:
         try:
-            send_password_reset_email(normalized_email, token, RESET_TOKEN_MINUTES)
+            send_password_reset_email(user["id"], normalized_email, token, RESET_TOKEN_MINUTES)
         except Exception:
             if reset_id:
                 with get_connection() as conn:

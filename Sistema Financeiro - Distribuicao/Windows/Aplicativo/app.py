@@ -4,6 +4,8 @@ import json
 import mimetypes
 import os
 import re
+import sqlite3
+import sys
 from datetime import date
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -82,7 +84,7 @@ from financeiro.transactions import (
     update_transaction,
 )
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 WEB_ROOT = ROOT / "web"
 HOST = os.environ.get("APP_HOST", "127.0.0.1")
 PORT = int(os.environ.get("APP_PORT", "8010"))
@@ -122,6 +124,36 @@ def normalize_netloc(value: str) -> str:
     return f"{host}:{port}"
 
 
+def csv_env_values(name: str) -> list[str]:
+    return [value.strip() for value in os.environ.get(name, "").split(",") if value.strip()]
+
+
+def host_variants(value: str) -> set[str]:
+    normalized = normalize_netloc(value)
+    if not normalized:
+        return set()
+    if ":" in normalized:
+        return {normalized}
+    return {normalized, f"{normalized}:{PORT}"}
+
+
+def normalize_origin(value: str) -> str:
+    candidate = value.strip()
+    if not candidate:
+        return ""
+    if "://" not in candidate:
+        candidate = f"http://{candidate}"
+    parsed = urlsplit(candidate)
+    if not parsed.scheme or not parsed.netloc:
+        return ""
+    netloc = normalize_netloc(parsed.netloc)
+    if not netloc:
+        return ""
+    if ":" not in netloc:
+        netloc = f"{netloc}:{PORT}"
+    return f"{parsed.scheme.lower()}://{netloc}"
+
+
 def public_url_origin() -> str:
     public_url = urlsplit(PUBLIC_URL)
     if not public_url.scheme or not public_url.netloc:
@@ -131,14 +163,20 @@ def public_url_origin() -> str:
 
 def allowed_host_values() -> set[str]:
     hosts = {f"{host}:{PORT}" for host in LOCAL_ALLOWED_HOSTS}
+    for value in csv_env_values("APP_ALLOWED_HOSTS"):
+        hosts.update(host_variants(value))
     public_host = normalize_netloc(urlsplit(PUBLIC_URL).netloc)
     if public_host:
-        hosts.add(public_host)
+        hosts.update(host_variants(public_host))
     return hosts
 
 
 def allowed_origin_values() -> set[str]:
     origins = {f"http://{host}:{PORT}" for host in LOCAL_ALLOWED_HOSTS}
+    for value in csv_env_values("APP_ALLOWED_ORIGINS"):
+        origin = normalize_origin(value)
+        if origin:
+            origins.add(origin)
     public_origin = public_url_origin()
     if public_origin:
         origins.add(public_origin)
@@ -951,8 +989,12 @@ class AppHandler(BaseHTTPRequestHandler):
         try:
             super().handle_one_request()
         except Exception as exc:
-            message = getattr(exc, "message", "Erro inesperado.")
-            status = getattr(exc, "status", HTTPStatus.INTERNAL_SERVER_ERROR)
+            if is_database_busy_error(exc):
+                message = "O banco esta ocupado por outra operacao. Aguarde alguns segundos e tente novamente."
+                status = HTTPStatus.SERVICE_UNAVAILABLE
+            else:
+                message = getattr(exc, "message", "Erro inesperado.")
+                status = getattr(exc, "status", HTTPStatus.INTERNAL_SERVER_ERROR)
             self.send_json({"error": message}, status)
 
     def log_message(self, format: str, *args: object) -> None:
@@ -964,6 +1006,13 @@ class ApiError(Exception):
         self.message = message
         self.status = status
         super().__init__(message)
+
+
+def is_database_busy_error(exc: Exception) -> bool:
+    if not isinstance(exc, sqlite3.OperationalError):
+        return False
+    message = str(exc).lower()
+    return "database is locked" in message or "database table is locked" in message or "database is busy" in message
 
 
 def cockpit_payload(transactions: list[dict]) -> dict:

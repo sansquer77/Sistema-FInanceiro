@@ -2,8 +2,8 @@
 tipo: spec
 area: seguranca
 status: implementado
-versao: 1.0
-atualizado: 2026-06-29
+versao: 1.1
+atualizado: 2026-07-04
 relacionados:
   - "[[recuperacao-senha]]"
   - "[[adr/0005-smtp-criptografado-local]]"
@@ -15,7 +15,7 @@ aliases: ["Segurança", "Autenticação"]
 # Segurança de Autenticação
 
 > [!info] Status
-> **implementado** · área: `seguranca` · atualizado em 2026-06-29 · relacionados: [[recuperacao-senha]], [[arquitetura]]
+> **implementado** · área: `seguranca` · atualizado em 2026-07-04 · relacionados: [[recuperacao-senha]], [[arquitetura]]
 
 ## Problema
 
@@ -55,6 +55,8 @@ Usuários locais do Sistema Financeiro que protegem dados financeiros sensíveis
 - Métodos mutáveis (`POST`, `PUT`, `DELETE`) validam `Host` e, quando enviado, `Origin`.
 - Hosts locais permitidos: `sistema-financeiro.localhost` e `127.0.0.1` na porta configurada em `APP_PORT`.
 - A origem definida em `APP_URL` também é aceita.
+- Hosts adicionais podem ser definidos em `APP_ALLOWED_HOSTS` como CSV; valores sem porta também aceitam `APP_PORT`.
+- Origens adicionais podem ser definidas em `APP_ALLOWED_ORIGINS` como CSV; valores sem esquema assumem `http://` e valores sem porta assumem `APP_PORT`.
 - Respostas JSON e arquivos estáticos enviam headers defensivos:
   - `Content-Security-Policy: frame-ancestors 'none'`
   - `X-Content-Type-Options: nosniff`
@@ -81,6 +83,7 @@ Rotas afetadas:
 - Dado `APP_URL` HTTPS, quando o cookie é gerado, contém `Secure`.
 - Dado um `Origin` desconhecido em requisição mutável, quando recebido, a API retorna `403 Forbidden`.
 - Dado um `Host` fora da lista permitida em requisição mutável, quando recebido, a API retorna `403 Forbidden`.
+- Dado um host/origem de LAN configurado por `APP_ALLOWED_HOSTS`/`APP_ALLOWED_ORIGINS`, quando uma mutação vem dessa origem, a validação aceita a requisição.
 - Dado qualquer resposta JSON ou arquivo estático, quando entregue, os headers defensivos estão presentes.
 - Dado tentativas de alterar recursos de outro usuário, quando feitas, retornam `404`.
 
@@ -93,6 +96,7 @@ Rotas afetadas:
 
 ## Changelog
 
+- `1.1` — 2026-07-04 — Validação de Host/Origin atualizada para documentar listas CSV de LAN e normalização de porta/esquema.
 - `1.0` — 2026-06-29 — Frontmatter e critérios formalizados.
 
 ## Relacionados

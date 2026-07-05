@@ -12,9 +12,20 @@ import app
 from financeiro import database
 from financeiro.accounts import AccountError, create_checking_account, update_checking_account
 from financeiro.auth import AuthError, create_user, login_user, request_password_reset
-from financeiro.categories import ClassificationError, create_category, update_category
-from financeiro.credit_cards import CreditCardError, create_credit_card, update_credit_card
+from financeiro.categories import ClassificationError, create_category, get_category_evolution, update_category
+from financeiro.credit_cards import (
+    CreditCardError,
+    create_credit_card,
+    create_credit_card_transaction,
+    list_credit_card_invoice,
+    update_credit_card,
+    update_credit_card_transaction,
+)
 from financeiro.database import initialize_database
+from financeiro.portfolio import PortfolioError, create_opening_position, update_opening_position
+from financeiro.secure_config import email_config_status, save_email_config
+from financeiro.spending_limits import SpendingLimitError, create_spending_limit, update_spending_limit
+from financeiro.transactions import TransactionError, create_transaction, update_transaction
 
 
 class IsolatedDatabaseTest(unittest.TestCase):
@@ -71,6 +82,15 @@ class BruteForceProtectionTest(IsolatedDatabaseTest):
 
         self.assertIsNotNone(reset["used_at"])
 
+    def test_password_reset_uses_requested_users_email_config(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+
+        with mock.patch("financeiro.auth.send_password_reset_email") as send_email:
+            request_password_reset("alice@example.com", source_key="127.0.0.1")
+
+        self.assertEqual(send_email.call_args.args[0], user["id"])
+        self.assertEqual(send_email.call_args.args[1], "alice@example.com")
+
 
 class IdorProtectionTest(IsolatedDatabaseTest):
     def test_account_update_requires_owner(self) -> None:
@@ -123,6 +143,162 @@ class IdorProtectionTest(IsolatedDatabaseTest):
                 "due_day": "20",
             })
         self.assertEqual(denied.exception.status, HTTPStatus.NOT_FOUND)
+
+    def test_credit_card_update_rejects_foreign_preferred_payment_account(self) -> None:
+        owner = create_user("Owner", "owner@example.com", "strong-password")
+        other_user = create_user("Other", "other@example.com", "strong-password")
+        foreign_account = create_checking_account(other_user["id"], {
+            "name": "Conta de outro usuario",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "100,00",
+        })
+        card = create_credit_card(owner["id"], {
+            "name": "Cartao",
+            "issuer": "Banco",
+            "currency": "BRL",
+            "limit": "1000,00",
+            "closing_day": "10",
+            "due_day": "20",
+        })
+
+        with self.assertRaises(CreditCardError):
+            update_credit_card(owner["id"], str(card["id"]), {
+                "name": "Cartao",
+                "issuer": "Banco",
+                "currency": "BRL",
+                "limit": "1000,00",
+                "closing_day": "10",
+                "due_day": "20",
+                "preferred_payment_account_id": str(foreign_account["id"]),
+            })
+
+    def test_transaction_update_requires_owner(self) -> None:
+        owner = create_user("Owner", "owner@example.com", "strong-password")
+        attacker = create_user("Attacker", "attacker@example.com", "strong-password")
+        owner_account = create_checking_account(owner["id"], {
+            "name": "Conta owner",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "100,00",
+        })
+        attacker_account = create_checking_account(attacker["id"], {
+            "name": "Conta attacker",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "100,00",
+        })
+        transaction = create_transaction(owner["id"], transaction_payload(owner_account["id"]))
+
+        with self.assertRaises(TransactionError) as denied:
+            update_transaction(attacker["id"], str(transaction["id"]), transaction_payload(attacker_account["id"]))
+        self.assertEqual(denied.exception.status, HTTPStatus.NOT_FOUND)
+
+    def test_transaction_create_rejects_foreign_account(self) -> None:
+        owner = create_user("Owner", "owner@example.com", "strong-password")
+        other_user = create_user("Other", "other@example.com", "strong-password")
+        foreign_account = create_checking_account(other_user["id"], {
+            "name": "Conta de outro usuario",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "100,00",
+        })
+
+        with self.assertRaises(TransactionError) as denied:
+            create_transaction(owner["id"], transaction_payload(foreign_account["id"]))
+        self.assertEqual(denied.exception.status, HTTPStatus.NOT_FOUND)
+
+    def test_credit_card_transaction_update_requires_owner(self) -> None:
+        owner = create_user("Owner", "owner@example.com", "strong-password")
+        attacker = create_user("Attacker", "attacker@example.com", "strong-password")
+        owner_card = create_credit_card(owner["id"], credit_card_payload("Cartao owner"))
+        attacker_card = create_credit_card(attacker["id"], credit_card_payload("Cartao attacker"))
+        transaction = create_credit_card_transaction(owner["id"], card_transaction_payload(owner_card["id"]))
+
+        with self.assertRaises(CreditCardError) as denied:
+            update_credit_card_transaction(
+                attacker["id"],
+                str(transaction["id"]),
+                card_transaction_payload(attacker_card["id"]),
+            )
+        self.assertEqual(denied.exception.status, HTTPStatus.NOT_FOUND)
+
+    def test_credit_card_invoice_rejects_foreign_card(self) -> None:
+        owner = create_user("Owner", "owner@example.com", "strong-password")
+        attacker = create_user("Attacker", "attacker@example.com", "strong-password")
+        owner_card = create_credit_card(owner["id"], credit_card_payload("Cartao owner"))
+
+        with self.assertRaises(CreditCardError) as denied:
+            list_credit_card_invoice(attacker["id"], str(owner_card["id"]), "2026-06")
+        self.assertEqual(denied.exception.status, HTTPStatus.NOT_FOUND)
+
+    def test_spending_limit_update_requires_owner(self) -> None:
+        owner = create_user("Owner", "owner@example.com", "strong-password")
+        attacker = create_user("Attacker", "attacker@example.com", "strong-password")
+        owner_category = create_category(owner["id"], "Mercado", "expense")
+        attacker_category = create_category(attacker["id"], "Mercado", "expense")
+        limit = create_spending_limit(owner["id"], spending_limit_payload(owner_category["id"]))
+
+        with self.assertRaises(SpendingLimitError) as denied:
+            update_spending_limit(attacker["id"], str(limit["id"]), spending_limit_payload(attacker_category["id"]))
+        self.assertEqual(denied.exception.status, HTTPStatus.NOT_FOUND)
+
+    def test_spending_limit_create_rejects_foreign_category(self) -> None:
+        owner = create_user("Owner", "owner@example.com", "strong-password")
+        other_user = create_user("Other", "other@example.com", "strong-password")
+        foreign_category = create_category(other_user["id"], "Mercado", "expense")
+
+        with self.assertRaises(SpendingLimitError):
+            create_spending_limit(owner["id"], spending_limit_payload(foreign_category["id"]))
+
+    def test_category_evolution_rejects_foreign_category(self) -> None:
+        owner = create_user("Owner", "owner@example.com", "strong-password")
+        attacker = create_user("Attacker", "attacker@example.com", "strong-password")
+        category = create_category(owner["id"], "Mercado", "expense")
+
+        with self.assertRaises(ClassificationError) as denied:
+            get_category_evolution(attacker["id"], category["id"])
+        self.assertEqual(denied.exception.status, HTTPStatus.NOT_FOUND)
+
+    def test_portfolio_position_update_requires_owner(self) -> None:
+        owner = create_user("Owner", "owner@example.com", "strong-password")
+        attacker = create_user("Attacker", "attacker@example.com", "strong-password")
+        owner_account = create_checking_account(owner["id"], investment_account_payload("Investimentos owner"))
+        attacker_account = create_checking_account(attacker["id"], investment_account_payload("Investimentos attacker"))
+        create_opening_position(owner["id"], portfolio_position_payload(owner_account["id"]))
+
+        with database.get_connection() as conn:
+            position_id = conn.execute(
+                "SELECT id FROM investment_opening_positions WHERE user_id = ?",
+                (owner["id"],),
+            ).fetchone()["id"]
+
+        with self.assertRaises(PortfolioError) as denied:
+            update_opening_position(attacker["id"], position_id, portfolio_position_payload(attacker_account["id"]))
+        self.assertEqual(denied.exception.status, HTTPStatus.NOT_FOUND)
+
+    def test_portfolio_position_create_rejects_foreign_account(self) -> None:
+        owner = create_user("Owner", "owner@example.com", "strong-password")
+        other_user = create_user("Other", "other@example.com", "strong-password")
+        foreign_account = create_checking_account(other_user["id"], investment_account_payload("Investimentos outro"))
+
+        with self.assertRaises(PortfolioError) as denied:
+            create_opening_position(owner["id"], portfolio_position_payload(foreign_account["id"]))
+        self.assertEqual(denied.exception.status, HTTPStatus.NOT_FOUND)
+
+    def test_email_config_is_isolated_per_user(self) -> None:
+        owner = create_user("Owner", "owner@example.com", "strong-password")
+        other_user = create_user("Other", "other@example.com", "strong-password")
+
+        save_email_config(owner["id"], email_config_payload("owner-smtp@example.com"))
+
+        owner_status = email_config_status(owner["id"])
+        other_status = email_config_status(other_user["id"])
+
+        self.assertTrue(owner_status["configured"])
+        self.assertEqual(owner_status["sender"], "owner-smtp@example.com")
+        self.assertFalse(other_status["configured"])
+        self.assertEqual(other_status["sender"], "")
 
 
 class SessionCookieTest(unittest.TestCase):
@@ -197,6 +373,78 @@ class DatabaseBusyErrorTest(unittest.TestCase):
     def test_ignores_other_operational_errors(self) -> None:
         self.assertFalse(app.is_database_busy_error(sqlite3.OperationalError("no such table: users")))
         self.assertFalse(app.is_database_busy_error(RuntimeError("database is locked")))
+
+
+def credit_card_payload(name: str = "Cartao") -> dict:
+    return {
+        "name": name,
+        "issuer": "Banco",
+        "currency": "BRL",
+        "limit": "1000,00",
+        "closing_day": "10",
+        "due_day": "20",
+    }
+
+
+def email_config_payload(sender: str) -> dict:
+    return {
+        "provider": "gmail",
+        "sender": sender,
+        "password": "app-password",
+    }
+
+
+def card_transaction_payload(card_id: int) -> dict:
+    return {
+        "credit_card_id": str(card_id),
+        "type": "expense",
+        "description": "Compra",
+        "amount": "10,00",
+        "date": "2026-06-15",
+        "invoice_month": "2026-06",
+        "category": "Mercado",
+    }
+
+
+def investment_account_payload(name: str) -> dict:
+    return {
+        "name": name,
+        "bank_name": "Banco",
+        "account_type": "investment",
+        "currency": "BRL",
+        "initial_balance": "1000,00",
+    }
+
+
+def portfolio_position_payload(account_id: int) -> dict:
+    return {
+        "account_id": str(account_id),
+        "asset_type": "other",
+        "asset_name": "Ativo teste",
+        "acquisition_date": "2026-06-15",
+        "quantity": "1",
+        "unit_price": "100,00",
+        "total_cost": "100,00",
+    }
+
+
+def spending_limit_payload(category_id: int) -> dict:
+    return {
+        "month": "2026-06",
+        "category_id": str(category_id),
+        "limit_amount": "500,00",
+    }
+
+
+def transaction_payload(account_id: int) -> dict:
+    return {
+        "type": "expense",
+        "description": "Compra",
+        "amount": "10,00",
+        "date": "2026-06-15",
+        "account_id": str(account_id),
+        "category": "Mercado",
+    }
 
 
 def json_handler(content_length: str, body: bytes):

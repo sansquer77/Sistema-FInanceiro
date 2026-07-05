@@ -90,11 +90,6 @@ HOST = os.environ.get("APP_HOST", "127.0.0.1")
 PORT = int(os.environ.get("APP_PORT", "8010"))
 PUBLIC_URL = os.environ.get("APP_URL", f"http://sistema-financeiro.localhost:{PORT}")
 LOCAL_ALLOWED_HOSTS = frozenset({"sistema-financeiro.localhost", "127.0.0.1"})
-# Optional additional allowed hosts provided by the environment (comma-separated)
-env_allowed = os.environ.get("APP_ALLOWED_HOSTS", "").strip()
-if env_allowed:
-    extra = {h.strip() for h in env_allowed.split(",") if h.strip()}
-    LOCAL_ALLOWED_HOSTS = frozenset(set(LOCAL_ALLOWED_HOSTS) | extra)
 MAX_JSON_BODY_BYTES = 1 * 1024 * 1024
 SECURITY_HEADERS = {
     "Content-Security-Policy": (
@@ -129,6 +124,36 @@ def normalize_netloc(value: str) -> str:
     return f"{host}:{port}"
 
 
+def csv_env_values(name: str) -> list[str]:
+    return [value.strip() for value in os.environ.get(name, "").split(",") if value.strip()]
+
+
+def host_variants(value: str) -> set[str]:
+    normalized = normalize_netloc(value)
+    if not normalized:
+        return set()
+    if ":" in normalized:
+        return {normalized}
+    return {normalized, f"{normalized}:{PORT}"}
+
+
+def normalize_origin(value: str) -> str:
+    candidate = value.strip()
+    if not candidate:
+        return ""
+    if "://" not in candidate:
+        candidate = f"http://{candidate}"
+    parsed = urlsplit(candidate)
+    if not parsed.scheme or not parsed.netloc:
+        return ""
+    netloc = normalize_netloc(parsed.netloc)
+    if not netloc:
+        return ""
+    if ":" not in netloc:
+        netloc = f"{netloc}:{PORT}"
+    return f"{parsed.scheme.lower()}://{netloc}"
+
+
 def public_url_origin() -> str:
     public_url = urlsplit(PUBLIC_URL)
     if not public_url.scheme or not public_url.netloc:
@@ -138,18 +163,19 @@ def public_url_origin() -> str:
 
 def allowed_host_values() -> set[str]:
     hosts = {f"{host}:{PORT}" for host in LOCAL_ALLOWED_HOSTS}
+    for value in csv_env_values("APP_ALLOWED_HOSTS"):
+        hosts.update(host_variants(value))
     public_host = normalize_netloc(urlsplit(PUBLIC_URL).netloc)
     if public_host:
-        hosts.add(public_host)
+        hosts.update(host_variants(public_host))
     return hosts
 
 
 def allowed_origin_values() -> set[str]:
     origins = {f"http://{host}:{PORT}" for host in LOCAL_ALLOWED_HOSTS}
-    # Allow additional explicit origins via environment (comma-separated full origins)
-    env_origins = os.environ.get("APP_ALLOWED_ORIGINS", "").strip()
-    if env_origins:
-        for origin in (o.strip() for o in env_origins.split(",") if o.strip()):
+    for value in csv_env_values("APP_ALLOWED_ORIGINS"):
+        origin = normalize_origin(value)
+        if origin:
             origins.add(origin)
     public_origin = public_url_origin()
     if public_origin:
@@ -437,14 +463,14 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_json({"ok": True})
 
     def handle_email_config_status(self) -> None:
-        self.require_user()
-        self.send_json(email_config_status())
+        user = self.require_user()
+        self.send_json(email_config_status(user["id"]))
 
     def handle_save_email_config(self) -> None:
-        self.require_user()
+        user = self.require_user()
         data = self.read_json()
         try:
-            self.send_json(save_email_config(data))
+            self.send_json(save_email_config(user["id"], data))
         except SecureConfigError as exc:
             raise ApiError(str(exc) or "Configuracao de email invalida.") from exc
 

@@ -8,7 +8,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
 
-from financeiro.database import get_connection, row_to_dict
+from financeiro.database import begin_immediate, get_connection, row_to_dict
 from financeiro.emailer import send_password_reset_email
 
 RESET_TOKEN_MINUTES = 15
@@ -103,6 +103,7 @@ def clear_user_launches(user_id: int, current_password: str) -> None:
         row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
         if not row or not verify_password(current_password, row["password_hash"]):
             raise AuthError("Senha atual invalida.", HTTPStatus.UNAUTHORIZED)
+        begin_immediate(conn)
         conn.execute("DELETE FROM credit_card_payments WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM credit_card_transactions WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM investment_value_overrides WHERE user_id = ?", (user_id,))
@@ -125,6 +126,7 @@ def request_password_reset(email: str, source_key: str | None = None) -> dict:
     normalized_email = email.strip().lower()
     validate_email(normalized_email)
     token = None
+    reset_id = None
     identifiers = auth_identifiers("password-reset-request", normalized_email, source_key)
     with get_connection() as conn:
         ensure_not_locked(conn, "password-reset-request", identifiers, PASSWORD_RESET_MAX_REQUESTS, PASSWORD_RESET_LOCK_MINUTES)
@@ -140,14 +142,22 @@ def request_password_reset(email: str, source_key: str | None = None) -> dict:
                 """,
                 (user["id"],),
             )
-            conn.execute(
+            cursor = conn.execute(
                 """
                 INSERT INTO password_resets (user_id, token_hash, expires_at)
                 VALUES (?, ?, ?)
                 """,
                 (user["id"], hash_reset_token(token), reset_expiration()),
             )
+            reset_id = cursor.lastrowid
+    if token:
+        try:
             send_password_reset_email(normalized_email, token, RESET_TOKEN_MINUTES)
+        except Exception:
+            if reset_id:
+                with get_connection() as conn:
+                    conn.execute("UPDATE password_resets SET used_at = CURRENT_TIMESTAMP WHERE id = ?", (reset_id,))
+            raise
     return {
         "ok": True,
         "expires_in_minutes": RESET_TOKEN_MINUTES,

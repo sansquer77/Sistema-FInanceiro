@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 1.2
-atualizado: 2026-07-03
+versao: 1.4
+atualizado: 2026-07-05
 relacionados:
   - "[[arquitetura]]"
   - "[[visao-produto]]"
@@ -14,7 +14,7 @@ tags: [produto, meta]
 # Requisitos
 
 > [!info] Status
-> **implementado** (escopo vivo) · área: `meta` · atualizado em 2026-06-29 · relacionados: [[arquitetura]], [[visao-produto]]
+> **implementado** (escopo vivo) · área: `meta` · atualizado em 2026-07-05 · relacionados: [[arquitetura]], [[visao-produto]]
 
 ## Objetivo
 
@@ -43,11 +43,12 @@ Manter um sistema financeiro local, privado e simples para controlar contas, sal
   - Importação de lançamentos por meio de planilhas de modelo do sistema (`.xlsx`) para contas e cartões.
   - Ver [[importacao-organizze]].
 - **Interface web estática**: painéis locais em `web/`, sem dependências externas de frontend. Ver [[arquitetura]] e [[adr/0001-stack-local-sem-framework]].
+- **Distribuição desktop**: pacotes macOS e Windows com instaladores, modo local e launchers opcionais para rede local confiável. Ver [[distribuição]].
 
 ## Fora do escopo atual
 
 - Open Finance, sincronização em nuvem ou integrações bancárias automáticas diretas.
-- Multiusuário em rede (o uso esperado é local/monousuário).
+- Multiusuário concorrente em rede; o modo LAN é apenas exposição local controlada para redes confiáveis, sem transformar o app em serviço multiusuário.
 
 ## Regras funcionais
 
@@ -72,17 +73,19 @@ Manter um sistema financeiro local, privado e simples para controlar contas, sal
 - Senhas são armazenadas com PBKDF2-HMAC-SHA256 e salt por senha.
 - Tokens de recuperação são armazenados como hash e expiram em 15 minutos.
 - Ao redefinir a senha, sessões ativas do usuário são encerradas.
-- A configuração SMTP fica criptografada em `data/email_config.enc`.
+- A configuração SMTP fica criptografada por usuário em `data/email_config_user_{id}.enc`.
 - A chave local fica em `data/email_config.key` ou na variável `SISTEMA_FINANCEIRO_CONFIG_KEY`.
-- Pacotes distribuíveis não incluem credenciais SMTP; cada instalação configura seu próprio remetente localmente.
+- Pacotes distribuíveis não incluem credenciais SMTP; cada usuário configura seu próprio remetente localmente.
 - Arquivos de runtime em `data/` não devem ser versionados.
 - Upload de importação é limitado a 5 MB.
 - Identificadores recebidos pela API devem ser validados contra o usuário autenticado.
 - Detalhes completos de bloqueio de tentativas, cookies e headers defensivos em [[seguranca-autenticacao]] e [[recuperacao-senha]].
+- Exposição em LAN deve configurar `APP_URL`, `APP_ALLOWED_HOSTS` e `APP_ALLOWED_ORIGINS`; acesso remoto deve usar reverse-proxy com HTTPS.
 
 ## Requisitos não funcionais
 
 - O app deve rodar localmente em macOS com Python 3 e bibliotecas padrão (ou extensões mínimas offline).
+- Pacotes distribuídos devem oferecer modo local por padrão e modo rede/LAN apenas por launcher explícito.
 - O frontend deve continuar simples, responsivo e sem build step.
 - Valores monetários devem ser persistidos em centavos.
 - O banco SQLite deve ser criado automaticamente em `data/finance.db`.
@@ -100,6 +103,8 @@ Manter um sistema financeiro local, privado e simples para controlar contas, sal
 
 ## Changelog
 
+- `1.4` — 2026-07-05 — Regras de segurança atualizadas para configuração SMTP criptografada e isolada por usuário.
+- `1.3` — 2026-07-04 — Escopo atualizado com distribuição desktop, modo rede/LAN confiável e exigência de configuração explícita de hosts/origens.
 - `1.2` — 2026-07-03 — Requisitos não funcionais atualizados para explicitar WAL, espera por locks e transações curtas no SQLite.
 - `1.1` — 2026-06-29 — Adição de frontmatter, wikilinks para specs por módulo e referência cruzada com ADRs.
 - `1.0` — escopo original consolidado.

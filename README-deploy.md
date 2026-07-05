@@ -1,6 +1,6 @@
 # Deploy — Sistema Financeiro
 
-Este documento descreve passos práticos para executar o `Sistema Financeiro` em um servidor Linux com `systemd` e `nginx` (reverse-proxy). Também mostra exemplos de variáveis de ambiente usadas pela aplicação.
+Este documento descreve como executar o `Sistema Financeiro` localmente, na rede local ou em um servidor Linux com `systemd` e `nginx` (reverse-proxy). Também mostra as variáveis de ambiente usadas pela aplicação.
 
 ## Variáveis de ambiente úteis
 - `APP_HOST` — interface que o backend vai escutar (padrão: `127.0.0.1`).
@@ -13,10 +13,39 @@ Este documento descreve passos práticos para executar o `Sistema Financeiro` em
 
 Defina essas variáveis no ambiente do serviço `systemd` ou no script de inicialização do contêiner.
 
+## Modos de execução
+
+### Local
+
+Use quando somente o computador instalado acessa o app.
+
+- `APP_HOST=127.0.0.1`
+- `APP_URL=http://127.0.0.1:8010` ou `http://sistema-financeiro.localhost:8010`
+
+### Rede local
+
+Use quando outros dispositivos da mesma rede precisam acessar o app.
+
+- `APP_HOST=0.0.0.0`
+- `APP_URL=http://IP_DA_MAQUINA:8010`
+- `APP_ALLOWED_HOSTS=IP_DA_MAQUINA,IP_DA_MAQUINA:8010`
+- `APP_ALLOWED_ORIGINS=http://IP_DA_MAQUINA:8010`
+
+Os pacotes desktop incluem launchers especificos para este modo:
+
+- macOS: `Abrir Sistema Financeiro na Rede.command`
+- Windows: atalho `Sistema Financeiro Rede`
+
+### Servidor com reverse-proxy
+
+Use quando o app sera acessado por nome DNS, dominio interno ou internet. Neste caso, mantenha o backend em `127.0.0.1` e exponha apenas o proxy.
+
 ## Recomendações gerais
 - Execute a aplicação em um ambiente isolado (virtualenv ou usuário dedicado).
 - Rode a aplicação por trás de um reverse-proxy (nginx/Caddy) que faça TLS e terminates HTTPS.
-- Mantenha `APP_HOST=127.0.0.1` quando usar reverse-proxy; quando quiser expor diretamente na LAN defina `APP_HOST=0.0.0.0` e configure `APP_ALLOWED_*` apropriadamente.
+- Mantenha `APP_HOST=127.0.0.1` quando usar reverse-proxy.
+- Quando quiser expor diretamente na LAN, defina `APP_HOST=0.0.0.0` e configure `APP_ALLOWED_HOSTS`/`APP_ALLOWED_ORIGINS`.
+- Use modo rede apenas em redes confiaveis. Para acesso remoto, use HTTPS no reverse-proxy.
 
 ## Exemplo de unit `systemd`
 Crie `/etc/systemd/system/sistema-financeiro.service` (ajuste paths/usuário conforme sua máquina):
@@ -100,7 +129,7 @@ pip install -r requirements.txt   # se houver
 APP_HOST=127.0.0.1 APP_PORT=8010 APP_URL=http://127.0.0.1:8010 python3 app.py
 ```
 
-Se usar o launcher incluído, defina `EXPOSE_LAN=1` para virar o comportamento de exposição da rede local (os launchers tentarão detectar o IP e preencher `APP_ALLOWED_HOSTS`/`APP_ALLOWED_ORIGINS`).
+Se usar o launcher incluído em pacote desktop, use o atalho/comando de rede. Em scripts, defina `EXPOSE_LAN=1` para ativar a detecção de IP e preencher `APP_ALLOWED_HOSTS`/`APP_ALLOWED_ORIGINS`.
 
 ## Segurança e notas finais
 - Sempre prefira colocar o app atrás de um proxy com TLS para evitar expor cookies/sessões em texto plano.
@@ -110,6 +139,3 @@ Se usar o launcher incluído, defina `EXPOSE_LAN=1` para virar o comportamento d
 ## Problemas comuns
 - Se o navegador reportar erro de origem (`Origin not allowed`), adicione a origem exata a `APP_ALLOWED_ORIGINS` (inclua esquema e porta).
 - Se `Host` for rejeitado, adicione `host:port` a `APP_ALLOWED_HOSTS`.
-
----
-Arquivo criado automaticamente pelo assistente de desenvolvimento.

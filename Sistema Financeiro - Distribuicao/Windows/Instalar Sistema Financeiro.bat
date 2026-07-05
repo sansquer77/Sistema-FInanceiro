@@ -5,6 +5,7 @@ set "PACKAGE_DIR=%~dp0"
 set "SOURCE_DIR=%PACKAGE_DIR%Aplicativo"
 set "DEST_DIR=%USERPROFILE%\Documents\Sistema Financeiro"
 set "LAUNCHER_PATH=%DEST_DIR%\Abrir Sistema Financeiro.bat"
+set "LAN_LAUNCHER_PATH=%DEST_DIR%\Abrir Sistema Financeiro na Rede.bat"
 set "ICON_PATH=%DEST_DIR%\web\assets\app-icon.ico"
 set "PYTHON_CHECK="
 
@@ -68,9 +69,18 @@ if not %errorlevel%==0 (
   echo.
 )
 
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$desktop = [Environment]::GetFolderPath('Desktop'); $shortcutPath = Join-Path $desktop 'Sistema Financeiro Rede.lnk'; $shell = New-Object -ComObject WScript.Shell; $shortcut = $shell.CreateShortcut($shortcutPath); $shortcut.TargetPath = $env:LAN_LAUNCHER_PATH; $shortcut.WorkingDirectory = $env:DEST_DIR; $shortcut.Description = 'Abrir Sistema Financeiro na rede local'; if (Test-Path $env:ICON_PATH) { $shortcut.IconLocation = $env:ICON_PATH }; $shortcut.Save()"
+if not %errorlevel%==0 (
+  echo Aviso: nao foi possivel criar o icone de rede automaticamente.
+  echo Voce ainda pode abrir o modo rede por:
+  echo %LAN_LAUNCHER_PATH%
+  echo.
+)
+
 echo Instalacao concluida.
 echo.
 echo Abra o app pelo icone "Sistema Financeiro" na Area de Trabalho.
+echo Para acessar de outros computadores na mesma rede, use "Sistema Financeiro Rede".
 echo.
 echo O banco de dados sera criado vazio no primeiro uso em:
 echo %DEST_DIR%\data\finance.db

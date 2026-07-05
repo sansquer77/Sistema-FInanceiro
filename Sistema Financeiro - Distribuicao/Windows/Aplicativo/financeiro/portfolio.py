@@ -11,7 +11,7 @@ from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 from financeiro.accounts import cents_to_money, empty_to_none, money_to_cents
-from financeiro.database import get_connection, row_to_dict
+from financeiro.database import begin_immediate, get_connection, row_to_dict
 from financeiro.transactions import convert_to_brl_cents, get_exchange_rate_to_brl, parse_exchange_rate, rate_to_micros
 
 MONEY_SCALE = Decimal("100")
@@ -421,18 +421,30 @@ def redeem_position(user_id: int, data: dict) -> dict:
         ).fetchone()
         if not account:
             raise PortfolioError("Conta da carteira nao encontrada.", HTTPStatus.NOT_FOUND)
-        positions = current_portfolio_positions(user_id)
-        candidates = [
-            position for position in positions
-            if matches_redemption_selector(position, selector)
-            and position["source_type"] in {"operation", "opening"}
-            and int(position["current_value_cents"] or 0) > 0
-            and int(position["total_cost_cents"] or 0) > 0
-        ]
-        candidates.sort(key=lambda position: (position["first_operation_date"], 0 if position["source_type"] == "operation" else 1, position["source_id"] or 0))
-        available_cents = sum(int(position["current_value_cents"] or 0) for position in candidates)
-        if redemption_value_cents > available_cents:
-            raise PortfolioError("Valor de resgate maior que o valor disponivel para este ativo.")
+    positions = current_portfolio_positions(user_id)
+    candidates = [
+        position for position in positions
+        if matches_redemption_selector(position, selector)
+        and position["source_type"] in {"operation", "opening"}
+        and int(position["current_value_cents"] or 0) > 0
+        and int(position["total_cost_cents"] or 0) > 0
+    ]
+    candidates.sort(key=lambda position: (position["first_operation_date"], 0 if position["source_type"] == "operation" else 1, position["source_id"] or 0))
+    available_cents = sum(int(position["current_value_cents"] or 0) for position in candidates)
+    if redemption_value_cents > available_cents:
+        raise PortfolioError("Valor de resgate maior que o valor disponivel para este ativo.")
+    with get_connection() as conn:
+        begin_immediate(conn)
+        account = conn.execute(
+            """
+            SELECT id, currency
+            FROM checking_accounts
+            WHERE id = ? AND user_id = ? AND archived_at IS NULL
+            """,
+            (selector["account_id"], user_id),
+        ).fetchone()
+        if not account:
+            raise PortfolioError("Conta da carteira nao encontrada.", HTTPStatus.NOT_FOUND)
         exchange_rate_micros = rate_to_micros(Decimal("1"))
         amount_brl_cents = convert_to_brl_cents(redemption_value_cents, exchange_rate_micros)
         description = f"Resgate - {selector['asset_name'] or selector['asset_identifier'] or 'Investimento'}"
@@ -516,26 +528,38 @@ def close_position(user_id: int, data: dict) -> dict:
         ).fetchone()
         if not account:
             raise PortfolioError("Conta da carteira nao encontrada.", HTTPStatus.NOT_FOUND)
-        positions = current_portfolio_positions(user_id)
-        matches = [
-            position for position in positions
-            if matches_redemption_selector(position, selector)
-            and position["first_operation_date"] <= closed_at
-        ]
-        if not matches:
-            raise PortfolioError("Posicao nao encontrada para encerramento.", HTTPStatus.NOT_FOUND)
-        position = aggregate_backend_positions(matches)
-        exchange_rate_micros = rate_to_micros(Decimal("1"))
-        closing_value_brl_cents = convert_to_brl_cents(closing_value_cents, exchange_rate_micros)
-        total_cost_brl_cents = int(position["total_cost_brl_cents"] or 0)
-        result_brl_cents = closing_value_brl_cents - total_cost_brl_cents
-        result_percent_micros = int((Decimal(result_brl_cents) * MICRO_SCALE / Decimal(total_cost_brl_cents)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)) if total_cost_brl_cents > 0 else 0
-        closed_indexer = common_value(matches, "fixed_income_indexer")
-        closed_maturity_date = common_value(matches, "fixed_income_maturity_date")
-        snapshot = format_quoted_position({**position})
-        snapshot["closed_at"] = closed_at
-        snapshot["closing_value"] = cents_to_money(closing_value_cents)
-        snapshot["closing_value_brl"] = cents_to_money(closing_value_brl_cents)
+    positions = current_portfolio_positions(user_id)
+    matches = [
+        position for position in positions
+        if matches_redemption_selector(position, selector)
+        and position["first_operation_date"] <= closed_at
+    ]
+    if not matches:
+        raise PortfolioError("Posicao nao encontrada para encerramento.", HTTPStatus.NOT_FOUND)
+    position = aggregate_backend_positions(matches)
+    exchange_rate_micros = rate_to_micros(Decimal("1"))
+    closing_value_brl_cents = convert_to_brl_cents(closing_value_cents, exchange_rate_micros)
+    total_cost_brl_cents = int(position["total_cost_brl_cents"] or 0)
+    result_brl_cents = closing_value_brl_cents - total_cost_brl_cents
+    result_percent_micros = int((Decimal(result_brl_cents) * MICRO_SCALE / Decimal(total_cost_brl_cents)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)) if total_cost_brl_cents > 0 else 0
+    closed_indexer = common_value(matches, "fixed_income_indexer")
+    closed_maturity_date = common_value(matches, "fixed_income_maturity_date")
+    snapshot = format_quoted_position({**position})
+    snapshot["closed_at"] = closed_at
+    snapshot["closing_value"] = cents_to_money(closing_value_cents)
+    snapshot["closing_value_brl"] = cents_to_money(closing_value_brl_cents)
+    with get_connection() as conn:
+        begin_immediate(conn)
+        account = conn.execute(
+            """
+            SELECT id, currency
+            FROM checking_accounts
+            WHERE id = ? AND user_id = ? AND archived_at IS NULL
+            """,
+            (selector["account_id"], user_id),
+        ).fetchone()
+        if not account:
+            raise PortfolioError("Conta da carteira nao encontrada.", HTTPStatus.NOT_FOUND)
         conn.execute(
             """
             INSERT INTO investment_closed_positions (
