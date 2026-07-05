@@ -305,6 +305,14 @@ textarea {
   padding: 10px 12px;
   color: var(--ink);
   background: var(--panel);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+input:hover,
+select:hover,
+textarea:hover {
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--line));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 .field-row > label,
@@ -335,6 +343,14 @@ textarea:focus {
   padding: 0 16px;
   border: 1px solid transparent;
   font-weight: 800;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+
+.primary:hover,
+.ghost:hover,
+.danger:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--control-shadow);
 }
 
 .primary {
@@ -723,50 +739,106 @@ textarea:focus {
 
 .simulation-form-panel,
 .simulation-results-panel {
-  padding: 16px;
+  padding: 18px;
+}
+
+.simulation-panel-intro {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+
+.simulation-panel-intro h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.simulation-panel-intro .muted-copy {
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .simulation-summary-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 14px;
+  gap: 14px;
+  margin-bottom: 16px;
 }
 
 .summary-card {
   display: grid;
   gap: 6px;
-  padding: 12px;
+  padding: 14px 13px;
   border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--surface-low);
+  border-radius: 12px;
+  background: linear-gradient(180deg, var(--panel) 0%, var(--surface-low) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.summary-card:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--line));
+  box-shadow: var(--control-shadow);
 }
 
 .summary-card.positive {
   border-color: color-mix(in srgb, var(--positive) 45%, var(--line));
-  background: color-mix(in srgb, var(--positive) 12%, var(--surface-low));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--positive) 12%, var(--surface-low)) 0%, color-mix(in srgb, var(--positive) 8%, var(--panel)) 100%);
 }
 
 .summary-card strong {
-  font-size: 18px;
+  font-size: 20px;
   color: var(--ink);
 }
 
 .summary-card span {
   color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
+}
+
+.simulation-section-title {
+  display: grid;
+  gap: 3px;
+  padding: 2px 2px 8px;
+}
+
+.simulation-section-title.compact {
+  padding-top: 6px;
+}
+
+.simulation-section-title span {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-dark);
+}
+
+.simulation-section-title small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .simulation-chart {
-  min-height: 140px;
-  border: 1px dashed var(--line);
-  border-radius: 10px;
-  padding: 12px;
-  background: var(--panel-subtle);
-  margin-bottom: 14px;
+  min-height: 230px;
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  border-radius: 12px;
+  padding: 14px 14px 16px;
+  background: linear-gradient(135deg, var(--panel-subtle) 0%, var(--surface-low) 100%);
+  margin-bottom: 0;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.simulation-chart:hover {
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--line));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
 .simulation-list,
@@ -779,14 +851,22 @@ textarea:focus {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel);
+  padding: 11px 12px;
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  border-radius: 10px;
+  background: linear-gradient(180deg, var(--panel) 0%, var(--surface-low) 100%);
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.simulation-item:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--line));
+  box-shadow: var(--control-shadow);
 }
 
 .simulation-item strong {
   font-size: 14px;
+  color: var(--ink);
 }
 
 .simulation-item small,
@@ -795,11 +875,18 @@ textarea:focus {
 }
 
 .simulation-warning {
-  padding: 10px 12px;
-  border-radius: 8px;
+  padding: 11px 12px;
+  border-radius: 10px;
   border: 1px solid var(--danger-border-soft);
-  background: var(--danger-surface);
+  background: linear-gradient(135deg, var(--danger-surface) 0%, color-mix(in srgb, var(--danger-surface) 88%, var(--panel)) 100%);
   color: var(--danger-text-strong);
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.simulation-warning:hover {
+  transform: translateY(-1px);
+  border-color: var(--danger-border);
+  box-shadow: var(--control-shadow);
 }
 
 .cockpit-stack {
@@ -1028,8 +1115,14 @@ textarea:focus {
   grid-template-columns: 1fr auto;
   gap: 12px;
   align-items: center;
-  min-height: 38px;
+  min-height: 40px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--line);
+}
+
+.chart-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
 }
 
 .chart-row span {
@@ -1550,6 +1643,16 @@ textarea:focus {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  justify-content: flex-end;
+  padding-top: 2px;
+}
+
+.simulation-form-panel .form {
+  gap: 16px;
+}
+
+.simulation-form-panel .field-row {
+  gap: 14px;
 }
 
 .section-heading {

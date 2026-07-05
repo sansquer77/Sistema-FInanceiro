@@ -157,12 +157,8 @@ export function registerSimulationsView({
     simulationProjectedBalance.textContent = formatMoney(accountImpact.projected_balance_cents || 0, currency);
     simulationDifference.textContent = formatMoney(accountImpact.difference_cents || 0, currency);
 
-    simulationChart.innerHTML = `
-      <div class="simulation-chart-legend">
-        <strong>${escapeHtml(response.scenario?.description || "Cenário")}</strong>
-        <p>${escapeHtml(response.warnings?.join(" · ") || "Sem alertas.")}</p>
-      </div>
-    `;
+    const chartItems = buildSimulationChartItems(accountImpact, currency);
+    simulationChart.innerHTML = chartItems;
 
     simulationVirtualItems.innerHTML = (response.virtual_items || []).map((item) => `
       <article class="simulation-item">
@@ -177,6 +173,78 @@ export function registerSimulationsView({
     simulationWarnings.innerHTML = (response.warnings || []).map((warning) => `
       <div class="simulation-warning">${escapeHtml(warning)}</div>
     `).join("");
+  }
+
+  function buildSimulationChartItems(accountImpact, currency) {
+    const currentBalance = Math.abs(accountImpact.current_balance_cents || 0);
+    const difference = Math.abs(accountImpact.difference_cents || 0);
+    const chartParts = [
+      {
+        label: "Saldo atual",
+        total: currentBalance || 1,
+        kind: "base",
+      },
+      {
+        label: accountImpact.difference_cents >= 0 ? "Impacto positivo" : "Impacto negativo",
+        total: difference || 1,
+        kind: accountImpact.difference_cents >= 0 ? "positive" : "negative",
+      },
+    ];
+    const total = chartParts.reduce((sum, item) => sum + item.total, 0);
+    if (!total) {
+      return '<div class="empty-state compact">Sem dados para exibir no gráfico.</div>';
+    }
+    return `
+      <div class="donut-chart">
+        ${donutSvg(chartParts, total)}
+        <div class="donut-center">
+          <span>Saldo projetado</span>
+          <strong>${formatMoney(accountImpact.projected_balance_cents || 0, currency)}</strong>
+        </div>
+      </div>
+      <div class="chart-list">
+        ${chartParts.map((item, index) => `
+          <div class="chart-row">
+            <span><i style="background:${impactColor(item.kind, index)}"></i>${escapeHtml(item.label)}</span>
+            <strong>${formatMoney(item.total, currency)}</strong>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  function donutSvg(items, total) {
+    const radius = 44;
+    const circumference = 2 * Math.PI * radius;
+    let offset = 0;
+    const circles = items.map((item, index) => {
+      const length = total ? (item.total / total) * circumference : 0;
+      const circle = `
+        <circle cx="60" cy="60" r="${radius}" fill="transparent" stroke="${chartColor(index)}"
+          stroke-width="18" stroke-dasharray="${length} ${circumference - length}"
+          stroke-dashoffset="${-offset}" />
+      `;
+      offset += length;
+      return circle;
+    }).join("");
+    return `<svg viewBox="0 0 120 120" role="img" aria-label="Gráfico da simulação">${circles}</svg>`;
+  }
+
+  function impactColor(kind, index) {
+    if (kind === "positive") {
+      return "var(--positive)";
+    }
+    if (kind === "negative") {
+      return "var(--danger)";
+    }
+    return chartColor(index);
+  }
+
+  function chartColor(index) {
+    const fallbackPalette = ["#14b8a6", "#6366f1", "#f97316", "#ec4899", "#22c55e", "#3b82f6"];
+    const tokenName = `--chart-${(index % fallbackPalette.length) + 1}`;
+    const tokenColor = getComputedStyle(document.documentElement).getPropertyValue(tokenName).trim();
+    return tokenColor || fallbackPalette[index % fallbackPalette.length];
   }
 
   return { loadSimulationFormData, resetForm, renderSimulation };

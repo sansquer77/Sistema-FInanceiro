@@ -11,7 +11,7 @@ from financeiro.categories import create_category
 from financeiro.database import initialize_database
 from financeiro.simulations import simulate_butterfly_effect
 from financeiro.spending_limits import create_spending_limit
-from financeiro.transactions import create_transaction
+from financeiro.transactions import create_transaction, set_transaction_reconciled
 
 
 class ButterflyEffectSimulationTest(unittest.TestCase):
@@ -52,6 +52,47 @@ class ButterflyEffectSimulationTest(unittest.TestCase):
         self.assertEqual(response["account_impact"]["difference_cents"], -25000)
         self.assertEqual(len(response["virtual_items"]), 1)
         self.assertEqual(response["virtual_items"][0]["impact_cents"], -25000)
+
+    def test_simulation_uses_reconciled_balance_as_of_selected_date(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta principal",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "1000,00",
+        })
+        income_category = create_category(user["id"], "Salário", "income")
+        income_transaction = create_transaction(user["id"], {
+            "type": "income",
+            "description": "Salário",
+            "amount": "100,00",
+            "date": "2026-01-03",
+            "account_id": str(account["id"]),
+            "category": "Salário",
+        })
+        set_transaction_reconciled(user["id"], str(income_transaction["id"]), True)
+        expense_category = create_category(user["id"], "Moradia", "expense")
+        create_transaction(user["id"], {
+            "type": "expense",
+            "description": "Despesa não conciliada",
+            "amount": "50,00",
+            "date": "2026-01-04",
+            "account_id": str(account["id"]),
+            "category": "Moradia",
+        })
+
+        response = simulate_butterfly_effect(user["id"], {
+            "type": "expense",
+            "amount": "250,00",
+            "date": "2026-01-15",
+            "description": "Despesa simulada",
+            "account_id": str(account["id"]),
+            "category_id": "1",
+            "series_kind": "single",
+        })
+
+        self.assertEqual(response["account_impact"]["current_balance_cents"], 110000)
+        self.assertEqual(response["account_impact"]["projected_balance_cents"], 85000)
 
     def test_installment_series_creates_virtual_items_and_limit_impact(self) -> None:
         user = create_user("Alice", "alice@example.com", "correct-password")

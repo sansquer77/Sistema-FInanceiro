@@ -1015,7 +1015,10 @@
 
             <div class="workspace simulations-workspace">
               <section class="panel simulation-form-panel">
-                <h3>Criar cenário</h3>
+                <div class="simulation-panel-intro">
+                  <h3>Criar cenário</h3>
+                  <span class="muted-copy">Estruture a hipótese como um lançamento virtual e compare o efeito sem alterar a realidade contábil.</span>
+                </div>
                 <form id="simulationForm" class="form">
                   <div class="field-row">
                     <label>Tipo
@@ -1078,8 +1081,9 @@
               </section>
 
               <section class="panel simulation-results-panel">
-                <div class="section-heading">
+                <div class="simulation-panel-intro">
                   <h3>Resultados</h3>
+                  <span class="muted-copy">Os números abaixo refletem a projeção em memória e mantêm a estrutura visual do cockpit.</span>
                 </div>
                 <div class="simulation-summary-grid">
                   <div class="summary-card">
@@ -1095,8 +1099,20 @@
                     <strong id="simulationDifference">R$ 0,00</strong>
                   </div>
                 </div>
+                <div class="simulation-section-title">
+                  <span>Comparativo do cenário</span>
+                  <small>Visão instantânea do impacto no saldo sem gravar nenhum lançamento real.</small>
+                </div>
                 <div class="simulation-chart" id="simulationChart"></div>
+                <div class="simulation-section-title compact">
+                  <span>Itens virtuais</span>
+                  <small>Parcelas e ocorrências calculadas em memória para a projeção.</small>
+                </div>
                 <div class="simulation-list" id="simulationVirtualItems"></div>
+                <div class="simulation-section-title compact">
+                  <span>Alertas</span>
+                  <small>Riscos de saldo ou limite destacados sem interromper a simulação.</small>
+                </div>
                 <div class="simulation-warnings" id="simulationWarnings"></div>
               </section>
             </div>

@@ -26,7 +26,7 @@ def simulate_butterfly_effect(user_id: int, data: dict) -> dict:
         account = fetch_account(conn, user_id, payload["account_id"])
         category_id, subcategory_id = resolve_category(conn, user_id, payload)
         virtual_items = build_virtual_items(payload)
-        account_impact = build_account_impact(account, virtual_items)
+        account_impact = build_account_impact(conn, user_id, account, payload, virtual_items)
         month_impact = build_month_impact(conn, user_id, account, payload, virtual_items)
         limit_impact = build_limit_impact(conn, user_id, account, payload, virtual_items, category_id, subcategory_id)
         chart_series = build_chart_series(conn, user_id, account, payload, virtual_items)
@@ -206,14 +206,48 @@ def build_virtual_items(payload: dict) -> list[dict]:
     }]
 
 
-def build_account_impact(account: dict, virtual_items: list[dict]) -> dict:
-    existing_balance_cents = int(account.get("current_balance_cents", 0) or 0)
-    projected_balance_cents = existing_balance_cents + sum(item["impact_cents"] for item in virtual_items)
+def build_account_impact(conn, user_id: int, account: dict, payload: dict, virtual_items: list[dict]) -> dict:
+    current_balance_cents = fetch_reconciled_balance_until(conn, user_id, account["id"], payload["date"])
+    projected_balance_cents = current_balance_cents + sum(item["impact_cents"] for item in virtual_items)
     return {
-        "current_balance_cents": existing_balance_cents,
+        "current_balance_cents": current_balance_cents,
         "projected_balance_cents": projected_balance_cents,
-        "difference_cents": projected_balance_cents - existing_balance_cents,
+        "difference_cents": projected_balance_cents - current_balance_cents,
     }
+
+
+def fetch_reconciled_balance_until(conn, user_id: int, account_id: int, limit_date: str) -> int:
+    start_date = None
+    rows = conn.execute(
+        """
+        SELECT amount_cents, type, date, reconciled_at, destination_account_id, destination_amount_cents
+        FROM transactions
+        WHERE user_id = ? AND archived_at IS NULL AND account_id = ? AND date <= ?
+        ORDER BY date ASC, id ASC
+        """,
+        (user_id, account_id, limit_date),
+    ).fetchall()
+    balance_cents = int(conn.execute(
+        """
+        SELECT initial_balance_cents
+        FROM checking_accounts
+        WHERE id = ? AND user_id = ? AND archived_at IS NULL
+        """,
+        (account_id, user_id),
+    ).fetchone()["initial_balance_cents"] or 0)
+    for row in rows:
+        if not row["reconciled_at"]:
+            continue
+        amount_cents = int(row["amount_cents"] or 0)
+        if row["type"] == "income":
+            balance_cents += amount_cents
+        elif row["type"] == "expense":
+            balance_cents -= amount_cents
+        elif row["type"] == "transfer":
+            balance_cents -= amount_cents
+            if row["destination_account_id"] and row["destination_amount_cents"]:
+                balance_cents += int(row["destination_amount_cents"] or 0)
+    return balance_cents
 
 
 def build_month_impact(conn, user_id: int, account: dict, payload: dict, virtual_items: list[dict]) -> dict:
