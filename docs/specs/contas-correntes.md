@@ -2,8 +2,8 @@
 tipo: spec
 area: contas
 status: implementado
-versao: 1.1
-atualizado: 2026-07-03
+versao: 1.2
+atualizado: 2026-07-05
 relacionados:
   - "[[lancamentos]]"
   - "[[cartoes]]"
@@ -16,7 +16,7 @@ aliases: ["Contas-correntes", "Contas"]
 # Contas-correntes
 
 > [!info] Status
-> **implementado** · área: `contas` · atualizado em 2026-07-03 · relacionados: [[lancamentos]], [[cartoes]], [[investimentos-portfolio]]
+> **implementado** · área: `contas` · atualizado em 2026-07-05 · relacionados: [[lancamentos]], [[cartoes]], [[investimentos-portfolio]]
 
 ## Problema
 
@@ -58,6 +58,8 @@ Qualquer usuário autenticado localmente que mantenha contas em um ou mais banco
 - O ajuste de saldo atual por mudança de saldo inicial deve ser aplicado como delta atômico para preservar lançamentos concorrentes.
 - Contas do tipo `wallet` aceitam apenas receitas, despesas e transferências à vista; não exibem recorrência. Ver [[lancamentos]].
 - Contas do tipo `investment` alimentam o portfólio de investimentos. Ver [[investimentos-portfolio]].
+- O saldo previsto de uma conta usada como conta preferencial de pagamento de cartão deve abater faturas não pagas com lançamentos conciliados, alocando o impacto no mês de vencimento da fatura.
+- Quando o saldo previsto incluir faturas conciliadas de cartão, a interface deve indicar `Saldo previsto (inclui faturas conciliadas de cartão)`.
 
 ## API e dados
 
@@ -79,9 +81,11 @@ Tabela: `checking_accounts`.
 - Dado uma conta arquivada, quando consultada, ela não aparece na lista principal, mas aparece em `?status=archived`.
 - Dado uma conta restaurada, quando listada, ela volta para a lista principal com o saldo correto.
 - Dado uma conta com lançamentos ativos, quando o usuário tenta alterar a moeda, a operação é bloqueada.
+- Dado uma conta preferencial de pagamento com fatura conciliada e não paga, quando o saldo previsto ou gráfico de meses futuros é exibido, então o valor conciliado da fatura é abatido no mês de vencimento.
 
 ## Changelog
 
+- `1.2` — 2026-07-05 — Saldo previsto passa a considerar faturas conciliadas e não pagas de cartões vinculados como conta preferencial, pelo mês de vencimento.
 - `1.1` — 2026-07-03 — Regra de ajuste de saldo inicial explicita delta atômico para uso concorrente leve.
 - `1.0` — 2026-06-29 — Frontmatter e critérios formalizados.
 
