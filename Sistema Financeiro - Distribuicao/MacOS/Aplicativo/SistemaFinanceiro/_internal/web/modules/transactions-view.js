@@ -29,6 +29,7 @@ export function registerTransactionsView({
   openMonthPicker,
   ensureSelectedAccount,
   getBalanceUntil,
+  accountHasPreferredCardForecast,
   loadCockpit,
   markPortfolioDirty,
   renderFinanceViews,
@@ -76,6 +77,7 @@ export function registerTransactionsView({
     todayMonthButton,
     nextMonthButton,
     currentBalanceSummary,
+    forecastBalanceLabel,
     forecastBalanceSummary,
     transactionBalanceHistoryChart,
     transactionSearch,
@@ -430,7 +432,14 @@ export function registerTransactionsView({
       .filter(matchesTransactionSearch);
 
     currentBalanceSummary.textContent = formatCurrencySummary(getBalanceUntil(todayLocalDateValue(), accountTransactions, true));
-    forecastBalanceSummary.textContent = formatCurrencySummary(getBalanceUntil(monthEndDate(state.transactionMonth), accountTransactions, false));
+    const forecastLimitDate = monthEndDate(state.transactionMonth);
+    forecastBalanceSummary.textContent = formatCurrencySummary(getBalanceUntil(forecastLimitDate, accountTransactions, false));
+    if (forecastBalanceLabel) {
+      const account = state.accounts.find((entry) => String(entry.id) === String(state.selectedAccountId));
+      forecastBalanceLabel.textContent = accountHasPreferredCardForecast(account, forecastLimitDate)
+        ? "Saldo previsto (inclui faturas conciliadas de cartão)"
+        : "Saldo previsto";
+    }
     renderBalanceHistory();
     renderTransactionCollection(transactionList, monthTransactions, false, accountTransactions);
   }

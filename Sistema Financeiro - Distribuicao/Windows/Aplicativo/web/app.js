@@ -53,6 +53,7 @@ import { registerAccountsView } from "./modules/accounts-view.js";
 import { registerCardsView } from "./modules/cards-view.js";
 import { registerPortfolioView } from "./modules/portfolio-view.js";
 import { registerTransactionsView } from "./modules/transactions-view.js";
+import { registerSimulationsView } from "./modules/simulations-view.js";
 
 applyTheme();
 
@@ -296,9 +297,30 @@ const todayMonthButton = document.querySelector("#todayMonthButton");
 const nextMonthButton = document.querySelector("#nextMonthButton");
 const transactionMonthLabel = document.querySelector("#transactionMonthLabel");
 const currentBalanceSummary = document.querySelector("#currentBalanceSummary");
+const forecastBalanceLabel = document.querySelector("#forecastBalanceLabel");
 const forecastBalanceSummary = document.querySelector("#forecastBalanceSummary");
 const transactionBalanceHistoryChart = document.querySelector("#transactionBalanceHistoryChart");
 const transactionSearch = document.querySelector("#transactionSearch");
+const simulationForm = document.querySelector("#simulationForm");
+const simulationType = document.querySelector("#simulationType");
+const simulationDate = document.querySelector("#simulationDate");
+const simulationAccount = document.querySelector("#simulationAccount");
+const simulationCategory = document.querySelector("#simulationCategory");
+const simulationSubcategory = document.querySelector("#simulationSubcategory");
+const simulationSeriesKind = document.querySelector("#simulationSeriesKind");
+const simulationInstallmentCountLabel = document.querySelector("#simulationInstallmentCountLabel");
+const simulationInstallmentCount = document.querySelector("#simulationInstallmentCount");
+const simulationRecurrenceGroup = document.querySelector("#simulationRecurrenceGroup");
+const simulationRecurrenceFrequency = document.querySelector("#simulationRecurrenceFrequency");
+const simulationRecurrenceCount = document.querySelector("#simulationRecurrenceCount");
+const simulationMessage = document.querySelector("#simulationMessage");
+const simulationCurrentBalance = document.querySelector("#simulationCurrentBalance");
+const simulationProjectedBalance = document.querySelector("#simulationProjectedBalance");
+const simulationDifference = document.querySelector("#simulationDifference");
+const simulationChart = document.querySelector("#simulationChart");
+const simulationVirtualItems = document.querySelector("#simulationVirtualItems");
+const simulationWarnings = document.querySelector("#simulationWarnings");
+const resetSimulationButton = document.querySelector("#resetSimulationButton");
 const navButtons = document.querySelectorAll("[data-view]");
 const moduleViews = {
   cockpit: document.querySelector("#cockpitView"),
@@ -308,6 +330,7 @@ const moduleViews = {
   transactions: document.querySelector("#transactionsView"),
   portfolio: document.querySelector("#portfolioView"),
   limits: document.querySelector("#limitsView"),
+  simulations: document.querySelector("#simulationsView"),
   reports: document.querySelector("#reportsView"),
   classifications: document.querySelector("#classificationsView"),
   imports: document.querySelector("#importsView"),
@@ -322,6 +345,7 @@ const viewTitles = {
   transactions: ["Lançamentos", "Contas"],
   portfolio: ["Gestão", "Portfólio"],
   limits: ["Gestão", "Limite de gastos"],
+  simulations: ["Gestão", "Efeito Borboleta"],
   reports: ["Gestão", "Relatórios"],
   classifications: ["Gestão", "Categorias e tags"],
   imports: ["Gestão", "Importação"],
@@ -607,6 +631,7 @@ const transactionsView = registerTransactionsView({
     todayMonthButton,
     nextMonthButton,
     currentBalanceSummary,
+    forecastBalanceLabel,
     forecastBalanceSummary,
     transactionBalanceHistoryChart,
     transactionSearch,
@@ -639,11 +664,39 @@ const transactionsView = registerTransactionsView({
   openMonthPicker,
   ensureSelectedAccount,
   getBalanceUntil,
+  accountHasPreferredCardForecast,
   loadCockpit,
   markPortfolioDirty,
   renderFinanceViews,
   renderPortfolio,
   renderImportTargets,
+});
+
+const simulationsView = registerSimulationsView({
+  state,
+  elements: {
+    simulationForm,
+    simulationType,
+    simulationDate,
+    simulationAccount,
+    simulationCategory,
+    simulationSubcategory,
+    simulationSeriesKind,
+    simulationInstallmentCountLabel,
+    simulationInstallmentCount,
+    simulationRecurrenceGroup,
+    simulationRecurrenceFrequency,
+    simulationRecurrenceCount,
+    simulationMessage,
+    simulationCurrentBalance,
+    simulationProjectedBalance,
+    simulationDifference,
+    simulationChart,
+    simulationVirtualItems,
+    simulationWarnings,
+    resetSimulationButton,
+  },
+  formatMoney,
 });
 
 const portfolioView = registerPortfolioView({
@@ -1034,6 +1087,9 @@ function showModule(view) {
   if (view === "limits") {
     renderLimits();
   }
+  if (view === "simulations") {
+    simulationsView.loadSimulationFormData().catch((error) => setMessage(simulationMessage, error.message, "error"));
+  }
   if (view === "reports") {
     renderReports();
   }
@@ -1277,7 +1333,8 @@ function getCurrencyTotals() {
   for (const card of state.creditCards) {
     const row = currencyTotalRow(totals, card.currency);
     const openAmount = cardOpenBalance(card.id, currentMonthValue());
-    const signedAmount = -openAmount;
+    const reservedAmount = preferredCardForecastAmount(card, currentMonthEndDate());
+    const signedAmount = -Math.max(openAmount - reservedAmount, 0);
     row.current += signedAmount;
     row.cards.push({
       id: card.id,
@@ -1308,7 +1365,7 @@ function accountReconciledBalance(account) {
 }
 
 function accountProjectedBalance(account) {
-  return accountBalanceUntil(account, currentMonthEndDate(), false);
+  return accountBalanceUntil(account, currentMonthEndDate(), false) - preferredCardForecastForAccount(account, currentMonthEndDate());
 }
 
 function accountBalanceUntil(account, limitDate, reconciledOnly) {
@@ -1330,6 +1387,74 @@ function accountBalanceUntil(account, limitDate, reconciledOnly) {
     }
     return total;
   }, 0);
+}
+
+function accountHasPreferredCardForecast(account, limitDate) {
+  return preferredCardForecastForAccount(account, limitDate) > 0;
+}
+
+function preferredCardForecastForAccount(account, limitDate) {
+  if (!account || !limitDate) {
+    return 0;
+  }
+  return state.creditCards.reduce((total, card) => {
+    if (String(card.preferred_payment_account_id || "") !== String(account.id)) {
+      return total;
+    }
+    if ((card.currency || "BRL") !== (account.currency || "BRL")) {
+      return total;
+    }
+    return total + preferredCardForecastAmount(card, limitDate);
+  }, 0);
+}
+
+function preferredCardForecastAmount(card, limitDate) {
+  if (!card || !card.preferred_payment_account_id) {
+    return 0;
+  }
+  const forecastByInvoice = new Map();
+  for (const transaction of state.cardTransactions) {
+    if (
+      String(transaction.credit_card_id) !== String(card.id)
+      || !transaction.reconciled_at
+      || !transaction.invoice_month
+      || cardInvoiceDueDate(transaction.invoice_month, card.due_day) > limitDate
+      || isCardInvoicePaid(card.id, transaction.invoice_month)
+    ) {
+      continue;
+    }
+    const current = forecastByInvoice.get(transaction.invoice_month) || 0;
+    forecastByInvoice.set(transaction.invoice_month, current + cardTransactionInvoiceDelta(transaction));
+  }
+  return [...forecastByInvoice.values()].reduce((total, amount) => total + Math.max(amount, 0), 0);
+}
+
+function cardTransactionInvoiceDelta(transaction) {
+  const amount = Number(transaction.amount || 0);
+  if (transaction.type === "income") {
+    return -amount;
+  }
+  if (transaction.type === "expense") {
+    return amount;
+  }
+  return 0;
+}
+
+function isCardInvoicePaid(cardId, invoiceMonth) {
+  return state.cardPayments.some((payment) => (
+    String(payment.credit_card_id) === String(cardId) && payment.invoice_month === invoiceMonth
+  ));
+}
+
+function cardInvoiceDueDate(invoiceMonth, dueDay) {
+  const [year, month] = String(invoiceMonth).split("-").map(Number);
+  const safeDueDay = Number(dueDay || 1);
+  if (!year || !month) {
+    return `${invoiceMonth}-01`;
+  }
+  const lastDay = new Date(year, month, 0).getDate();
+  const day = Math.min(Math.max(safeDueDay, 1), lastDay);
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
 function currentMonthEndDate() {
@@ -1379,6 +1504,9 @@ function getBalanceUntil(limitDate, transactions = state.transactions, reconcile
           }
         }
       }
+      if (!reconciledOnly) {
+        totals.set(account.currency, (totals.get(account.currency) || 0) - preferredCardForecastForAccount(account, limitDate));
+      }
     }
   } else {
     // No account selected: calculate balance for all accounts
@@ -1400,6 +1528,11 @@ function getBalanceUntil(limitDate, transactions = state.transactions, reconcile
         const destinationCurrency = transaction.destination_account_currency || sourceCurrency;
         const destinationAmount = Number(transaction.destination_amount || transaction.amount);
         totals.set(destinationCurrency, (totals.get(destinationCurrency) || 0) + destinationAmount);
+      }
+    }
+    if (!reconciledOnly) {
+      for (const account of state.accounts) {
+        totals.set(account.currency, (totals.get(account.currency) || 0) - preferredCardForecastForAccount(account, limitDate));
       }
     }
   }

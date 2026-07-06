@@ -23,6 +23,19 @@ Durante a instalacao do Python, marque a opcao:
 3. Se o Windows SmartScreen perguntar, escolha `Mais informacoes` e depois `Executar assim mesmo`.
 4. Ao final, use o icone `Sistema Financeiro` criado na Area de Trabalho.
 
+## Acessar servidor Linux
+
+Use esta opcao quando o Sistema Financeiro estiver rodando no servidor `192.168.1.212`.
+
+1. Clique com o botao direito em `configurar_windows.ps1`.
+2. Escolha `Executar com o PowerShell`.
+3. Confirme a execucao como Administrador.
+4. Acesse no navegador:
+
+   `https://sistema-financeiro.net:8030`
+
+Se o certificado SSL for autoassinado, o navegador pode pedir confirmacao de seguranca no primeiro acesso.
+
 ## Primeiro uso local
 
 1. Abra `Sistema Financeiro` pela Area de Trabalho.
@@ -50,6 +63,8 @@ Observacoes:
 - O Windows pode pedir permissao de firewall para permitir conexoes de entrada do Python.
 - Todos os dispositivos precisam estar na mesma rede.
 - Use este modo apenas em rede confiavel. Para acesso fora da rede local, prefira reverse-proxy com HTTPS.
+
+Este modo e diferente do servidor Linux: ele expoe o app instalado neste Windows para a LAN.
 
 ## O que o instalador faz
 

@@ -91,6 +91,19 @@ HOST = os.environ.get("APP_HOST", "127.0.0.1")
 PORT = int(os.environ.get("APP_PORT", "8010"))
 PUBLIC_URL = os.environ.get("APP_URL", f"http://sistema-financeiro.localhost:{PORT}")
 LOCAL_ALLOWED_HOSTS = frozenset({"sistema-financeiro.localhost", "127.0.0.1"})
+DEFAULT_ALLOWED_HOSTS = frozenset({
+    "sistema-financeiro.net",
+    "sistema-financeiro.net:8030",
+    "192.168.1.212",
+    "192.168.1.212:8030",
+})
+DEFAULT_ALLOWED_ORIGINS = frozenset({
+    "http://sistema-financeiro.localhost:8010",
+    "https://sistema-financeiro.net:8030",
+    "http://sistema-financeiro.net:8030",
+    "https://192.168.1.212:8030",
+    "http://192.168.1.212:8030",
+})
 MAX_JSON_BODY_BYTES = 1 * 1024 * 1024
 SECURITY_HEADERS = {
     "Content-Security-Policy": (
@@ -164,6 +177,8 @@ def public_url_origin() -> str:
 
 def allowed_host_values() -> set[str]:
     hosts = {f"{host}:{PORT}" for host in LOCAL_ALLOWED_HOSTS}
+    for value in DEFAULT_ALLOWED_HOSTS:
+        hosts.update(host_variants(value))
     for value in csv_env_values("APP_ALLOWED_HOSTS"):
         hosts.update(host_variants(value))
     public_host = normalize_netloc(urlsplit(PUBLIC_URL).netloc)
@@ -174,6 +189,7 @@ def allowed_host_values() -> set[str]:
 
 def allowed_origin_values() -> set[str]:
     origins = {f"http://{host}:{PORT}" for host in LOCAL_ALLOWED_HOSTS}
+    origins.update(DEFAULT_ALLOWED_ORIGINS)
     for value in csv_env_values("APP_ALLOWED_ORIGINS"):
         origin = normalize_origin(value)
         if origin:

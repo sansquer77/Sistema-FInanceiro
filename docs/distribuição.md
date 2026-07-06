@@ -2,8 +2,8 @@
 tipo: spec
 area: distribuicao
 status: implementado
-versao: 1.5
-atualizado: 2026-07-04
+versao: 1.6
+atualizado: 2026-07-06
 relacionados:
   - "[[sdd]]"
   - "[[templates/spec-template|Template de spec]]"
@@ -16,7 +16,7 @@ aliases: ["Distribuicao", "Pacotes de Distribuicao", "Instalador macOS", "Instal
 # Distribuicao
 
 > [!info] Status
-> **implementado** · área: `distribuicao` · atualizado em 2026-07-04 · relacionados: [[sdd]], [[templates/spec-template|Template de spec]], [[arquitetura]], [[requisitos]]
+> **implementado** · área: `distribuicao` · atualizado em 2026-07-06 · relacionados: [[sdd]], [[templates/spec-template|Template de spec]], [[arquitetura]], [[requisitos]]
 
 ## Problema
 
@@ -50,6 +50,7 @@ Usuario final que vai instalar o Sistema Financeiro em outro computador e manten
 | `Sistema Financeiro - Distribuicao/MacOS/Aplicativo/Abrir Sistema Financeiro na Rede.command` | script executavel | Launcher macOS para expor o app na rede local com `APP_HOST=0.0.0.0`. |
 | `Sistema Financeiro - Distribuicao/MacOS/Instalar Sistema Financeiro.command` | script executavel | Copia os arquivos para `~/Documents/Sistema Financeiro` e instala o `.app` em `/Applications`. |
 | `Sistema Financeiro - Distribuicao/MacOS/README-INSTALACAO.md` | documento | Instrui instalacao, primeiro uso, dados nao incluidos, URL local e atualizacao no macOS. |
+| `Sistema Financeiro - Distribuicao/MacOS/configurar_mac.sh` | script | Configura `/etc/hosts` em clientes macOS/Linux para acessar `sistema-financeiro.net`. |
 | `Sistema Financeiro - Distribuicao/MacOS/Sistema Financeiro - Distribuicao MacOS.zip` | arquivo zip | Zip final do macOS, gerado a partir de `Sistema Financeiro - Distribuicao/MacOS/`. |
 | `Sistema Financeiro - Distribuicao/Windows/` | diretorio | Raiz do pacote Windows a ser compactado. Deve conter somente itens necessarios para instalacao no Windows. |
 | `Sistema Financeiro - Distribuicao/Windows/Aplicativo/` | diretorio | Copia limpa da aplicacao atual para Windows, sem `data/`, `tests/`, `docs/`, caches ou metadados temporarios. |
@@ -57,6 +58,7 @@ Usuario final que vai instalar o Sistema Financeiro em outro computador e manten
 | `Sistema Financeiro - Distribuicao/Windows/Aplicativo/Abrir Sistema Financeiro na Rede.bat` | script | Launcher Windows para expor o app na rede local via `EXPOSE_LAN=1`. |
 | `Sistema Financeiro - Distribuicao/Windows/Instalar Sistema Financeiro.bat` | script | Instalador Windows. |
 | `Sistema Financeiro - Distribuicao/Windows/README-INSTALACAO-WINDOWS.md` | documento | Instrui instalacao, primeiro uso, dados nao incluidos, URL local e atualizacao no Windows. |
+| `Sistema Financeiro - Distribuicao/Windows/configurar_windows.ps1` | script | Configura o arquivo `hosts` em clientes Windows para acessar `sistema-financeiro.net`. |
 | `Sistema Financeiro - Distribuicao/Windows/Sistema Financeiro - Distribuicao Windows.zip` | arquivo zip | Zip final do Windows, gerado a partir de `Sistema Financeiro - Distribuicao/Windows/`. |
 
 ## Regras
@@ -77,6 +79,9 @@ Usuario final que vai instalar o Sistema Financeiro em outro computador e manten
 - O instalador Windows deve manter os dados locais fora do pacote e nao deve copiar dados de desenvolvimento.
 - Builds PyInstaller devem ser gerados no sistema operacional alvo; o build Windows deve ser feito em Windows, nao em macOS.
 - A URL padrao do app distribuido deve ser `http://sistema-financeiro.localhost:8010` quando suportada pela plataforma.
+- O backend deve aceitar `http://sistema-financeiro.localhost:8010` e `https://sistema-financeiro.net:8030`.
+- A configuracao do servidor Linux deve usar `APP_URL=https://sistema-financeiro.net:8030`, backend interno em `127.0.0.1:8010` e nginx em `8030 ssl`.
+- Hosts/origens permitidos do servidor devem cobrir dominio e IP: `sistema-financeiro.net`, `sistema-financeiro.net:8030`, `192.168.1.212`, `192.168.1.212:8030`, e origens HTTP/HTTPS correspondentes.
 - A porta padrao deve ser `8010`; conflito de porta deve ser tratado como orientacao operacional no README de instalacao de cada plataforma.
 - O modo local deve manter `APP_HOST=127.0.0.1`.
 - O modo rede deve usar `APP_HOST=0.0.0.0`, detectar o IP local da maquina e preencher `APP_URL`, `APP_ALLOWED_HOSTS` e `APP_ALLOWED_ORIGINS`.
@@ -112,6 +117,9 @@ Arquivos e diretorios afetados:
 - Dado o pacote macOS gerado, quando inspecionado, entao o runtime principal e `Aplicativo/SistemaFinanceiro/SistemaFinanceiro` e nao `Aplicativo/app.py`.
 - Dado o pacote macOS instalado, quando o usuario executa `Abrir Sistema Financeiro na Rede.command`, entao o app sobe em `0.0.0.0`, mostra uma URL com IP local e permite acesso de outros dispositivos da mesma rede.
 - Dado o pacote Windows instalado, quando o usuario executa o atalho `Sistema Financeiro Rede`, entao o app sobe em `0.0.0.0`, abre uma URL com IP local e permite acesso de outros dispositivos da mesma rede.
+- Dado um cliente macOS/Linux, quando `configurar_mac.sh` e executado, entao `192.168.1.212 sistema-financeiro.net` fica presente em `/etc/hosts`.
+- Dado um cliente Windows, quando `configurar_windows.ps1` e executado como Administrador, entao `192.168.1.212 sistema-financeiro.net` fica presente no arquivo `hosts` do Windows.
+- Dado o servidor Linux configurado conforme `README-deploy.md`, quando acessado via `https://sistema-financeiro.net:8030`, entao as validacoes de Host e Origin aceitam a requisicao.
 - Dado o zip final de cada plataforma, quando `zip -T` for executado, entao a integridade do arquivo e confirmada.
 - Dado o zip final macOS, quando os metadados forem inspecionados, entao `Instalar Sistema Financeiro.command` e `Contents/MacOS/launcher` estao executaveis.
 - Dado a pasta `Aplicativo/`, quando os arquivos Python forem compilados com `py_compile`, entao nao ha erro de sintaxe.
@@ -129,6 +137,7 @@ Arquivos e diretorios afetados:
 
 ## Changelog
 
+- `1.6` — 2026-07-06 — Inclusao de servidor Linux em `sistema-financeiro.net:8030`, scripts de hosts para clientes e regras padrao de Host/Origin.
 - `1.5` — 2026-07-04 — Normalizacao de hosts/origens permitidos documentada para modo rede e launchers LAN.
 - `1.4` — 2026-07-04 — Pacotes passam a documentar e entregar launchers separados para modo local e modo rede/LAN.
 - `1.3` — 2026-07-02 — Pacote macOS passa a usar runtime PyInstaller; build Windows PyInstaller documentado como dependente de ambiente Windows.

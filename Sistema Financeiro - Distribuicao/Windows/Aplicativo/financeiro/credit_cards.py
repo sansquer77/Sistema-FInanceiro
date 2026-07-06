@@ -593,6 +593,7 @@ def update_credit_card(user_id: int, card_id: str, data: dict) -> dict:
     card = normalize_credit_card_payload(data)
     try:
         with get_connection() as conn:
+            validate_preferred_payment_account(conn, user_id, card["preferred_payment_account_id"], card["currency"])
             cursor = conn.execute(
                 """
                 UPDATE credit_cards

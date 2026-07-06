@@ -15,6 +15,24 @@ Este pacote instala uma copia limpa do Sistema Financeiro em outro Mac.
 4. Se o macOS pedir senha, informe a senha do usuario do Mac para permitir a copia do icone para `/Applications`.
 5. Ao final, abra `Sistema Financeiro` pela pasta Aplicativos.
 
+## Acessar servidor Linux
+
+Use esta opcao quando o Sistema Financeiro estiver rodando no servidor `192.168.1.212`.
+
+1. No Mac, abra o Terminal na pasta descompactada do pacote.
+2. Execute:
+
+   ```bash
+   chmod +x configurar_mac.sh
+   sudo ./configurar_mac.sh
+   ```
+
+3. Acesse no navegador:
+
+   `https://sistema-financeiro.net:8030`
+
+Se o certificado SSL for autoassinado, o navegador pode pedir confirmacao de seguranca no primeiro acesso.
+
 ## Primeiro uso local
 
 1. Abra `Sistema Financeiro` em Aplicativos.
@@ -45,6 +63,8 @@ Observacoes:
 - O Mac pode pedir permissao de firewall para aceitar conexoes de entrada.
 - Todos os dispositivos precisam estar na mesma rede.
 - Use este modo apenas em rede confiavel. Para acesso fora da rede local, prefira reverse-proxy com HTTPS.
+
+Este modo e diferente do servidor Linux: ele expoe o app instalado neste Mac para a LAN.
 
 ## Recuperacao de senha por email
 

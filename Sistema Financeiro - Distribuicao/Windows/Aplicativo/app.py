@@ -69,6 +69,7 @@ from financeiro.database import initialize_database
 from financeiro.imports import import_organizze_transactions, import_system_template, system_import_template
 from financeiro.portfolio import close_position, create_opening_position, delete_opening_position, get_portfolio, redeem_position, update_opening_position, update_position_value_override
 from financeiro.secure_config import SecureConfigError, email_config_status, save_email_config
+from financeiro.simulations import simulate_butterfly_effect
 from financeiro.spending_limits import (
     create_spending_limit,
     delete_spending_limit,
@@ -90,6 +91,19 @@ HOST = os.environ.get("APP_HOST", "127.0.0.1")
 PORT = int(os.environ.get("APP_PORT", "8010"))
 PUBLIC_URL = os.environ.get("APP_URL", f"http://sistema-financeiro.localhost:{PORT}")
 LOCAL_ALLOWED_HOSTS = frozenset({"sistema-financeiro.localhost", "127.0.0.1"})
+DEFAULT_ALLOWED_HOSTS = frozenset({
+    "sistema-financeiro.net",
+    "sistema-financeiro.net:8030",
+    "192.168.1.212",
+    "192.168.1.212:8030",
+})
+DEFAULT_ALLOWED_ORIGINS = frozenset({
+    "http://sistema-financeiro.localhost:8010",
+    "https://sistema-financeiro.net:8030",
+    "http://sistema-financeiro.net:8030",
+    "https://192.168.1.212:8030",
+    "http://192.168.1.212:8030",
+})
 MAX_JSON_BODY_BYTES = 1 * 1024 * 1024
 SECURITY_HEADERS = {
     "Content-Security-Policy": (
@@ -163,6 +177,8 @@ def public_url_origin() -> str:
 
 def allowed_host_values() -> set[str]:
     hosts = {f"{host}:{PORT}" for host in LOCAL_ALLOWED_HOSTS}
+    for value in DEFAULT_ALLOWED_HOSTS:
+        hosts.update(host_variants(value))
     for value in csv_env_values("APP_ALLOWED_HOSTS"):
         hosts.update(host_variants(value))
     public_host = normalize_netloc(urlsplit(PUBLIC_URL).netloc)
@@ -173,6 +189,7 @@ def allowed_host_values() -> set[str]:
 
 def allowed_origin_values() -> set[str]:
     origins = {f"http://{host}:{PORT}" for host in LOCAL_ALLOWED_HOSTS}
+    origins.update(DEFAULT_ALLOWED_ORIGINS)
     for value in csv_env_values("APP_ALLOWED_ORIGINS"):
         origin = normalize_origin(value)
         if origin:
@@ -226,6 +243,9 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/spending-limits":
             self.handle_list_spending_limits()
+            return
+        if path == "/api/simulations/butterfly-effect":
+            self.send_json({"error": "Metodo nao permitido."}, HTTPStatus.METHOD_NOT_ALLOWED)
             return
         if path == "/api/cockpit":
             self.handle_cockpit()
@@ -316,6 +336,9 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/spending-limits":
             self.handle_create_spending_limit()
+            return
+        if path == "/api/simulations/butterfly-effect":
+            self.handle_simulate_butterfly_effect()
             return
         self.send_json({"error": "Rota nao encontrada."}, HTTPStatus.NOT_FOUND)
 
@@ -463,14 +486,14 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_json({"ok": True})
 
     def handle_email_config_status(self) -> None:
-        self.require_user()
-        self.send_json(email_config_status())
+        user = self.require_user()
+        self.send_json(email_config_status(user["id"]))
 
     def handle_save_email_config(self) -> None:
-        self.require_user()
+        user = self.require_user()
         data = self.read_json()
         try:
-            self.send_json(save_email_config(data))
+            self.send_json(save_email_config(user["id"], data))
         except SecureConfigError as exc:
             raise ApiError(str(exc) or "Configuracao de email invalida.") from exc
 
@@ -569,6 +592,11 @@ class AppHandler(BaseHTTPRequestHandler):
         query = parse_qs(urlsplit(self.path).query)
         month = (query.get("month") or [None])[0]
         self.send_json({"limits": list_spending_limits(user["id"], month)})
+
+    def handle_simulate_butterfly_effect(self) -> None:
+        user = self.require_user()
+        data = self.read_json()
+        self.send_json(simulate_butterfly_effect(user["id"], data))
 
     def handle_portfolio(self) -> None:
         user = self.require_user()

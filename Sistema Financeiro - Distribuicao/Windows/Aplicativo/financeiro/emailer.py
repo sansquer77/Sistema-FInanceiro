@@ -4,7 +4,7 @@ import smtplib
 from email.message import EmailMessage
 from http import HTTPStatus
 
-from financeiro.secure_config import SecureConfigError, load_encrypted_config
+from financeiro.secure_config import SecureConfigError, load_email_config
 
 
 class EmailError(Exception):
@@ -14,7 +14,7 @@ class EmailError(Exception):
         super().__init__(message)
 
 
-def send_password_reset_email(recipient: str, token: str, expires_in_minutes: int) -> None:
+def send_password_reset_email(user_id: int, recipient: str, token: str, expires_in_minutes: int) -> None:
     subject = "Codigo de recuperacao do Sistema Financeiro"
     body = (
         "Ola,\n\n"
@@ -23,12 +23,12 @@ def send_password_reset_email(recipient: str, token: str, expires_in_minutes: in
         f"Validade: {expires_in_minutes} minutos.\n\n"
         "Se voce nao solicitou esta recuperacao, ignore este email."
     )
-    send_email(recipient, subject, body)
+    send_email(user_id, recipient, subject, body)
 
 
-def send_email(recipient: str, subject: str, body: str) -> None:
+def send_email(user_id: int, recipient: str, subject: str, body: str) -> None:
     try:
-        config = load_encrypted_config()
+        config = load_email_config(user_id)
     except SecureConfigError as exc:
         raise EmailError(exc.args[0] or "Configuracao de email indisponivel.") from exc
 

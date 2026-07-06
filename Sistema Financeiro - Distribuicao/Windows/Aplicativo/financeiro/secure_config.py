@@ -8,10 +8,8 @@ import os
 import secrets
 from pathlib import Path
 
-from financeiro.database import DATA_DIR
+from financeiro import database
 
-EMAIL_CONFIG_PATH = DATA_DIR / "email_config.enc"
-EMAIL_CONFIG_KEY_PATH = DATA_DIR / "email_config.key"
 CONFIG_KEY_ENV = "SISTEMA_FINANCEIRO_CONFIG_KEY"
 KDF_ITERATIONS = 310_000
 EMAIL_PROVIDER_PRESETS = {
@@ -34,7 +32,17 @@ class SecureConfigError(Exception):
     pass
 
 
-def load_encrypted_config(path: Path = EMAIL_CONFIG_PATH, key_path: Path = EMAIL_CONFIG_KEY_PATH) -> dict:
+def email_config_path(user_id: int) -> Path:
+    return database.DATA_DIR / f"email_config_user_{int(user_id)}.enc"
+
+
+def email_config_key_path() -> Path:
+    return database.DATA_DIR / "email_config.key"
+
+
+def load_encrypted_config(path: Path, key_path: Path | None = None) -> dict:
+    if key_path is None:
+        key_path = email_config_key_path()
     if not path.exists():
         raise SecureConfigError("Configuracao de email criptografada nao encontrada.")
     payload = json.loads(path.read_text(encoding="utf-8"))
@@ -52,8 +60,10 @@ def load_encrypted_config(path: Path = EMAIL_CONFIG_PATH, key_path: Path = EMAIL
     return json.loads(plain.decode("utf-8"))
 
 
-def save_encrypted_config(config: dict, path: Path = EMAIL_CONFIG_PATH, key_path: Path = EMAIL_CONFIG_KEY_PATH) -> None:
-    DATA_DIR.mkdir(exist_ok=True)
+def save_encrypted_config(config: dict, path: Path, key_path: Path | None = None) -> None:
+    if key_path is None:
+        key_path = email_config_key_path()
+    database.DATA_DIR.mkdir(exist_ok=True)
     key_material = load_or_create_key_material(key_path)
     salt = secrets.token_bytes(16)
     nonce = secrets.token_bytes(16)
@@ -73,8 +83,9 @@ def save_encrypted_config(config: dict, path: Path = EMAIL_CONFIG_PATH, key_path
     os.chmod(path, 0o600)
 
 
-def email_config_status() -> dict:
-    configured = EMAIL_CONFIG_PATH.exists()
+def email_config_status(user_id: int) -> dict:
+    path = email_config_path(user_id)
+    configured = path.exists()
     status = {
         "configured": configured,
         "provider": "",
@@ -87,7 +98,7 @@ def email_config_status() -> dict:
     if not configured:
         return status
     try:
-        config = load_encrypted_config()
+        config = load_email_config(user_id)
     except SecureConfigError:
         status["configured"] = False
         return status
@@ -102,7 +113,7 @@ def email_config_status() -> dict:
     }
 
 
-def save_email_config(data: dict) -> dict:
+def save_email_config(user_id: int, data: dict) -> dict:
     provider = str(data.get("provider") or "gmail").strip().lower()
     sender = str(data.get("sender") or "").strip()
     password = str(data.get("password") or "")
@@ -133,8 +144,12 @@ def save_email_config(data: dict) -> dict:
         "smtp_server": smtp_server,
         "smtp_port": smtp_port,
         "use_tls": use_tls,
-    })
-    return email_config_status()
+    }, email_config_path(user_id))
+    return email_config_status(user_id)
+
+
+def load_email_config(user_id: int) -> dict:
+    return load_encrypted_config(email_config_path(user_id))
 
 
 def email_provider_presets() -> list[dict]:
