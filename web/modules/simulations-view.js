@@ -142,7 +142,6 @@ export function registerSimulationsView({
     event.preventDefault();
     setMessage(simulationMessage, "", "");
     const payload = formData(simulationForm);
-    payload.amount = payload.amount.replace(".", "").replace(",", ".");
     try {
       const response = await api("/api/simulations/butterfly-effect", { method: "POST", body: payload });
       renderSimulation(response);
@@ -204,6 +203,7 @@ export function registerSimulationsView({
           <button class="invoice-history-card ${row.index === 0 ? "current" : ""}" type="button" role="listitem" aria-current="${row.index === 0 ? "true" : "false"}">
             <span>${escapeHtml(row.label)}</span>
             <em>${escapeHtml(row.description)}</em>
+            <small>Saldo projetado</small>
             <strong class="${row.amount < 0 ? "danger-text" : row.amount > 0 ? "positive-text" : ""}">${formatMoney(Math.abs(row.amount), currency)}</strong>
           </button>
         `).join("")}
@@ -219,7 +219,7 @@ export function registerSimulationsView({
       description: Number(entry.simulated_total_cents || 0)
         ? `Simulado ${formatSignedMoney(entry.simulated_total_cents, currency)}`
         : "Previsto",
-      amount: Number(entry.projected_balance_cents || 0) / 100,
+      amount: Number(projectedBalanceCents(entry)) / 100,
       currency,
     }));
     const values = rawRows.map((row) => row.amount);
@@ -234,6 +234,16 @@ export function registerSimulationsView({
         ? balanceHistoryChartFlat
         : balanceHistoryChartBottom - ((row.amount - min) / range) * (balanceHistoryChartBottom - balanceHistoryChartTop),
     }));
+  }
+
+  function projectedBalanceCents(entry) {
+    if (entry.projected_balance_cents !== undefined && entry.projected_balance_cents !== null) {
+      return entry.projected_balance_cents;
+    }
+    if (entry.real_balance_cents !== undefined && entry.real_balance_cents !== null) {
+      return Number(entry.real_balance_cents || 0) + Number(entry.simulated_total_cents || 0);
+    }
+    return entry.projected_total_cents || 0;
   }
 
   function balanceHistoryPath(rows) {

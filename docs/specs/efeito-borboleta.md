@@ -2,8 +2,8 @@
 tipo: spec
 area: simulacoes
 status: rascunho
-versao: 0.3
-atualizado: 2026-07-05
+versao: 0.4
+atualizado: 2026-07-06
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -18,7 +18,7 @@ aliases: ["Efeito Borboleta", "Simulador Financeiro"]
 # Efeito Borboleta
 
 > [!info] Status
-> **rascunho** · área: `simulacoes` · atualizado em 2026-07-05 · relacionados: [[contas-correntes]], [[lancamentos]], [[cartoes]], [[limites-gastos]], [[relatorios]]
+> **rascunho** · área: `simulacoes` · atualizado em 2026-07-06 · relacionados: [[contas-correntes]], [[lancamentos]], [[cartoes]], [[limites-gastos]], [[relatorios]]
 
 ## Problema
 
@@ -79,6 +79,7 @@ Qualquer usuário autenticado localmente que queira testar cenários financeiros
 - O impacto de limites de gastos deve considerar a competência mensal de cada parcela ou ocorrência.
 - Gráficos e totais devem mostrar o efeito acumulado ao longo dos meses afetados pela série simulada.
 - O horizonte padrão sugerido para visualização deve cobrir todos os meses impactados pelo cenário, respeitando um limite máximo definido pela implementação.
+- A série do gráfico deve usar a mesma base de saldo previsto da conta-corrente, incluindo faturas conciliadas e não pagas de cartões vinculados como conta preferencial, e aplicar apenas os itens virtuais da simulação por cima dessa base.
 
 ## API e dados
 
@@ -86,7 +87,7 @@ Qualquer usuário autenticado localmente que queira testar cenários financeiros
 |---|---|---|
 | `POST` | `/api/simulations/butterfly-effect` | Recebe um cenário hipotético validado e retorna projeções comparativas sem persistir dados. |
 
-Tabelas consultadas: `checking_accounts`, `transactions`, `categories`, `subcategories`, `tags`, `spending_limits`, `credit_card_transactions`.
+Tabelas consultadas: `checking_accounts`, `transactions`, `categories`, `subcategories`, `tags`, `spending_limits`, `credit_card_transactions`, `credit_card_payments`.
 
 Tabelas criadas ou alteradas: nenhuma.
 
@@ -115,6 +116,7 @@ Resposta esperada:
 - Dado uma despesa parcelada de R$ 1.200,00 em 12 vezes, quando simulada, então o sistema distribui R$ 100,00 por mês na projeção e mostra o impacto acumulado nos meses afetados.
 - Dado uma receita recorrente mensal de R$ 500,00 por 6 meses, quando simulada, então o sistema mostra seis ocorrências virtuais e atualiza o saldo projetado mês a mês.
 - Dado uma despesa recorrente categorizada, quando há limites cadastrados nos meses afetados, então cada ocorrência impacta apenas o limite do seu mês de competência.
+- Dado uma conta preferencial de pagamento com fatura de cartão conciliada e não paga, quando o usuário simula um cenário nessa conta, então o gráfico parte do saldo previsto da conta com a fatura abatida e adiciona somente os valores simulados.
 
 ## Fora de escopo
 
@@ -127,6 +129,7 @@ Resposta esperada:
 
 ## Changelog
 
+- `0.4` — 2026-07-06 — Gráfico da simulação passa a usar a mesma base de saldo previsto das contas, incluindo faturas conciliadas e não pagas de cartão.
 - `0.3` — 2026-07-05 — Campo de recorrência alinhado à implementação (`recurrence_count`) e recorrência mensal definida como única frequência aceita na primeira entrega.
 - `0.2` — 2026-07-05 — Parcelamento e recorrência entram no escopo principal da simulação por serem cenários de maior impacto financeiro.
 - `0.1` — 2026-07-05 — Spec inicial em rascunho para o módulo Efeito Borboleta, com núcleo determinístico e sem LLM.

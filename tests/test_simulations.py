@@ -8,6 +8,7 @@ from financeiro import database
 from financeiro.accounts import create_checking_account
 from financeiro.auth import create_user
 from financeiro.categories import create_category
+from financeiro.credit_cards import create_credit_card, create_credit_card_transaction, set_credit_card_transaction_reconciled
 from financeiro.database import initialize_database
 from financeiro.simulations import SimulationError, simulate_butterfly_effect
 from financeiro.spending_limits import create_spending_limit
@@ -156,6 +157,46 @@ class ButterflyEffectSimulationTest(unittest.TestCase):
 
         self.assertEqual(response["chart_series"][0]["real_balance_cents"], 150000)
         self.assertEqual(response["chart_series"][0]["projected_balance_cents"], 160000)
+
+    def test_chart_series_uses_account_forecast_with_reconciled_card_invoice(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta principal",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "1000,00",
+        })
+        card = create_credit_card(user["id"], {
+            "name": "Cartao principal",
+            "issuer": "Banco",
+            "currency": "BRL",
+            "limit": "5000,00",
+            "closing_day": "25",
+            "due_day": "10",
+            "preferred_payment_account_id": str(account["id"]),
+        })
+        card_transaction = create_credit_card_transaction(user["id"], {
+            "credit_card_id": str(card["id"]),
+            "type": "expense",
+            "description": "Fatura conciliada",
+            "amount": "300,00",
+            "date": "2026-01-05",
+            "invoice_month": "2026-01",
+            "category": "Cartao",
+        })
+        set_credit_card_transaction_reconciled(user["id"], str(card_transaction["id"]), True)
+
+        response = simulate_butterfly_effect(user["id"], {
+            "type": "income",
+            "amount": "200,00",
+            "date": "2026-01-15",
+            "description": "Receita simulada",
+            "account_id": str(account["id"]),
+            "series_kind": "single",
+        })
+
+        self.assertEqual(response["chart_series"][0]["real_balance_cents"], 70000)
+        self.assertEqual(response["chart_series"][0]["projected_balance_cents"], 90000)
 
     def test_recurring_income_adds_full_amount_to_each_projected_month(self) -> None:
         user = create_user("Alice", "alice@example.com", "correct-password")

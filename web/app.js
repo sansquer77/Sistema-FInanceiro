@@ -1418,7 +1418,7 @@ function preferredCardForecastAmount(card, limitDate) {
       String(transaction.credit_card_id) !== String(card.id)
       || !transaction.reconciled_at
       || !transaction.invoice_month
-      || cardInvoiceDueDate(transaction.invoice_month, card.due_day) > limitDate
+      || cardInvoiceDueDateValue(transaction.invoice_month, card.due_day) > limitDate
       || isCardInvoicePaid(card.id, transaction.invoice_month)
     ) {
       continue;
@@ -1446,7 +1446,7 @@ function isCardInvoicePaid(cardId, invoiceMonth) {
   ));
 }
 
-function cardInvoiceDueDate(invoiceMonth, dueDay) {
+function cardInvoiceDueDateValue(invoiceMonth, dueDay) {
   const [year, month] = String(invoiceMonth).split("-").map(Number);
   const safeDueDay = Number(dueDay || 1);
   if (!year || !month) {

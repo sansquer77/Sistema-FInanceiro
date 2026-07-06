@@ -2503,6 +2503,15 @@ textarea:focus {
   text-transform: uppercase;
 }
 
+.invoice-history-card small {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
 .invoice-history-card strong {
   font-size: 16px;
   font-weight: 900;
