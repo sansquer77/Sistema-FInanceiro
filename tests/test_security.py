@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest import mock
 
 import app
+from financeiro import auth as auth_module
 from financeiro import database
 from financeiro.accounts import AccountError, create_checking_account, update_checking_account
 from financeiro.auth import AuthError, create_user, login_user, request_password_reset
@@ -47,6 +48,23 @@ class IsolatedDatabaseTest(unittest.TestCase):
 
 
 class BruteForceProtectionTest(IsolatedDatabaseTest):
+    def test_login_uses_single_connection_on_success(self) -> None:
+        create_user("Alice", "alice@example.com", "correct-password")
+
+        with mock.patch("financeiro.auth.get_connection", wraps=auth_module.get_connection) as get_connection:
+            login_user("alice@example.com", "correct-password", source_key="127.0.0.1")
+
+        self.assertEqual(get_connection.call_count, 1)
+
+    def test_login_uses_single_connection_on_invalid_password(self) -> None:
+        create_user("Alice", "alice@example.com", "correct-password")
+
+        with mock.patch("financeiro.auth.get_connection", wraps=auth_module.get_connection) as get_connection:
+            with self.assertRaises(AuthError):
+                login_user("alice@example.com", "wrong-password", source_key="127.0.0.1")
+
+        self.assertEqual(get_connection.call_count, 1)
+
     def test_login_locks_after_repeated_failures(self) -> None:
         create_user("Alice", "alice@example.com", "correct-password")
 

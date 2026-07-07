@@ -54,13 +54,12 @@ def login_user(email: str, password: str, source_key: str | None = None) -> dict
     with get_connection() as conn:
         ensure_not_locked(conn, "login", login_identifiers, LOGIN_MAX_FAILURES, LOGIN_LOCK_MINUTES)
         row = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
-    if not row or not verify_password(password, row["password_hash"]):
-        with get_connection() as conn:
+        if not row or not verify_password(password, row["password_hash"]):
             record_auth_failure(conn, "login", login_identifiers, LOGIN_MAX_FAILURES, LOGIN_LOCK_MINUTES)
-        raise AuthError("Email ou senha invalidos.", HTTPStatus.UNAUTHORIZED)
-    with get_connection() as conn:
+            conn.commit()
+            raise AuthError("Email ou senha invalidos.", HTTPStatus.UNAUTHORIZED)
         clear_auth_attempts(conn, "login", login_identifiers)
-    return {"id": row["id"], "name": row["name"], "email": row["email"], "created_at": row["created_at"]}
+        return {"id": row["id"], "name": row["name"], "email": row["email"], "created_at": row["created_at"]}
 
 
 def update_user_email(user_id: int, email: str, current_password: str) -> dict:
@@ -127,12 +126,14 @@ def request_password_reset(email: str, source_key: str | None = None) -> dict:
     validate_email(normalized_email)
     token = None
     reset_id = None
+    user_id = None
     identifiers = auth_identifiers("password-reset-request", normalized_email, source_key)
     with get_connection() as conn:
         ensure_not_locked(conn, "password-reset-request", identifiers, PASSWORD_RESET_MAX_REQUESTS, PASSWORD_RESET_LOCK_MINUTES)
         record_auth_failure(conn, "password-reset-request", identifiers, PASSWORD_RESET_MAX_REQUESTS, PASSWORD_RESET_LOCK_MINUTES)
         user = conn.execute("SELECT id FROM users WHERE email = ?", (normalized_email,)).fetchone()
         if user:
+            user_id = user["id"]
             token = secrets.token_urlsafe(24)
             conn.execute(
                 """
@@ -140,19 +141,19 @@ def request_password_reset(email: str, source_key: str | None = None) -> dict:
                 SET used_at = CURRENT_TIMESTAMP
                 WHERE user_id = ? AND used_at IS NULL
                 """,
-                (user["id"],),
+                (user_id,),
             )
             cursor = conn.execute(
                 """
                 INSERT INTO password_resets (user_id, token_hash, expires_at)
                 VALUES (?, ?, ?)
                 """,
-                (user["id"], hash_reset_token(token), reset_expiration()),
+                (user_id, hash_reset_token(token), reset_expiration()),
             )
             reset_id = cursor.lastrowid
-    if token:
+    if token and user_id is not None:
         try:
-            send_password_reset_email(user["id"], normalized_email, token, RESET_TOKEN_MINUTES)
+            send_password_reset_email(user_id, normalized_email, token, RESET_TOKEN_MINUTES)
         except Exception:
             if reset_id:
                 with get_connection() as conn:
@@ -177,7 +178,7 @@ def reset_password(token: str, new_password: str, source_key: str | None = None)
         ensure_not_locked(conn, "password-reset-confirm", identifiers, PASSWORD_RESET_CONFIRM_MAX_FAILURES, PASSWORD_RESET_CONFIRM_LOCK_MINUTES)
         reset = conn.execute(
             """
-            SELECT *
+            SELECT id, user_id
             FROM password_resets
             WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?
             ORDER BY created_at DESC
@@ -187,6 +188,7 @@ def reset_password(token: str, new_password: str, source_key: str | None = None)
         ).fetchone()
         if not reset:
             record_auth_failure(conn, "password-reset-confirm", identifiers, PASSWORD_RESET_CONFIRM_MAX_FAILURES, PASSWORD_RESET_CONFIRM_LOCK_MINUTES)
+            conn.commit()
             raise AuthError("Codigo de recuperacao invalido ou expirado.", HTTPStatus.UNAUTHORIZED)
         conn.execute(
             "UPDATE users SET password_hash = ? WHERE id = ?",

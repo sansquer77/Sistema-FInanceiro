@@ -105,10 +105,20 @@ def list_credit_card_invoice(user_id: int, card_id: object, month: object) -> di
     }
 
 
-def list_credit_card_transactions(user_id: int) -> list[dict]:
+def list_credit_card_transactions(user_id: int, invoice_month: object | None = None) -> list[dict]:
+    normalized_invoice_month = normalize_month(invoice_month) if invoice_month else None
+    filters = [
+        "credit_card_transactions.user_id = ?",
+        "credit_card_transactions.archived_at IS NULL",
+    ]
+    params: list[object] = [user_id]
+    if normalized_invoice_month:
+        filters.append("credit_card_transactions.invoice_month = ?")
+        params.append(normalized_invoice_month)
+    where_clause = " AND ".join(filters)
     with get_connection() as conn:
         rows = conn.execute(
-            """
+            f"""
             SELECT
                 credit_card_transactions.*,
                 credit_cards.name AS credit_card_name,
@@ -132,12 +142,11 @@ def list_credit_card_transactions(user_id: int) -> list[dict]:
             LEFT JOIN tags
                 ON tags.id = credit_card_transaction_tags.tag_id
                 AND tags.user_id = credit_card_transactions.user_id
-            WHERE credit_card_transactions.user_id = ?
-                AND credit_card_transactions.archived_at IS NULL
+            WHERE {where_clause}
             GROUP BY credit_card_transactions.id
             ORDER BY credit_card_transactions.date DESC, credit_card_transactions.id DESC
             """,
-            (user_id,),
+            params,
         ).fetchall()
     return [
         format_card_transaction(row_to_dict(row), row["card_currency"])
