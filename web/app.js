@@ -1332,15 +1332,16 @@ function getCurrencyTotals() {
   }
   for (const card of state.creditCards) {
     const row = currencyTotalRow(totals, card.currency);
-    const openAmount = cardOpenBalance(card.id, currentMonthValue());
+    const openAmount = cardOpenBalance(card.id, currentInvoiceMonthForCard(card));
     const reservedAmount = preferredCardForecastAmount(card, currentMonthEndDate());
     const signedAmount = -Math.max(openAmount - reservedAmount, 0);
+    const displayedAmount = -Math.max(openAmount, 0);
     row.current += signedAmount;
     row.cards.push({
       id: card.id,
       name: card.name,
       issuer: card.issuer,
-      amount: signedAmount,
+      amount: displayedAmount,
       reconciled: -cardReconciledBalance(card.id),
     });
   }
@@ -1429,6 +1430,12 @@ function preferredCardForecastAmount(card, limitDate) {
   return [...forecastByInvoice.values()].reduce((total, amount) => total + Math.max(amount, 0), 0);
 }
 
+function currentInvoiceMonthForCard(card) {
+  const month = currentMonthValue();
+  const closingDate = cardInvoiceDateValue(month, card.closing_day);
+  return todayLocalDateValue() > closingDate ? shiftMonth(month, 1) : month;
+}
+
 function cardTransactionInvoiceDelta(transaction) {
   const amount = Number(transaction.amount || 0);
   if (transaction.type === "income") {
@@ -1447,14 +1454,18 @@ function isCardInvoicePaid(cardId, invoiceMonth) {
 }
 
 function cardInvoiceDueDateValue(invoiceMonth, dueDay) {
+  return cardInvoiceDateValue(invoiceMonth, dueDay);
+}
+
+function cardInvoiceDateValue(invoiceMonth, day) {
   const [year, month] = String(invoiceMonth).split("-").map(Number);
-  const safeDueDay = Number(dueDay || 1);
+  const safeDay = Number(day || 1);
   if (!year || !month) {
     return `${invoiceMonth}-01`;
   }
   const lastDay = new Date(year, month, 0).getDate();
-  const day = Math.min(Math.max(safeDueDay, 1), lastDay);
-  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  const invoiceDay = Math.min(Math.max(safeDay, 1), lastDay);
+  return `${year}-${String(month).padStart(2, "0")}-${String(invoiceDay).padStart(2, "0")}`;
 }
 
 function currentMonthEndDate() {
