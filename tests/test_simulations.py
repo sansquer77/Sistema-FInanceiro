@@ -100,8 +100,8 @@ class ButterflyEffectSimulationTest(unittest.TestCase):
             "series_kind": "single",
         })
 
-        self.assertEqual(response["account_impact"]["current_balance_cents"], 85000)
-        self.assertEqual(response["account_impact"]["projected_balance_cents"], 85000)
+        self.assertEqual(response["account_impact"]["current_balance_cents"], 110000)
+        self.assertEqual(response["account_impact"]["projected_balance_cents"], 80000)
 
     def test_chart_series_tracks_monthly_projected_balance(self) -> None:
         user = create_user("Alice", "alice@example.com", "correct-password")
@@ -122,11 +122,11 @@ class ButterflyEffectSimulationTest(unittest.TestCase):
             "installment_count": 3,
         })
 
-        self.assertEqual(response["account_impact"]["current_balance_cents"], 166667)
+        self.assertEqual(response["account_impact"]["current_balance_cents"], 100000)
         self.assertEqual(response["account_impact"]["projected_balance_cents"], 300000)
         self.assertEqual(
             [entry["projected_balance_cents"] for entry in response["chart_series"]],
-            [166667, 233334, 300000, 300000, 300000, 300000],
+            [166667, 233334, 300000, 300000, 300000],
         )
 
     def test_chart_series_keeps_previous_real_movements_in_base_balance(self) -> None:
@@ -218,12 +218,12 @@ class ButterflyEffectSimulationTest(unittest.TestCase):
             "recurrence_count": 3,
         })
 
-        self.assertEqual(response["account_impact"]["current_balance_cents"], 2074704)
+        self.assertEqual(response["account_impact"]["current_balance_cents"], 1874704)
         self.assertEqual(response["account_impact"]["projected_balance_cents"], 2474704)
         self.assertEqual([item["impact_cents"] for item in response["virtual_items"]], [200000, 200000, 200000])
         self.assertEqual(
             [entry["projected_balance_cents"] for entry in response["chart_series"]],
-            [2074704, 2274704, 2474704, 2474704, 2474704, 2474704],
+            [2074704, 2274704, 2474704, 2474704, 2474704],
         )
 
     def test_rejects_non_monthly_recurrence_until_supported(self) -> None:

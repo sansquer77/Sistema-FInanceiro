@@ -71,6 +71,8 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 - **Edição em cascata** (`apply_to_future`): ao editar um lançamento de uma série, o usuário pode aplicar as alterações ao lançamento atual ou a todos os futuros da série que ainda não foram conciliados (`reconciled_at IS NULL`).
 - **Exclusão em cascata** (`scope=future`): remove recursivamente todos os lançamentos futuros não conciliados da mesma série, revertendo os respectivos impactos nos saldos.
 - Lançamentos parcelados exibem índice e total (`1/36`, `2/36`...) sem reiniciar a contagem em edições pontuais.
+- Em lançamentos parcelados, o valor informado é o total da compra/lançamento e deve ser dividido pela quantidade de parcelas. Ex.: R$ 500 em 5x gera 5 lançamentos de R$ 100.
+- Em lançamentos recorrentes, cada ocorrência futura deve manter exatamente o valor informado. Ex.: R$ 500 recorrente por 5 ocorrências gera 5 lançamentos de R$ 500.
 
 ## API e dados
 

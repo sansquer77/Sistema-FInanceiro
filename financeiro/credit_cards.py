@@ -9,7 +9,7 @@ from uuid import uuid4
 from financeiro.accounts import SUPPORTED_CURRENCIES, cents_to_money, empty_to_none, money_to_cents
 from financeiro.categories import get_or_create_category, get_or_create_subcategory, get_or_create_tag, normalize_name
 from financeiro.database import begin_immediate, get_connection, row_to_dict
-from financeiro.transactions import create_transaction_with_conn, normalize_optional_tags
+from financeiro.transactions import create_transaction_with_conn, normalize_optional_tags, split_cents
 
 CARD_TRANSACTION_TYPES = {"income", "expense"}
 CARD_SERIES_KINDS = {"single", "installment", "recurring"}
@@ -238,7 +238,7 @@ def create_credit_card_transaction_with_conn(conn: sqlite3.Connection, user_id: 
                 card["id"],
                 transaction["type"],
                 occurrence["description"],
-                transaction["amount_cents"],
+                occurrence["amount_cents"],
                 occurrence["date"],
                 occurrence["invoice_month"],
                 series_id,
@@ -781,6 +781,7 @@ def build_card_transaction_occurrences(transaction: dict) -> list[dict]:
                 "date": add_recurrence(start_date, transaction["recurrence_frequency"], index).isoformat(),
                 "invoice_month": add_recurrence(date.fromisoformat(f"{transaction['invoice_month']}-01"), transaction["recurrence_frequency"], index).strftime("%Y-%m"),
                 "description": transaction["description"],
+                "amount_cents": transaction["amount_cents"],
                 "installment_index": None,
                 "installment_count": count,
             }
@@ -791,15 +792,18 @@ def build_card_transaction_occurrences(transaction: dict) -> list[dict]:
             "date": transaction["date"],
             "invoice_month": transaction["invoice_month"],
             "description": transaction["description"],
+            "amount_cents": transaction["amount_cents"],
             "installment_index": None,
             "installment_count": None,
         }]
     count = transaction["installment_count"] or 2
+    amounts = split_cents(transaction["amount_cents"], count)
     return [
         {
             "date": add_months(start_date, index).isoformat(),
             "invoice_month": shift_month(transaction["invoice_month"], index),
             "description": transaction["description"],
+            "amount_cents": amounts[index],
             "installment_index": index + 1,
             "installment_count": count,
         }

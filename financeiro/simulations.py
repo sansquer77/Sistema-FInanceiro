@@ -211,11 +211,11 @@ def signed_impact_cents(simulation_type: str, amount_cents: int) -> int:
 
 def build_account_impact(conn, user_id: int, account: dict, payload: dict, virtual_items: list[dict]) -> dict:
     base_balance_cents = fetch_account_balance_until(conn, user_id, account["id"], payload["date"], reconciled_only=True)
-    current_month = payload["date"][:7]
-    current_month_impact_cents = sum(item["impact_cents"] for item in virtual_items if item["month"] == current_month)
-    projected_balance_cents = base_balance_cents + sum(item["impact_cents"] for item in virtual_items)
+    projected_base_cents = account_projected_balance_until(conn, user_id, account, month_end_date(payload["date"][:7]))
+    simulated_total_cents = sum(item["impact_cents"] for item in virtual_items)
+    projected_balance_cents = projected_base_cents + simulated_total_cents
     return {
-        "current_balance_cents": base_balance_cents + current_month_impact_cents,
+        "current_balance_cents": base_balance_cents,
         "projected_balance_cents": projected_balance_cents,
         "difference_cents": projected_balance_cents - base_balance_cents,
     }
@@ -460,14 +460,9 @@ def simulation_deltas_by_month(virtual_items: list[dict]) -> dict[str, int]:
 
 def build_forecast_months(payload: dict, virtual_items: list[dict]) -> list[str]:
     start_month = payload["date"][:7]
-    last_virtual_month = max((item["month"] for item in virtual_items), default=start_month)
-    start = date.fromisoformat(f"{start_month}-01")
-    last_virtual = date.fromisoformat(f"{last_virtual_month}-01")
-    months_until_last_virtual = (last_virtual.year - start.year) * 12 + (last_virtual.month - start.month) + 1
-    horizon_months = max(6, months_until_last_virtual)
     current = date.fromisoformat(f"{start_month}-01")
     generated = []
-    for offset in range(horizon_months):
+    for offset in range(5):
         month_date = add_months(current, offset)
         generated.append(month_date.strftime("%Y-%m"))
     return generated

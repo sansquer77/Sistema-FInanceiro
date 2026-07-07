@@ -81,6 +81,63 @@ class TransactionSeriesUpdateTest(unittest.TestCase):
         self.assertLessEqual(resolve_transaction_category.call_count, 2)
         self.assertLessEqual(get_or_create_tag.call_count, 2)
 
+    def test_installment_transaction_splits_total_amount_across_installments(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta principal",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "1000,00",
+        })
+
+        create_transaction(user["id"], {
+            "type": "expense",
+            "description": "Compra parcelada",
+            "amount": "500,00",
+            "date": "2026-01-10",
+            "account_id": str(account["id"]),
+            "category": "Compras",
+            "series_kind": "installment",
+            "installment_count": "5",
+        })
+
+        rows = sorted(list_transactions(user["id"], account_id=account["id"]), key=lambda row: row["installment_index"])
+
+        self.assertEqual([row["amount"] for row in rows], ["100.00", "100.00", "100.00", "100.00", "100.00"])
+        self.assertEqual([row["description"] for row in rows], [
+            "Compra parcelada (1/5)",
+            "Compra parcelada (2/5)",
+            "Compra parcelada (3/5)",
+            "Compra parcelada (4/5)",
+            "Compra parcelada (5/5)",
+        ])
+
+    def test_recurring_transaction_keeps_full_amount_on_each_occurrence(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta principal",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "1000,00",
+        })
+
+        create_transaction(user["id"], {
+            "type": "expense",
+            "description": "Assinatura recorrente",
+            "amount": "500,00",
+            "date": "2026-01-10",
+            "account_id": str(account["id"]),
+            "category": "Servicos",
+            "series_kind": "recurring",
+            "recurrence_frequency": "monthly",
+            "recurrence_count": "5",
+        })
+
+        rows = list_transactions(user["id"], account_id=account["id"])
+
+        self.assertEqual(len(rows), 5)
+        self.assertTrue(all(row["amount"] == "500.00" for row in rows))
+
 
 if __name__ == "__main__":
     unittest.main()

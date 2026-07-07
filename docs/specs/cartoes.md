@@ -77,6 +77,8 @@ Qualquer usuário autenticado localmente que utilize cartões de crédito para d
 - Moedas do cartão e da conta de pagamento da fatura devem ser idênticas.
 - A conta preferencial de pagamento, quando informada, deve ter a mesma moeda do cartão.
 - Lançamentos de cartão podem ser únicos, parcelados ou recorrentes.
+- Em lançamentos parcelados de cartão, o valor informado é o total da compra e deve ser dividido pela quantidade de parcelas. Ex.: R$ 500 em 5x gera 5 lançamentos/faturas de R$ 100.
+- Em lançamentos recorrentes de cartão, cada ocorrência deve manter exatamente o valor informado. Ex.: R$ 500 recorrente por 5 ocorrências gera 5 lançamentos de R$ 500.
 - A fatura exibe total atual, total conciliado e contador de lançamentos não conciliados.
 - A lista de lançamentos da fatura permite busca por descrição, categoria, subcategoria, tag, observação, data, tipo ou valor.
 - O filtro de conciliação da fatura alterna entre todos, não conciliados e conciliados sem alterar os totais da fatura.

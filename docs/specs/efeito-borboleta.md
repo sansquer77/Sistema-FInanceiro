@@ -2,7 +2,7 @@
 tipo: spec
 area: simulacoes
 status: rascunho
-versao: 0.4
+versao: 0.5
 atualizado: 2026-07-06
 relacionados:
   - "[[contas-correntes]]"
@@ -63,7 +63,9 @@ Qualquer usuário autenticado localmente que queira testar cenários financeiros
 - O cálculo deve tratar o cenário como um lançamento virtual mantido apenas em memória.
 - Receitas simuladas aumentam o saldo projetado da conta escolhida.
 - Despesas simuladas reduzem o saldo projetado da conta escolhida.
-- O impacto deve ser exibido separando valor real atual, valor simulado e diferença.
+- O saldo atual exibido deve permanecer igual ao saldo conciliado real da conta, sem somar valores simulados.
+- O saldo projetado exibido deve partir do saldo previsto da conta e somar apenas o cenário virtual.
+- O impacto deve ser exibido separando valor real atual, saldo projetado com simulação e itens virtuais.
 - O cenário deve respeitar a moeda da conta selecionada.
 - Totais multimoeda devem continuar separados por moeda, sem conversão implícita para somatórios financeiros.
 - Simulações de despesa com categoria/subcategoria devem indicar impacto em limites de gastos do mês correspondente.
@@ -78,8 +80,9 @@ Qualquer usuário autenticado localmente que queira testar cenários financeiros
 - Parcelas e recorrências simuladas devem exibir índice e total (`1/12`, `2/12` etc.) quando aplicável.
 - O impacto de limites de gastos deve considerar a competência mensal de cada parcela ou ocorrência.
 - Gráficos e totais devem mostrar o efeito acumulado ao longo dos meses afetados pela série simulada.
-- O horizonte padrão sugerido para visualização deve cobrir todos os meses impactados pelo cenário, respeitando um limite máximo definido pela implementação.
+- O horizonte do gráfico deve ser sempre de 5 meses, sendo o mês atual da simulação mais 4 meses projetados.
 - A série do gráfico deve usar a mesma base de saldo previsto da conta-corrente, incluindo faturas conciliadas e não pagas de cartões vinculados como conta preferencial, e aplicar apenas os itens virtuais da simulação por cima dessa base.
+- O gráfico deve comparar a linha de saldo previsto da conta com a linha de saldo com simulação, usando legenda visual e sem transformar valores simulados em lançamentos reais.
 
 ## API e dados
 
@@ -117,6 +120,8 @@ Resposta esperada:
 - Dado uma receita recorrente mensal de R$ 500,00 por 6 meses, quando simulada, então o sistema mostra seis ocorrências virtuais e atualiza o saldo projetado mês a mês.
 - Dado uma despesa recorrente categorizada, quando há limites cadastrados nos meses afetados, então cada ocorrência impacta apenas o limite do seu mês de competência.
 - Dado uma conta preferencial de pagamento com fatura de cartão conciliada e não paga, quando o usuário simula um cenário nessa conta, então o gráfico parte do saldo previsto da conta com a fatura abatida e adiciona somente os valores simulados.
+- Dado qualquer cenário válido, quando o resultado é exibido, então o saldo atual permanece igual ao saldo conciliado real da conta.
+- Dado qualquer cenário válido, quando o gráfico é exibido, então ele mostra 5 meses e compara saldo previsto da conta contra saldo com simulação.
 
 ## Fora de escopo
 
@@ -129,6 +134,7 @@ Resposta esperada:
 
 ## Changelog
 
+- `0.5` — 2026-07-06 — Resultado separa saldo atual real de saldo projetado; gráfico passa a comparar previsão da conta e cenário simulado em horizonte fixo de 5 meses.
 - `0.4` — 2026-07-06 — Gráfico da simulação passa a usar a mesma base de saldo previsto das contas, incluindo faturas conciliadas e não pagas de cartão.
 - `0.3` — 2026-07-05 — Campo de recorrência alinhado à implementação (`recurrence_count`) e recorrência mensal definida como única frequência aceita na primeira entrega.
 - `0.2` — 2026-07-05 — Parcelamento e recorrência entram no escopo principal da simulação por serem cenários de maior impacto financeiro.

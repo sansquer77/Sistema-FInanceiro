@@ -140,22 +140,24 @@ def create_transaction_with_conn(conn: sqlite3.Connection, user_id: int, data: d
         transaction["date"],
         transaction["exchange_rate"],
     )
-    amount_brl_cents = convert_to_brl_cents(transaction["amount_cents"], exchange_rate_micros)
     category_id, subcategory_id = resolve_transaction_category(conn, user_id, transaction, destination)
     tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
     first_transaction_id = None
     series_id = str(uuid4()) if transaction["series_kind"] != "single" else None
     for occurrence in occurrences:
+        occurrence_amount_cents = occurrence["amount_cents"]
+        occurrence_destination_amount_cents = occurrence["destination_amount_cents"]
+        occurrence_amount_brl_cents = convert_to_brl_cents(occurrence_amount_cents, exchange_rate_micros)
         apply_balance_delta(
             conn,
             source["id"],
-            balance_delta(transaction["type"], transaction["amount_cents"], "source"),
+            balance_delta(transaction["type"], occurrence_amount_cents, "source"),
         )
         if destination:
             apply_balance_delta(
                 conn,
                 destination["id"],
-                balance_delta(transaction["type"], destination_balance_amount(transaction), "destination"),
+                balance_delta(transaction["type"], occurrence_destination_amount_cents, "destination"),
             )
         cursor = conn.execute(
             """
@@ -170,11 +172,11 @@ def create_transaction_with_conn(conn: sqlite3.Connection, user_id: int, data: d
                 user_id,
                 transaction["type"],
                 occurrence["description"],
-                transaction["amount_cents"],
-                transaction["destination_amount_cents"],
+                occurrence_amount_cents,
+                occurrence_destination_amount_cents,
                 exchange_rate_micros,
                 transaction["transfer_exchange_rate_micros"],
-                amount_brl_cents,
+                occurrence_amount_brl_cents,
                 occurrence["date"],
                 source["id"],
                 destination["id"] if destination else None,
@@ -651,10 +653,14 @@ def decimal_to_micros(value: object) -> int:
 def build_transaction_occurrences(transaction: dict) -> list[dict]:
     start_date = date.fromisoformat(transaction["date"])
     if transaction["series_kind"] == "installment":
+        amounts = split_cents(transaction["amount_cents"], transaction["installment_count"])
+        destination_amounts = split_optional_cents(transaction["destination_amount_cents"], transaction["installment_count"])
         return [
             {
                 "date": add_months(start_date, index).isoformat(),
                 "description": f"{transaction['description']} ({index + 1}/{transaction['installment_count']})",
+                "amount_cents": amounts[index],
+                "destination_amount_cents": destination_amounts[index],
                 "installment_index": index + 1,
                 "installment_count": transaction["installment_count"],
             }
@@ -665,6 +671,8 @@ def build_transaction_occurrences(transaction: dict) -> list[dict]:
             {
                 "date": add_recurrence(start_date, transaction["recurrence_frequency"], index).isoformat(),
                 "description": transaction["description"],
+                "amount_cents": transaction["amount_cents"],
+                "destination_amount_cents": transaction["destination_amount_cents"],
                 "installment_index": None,
                 "installment_count": transaction["recurrence_count"],
             }
@@ -673,9 +681,22 @@ def build_transaction_occurrences(transaction: dict) -> list[dict]:
     return [{
         "date": transaction["date"],
         "description": transaction["description"],
+        "amount_cents": transaction["amount_cents"],
+        "destination_amount_cents": transaction["destination_amount_cents"],
         "installment_index": None,
         "installment_count": None,
     }]
+
+
+def split_cents(total_cents: int, count: int) -> list[int]:
+    base, remainder = divmod(total_cents, count)
+    return [base + (1 if index < remainder else 0) for index in range(count)]
+
+
+def split_optional_cents(total_cents: int | None, count: int) -> list[int | None]:
+    if total_cents is None:
+        return [None for _ in range(count)]
+    return split_cents(total_cents, count)
 
 
 def add_recurrence(start_date: date, frequency: str, index: int) -> date:

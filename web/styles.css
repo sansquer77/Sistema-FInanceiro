@@ -762,7 +762,7 @@ textarea:focus {
 
 .simulation-summary-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 16px;
 }
@@ -2611,6 +2611,82 @@ textarea:focus {
 .invoice-history-point.current {
   width: 22px;
   height: 22px;
+}
+
+.simulation-chart .invoice-history-rail {
+  min-width: 620px;
+  min-height: 150px;
+}
+
+.simulation-chart .invoice-history-card {
+  min-height: 136px;
+  padding: 14px 10px 12px;
+}
+
+.simulation-chart .invoice-history-card span {
+  font-size: 15px;
+}
+
+.simulation-chart .invoice-history-card strong {
+  font-size: 13px;
+}
+
+.simulation-chart .invoice-history-card small {
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+}
+
+.simulation-chart .simulation-forecast-line {
+  stroke: color-mix(in srgb, var(--muted) 68%, transparent);
+  stroke-dasharray: 5 5;
+  stroke-width: 2;
+}
+
+.simulation-chart .simulation-point {
+  width: 10px;
+  height: 10px;
+  border-width: 2px;
+  box-shadow: 0 0 0 1.5px var(--accent);
+}
+
+.simulation-chart .simulation-point.current {
+  width: 12px;
+  height: 12px;
+}
+
+.simulation-chart .simulation-point.forecast {
+  background: var(--surface-low);
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--muted) 72%, transparent);
+}
+
+.simulation-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 10px 4px 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.simulation-chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-line {
+  display: inline-block;
+  width: 24px;
+  height: 0;
+  border-top: 2px solid var(--accent);
+}
+
+.legend-line.forecast {
+  border-color: color-mix(in srgb, var(--muted) 68%, transparent);
+  border-style: dashed;
 }
 
 .card-invoice-summary > div {

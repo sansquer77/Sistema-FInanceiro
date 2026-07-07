@@ -12,6 +12,7 @@ from financeiro.credit_cards import (
     CreditCardError,
     create_credit_card,
     create_credit_card_transaction,
+    list_credit_card_transactions,
     pay_credit_card_invoice,
 )
 from financeiro.database import get_connection, initialize_database
@@ -81,6 +82,77 @@ class CreditCardPaymentAtomicityTest(unittest.TestCase):
         self.assertEqual(transaction_count, 0)
         self.assertEqual(payment_count, 0)
         self.assertEqual(account_row["current_balance_cents"], 100000)
+
+    def test_installment_card_transaction_splits_total_amount_across_installments(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta principal",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "1000,00",
+        })
+        card = create_credit_card(user["id"], {
+            "name": "Cartao",
+            "issuer": "Banco",
+            "currency": "BRL",
+            "limit": "2000,00",
+            "closing_day": "28",
+            "due_day": "10",
+            "preferred_payment_account_id": str(account["id"]),
+        })
+
+        create_credit_card_transaction(user["id"], {
+            "credit_card_id": str(card["id"]),
+            "type": "expense",
+            "description": "Compra parcelada",
+            "amount": "500,00",
+            "date": "2026-06-10",
+            "invoice_month": "2026-06",
+            "category": "Compras",
+            "series_kind": "installment",
+            "installment_count": "5",
+        })
+
+        rows = sorted(list_credit_card_transactions(user["id"]), key=lambda row: row["installment_index"])
+
+        self.assertEqual([row["amount"] for row in rows], ["100.00", "100.00", "100.00", "100.00", "100.00"])
+        self.assertEqual([row["installment_index"] for row in rows], [1, 2, 3, 4, 5])
+
+    def test_recurring_card_transaction_keeps_full_amount_on_each_occurrence(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta principal",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "1000,00",
+        })
+        card = create_credit_card(user["id"], {
+            "name": "Cartao",
+            "issuer": "Banco",
+            "currency": "BRL",
+            "limit": "2000,00",
+            "closing_day": "28",
+            "due_day": "10",
+            "preferred_payment_account_id": str(account["id"]),
+        })
+
+        create_credit_card_transaction(user["id"], {
+            "credit_card_id": str(card["id"]),
+            "type": "expense",
+            "description": "Assinatura recorrente",
+            "amount": "500,00",
+            "date": "2026-06-10",
+            "invoice_month": "2026-06",
+            "category": "Servicos",
+            "series_kind": "recurring",
+            "recurrence_frequency": "monthly",
+            "installment_count": "5",
+        })
+
+        rows = list_credit_card_transactions(user["id"])
+
+        self.assertEqual(len(rows), 5)
+        self.assertTrue(all(row["amount"] == "500.00" for row in rows))
 
 
 if __name__ == "__main__":
