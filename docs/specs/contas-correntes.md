@@ -58,8 +58,8 @@ Qualquer usuário autenticado localmente que mantenha contas em um ou mais banco
 - O ajuste de saldo atual por mudança de saldo inicial deve ser aplicado como delta atômico para preservar lançamentos concorrentes.
 - Contas do tipo `wallet` aceitam apenas receitas, despesas e transferências à vista; não exibem recorrência. Ver [[lancamentos]].
 - Contas do tipo `investment` alimentam o portfólio de investimentos. Ver [[investimentos-portfolio]].
-- O saldo previsto de uma conta usada como conta preferencial de pagamento de cartão deve abater faturas não pagas com lançamentos conciliados, alocando o impacto no mês de vencimento da fatura.
-- Quando o saldo previsto incluir faturas conciliadas de cartão, a interface deve indicar `Saldo previsto (inclui faturas conciliadas de cartão)`.
+- O saldo previsto de uma conta usada como conta preferencial de pagamento de cartão deve abater despesas conciliadas de cartão em faturas não pagas, alocando o impacto no mês de vencimento da fatura.
+- Quando o saldo previsto incluir despesas conciliadas de cartão, a interface deve indicar `Saldo previsto (inclui despesas conciliadas de cartão)`.
 
 ## API e dados
 

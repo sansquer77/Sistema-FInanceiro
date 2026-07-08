@@ -132,7 +132,9 @@ export function registerSimulationsView({
   function clearSimulationResult() {
     simulationCurrentBalance.textContent = "-";
     simulationProjectedBalance.textContent = "-";
-    simulationDifference.textContent = "-";
+    if (simulationDifference) {
+      simulationDifference.textContent = "-";
+    }
     simulationChart.innerHTML = '<p class="muted-copy">Preencha o formulário e clique em Simular.</p>';
     simulationVirtualItems.innerHTML = "";
     simulationWarnings.innerHTML = "";
@@ -142,7 +144,6 @@ export function registerSimulationsView({
     event.preventDefault();
     setMessage(simulationMessage, "", "");
     const payload = formData(simulationForm);
-    payload.amount = payload.amount.replace(".", "").replace(",", ".");
     try {
       const response = await api("/api/simulations/butterfly-effect", { method: "POST", body: payload });
       renderSimulation(response);
@@ -158,7 +159,9 @@ export function registerSimulationsView({
     const currency = account?.currency || "BRL";
     simulationCurrentBalance.textContent = formatMoney((accountImpact.current_balance_cents || 0) / 100, currency);
     simulationProjectedBalance.textContent = formatMoney((accountImpact.projected_balance_cents || 0) / 100, currency);
-    simulationDifference.textContent = formatMoney((accountImpact.difference_cents || 0) / 100, currency);
+    if (simulationDifference) {
+      simulationDifference.textContent = formatMoney((accountImpact.difference_cents || 0) / 100, currency);
+    }
 
     simulationChart.innerHTML = buildSimulationBalanceHistory(response.chart_series || [], currency);
 
@@ -182,10 +185,14 @@ export function registerSimulationsView({
     if (!rows.length) {
       return '<div class="empty-state compact">Sem dados para exibir no gráfico.</div>';
     }
-    const path = balanceHistoryPath(rows);
-    const areaPath = balanceHistoryAreaPath(rows);
-    const points = rows.map((row) => `
-      <span class="invoice-history-point ${row.index === 0 ? "current" : "future"}" style="left: ${row.x}%; top: ${row.y}%"></span>
+    const forecastPath = balanceHistoryPath(rows, "forecastY");
+    const simulatedPath = balanceHistoryPath(rows, "simulatedY");
+    const areaPath = balanceHistoryAreaPath(rows, "simulatedY");
+    const forecastPoints = rows.map((row) => `
+      <span class="invoice-history-point simulation-point forecast" style="left: ${row.x}%; top: ${row.forecastY}%"></span>
+    `).join("");
+    const simulatedPoints = rows.map((row) => `
+      <span class="invoice-history-point simulation-point ${row.index === 0 ? "current" : "future"}" style="left: ${row.x}%; top: ${row.simulatedY}%"></span>
     `).join("");
     return `
       <div class="invoice-history-rail" role="list">
@@ -197,16 +204,22 @@ export function registerSimulationsView({
             </linearGradient>
           </defs>
           <path class="invoice-history-area account-balance-history-area" d="${areaPath}"></path>
-          <path class="invoice-history-line future" d="${path}"></path>
+          <path class="invoice-history-line simulation-forecast-line" d="${forecastPath}"></path>
+          <path class="invoice-history-line future" d="${simulatedPath}"></path>
         </svg>
-        ${points}
+        ${forecastPoints}
+        ${simulatedPoints}
         ${rows.map((row) => `
           <button class="invoice-history-card ${row.index === 0 ? "current" : ""}" type="button" role="listitem" aria-current="${row.index === 0 ? "true" : "false"}">
             <span>${escapeHtml(row.label)}</span>
-            <em>${escapeHtml(row.description)}</em>
-            <strong class="${row.amount < 0 ? "danger-text" : row.amount > 0 ? "positive-text" : ""}">${formatMoney(Math.abs(row.amount), currency)}</strong>
+            <strong class="${row.simulatedAmount < 0 ? "danger-text" : row.simulatedAmount > 0 ? "positive-text" : ""}">${formatMoney(Math.abs(row.simulatedAmount), currency)}</strong>
+            <small>${formatMoney(Math.abs(row.forecastAmount), currency)}</small>
           </button>
         `).join("")}
+      </div>
+      <div class="simulation-chart-legend">
+        <span><i class="legend-line forecast"></i>Saldo previsto da conta</span>
+        <span><i class="legend-line simulated"></i>Saldo com simulação</span>
       </div>
     `;
   }
@@ -216,13 +229,11 @@ export function registerSimulationsView({
       index,
       month: entry.month,
       label: shortMonthLabel(entry.month),
-      description: Number(entry.simulated_total_cents || 0)
-        ? `Simulado ${formatSignedMoney(entry.simulated_total_cents, currency)}`
-        : "Previsto",
-      amount: Number(entry.projected_balance_cents || 0) / 100,
+      forecastAmount: Number(entry.real_balance_cents || 0) / 100,
+      simulatedAmount: Number(projectedBalanceCents(entry)) / 100,
       currency,
     }));
-    const values = rawRows.map((row) => row.amount);
+    const values = rawRows.flatMap((row) => [row.forecastAmount, row.simulatedAmount]);
     const min = Math.min(...values);
     const max = Math.max(...values);
     const range = max - min;
@@ -230,21 +241,36 @@ export function registerSimulationsView({
     return rawRows.map((row, index) => ({
       ...row,
       x: rawRows.length === 1 ? 50 : 8 + (index / denominator) * 84,
-      y: range === 0
-        ? balanceHistoryChartFlat
-        : balanceHistoryChartBottom - ((row.amount - min) / range) * (balanceHistoryChartBottom - balanceHistoryChartTop),
+      forecastY: chartY(row.forecastAmount, min, range),
+      simulatedY: chartY(row.simulatedAmount, min, range),
     }));
   }
 
-  function balanceHistoryPath(rows) {
+  function chartY(amount, min, range) {
+    return range === 0
+        ? balanceHistoryChartFlat
+        : balanceHistoryChartBottom - ((amount - min) / range) * (balanceHistoryChartBottom - balanceHistoryChartTop);
+  }
+
+  function projectedBalanceCents(entry) {
+    if (entry.projected_balance_cents !== undefined && entry.projected_balance_cents !== null) {
+      return entry.projected_balance_cents;
+    }
+    if (entry.real_balance_cents !== undefined && entry.real_balance_cents !== null) {
+      return Number(entry.real_balance_cents || 0) + Number(entry.simulated_total_cents || 0);
+    }
+    return entry.projected_total_cents || 0;
+  }
+
+  function balanceHistoryPath(rows, yKey = "simulatedY") {
     if (rows.length < 2) {
       return "";
     }
-    return smoothBalancePath(rows.map((row) => ({ x: row.x, y: row.y })));
+    return smoothBalancePath(rows.map((row) => ({ x: row.x, y: row[yKey] })));
   }
 
-  function balanceHistoryAreaPath(rows) {
-    const points = rows.map((row) => ({ x: row.x, y: row.y }));
+  function balanceHistoryAreaPath(rows, yKey = "simulatedY") {
+    const points = rows.map((row) => ({ x: row.x, y: row[yKey] }));
     if (points.length < 2) {
       return "";
     }
@@ -272,12 +298,6 @@ export function registerSimulationsView({
     }
     const date = new Date(year, monthNumber - 1, 1);
     return date.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
-  }
-
-  function formatSignedMoney(cents, currency) {
-    const amount = Number(cents || 0) / 100;
-    const prefix = amount >= 0 ? "+" : "-";
-    return `${prefix}${formatMoney(Math.abs(amount), currency)}`;
   }
 
   return { loadSimulationFormData, resetForm, renderSimulation };

@@ -437,7 +437,7 @@ export function registerTransactionsView({
     if (forecastBalanceLabel) {
       const account = state.accounts.find((entry) => String(entry.id) === String(state.selectedAccountId));
       forecastBalanceLabel.textContent = accountHasPreferredCardForecast(account, forecastLimitDate)
-        ? "Saldo previsto (inclui faturas conciliadas de cartão)"
+        ? "Saldo previsto (inclui despesas conciliadas de cartão)"
         : "Saldo previsto";
     }
     renderBalanceHistory();

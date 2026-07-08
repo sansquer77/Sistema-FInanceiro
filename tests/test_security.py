@@ -25,7 +25,7 @@ from financeiro.credit_cards import (
 from financeiro.database import initialize_database
 from financeiro.portfolio import PortfolioError, create_opening_position, update_opening_position
 from financeiro.secure_config import email_config_status, save_email_config
-from financeiro.spending_limits import SpendingLimitError, create_spending_limit, update_spending_limit
+from financeiro.spending_limits import SpendingLimitError, create_spending_limit, list_spending_limits, update_spending_limit
 from financeiro.transactions import TransactionError, create_transaction, update_transaction
 
 
@@ -268,6 +268,33 @@ class IdorProtectionTest(IsolatedDatabaseTest):
 
         with self.assertRaises(SpendingLimitError):
             create_spending_limit(owner["id"], spending_limit_payload(foreign_category["id"]))
+
+    def test_spending_limits_are_recurring_from_start_month(self) -> None:
+        user = create_user("Alice", "alice@example.com", "strong-password")
+        category = create_category(user["id"], "Restaurantes", "expense")
+        create_spending_limit(user["id"], spending_limit_payload(category["id"]))
+
+        july_limits = list_spending_limits(user["id"], "2026-07")
+
+        self.assertEqual(len(july_limits), 1)
+        self.assertEqual(july_limits[0]["month"], "2026-06")
+        self.assertEqual(july_limits[0]["limit_amount"], "500.00")
+
+    def test_spending_limits_use_latest_definition_until_month(self) -> None:
+        user = create_user("Alice", "alice@example.com", "strong-password")
+        category = create_category(user["id"], "Restaurantes", "expense")
+        create_spending_limit(user["id"], spending_limit_payload(category["id"]))
+        create_spending_limit(user["id"], {
+            "month": "2026-07",
+            "category_id": str(category["id"]),
+            "limit_amount": "750,00",
+        })
+
+        july_limits = list_spending_limits(user["id"], "2026-07")
+
+        self.assertEqual(len(july_limits), 1)
+        self.assertEqual(july_limits[0]["month"], "2026-07")
+        self.assertEqual(july_limits[0]["limit_amount"], "750.00")
 
     def test_category_evolution_rejects_foreign_category(self) -> None:
         owner = create_user("Owner", "owner@example.com", "strong-password")

@@ -545,11 +545,7 @@ class AppHandler(BaseHTTPRequestHandler):
         query = parse_qs(urlsplit(self.path).query)
         month = (query.get("month") or [date.today().strftime("%Y-%m")])[0]
         transactions = list_transactions(user["id"], month=month)
-        card_transactions = [
-            transaction
-            for transaction in list_credit_card_transactions(user["id"])
-            if transaction.get("invoice_month") == month
-        ]
+        card_transactions = list_credit_card_transactions(user["id"], invoice_month=month)
         self.send_json(cockpit_payload([*transactions, *card_transactions]))
 
     def handle_exchange_rate(self) -> None:
@@ -891,7 +887,10 @@ class AppHandler(BaseHTTPRequestHandler):
         body = file_path.read_bytes()
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", content_type)
-        self.send_header("Cache-Control", "no-store")
+        if path.startswith("/assets/"):
+            self.send_header("Cache-Control", "public, max-age=31536000, immutable")
+        else:
+            self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(body)))
         self.send_security_headers()
         self.end_headers()

@@ -9,7 +9,7 @@ from uuid import uuid4
 from financeiro.accounts import SUPPORTED_CURRENCIES, cents_to_money, empty_to_none, money_to_cents
 from financeiro.categories import get_or_create_category, get_or_create_subcategory, get_or_create_tag, normalize_name
 from financeiro.database import begin_immediate, get_connection, row_to_dict
-from financeiro.transactions import create_transaction_with_conn, normalize_optional_tags
+from financeiro.transactions import create_transaction_with_conn, normalize_optional_tags, split_cents
 
 CARD_TRANSACTION_TYPES = {"income", "expense"}
 CARD_SERIES_KINDS = {"single", "installment", "recurring"}
@@ -105,10 +105,20 @@ def list_credit_card_invoice(user_id: int, card_id: object, month: object) -> di
     }
 
 
-def list_credit_card_transactions(user_id: int) -> list[dict]:
+def list_credit_card_transactions(user_id: int, invoice_month: object | None = None) -> list[dict]:
+    normalized_invoice_month = normalize_month(invoice_month) if invoice_month else None
+    filters = [
+        "credit_card_transactions.user_id = ?",
+        "credit_card_transactions.archived_at IS NULL",
+    ]
+    params: list[object] = [user_id]
+    if normalized_invoice_month:
+        filters.append("credit_card_transactions.invoice_month = ?")
+        params.append(normalized_invoice_month)
+    where_clause = " AND ".join(filters)
     with get_connection() as conn:
         rows = conn.execute(
-            """
+            f"""
             SELECT
                 credit_card_transactions.*,
                 credit_cards.name AS credit_card_name,
@@ -132,12 +142,11 @@ def list_credit_card_transactions(user_id: int) -> list[dict]:
             LEFT JOIN tags
                 ON tags.id = credit_card_transaction_tags.tag_id
                 AND tags.user_id = credit_card_transactions.user_id
-            WHERE credit_card_transactions.user_id = ?
-                AND credit_card_transactions.archived_at IS NULL
+            WHERE {where_clause}
             GROUP BY credit_card_transactions.id
             ORDER BY credit_card_transactions.date DESC, credit_card_transactions.id DESC
             """,
-            (user_id,),
+            params,
         ).fetchall()
     return [
         format_card_transaction(row_to_dict(row), row["card_currency"])
@@ -238,7 +247,7 @@ def create_credit_card_transaction_with_conn(conn: sqlite3.Connection, user_id: 
                 card["id"],
                 transaction["type"],
                 occurrence["description"],
-                transaction["amount_cents"],
+                occurrence["amount_cents"],
                 occurrence["date"],
                 occurrence["invoice_month"],
                 series_id,
@@ -781,6 +790,7 @@ def build_card_transaction_occurrences(transaction: dict) -> list[dict]:
                 "date": add_recurrence(start_date, transaction["recurrence_frequency"], index).isoformat(),
                 "invoice_month": add_recurrence(date.fromisoformat(f"{transaction['invoice_month']}-01"), transaction["recurrence_frequency"], index).strftime("%Y-%m"),
                 "description": transaction["description"],
+                "amount_cents": transaction["amount_cents"],
                 "installment_index": None,
                 "installment_count": count,
             }
@@ -791,15 +801,18 @@ def build_card_transaction_occurrences(transaction: dict) -> list[dict]:
             "date": transaction["date"],
             "invoice_month": transaction["invoice_month"],
             "description": transaction["description"],
+            "amount_cents": transaction["amount_cents"],
             "installment_index": None,
             "installment_count": None,
         }]
     count = transaction["installment_count"] or 2
+    amounts = split_cents(transaction["amount_cents"], count)
     return [
         {
             "date": add_months(start_date, index).isoformat(),
             "invoice_month": shift_month(transaction["invoice_month"], index),
             "description": transaction["description"],
+            "amount_cents": amounts[index],
             "installment_index": index + 1,
             "installment_count": count,
         }

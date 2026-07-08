@@ -19,10 +19,36 @@ class SpendingLimitError(Exception):
 
 def list_spending_limits(user_id: int, month: object | None = None) -> list[dict]:
     normalized_month = normalize_month(month, required=False)
-    month_filter = "AND spending_limits.month = ?" if normalized_month else ""
-    params = [user_id]
     if normalized_month:
-        params.append(normalized_month)
+        where_clause = """
+            spending_limits.user_id = ?
+            AND spending_limits.month <= ?
+            AND NOT EXISTS (
+                SELECT 1
+                FROM spending_limits newer_limits
+                WHERE newer_limits.user_id = spending_limits.user_id
+                    AND newer_limits.category_id = spending_limits.category_id
+                    AND (
+                        newer_limits.subcategory_id = spending_limits.subcategory_id
+                        OR (
+                            newer_limits.subcategory_id IS NULL
+                            AND spending_limits.subcategory_id IS NULL
+                        )
+                    )
+                    AND newer_limits.month <= ?
+                    AND (
+                        newer_limits.month > spending_limits.month
+                        OR (
+                            newer_limits.month = spending_limits.month
+                            AND newer_limits.id > spending_limits.id
+                        )
+                    )
+            )
+        """
+        params = (user_id, normalized_month, normalized_month)
+    else:
+        where_clause = "spending_limits.user_id = ?"
+        params = (user_id,)
     with get_connection() as conn:
         rows = conn.execute(
             f"""
@@ -37,10 +63,10 @@ def list_spending_limits(user_id: int, month: object | None = None) -> list[dict
             LEFT JOIN subcategories
                 ON subcategories.id = spending_limits.subcategory_id
                 AND subcategories.user_id = spending_limits.user_id
-            WHERE spending_limits.user_id = ? {month_filter}
+            WHERE {where_clause}
             ORDER BY categories.name COLLATE NOCASE, subcategories.name COLLATE NOCASE
             """,
-            tuple(params),
+            params,
         ).fetchall()
     return [format_spending_limit(row_to_dict(row)) for row in rows]
 

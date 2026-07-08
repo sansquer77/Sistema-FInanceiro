@@ -152,7 +152,7 @@ export function registerLimitsView({
     const rows = spendingLimitRows();
     renderLimitSummary(rows);
     if (rows.length === 0) {
-      spendingLimitList.append(emptyState("Nenhum limite definido para este mês."));
+      spendingLimitList.append(emptyState("Nenhum limite vigente para este mês."));
       return;
     }
     rows.forEach((row) => {
@@ -228,15 +228,15 @@ export function registerLimitsView({
   }
 
   function exceededCurrentLimitRows() {
-    return spendingLimitRows(state.currentSpendingLimits)
+    return spendingLimitRows(state.currentSpendingLimits, currentMonthValue())
       .filter((row) => row.percent > 1)
       .sort((a, b) => Math.abs(b.remaining) - Math.abs(a.remaining));
   }
 
-  function spendingLimitRows(limits = state.spendingLimits) {
-    const spentIndex = buildSpendingLimitSpentIndex(limits);
+  function spendingLimitRows(limits = state.spendingLimits, targetMonth = state.limitMonth) {
+    const spentIndex = buildSpendingLimitSpentIndex(targetMonth);
     return limits.map((limit) => {
-      const spent = spendingLimitSpentFromIndex(spentIndex, limit);
+      const spent = spendingLimitSpentFromIndex(spentIndex, limit, targetMonth);
       const limitAmount = Number(limit.limit_amount);
       return {
         limitRecord: limit,
@@ -251,8 +251,7 @@ export function registerLimitsView({
     }).sort((a, b) => b.percent - a.percent || b.spent - a.spent);
   }
 
-  function buildSpendingLimitSpentIndex(limits = state.spendingLimits) {
-    const months = new Set(limits.map((limit) => limit.month).filter(Boolean));
+  function buildSpendingLimitSpentIndex(targetMonth = state.limitMonth) {
     const index = new Map();
     const addSpent = (month, categoryId, subcategoryId, amount) => {
       const categoryKey = spendingLimitSpentKey(month, categoryId, "");
@@ -264,14 +263,14 @@ export function registerLimitsView({
     };
     state.transactions.forEach((transaction) => {
       const month = transaction.date ? transaction.date.slice(0, 7) : "";
-      if (transaction.type !== "expense" || (months.size && !months.has(month))) {
+      if (transaction.type !== "expense" || month !== targetMonth) {
         return;
       }
       addSpent(month, transaction.category_id, transaction.subcategory_id, Number(transaction.amount_brl || transaction.amount));
     });
     state.cardTransactions.forEach((transaction) => {
       const month = transaction.invoice_month || (transaction.date ? transaction.date.slice(0, 7) : "");
-      if (transaction.type !== "expense" || (months.size && !months.has(month))) {
+      if (transaction.type !== "expense" || month !== targetMonth) {
         return;
       }
       addSpent(month, transaction.category_id, transaction.subcategory_id, Number(transaction.amount_brl || transaction.amount));
@@ -279,8 +278,8 @@ export function registerLimitsView({
     return index;
   }
 
-  function spendingLimitSpentFromIndex(index, limit) {
-    return index.get(spendingLimitSpentKey(limit.month, limit.category_id, limit.subcategory_id || "")) || 0;
+  function spendingLimitSpentFromIndex(index, limit, targetMonth = state.limitMonth) {
+    return index.get(spendingLimitSpentKey(targetMonth, limit.category_id, limit.subcategory_id || "")) || 0;
   }
 
   function spendingLimitSpentKey(month, categoryId, subcategoryId) {

@@ -211,11 +211,11 @@ def signed_impact_cents(simulation_type: str, amount_cents: int) -> int:
 
 def build_account_impact(conn, user_id: int, account: dict, payload: dict, virtual_items: list[dict]) -> dict:
     base_balance_cents = fetch_account_balance_until(conn, user_id, account["id"], payload["date"], reconciled_only=True)
-    current_month = payload["date"][:7]
-    current_month_impact_cents = sum(item["impact_cents"] for item in virtual_items if item["month"] == current_month)
-    projected_balance_cents = base_balance_cents + sum(item["impact_cents"] for item in virtual_items)
+    projected_base_cents = account_projected_balance_until(conn, user_id, account, month_end_date(payload["date"][:7]))
+    simulated_total_cents = sum(item["impact_cents"] for item in virtual_items)
+    projected_balance_cents = projected_base_cents + simulated_total_cents
     return {
-        "current_balance_cents": base_balance_cents + current_month_impact_cents,
+        "current_balance_cents": base_balance_cents,
         "projected_balance_cents": projected_balance_cents,
         "difference_cents": projected_balance_cents - base_balance_cents,
     }
@@ -374,36 +374,80 @@ def fetch_limit_real_spend(conn, user_id: int, account_id: int, month: str, cate
 
 def build_chart_series(conn, user_id: int, account: dict, payload: dict, virtual_items: list[dict]) -> list[dict]:
     months = build_forecast_months(payload, virtual_items)
-    base_date = (date.fromisoformat(f"{months[0]}-01") - timedelta(days=1)).isoformat()
-    last_month_end_date = month_end_date(months[-1])
-    transactions = fetch_account_transactions_until(conn, user_id, account["id"], last_month_end_date)
-    real_deltas_by_month = account_transaction_deltas_by_month(transactions, account["id"])
     simulated_deltas_by_month = simulation_deltas_by_month(virtual_items)
     series = []
-    running_real_balance_cents = fetch_account_balance_until(conn, user_id, account["id"], base_date, reconciled_only=False)
     running_simulated_delta_cents = 0
     for month in months:
-        real_total_cents = real_deltas_by_month.get(month, 0)
+        previous_real_balance_cents = account_projected_balance_until(
+            conn,
+            user_id,
+            account,
+            (date.fromisoformat(f"{month}-01") - timedelta(days=1)).isoformat(),
+        )
+        real_balance_cents = account_projected_balance_until(conn, user_id, account, month_end_date(month))
+        real_total_cents = real_balance_cents - previous_real_balance_cents
         simulated_total_cents = simulated_deltas_by_month.get(month, 0)
-        running_real_balance_cents += real_total_cents
         running_simulated_delta_cents += simulated_total_cents
         series.append({
             "month": month,
             "real_total_cents": real_total_cents,
             "simulated_total_cents": simulated_total_cents,
             "result_cents": real_total_cents + simulated_total_cents,
-            "real_balance_cents": running_real_balance_cents,
-            "projected_balance_cents": running_real_balance_cents + running_simulated_delta_cents,
+            "real_balance_cents": real_balance_cents,
+            "projected_balance_cents": real_balance_cents + running_simulated_delta_cents,
         })
     return series
 
 
-def account_transaction_deltas_by_month(transactions: list, account_id: int) -> dict[str, int]:
-    deltas: dict[str, int] = {}
-    for row in transactions:
-        month = str(row["date"])[:7]
-        deltas[month] = deltas.get(month, 0) + transaction_balance_delta(row, account_id)
-    return deltas
+def account_projected_balance_until(conn, user_id: int, account: dict, limit_date: str) -> int:
+    balance_cents = fetch_account_balance_until(conn, user_id, account["id"], limit_date, reconciled_only=False)
+    return balance_cents - preferred_card_forecast_for_account(conn, user_id, account, limit_date)
+
+
+def preferred_card_forecast_for_account(conn, user_id: int, account: dict, limit_date: str) -> int:
+    rows = conn.execute(
+        """
+        SELECT
+            credit_cards.id AS card_id,
+            credit_cards.due_day,
+            credit_card_transactions.invoice_month,
+            credit_card_transactions.type,
+            credit_card_transactions.amount_cents
+        FROM credit_cards
+        JOIN credit_card_transactions
+            ON credit_card_transactions.credit_card_id = credit_cards.id
+            AND credit_card_transactions.user_id = credit_cards.user_id
+        LEFT JOIN credit_card_payments
+            ON credit_card_payments.credit_card_id = credit_card_transactions.credit_card_id
+            AND credit_card_payments.invoice_month = credit_card_transactions.invoice_month
+            AND credit_card_payments.user_id = credit_card_transactions.user_id
+        WHERE credit_cards.user_id = ?
+            AND credit_cards.archived_at IS NULL
+            AND credit_cards.preferred_payment_account_id = ?
+            AND credit_cards.currency = ?
+            AND credit_card_transactions.archived_at IS NULL
+            AND credit_card_transactions.reconciled_at IS NOT NULL
+            AND credit_card_payments.id IS NULL
+        """,
+        (user_id, account["id"], account["currency"]),
+    ).fetchall()
+    invoice_totals: dict[tuple[int, str], int] = {}
+    for row in rows:
+        due_date = card_invoice_due_date(row["invoice_month"], row["due_day"])
+        if due_date > limit_date:
+            continue
+        key = (int(row["card_id"]), str(row["invoice_month"]))
+        amount_cents = int(row["amount_cents"] or 0)
+        delta_cents = amount_cents if row["type"] == "expense" else -amount_cents
+        invoice_totals[key] = invoice_totals.get(key, 0) + delta_cents
+    return sum(max(total, 0) for total in invoice_totals.values())
+
+
+def card_invoice_due_date(invoice_month: str, due_day: int) -> str:
+    year, month = map(int, str(invoice_month).split("-"))
+    last_day = (date(year, month, 1) + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+    day = min(max(int(due_day or 1), 1), last_day.day)
+    return date(year, month, day).isoformat()
 
 
 def simulation_deltas_by_month(virtual_items: list[dict]) -> dict[str, int]:
@@ -416,14 +460,9 @@ def simulation_deltas_by_month(virtual_items: list[dict]) -> dict[str, int]:
 
 def build_forecast_months(payload: dict, virtual_items: list[dict]) -> list[str]:
     start_month = payload["date"][:7]
-    last_virtual_month = max((item["month"] for item in virtual_items), default=start_month)
-    start = date.fromisoformat(f"{start_month}-01")
-    last_virtual = date.fromisoformat(f"{last_virtual_month}-01")
-    months_until_last_virtual = (last_virtual.year - start.year) * 12 + (last_virtual.month - start.month) + 1
-    horizon_months = max(6, months_until_last_virtual)
     current = date.fromisoformat(f"{start_month}-01")
     generated = []
-    for offset in range(horizon_months):
+    for offset in range(5):
         month_date = add_months(current, offset)
         generated.append(month_date.strftime("%Y-%m"))
     return generated
