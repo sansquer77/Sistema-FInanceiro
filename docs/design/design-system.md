@@ -2,8 +2,8 @@
 tipo: design
 area: meta
 status: implementado
-versao: 1.5
-atualizado: 2026-07-01
+versao: 1.6
+atualizado: 2026-07-08
 relacionados:
   - "[[arquitetura]]"
   - "[[specs/frontend-modularizacao]]"
@@ -14,7 +14,7 @@ aliases: ["Design System", "Tokens Visuais", "Precisão Institucional"]
 # Design System — Precisão Institucional
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-07-01 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]]
+> **implementado** · área: `meta` · atualizado em 2026-07-08 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]]
 
 ## Personalidade da marca
 
@@ -154,6 +154,13 @@ Grade de linha de base: **4px** (todos os valores são múltiplos de 4px).
 
 ## Componentes
 
+### Hierarquia de títulos
+
+- O cabeçalho global identifica o módulo ativo, como `Portfólio`, `Limites` ou `Relatórios`.
+- O primeiro painel não deve repetir o nome do módulo. Seu título deve descrever o conteúdo ou a ação, como `Resumo da carteira`, `Resumo mensal`, `Resumo do período` ou `Nova importação`.
+- Títulos de painel usam linguagem curta, específica e orientada à tarefa.
+- Esta regra se aplica também aos módulos agrupados no menu Gestão, evitando sequências visuais como `Portfólio` seguido imediatamente de `Portfólio`.
+
 ### Botões
 
 | Variante | Fundo | Texto |
@@ -227,6 +234,7 @@ Grade de linha de base: **4px** (todos os valores são múltiplos de 4px).
 - `1.3` — 2026-06-30 — Paleta de tokens do tema escuro documentada como override centralizado.
 - `1.4` — 2026-07-01 — Controle de alternância claro/escuro em Preferências documentado.
 - `1.5` — 2026-07-01 — Checklist de QA, release e rollback do tema documentados.
+- `1.6` — 2026-07-08 — Hierarquia de títulos definida para impedir repetição entre o cabeçalho do módulo e o primeiro painel.
 
 ## Relacionados
 
