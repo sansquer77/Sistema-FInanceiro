@@ -1187,6 +1187,39 @@ textarea:focus {
   color: var(--danger);
 }
 
+.planning-currency-group {
+  display: grid;
+  gap: 0;
+}
+
+.planning-currency-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--outline-variant);
+  color: var(--on-surface-variant);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.planning-currency-header strong {
+  color: var(--on-surface);
+  font-size: 14px;
+  letter-spacing: normal;
+  text-align: right;
+}
+
+.planning-section-income .planning-currency-header strong {
+  color: var(--positive);
+}
+
+.planning-section-expense .planning-currency-header strong {
+  color: var(--danger);
+}
+
 .planning-row {
   display: grid;
   grid-template-columns: 1fr auto;

@@ -1059,7 +1059,9 @@ def cockpit_payload(transactions: list[dict]) -> dict:
         label = cockpit_category_label(transaction)
         add_cockpit_group(category_rows[report_type], label, amount)
         if transaction.get("series_kind") == "recurring" or (report_type == "investment" and transaction.get("series_kind") != "single"):
-            add_cockpit_group(planning[report_type], label, amount)
+            currency = cockpit_transaction_currency(transaction)
+            original_amount = float(transaction.get("amount") or 0)
+            add_cockpit_group(planning[report_type], label, original_amount, currency)
     savings_rate = totals["investment"] / totals["income"] if totals["income"] > 0 else 0
     return {
         "month_totals": {**totals, "savings_rate": savings_rate},
@@ -1089,14 +1091,28 @@ def cockpit_category_label(transaction: dict) -> str:
     return f"{category} / {subcategory}" if subcategory else category
 
 
-def add_cockpit_group(groups: dict, label: str, amount: float) -> None:
-    row = groups.setdefault(label, {"label": label, "total": 0.0, "count": 0})
+def cockpit_transaction_currency(transaction: dict) -> str:
+    return str(
+        transaction.get("account_currency")
+        or transaction.get("card_currency")
+        or "BRL"
+    ).upper()
+
+
+def add_cockpit_group(groups: dict, label: str, amount: float, currency: str | None = None) -> None:
+    key = (currency, label) if currency else label
+    row = groups.setdefault(key, {"label": label, "total": 0.0, "count": 0})
+    if currency:
+        row["currency"] = currency
     row["total"] += amount
     row["count"] += 1
 
 
 def ranked_cockpit_rows(groups: dict, limit: int | None = None) -> list[dict]:
-    rows = sorted(groups.values(), key=lambda row: (-row["total"], row["label"]))
+    rows = sorted(
+        groups.values(),
+        key=lambda row: (row.get("currency", ""), -row["total"], row["label"]),
+    )
     if limit and len(rows) > limit:
         visible = rows[:limit]
         other_total = sum(row["total"] for row in rows[limit:])

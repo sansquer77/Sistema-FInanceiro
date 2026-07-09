@@ -2,8 +2,8 @@
 tipo: spec
 area: relatorios
 status: implementado
-versao: 1.1
-atualizado: 2026-06-30
+versao: 1.2
+atualizado: 2026-07-09
 relacionados:
   - "[[lancamentos]]"
   - "[[cartoes]]"
@@ -56,6 +56,7 @@ Qualquer usuário autenticado localmente que queira analisar seus gastos e recei
 - O relatório de tags considera lançamentos de contas e cartões com tag, mesmo quando não houver subcategoria.
 - **Lançamentos de cartão entram nos relatórios pela competência da fatura (`invoice_month`), não pela data da compra.** Ver [[cartoes]].
 - Relatórios exibem totais por moeda quando houver movimentações multimoeda.
+- O planejamento do Cockpit separa receitas recorrentes, investimentos planejados e despesas recorrentes por moeda, exibindo os valores originais sem somar moedas distintas.
 - Percentuais são calculados contra o total da seção.
 - Relatório **detalhado** mostra lançamentos individuais.
 - Relatório **sintético** mostra apenas agregados.
@@ -80,10 +81,12 @@ Valores aceitos para `periodo`: `3m`, `6m`, `12m`, `ytd` e `all`.
 - Dado o relatório de subcategorias, quando exibido, mostra total e percentual por categoria/subcategoria.
 - Dado o relatório de tags, quando exibido, agrega lançamentos por tag, incluindo lançamentos de cartão.
 - Dado movimentações em múltiplas moedas, quando exibidas, os totais são separados por moeda.
+- Dado um planejamento mensal com lançamentos em moedas distintas, quando o Cockpit é exibido, cada seção apresenta subtotal e itens por moeda, sem rotular valores estrangeiros como reais.
 - Dado uma categoria com histórico, quando o usuário abre a evolução, o sistema retorna a série mensal do período selecionado.
 
 ## Changelog
 
+- `1.2` — 2026-07-09 — Planejamento mensal do Cockpit separado por moeda.
 - `1.1` — 2026-06-30 — Documentação do endpoint de Cockpit e da evolução temporal por categoria/subcategoria.
 - `1.0` — 2026-06-29 — Frontmatter e critérios formalizados.
 
