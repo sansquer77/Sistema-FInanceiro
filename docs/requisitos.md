@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 1.4
-atualizado: 2026-07-05
+versao: 1.5
+atualizado: 2026-07-09
 relacionados:
   - "[[arquitetura]]"
   - "[[visao-produto]]"
@@ -14,7 +14,7 @@ tags: [produto, meta]
 # Requisitos
 
 > [!info] Status
-> **implementado** (escopo vivo) · área: `meta` · atualizado em 2026-07-05 · relacionados: [[arquitetura]], [[visao-produto]]
+> **implementado** (escopo vivo) · área: `meta` · atualizado em 2026-07-09 · relacionados: [[arquitetura]], [[visao-produto]]
 
 ## Objetivo
 
@@ -42,6 +42,7 @@ Manter um sistema financeiro local, privado e simples para controlar contas, sal
   - Leitura e importação de extratos do Organizze em formato `.csv` ou `.xls`.
   - Importação de lançamentos por meio de planilhas de modelo do sistema (`.xlsx`) para contas e cartões.
   - Ver [[importacao-organizze]].
+- **Histórico de Operações**: auditoria funcional somente leitura com filtros, busca, agrupamentos e rastreio de lotes por `operation_batch_id`. Ver [[historico-operacoes]].
 - **Interface web estática**: painéis locais em `web/`, sem dependências externas de frontend. Ver [[arquitetura]] e [[adr/0001-stack-local-sem-framework]].
 - **Distribuição desktop**: pacotes macOS e Windows com instaladores, modo local e launchers opcionais para rede local confiável. Ver [[distribuição]].
 
@@ -61,6 +62,7 @@ Manter um sistema financeiro local, privado e simples para controlar contas, sal
 - Transferências reduzem o saldo da conta de origem e aumentam o saldo da conta de destino.
 - Transferências exigem contas diferentes e com a mesma moeda. Câmbio entre contas de moedas diferentes é registrado como tipo próprio, com valor de destino e taxa de câmbio.
 - Cada lançamento exige descrição, data válida, valor maior que zero, conta/cartão e categoria quando o tipo exigir classificação. Tags são opcionais.
+- Operações financeiras e administrativas relevantes devem gerar registro no Histórico de Operações, sem armazenar senhas, tokens ou segredos.
 - Categorias, subcategorias e tags em uso por lançamentos não podem ser excluídas.
 - Importações podem criar categorias, subcategorias e tags inexistentes para o usuário autenticado.
 - Linhas importadas com situação diferente de `Pago` são ignoradas e reportadas.
@@ -103,6 +105,7 @@ Manter um sistema financeiro local, privado e simples para controlar contas, sal
 
 ## Changelog
 
+- `1.5` — 2026-07-09 — Histórico de Operações incluído no escopo implementado e nas regras funcionais.
 - `1.4` — 2026-07-05 — Regras de segurança atualizadas para configuração SMTP criptografada e isolada por usuário.
 - `1.3` — 2026-07-04 — Escopo atualizado com distribuição desktop, modo rede/LAN confiável e exigência de configuração explícita de hosts/origens.
 - `1.2` — 2026-07-03 — Requisitos não funcionais atualizados para explicitar WAL, espera por locks e transações curtas no SQLite.

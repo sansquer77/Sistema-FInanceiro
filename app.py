@@ -67,6 +67,7 @@ from financeiro.credit_cards import (
 )
 from financeiro.database import initialize_database
 from financeiro.imports import import_organizze_transactions, import_system_template, system_import_template
+from financeiro.operation_logs import create_operation_log, get_operation_log, list_operation_logs
 from financeiro.portfolio import close_position, create_opening_position, delete_opening_position, get_portfolio, redeem_position, update_opening_position, update_position_value_override
 from financeiro.secure_config import SecureConfigError, email_config_status, save_email_config
 from financeiro.simulations import simulate_butterfly_effect
@@ -255,6 +256,12 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/reports/category-evolution":
             self.handle_category_evolution()
+            return
+        if path == "/api/operation-logs":
+            self.handle_list_operation_logs()
+            return
+        if path.startswith("/api/operation-logs/"):
+            self.handle_operation_log_detail()
             return
         self.serve_static()
 
@@ -465,17 +472,20 @@ class AppHandler(BaseHTTPRequestHandler):
         user = self.require_user()
         data = self.read_json()
         updated = update_user_email(user["id"], data.get("email", ""), data.get("current_password", ""))
+        self.record_operation(user["id"], "user_admin", "update", "user", "Email do usuario alterado", updated["id"])
         self.send_json({"user": updated})
 
     def handle_update_password(self) -> None:
         user = self.require_user()
         data = self.read_json()
         update_user_password(user["id"], data.get("current_password", ""), data.get("new_password", ""))
+        self.record_operation(user["id"], "user_admin", "update", "user", "Senha do usuario alterada", user["id"])
         self.send_json({"ok": True})
 
     def handle_delete_user(self) -> None:
         user = self.require_user()
         data = self.read_json()
+        self.record_operation(user["id"], "user_admin", "delete", "user", "Usuario excluido", user["id"])
         delete_user_account(user["id"], data.get("current_password", ""))
         self.send_json({"ok": True}, headers={"Set-Cookie": self.expired_session_cookie()})
 
@@ -483,6 +493,7 @@ class AppHandler(BaseHTTPRequestHandler):
         user = self.require_user()
         data = self.read_json()
         clear_user_launches(user["id"], data.get("current_password", ""))
+        self.record_operation(user["id"], "user_admin", "clear", "user", "Lancamentos do usuario limpos", user["id"])
         self.send_json({"ok": True})
 
     def handle_email_config_status(self) -> None:
@@ -589,6 +600,17 @@ class AppHandler(BaseHTTPRequestHandler):
         month = (query.get("month") or [None])[0]
         self.send_json({"limits": list_spending_limits(user["id"], month)})
 
+    def handle_list_operation_logs(self) -> None:
+        user = self.require_user()
+        query = parse_qs(urlsplit(self.path).query)
+        filters = {key: values[0] for key, values in query.items() if values}
+        self.send_json(list_operation_logs(user["id"], filters))
+
+    def handle_operation_log_detail(self) -> None:
+        user = self.require_user()
+        log_id = self.route_path().rsplit("/", 1)[-1]
+        self.send_json({"log": get_operation_log(user["id"], log_id)})
+
     def handle_simulate_butterfly_effect(self) -> None:
         user = self.require_user()
         data = self.read_json()
@@ -603,50 +625,97 @@ class AppHandler(BaseHTTPRequestHandler):
     def handle_create_portfolio_position(self) -> None:
         user = self.require_user()
         data = self.read_json()
-        self.send_json(create_opening_position(user["id"], data), status=HTTPStatus.CREATED)
+        result = create_opening_position(user["id"], data)
+        position = result.get("opening_position") or result.get("position") or {}
+        self.record_operation(
+            user["id"], "portfolio", "create", "portfolio_position",
+            "Posicao de portfolio cadastrada", position.get("id"),
+            account_id=position.get("account_id") or data.get("account_id"),
+            metadata={"asset_name": data.get("asset_name"), "asset_identifier": data.get("asset_identifier")},
+        )
+        self.send_json(result, status=HTTPStatus.CREATED)
 
     def handle_update_portfolio_position(self) -> None:
         user = self.require_user()
         position_id = self.route_path().rsplit("/", 1)[-1]
         data = self.read_json()
-        self.send_json(update_opening_position(user["id"], position_id, data))
+        result = update_opening_position(user["id"], position_id, data)
+        self.record_operation(
+            user["id"], "portfolio", "update", "portfolio_position",
+            "Posicao de portfolio atualizada", position_id,
+            account_id=data.get("account_id"),
+            metadata={"asset_name": data.get("asset_name"), "asset_identifier": data.get("asset_identifier")},
+        )
+        self.send_json(result)
 
     def handle_delete_portfolio_position(self) -> None:
         user = self.require_user()
         position_id = self.route_path().rsplit("/", 1)[-1]
-        self.send_json(delete_opening_position(user["id"], position_id))
+        result = delete_opening_position(user["id"], position_id)
+        self.record_operation(user["id"], "portfolio", "delete", "portfolio_position", "Posicao de portfolio excluida", position_id)
+        self.send_json(result)
 
     def handle_redeem_portfolio_position(self) -> None:
         user = self.require_user()
         data = self.read_json()
-        self.send_json(redeem_position(user["id"], data), status=HTTPStatus.CREATED)
+        result = redeem_position(user["id"], data)
+        self.record_operation(
+            user["id"], "portfolio", "redeem", "portfolio_redemption",
+            "Resgate de portfolio registrado", None,
+            account_id=data.get("account_id"),
+            metadata={"source_type": data.get("source_type"), "source_id": data.get("source_id")},
+        )
+        self.send_json(result, status=HTTPStatus.CREATED)
 
     def handle_close_portfolio_position(self) -> None:
         user = self.require_user()
         data = self.read_json()
-        self.send_json(close_position(user["id"], data), status=HTTPStatus.CREATED)
+        result = close_position(user["id"], data)
+        self.record_operation(
+            user["id"], "portfolio", "close", "portfolio_position",
+            "Posicao de portfolio encerrada", None,
+            account_id=data.get("account_id"),
+            metadata={"asset_type": data.get("asset_type"), "closed_at": data.get("closed_at")},
+        )
+        self.send_json(result, status=HTTPStatus.CREATED)
 
     def handle_update_portfolio_value(self) -> None:
         user = self.require_user()
         data = self.read_json()
-        self.send_json(update_position_value_override(user["id"], data))
+        result = update_position_value_override(user["id"], data)
+        self.record_operation(
+            user["id"], "portfolio", "value_update", "portfolio_position",
+            "Valor de portfolio atualizado", None,
+            account_id=data.get("account_id"),
+            metadata={"asset_type": data.get("asset_type"), "quote_date": data.get("quote_date")},
+        )
+        self.send_json(result)
 
     def handle_create_account(self) -> None:
         user = self.require_user()
         data = self.read_json()
         account = create_checking_account(user["id"], data)
+        self.record_operation(user["id"], "accounts", "create", "account", f"Conta criada: {account['name']}", account["id"], account_id=account["id"], metadata={"currency": account.get("currency")})
         self.send_json({"account": account}, status=HTTPStatus.CREATED)
 
     def handle_create_credit_card(self) -> None:
         user = self.require_user()
         data = self.read_json()
         card = create_credit_card(user["id"], data)
+        self.record_operation(user["id"], "cards", "create", "credit_card", f"Cartao criado: {card['name']}", card["id"], credit_card_id=card["id"], metadata={"currency": card.get("currency")})
         self.send_json({"card": card}, status=HTTPStatus.CREATED)
 
     def handle_create_credit_card_transaction(self) -> None:
         user = self.require_user()
         data = self.read_json()
         transaction = create_credit_card_transaction(user["id"], data)
+        self.record_operation(
+            user["id"], "cards", "create", "credit_card_transaction",
+            f"Lancamento de cartao criado: {transaction['description']}", transaction["id"],
+            credit_card_id=transaction.get("credit_card_id"),
+            operation_batch_id=transaction.get("series_id"),
+            metadata={"amount": transaction.get("amount"), "invoice_month": transaction.get("invoice_month"), "series_kind": transaction.get("series_kind")},
+        )
         self.send_json({"transaction": transaction}, status=HTTPStatus.CREATED)
 
     def handle_update_credit_card_transaction(self) -> None:
@@ -654,6 +723,13 @@ class AppHandler(BaseHTTPRequestHandler):
         transaction_id = self.path.split("?", 1)[0].split("/")[-1]
         data = self.read_json()
         transaction = update_credit_card_transaction(user["id"], transaction_id, data)
+        self.record_operation(
+            user["id"], "cards", "update", "credit_card_transaction",
+            f"Lancamento de cartao atualizado: {transaction['description']}", transaction["id"],
+            credit_card_id=transaction.get("credit_card_id"),
+            operation_batch_id=transaction.get("series_id") if data.get("scope") == "future" else None,
+            metadata={"amount": transaction.get("amount"), "invoice_month": transaction.get("invoice_month")},
+        )
         self.send_json({"transaction": transaction})
 
     def handle_move_credit_card_transaction_invoice(self) -> None:
@@ -662,18 +738,39 @@ class AppHandler(BaseHTTPRequestHandler):
         transaction_id = path_parts[-2]
         data = self.read_json()
         transaction = move_credit_card_transaction_invoice(user["id"], transaction_id, data.get("direction"))
+        self.record_operation(
+            user["id"], "cards", "move", "credit_card_transaction",
+            f"Lancamento movido para fatura {transaction['invoice_month']}", transaction["id"],
+            credit_card_id=transaction.get("credit_card_id"),
+            metadata={"direction": data.get("direction"), "invoice_month": transaction.get("invoice_month")},
+        )
         self.send_json({"transaction": transaction})
 
     def handle_pay_credit_card_invoice(self) -> None:
         user = self.require_user()
         data = self.read_json()
         result = pay_credit_card_invoice(user["id"], data)
+        payment = result.get("payment") or {}
+        self.record_operation(
+            user["id"], "cards", "pay", "credit_card_payment",
+            f"Fatura paga: {data.get('invoice_month', '')}", payment.get("id"),
+            account_id=data.get("account_id"),
+            credit_card_id=data.get("credit_card_id"),
+            metadata={"invoice_month": data.get("invoice_month"), "transaction_id": payment.get("transaction_id")},
+        )
         self.send_json(result, status=HTTPStatus.CREATED)
 
     def handle_create_transaction(self) -> None:
         user = self.require_user()
         data = self.read_json()
         transaction = create_transaction(user["id"], data)
+        self.record_operation(
+            user["id"], "transactions", "create", "transaction",
+            f"Lancamento criado: {transaction['description']}", transaction["id"],
+            account_id=transaction.get("account_id"),
+            operation_batch_id=transaction.get("series_id"),
+            metadata={"amount": transaction.get("amount"), "type": transaction.get("type"), "date": transaction.get("date"), "series_kind": transaction.get("series_kind")},
+        )
         self.send_json({"transaction": transaction}, status=HTTPStatus.CREATED)
 
     def handle_update_transaction(self) -> None:
@@ -681,6 +778,13 @@ class AppHandler(BaseHTTPRequestHandler):
         transaction_id = self.path.split("?", 1)[0].split("/")[-1]
         data = self.read_json()
         transaction = update_transaction(user["id"], transaction_id, data)
+        self.record_operation(
+            user["id"], "transactions", "update", "transaction",
+            f"Lancamento atualizado: {transaction['description']}", transaction["id"],
+            account_id=transaction.get("account_id"),
+            operation_batch_id=transaction.get("series_id") if data.get("scope") == "future" else None,
+            metadata={"amount": transaction.get("amount"), "type": transaction.get("type"), "date": transaction.get("date")},
+        )
         self.send_json({"transaction": transaction})
 
     def handle_reconcile_transaction(self) -> None:
@@ -688,6 +792,12 @@ class AppHandler(BaseHTTPRequestHandler):
         transaction_id = self.path.split("?", 1)[0].split("/")[-2]
         data = self.read_json()
         transaction = set_transaction_reconciled(user["id"], transaction_id, bool(data.get("reconciled")))
+        operation_type = "reconcile" if data.get("reconciled") else "unreconcile"
+        self.record_operation(
+            user["id"], "transactions", operation_type, "transaction",
+            f"Lancamento {'conciliado' if data.get('reconciled') else 'desconciliado'}: {transaction['description']}",
+            transaction["id"], account_id=transaction.get("account_id"),
+        )
         self.send_json({"transaction": transaction})
 
     def handle_reconcile_credit_card_transaction(self) -> None:
@@ -695,30 +805,45 @@ class AppHandler(BaseHTTPRequestHandler):
         transaction_id = self.path.split("?", 1)[0].split("/")[-2]
         data = self.read_json()
         transaction = set_credit_card_transaction_reconciled(user["id"], transaction_id, bool(data.get("reconciled")))
+        operation_type = "reconcile" if data.get("reconciled") else "unreconcile"
+        self.record_operation(
+            user["id"], "cards", operation_type, "credit_card_transaction",
+            f"Lancamento de cartao {'conciliado' if data.get('reconciled') else 'desconciliado'}: {transaction['description']}",
+            transaction["id"], credit_card_id=transaction.get("credit_card_id"),
+            metadata={"invoice_month": transaction.get("invoice_month")},
+        )
         self.send_json({"transaction": transaction})
 
     def handle_create_category(self) -> None:
         user = self.require_user()
         data = self.read_json()
         category = create_category(user["id"], data.get("name", ""), data.get("group_type", "expense"))
+        self.record_operation(user["id"], "classifications", "create", "category", f"Categoria criada: {category['name']}", category["id"], metadata={"group_type": category.get("group_type")})
         self.send_json({"category": category}, status=HTTPStatus.CREATED)
 
     def handle_create_subcategory(self) -> None:
         user = self.require_user()
         data = self.read_json()
         subcategory = create_subcategory(user["id"], data.get("category_id", ""), data.get("name", ""))
+        self.record_operation(user["id"], "classifications", "create", "subcategory", f"Subcategoria criada: {subcategory['name']}", subcategory["id"], metadata={"category_id": subcategory.get("category_id")})
         self.send_json({"subcategory": subcategory}, status=HTTPStatus.CREATED)
 
     def handle_create_tag(self) -> None:
         user = self.require_user()
         data = self.read_json()
         tag = create_tag(user["id"], data.get("name", ""))
+        self.record_operation(user["id"], "classifications", "create", "tag", f"Tag criada: {tag['name']}", tag["id"])
         self.send_json({"tag": tag}, status=HTTPStatus.CREATED)
 
     def handle_create_spending_limit(self) -> None:
         user = self.require_user()
         data = self.read_json()
         spending_limit = create_spending_limit(user["id"], data)
+        self.record_operation(
+            user["id"], "limits", "create", "spending_limit",
+            "Limite de gastos criado", spending_limit["id"],
+            metadata={"month": spending_limit.get("month"), "category_id": spending_limit.get("category_id"), "subcategory_id": spending_limit.get("subcategory_id")},
+        )
         self.send_json({"limit": spending_limit}, status=HTTPStatus.CREATED)
 
     def handle_update_account(self) -> None:
@@ -726,6 +851,7 @@ class AppHandler(BaseHTTPRequestHandler):
         account_id = self.path.rsplit("/", 1)[-1]
         data = self.read_json()
         account = update_checking_account(user["id"], account_id, data)
+        self.record_operation(user["id"], "accounts", "update", "account", f"Conta atualizada: {account['name']}", account["id"], account_id=account["id"], metadata={"currency": account.get("currency")})
         self.send_json({"account": account})
 
     def handle_update_credit_card(self) -> None:
@@ -733,6 +859,7 @@ class AppHandler(BaseHTTPRequestHandler):
         card_id = self.path.rsplit("/", 1)[-1]
         data = self.read_json()
         card = update_credit_card(user["id"], card_id, data)
+        self.record_operation(user["id"], "cards", "update", "credit_card", f"Cartao atualizado: {card['name']}", card["id"], credit_card_id=card["id"], metadata={"currency": card.get("currency")})
         self.send_json({"card": card})
 
     def handle_update_category(self) -> None:
@@ -740,6 +867,7 @@ class AppHandler(BaseHTTPRequestHandler):
         category_id = self.path.rsplit("/", 1)[-1]
         data = self.read_json()
         category = update_category(user["id"], category_id, data.get("name", ""))
+        self.record_operation(user["id"], "classifications", "update", "category", f"Categoria atualizada: {category['name']}", category["id"], metadata={"group_type": category.get("group_type")})
         self.send_json({"category": category})
 
     def handle_update_subcategory(self) -> None:
@@ -747,6 +875,7 @@ class AppHandler(BaseHTTPRequestHandler):
         subcategory_id = self.path.rsplit("/", 1)[-1]
         data = self.read_json()
         subcategory = update_subcategory(user["id"], subcategory_id, data.get("name", ""))
+        self.record_operation(user["id"], "classifications", "update", "subcategory", f"Subcategoria atualizada: {subcategory['name']}", subcategory["id"])
         self.send_json({"subcategory": subcategory})
 
     def handle_update_tag(self) -> None:
@@ -754,6 +883,7 @@ class AppHandler(BaseHTTPRequestHandler):
         tag_id = self.path.rsplit("/", 1)[-1]
         data = self.read_json()
         tag = update_tag(user["id"], tag_id, data.get("name", ""))
+        self.record_operation(user["id"], "classifications", "update", "tag", f"Tag atualizada: {tag['name']}", tag["id"])
         self.send_json({"tag": tag})
 
     def handle_update_spending_limit(self) -> None:
@@ -761,42 +891,53 @@ class AppHandler(BaseHTTPRequestHandler):
         limit_id = self.path.rsplit("/", 1)[-1]
         data = self.read_json()
         spending_limit = update_spending_limit(user["id"], limit_id, data)
+        self.record_operation(
+            user["id"], "limits", "update", "spending_limit",
+            "Limite de gastos atualizado", spending_limit["id"],
+            metadata={"month": spending_limit.get("month"), "category_id": spending_limit.get("category_id"), "subcategory_id": spending_limit.get("subcategory_id")},
+        )
         self.send_json({"limit": spending_limit})
 
     def handle_archive_account(self) -> None:
         user = self.require_user()
         account_id = self.path.rsplit("/", 1)[-1]
         archive_checking_account(user["id"], account_id)
+        self.record_operation(user["id"], "accounts", "archive", "account", "Conta arquivada", account_id, account_id=account_id)
         self.send_json({"ok": True})
 
     def handle_archive_credit_card(self) -> None:
         user = self.require_user()
         card_id = self.path.rsplit("/", 1)[-1]
         archive_credit_card(user["id"], card_id)
+        self.record_operation(user["id"], "cards", "archive", "credit_card", "Cartao arquivado", card_id, credit_card_id=card_id)
         self.send_json({"ok": True})
 
     def handle_restore_account(self) -> None:
         user = self.require_user()
         account_id = self.path.split("?", 1)[0].split("/")[-2]
         account = restore_checking_account(user["id"], account_id)
+        self.record_operation(user["id"], "accounts", "restore", "account", f"Conta restaurada: {account['name']}", account["id"], account_id=account["id"])
         self.send_json({"account": account})
 
     def handle_restore_credit_card(self) -> None:
         user = self.require_user()
         card_id = self.path.split("?", 1)[0].split("/")[-2]
         card = restore_credit_card(user["id"], card_id)
+        self.record_operation(user["id"], "cards", "restore", "credit_card", f"Cartao restaurado: {card['name']}", card["id"], credit_card_id=card["id"])
         self.send_json({"card": card})
 
     def handle_delete_transaction(self) -> None:
         user = self.require_user()
         transaction_id = self.route_path().rsplit("/", 1)[-1]
         delete_transaction(user["id"], transaction_id, apply_to_future=self.delete_scope_is_future())
+        self.record_operation(user["id"], "transactions", "delete", "transaction", "Lancamento excluido", transaction_id)
         self.send_json({"ok": True})
 
     def handle_delete_credit_card_transaction(self) -> None:
         user = self.require_user()
         transaction_id = self.route_path().rsplit("/", 1)[-1]
         delete_credit_card_transaction(user["id"], transaction_id, apply_to_future=self.delete_scope_is_future())
+        self.record_operation(user["id"], "cards", "delete", "credit_card_transaction", "Lancamento de cartao excluido", transaction_id)
         self.send_json({"ok": True})
 
     def delete_scope_is_future(self) -> bool:
@@ -807,24 +948,28 @@ class AppHandler(BaseHTTPRequestHandler):
         user = self.require_user()
         category_id = self.path.rsplit("/", 1)[-1]
         delete_category(user["id"], category_id)
+        self.record_operation(user["id"], "classifications", "delete", "category", "Categoria excluida", category_id)
         self.send_json({"ok": True})
 
     def handle_delete_subcategory(self) -> None:
         user = self.require_user()
         subcategory_id = self.path.rsplit("/", 1)[-1]
         delete_subcategory(user["id"], subcategory_id)
+        self.record_operation(user["id"], "classifications", "delete", "subcategory", "Subcategoria excluida", subcategory_id)
         self.send_json({"ok": True})
 
     def handle_delete_tag(self) -> None:
         user = self.require_user()
         tag_id = self.path.rsplit("/", 1)[-1]
         delete_tag(user["id"], tag_id)
+        self.record_operation(user["id"], "classifications", "delete", "tag", "Tag excluida", tag_id)
         self.send_json({"ok": True})
 
     def handle_delete_spending_limit(self) -> None:
         user = self.require_user()
         limit_id = self.path.rsplit("/", 1)[-1]
         delete_spending_limit(user["id"], limit_id)
+        self.record_operation(user["id"], "limits", "delete", "spending_limit", "Limite de gastos excluido", limit_id)
         self.send_json({"ok": True})
 
     def handle_import_organizze_transactions(self) -> None:
@@ -838,6 +983,13 @@ class AppHandler(BaseHTTPRequestHandler):
             form["fields"].get("account_id", ""),
             uploaded["content"],
             uploaded["filename"],
+        )
+        self.record_operation(
+            user["id"], "imports", "import", "transaction",
+            f"Importacao Organizze: {result.get('imported', 0)} lancamentos importados", None,
+            account_id=form["fields"].get("account_id", ""),
+            operation_batch_id=result.get("operation_batch_id"),
+            metadata={"filename": uploaded["filename"], "imported": result.get("imported"), "skipped": result.get("skipped")},
         )
         self.send_json(result, status=HTTPStatus.CREATED)
 
@@ -853,6 +1005,16 @@ class AppHandler(BaseHTTPRequestHandler):
             form["fields"].get("target_id") or form["fields"].get("account_id") or form["fields"].get("credit_card_id") or "",
             uploaded["content"],
             uploaded["filename"],
+        )
+        target = form["fields"].get("target", "account")
+        target_id = form["fields"].get("target_id") or form["fields"].get("account_id") or form["fields"].get("credit_card_id") or ""
+        self.record_operation(
+            user["id"], "imports", "import", "transaction",
+            f"Importacao de modelo: {result.get('imported', 0)} lancamentos importados", None,
+            account_id=target_id if target == "account" else None,
+            credit_card_id=target_id if target == "card" else None,
+            operation_batch_id=result.get("operation_batch_id"),
+            metadata={"filename": uploaded["filename"], "target": target, "imported": result.get("imported"), "skipped": result.get("skipped")},
         )
         self.send_json(result, status=HTTPStatus.CREATED)
 
@@ -870,6 +1032,33 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_security_headers()
         self.end_headers()
         self.wfile.write(body)
+
+    def record_operation(
+        self,
+        user_id: int,
+        module: str,
+        operation_type: str,
+        entity_type: str,
+        description: str,
+        entity_id: object | None = None,
+        *,
+        account_id: object | None = None,
+        credit_card_id: object | None = None,
+        operation_batch_id: object | None = None,
+        metadata: dict | None = None,
+    ) -> None:
+        create_operation_log(
+            user_id,
+            module=module,
+            operation_type=operation_type,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            account_id=account_id,
+            credit_card_id=credit_card_id,
+            operation_batch_id=operation_batch_id,
+            description=description,
+            metadata=metadata or {},
+        )
 
     def serve_static(self) -> None:
         path = self.path.split("?", 1)[0]

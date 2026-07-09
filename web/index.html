@@ -158,6 +158,10 @@
                 <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4"></path><path d="m8 8 4-4 4 4"></path><path d="M20 16.5A3.5 3.5 0 0 0 16.5 13H16a5 5 0 0 0-9.6-1.8A4 4 0 0 0 8 19h10a3 3 0 0 0 2-5.2"></path></svg>
                 <span class="nav-label">Importação</span>
               </button>
+              <button class="nav-button" type="button" data-view="operationHistory" data-short="HO" title="Histórico de Operações">
+                <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 4v5h5"></path><path d="M12 7v5l3 2"></path></svg>
+                <span class="nav-label">Histórico</span>
+              </button>
             </div>
             <div class="nav-group">
               <span>Usuário</span>
@@ -1235,6 +1239,79 @@
           </div>
         </section>
 
+        <section class="module-view" id="operationHistoryView" hidden>
+          <section class="panel">
+            <div class="section-heading">
+              <h2>Auditoria</h2>
+            </div>
+            <form id="operationHistoryForm" class="form operation-history-filters">
+              <label>De
+                <input id="operationHistoryDateFrom" name="date_from" type="date">
+              </label>
+              <label>Ate
+                <input id="operationHistoryDateTo" name="date_to" type="date">
+              </label>
+              <label>Modulo
+                <select id="operationHistoryModule" name="module">
+                  <option value="">Todos</option>
+                  <option value="accounts">Contas</option>
+                  <option value="transactions">Lancamentos</option>
+                  <option value="cards">Cartoes</option>
+                  <option value="portfolio">Portfolio</option>
+                  <option value="imports">Importacao</option>
+                  <option value="classifications">Categorias</option>
+                  <option value="limits">Limites</option>
+                  <option value="user_admin">Usuario</option>
+                </select>
+              </label>
+              <label>Tipo
+                <select id="operationHistoryType" name="operation_type">
+                  <option value="">Todos</option>
+                  <option value="create">Criacao</option>
+                  <option value="update">Atualizacao</option>
+                  <option value="delete">Exclusao</option>
+                  <option value="archive">Arquivamento</option>
+                  <option value="restore">Restauracao</option>
+                  <option value="reconcile">Conciliacao</option>
+                  <option value="unreconcile">Desconciliacao</option>
+                  <option value="move">Movimento</option>
+                  <option value="pay">Pagamento</option>
+                  <option value="import">Importacao</option>
+                  <option value="redeem">Resgate</option>
+                  <option value="close">Encerramento</option>
+                  <option value="value_update">Atualizacao de valor</option>
+                  <option value="clear">Limpeza</option>
+                </select>
+              </label>
+              <label>Conta
+                <select id="operationHistoryAccount" name="account_id"></select>
+              </label>
+              <label>Cartao
+                <select id="operationHistoryCard" name="credit_card_id"></select>
+              </label>
+              <label>Agrupar por
+                <select id="operationHistoryGroupBy" name="group_by">
+                  <option value="date">Data</option>
+                  <option value="module">Modulo</option>
+                  <option value="type">Tipo</option>
+                  <option value="account">Conta</option>
+                  <option value="card">Cartao</option>
+                </select>
+              </label>
+              <label>Busca
+                <input name="q" type="search" placeholder="Descricao, lote, entidade">
+              </label>
+              <button class="primary" type="submit">Filtrar</button>
+            </form>
+            <p class="message" id="operationHistoryMessage" role="alert"></p>
+          </section>
+
+          <section class="panel operation-history-panel">
+            <div id="operationHistoryList" class="operation-history-list"></div>
+            <button class="ghost" id="operationHistoryLoadMoreButton" type="button" hidden>Carregar mais</button>
+          </section>
+        </section>
+
         <section class="module-view" id="userView" hidden>
           <div class="user-settings-grid">
             <section class="panel appearance-panel">
@@ -1430,6 +1507,6 @@
         </div>
       </aside>
     </main>
-    <script type="module" src="/app.js?v=113"></script>
+    <script type="module" src="/app.js?v=114"></script>
   </body>
 </html>

@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 1.5
-atualizado: 2026-07-05
+versao: 1.6
+atualizado: 2026-07-09
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -16,7 +16,7 @@ tags: [arquitetura, meta]
 # Arquitetura
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-07-05 · relacionados: [[requisitos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
+> **implementado** · área: `meta` · atualizado em 2026-07-09 · relacionados: [[requisitos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
 
 ## Visão geral
 
@@ -70,6 +70,7 @@ docs/               Requisitos, arquitetura, specs e referências
 | `cards-view.js` | Cartões: cadastro, faturas, pagamento, conciliação. |
 | `portfolio-view.js` | Ativos: posições, histórico, resgate, encerramento. |
 | `transactions-view.js` | Lançamentos: formulário, recorrência, parcelas, câmbio. |
+| `operation-history-view.js` | Histórico de Operações: filtros, busca, agrupamentos e paginação. |
 
 > [!tip] Regra de fronteira
 > A interface orquestra formulários, listas e navegação. **Regras financeiras, validações de propriedade e cálculo de saldo ficam no núcleo Python.** Ver [[adr/0002-modularizacao-frontend]].
@@ -195,6 +196,13 @@ O modo local mantém `APP_HOST=127.0.0.1`. O modo rede/LAN dos pacotes usa `APP_
 | `GET` | `/api/cockpit?month=AAAA-MM` |
 | `GET` | `/api/reports/category-evolution?category_id={id}&subcategory_id={id}&period={periodo}` |
 
+#### Rotas — Histórico de Operações → [[historico-operacoes]]
+
+| Método | Rota |
+|---|---|
+| `GET` | `/api/operation-logs` |
+| `GET` | `/api/operation-logs/{id}` |
+
 #### Rotas — Importação → [[importacao-organizze]]
 
 | Método | Rota |
@@ -218,6 +226,7 @@ O modo local mantém `APP_HOST=127.0.0.1`. O modo rede/LAN dos pacotes usa `APP_
 | `spending_limits.py` | Metas e orçamentos mensais. Ver [[limites-gastos]]. |
 | `portfolio.py` | Consolidação de investimentos, precificação e impostos. Ver [[investimentos-portfolio]]. |
 | `imports.py` | Leitura de exportações Organizze e planilhas modelo. Ver [[importacao-organizze]]. |
+| `operation_logs.py` | Auditoria funcional das operações do usuário. Ver [[historico-operacoes]]. |
 | `emailer.py` | Envio SMTP do código de recuperação de senha. Ver [[recuperacao-senha]]. |
 | `secure_config.py` | Armazenamento criptografado da configuração SMTP local. Ver [[recuperacao-senha]]. |
 
@@ -389,6 +398,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `1.6` — 2026-07-09 — Histórico de Operações documentado na arquitetura com view, módulo Python e rotas de auditoria.
 - `1.5` — 2026-07-05 — Configuração SMTP documentada como preferência criptografada por usuário autenticado.
 - `1.4` — 2026-07-04 — Configuração de origem/rede documentada para `APP_ALLOWED_HOSTS`, `APP_ALLOWED_ORIGINS`, modo LAN e reverse-proxy HTTPS.
 - `1.3` — 2026-07-03 — Persistência documenta WAL, espera por locks, transações imediatas curtas e regra de deltas atômicos para saldos.

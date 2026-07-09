@@ -59,6 +59,30 @@ PERFORMANCE_INDEXES = (
         "ON investment_closed_positions (user_id, account_id, asset_type, closed_at)"
     ),
     "CREATE INDEX IF NOT EXISTS idx_quote_cache_expires_at ON quote_cache (expires_at)",
+    (
+        "CREATE INDEX IF NOT EXISTS idx_operation_logs_user_created "
+        "ON operation_logs (user_id, created_at DESC)"
+    ),
+    (
+        "CREATE INDEX IF NOT EXISTS idx_operation_logs_user_module_created "
+        "ON operation_logs (user_id, module, created_at DESC)"
+    ),
+    (
+        "CREATE INDEX IF NOT EXISTS idx_operation_logs_user_type_created "
+        "ON operation_logs (user_id, operation_type, created_at DESC)"
+    ),
+    (
+        "CREATE INDEX IF NOT EXISTS idx_operation_logs_user_account_created "
+        "ON operation_logs (user_id, account_id, created_at DESC)"
+    ),
+    (
+        "CREATE INDEX IF NOT EXISTS idx_operation_logs_user_card_created "
+        "ON operation_logs (user_id, credit_card_id, created_at DESC)"
+    ),
+    (
+        "CREATE INDEX IF NOT EXISTS idx_operation_logs_user_batch "
+        "ON operation_logs (user_id, operation_batch_id)"
+    ),
 )
 
 
@@ -400,6 +424,21 @@ def initialize_database() -> None:
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
+            CREATE TABLE IF NOT EXISTS operation_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                operation_batch_id TEXT,
+                module TEXT NOT NULL,
+                operation_type TEXT NOT NULL,
+                entity_type TEXT NOT NULL,
+                entity_id TEXT,
+                account_id INTEGER REFERENCES checking_accounts(id) ON DELETE SET NULL,
+                credit_card_id INTEGER REFERENCES credit_cards(id) ON DELETE SET NULL,
+                description TEXT NOT NULL,
+                metadata_json TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
             CREATE UNIQUE INDEX IF NOT EXISTS idx_spending_limits_category
             ON spending_limits (user_id, month, category_id)
             WHERE subcategory_id IS NULL;
@@ -469,6 +508,7 @@ def initialize_database() -> None:
         ensure_column(conn, "investment_opening_positions", "savings_anniversaries_json", "TEXT")
         ensure_column(conn, "checking_accounts", "account_type", "TEXT NOT NULL DEFAULT 'liquidity'")
         ensure_column(conn, "categories", "group_type", "TEXT NOT NULL DEFAULT 'expense'")
+        ensure_operation_logs(conn)
         migrate_category_unique_constraint(conn)
         migrate_transaction_type_constraint(conn)
         migrate_transaction_tags(conn)
@@ -479,6 +519,30 @@ def initialize_database() -> None:
 def ensure_performance_indexes(conn: sqlite3.Connection) -> None:
     for statement in PERFORMANCE_INDEXES:
         conn.execute(statement)
+
+
+def ensure_operation_logs(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS operation_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            operation_batch_id TEXT,
+            module TEXT NOT NULL,
+            operation_type TEXT NOT NULL,
+            entity_type TEXT NOT NULL,
+            entity_id TEXT,
+            account_id INTEGER REFERENCES checking_accounts(id) ON DELETE SET NULL,
+            credit_card_id INTEGER REFERENCES credit_cards(id) ON DELETE SET NULL,
+            description TEXT NOT NULL,
+            metadata_json TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    ensure_column(conn, "operation_logs", "operation_batch_id", "TEXT")
+    ensure_column(conn, "operation_logs", "account_id", "INTEGER REFERENCES checking_accounts(id) ON DELETE SET NULL")
+    ensure_column(conn, "operation_logs", "credit_card_id", "INTEGER REFERENCES credit_cards(id) ON DELETE SET NULL")
 
 
 def row_to_dict(row: sqlite3.Row | None) -> dict | None:

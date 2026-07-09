@@ -9,6 +9,7 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from difflib import SequenceMatcher
 from http import HTTPStatus
 from io import BytesIO, StringIO
+from uuid import uuid4
 from xml.etree import ElementTree
 from xml.sax.saxutils import escape as xml_escape
 
@@ -219,6 +220,7 @@ def system_import_template(user_id: int, target: str) -> bytes:
 def import_system_template(user_id: int, target: str, target_id: object, file_bytes: bytes, filename: str) -> dict:
     normalized_target = normalize_import_target(target)
     rows = parse_system_template_file(file_bytes, filename)
+    operation_batch_id = str(uuid4())
     imported = []
     skipped = []
     for raw in rows:
@@ -243,6 +245,7 @@ def import_system_template(user_id: int, target: str, target_id: object, file_by
                     "reason": getattr(exc, "message", str(exc) or "Nao foi possivel importar a linha."),
                 })
     return {
+        "operation_batch_id": operation_batch_id,
         "imported": len(imported),
         "skipped": len(skipped),
         "total_rows": len(rows),
@@ -662,6 +665,7 @@ def xlsx_column_index(cell_ref: str) -> int:
 def import_organizze_transactions(user_id: int, account_id: object, file_bytes: bytes, filename: str) -> dict:
     normalized_account_id = normalize_account_id(account_id)
     raw_rows = parse_organizze_file(file_bytes, filename)
+    operation_batch_id = str(uuid4())
     imported = []
     skipped = []
     with get_connection() as conn:
@@ -727,6 +731,7 @@ def import_organizze_transactions(user_id: int, account_id: object, file_bytes: 
                     "reason": getattr(exc, "message", str(exc) or "Nao foi possivel importar a linha."),
                 })
     return {
+        "operation_batch_id": operation_batch_id,
         "imported": len(imported),
         "skipped": len(skipped),
         "total_rows": len(raw_rows),

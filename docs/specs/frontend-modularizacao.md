@@ -2,8 +2,8 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 1.6
-atualizado: 2026-07-01
+versao: 1.7
+atualizado: 2026-07-09
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
   - "[[arquitetura]]"
@@ -14,7 +14,7 @@ aliases: ["Modularização Frontend", "ES Modules"]
 # Modularização do Frontend
 
 > [!info] Status
-> **implementado** · área: `frontend` · atualizado em 2026-07-01 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]]
+> **implementado** · área: `frontend` · atualizado em 2026-07-09 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]]
 
 ## Problema
 
@@ -59,6 +59,7 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `cards-view.js` | Cartões: cadastro, faturas, busca/filtro da fatura, pagamento e conciliação. |
 | `portfolio-view.js` | Ativos: posições, consolidações com escala BRL, histórico, resgate e encerramento. |
 | `transactions-view.js` | Lançamentos: formulário, recorrência, parcelas e câmbio. |
+| `operation-history-view.js` | Histórico de Operações: filtros, busca, agrupamentos e paginação incremental. |
 
 ## Contrato de fábrica para views
 
@@ -115,6 +116,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - `1.4` — 2026-06-30 — Regra de evolução do modo escuro por overrides centralizados de tokens registrada.
 - `1.5` — 2026-07-01 — Controle claro/escuro em Preferências registrado em `user-admin-view.js`.
 - `1.6` — 2026-07-01 — Critérios de aceite e cobertura de QA do tema claro/escuro registrados.
+- `1.7` — 2026-07-09 — `operation-history-view.js` registrado como view funcional do Histórico de Operações.
 
 ## Relacionados
 

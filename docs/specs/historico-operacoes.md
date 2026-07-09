@@ -1,9 +1,9 @@
 ---
 tipo: spec
 area: historico-operacoes
-status: rascunho
-versao: 0.1
-atualizado: 2026-07-07
+status: implementado
+versao: 1.1
+atualizado: 2026-07-09
 relacionados:
   - "[[sdd]]"
   - "[[templates/spec-template|Template de spec]]"
@@ -19,7 +19,7 @@ aliases: ["Histórico de Operações", "Historico de Operacoes", "Auditoria de O
 # Histórico de Operações
 
 > [!info] Status
-> **rascunho** · área: `historico-operacoes` · atualizado em 2026-07-07 · relacionados: [[sdd]], [[templates/spec-template|Template de spec]], [[arquitetura]], [[lancamentos]], [[cartoes]], [[investimentos-portfolio]], [[importacao-organizze]]
+> **implementado** · área: `historico-operacoes` · atualizado em 2026-07-09 · relacionados: [[sdd]], [[templates/spec-template|Template de spec]], [[arquitetura]], [[lancamentos]], [[cartoes]], [[investimentos-portfolio]], [[importacao-organizze]]
 
 ## Problema
 
@@ -66,6 +66,7 @@ Usuário autenticado que administra seus dados financeiros e precisa auditar aç
 - Pagamento de fatura deve registrar a operação composta, relacionando cartão, fatura, conta de pagamento e transação criada.
 - Operações de portfólio devem registrar cadastro, edição, resgate, encerramento e atualização de valor.
 - O histórico deve respeitar isolamento por `user_id`; nenhum usuário pode listar operações de outro.
+- A API deve retornar o nome e e-mail do usuário proprietário para exibição no histórico; IP de origem fica fora do escopo do histórico funcional.
 - O histórico não deve armazenar senha, token de sessão, token de recuperação, chave SMTP, conteúdo bruto de arquivo importado ou qualquer segredo.
 - `metadata_json` deve conter apenas dados necessários para auditoria e exibição, como mês da fatura, descrição do lançamento, valor formatável, moeda, nome de conta/cartão no momento da operação e identificadores relacionados.
 - A busca textual deve considerar `description`, `module`, `operation_type`, `entity_type` e campos relevantes de `metadata_json`.
@@ -150,7 +151,17 @@ Módulo sugerido:
 |---|---|
 | `web/modules/operation-history-view.js` | Filtros, busca, agrupamentos, paginação e renderização do histórico. |
 
-O menu lateral deve incluir **Histórico** ou **Operações** com ícone compatível com auditoria, como `History` quando disponível no conjunto de ícones usado pelo app.
+O menu lateral inclui **Histórico** no grupo Gestão, com ícone de histórico/auditoria.
+
+### Implementação
+
+- `financeiro/operation_logs.py` centraliza criação, listagem e detalhe de registros.
+- `operation_logs.metadata_json` é sanitizado para não persistir senha, sessão, token ou segredo SMTP.
+- A listagem usa paginação incremental com teto de 100 registros por chamada.
+- O frontend agrupa os registros por data, módulo, tipo, conta ou cartão sem carregar todo o histórico.
+- A tela exibe o usuário responsável pela operação a partir do próprio `user_id`; não exibe nem persiste IP.
+- Importações retornam `operation_batch_id` para rastrear o lote importado.
+- Parcelamentos e recorrências usam `series_id` como `operation_batch_id` quando a operação cria ou altera uma série.
 
 ## Critérios de aceite
 
@@ -177,6 +188,8 @@ O menu lateral deve incluir **Histórico** ou **Operações** com ícone compat�
 
 ## Changelog
 
+- `1.1` — 2026-07-09 — Exibição do usuário responsável adicionada ao Histórico de Operações, sem registro de IP.
+- `1.0` — 2026-07-09 — Histórico de Operações implementado com tabela, índices, API, menu, filtros, busca, agrupamentos, paginação e registros nas operações principais.
 - `0.1` — 2026-07-07 — Spec inicial do Histórico de Operações, sem desfazer, com `operation_batch_id`, filtros, busca e agrupamentos.
 
 ## Relacionados
