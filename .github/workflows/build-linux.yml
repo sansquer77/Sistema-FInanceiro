@@ -16,10 +16,10 @@ jobs:
 
     steps:
       - name: Baixar repositorio
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Configurar Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.13"
 
@@ -137,7 +137,7 @@ jobs:
           unzip -Z1 "$ZIP_PATH" | grep -E 'Linux/Aplicativo/SistemaFinanceiro/SistemaFinanceiro$'
 
       - name: Publicar artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: Sistema-Financeiro-Linux
           path: Sistema Financeiro - Distribuicao/Linux/Sistema Financeiro - Distribuicao Linux.zip
