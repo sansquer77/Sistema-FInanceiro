@@ -54,6 +54,7 @@ import { registerCardsView } from "./modules/cards-view.js";
 import { registerPortfolioView } from "./modules/portfolio-view.js";
 import { registerTransactionsView } from "./modules/transactions-view.js";
 import { registerSimulationsView } from "./modules/simulations-view.js";
+import { registerOperationHistoryView } from "./modules/operation-history-view.js";
 
 applyTheme();
 
@@ -235,6 +236,17 @@ const importCardLabel = document.querySelector("#importCardLabel");
 const downloadImportTemplateButton = document.querySelector("#downloadImportTemplateButton");
 const importMessage = document.querySelector("#importMessage");
 const importResult = document.querySelector("#importResult");
+const operationHistoryForm = document.querySelector("#operationHistoryForm");
+const operationHistoryDateFrom = document.querySelector("#operationHistoryDateFrom");
+const operationHistoryDateTo = document.querySelector("#operationHistoryDateTo");
+const operationHistoryModule = document.querySelector("#operationHistoryModule");
+const operationHistoryType = document.querySelector("#operationHistoryType");
+const operationHistoryAccount = document.querySelector("#operationHistoryAccount");
+const operationHistoryCard = document.querySelector("#operationHistoryCard");
+const operationHistoryGroupBy = document.querySelector("#operationHistoryGroupBy");
+const operationHistoryList = document.querySelector("#operationHistoryList");
+const operationHistoryMessage = document.querySelector("#operationHistoryMessage");
+const operationHistoryLoadMoreButton = document.querySelector("#operationHistoryLoadMoreButton");
 const emailForm = document.querySelector("#emailForm");
 const passwordForm = document.querySelector("#passwordForm");
 const emailConfigForm = document.querySelector("#emailConfigForm");
@@ -334,6 +346,7 @@ const moduleViews = {
   reports: document.querySelector("#reportsView"),
   classifications: document.querySelector("#classificationsView"),
   imports: document.querySelector("#importsView"),
+  operationHistory: document.querySelector("#operationHistoryView"),
   user: document.querySelector("#userView"),
 };
 
@@ -349,6 +362,7 @@ const viewTitles = {
   reports: ["Gestão", "Relatórios"],
   classifications: ["Gestão", "Categorias e tags"],
   imports: ["Gestão", "Importação"],
+  operationHistory: ["Gestão", "Histórico de Operações"],
   user: ["Usuário", "Preferências"],
 };
 
@@ -457,6 +471,24 @@ const importsView = registerImportsView({
   setMessage,
   escapeHtml,
   onImportCompleted: loadTransactionsAndAccounts,
+});
+
+const operationHistoryView = registerOperationHistoryView({
+  state,
+  elements: {
+    operationHistoryForm,
+    operationHistoryDateFrom,
+    operationHistoryDateTo,
+    operationHistoryModule,
+    operationHistoryType,
+    operationHistoryAccount,
+    operationHistoryCard,
+    operationHistoryGroupBy,
+    operationHistoryList,
+    operationHistoryMessage,
+    operationHistoryLoadMoreButton,
+  },
+  formatDate,
 });
 
 const cockpitView = registerCockpitView({
@@ -1105,6 +1137,10 @@ function showModule(view) {
   }
   if (view === "imports") {
     renderImportTargets();
+  }
+  if (view === "operationHistory") {
+    operationHistoryView.renderFilters();
+    operationHistoryView.loadOperationLogs({ reset: true });
   }
   if (view === "user" && state.user) {
     emailForm.elements.email.value = state.user.email;

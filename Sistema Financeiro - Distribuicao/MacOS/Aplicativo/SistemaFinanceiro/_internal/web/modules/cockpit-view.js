@@ -154,19 +154,10 @@ export function registerCockpitView({
   function planningSectionFromRows(title, rows, kind = "neutral") {
     const section = document.createElement("section");
     section.className = `planning-section planning-section-${kind}`;
-    const total = rows.reduce((sum, item) => sum + Number(item.total || 0), 0);
-    const content = rows.length
-      ? rows.map((item) => `
-        <div class="planning-row">
-          <span>${escapeHtml(item.label)}</span>
-          <strong>${formatMoney(item.total, "BRL")}</strong>
-        </div>
-      `).join("")
-      : '<div class="empty-state compact">Nada previsto neste mês.</div>';
+    const content = planningCurrencyGroups(rows);
     section.innerHTML = `
       <div class="planning-section-header">
         <h3>${title}</h3>
-        <strong>${formatMoney(total, "BRL")}</strong>
       </div>
       ${content}
     `;
@@ -174,26 +165,49 @@ export function registerCockpitView({
   }
 
   function planningSection(title, transactions, kind = "neutral") {
-    const section = document.createElement("section");
-    section.className = `planning-section planning-section-${kind}`;
-    const grouped = groupTransactionsByCategory(transactions);
-    const total = grouped.reduce((sum, item) => sum + item.total, 0);
-    const rows = grouped.length
-      ? grouped.map((item) => `
-        <div class="planning-row">
-          <span>${escapeHtml(item.label)}</span>
-          <strong>${formatMoney(item.total, "BRL")}</strong>
-        </div>
-      `).join("")
-      : '<div class="empty-state compact">Nada previsto neste mês.</div>';
-    section.innerHTML = `
-      <div class="planning-section-header">
-        <h3>${title}</h3>
-        <strong>${formatMoney(total, "BRL")}</strong>
-      </div>
-      ${rows}
-    `;
-    return section;
+    const totals = new Map();
+    for (const transaction of transactions) {
+      const currency = transaction.account_currency || transaction.card_currency || "BRL";
+      const label = formatCategoryPath(transaction);
+      const key = `${currency}\u0000${label}`;
+      const row = totals.get(key) || { currency, label, total: 0 };
+      row.total += Number(transaction.amount || 0);
+      totals.set(key, row);
+    }
+    return planningSectionFromRows(title, [...totals.values()], kind);
+  }
+
+  function planningCurrencyGroups(rows) {
+    if (!rows.length) {
+      return '<div class="empty-state compact">Nada previsto neste mês.</div>';
+    }
+    const currencies = new Map();
+    for (const item of rows) {
+      const currency = item.currency || "BRL";
+      const group = currencies.get(currency) || [];
+      group.push(item);
+      currencies.set(currency, group);
+    }
+    return [...currencies.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([currency, items]) => {
+        const total = items.reduce((sum, item) => sum + Number(item.total || 0), 0);
+        const itemRows = items.map((item) => `
+          <div class="planning-row">
+            <span>${escapeHtml(item.label)}</span>
+            <strong>${formatMoney(item.total, currency)}</strong>
+          </div>
+        `).join("");
+        return `
+          <div class="planning-currency-group">
+            <div class="planning-currency-header">
+              <span>${escapeHtml(currency)}</span>
+              <strong>${formatMoney(total, currency)}</strong>
+            </div>
+            ${itemRows}
+          </div>
+        `;
+      }).join("");
   }
 
   function renderInstallmentDebts() {

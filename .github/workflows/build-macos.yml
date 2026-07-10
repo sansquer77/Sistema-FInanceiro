@@ -1,0 +1,90 @@
+name: Build MacOS
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build-macos:
+    name: Gerar pacote MacOS
+    runs-on: macos-latest
+
+    steps:
+      - name: Baixar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Instalar PyInstaller
+        run: python -m pip install --upgrade pip pyinstaller
+
+      - name: Validar Python
+        run: |
+          python -m py_compile app.py financeiro/*.py
+
+      - name: Gerar executavel MacOS
+        run: |
+          pyinstaller \
+            --noconfirm \
+            --clean \
+            --onedir \
+            --name SistemaFinanceiro \
+            --add-data "web:web" \
+            app.py
+
+      - name: Montar pacote de distribuicao
+        run: |
+          PACKAGE_ROOT="Sistema Financeiro - Distribuicao/MacOS"
+          APP_ROOT="$PACKAGE_ROOT/Aplicativo"
+          RUNTIME_ROOT="$APP_ROOT/SistemaFinanceiro"
+
+          rm -rf "$RUNTIME_ROOT"
+          cp -R "dist/SistemaFinanceiro" "$RUNTIME_ROOT"
+          cp README.md "$APP_ROOT/README.md"
+
+          find "$PACKAGE_ROOT" \( \
+            -name data -o \
+            -name tests -o \
+            -name docs -o \
+            -name __pycache__ -o \
+            -name .DS_Store -o \
+            -name _CodeSignature -o \
+            -name '._*' -o \
+            -name '* 2*' \
+          \) -prune -exec rm -rf {} +
+
+      - name: Compactar pacote MacOS
+        run: |
+          ZIP_PATH="Sistema Financeiro - Distribuicao/MacOS/Sistema Financeiro - Distribuicao MacOS.zip"
+          rm -f "$ZIP_PATH" /tmp/sistema-financeiro-macos.zip
+
+          cd "Sistema Financeiro - Distribuicao"
+          /usr/bin/zip -r -X /tmp/sistema-financeiro-macos.zip MacOS
+          mv /tmp/sistema-financeiro-macos.zip "MacOS/Sistema Financeiro - Distribuicao MacOS.zip"
+
+      - name: Validar conteudo do zip
+        run: |
+          ZIP_PATH="Sistema Financeiro - Distribuicao/MacOS/Sistema Financeiro - Distribuicao MacOS.zip"
+          zip -T "$ZIP_PATH"
+
+          if unzip -Z1 "$ZIP_PATH" | grep -E '(^|/)(data|tests|docs|__pycache__|\.DS_Store|_CodeSignature|\._[^/]*)(/|$)|MacOS/Aplicativo/app.py|MacOS/Aplicativo/financeiro/| 2'; then
+            echo "O pacote contem arquivos, pastas proibidas ou duplicatas."
+            exit 1
+          fi
+
+          unzip -Z1 "$ZIP_PATH" | grep -E 'MacOS/Aplicativo/SistemaFinanceiro/SistemaFinanceiro$'
+
+      - name: Publicar artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sistema-Financeiro-MacOS
+          path: Sistema Financeiro - Distribuicao/MacOS/Sistema Financeiro - Distribuicao MacOS.zip
+          if-no-files-found: error
