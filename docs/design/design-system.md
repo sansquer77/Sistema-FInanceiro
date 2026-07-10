@@ -2,8 +2,8 @@
 tipo: design
 area: meta
 status: implementado
-versao: 1.6
-atualizado: 2026-07-08
+versao: 1.7
+atualizado: 2026-07-09
 relacionados:
   - "[[arquitetura]]"
   - "[[specs/frontend-modularizacao]]"
@@ -14,7 +14,7 @@ aliases: ["Design System", "Tokens Visuais", "Precisão Institucional"]
 # Design System — Precisão Institucional
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-07-08 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]]
+> **implementado** · área: `meta` · atualizado em 2026-07-09 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]]
 
 ## Personalidade da marca
 
@@ -161,6 +161,12 @@ Grade de linha de base: **4px** (todos os valores são múltiplos de 4px).
 - Títulos de painel usam linguagem curta, específica e orientada à tarefa.
 - Esta regra se aplica também aos módulos agrupados no menu Gestão, evitando sequências visuais como `Portfólio` seguido imediatamente de `Portfólio`.
 
+### Menu de navegação (Sidebar)
+
+- **Gaps**: Grupos separados por `12px`. Itens do mesmo grupo separados por `4px` (`--spacing-xs`).
+- **Botões (`.nav-button`)**: Altura mínima de `32px` para garantir densidade de dados sem comprometer a área de clique.
+- **Hierarquia**: Títulos de grupos (ex: "Cadastro", "Gestão") devem ser concisos e agrupar itens logicamente.
+
 ### Botões
 
 | Variante | Fundo | Texto |
@@ -235,6 +241,7 @@ Grade de linha de base: **4px** (todos os valores são múltiplos de 4px).
 - `1.4` — 2026-07-01 — Controle de alternância claro/escuro em Preferências documentado.
 - `1.5` — 2026-07-01 — Checklist de QA, release e rollback do tema documentados.
 - `1.6` — 2026-07-08 — Hierarquia de títulos definida para impedir repetição entre o cabeçalho do módulo e o primeiro painel.
+- `1.7` — 2026-07-09 — Diretrizes de espaçamento e compactação do menu de navegação documentadas.
 
 ## Relacionados
 
