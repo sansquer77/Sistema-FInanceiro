@@ -546,12 +546,12 @@ textarea:focus {
 
 .app-nav {
   display: grid;
-  gap: 16px;
+  gap: 12px;
 }
 
 .nav-group {
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .nav-group > span {
@@ -567,7 +567,7 @@ textarea:focus {
   align-items: center;
   justify-content: flex-start;
   gap: 10px;
-  min-height: 38px;
+  min-height: 32px;
   width: 100%;
   padding: 0 12px;
   border: 1px solid transparent;

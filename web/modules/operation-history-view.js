@@ -146,7 +146,7 @@ export function registerOperationHistoryView({ state, elements, formatDate }) {
             <div><dt>Usuario</dt><dd>${escapeHtml(userLabel(log))}</dd></div>
             <div><dt>Entidade</dt><dd>${escapeHtml(log.entity_type)} ${escapeHtml(log.entity_id || "")}</dd></div>
             ${Object.entries(metadata).map(([key, value]) => `
-              <div><dt>${escapeHtml(key)}</dt><dd>${escapeHtml(Array.isArray(value) ? value.join(", ") : value ?? "")}</dd></div>
+              <div><dt>${escapeHtml(metadataLabel(key))}</dt><dd>${escapeHtml(metadataValue(key, value))}</dd></div>
             `).join("")}
           </dl>
         </details>
@@ -208,4 +208,40 @@ function userLabel(log) {
     return `${log.user_name} <${log.user_email}>`;
   }
   return log.user_name || log.user_email || String(log.user_id || "");
+}
+
+function metadataLabel(key) {
+  const labels = {
+    amount: "Valor",
+    date: "Data",
+    type: "Tipo",
+    invoice_month: "Fatura",
+    series_kind: "Serie",
+    changed_fields: "Campos alterados",
+    changes: "Alteracoes",
+  };
+  return labels[key] || key;
+}
+
+function metadataValue(key, value) {
+  if (key === "changes" && Array.isArray(value)) {
+    if (!value.length) {
+      return "Nenhuma diferenca relevante identificada.";
+    }
+    return value.map((change) => (
+      `${change.label || change.field}: ${emptyAuditValue(change.before)} -> ${emptyAuditValue(change.after)}`
+    )).join("; ");
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => (typeof item === "object" && item !== null ? JSON.stringify(item) : item)).join(", ");
+  }
+  if (typeof value === "object" && value !== null) {
+    return JSON.stringify(value);
+  }
+  return value ?? "";
+}
+
+function emptyAuditValue(value) {
+  const text = String(value ?? "");
+  return text || "(vazio)";
 }

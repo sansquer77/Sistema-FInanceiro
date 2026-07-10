@@ -53,6 +53,8 @@ from financeiro.credit_cards import (
     create_credit_card,
     create_credit_card_transaction,
     delete_credit_card_transaction,
+    fetch_card_transaction,
+    format_card_transaction,
     list_archived_credit_cards,
     list_credit_card_invoice,
     list_credit_card_payments,
@@ -66,6 +68,7 @@ from financeiro.credit_cards import (
     update_credit_card,
 )
 from financeiro.database import initialize_database
+from financeiro.database import get_connection
 from financeiro.imports import import_organizze_transactions, import_system_template, system_import_template
 from financeiro.operation_logs import create_operation_log, get_operation_log, list_operation_logs
 from financeiro.portfolio import close_position, create_opening_position, delete_opening_position, get_portfolio, redeem_position, update_opening_position, update_position_value_override
@@ -80,6 +83,8 @@ from financeiro.spending_limits import (
 from financeiro.transactions import (
     create_transaction,
     delete_transaction,
+    fetch_transaction,
+    format_transaction,
     get_exchange_rate_to_brl,
     list_transactions,
     set_transaction_reconciled,
@@ -722,13 +727,19 @@ class AppHandler(BaseHTTPRequestHandler):
         user = self.require_user()
         transaction_id = self.path.split("?", 1)[0].split("/")[-1]
         data = self.read_json()
+        previous = load_card_transaction_snapshot(user["id"], transaction_id)
         transaction = update_credit_card_transaction(user["id"], transaction_id, data)
+        metadata = {
+            "amount": transaction.get("amount"),
+            "invoice_month": transaction.get("invoice_month"),
+            **change_metadata(previous, transaction, CARD_TRANSACTION_AUDIT_FIELDS),
+        }
         self.record_operation(
             user["id"], "cards", "update", "credit_card_transaction",
             f"Lancamento de cartao atualizado: {transaction['description']}", transaction["id"],
             credit_card_id=transaction.get("credit_card_id"),
             operation_batch_id=transaction.get("series_id") if data.get("scope") == "future" else None,
-            metadata={"amount": transaction.get("amount"), "invoice_month": transaction.get("invoice_month")},
+            metadata=metadata,
         )
         self.send_json({"transaction": transaction})
 
@@ -777,13 +788,20 @@ class AppHandler(BaseHTTPRequestHandler):
         user = self.require_user()
         transaction_id = self.path.split("?", 1)[0].split("/")[-1]
         data = self.read_json()
+        previous = load_transaction_snapshot(user["id"], transaction_id)
         transaction = update_transaction(user["id"], transaction_id, data)
+        metadata = {
+            "amount": transaction.get("amount"),
+            "type": transaction.get("type"),
+            "date": transaction.get("date"),
+            **change_metadata(previous, transaction, TRANSACTION_AUDIT_FIELDS),
+        }
         self.record_operation(
             user["id"], "transactions", "update", "transaction",
             f"Lancamento atualizado: {transaction['description']}", transaction["id"],
             account_id=transaction.get("account_id"),
             operation_batch_id=transaction.get("series_id") if data.get("scope") == "future" else None,
-            metadata={"amount": transaction.get("amount"), "type": transaction.get("type"), "date": transaction.get("date")},
+            metadata=metadata,
         )
         self.send_json({"transaction": transaction})
 
@@ -1229,6 +1247,74 @@ def is_database_busy_error(exc: Exception) -> bool:
         return False
     message = str(exc).lower()
     return "database is locked" in message or "database table is locked" in message or "database is busy" in message
+
+
+TRANSACTION_AUDIT_FIELDS = (
+    ("type", "Tipo"),
+    ("description", "Descricao"),
+    ("amount", "Valor"),
+    ("date", "Data"),
+    ("account_name", "Conta"),
+    ("destination_account_name", "Conta destino"),
+    ("category_name", "Categoria"),
+    ("subcategory_name", "Subcategoria"),
+    ("tag_name", "Tags"),
+    ("notes", "Observacoes"),
+)
+
+CARD_TRANSACTION_AUDIT_FIELDS = (
+    ("type", "Tipo"),
+    ("description", "Descricao"),
+    ("amount", "Valor"),
+    ("date", "Data"),
+    ("invoice_month", "Fatura"),
+    ("category_name", "Categoria"),
+    ("subcategory_name", "Subcategoria"),
+    ("tag_name", "Tags"),
+    ("notes", "Observacoes"),
+)
+
+
+def load_transaction_snapshot(user_id: int, transaction_id: object) -> dict | None:
+    try:
+        with get_connection() as conn:
+            row = fetch_transaction(conn, user_id, int(transaction_id))
+        return format_transaction(row) if row else None
+    except Exception:
+        return None
+
+
+def load_card_transaction_snapshot(user_id: int, transaction_id: object) -> dict | None:
+    try:
+        with get_connection() as conn:
+            row = fetch_card_transaction(conn, user_id, int(transaction_id))
+        currency = row.get("card_currency", "BRL") if row else "BRL"
+        return format_card_transaction(row, currency) if row else None
+    except Exception:
+        return None
+
+
+def change_metadata(before: dict | None, after: dict, fields: tuple[tuple[str, str], ...]) -> dict:
+    if not before:
+        return {"changed_fields": [], "changes": []}
+    changes = []
+    for key, label in fields:
+        previous = audit_value(before.get(key))
+        current = audit_value(after.get(key))
+        if previous != current:
+            changes.append({"field": key, "label": label, "before": previous, "after": current})
+    return {
+        "changed_fields": [change["field"] for change in changes],
+        "changes": changes,
+    }
+
+
+def audit_value(value: object) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, list):
+        return ", ".join(str(item) for item in value)
+    return str(value)
 
 
 def cockpit_payload(transactions: list[dict]) -> dict:

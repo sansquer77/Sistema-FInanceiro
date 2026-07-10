@@ -2,7 +2,7 @@
 tipo: spec
 area: historico-operacoes
 status: implementado
-versao: 1.1
+versao: 1.2
 atualizado: 2026-07-09
 relacionados:
   - "[[sdd]]"
@@ -67,6 +67,7 @@ Usuário autenticado que administra seus dados financeiros e precisa auditar aç
 - Operações de portfólio devem registrar cadastro, edição, resgate, encerramento e atualização de valor.
 - O histórico deve respeitar isolamento por `user_id`; nenhum usuário pode listar operações de outro.
 - A API deve retornar o nome e e-mail do usuário proprietário para exibição no histórico; IP de origem fica fora do escopo do histórico funcional.
+- Operações de atualização de lançamentos de conta e cartão devem registrar campos alterados em `metadata_json.changes`, com rótulo, valor anterior e valor novo para campos financeiros e classificatórios relevantes.
 - O histórico não deve armazenar senha, token de sessão, token de recuperação, chave SMTP, conteúdo bruto de arquivo importado ou qualquer segredo.
 - `metadata_json` deve conter apenas dados necessários para auditoria e exibição, como mês da fatura, descrição do lançamento, valor formatável, moeda, nome de conta/cartão no momento da operação e identificadores relacionados.
 - A busca textual deve considerar `description`, `module`, `operation_type`, `entity_type` e campos relevantes de `metadata_json`.
@@ -160,6 +161,7 @@ O menu lateral inclui **Histórico** no grupo Gestão, com ícone de histórico/
 - A listagem usa paginação incremental com teto de 100 registros por chamada.
 - O frontend agrupa os registros por data, módulo, tipo, conta ou cartão sem carregar todo o histórico.
 - A tela exibe o usuário responsável pela operação a partir do próprio `user_id`; não exibe nem persiste IP.
+- A tela exibe alterações de lançamentos como `Campo: valor anterior -> valor novo`, incluindo valor, data, conta, fatura, categoria, subcategoria, tags e observações quando aplicável.
 - Importações retornam `operation_batch_id` para rastrear o lote importado.
 - Parcelamentos e recorrências usam `series_id` como `operation_batch_id` quando a operação cria ou altera uma série.
 
@@ -188,6 +190,7 @@ O menu lateral inclui **Histórico** no grupo Gestão, com ícone de histórico/
 
 ## Changelog
 
+- `1.2` — 2026-07-09 — Atualizações de lançamentos passam a registrar e exibir resumo antes/depois dos campos alterados.
 - `1.1` — 2026-07-09 — Exibição do usuário responsável adicionada ao Histórico de Operações, sem registro de IP.
 - `1.0` — 2026-07-09 — Histórico de Operações implementado com tabela, índices, API, menu, filtros, busca, agrupamentos, paginação e registros nas operações principais.
 - `0.1` — 2026-07-07 — Spec inicial do Histórico de Operações, sem desfazer, com `operation_batch_id`, filtros, busca e agrupamentos.

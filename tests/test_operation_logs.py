@@ -86,3 +86,29 @@ class OperationLogsTest(unittest.TestCase):
 
         with self.assertRaises(Exception):
             get_operation_log(other["id"], log["id"])
+
+    def test_operation_log_preserves_structured_changes_without_secrets(self) -> None:
+        owner = create_user("Alice", "alice@example.com", "correct-password")
+
+        log = create_operation_log(
+            owner["id"],
+            module="transactions",
+            operation_type="update",
+            entity_type="transaction",
+            description="Lancamento atualizado",
+            metadata={
+                "changes": [
+                    {
+                        "field": "subcategory_name",
+                        "label": "Subcategoria",
+                        "before": "",
+                        "after": "Dividendos / JCP",
+                    }
+                ],
+                "token": "secret",
+            },
+        )
+
+        self.assertEqual(log["metadata"]["changes"][0]["field"], "subcategory_name")
+        self.assertEqual(log["metadata"]["changes"][0]["after"], "Dividendos / JCP")
+        self.assertNotIn("token", log["metadata"])

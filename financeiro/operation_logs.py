@@ -253,13 +253,22 @@ def safe_metadata(metadata: dict) -> dict:
         key_text = str(key)
         if key_text.lower() in blocked:
             continue
-        if isinstance(value, (str, int, float, bool)) or value is None:
-            safe[key_text] = value
-        elif isinstance(value, (list, tuple)):
-            safe[key_text] = [item for item in value if isinstance(item, (str, int, float, bool)) or item is None]
-        else:
-            safe[key_text] = str(value)
+        safe[key_text] = safe_metadata_value(value, blocked)
     return safe
+
+
+def safe_metadata_value(value: object, blocked: set[str]) -> object:
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    if isinstance(value, dict):
+        return {
+            str(key): safe_metadata_value(item, blocked)
+            for key, item in value.items()
+            if str(key).lower() not in blocked
+        }
+    if isinstance(value, (list, tuple)):
+        return [safe_metadata_value(item, blocked) for item in value]
+    return str(value)
 
 
 def clean_optional_text(value: object | None) -> str | None:
