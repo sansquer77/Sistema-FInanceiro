@@ -2,8 +2,8 @@
 tipo: spec
 area: seguranca
 status: implementado
-versao: 1.1
-atualizado: 2026-07-04
+versao: 1.3
+atualizado: 2026-07-10
 relacionados:
   - "[[recuperacao-senha]]"
   - "[[adr/0005-smtp-criptografado-local]]"
@@ -15,7 +15,7 @@ aliases: ["Segurança", "Autenticação"]
 # Segurança de Autenticação
 
 > [!info] Status
-> **implementado** · área: `seguranca` · atualizado em 2026-07-04 · relacionados: [[recuperacao-senha]], [[arquitetura]]
+> **implementado** · área: `seguranca` · atualizado em 2026-07-10 · relacionados: [[recuperacao-senha]], [[arquitetura]]
 
 ## Problema
 
@@ -32,7 +32,9 @@ Usuários locais do Sistema Financeiro que protegem dados financeiros sensíveis
 3. Após repetidas falhas, novas tentativas recebem bloqueio temporário.
 4. Pedidos e confirmações de recuperação de senha também respeitam limite persistente.
 5. Quando o app roda em HTTPS, o cookie de sessão recebe `Secure`.
-6. Requisições mutáveis são aceitas apenas a partir dos hosts/origens locais esperados.
+6. Requisições mutáveis são aceitas apenas a partir dos hosts e origens locais esperados.
+7. Ao trocar ou recuperar a senha, todas as sessões do usuário são revogadas e ele precisa entrar novamente.
+8. A sessão expira definitivamente 30 dias após sua criação.
 
 ## Dados
 
@@ -52,7 +54,12 @@ Usuários locais do Sistema Financeiro que protegem dados financeiros sensíveis
 - Erros de login não revelam se o e-mail existe.
 - Cookie de sessão usa `HttpOnly` e `SameSite=Lax`.
 - Cookie de sessão usa `Secure` somente quando `APP_URL` estiver em HTTPS.
-- Métodos mutáveis (`POST`, `PUT`, `DELETE`) validam `Host` e, quando enviado, `Origin`.
+- O banco armazena somente o hash SHA-256 do token de sessão; o token original existe apenas no cookie.
+- Métodos mutáveis (`POST`, `PUT`, `DELETE`) exigem e validam `Host` e `Origin`.
+- A troca e a recuperação de senha revogam todas as sessões do usuário.
+- Sessões têm expiração absoluta de **30 dias**, sem renovação automática por atividade.
+- HTTP continua permitido quando o servidor escuta apenas localmente.
+- Exposição em LAN usando HTTP não bloqueia a inicialização, mas emite um alerta explícito no terminal.
 - Hosts locais permitidos: `sistema-financeiro.localhost` e `127.0.0.1` na porta configurada em `APP_PORT`.
 - A origem definida em `APP_URL` também é aceita.
 - Hosts adicionais podem ser definidos em `APP_ALLOWED_HOSTS` como CSV; valores sem porta também aceitam `APP_PORT`.
@@ -65,7 +72,7 @@ Usuários locais do Sistema Financeiro que protegem dados financeiros sensíveis
 
 ## API e dados
 
-Nenhum endpoint novo. Tabela nova (idempotente): `auth_attempts`.
+Nenhum endpoint novo. A tabela `sessions` armazena `token_hash` em vez do token original; instalações existentes são migradas de forma idempotente.
 
 Rotas afetadas:
 
@@ -82,20 +89,28 @@ Rotas afetadas:
 - Dado `APP_URL` HTTP, quando o cookie é gerado, não contém `Secure`.
 - Dado `APP_URL` HTTPS, quando o cookie é gerado, contém `Secure`.
 - Dado um `Origin` desconhecido em requisição mutável, quando recebido, a API retorna `403 Forbidden`.
+- Dada uma requisição mutável sem `Origin`, quando recebida, a API retorna `403 Forbidden`.
 - Dado um `Host` fora da lista permitida em requisição mutável, quando recebido, a API retorna `403 Forbidden`.
 - Dado um host/origem de LAN configurado por `APP_ALLOWED_HOSTS`/`APP_ALLOWED_ORIGINS`, quando uma mutação vem dessa origem, a validação aceita a requisição.
 - Dado qualquer resposta JSON ou arquivo estático, quando entregue, os headers defensivos estão presentes.
 - Dado tentativas de alterar recursos de outro usuário, quando feitas, retornam `404`.
+- Dado um token de sessão emitido, quando o banco é consultado, somente seu hash está armazenado.
+- Dada uma troca ou recuperação de senha, quando qualquer sessão anterior é reutilizada, ela não autentica.
+- Dada uma sessão com mais de 30 dias, quando reutilizada, ela não autentica.
+- Dado `APP_HOST` local com HTTP, quando o app inicia, ele funciona sem alerta de exposição em rede.
+- Dado `APP_HOST` exposto à LAN e `APP_URL` HTTP, quando o app inicia, ele exibe alerta recomendando HTTPS.
 
 ## Fora de escopo
 
 - Exposição do app publicamente.
 - Adição de JWE.
-- Implementação de CSRF token.
+- Implementação de CSRF token dedicado (a proteção adotada é validação obrigatória de origem).
 - Expiração por inatividade ou rotação automática de sessão.
 
 ## Changelog
 
+- `1.3` — 2026-07-10 — Adicionada expiração absoluta de 30 dias e alerta não bloqueante para exposição em LAN sem HTTPS; HTTP local permanece permitido.
+- `1.2` — 2026-07-10 — Tokens de sessão passam a ser armazenados com hash, `Origin` torna-se obrigatório em mutações e troca/recuperação de senha revoga todas as sessões.
 - `1.1` — 2026-07-04 — Validação de Host/Origin atualizada para documentar listas CSV de LAN e normalização de porta/esquema.
 - `1.0` — 2026-06-29 — Frontmatter e critérios formalizados.
 

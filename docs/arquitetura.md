@@ -84,7 +84,7 @@ Responsabilidades:
 - Controlar sessão por cookie.
 - Exigir usuário autenticado nas rotas financeiras.
 - Converter erros de domínio em respostas HTTP.
-- Validar `Host` e `Origin` em mutações contra `APP_URL`, hosts locais e listas CSV opcionais em `APP_ALLOWED_HOSTS`/`APP_ALLOWED_ORIGINS`.
+- Exigir e validar `Host` e `Origin` em mutações contra `APP_URL`, hosts locais e listas CSV opcionais em `APP_ALLOWED_HOSTS`/`APP_ALLOWED_ORIGINS`.
 
 #### Configuração de origem e rede
 
@@ -96,7 +96,7 @@ Responsabilidades:
 | `APP_ALLOWED_HOSTS` | CSV de hosts adicionais aceitos. Entradas sem porta também aceitam a porta padrão configurada. |
 | `APP_ALLOWED_ORIGINS` | CSV de origens adicionais aceitas. Entradas sem esquema assumem `http://`; entradas sem porta assumem `APP_PORT`. |
 
-O modo local mantém `APP_HOST=127.0.0.1`. O modo rede/LAN dos pacotes usa `APP_HOST=0.0.0.0`, detecta o IP local e preenche `APP_URL`, `APP_ALLOWED_HOSTS` e `APP_ALLOWED_ORIGINS`; esse modo é adequado apenas para redes confiáveis. Acesso remoto deve ficar atrás de reverse-proxy com HTTPS.
+O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pacotes usa `APP_HOST=0.0.0.0`, detecta o IP local e preenche `APP_URL`, `APP_ALLOWED_HOSTS` e `APP_ALLOWED_ORIGINS`; esse modo é adequado apenas para redes confiáveis. Quando essa exposição usa HTTP, a inicialização emite um alerta não bloqueante. Acesso remoto deve ficar atrás de reverse-proxy com HTTPS.
 
 #### Rotas — Autenticação e Perfil
 
@@ -300,8 +300,10 @@ Conexões SQLite são abertas com `journal_mode=WAL`, `busy_timeout` curto e `fo
 1. Usuário registra ou autentica pela interface.
 2. `app.py` chama `financeiro.auth`.
 3. Senha validada contra hash PBKDF2.
-4. Sessão criada em `sessions`.
+4. Sessão criada em `sessions`, persistindo somente o hash SHA-256 do token.
 5. API grava cookie `session` com `HttpOnly` e `SameSite=Lax`.
+6. Troca ou recuperação de senha revoga todas as sessões do usuário.
+7. A sessão expira definitivamente 30 dias após a criação, sem renovação por atividade.
 
 Ver [[seguranca-autenticacao]], [[recuperacao-senha]].
 

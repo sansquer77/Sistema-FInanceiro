@@ -18,6 +18,7 @@ PASSWORD_RESET_MAX_REQUESTS = 3
 PASSWORD_RESET_LOCK_MINUTES = 30
 PASSWORD_RESET_CONFIRM_MAX_FAILURES = 5
 PASSWORD_RESET_CONFIRM_LOCK_MINUTES = 30
+SESSION_LIFETIME_DAYS = 30
 
 
 class AuthError(Exception):
@@ -87,6 +88,7 @@ def update_user_password(user_id: int, current_password: str, new_password: str)
         if not row or not verify_password(current_password, row["password_hash"]):
             raise AuthError("Senha atual invalida.", HTTPStatus.UNAUTHORIZED)
         conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (hash_password(new_password), user_id))
+        conn.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
 
 
 def delete_user_account(user_id: int, current_password: str) -> None:
@@ -204,8 +206,12 @@ def reset_password(token: str, new_password: str, source_key: str | None = None)
 
 def create_session(user_id: int) -> str:
     token = secrets.token_urlsafe(32)
+    expires_at = (datetime.now(timezone.utc) + timedelta(days=SESSION_LIFETIME_DAYS)).replace(microsecond=0).isoformat()
     with get_connection() as conn:
-        conn.execute("INSERT INTO sessions (token, user_id) VALUES (?, ?)", (token, user_id))
+        conn.execute(
+            "INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)",
+            (hash_session_token(token), user_id, expires_at),
+        )
     return token
 
 
@@ -213,21 +219,26 @@ def get_current_user(token: str | None) -> dict | None:
     if not token:
         return None
     with get_connection() as conn:
+        conn.execute("DELETE FROM sessions WHERE datetime(expires_at) <= CURRENT_TIMESTAMP")
         row = conn.execute(
             """
             SELECT users.id, users.name, users.email, users.created_at
             FROM sessions
             JOIN users ON users.id = sessions.user_id
-            WHERE sessions.token = ?
+            WHERE sessions.token_hash = ? AND datetime(sessions.expires_at) > CURRENT_TIMESTAMP
             """,
-            (token,),
+            (hash_session_token(token),),
         ).fetchone()
     return row_to_dict(row)
 
 
 def logout_session(token: str) -> None:
     with get_connection() as conn:
-        conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
+        conn.execute("DELETE FROM sessions WHERE token_hash = ?", (hash_session_token(token),))
+
+
+def hash_session_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 def auth_identifiers(action: str, primary: str, source_key: str | None = None) -> list[str]:

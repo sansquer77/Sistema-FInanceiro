@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import hashlib
 import sqlite3
 import sys
 from pathlib import Path
@@ -122,9 +123,10 @@ def initialize_database() -> None:
             );
 
             CREATE TABLE IF NOT EXISTS sessions (
-                token TEXT PRIMARY KEY,
+                token_hash TEXT PRIMARY KEY,
                 user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                expires_at TEXT NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS password_resets (
@@ -497,6 +499,8 @@ def initialize_database() -> None:
         ensure_column(conn, "credit_card_transactions", "reconciled_at", "TEXT")
         ensure_column(conn, "credit_card_transactions", "series_id", "TEXT")
         ensure_column(conn, "credit_card_transactions", "series_kind", "TEXT NOT NULL DEFAULT 'single'")
+        migrate_session_tokens(conn)
+        ensure_session_expiration(conn)
         ensure_column(conn, "credit_card_transactions", "installment_index", "INTEGER")
         ensure_column(conn, "credit_card_transactions", "installment_count", "INTEGER")
         ensure_column(conn, "credit_card_transactions", "recurrence_frequency", "TEXT")
@@ -555,6 +559,39 @@ def ensure_column(conn: sqlite3.Connection, table: str, column: str, definition:
     columns = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
     if column not in columns:
         conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
+
+def migrate_session_tokens(conn: sqlite3.Connection) -> None:
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(sessions)")}
+    if "token" not in columns:
+        return
+    conn.execute("PRAGMA foreign_keys = OFF")
+    try:
+        rows = conn.execute("SELECT token, user_id, created_at FROM sessions").fetchall()
+        conn.executescript(
+            """
+            CREATE TABLE sessions_new (
+                token_hash TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                expires_at TEXT NOT NULL
+            );
+            """
+        )
+        conn.executemany(
+            "INSERT INTO sessions_new (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, datetime(?, '+30 days'))",
+            ((hashlib.sha256(row["token"].encode("utf-8")).hexdigest(), row["user_id"], row["created_at"], row["created_at"]) for row in rows),
+        )
+        conn.executescript("DROP TABLE sessions; ALTER TABLE sessions_new RENAME TO sessions;")
+    finally:
+        conn.execute("PRAGMA foreign_keys = ON")
+
+
+def ensure_session_expiration(conn: sqlite3.Connection) -> None:
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(sessions)")}
+    if "expires_at" not in columns:
+        conn.execute("ALTER TABLE sessions ADD COLUMN expires_at TEXT")
+        conn.execute("UPDATE sessions SET expires_at = datetime(created_at, '+30 days')")
 
 
 def migrate_category_unique_constraint(conn: sqlite3.Connection) -> None:

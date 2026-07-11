@@ -12,6 +12,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 from urllib.parse import parse_qs
+import ipaddress
 
 from financeiro.accounts import (
     archive_checking_account,
@@ -111,6 +112,7 @@ DEFAULT_ALLOWED_ORIGINS = frozenset({
     "http://192.168.1.212:8030",
 })
 MAX_JSON_BODY_BYTES = 1 * 1024 * 1024
+SESSION_COOKIE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60
 SECURITY_HEADERS = {
     "Content-Security-Policy": (
         "default-src 'self'; "
@@ -485,7 +487,7 @@ class AppHandler(BaseHTTPRequestHandler):
         data = self.read_json()
         update_user_password(user["id"], data.get("current_password", ""), data.get("new_password", ""))
         self.record_operation(user["id"], "user_admin", "update", "user", "Senha do usuario alterada", user["id"])
-        self.send_json({"ok": True})
+        self.send_json({"ok": True}, headers={"Set-Cookie": self.expired_session_cookie()})
 
     def handle_delete_user(self) -> None:
         user = self.require_user()
@@ -1182,7 +1184,7 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_json({"error": "Origem da requisicao nao permitida."}, HTTPStatus.FORBIDDEN)
             return False
         origin = self.headers.get("Origin")
-        if origin and not self.is_allowed_origin(origin):
+        if not origin or not self.is_allowed_origin(origin):
             self.send_json({"error": "Origem da requisicao nao permitida."}, HTTPStatus.FORBIDDEN)
             return False
         return True
@@ -1205,7 +1207,7 @@ class AppHandler(BaseHTTPRequestHandler):
         return None
 
     def session_cookie(self, token: str) -> dict:
-        return {"Set-Cookie": self.cookie_header(f"session={token}")}
+        return {"Set-Cookie": self.cookie_header(f"session={token}; Max-Age={SESSION_COOKIE_MAX_AGE_SECONDS}")}
 
     def expired_session_cookie(self) -> str:
         return self.cookie_header("session=; Max-Age=0")
@@ -1402,7 +1404,24 @@ def main() -> None:
     initialize_database()
     server = ThreadingHTTPServer((HOST, PORT), AppHandler)
     print(f"Sistema Financeiro rodando em {PUBLIC_URL}")
+    warning = insecure_lan_warning(HOST, PUBLIC_URL)
+    if warning:
+        print(warning)
     server.serve_forever()
+
+
+def insecure_lan_warning(host: str, public_url: str) -> str | None:
+    if urlsplit(public_url).scheme.lower() != "http":
+        return None
+    normalized_host = host.strip().strip("[]").lower()
+    if normalized_host in {"localhost", "127.0.0.1", "::1"}:
+        return None
+    try:
+        if ipaddress.ip_address(normalized_host).is_loopback:
+            return None
+    except ValueError:
+        pass
+    return "AVISO DE SEGURANCA: app exposto na rede local via HTTP. Configure HTTPS para proteger credenciais e sessoes."
 
 
 if __name__ == "__main__":

@@ -74,7 +74,10 @@ Manter um sistema financeiro local, privado e simples para controlar contas, sal
 
 - Senhas são armazenadas com PBKDF2-HMAC-SHA256 e salt por senha.
 - Tokens de recuperação são armazenados como hash e expiram em 15 minutos.
-- Ao redefinir a senha, sessões ativas do usuário são encerradas.
+- Tokens de sessão são armazenados somente como hash no banco.
+- Sessões expiram definitivamente 30 dias após a criação.
+- Ao trocar ou redefinir a senha, todas as sessões ativas do usuário são encerradas.
+- Toda mutação exige `Host` e `Origin` válidos como proteção contra CSRF.
 - A configuração SMTP fica criptografada por usuário em `data/email_config_user_{id}.enc`.
 - A chave local fica em `data/email_config.key` ou na variável `SISTEMA_FINANCEIRO_CONFIG_KEY`.
 - Pacotes distribuíveis não incluem credenciais SMTP; cada usuário configura seu próprio remetente localmente.
@@ -83,6 +86,7 @@ Manter um sistema financeiro local, privado e simples para controlar contas, sal
 - Identificadores recebidos pela API devem ser validados contra o usuário autenticado.
 - Detalhes completos de bloqueio de tentativas, cookies e headers defensivos em [[seguranca-autenticacao]] e [[recuperacao-senha]].
 - Exposição em LAN deve configurar `APP_URL`, `APP_ALLOWED_HOSTS` e `APP_ALLOWED_ORIGINS`; acesso remoto deve usar reverse-proxy com HTTPS.
+- Exposição em LAN via HTTP deve gerar alerta de segurança sem impedir a inicialização; HTTP local continua permitido.
 
 ## Requisitos não funcionais
 

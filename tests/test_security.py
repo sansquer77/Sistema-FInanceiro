@@ -12,7 +12,16 @@ import app
 from financeiro import auth as auth_module
 from financeiro import database
 from financeiro.accounts import AccountError, create_checking_account, update_checking_account
-from financeiro.auth import AuthError, create_user, login_user, request_password_reset
+from financeiro.auth import (
+    AuthError,
+    create_session,
+    create_user,
+    get_current_user,
+    hash_session_token,
+    login_user,
+    request_password_reset,
+    update_user_password,
+)
 from financeiro.categories import ClassificationError, create_category, get_category_evolution, update_category
 from financeiro.credit_cards import (
     CreditCardError,
@@ -353,6 +362,7 @@ class SessionCookieTest(unittest.TestCase):
             cookie = handler.session_cookie("token")["Set-Cookie"]
         self.assertIn("HttpOnly", cookie)
         self.assertIn("SameSite=Lax", cookie)
+        self.assertIn("Max-Age=2592000", cookie)
         self.assertNotIn("Secure", cookie)
 
     def test_session_cookie_adds_secure_on_https(self) -> None:
@@ -362,7 +372,78 @@ class SessionCookieTest(unittest.TestCase):
         self.assertIn("Secure", cookie)
 
 
+class SessionSecurityTest(IsolatedDatabaseTest):
+    def test_session_database_stores_only_token_hash(self) -> None:
+        user = create_user("Alice", "alice@example.com", "strong-password")
+        token = create_session(user["id"])
+        with database.get_connection() as conn:
+            row = conn.execute("SELECT token_hash FROM sessions").fetchone()
+            columns = {item["name"] for item in conn.execute("PRAGMA table_info(sessions)")}
+        self.assertNotIn("token", columns)
+        self.assertEqual(row["token_hash"], hash_session_token(token))
+        self.assertIsNotNone(get_current_user(token))
+
+    def test_existing_plaintext_sessions_are_migrated_and_remain_valid(self) -> None:
+        user = create_user("Alice", "alice@example.com", "strong-password")
+        token = "legacy-session-token"
+        with database.get_connection() as conn:
+            conn.execute("DROP TABLE sessions")
+            conn.execute(
+                "CREATE TABLE sessions (token TEXT PRIMARY KEY, user_id INTEGER NOT NULL, created_at TEXT NOT NULL)"
+            )
+            conn.execute(
+                "INSERT INTO sessions (token, user_id, created_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
+                (token, user["id"]),
+            )
+        initialize_database()
+        self.assertIsNotNone(get_current_user(token))
+        with database.get_connection() as conn:
+            columns = {item["name"] for item in conn.execute("PRAGMA table_info(sessions)")}
+        self.assertEqual(columns, {"token_hash", "user_id", "created_at", "expires_at"})
+
+    def test_expired_session_does_not_authenticate(self) -> None:
+        user = create_user("Alice", "alice@example.com", "strong-password")
+        token = create_session(user["id"])
+        with database.get_connection() as conn:
+            conn.execute(
+                "UPDATE sessions SET expires_at = datetime('now', '-1 second') WHERE token_hash = ?",
+                (hash_session_token(token),),
+            )
+        self.assertIsNone(get_current_user(token))
+
+    def test_password_change_revokes_all_sessions(self) -> None:
+        user = create_user("Alice", "alice@example.com", "strong-password")
+        first = create_session(user["id"])
+        second = create_session(user["id"])
+        update_user_password(user["id"], "strong-password", "new-strong-password")
+        self.assertIsNone(get_current_user(first))
+        self.assertIsNone(get_current_user(second))
+
+
 class RequestSourceProtectionTest(unittest.TestCase):
+    def test_mutation_without_origin_is_rejected(self) -> None:
+        handler = object.__new__(app.AppHandler)
+        handler.headers = {"Host": "sistema-financeiro.localhost:8020"}
+        handler.send_json = mock.Mock()
+        with (
+            mock.patch.object(app, "PORT", 8020),
+            mock.patch.object(app, "PUBLIC_URL", "http://sistema-financeiro.localhost:8020"),
+        ):
+            self.assertFalse(handler.validate_mutation_source())
+        handler.send_json.assert_called_once_with(
+            {"error": "Origem da requisicao nao permitida."}, HTTPStatus.FORBIDDEN
+        )
+
+    def test_local_http_does_not_warn(self) -> None:
+        self.assertIsNone(app.insecure_lan_warning("127.0.0.1", "http://sistema-financeiro.localhost:8020"))
+
+    def test_lan_http_warns_without_blocking(self) -> None:
+        warning = app.insecure_lan_warning("0.0.0.0", "http://192.168.1.20:8020")
+        self.assertIn("AVISO DE SEGURANCA", warning)
+
+    def test_lan_https_does_not_warn(self) -> None:
+        self.assertIsNone(app.insecure_lan_warning("0.0.0.0", "https://financeiro.example.test"))
+
     def test_allowed_hosts_include_local_hosts_on_expected_port(self) -> None:
         with (
             mock.patch.object(app, "PORT", 8020),

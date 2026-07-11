@@ -29,6 +29,8 @@ Para outros dominios, IPs ou portas, ajuste `APP_URL`, `APP_ALLOWED_HOSTS` e `AP
 | `APP_ALLOWED_ORIGINS` | Origens aceitas para requisicoes mutaveis, em CSV. |
 | `SISTEMA_FINANCEIRO_DATA_DIR` | Pasta dos dados locais. Opcional. |
 
+HTTP é permitido no modo estritamente local. Quando `APP_HOST` expõe o serviço à LAN e `APP_URL` usa HTTP, o app inicia normalmente, mas registra um alerta recomendando HTTPS.
+
 ## Servidor Linux
 
 Salve estes arquivos no servidor Linux `192.168.1.212`.
