@@ -58,6 +58,7 @@ export function registerCardsView({
     cardTransactionType,
     cardTransactionCategory,
     cardTransactionSubcategory,
+    cardTransactionTagOptions,
     cardSeriesKind,
     cardInstallmentCount,
     cardInstallmentCountLabel,
@@ -326,6 +327,7 @@ export function registerCardsView({
     cardTransactionForm.elements.date.value = todayLocalDateValue();
     cardTransactionForm.elements.credit_card_id.value = state.selectedCreditCardId;
     cardTransactionForm.elements.invoice_month.value = state.cardInvoiceMonth;
+    cardTransactionForm.elements.tags.value = "";
     cardSeriesKind.disabled = false;
     cardInstallmentCount.disabled = false;
     cardRecurrenceFrequency.disabled = false;
@@ -339,6 +341,7 @@ export function registerCardsView({
     cardTransactionForm.querySelector('button[type="submit"]').textContent = "Salvar lançamento";
     updateCardSeriesState();
     renderCardTransactionCategories();
+    renderCardTransactionTagOptions();
   }
 
   function editCardTransaction(transaction) {
@@ -350,6 +353,7 @@ export function registerCardsView({
     cardTransactionForm.elements.date.value = transaction.date;
     cardTransactionForm.elements.description.value = transaction.description;
     cardTransactionForm.elements.amount.value = moneyInputValue(transaction.amount);
+    cardTransactionForm.elements.tags.value = (transaction.tags || []).join(", ");
     cardTransactionForm.elements.notes.value = transaction.notes || "";
     cardSeriesKind.value = isInstallmentTransaction(transaction) ? "installment" : transaction.series_kind || "single";
     cardInstallmentCount.value = transaction.installment_count || "2";
@@ -369,6 +373,7 @@ export function registerCardsView({
       cardTransactionCategory.value = transaction.category_name;
     }
     renderCardTransactionSubcategories();
+    renderCardTransactionTagOptions();
     if (transaction.subcategory_name) {
       cardTransactionSubcategory.value = transaction.subcategory_name;
     }
@@ -417,6 +422,7 @@ export function registerCardsView({
   function renderCardInvoice() {
     renderCardInvoiceSelector();
     renderCardTransactionCategories();
+    renderCardTransactionTagOptions();
     renderCardPaymentAccounts();
     cardInvoiceMonthLabel.textContent = formatMonthLabel(state.cardInvoiceMonth);
     cardTransactionForm.elements.credit_card_id.value = state.selectedCreditCardId;
@@ -546,6 +552,15 @@ export function registerCardsView({
     cardTransactionSubcategory.disabled = subcategories.length === 0;
   }
 
+  function renderCardTransactionTagOptions() {
+    if (!cardTransactionTagOptions) {
+      return;
+    }
+    cardTransactionTagOptions.innerHTML = state.tags
+      .map((tag) => `<option value="${escapeHtml(tag.name)}"></option>`)
+      .join("");
+  }
+
   function renderCardInvoiceList(card) {
     cardInvoiceList.innerHTML = "";
     if (state.cardInvoicePayments.length) {
@@ -585,6 +600,7 @@ export function registerCardsView({
             <span>${formatDate(transaction.date)}</span>
             <span>${cardTransactionTypeLabel(transaction.type)}</span>
             ${transactionSeriesLabel(transaction) ? `<span>${transactionSeriesLabel(transaction)}</span>` : ""}
+            ${transaction.tags && transaction.tags.length ? `<span>${transaction.tags.map((tag) => `#${escapeHtml(tag)}`).join(" ")}</span>` : ""}
           </div>
         </div>
         <div class="invoice-entry-category">

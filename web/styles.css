@@ -1434,6 +1434,15 @@ textarea:focus {
   align-items: start;
 }
 
+.launch-form-sticky {
+  position: sticky;
+  top: 24px;
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  align-self: start;
+  overscroll-behavior: contain;
+}
+
 .archived-panel {
   margin-top: 18px;
 }
@@ -3301,6 +3310,12 @@ textarea:focus {
 }
 
 @media (max-width: 860px) {
+  .launch-form-sticky {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+
   .auth-panel,
   .dashboard,
   .workspace,

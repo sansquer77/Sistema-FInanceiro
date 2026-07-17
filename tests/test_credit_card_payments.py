@@ -199,6 +199,51 @@ class CreditCardPaymentAtomicityTest(unittest.TestCase):
         self.assertEqual(june_rows[0]["description"], "Compra Junho")
         self.assertEqual(june_rows[0]["invoice_month"], "2026-06")
 
+    def test_card_transaction_before_closing_uses_next_invoice_when_calculated_invoice_is_paid(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta principal",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "1000,00",
+        })
+        card = create_credit_card(user["id"], {
+            "name": "Cartao",
+            "issuer": "Banco",
+            "currency": "BRL",
+            "limit": "2000,00",
+            "closing_day": "28",
+            "due_day": "10",
+            "preferred_payment_account_id": str(account["id"]),
+        })
+        create_credit_card_transaction(user["id"], {
+            "credit_card_id": str(card["id"]),
+            "type": "expense",
+            "description": "Compra antiga",
+            "amount": "100,00",
+            "date": "2026-07-10",
+            "invoice_month": "2026-07",
+            "category": "Compras",
+        })
+        pay_credit_card_invoice(user["id"], {
+            "credit_card_id": str(card["id"]),
+            "invoice_month": "2026-07",
+            "account_id": str(account["id"]),
+            "payment_date": "2026-07-20",
+        })
+
+        transaction = create_credit_card_transaction(user["id"], {
+            "credit_card_id": str(card["id"]),
+            "type": "expense",
+            "description": "Compra depois do pagamento",
+            "amount": "50,00",
+            "date": "2026-07-15",
+            "invoice_month": "2026-07",
+            "category": "Compras",
+        })
+
+        self.assertEqual(transaction["invoice_month"], "2026-08")
+
 
 if __name__ == "__main__":
     unittest.main()

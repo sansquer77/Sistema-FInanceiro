@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from http import HTTPStatus
 
@@ -26,15 +27,54 @@ def list_archived_checking_accounts(user_id: int) -> list[dict]:
 
 def list_accounts_by_status(user_id: int, archived: bool) -> list[dict]:
     archived_filter = "archived_at IS NOT NULL" if archived else "archived_at IS NULL"
+    today = date.today().isoformat()
     with get_connection() as conn:
         rows = conn.execute(
             f"""
-            SELECT *
+            SELECT
+                checking_accounts.id,
+                checking_accounts.user_id,
+                checking_accounts.name,
+                checking_accounts.bank_name,
+                checking_accounts.branch,
+                checking_accounts.account_number,
+                checking_accounts.account_type,
+                checking_accounts.currency,
+                checking_accounts.initial_balance_cents,
+                checking_accounts.current_balance_cents AS stored_current_balance_cents,
+                checking_accounts.notes,
+                checking_accounts.archived_at,
+                checking_accounts.created_at,
+                checking_accounts.updated_at,
+                checking_accounts.initial_balance_cents
+                    + COALESCE(SUM(
+                        CASE
+                            WHEN transactions.account_id = checking_accounts.id
+                                AND transactions.type = 'income'
+                                THEN transactions.amount_cents
+                            WHEN transactions.account_id = checking_accounts.id
+                                AND transactions.type IN ('expense', 'investment', 'transfer')
+                                THEN -transactions.amount_cents
+                            WHEN transactions.destination_account_id = checking_accounts.id
+                                AND transactions.type = 'transfer'
+                                THEN COALESCE(NULLIF(transactions.destination_amount_cents, 0), transactions.amount_cents)
+                            ELSE 0
+                        END
+                    ), 0) AS effective_current_balance_cents
             FROM checking_accounts
-            WHERE user_id = ? AND {archived_filter}
-            ORDER BY bank_name COLLATE NOCASE, name COLLATE NOCASE
+            LEFT JOIN transactions
+                ON transactions.user_id = checking_accounts.user_id
+                AND transactions.archived_at IS NULL
+                AND transactions.date <= ?
+                AND (
+                    transactions.account_id = checking_accounts.id
+                    OR transactions.destination_account_id = checking_accounts.id
+                )
+            WHERE checking_accounts.user_id = ? AND checking_accounts.{archived_filter}
+            GROUP BY checking_accounts.id
+            ORDER BY checking_accounts.bank_name COLLATE NOCASE, checking_accounts.name COLLATE NOCASE
             """,
-            (user_id,),
+            (today, user_id),
         ).fetchall()
     return [format_account(row_to_dict(row)) for row in rows]
 
@@ -201,5 +241,14 @@ def empty_to_none(value: object) -> str | None:
 
 def format_account(account: dict) -> dict:
     account["initial_balance"] = cents_to_money(account.pop("initial_balance_cents"))
+    stored_balance = account.pop("stored_current_balance_cents", None)
+    if stored_balance is not None:
+        account["stored_current_balance"] = cents_to_money(stored_balance)
+    effective_balance = account.pop("effective_current_balance_cents", None)
+    if effective_balance is not None:
+        account["current_balance_cents"] = effective_balance
+        account["balance_source"] = "calculated"
+    else:
+        account["balance_source"] = "stored"
     account["current_balance"] = cents_to_money(account.pop("current_balance_cents"))
     return account

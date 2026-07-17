@@ -21,7 +21,7 @@
         document.documentElement.style.colorScheme = theme;
       })();
     </script>
-    <link rel="stylesheet" href="/styles.css?v=113">
+    <link rel="stylesheet" href="/styles.css?v=114">
   </head>
   <body>
     <main class="app-shell">
@@ -451,7 +451,7 @@
           </section>
 
           <div class="workspace card-transaction-workspace">
-            <section class="panel">
+            <section class="panel launch-form-sticky">
               <h2 id="cardTransactionFormTitle">Novo lançamento no cartão</h2>
               <form id="cardTransactionForm" class="form">
                 <input type="hidden" name="id">
@@ -508,6 +508,12 @@
                     <select name="subcategory" id="cardTransactionSubcategory"></select>
                   </label>
                 </div>
+                <div class="field-row">
+                  <label>Tag
+                    <input name="tags" id="cardTransactionTags" type="text" list="cardTransactionTagOptions" placeholder="Selecione ou digite uma tag">
+                    <datalist id="cardTransactionTagOptions"></datalist>
+                  </label>
+                </div>
                 <label>Observações
                   <textarea name="notes" rows="3"></textarea>
                 </label>
@@ -539,7 +545,7 @@
 
         <section class="module-view" id="transactionsView" hidden>
           <div class="workspace">
-            <section class="transaction-form-panel">
+            <section class="transaction-form-panel launch-form-sticky">
               <h2 id="transactionFormTitle">Novo lançamento</h2>
               <form id="transactionForm" class="form">
                 <input type="hidden" name="id">

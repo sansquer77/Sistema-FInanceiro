@@ -2,8 +2,8 @@
 tipo: design
 area: meta
 status: implementado
-versao: 1.7
-atualizado: 2026-07-09
+versao: 1.8
+atualizado: 2026-07-17
 relacionados:
   - "[[arquitetura]]"
   - "[[specs/frontend-modularizacao]]"
@@ -14,7 +14,7 @@ aliases: ["Design System", "Tokens Visuais", "Precisão Institucional"]
 # Design System — Precisão Institucional
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-07-09 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]]
+> **implementado** · área: `meta` · atualizado em 2026-07-17 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]]
 
 ## Personalidade da marca
 
@@ -212,6 +212,12 @@ Grade de linha de base: **4px** (todos os valores são múltiplos de 4px).
 - Ativo / Operacional → verde `#10B981`.
 - Inativo / Em atraso / Alerta → vermelho `#EF4444`.
 
+### Formulários de lançamento
+
+- Nas telas de Lançamentos de contas e Lançamentos de cartões, o formulário principal deve permanecer visível no desktop/tablet durante a rolagem da lista, usando comportamento sticky dentro da coluna esquerda.
+- Quando o formulário for maior que a altura disponível, a rolagem deve acontecer dentro do próprio painel para manter cabeçalho e ações acessíveis sem ocultar a lista.
+- Em mobile, o formulário volta ao fluxo normal da página para preservar área útil e evitar sobreposição com listas e controles.
+
 ---
 
 ## QA de tema
@@ -242,6 +248,7 @@ Grade de linha de base: **4px** (todos os valores são múltiplos de 4px).
 - `1.5` — 2026-07-01 — Checklist de QA, release e rollback do tema documentados.
 - `1.6` — 2026-07-08 — Hierarquia de títulos definida para impedir repetição entre o cabeçalho do módulo e o primeiro painel.
 - `1.7` — 2026-07-09 — Diretrizes de espaçamento e compactação do menu de navegação documentadas.
+- `1.8` — 2026-07-17 — Comportamento sticky dos formulários de lançamento em contas e cartões documentado.
 
 ## Relacionados
 

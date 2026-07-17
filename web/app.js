@@ -147,6 +147,7 @@ const cardTransactionFormTitle = document.querySelector("#cardTransactionFormTit
 const cardTransactionType = document.querySelector("#cardTransactionType");
 const cardTransactionCategory = document.querySelector("#cardTransactionCategory");
 const cardTransactionSubcategory = document.querySelector("#cardTransactionSubcategory");
+const cardTransactionTagOptions = document.querySelector("#cardTransactionTagOptions");
 const cardSeriesKind = document.querySelector("#cardSeriesKind");
 const cardInstallmentCount = document.querySelector("#cardInstallmentCount");
 const cardInstallmentCountLabel = document.querySelector("#cardInstallmentCountLabel");
@@ -581,6 +582,7 @@ const cardsView = registerCardsView({
     cardTransactionType,
     cardTransactionCategory,
     cardTransactionSubcategory,
+    cardTransactionTagOptions,
     cardSeriesKind,
     cardInstallmentCount,
     cardInstallmentCountLabel,

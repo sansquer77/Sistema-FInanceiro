@@ -2,8 +2,8 @@
 tipo: spec
 area: cartoes
 status: implementado
-versao: 1.2
-atualizado: 2026-07-05
+versao: 1.3
+atualizado: 2026-07-17
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -18,7 +18,7 @@ aliases: ["Cartões de Crédito", "Faturas"]
 # Cartões de Crédito
 
 > [!info] Status
-> **implementado** · área: `cartoes` · atualizado em 2026-07-05 · relacionados: [[contas-correntes]], [[lancamentos]], [[limites-gastos]], [[relatorios]]
+> **implementado** · área: `cartoes` · atualizado em 2026-07-17 · relacionados: [[contas-correntes]], [[lancamentos]], [[limites-gastos]], [[relatorios]]
 
 ## Problema
 
@@ -71,12 +71,14 @@ Qualquer usuário autenticado localmente que utilize cartões de crédito para d
 
 - Gasto em cartão pertence obrigatoriamente a uma fatura mensal (`AAAA-MM`).
 - A fatura é calculada pela data do lançamento e pelo dia de fechamento do cartão. Compras após o fechamento entram na fatura posterior.
-- Não é permitido adicionar ou editar lançamentos em faturas já pagas (fechadas).
+- Quando a fatura calculada pela data já estiver paga/fechada, o lançamento deve ser registrado automaticamente na próxima fatura aberta.
+- Não é permitido adicionar ou editar lançamentos diretamente em faturas já pagas (fechadas); nesses casos o sistema deve avançar a competência para a próxima fatura aberta quando a operação vier de um lançamento por data.
 - É possível mover uma transação para a fatura anterior ou posterior desde que a fatura de destino não esteja paga.
-- O sistema deve alertar/bloquear lançamento com data anterior ou igual ao fechamento de uma fatura anterior já paga.
+- O sistema não deve perder silenciosamente lançamentos de cartão quando a competência original estiver fechada.
 - Moedas do cartão e da conta de pagamento da fatura devem ser idênticas.
 - A conta preferencial de pagamento, quando informada, deve ter a mesma moeda do cartão.
 - Lançamentos de cartão podem ser únicos, parcelados ou recorrentes.
+- O formulário manual de lançamento no cartão deve oferecer o campo `Tag`, com as mesmas sugestões de tags usadas em lançamentos de contas e suporte a múltiplas tags separadas por vírgula.
 - Em lançamentos parcelados de cartão, o valor informado é o total da compra e deve ser dividido pela quantidade de parcelas. Ex.: R$ 500 em 5x gera 5 lançamentos/faturas de R$ 100.
 - Em lançamentos recorrentes de cartão, cada ocorrência deve manter exatamente o valor informado. Ex.: R$ 500 recorrente por 5 ocorrências gera 5 lançamentos de R$ 500.
 - A fatura exibe total atual, total conciliado e contador de lançamentos não conciliados.
@@ -112,17 +114,20 @@ Tabelas: `credit_cards`, `credit_card_transactions`, `credit_card_payments`, `cr
 ## Critérios de aceite
 
 - Dado um cartão cadastrado, quando uma despesa é registrada, ela aparece na fatura correta calculada pelo dia de fechamento.
+- Dado uma compra com data antes do fechamento de uma fatura já paga, quando registrada, então ela aparece na próxima fatura aberta.
 - Dado uma fatura em aberto, quando consultada, o total soma seus lançamentos.
-- Dado uma fatura paga, quando o usuário tenta adicionar um lançamento a ela, a operação é bloqueada.
+- Dado uma fatura paga, quando o usuário registra um lançamento cuja data cairia nela, então o sistema preserva o lançamento e ajusta a competência para a próxima fatura aberta.
 - Dado um lançamento conciliado, quando exibido, o status de verificado persiste.
 - Dado uma fatura com lançamentos, quando o usuário busca por texto, a lista exibe apenas os lançamentos correspondentes sem alterar o total da fatura.
 - Dado uma fatura com lançamentos conciliados e não conciliados, quando o usuário troca o filtro de conciliação, a lista exibe apenas o status escolhido.
+- Dado um lançamento de cartão criado ou editado com tags, quando a fatura é exibida, então as tags aparecem no lançamento e podem ser usadas na busca.
 - Dado o pagamento de uma fatura, quando executado, o saldo da conta escolhida é reduzido pelo valor da fatura e a fatura é marcada como paga.
 - Dado lançamentos recorrentes de cartão, quando listados no Cockpit, aparecem pela competência da fatura.
 - Dado uma fatura conciliada e não paga com conta preferencial configurada, quando a conta exibe saldo previsto, então a fatura é considerada pelo vencimento sem duplicar faturas já pagas.
 
 ## Changelog
 
+- `1.3` — 2026-07-17 — Lançamentos com competência calculada em fatura paga passam automaticamente para a próxima fatura aberta.
 - `1.2` — 2026-07-05 — Faturas conciliadas e não pagas passam a impactar o saldo previsto da conta preferencial no mês de vencimento.
 - `1.1` — 2026-06-30 — Busca textual e filtro de conciliação na lista da fatura.
 - `1.0` — 2026-06-29 — Frontmatter e critérios formalizados.

@@ -222,9 +222,7 @@ def create_credit_card_transaction_with_conn(conn: sqlite3.Connection, user_id: 
     transaction = normalize_card_transaction_payload(data)
     begin_immediate(conn)
     card = get_active_credit_card(conn, user_id, transaction["credit_card_id"])
-    transaction["invoice_month"] = invoice_month_for_transaction_date(card, transaction["date"])
-    ensure_invoice_is_open(conn, user_id, card["id"], transaction["invoice_month"])
-    ensure_not_before_previous_closed_invoice(conn, user_id, card, transaction["invoice_month"], transaction["date"])
+    transaction["invoice_month"] = open_invoice_month_for_transaction_date(conn, user_id, card, transaction["date"])
     category_id = get_or_create_category(conn, user_id, transaction["category"], transaction["type"])
     subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
     tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
@@ -232,8 +230,7 @@ def create_credit_card_transaction_with_conn(conn: sqlite3.Connection, user_id: 
     series_id = str(uuid4()) if transaction["series_kind"] != "single" else None
     first_transaction_id = None
     for occurrence in occurrences:
-        ensure_invoice_is_open(conn, user_id, card["id"], occurrence["invoice_month"])
-        ensure_not_before_previous_closed_invoice(conn, user_id, card, occurrence["invoice_month"], occurrence["date"])
+        occurrence["invoice_month"] = first_open_invoice_month(conn, user_id, card["id"], occurrence["invoice_month"])
         cursor = conn.execute(
             """
             INSERT INTO credit_card_transactions (
@@ -287,10 +284,9 @@ def update_credit_card_transaction(user_id: int, transaction_id: str, data: dict
         card = get_active_credit_card(conn, user_id, transaction["credit_card_id"])
         if card["id"] != existing["credit_card_id"]:
             raise CreditCardError("Nao e possivel mover lancamento entre cartoes.")
-        transaction["invoice_month"] = invoice_month_for_transaction_date(card, transaction["date"])
+        transaction["invoice_month"] = open_invoice_month_for_transaction_date(conn, user_id, card, transaction["date"])
         if transaction["invoice_month"] != existing["invoice_month"]:
             ensure_invoice_is_open(conn, user_id, existing["credit_card_id"], transaction["invoice_month"])
-        ensure_not_before_previous_closed_invoice(conn, user_id, card, transaction["invoice_month"], transaction["date"])
         category_id = get_or_create_category(conn, user_id, transaction["category"], transaction["type"])
         subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
         tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
@@ -845,6 +841,20 @@ def invoice_month_for_transaction_date(card, transaction_date: str) -> str:
     if parsed_date > closing_date:
         return shift_month(base_month, 1)
     return base_month
+
+
+def open_invoice_month_for_transaction_date(conn, user_id: int, card, transaction_date: str) -> str:
+    invoice_month = invoice_month_for_transaction_date(card, transaction_date)
+    return first_open_invoice_month(conn, user_id, card["id"], invoice_month)
+
+
+def first_open_invoice_month(conn, user_id: int, card_id: int, invoice_month: str) -> str:
+    candidate = invoice_month
+    for _ in range(240):
+        if not is_invoice_paid(conn, user_id, card_id, candidate):
+            return candidate
+        candidate = shift_month(candidate, 1)
+    raise CreditCardError("Nao foi encontrada uma fatura aberta para este cartao.", HTTPStatus.CONFLICT)
 
 
 def add_months(start_date: date, months: int) -> date:
