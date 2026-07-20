@@ -13,6 +13,7 @@ export function registerPortfolioView({
   portfolioQuoteText,
   todayLocalDateValue,
   chartColor,
+  decisionModal,
   onPortfolioChanged = () => {},
   onPortfolioRedeemed = async () => {},
   editSourceTransaction = () => {},
@@ -127,6 +128,7 @@ export function registerPortfolioView({
       state.portfolioDirty = false;
       resetPortfolioAssetForm();
       renderPortfolio();
+      onPortfolioChanged();
       setMessage(portfolioMessage, isEditing ? "Ativo atualizado no portfólio." : "Ativo incluído no portfólio sem movimentar conta.", "success");
     } catch (error) {
       setMessage(portfolioMessage, error.message, "error");
@@ -212,6 +214,7 @@ export function registerPortfolioView({
       state.portfolioDirty = false;
       resetPortfolioAssetForm();
       renderPortfolio();
+      onPortfolioChanged();
       setMessage(portfolioMessage, "Ativo excluído do portfólio.", "success");
     } catch (error) {
       setMessage(portfolioMessage, error.message, "error");
@@ -246,6 +249,7 @@ export function registerPortfolioView({
       state.portfolioDirty = false;
       await onPortfolioRedeemed();
       renderPortfolio();
+      onPortfolioChanged();
       setMessage(portfolioMessage, "Resgate registrado e valor retornado para a conta da carteira.", "success");
     } catch (error) {
       setMessage(portfolioMessage, error.message, "error");
@@ -886,6 +890,45 @@ export function registerPortfolioView({
     return null;
   }
 
+  function portfolioMaturityAlerts() {
+    const positions = state.portfolio?.positions || [];
+    const alerts = [];
+    const seen = new Set();
+    for (const position of positions) {
+      const alert = portfolioMaturityAlert(position);
+      if (!alert) {
+        continue;
+      }
+      const key = [
+        position.account_id,
+        position.asset_type,
+        position.asset_identifier || "",
+        position.asset_name || "",
+        position.cnpj || "",
+        position.fixed_income_indexer || "",
+        position.fixed_income_maturity_date || "",
+        position.source_type || "",
+        position.source_id || "",
+      ].join("|");
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      alerts.push({
+        ...alert,
+        maturityDate: position.fixed_income_maturity_date,
+        label: position.asset_name || position.asset_identifier || position.description || "Ativo sem identificação",
+        accountName: position.account_name || "Carteira",
+      });
+    }
+    return alerts.sort((a, b) => {
+      if (a.status !== b.status) {
+        return a.status === "overdue" ? -1 : 1;
+      }
+      return String(a.maturityDate).localeCompare(String(b.maturityDate));
+    });
+  }
+
   function portfolioIconButton(icon, label, attributes) {
     return `
       <button class="portfolio-icon-button" type="button" ${attributes} title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">
@@ -915,15 +958,36 @@ export function registerPortfolioView({
   }
 
   async function closePortfolioPosition(position) {
-    const rawDate = window.prompt("Data de encerramento", todayLocalDateValue());
-    if (rawDate === null) {
-      return;
-    }
-    const rawValue = window.prompt("Valor final reconhecido pelo banco", moneyInputValue(position.current_value));
-    if (rawValue === null) {
-      return;
-    }
-    if (!window.confirm("Encerrar esta posição? Ela deixará a posição atual e será movida para Histórico.")) {
+    const result = await decisionModal.form({
+      title: "Encerrar posição",
+      message: "A posição deixará a carteira atual e será movida para Histórico.",
+      fields: [
+        {
+          name: "date",
+          label: "Data de encerramento",
+          type: "date",
+          value: todayLocalDateValue(),
+          required: true,
+        },
+        {
+          name: "closing_value",
+          label: "Valor final reconhecido pelo banco",
+          type: "text",
+          inputMode: "decimal",
+          value: moneyInputValue(position.current_value),
+          required: true,
+        },
+        {
+          name: "register_credit",
+          label: "Registrar crédito na conta",
+          type: "checkbox",
+          value: false,
+          help: "Marque apenas se o valor final entrou na conta agora.",
+        },
+      ],
+      primaryLabel: "Encerrar posição",
+    });
+    if (!result) {
       return;
     }
     setMessage(portfolioMessage, "Encerrando posição...");
@@ -932,8 +996,9 @@ export function registerPortfolioView({
         method: "POST",
         body: {
           ...position,
-          date: rawDate,
-          closing_value: rawValue,
+          date: result.date,
+          closing_value: result.closing_value,
+          register_credit: result.register_credit,
         },
       });
       state.portfolio = response;
@@ -1033,5 +1098,6 @@ export function registerPortfolioView({
     renderPortfolioAssetAccounts,
     renderPortfolio,
     portfolioTotalsByCurrency,
+    portfolioMaturityAlerts,
   };
 }

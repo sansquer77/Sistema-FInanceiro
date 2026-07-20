@@ -21,6 +21,7 @@ export function registerCardsView({
   transactionSeriesLabel,
   cardCategoryPath,
   launchActionButton,
+  decisionModal,
   deleteSeriesScope,
   openMonthPicker,
   onCreditCardsChanged = async () => {},
@@ -195,7 +196,12 @@ export function registerCardsView({
     data.invoice_month = state.cardInvoiceMonth;
     const isEditing = Boolean(data.id);
     if (isEditing && shouldAskFutureCardReplication(data.id)) {
-      data.apply_to_future = window.confirm("Replicar esta alteração nos próximos lançamentos futuros desta série? Lançamentos passados ou conciliados não serão alterados.");
+      const scope = await chooseSeriesEditScope();
+      if (!scope) {
+        setFormBusy(cardTransactionForm, false);
+        return;
+      }
+      data.apply_to_future = scope === "future";
     }
     try {
       await api(isEditing ? `/api/credit-card-transactions/${data.id}` : "/api/credit-card-transactions", {
@@ -249,7 +255,10 @@ export function registerCardsView({
 
   async function deleteCardTransaction(id) {
     try {
-      const scope = deleteSeriesScope(id, state.cardTransactions, "cartão");
+      const scope = await deleteSeriesScope(id, state.cardTransactions, "cartão");
+      if (scope === null) {
+        return;
+      }
       await api(`/api/credit-card-transactions/${id}${scope}`, { method: "DELETE" });
       await refreshCardLaunches();
       setMessage(cardInvoiceMessage, "Lançamento do cartão excluído.", "success");
@@ -293,6 +302,18 @@ export function registerCardsView({
   function shouldAskFutureCardReplication(transactionId) {
     const transaction = state.cardTransactions.find((entry) => String(entry.id) === String(transactionId));
     return Boolean(transaction && transaction.series_id && isInstallmentTransaction(transaction));
+  }
+
+  function chooseSeriesEditScope() {
+    return decisionModal.choose({
+      title: "Aplicar alteração",
+      message: "Este lançamento pertence a uma série do cartão. Como deseja aplicar a mudança?",
+      actions: [
+        { value: "single", label: "Apenas este lançamento", variant: "ghost" },
+        { value: "future", label: "Este e os próximos", variant: "primary" },
+        { value: null, label: "Voltar", variant: "ghost" },
+      ],
+    });
   }
 
   function editCreditCard(card) {

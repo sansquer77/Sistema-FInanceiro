@@ -2,8 +2,8 @@
 tipo: design
 area: meta
 status: implementado
-versao: 1.8
-atualizado: 2026-07-17
+versao: 1.9
+atualizado: 2026-07-20
 relacionados:
   - "[[arquitetura]]"
   - "[[specs/frontend-modularizacao]]"
@@ -14,7 +14,7 @@ aliases: ["Design System", "Tokens Visuais", "Precisão Institucional"]
 # Design System — Precisão Institucional
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-07-17 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]]
+> **implementado** · área: `meta` · atualizado em 2026-07-20 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]]
 
 ## Personalidade da marca
 
@@ -174,6 +174,16 @@ Grade de linha de base: **4px** (todos os valores são múltiplos de 4px).
 | Primário | `--primary` | `--on-primary` (`#ffffff`) |
 | Secundário | transparente | `--on-surface` com borda `--outline` |
 
+### Modais de decisão
+
+- Decisões financeiras, destrutivas ou de edição em cascata não devem usar `window.confirm()` ou `window.prompt()`.
+- Use o helper reutilizável `decision-modal.js` para manter consistência visual, acessibilidade e textos acionáveis.
+- Botões devem descrever a ação real, como `Apenas este lançamento`, `Este e os próximos`, `Excluir apenas este`, `Excluir este e os próximos` ou `Encerrar posição`.
+- Evite escolhas ambíguas do tipo `OK`/`Cancelar` quando cada opção representa um comportamento de domínio.
+- A ação de retorno deve ser nomeada como `Voltar` e deve abortar a operação sem efeitos colaterais.
+- Formulários em modal devem agrupar os campos necessários em uma única etapa quando isso reduzir cliques, como no encerramento de posição do Portfólio.
+- Opções que movimentam saldo financeiro adicional devem iniciar desmarcadas por padrão.
+
 ### Campos de input
 
 - Borda padrão: 1px `--outline`.
@@ -249,6 +259,7 @@ Grade de linha de base: **4px** (todos os valores são múltiplos de 4px).
 - `1.6` — 2026-07-08 — Hierarquia de títulos definida para impedir repetição entre o cabeçalho do módulo e o primeiro painel.
 - `1.7` — 2026-07-09 — Diretrizes de espaçamento e compactação do menu de navegação documentadas.
 - `1.8` — 2026-07-17 — Comportamento sticky dos formulários de lançamento em contas e cartões documentado.
+- `1.9` — 2026-07-20 — Padrão de modais de decisão definido para substituir prompts/confirms nativos em decisões financeiras e de cascata.
 
 ## Relacionados
 

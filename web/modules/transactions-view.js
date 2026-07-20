@@ -27,11 +27,13 @@ export function registerTransactionsView({
   transactionSeriesLabel,
   transactionTypeLabel,
   openMonthPicker,
+  decisionModal,
   ensureSelectedAccount,
   getBalanceUntil,
   accountHasPreferredCardForecast,
   loadCockpit,
   markPortfolioDirty,
+  renderBaseViews,
   renderFinanceViews,
   renderPortfolio,
   renderImportTargets,
@@ -167,7 +169,11 @@ export function registerTransactionsView({
       }
       const isEditing = Boolean(data.id);
       if (isEditing && shouldAskFutureReplication(data.id)) {
-        data.apply_to_future = window.confirm("Replicar esta alteração nos próximos lançamentos desta série? Lançamentos passados ou conciliados não serão alterados.");
+        const scope = await chooseSeriesEditScope("conta");
+        if (!scope) {
+          return;
+        }
+        data.apply_to_future = scope === "future";
       }
       await api(isEditing ? `/api/transactions/${data.id}` : "/api/transactions", {
         method: isEditing ? "PUT" : "POST",
@@ -192,7 +198,10 @@ export function registerTransactionsView({
 
   async function deleteTransaction(id) {
     try {
-      const scope = deleteSeriesScope(id, state.accountTransactions.length ? state.accountTransactions : state.transactions, "conta");
+      const scope = await deleteSeriesScope(id, state.accountTransactions.length ? state.accountTransactions : state.transactions, "conta");
+      if (scope === null) {
+        return;
+      }
       await api(`/api/transactions/${id}${scope}`, { method: "DELETE" });
       await refreshAfterTransactionChange();
       setMessage(transactionMessage, "Lançamento excluído.", "success");
@@ -201,7 +210,7 @@ export function registerTransactionsView({
     }
   }
 
-  function deleteSeriesScope(id, transactions, label) {
+  async function deleteSeriesScope(id, transactions, label) {
     const transaction = transactions.find((entry) => String(entry.id) === String(id));
     if (!transaction || !transaction.series_id) {
       return "";
@@ -210,8 +219,31 @@ export function registerTransactionsView({
     if (!isSeries) {
       return "";
     }
-    const replicate = window.confirm(`Este lançamento pertence a uma série. Clique em OK para apagar este lançamento e os próximos lançamentos futuros não conciliados da mesma série no módulo de ${label}. Clique em Cancelar para apagar apenas este lançamento.`);
-    return replicate ? "?scope=future" : "";
+    const scope = await decisionModal.choose({
+      title: "Excluir lançamento da série",
+      message: `Este lançamento pertence a uma série no módulo de ${label}. Como deseja excluir?`,
+      actions: [
+        { value: "single", label: "Excluir apenas este", variant: "ghost" },
+        { value: "future", label: "Excluir este e os próximos", variant: "danger" },
+        { value: null, label: "Voltar", variant: "ghost" },
+      ],
+    });
+    if (!scope) {
+      return null;
+    }
+    return scope === "future" ? "?scope=future" : "";
+  }
+
+  function chooseSeriesEditScope(label) {
+    return decisionModal.choose({
+      title: "Aplicar alteração",
+      message: `Este lançamento pertence a uma série no módulo de ${label}. Como deseja aplicar a mudança?`,
+      actions: [
+        { value: "single", label: "Apenas este lançamento", variant: "ghost" },
+        { value: "future", label: "Este e os próximos", variant: "primary" },
+        { value: null, label: "Voltar", variant: "ghost" },
+      ],
+    });
   }
 
   function findTransactionById(id) {
@@ -231,13 +263,17 @@ export function registerTransactionsView({
   }
 
   async function refreshAfterTransactionChange() {
-    const [, transactionsResponse] = await Promise.all([
+    const [, accountsResponse, transactionsResponse] = await Promise.all([
       loadTransactionSlice(),
+      api("/api/checking-accounts"),
       api("/api/transactions"),
       loadCockpit(),
     ]);
+    state.accounts = accountsResponse.accounts || [];
+    ensureSelectedAccount();
     state.transactions = transactionsResponse.transactions || [];
     markPortfolioDirty();
+    renderBaseViews();
     renderFinanceViews();
     renderPortfolio();
   }

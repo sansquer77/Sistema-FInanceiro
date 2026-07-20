@@ -14,6 +14,8 @@ export function registerCockpitView({
   renderLimitAlerts,
   loadPortfolio,
   portfolioTotalsByCurrency,
+  portfolioMaturityAlerts,
+  goToPortfolio,
 }) {
   const {
     monthIncome,
@@ -26,6 +28,7 @@ export function registerCockpitView({
     topExpensesChart,
     cashDistributionChart,
     cockpitPortfolioByType,
+    cockpitPortfolioMaturityAlert,
   } = elements;
 
   function renderCockpit() {
@@ -40,8 +43,61 @@ export function registerCockpitView({
     renderMonthlyPlanning();
     renderInstallmentDebts();
     renderLimitAlerts();
+    renderPortfolioMaturityAlerts();
     renderTopExpensesChart();
     renderTopIncomeChart();
+  }
+
+  function renderPortfolioMaturityAlerts() {
+    const alerts = portfolioMaturityAlerts();
+    if (alerts.length > 0) {
+      setPortfolioNavAlert(true);
+    }
+    if (!cockpitPortfolioMaturityAlert) {
+      return;
+    }
+    if (!state.portfolio && state.portfolioDirty) {
+      cockpitPortfolioMaturityAlert.hidden = true;
+      cockpitPortfolioMaturityAlert.innerHTML = "";
+      loadPortfolio();
+      return;
+    }
+    if (state.portfolioLoading) {
+      cockpitPortfolioMaturityAlert.hidden = true;
+      cockpitPortfolioMaturityAlert.innerHTML = "";
+      return;
+    }
+    setPortfolioNavAlert(alerts.length > 0);
+    if (alerts.length === 0) {
+      cockpitPortfolioMaturityAlert.hidden = true;
+      cockpitPortfolioMaturityAlert.innerHTML = "";
+      return;
+    }
+    const overdueCount = alerts.filter((alert) => alert.status === "overdue").length;
+    const dueTodayCount = alerts.length - overdueCount;
+    const headline = [
+      overdueCount ? `${overdueCount} vencido(s)` : "",
+      dueTodayCount ? `${dueTodayCount} vencendo hoje` : "",
+    ].filter(Boolean).join(" e ");
+    const first = alerts[0];
+    cockpitPortfolioMaturityAlert.hidden = false;
+    cockpitPortfolioMaturityAlert.innerHTML = `
+      <button class="cockpit-alert-card portfolio-maturity-alert-card" type="button" data-go-portfolio>
+        <span class="cockpit-alert-beacon" aria-hidden="true"></span>
+        <span>
+          <strong>${escapeHtml(headline || `${alerts.length} ativo(s) vencendo`)}</strong>
+          <small>${escapeHtml(first.label)} · ${escapeHtml(first.accountName)} · venc. ${formatDate(first.maturityDate)}</small>
+        </span>
+        <b>Ver portfólio</b>
+      </button>
+    `;
+    cockpitPortfolioMaturityAlert.querySelector("[data-go-portfolio]").addEventListener("click", goToPortfolio);
+  }
+
+  function setPortfolioNavAlert(active) {
+    document.querySelectorAll('[data-view="portfolio"]').forEach((button) => {
+      button.classList.toggle("has-alert", active);
+    });
   }
 
   function getCurrentMonthTotals() {
@@ -469,6 +525,7 @@ export function registerCockpitView({
   return {
     renderCockpit,
     renderLimitAlerts,
+    renderPortfolioMaturityAlerts,
     renderCockpitPortfolioByType,
   };
 }

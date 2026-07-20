@@ -41,6 +41,7 @@ import {
   isInvestmentTransfer,
 } from "./modules/transaction-kind.js";
 import { openMonthPicker } from "./modules/month-picker.js";
+import { createDecisionModal } from "./modules/decision-modal.js";
 import { applyTheme, setTheme, storedTheme } from "./modules/theme-utils.js";
 import { registerAuthView } from "./modules/auth-view.js";
 import { registerUserAdminView } from "./modules/user-admin-view.js";
@@ -57,6 +58,8 @@ import { registerSimulationsView } from "./modules/simulations-view.js";
 import { registerOperationHistoryView } from "./modules/operation-history-view.js";
 
 applyTheme();
+
+const decisionModal = createDecisionModal();
 
 const state = {
   user: null,
@@ -303,6 +306,7 @@ const savingsRate = document.querySelector("#savingsRate");
 const currencyList = document.querySelector("#currencyList");
 const cockpitPortfolioByType = document.querySelector("#cockpitPortfolioByType");
 const cockpitLimitAlert = document.querySelector("#cockpitLimitAlert");
+const cockpitPortfolioMaturityAlert = document.querySelector("#cockpitPortfolioMaturityAlert");
 const topExpensesChart = document.querySelector("#topExpensesChart");
 const cashDistributionChart = document.querySelector("#cashDistributionChart");
 const previousMonthButton = document.querySelector("#previousMonthButton");
@@ -505,6 +509,7 @@ const cockpitView = registerCockpitView({
     topExpensesChart,
     cashDistributionChart,
     cockpitPortfolioByType,
+    cockpitPortfolioMaturityAlert,
   },
   currentMonthValue,
   formatMoney,
@@ -519,6 +524,8 @@ const cockpitView = registerCockpitView({
   renderLimitAlerts: () => limitsView.renderLimitAlerts(),
   loadPortfolio,
   portfolioTotalsByCurrency,
+  portfolioMaturityAlerts: () => portfolioView.portfolioMaturityAlerts(),
+  goToPortfolio: () => showModule("portfolio"),
 });
 
 const accountsView = registerAccountsView({
@@ -612,6 +619,7 @@ const cardsView = registerCardsView({
   transactionSeriesLabel,
   cardCategoryPath,
   launchActionButton,
+  decisionModal,
   deleteSeriesScope,
   openMonthPicker,
   onCreditCardsChanged: async () => {
@@ -696,11 +704,13 @@ const transactionsView = registerTransactionsView({
   transactionSeriesLabel,
   transactionTypeLabel,
   openMonthPicker,
+  decisionModal,
   ensureSelectedAccount,
   getBalanceUntil,
   accountHasPreferredCardForecast,
   loadCockpit,
   markPortfolioDirty,
+  renderBaseViews,
   renderFinanceViews,
   renderPortfolio,
   renderImportTargets,
@@ -780,7 +790,11 @@ const portfolioView = registerPortfolioView({
   portfolioQuoteText,
   todayLocalDateValue,
   chartColor,
-  onPortfolioChanged: renderCockpitPortfolioByType,
+  decisionModal,
+  onPortfolioChanged: () => {
+    renderCockpitPortfolioByType();
+    renderPortfolioMaturityAlerts();
+  },
   onPortfolioRedeemed: loadTransactionsAndAccounts,
   editSourceTransaction: editPortfolioSourceTransaction,
 });
@@ -1106,6 +1120,7 @@ function showModule(view) {
   }
   navButtons.forEach((button) => button.classList.toggle("active", button.dataset.view === view));
   renderLimitAlerts();
+  renderPortfolioMaturityAlerts();
   moduleEyebrow.textContent = viewTitles[view][0];
   pageTitle.textContent = viewTitles[view][1];
   if (view === "cockpit") {
@@ -1241,6 +1256,10 @@ function renderCockpit() {
 
 function renderLimitAlerts() {
   cockpitView.renderLimitAlerts();
+}
+
+function renderPortfolioMaturityAlerts() {
+  cockpitView.renderPortfolioMaturityAlerts();
 }
 
 function chartColor(index) {

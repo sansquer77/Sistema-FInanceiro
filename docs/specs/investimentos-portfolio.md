@@ -2,8 +2,8 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 1.2
-atualizado: 2026-06-30
+versao: 1.5
+atualizado: 2026-07-20
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -16,7 +16,7 @@ aliases: ["Investimentos", "Portfólio"]
 # Investimentos e Portfólio
 
 > [!info] Status
-> **implementado** · área: `investimentos` · atualizado em 2026-06-30 · relacionados: [[contas-correntes]], [[lancamentos]], [[relatorios]]
+> **implementado** · área: `investimentos` · atualizado em 2026-07-20 · relacionados: [[contas-correntes]], [[lancamentos]], [[relatorios]]
 
 ## Problema
 
@@ -60,6 +60,7 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 - Pós-fixados/híbridos usam indexadores (CDI, SELIC, IPCA, IGP-M, TR) via API do Banco Central (SGS).
 - Pré-fixados usam a taxa acordada anual; exibem `Pré-fixado` e a taxa antes do vencimento.
 - O sistema calcula e deduz estimativas de IOF (até 30 dias) e IR (tabela regressiva de 22,5% a 15%).
+- Posições de renda fixa com vencimento igual ou anterior à data atual devem gerar alerta visual no menu Portfólio e aviso no Cockpit até que sejam encerradas.
 
 **Poupança (`savings`):**
 - Não aparece como subcategoria de Renda Fixa no formulário.
@@ -79,6 +80,8 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 **Resgates e encerramentos:**
 - Resgates retornam valor para a conta da carteira. Em posições com múltiplas origens, consumo segue FIFO.
 - Encerramento move a posição para Histórico com os valores no momento do resgate/fechamento.
+- No encerramento, o usuário informa data, valor final e pode optar por registrar o valor final como receita na conta da carteira em um modal único de decisão.
+- A opção de registrar crédito deve ficar desmarcada por padrão para evitar duplicidade com resgates ou créditos já lançados.
 
 ## API e dados
 
@@ -100,12 +103,20 @@ Tabelas: `investment_opening_positions`, `investment_operations`, `investment_re
 - Dado consolidações por classe, indexador, moeda ou carteira com moedas distintas, quando as barras são exibidas, seu tamanho é calculado pelo valor atual convertido para BRL, enquanto o texto mantém a moeda original.
 - Dado um ativo de renda fixa pós-fixado, quando listado, exibe indexador, taxa e rendimento bruto/líquido com impostos regressivos.
 - Dado um ativo pré-fixado, quando listado, exibe `Pré-fixado` e a taxa anual.
+- Dado uma posição de renda fixa vencendo hoje ou vencida, quando o usuário navega pelo app, o item Portfólio no menu aparece em estado de alerta e o Cockpit exibe um aviso acionável.
+- Dado uma posição vencida já encerrada, quando o portfólio é recarregado, o alerta de menu e o aviso do Cockpit deixam de considerar essa posição.
 - Dado um ativo em moeda estrangeira, quando listado, é exibido na própria moeda sem conversão visual redundante.
 - Dado uma posição com múltiplas origens, quando expandida, exibe os lançamentos/posições que a compõem.
 - Dado um resgate realizado, quando executado, o valor retorna à conta de origem e a posição é atualizada via FIFO.
+- Dado um encerramento sem a opção de crédito, quando executado, a posição vai para o histórico sem criar lançamento financeiro.
+- Dado um encerramento com a opção de crédito marcada, quando executado, o sistema cria uma receita na conta da carteira e soma o valor final ao saldo da conta.
+- Dado o modal de encerramento aberto, quando o usuário escolhe `Voltar`, a posição permanece aberta e nenhum lançamento é criado.
 
 ## Changelog
 
+- `1.5` — 2026-07-20 — UX de encerramento documentado como modal único com data, valor final e opção de crédito.
+- `1.4` — 2026-07-20 — Opção de registrar crédito na conta no encerramento de posição, desmarcada por padrão.
+- `1.3` — 2026-07-20 — Alertas de vencimento de renda fixa no menu Portfólio e no Cockpit documentados.
 - `1.2` — 2026-06-30 — Regra das barras de consolidação documentada: escala por valor atual normalizado em BRL e exibição na moeda original.
 - `1.1` — 2026-06-30 — Método do ajuste manual de valor corrigido para refletir a API real (`PUT /api/portfolio/value`).
 - `1.0` — 2026-06-29 — Frontmatter e critérios formalizados.

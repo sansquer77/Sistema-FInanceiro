@@ -2,8 +2,8 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 1.7
-atualizado: 2026-07-09
+versao: 1.8
+atualizado: 2026-07-20
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
   - "[[arquitetura]]"
@@ -14,7 +14,7 @@ aliases: ["Modularização Frontend", "ES Modules"]
 # Modularização do Frontend
 
 > [!info] Status
-> **implementado** · área: `frontend` · atualizado em 2026-07-09 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]]
+> **implementado** · área: `frontend` · atualizado em 2026-07-20 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]]
 
 ## Problema
 
@@ -42,6 +42,7 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `transaction-kind.js` | Predicados de tipo de lançamento. |
 | `labels.js` | Labels de domínio usados pela interface. |
 | `month-picker.js` | Popover reutilizável de seleção de mês. |
+| `decision-modal.js` | Modal reutilizável para decisões, confirmações explícitas e pequenos formulários. |
 | `theme-utils.js` | Preferência visual local e aplicação de tema no `documentElement`. |
 
 ## Views funcionais
@@ -84,6 +85,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Tema visual é uma preferência local: `theme-utils.js` aplica `data-theme` no elemento raiz e persiste em `localStorage`.
 - O modo escuro deve ser evoluído por tokens em CSS, mantendo views sem ramificações por tema.
 - `user-admin-view.js` apenas orquestra o controle de Preferências; persistência e aplicação do tema permanecem em `theme-utils.js`.
+- Fluxos com decisão financeira, destrutiva ou de cascata devem usar `decision-modal.js`, evitando `window.confirm()` e `window.prompt()` para escolhas de domínio.
 
 ## API e dados
 
@@ -100,6 +102,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Dado o usuário autenticado, quando alterna `Claro` ou `Escuro` em Preferências, o `data-theme` do documento muda imediatamente e persiste após reload.
 - Dado o tema claro ou escuro ativo, quando navega por Cockpit, Contas, Cartões, Lançamentos, Portfólio, Limites, Relatórios, Categorias, Importação e Preferências, os módulos abrem sem erro de console e mantêm contraste legível.
 - Dado viewport mobile, quando abre Preferências, o controle de tema ocupa a largura disponível sem overflow horizontal.
+- Dado uma decisão de edição/exclusão em cascata ou encerramento de posição, quando a interface solicita confirmação, os botões exibem ações explícitas e `Voltar` aborta a operação.
 
 ## Fora de escopo
 
@@ -117,6 +120,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - `1.5` — 2026-07-01 — Controle claro/escuro em Preferências registrado em `user-admin-view.js`.
 - `1.6` — 2026-07-01 — Critérios de aceite e cobertura de QA do tema claro/escuro registrados.
 - `1.7` — 2026-07-09 — `operation-history-view.js` registrado como view funcional do Histórico de Operações.
+- `1.8` — 2026-07-20 — `decision-modal.js` registrado como helper reutilizável para decisões e formulários curtos.
 
 ## Relacionados
 

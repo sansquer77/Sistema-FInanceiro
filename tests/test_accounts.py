@@ -98,6 +98,35 @@ class AccountBalanceListingTest(unittest.TestCase):
         self.assertEqual(listed_account["stored_current_balance"], "156.26")
         self.assertEqual(listed_account["current_balance"], "33.93")
 
+    def test_transfer_updates_destination_account_balance(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        source = create_checking_account(user["id"], {
+            "name": "Origem",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "500,00",
+        })
+        destination = create_checking_account(user["id"], {
+            "name": "Destino",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "10,00",
+        })
+
+        create_transaction(user["id"], {
+            "type": "transfer",
+            "description": "Transferencia",
+            "amount": "125,50",
+            "date": date.today().isoformat(),
+            "account_id": str(source["id"]),
+            "destination_account_id": str(destination["id"]),
+        })
+
+        accounts = {account["id"]: account for account in list_checking_accounts(user["id"])}
+
+        self.assertEqual(accounts[source["id"]]["current_balance"], "374.50")
+        self.assertEqual(accounts[destination["id"]]["current_balance"], "135.50")
+
 
 if __name__ == "__main__":
     unittest.main()

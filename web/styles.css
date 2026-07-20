@@ -57,6 +57,8 @@
   --tooltip-text: #ffffff;
   --drawer-overlay: rgba(15, 23, 42, 0.42);
   --drawer-shadow: -4px 0 24px rgba(15, 23, 42, 0.12);
+  --modal-overlay: rgba(15, 23, 42, 0.42);
+  --modal-shadow: 0 4px 20px rgba(15, 23, 42, 0.16);
   --chart-1: #14b8a6;
   --chart-2: #6366f1;
   --chart-3: #f97316;
@@ -131,6 +133,8 @@
   --tooltip-text: #101114;
   --drawer-overlay: rgba(0, 0, 0, 0.58);
   --drawer-shadow: -6px 0 28px rgba(0, 0, 0, 0.34);
+  --modal-overlay: rgba(0, 0, 0, 0.62);
+  --modal-shadow: 0 8px 32px rgba(0, 0, 0, 0.42);
   --chart-1: #2dd4bf;
   --chart-2: #a78bfa;
   --chart-3: #fb923c;
@@ -382,6 +386,97 @@ textarea:focus {
   color: var(--accent-dark);
   font-weight: 800;
   text-align: left;
+}
+
+.decision-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--modal-overlay);
+  backdrop-filter: blur(2px);
+}
+
+.decision-modal {
+  width: min(520px, 100%);
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--modal-shadow);
+}
+
+.decision-modal-header {
+  display: grid;
+  gap: 6px;
+}
+
+.decision-modal-header h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 1rem;
+  line-height: 1.25;
+}
+
+.decision-modal-header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.decision-modal-body {
+  display: grid;
+  gap: 12px;
+}
+
+.decision-modal-field,
+.decision-modal-check {
+  display: grid;
+  gap: 6px;
+}
+
+.decision-modal-field span,
+.decision-modal-check span {
+  color: var(--field-label);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.decision-modal-check {
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-subtle);
+}
+
+.decision-modal-check input {
+  width: auto;
+  margin-top: 2px;
+}
+
+.decision-modal-check small {
+  grid-column: 2;
+}
+
+.decision-modal-field small,
+.decision-modal-check small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.decision-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .message {
@@ -909,10 +1004,12 @@ textarea:focus {
   margin-top: 18px;
 }
 
+.cockpit-alert,
 .limit-alert {
   margin: 14px 0 18px;
 }
 
+.cockpit-alert-card,
 .limit-alert-card {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -927,17 +1024,21 @@ textarea:focus {
   text-align: left;
 }
 
+.cockpit-alert-card:hover,
 .limit-alert-card:hover {
   border-color: var(--danger-border-hover);
   background: var(--danger-surface-hover);
 }
 
+.cockpit-alert-card strong,
+.cockpit-alert-card b,
 .limit-alert-card strong,
 .limit-alert-card b {
   color: var(--danger);
   font-weight: 900;
 }
 
+.cockpit-alert-card small,
 .limit-alert-card small {
   display: block;
   margin-top: 2px;
@@ -946,10 +1047,12 @@ textarea:focus {
   font-weight: 800;
 }
 
+.cockpit-alert-card b,
 .limit-alert-card b {
   white-space: nowrap;
 }
 
+.cockpit-alert-beacon,
 .limit-alert-beacon {
   width: 18px;
   height: 18px;

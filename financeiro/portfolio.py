@@ -6,6 +6,7 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from http import HTTPStatus
 import json
 import ssl
+import sqlite3
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
@@ -517,6 +518,7 @@ def close_position(user_id: int, data: dict) -> dict:
     closing_value_cents = money_to_cents(data.get("closing_value", data.get("current_value", "0")))
     if closing_value_cents < 0:
         raise PortfolioError("Informe um valor final valido.")
+    register_credit = should_register_closing_credit(data)
     with get_connection() as conn:
         account = conn.execute(
             """
@@ -560,6 +562,27 @@ def close_position(user_id: int, data: dict) -> dict:
         ).fetchone()
         if not account:
             raise PortfolioError("Conta da carteira nao encontrada.", HTTPStatus.NOT_FOUND)
+        existing_closed_position = conn.execute(
+            """
+            SELECT id
+            FROM investment_closed_positions
+            WHERE user_id = ? AND account_id = ? AND asset_type = ?
+                AND asset_identifier = ? AND asset_name = ? AND cnpj = ?
+                AND fixed_income_indexer = ? AND fixed_income_maturity_date = ?
+                AND closed_at = ?
+            """,
+            (
+                user_id,
+                selector["account_id"],
+                selector["asset_type"],
+                selector["asset_identifier"],
+                selector["asset_name"],
+                selector["cnpj"],
+                closed_indexer,
+                closed_maturity_date,
+                closed_at,
+            ),
+        ).fetchone()
         conn.execute(
             """
             INSERT INTO investment_closed_positions (
@@ -615,7 +638,62 @@ def close_position(user_id: int, data: dict) -> dict:
                 json.dumps(snapshot, ensure_ascii=True),
             ),
         )
+        if register_credit and not existing_closed_position and closing_value_cents > 0:
+            record_portfolio_closing_credit(
+                conn,
+                user_id,
+                account["id"],
+                closing_value_cents,
+                closing_value_brl_cents,
+                closed_at,
+                selector["asset_name"] or selector["asset_identifier"] or "Investimento",
+                data.get("notes"),
+            )
     return get_portfolio(user_id)
+
+
+def should_register_closing_credit(data: dict) -> bool:
+    return str(data.get("register_credit") or "").strip().lower() in {"1", "true", "on", "yes", "sim"}
+
+
+def record_portfolio_closing_credit(
+    conn: sqlite3.Connection,
+    user_id: int,
+    account_id: int,
+    amount_cents: int,
+    amount_brl_cents: int,
+    transaction_date: str,
+    asset_label: str,
+    notes: object,
+) -> None:
+    description = f"Encerramento - {asset_label}"
+    conn.execute(
+        """
+        INSERT INTO transactions (
+            user_id, type, description, amount_cents, destination_amount_cents,
+            exchange_rate_micros, transfer_exchange_rate_micros, amount_brl_cents,
+            date, account_id, series_kind, notes
+        ) VALUES (?, 'income', ?, ?, 0, ?, 0, ?, ?, ?, 'single', ?)
+        """,
+        (
+            user_id,
+            description,
+            amount_cents,
+            rate_to_micros(Decimal("1")),
+            amount_brl_cents,
+            transaction_date,
+            account_id,
+            empty_to_none(notes),
+        ),
+    )
+    conn.execute(
+        """
+        UPDATE checking_accounts
+        SET current_balance_cents = current_balance_cents + ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND user_id = ?
+        """,
+        (amount_cents, account_id, user_id),
+    )
 
 
 def current_portfolio_positions(user_id: int, force_refresh: bool = False) -> list[dict]:
