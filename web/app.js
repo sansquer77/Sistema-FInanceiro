@@ -1,4 +1,4 @@
-import { api, upload } from "./modules/api.js";
+import { api, configureApi, upload } from "./modules/api.js";
 import {
   currentMonthValue,
   formatDate,
@@ -60,6 +60,10 @@ import { registerOperationHistoryView } from "./modules/operation-history-view.j
 applyTheme();
 
 const decisionModal = createDecisionModal();
+
+configureApi({
+  onUnauthorized: handleSessionExpired,
+});
 
 const state = {
   user: null,
@@ -898,6 +902,14 @@ function resetSessionState() {
   resetTransactionForm();
 }
 
+function handleSessionExpired() {
+  resetSessionState();
+  renderBaseViews();
+  renderFinanceViews();
+  renderManagementViews();
+  showAuth("Sessao expirada. Entre novamente para continuar.");
+}
+
 async function loadDashboard() {
   userName.textContent = state.user.name;
   authView.hidden = true;
@@ -1619,8 +1631,11 @@ function renderCockpitPortfolioByType() {
   cockpitView.renderCockpitPortfolioByType();
 }
 
-function showAuth() {
+function showAuth(message = "") {
   authView.hidden = false;
   dashboardView.hidden = true;
   authViewController.switchAuthMode("login");
+  if (message) {
+    setMessage(authMessage, message, "error");
+  }
 }
