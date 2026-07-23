@@ -59,6 +59,7 @@ export function registerCardsView({
     cardTransactionType,
     cardTransactionCategory,
     cardTransactionSubcategory,
+    cardClassificationSuggestion,
     cardTransactionTagOptions,
     cardSeriesKind,
     cardInstallmentCount,
@@ -69,6 +70,9 @@ export function registerCardsView({
     cardInvoiceList,
     cancelCardTransactionEditButton,
   } = elements;
+  let classificationSuggestionTimer = null;
+  let classificationSuggestionRequestId = 0;
+  let classificationSelectionTouched = false;
 
   creditCardForm.addEventListener("submit", handleCreditCardSubmit);
   creditCardForm.elements.currency.addEventListener("change", renderCreditCardPreferredPaymentAccounts);
@@ -100,11 +104,84 @@ export function registerCardsView({
   cardInvoicePaymentForm.addEventListener("submit", handleCardInvoicePaymentSubmit);
   cardPaymentAccount.addEventListener("change", renderCardInvoice);
   cardTransactionForm.addEventListener("submit", handleCardTransactionSubmit);
-  cardTransactionType.addEventListener("change", renderCardTransactionCategories);
-  cardTransactionCategory.addEventListener("change", renderCardTransactionSubcategories);
+  cardTransactionType.addEventListener("change", () => {
+    renderCardTransactionCategories();
+    scheduleClassificationSuggestion();
+  });
+  cardTransactionCategory.addEventListener("change", () => {
+    classificationSelectionTouched = true;
+    renderCardTransactionSubcategories();
+  });
+  cardTransactionSubcategory.addEventListener("change", () => {
+    classificationSelectionTouched = true;
+  });
+  cardTransactionForm.elements.description.addEventListener("input", scheduleClassificationSuggestion);
   cardSeriesKind.addEventListener("change", updateCardSeriesState);
   cancelCreditCardEditButton.addEventListener("click", resetCreditCardForm);
   cancelCardTransactionEditButton.addEventListener("click", resetCardTransactionForm);
+
+  function scheduleClassificationSuggestion() {
+    clearTimeout(classificationSuggestionTimer);
+    const requestId = ++classificationSuggestionRequestId;
+    if (cardClassificationSuggestion) {
+      cardClassificationSuggestion.textContent = "";
+    }
+    if (
+      cardTransactionForm.elements.id.value
+      || classificationSelectionTouched
+      || cardTransactionForm.elements.description.value.trim().length < 2
+    ) {
+      return;
+    }
+    classificationSuggestionTimer = setTimeout(() => {
+      applyClassificationSuggestion(requestId);
+    }, 300);
+  }
+
+  async function applyClassificationSuggestion(requestId) {
+    const description = cardTransactionForm.elements.description.value.trim();
+    const groupType = cardTransactionType.value;
+    try {
+      const response = await api(
+        `/api/classification-suggestion?description=${encodeURIComponent(description)}&group_type=${encodeURIComponent(groupType)}`,
+      );
+      if (
+        requestId !== classificationSuggestionRequestId
+        || classificationSelectionTouched
+        || cardTransactionForm.elements.id.value
+        || description !== cardTransactionForm.elements.description.value.trim()
+        || groupType !== cardTransactionType.value
+        || !response.suggestion
+      ) {
+        return;
+      }
+      const suggestion = response.suggestion;
+      const categoryExists = Array.from(cardTransactionCategory.options).some(
+        (option) => option.value === suggestion.category_name,
+      );
+      if (!categoryExists) {
+        return;
+      }
+      cardTransactionCategory.value = suggestion.category_name;
+      renderCardTransactionSubcategories();
+      if (suggestion.subcategory_name) {
+        const subcategoryExists = Array.from(cardTransactionSubcategory.options).some(
+          (option) => option.value === suggestion.subcategory_name,
+        );
+        if (subcategoryExists) {
+          cardTransactionSubcategory.value = suggestion.subcategory_name;
+        }
+      }
+      if (cardClassificationSuggestion) {
+        const path = suggestion.subcategory_name
+          ? `${suggestion.category_name} › ${suggestion.subcategory_name}`
+          : suggestion.category_name;
+        cardClassificationSuggestion.textContent = `Sugerido pelo histórico: ${path}`;
+      }
+    } catch {
+      // A classificação assistida nunca bloqueia o cadastro manual.
+    }
+  }
 
   async function loadCreditCards() {
     const response = await api("/api/credit-cards");
@@ -343,6 +420,12 @@ export function registerCardsView({
   }
 
   function resetCardTransactionForm() {
+    classificationSelectionTouched = false;
+    classificationSuggestionRequestId += 1;
+    clearTimeout(classificationSuggestionTimer);
+    if (cardClassificationSuggestion) {
+      cardClassificationSuggestion.textContent = "";
+    }
     cardTransactionForm.reset();
     cardTransactionForm.elements.id.value = "";
     cardTransactionForm.elements.date.value = todayLocalDateValue();

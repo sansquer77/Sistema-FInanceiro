@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 1.6
-atualizado: 2026-07-09
+versao: 1.7
+atualizado: 2026-07-23
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -136,6 +136,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `DELETE` | `/api/transactions/{id}` |
 | `PUT` | `/api/transactions/{id}/reconciliation` |
 | `GET` | `/api/exchange-rate` |
+| `GET` | `/api/classification-suggestion?description={texto}&group_type={grupo}` |
 
 #### Rotas — Cartões de Crédito → [[cartoes]]
 
@@ -222,6 +223,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `accounts.py` | Contas-correntes, saldos e arquivamento. Ver [[contas-correntes]]. |
 | `transactions.py` | Lançamentos, transferências, tags, câmbio, recorrência/parcelamento e conciliação. Ver [[lancamentos]]. |
 | `categories.py` | Categorias, subcategorias, tags e bloqueios de exclusão. Ver [[categorias-tags-gestao]]. |
+| `classification_suggestions.py` | Normalização de descrições e sugestão local por histórico exato indexado. Ver [[classificacao-assistida]]. |
 | `credit_cards.py` | Cartões, faturas mensais, transações e pagamentos. Ver [[cartoes]]. |
 | `spending_limits.py` | Metas e orçamentos mensais. Ver [[limites-gastos]]. |
 | `portfolio.py` | Consolidação de investimentos, precificação e impostos. Ver [[investimentos-portfolio]]. |
@@ -264,6 +266,8 @@ Conexões SQLite são abertas com `journal_mode=WAL`, `busy_timeout` curto e `fo
 | `investment_value_overrides` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
 | `quote_cache` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
 
+`transactions` e `credit_card_transactions` persistem `normalized_description` para a classificação assistida. Bancos existentes são retroalimentados de forma idempotente durante a inicialização.
+
 ### Índices principais
 
 - `idx_transactions_user_date`
@@ -271,6 +275,7 @@ Conexões SQLite são abertas com `journal_mode=WAL`, `busy_timeout` curto e `fo
 - `idx_transactions_user_account_date`
 - `idx_transactions_user_destination_date`
 - `idx_transactions_user_series_date`
+- `idx_transactions_user_type_normalized_description`
 - `idx_subcategories_category`
 - `idx_transaction_tags_tag`
 - `idx_password_resets_token`
@@ -286,6 +291,7 @@ Conexões SQLite são abertas com `journal_mode=WAL`, `busy_timeout` curto e `fo
 - `idx_credit_card_transactions_user_card_invoice_date`
 - `idx_credit_card_transactions_user_invoice_date`
 - `idx_credit_card_transactions_user_series_invoice_date`
+- `idx_card_transactions_user_type_normalized_description`
 - `idx_credit_card_payments_user_card_invoice`
 - `idx_credit_card_payments_user_date`
 - `idx_credit_card_transaction_tags_tag`
@@ -323,6 +329,16 @@ Ver [[seguranca-autenticacao]], [[recuperacao-senha]].
 4. Exclusão: impacto financeiro revertido.
 
 Ver [[lancamentos]].
+
+### Classificação assistida
+
+1. O frontend aguarda 300 ms após a digitação da descrição.
+2. `GET /api/classification-suggestion` normaliza descrição e grupo.
+3. SQLite busca correspondências exatas, isoladas por usuário, nos índices de lançamentos de conta e cartão.
+4. O backend agrega suporte por categoria/subcategoria e só retorna resultado com pelo menos 2 ocorrências e 80% de dominância.
+5. O frontend preenche campos ainda não alterados manualmente e ignora respostas obsoletas; falhas nunca bloqueiam o cadastro.
+
+Ver [[classificacao-assistida]], [[adr/0006-classificacao-assistida-local]].
 
 ### Cartões de Crédito e Fatura
 
@@ -397,9 +413,11 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 - [[adr/0003-sqlite-fonte-de-verdade]] — SQLite local como fonte de verdade: offline-first, sem servidor de banco externo.
 - [[adr/0004-importador-xls-sem-dependencia]] — Parser `.xls` implementado sem pacote externo para reduzir requisitos de instalação.
 - [[adr/0005-smtp-criptografado-local]] — Configuração SMTP criptografada no próprio ambiente; pacotes distribuíveis nunca incluem credenciais.
+- [[adr/0006-classificacao-assistida-local]] — Correspondência exata normalizada como MVP local; ML local reservado para V2.
 
 ## Changelog
 
+- `1.7` — 2026-07-23 — Documentados módulo, rota, colunas, índices e fluxo do MVP de classificação assistida local.
 - `1.6` — 2026-07-09 — Histórico de Operações documentado na arquitetura com view, módulo Python e rotas de auditoria.
 - `1.5` — 2026-07-05 — Configuração SMTP documentada como preferência criptografada por usuário autenticado.
 - `1.4` — 2026-07-04 — Configuração de origem/rede documentada para `APP_ALLOWED_HOSTS`, `APP_ALLOWED_ORIGINS`, modo LAN e reverse-proxy HTTPS.

@@ -2,8 +2,8 @@
 tipo: spec
 area: cartoes
 status: implementado
-versao: 1.3
-atualizado: 2026-07-17
+versao: 1.4
+atualizado: 2026-07-23
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -79,6 +79,7 @@ Qualquer usuário autenticado localmente que utilize cartões de crédito para d
 - A conta preferencial de pagamento, quando informada, deve ter a mesma moeda do cartão.
 - Lançamentos de cartão podem ser únicos, parcelados ou recorrentes.
 - O formulário manual de lançamento no cartão deve oferecer o campo `Tag`, com as mesmas sugestões de tags usadas em lançamentos de contas e suporte a múltiplas tags separadas por vírgula.
+- Em novos lançamentos, descrições com histórico exato e confiança suficiente podem preencher categoria e subcategoria sem sobrescrever escolhas manuais. Ver [[classificacao-assistida]].
 - Em lançamentos parcelados de cartão, o valor informado é o total da compra e deve ser dividido pela quantidade de parcelas. Ex.: R$ 500 em 5x gera 5 lançamentos/faturas de R$ 100.
 - Em lançamentos recorrentes de cartão, cada ocorrência deve manter exatamente o valor informado. Ex.: R$ 500 recorrente por 5 ocorrências gera 5 lançamentos de R$ 500.
 - A fatura exibe total atual, total conciliado e contador de lançamentos não conciliados.
@@ -107,6 +108,7 @@ Qualquer usuário autenticado localmente que utilize cartões de crédito para d
 | `PUT` | `/api/credit-card-transactions/{id}/invoice` |
 | `PUT` | `/api/credit-card-transactions/{id}/reconciliation` |
 | `GET` | `/api/credit-card-payments` |
+| `GET` | `/api/classification-suggestion` |
 | `POST` | `/api/credit-card-invoice/pay` |
 
 Tabelas: `credit_cards`, `credit_card_transactions`, `credit_card_payments`, `credit_card_transaction_tags`.
@@ -127,6 +129,7 @@ Tabelas: `credit_cards`, `credit_card_transactions`, `credit_card_payments`, `cr
 
 ## Changelog
 
+- `1.4` — 2026-07-23 — Integrada a sugestão local de categoria e subcategoria por histórico exato.
 - `1.3` — 2026-07-17 — Lançamentos com competência calculada em fatura paga passam automaticamente para a próxima fatura aberta.
 - `1.2` — 2026-07-05 — Faturas conciliadas e não pagas passam a impactar o saldo previsto da conta preferencial no mês de vencimento.
 - `1.1` — 2026-06-30 — Busca textual e filtro de conciliação na lista da fatura.

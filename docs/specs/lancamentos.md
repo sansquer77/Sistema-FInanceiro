@@ -2,7 +2,7 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 1.2
+versao: 1.3
 atualizado: 2026-07-20
 relacionados:
   - "[[contas-correntes]]"
@@ -64,6 +64,7 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 - **Câmbio**: movimentação entre contas de moedas diferentes; registra valor de origem, valor de destino e cotação ajustável.
 - Valor deve ser maior que zero.
 - Categoria é obrigatória para receitas, despesas e investimentos. Transferências e câmbio não exigem categoria.
+- Em novos lançamentos, descrições com histórico exato e confiança suficiente podem preencher categoria e subcategoria sem sobrescrever escolhas manuais. Ver [[classificacao-assistida]].
 - Subcategoria, tags e observações são opcionais.
 - Contas do tipo `wallet` aceitam apenas receitas, despesas e transferências à vista — sem recorrência. Ver [[contas-correntes]].
 - Ao selecionar uma conta de investimento, o tipo padrão sugerido é `investment`.
@@ -85,6 +86,7 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 | `DELETE` | `/api/transactions/{id}` |
 | `PUT` | `/api/transactions/{id}/reconciliation` |
 | `GET` | `/api/exchange-rate` |
+| `GET` | `/api/classification-suggestion` |
 
 Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, `subcategories`, `tags`.
 
@@ -102,6 +104,7 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 
 ## Changelog
 
+- `1.3` — 2026-07-23 — Integrada a sugestão local de categoria e subcategoria por histórico exato.
 - `1.2` — 2026-07-20 — Modal de decisão explícita documentado para edição e exclusão de séries.
 - `1.1` — 2026-06-29 — Frontmatter, tabela de dados e critérios formalizados; wikilinks adicionados.
 - `1.0` — versão original.

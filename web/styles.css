@@ -3930,3 +3930,9 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 }
+.field-hint {
+  min-height: 1.25rem;
+  margin: -0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}

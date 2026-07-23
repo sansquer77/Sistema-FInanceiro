@@ -154,6 +154,7 @@ const cardTransactionFormTitle = document.querySelector("#cardTransactionFormTit
 const cardTransactionType = document.querySelector("#cardTransactionType");
 const cardTransactionCategory = document.querySelector("#cardTransactionCategory");
 const cardTransactionSubcategory = document.querySelector("#cardTransactionSubcategory");
+const cardClassificationSuggestion = document.querySelector("#cardClassificationSuggestion");
 const cardTransactionTagOptions = document.querySelector("#cardTransactionTagOptions");
 const cardSeriesKind = document.querySelector("#cardSeriesKind");
 const cardInstallmentCount = document.querySelector("#cardInstallmentCount");
@@ -287,6 +288,7 @@ const investmentFixedFields = document.querySelector("#investmentFixedFields");
 const transactionCategory = document.querySelector("#transactionCategory");
 const transactionCategoryRow = document.querySelector("#transactionCategoryRow");
 const transactionSubcategory = document.querySelector("#transactionSubcategory");
+const transactionClassificationSuggestion = document.querySelector("#transactionClassificationSuggestion");
 const seriesKind = document.querySelector("#seriesKind");
 const seriesKindRow = document.querySelector("#seriesKindRow");
 const installmentCount = document.querySelector("#installmentCount");
@@ -593,6 +595,7 @@ const cardsView = registerCardsView({
     cardTransactionType,
     cardTransactionCategory,
     cardTransactionSubcategory,
+    cardClassificationSuggestion,
     cardTransactionTagOptions,
     cardSeriesKind,
     cardInstallmentCount,
@@ -662,6 +665,7 @@ const transactionsView = registerTransactionsView({
     transactionCategory,
     transactionCategoryRow,
     transactionSubcategory,
+    transactionClassificationSuggestion,
     seriesKind,
     seriesKindRow,
     installmentCount,

@@ -14,6 +14,7 @@ from xml.etree import ElementTree
 from xml.sax.saxutils import escape as xml_escape
 
 from financeiro.categories import ClassificationError, get_or_create_category, get_or_create_subcategory, get_or_create_tag, normalize_name
+from financeiro.classification_suggestions import normalize_description
 from financeiro.credit_cards import create_credit_card_transaction_with_conn
 from financeiro.transactions import (
     apply_balance_delta,
@@ -701,14 +702,15 @@ def import_organizze_transactions(user_id: int, account_id: object, file_bytes: 
                 cursor = conn.execute(
                     """
                     INSERT INTO transactions (
-                        user_id, type, description, amount_cents, exchange_rate_micros, amount_brl_cents, date, account_id,
+                        user_id, type, description, normalized_description, amount_cents, exchange_rate_micros, amount_brl_cents, date, account_id,
                         category_id, subcategory_id, notes
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         user_id,
                         transaction["type"],
                         transaction["description"],
+                        normalize_description(transaction["description"]),
                         transaction["amount_cents"],
                         exchange_rate_micros,
                         amount_brl_cents,

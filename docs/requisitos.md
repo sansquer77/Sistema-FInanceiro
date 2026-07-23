@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 1.5
-atualizado: 2026-07-09
+versao: 1.6
+atualizado: 2026-07-23
 relacionados:
   - "[[arquitetura]]"
   - "[[visao-produto]]"
@@ -37,6 +37,7 @@ Manter um sistema financeiro local, privado e simples para controlar contas, sal
   - Cálculo de impostos de renda fixa: IOF (tabela regressiva até 30 dias) e Imposto de Renda (tabela regressiva de 22,5% a 15% por prazo de retenção).
   - Ver [[investimentos-portfolio]].
 - **Categorias e Tags**: cadastro, edição, listagem e exclusão de categorias (tipo receita, despesa, investimento), subcategorias e múltiplos marcadores (tags) por transação. Ver [[categorias-tags-gestao]].
+- **Classificação Assistida**: sugestão local de categoria e subcategoria por correspondência exata normalizada com o histórico do próprio usuário, sem dependência de internet. Ver [[classificacao-assistida]].
 - **Cockpit e Relatórios**: resumo financeiro mensal, saldos por moeda, planejamento recorrente, dívidas parceladas, portfólio por tipo, maiores receitas/despesas, relatórios por categoria, subcategoria, conta, tag e fluxo diário. Ver [[relatorios]] e [[arquitetura]].
 - **Importação de Dados**:
   - Leitura e importação de extratos do Organizze em formato `.csv` ou `.xls`.
@@ -64,6 +65,7 @@ Manter um sistema financeiro local, privado e simples para controlar contas, sal
 - Cada lançamento exige descrição, data válida, valor maior que zero, conta/cartão e categoria quando o tipo exigir classificação. Tags são opcionais.
 - Operações financeiras e administrativas relevantes devem gerar registro no Histórico de Operações, sem armazenar senhas, tokens ou segredos.
 - Categorias, subcategorias e tags em uso por lançamentos não podem ser excluídas.
+- Sugestões de classificação devem ser isoladas por usuário e grupo, não sobrescrever escolhas manuais e só preencher os campos quando houver suporte e dominância suficientes.
 - Importações podem criar categorias, subcategorias e tags inexistentes para o usuário autenticado.
 - Linhas importadas com situação diferente de `Pago` são ignoradas e reportadas.
 - Pagamento de fatura de cartão de crédito só é permitido em contas da mesma moeda do cartão e gera uma transação de despesa automática na conta escolhida.
@@ -97,6 +99,7 @@ Manter um sistema financeiro local, privado e simples para controlar contas, sal
 - O banco SQLite deve ser criado automaticamente em `data/finance.db`.
 - O SQLite deve operar com WAL e espera curta por locks para tolerar uso local compartilhado leve, sem transformar o app em sistema multiusuário em rede.
 - Operações de escrita devem manter transações curtas e evitar chamadas externas enquanto seguram conexão aberta.
+- Consultas de classificação assistida devem usar descrições normalizadas indexadas e não percorrer todo o histórico a cada digitação.
 - Mudanças de schema devem ser idempotentes para preservar bancos locais existentes.
 - Mensagens de erro devem ser claras para o usuário e não expor detalhes internos.
 
@@ -109,6 +112,7 @@ Manter um sistema financeiro local, privado e simples para controlar contas, sal
 
 ## Changelog
 
+- `1.6` — 2026-07-23 — Incluído o MVP local de classificação assistida por correspondência exata normalizada.
 - `1.5` — 2026-07-09 — Histórico de Operações incluído no escopo implementado e nas regras funcionais.
 - `1.4` — 2026-07-05 — Regras de segurança atualizadas para configuração SMTP criptografada e isolada por usuário.
 - `1.3` — 2026-07-04 — Escopo atualizado com distribuição desktop, modo rede/LAN confiável e exigência de configuração explícita de hosts/origens.

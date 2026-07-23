@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from financeiro.accounts import SUPPORTED_CURRENCIES, cents_to_money, empty_to_none, money_to_cents
 from financeiro.categories import get_or_create_category, get_or_create_subcategory, get_or_create_tag, normalize_name
+from financeiro.classification_suggestions import normalize_description
 from financeiro.database import begin_immediate, get_connection, row_to_dict
 from financeiro.transactions import create_transaction_with_conn, normalize_optional_tags, split_cents
 
@@ -234,16 +235,17 @@ def create_credit_card_transaction_with_conn(conn: sqlite3.Connection, user_id: 
         cursor = conn.execute(
             """
             INSERT INTO credit_card_transactions (
-                user_id, credit_card_id, type, description, amount_cents, date,
+                user_id, credit_card_id, type, description, normalized_description, amount_cents, date,
                 invoice_month, series_id, series_kind, installment_index,
                 installment_count, recurrence_frequency, category_id, subcategory_id, notes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 user_id,
                 card["id"],
                 transaction["type"],
                 occurrence["description"],
+                normalize_description(occurrence["description"]),
                 occurrence["amount_cents"],
                 occurrence["date"],
                 occurrence["invoice_month"],
@@ -293,13 +295,14 @@ def update_credit_card_transaction(user_id: int, transaction_id: str, data: dict
         conn.execute(
             """
             UPDATE credit_card_transactions
-            SET type = ?, description = ?, amount_cents = ?, date = ?, invoice_month = ?, category_id = ?,
+            SET type = ?, description = ?, normalized_description = ?, amount_cents = ?, date = ?, invoice_month = ?, category_id = ?,
                 subcategory_id = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND user_id = ? AND archived_at IS NULL
             """,
             (
                 transaction["type"],
                 transaction["description"],
+                normalize_description(transaction["description"]),
                 transaction["amount_cents"],
                 transaction["date"],
                 transaction["invoice_month"],
@@ -383,13 +386,14 @@ def update_future_card_series(
         conn.execute(
             """
             UPDATE credit_card_transactions
-            SET type = ?, description = ?, amount_cents = ?, date = ?, category_id = ?,
+            SET type = ?, description = ?, normalized_description = ?, amount_cents = ?, date = ?, category_id = ?,
                 subcategory_id = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND user_id = ? AND archived_at IS NULL
             """,
             (
                 transaction["type"],
                 transaction["description"],
+                normalize_description(transaction["description"]),
                 transaction["amount_cents"],
                 shifted_date,
                 category_id,

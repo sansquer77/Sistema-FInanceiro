@@ -64,6 +64,7 @@ export function registerTransactionsView({
     transactionCategory,
     transactionCategoryRow,
     transactionSubcategory,
+    transactionClassificationSuggestion,
     seriesKind,
     seriesKindRow,
     installmentCount,
@@ -84,11 +85,15 @@ export function registerTransactionsView({
     transactionBalanceHistoryChart,
     transactionSearch,
   } = elements;
+  let classificationSuggestionTimer = null;
+  let classificationSuggestionRequestId = 0;
+  let classificationSelectionTouched = false;
 
   transactionForm.addEventListener("submit", handleTransactionSubmit);
   transactionType.addEventListener("change", () => {
     applyWalletAccountRestrictions();
     updateTransactionTypeState();
+    scheduleClassificationSuggestion();
   });
   transactionAccount.addEventListener("change", handleTransactionAccountChange);
   destinationAccount.addEventListener("change", updateTransferExchangeRateState);
@@ -98,10 +103,15 @@ export function registerTransactionsView({
     }
   });
   transactionCategory.addEventListener("change", () => {
+    classificationSelectionTouched = true;
     renderTransactionSubcategories();
     updateInvestmentFieldState();
   });
-  transactionSubcategory.addEventListener("change", updateInvestmentFieldState);
+  transactionSubcategory.addEventListener("change", () => {
+    classificationSelectionTouched = true;
+    updateInvestmentFieldState();
+  });
+  transactionForm.elements.description.addEventListener("input", scheduleClassificationSuggestion);
   seriesKind.addEventListener("change", updateSeriesState);
   transactionForm.elements.date.addEventListener("change", updateExchangeRateState);
   transactionForm.elements.date.addEventListener("change", updateTransferExchangeRateState);
@@ -120,6 +130,71 @@ export function registerTransactionsView({
     transactionBalanceHistoryChart.addEventListener("click", handleBalanceHistoryClick);
   }
   cancelTransactionEditButton.addEventListener("click", resetTransactionForm);
+
+  function scheduleClassificationSuggestion() {
+    clearTimeout(classificationSuggestionTimer);
+    const requestId = ++classificationSuggestionRequestId;
+    if (transactionClassificationSuggestion) {
+      transactionClassificationSuggestion.textContent = "";
+    }
+    if (
+      transactionForm.elements.id.value
+      || classificationSelectionTouched
+      || !["expense", "income", "investment"].includes(transactionType.value)
+      || transactionForm.elements.description.value.trim().length < 2
+    ) {
+      return;
+    }
+    classificationSuggestionTimer = setTimeout(() => {
+      applyClassificationSuggestion(requestId);
+    }, 300);
+  }
+
+  async function applyClassificationSuggestion(requestId) {
+    const description = transactionForm.elements.description.value.trim();
+    const groupType = transactionType.value;
+    try {
+      const response = await api(
+        `/api/classification-suggestion?description=${encodeURIComponent(description)}&group_type=${encodeURIComponent(groupType)}`,
+      );
+      if (
+        requestId !== classificationSuggestionRequestId
+        || classificationSelectionTouched
+        || transactionForm.elements.id.value
+        || description !== transactionForm.elements.description.value.trim()
+        || groupType !== transactionType.value
+        || !response.suggestion
+      ) {
+        return;
+      }
+      const suggestion = response.suggestion;
+      const categoryExists = Array.from(transactionCategory.options).some(
+        (option) => option.value === suggestion.category_name,
+      );
+      if (!categoryExists) {
+        return;
+      }
+      transactionCategory.value = suggestion.category_name;
+      renderTransactionSubcategories();
+      if (suggestion.subcategory_name) {
+        const subcategoryExists = Array.from(transactionSubcategory.options).some(
+          (option) => option.value === suggestion.subcategory_name,
+        );
+        if (subcategoryExists) {
+          transactionSubcategory.value = suggestion.subcategory_name;
+        }
+      }
+      updateInvestmentFieldState();
+      if (transactionClassificationSuggestion) {
+        const path = suggestion.subcategory_name
+          ? `${suggestion.category_name} › ${suggestion.subcategory_name}`
+          : suggestion.category_name;
+        transactionClassificationSuggestion.textContent = `Sugerido pelo histórico: ${path}`;
+      }
+    } catch {
+      // A classificação assistida nunca bloqueia o cadastro manual.
+    }
+  }
 
   async function loadTransactionSlice() {
     ensureSelectedAccount();
@@ -279,6 +354,12 @@ export function registerTransactionsView({
   }
 
   function resetTransactionForm() {
+    classificationSelectionTouched = false;
+    classificationSuggestionRequestId += 1;
+    clearTimeout(classificationSuggestionTimer);
+    if (transactionClassificationSuggestion) {
+      transactionClassificationSuggestion.textContent = "";
+    }
     const selectedAccountId = String(state.selectedAccountId || transactionAccount.value || "");
     transactionForm.reset();
     if (selectedAccountId && state.accounts.some((account) => String(account.id) === selectedAccountId)) {

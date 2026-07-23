@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 2.2
-atualizado: 2026-07-04
+versao: 2.5
+atualizado: 2026-07-23
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -41,6 +41,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[specs/categorias-tags-gestao]] | ✅ implementado | Classificação |
 | [[specs/cartoes]] | ✅ implementado | Cartões |
 | [[specs/limites-gastos]] | ✅ implementado | Limites |
+| [[specs/classificacao-assistida]] | ✅ implementado | Classificação |
 | [[specs/investimentos-portfolio]] | ✅ implementado | Investimentos |
 | [[specs/relatorios]] | ✅ implementado | Relatórios |
 | [[specs/importacao-organizze]] | ✅ implementado | Importação |
@@ -60,6 +61,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[adr/0003-sqlite-fonte-de-verdade]] | SQLite local como única fonte de verdade. |
 | [[adr/0004-importador-xls-sem-dependencia]] | Parser `.xls` implementado sem biblioteca externa. |
 | [[adr/0005-smtp-criptografado-local]] | Configuração SMTP criptografada em arquivo local. |
+| [[adr/0006-classificacao-assistida-local]] | Proposta de classificação assistida por hábitos locais, com IA externa apenas como fallback opcional. |
 
 ---
 
@@ -95,6 +97,9 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 
 ## Changelog
 
+- `2.5` — 2026-07-23 — MVP de classificação assistida concluído e documentação marcada como implementada.
+- `2.4` — 2026-07-23 — MVP de classificação assistida aprovado e movido para implementação; ADR-0006 adotado.
+- `2.3` — 2026-07-23 — Incluídos a spec e o ADR em rascunho para classificação assistida por hábitos locais.
 - `2.2` — 2026-07-04 — Índice inclui a spec de distribuição, stack reflete macOS/Windows e reforça que novos documentos também partem do template de spec.
 - `2.1` — 2026-06-30 — Regra prática ajustada para explicitar que novas specs devem usar `docs/templates/spec-template.md` como base.
 - `2.0` — 2026-06-29 — Reestruturação completa do vault: frontmatter padronizado em todas as notas, glossário, ADRs, design system, template de spec, MoC como ponto de entrada único, wikilinks cruzados entre todos os documentos.

@@ -20,6 +20,10 @@ PERFORMANCE_INDEXES = (
     ),
     "CREATE INDEX IF NOT EXISTS idx_transactions_user_series_date ON transactions (user_id, series_id, date)",
     (
+        "CREATE INDEX IF NOT EXISTS idx_transactions_user_type_normalized_description "
+        "ON transactions (user_id, type, normalized_description)"
+    ),
+    (
         "CREATE INDEX IF NOT EXISTS idx_credit_card_transactions_user_card_invoice_date "
         "ON credit_card_transactions (user_id, credit_card_id, invoice_month, date)"
     ),
@@ -30,6 +34,10 @@ PERFORMANCE_INDEXES = (
     (
         "CREATE INDEX IF NOT EXISTS idx_credit_card_transactions_user_series_invoice_date "
         "ON credit_card_transactions (user_id, series_id, invoice_month, date)"
+    ),
+    (
+        "CREATE INDEX IF NOT EXISTS idx_card_transactions_user_type_normalized_description "
+        "ON credit_card_transactions (user_id, type, normalized_description)"
     ),
     (
         "CREATE INDEX IF NOT EXISTS idx_credit_card_payments_user_card_invoice "
@@ -496,7 +504,9 @@ def initialize_database() -> None:
         ensure_column(conn, "transactions", "installment_count", "INTEGER")
         ensure_column(conn, "transactions", "recurrence_frequency", "TEXT")
         ensure_column(conn, "transactions", "reconciled_at", "TEXT")
+        ensure_column(conn, "transactions", "normalized_description", "TEXT")
         ensure_column(conn, "credit_card_transactions", "reconciled_at", "TEXT")
+        ensure_column(conn, "credit_card_transactions", "normalized_description", "TEXT")
         ensure_column(conn, "credit_card_transactions", "series_id", "TEXT")
         ensure_column(conn, "credit_card_transactions", "series_kind", "TEXT NOT NULL DEFAULT 'single'")
         migrate_session_tokens(conn)
@@ -517,12 +527,27 @@ def initialize_database() -> None:
         migrate_transaction_type_constraint(conn)
         migrate_transaction_tags(conn)
         migrate_transaction_brl_values(conn)
+        backfill_normalized_descriptions(conn)
         ensure_performance_indexes(conn)
 
 
 def ensure_performance_indexes(conn: sqlite3.Connection) -> None:
     for statement in PERFORMANCE_INDEXES:
         conn.execute(statement)
+
+
+def backfill_normalized_descriptions(conn: sqlite3.Connection) -> None:
+    from financeiro.classification_suggestions import normalize_description
+
+    for table in ("transactions", "credit_card_transactions"):
+        rows = conn.execute(
+            f"SELECT id, description FROM {table} WHERE normalized_description IS NULL"
+        ).fetchall()
+        if rows:
+            conn.executemany(
+                f"UPDATE {table} SET normalized_description = ? WHERE id = ?",
+                [(normalize_description(row["description"]), row["id"]) for row in rows],
+            )
 
 
 def ensure_operation_logs(conn: sqlite3.Connection) -> None:

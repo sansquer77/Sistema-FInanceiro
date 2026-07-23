@@ -49,6 +49,7 @@ from financeiro.categories import (
     update_tag,
     get_category_evolution,
 )
+from financeiro.classification_suggestions import get_classification_suggestion
 from financeiro.credit_cards import (
     archive_credit_card,
     create_credit_card,
@@ -236,6 +237,9 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/exchange-rate":
             self.handle_exchange_rate()
+            return
+        if path == "/api/classification-suggestion":
+            self.handle_classification_suggestion()
             return
         if path == "/api/email-config":
             self.handle_email_config_status()
@@ -573,6 +577,13 @@ class AppHandler(BaseHTTPRequestHandler):
         transaction_date = (query.get("date") or [None])[0]
         rate = get_exchange_rate_to_brl(currency, transaction_date)
         self.send_json({"currency": currency.upper(), "date": transaction_date, "rate": f"{rate:.6f}"})
+
+    def handle_classification_suggestion(self) -> None:
+        user = self.require_user()
+        query = parse_qs(urlsplit(self.path).query)
+        description = (query.get("description") or [""])[0]
+        group_type = (query.get("group_type") or [""])[0]
+        self.send_json(get_classification_suggestion(user["id"], description, group_type))
 
     def handle_list_categories(self) -> None:
         user = self.require_user()

@@ -11,6 +11,7 @@ from urllib.request import Request, urlopen
 
 from financeiro.accounts import cents_to_money, empty_to_none, money_to_cents
 from financeiro.categories import ClassificationError, get_or_create_category, get_or_create_subcategory, get_or_create_tag, normalize_name
+from financeiro.classification_suggestions import normalize_description
 from financeiro.database import begin_immediate, get_connection, row_to_dict
 
 TRANSACTION_TYPES = {"income", "expense", "transfer", "investment"}
@@ -162,16 +163,17 @@ def create_transaction_with_conn(conn: sqlite3.Connection, user_id: int, data: d
         cursor = conn.execute(
             """
             INSERT INTO transactions (
-                user_id, type, description, amount_cents, destination_amount_cents,
+                user_id, type, description, normalized_description, amount_cents, destination_amount_cents,
                 exchange_rate_micros, transfer_exchange_rate_micros, amount_brl_cents, date, account_id,
                 destination_account_id, category_id, subcategory_id, series_id, series_kind, installment_index,
                 installment_count, recurrence_frequency, notes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 user_id,
                 transaction["type"],
                 occurrence["description"],
+                normalize_description(occurrence["description"]),
                 occurrence_amount_cents,
                 occurrence_destination_amount_cents,
                 exchange_rate_micros,
@@ -237,7 +239,7 @@ def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
         conn.execute(
             """
             UPDATE transactions
-            SET type = ?, description = ?, amount_cents = ?, destination_amount_cents = ?,
+            SET type = ?, description = ?, normalized_description = ?, amount_cents = ?, destination_amount_cents = ?,
                 exchange_rate_micros = ?, transfer_exchange_rate_micros = ?,
                 amount_brl_cents = ?, date = ?, account_id = ?, destination_account_id = ?,
                 category_id = ?, subcategory_id = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
@@ -245,12 +247,13 @@ def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
             """,
             (
                 transaction["type"],
-                    transaction["description"],
-                    transaction["amount_cents"],
-                    transaction["destination_amount_cents"],
-                    exchange_rate_micros,
-                    transaction["transfer_exchange_rate_micros"],
-                    amount_brl_cents,
+                transaction["description"],
+                normalize_description(transaction["description"]),
+                transaction["amount_cents"],
+                transaction["destination_amount_cents"],
+                exchange_rate_micros,
+                transaction["transfer_exchange_rate_micros"],
+                amount_brl_cents,
                 transaction["date"],
                 source["id"],
                 destination["id"] if destination else None,
@@ -371,7 +374,7 @@ def apply_future_series_updates(
         conn.execute(
             """
             UPDATE transactions
-            SET type = ?, description = ?, amount_cents = ?, destination_amount_cents = ?,
+            SET type = ?, description = ?, normalized_description = ?, amount_cents = ?, destination_amount_cents = ?,
                 exchange_rate_micros = ?, transfer_exchange_rate_micros = ?,
                 amount_brl_cents = ?, date = ?, account_id = ?, destination_account_id = ?,
                 category_id = ?, subcategory_id = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
@@ -380,6 +383,7 @@ def apply_future_series_updates(
             (
                 future_transaction["type"],
                 future_transaction["description"],
+                normalize_description(future_transaction["description"]),
                 future_transaction["amount_cents"],
                 future_transaction["destination_amount_cents"],
                 exchange_rate_micros,
