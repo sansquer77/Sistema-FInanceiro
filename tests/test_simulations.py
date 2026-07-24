@@ -62,6 +62,28 @@ class ButterflyEffectSimulationTest(unittest.TestCase):
         self.assertEqual(transaction_count, 0)
         self.assertEqual(account_row["current_balance_cents"], 100000)
 
+    def test_single_expense_accepts_minimal_uncategorized_payload(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta principal",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "1000,00",
+        })
+
+        response = simulate_butterfly_effect(user["id"], {
+            "type": "expense",
+            "amount": "250,00",
+            "date": "2026-01-15",
+            "account_id": str(account["id"]),
+            "series_kind": "single",
+        })
+
+        self.assertEqual(response["scenario"]["description"], "Despesa simulada")
+        self.assertIsNone(response["scenario"]["category_id"])
+        self.assertEqual(response["account_impact"]["projected_balance_cents"], 75000)
+        self.assertEqual(response["limit_impact"]["items"], [])
+
     def test_simulation_uses_reconciled_balance_as_of_selected_date(self) -> None:
         user = create_user("Alice", "alice@example.com", "correct-password")
         account = create_checking_account(user["id"], {

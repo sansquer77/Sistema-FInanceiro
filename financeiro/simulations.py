@@ -57,9 +57,6 @@ def normalize_simulation_payload(data: dict) -> dict:
     simulation_type = str(data.get("type", "")).strip().lower()
     if simulation_type not in SIMULATION_TYPES:
         raise SimulationError("Tipo de simulacao invalido.")
-    description = str(data.get("description", "")).strip()
-    if not description:
-        raise SimulationError("Informe a descricao do cenário.")
     amount_cents = money_to_cents(data.get("amount", "0"))
     if amount_cents <= 0:
         raise SimulationError("Informe um valor maior que zero.")
@@ -82,7 +79,7 @@ def normalize_simulation_payload(data: dict) -> dict:
         "type": simulation_type,
         "amount_cents": amount_cents,
         "date": simulation_date,
-        "description": description,
+        "description": normalize_description(data.get("description"), simulation_type),
         "account_id": account_id,
         "category_id": normalize_optional_id(data.get("category_id")),
         "subcategory_id": normalize_optional_id(data.get("subcategory_id")),
@@ -112,6 +109,13 @@ def normalize_optional_id(value: object) -> int | None:
     return normalize_id(text, "Identificador invalido.")
 
 
+def normalize_description(value: object, simulation_type: str) -> str:
+    text = str(value or "").strip()
+    if text:
+        return text
+    return "Receita simulada" if simulation_type == "income" else "Despesa simulada"
+
+
 def fetch_account(conn, user_id: int, account_id: int) -> dict:
     row = conn.execute(
         """
@@ -127,8 +131,6 @@ def fetch_account(conn, user_id: int, account_id: int) -> dict:
 
 
 def resolve_category(conn, user_id: int, payload: dict) -> tuple[int | None, int | None]:
-    if payload["type"] == "expense" and not payload["category_id"]:
-        raise SimulationError("Escolha uma categoria para despesas.")
     if payload["category_id"] is None:
         return None, None
     row = conn.execute(
@@ -307,27 +309,19 @@ def fetch_month_real_balance_delta(conn, user_id: int, account_id: int, month: s
 
 
 def build_limit_impact(conn, user_id: int, account: dict, payload: dict, virtual_items: list[dict], category_id: int | None, subcategory_id: int | None) -> dict:
+    if category_id is None:
+        return {"items": []}
     items = []
     months = sorted({item["month"] for item in virtual_items})
     for month in months:
-        if category_id is not None:
-            limit_rows = conn.execute(
-                """
-                SELECT id, month, category_id, subcategory_id, limit_amount_cents
-                FROM spending_limits
-                WHERE user_id = ? AND month = ? AND category_id = ?
-                """,
-                (user_id, month, category_id),
-            ).fetchall()
-        else:
-            limit_rows = conn.execute(
-                """
-                SELECT id, month, category_id, subcategory_id, limit_amount_cents
-                FROM spending_limits
-                WHERE user_id = ? AND month = ?
-                """,
-                (user_id, month),
-            ).fetchall()
+        limit_rows = conn.execute(
+            """
+            SELECT id, month, category_id, subcategory_id, limit_amount_cents
+            FROM spending_limits
+            WHERE user_id = ? AND month = ? AND category_id = ?
+            """,
+            (user_id, month, category_id),
+        ).fetchall()
         for row in limit_rows:
             if subcategory_id is not None and row["subcategory_id"] not in {None, subcategory_id}:
                 continue

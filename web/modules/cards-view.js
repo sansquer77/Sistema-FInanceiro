@@ -805,14 +805,31 @@ export function registerCardsView({
           <path class="invoice-history-line future" d="${futurePath}"></path>
         </svg>
         ${points}
-        ${rows.map((row) => `
+        ${rows.map((row) => {
+          const amountText = formatMoney(row.amount, card.currency);
+          return `
           <button class="invoice-history-card ${row.isCurrent ? "current" : ""}" type="button" data-invoice-history-month="${escapeHtml(row.month)}" role="listitem" aria-current="${row.isCurrent ? "true" : "false"}">
             <span>${escapeHtml(row.label)}</span>
-            <strong>${formatMoney(row.amount, card.currency)}</strong>
+            <strong class="${chartAmountSizeClass(amountText)}">${amountText}</strong>
           </button>
-        `).join("")}
+        `;
+        }).join("")}
       </div>
     `;
+  }
+
+  function chartAmountSizeClass(text) {
+    const length = String(text || "").replace(/\s/g, "").length;
+    if (length >= 18) {
+      return "chart-amount-xxs";
+    }
+    if (length >= 15) {
+      return "chart-amount-xs";
+    }
+    if (length >= 12) {
+      return "chart-amount-sm";
+    }
+    return "";
   }
 
   function invoiceHistoryRows(card) {

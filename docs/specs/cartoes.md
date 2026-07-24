@@ -2,7 +2,7 @@
 tipo: spec
 area: cartoes
 status: implementado
-versao: 1.5
+versao: 1.6
 atualizado: 2026-07-24
 relacionados:
   - "[[contas-correntes]]"
@@ -90,6 +90,7 @@ Qualquer usuário autenticado localmente que utilize cartões de crédito para d
 - Faturas não pagas com lançamentos conciliados devem entrar como abatimento no saldo previsto da conta preferencial de pagamento, no mês de vencimento da fatura.
 - Faturas já pagas não devem ser abatidas novamente no saldo previsto da conta preferencial.
 - Valores de lançamentos de cartão usam o mesmo tamanho de fonte compacto dos lançamentos de conta para melhorar a densidade de leitura.
+- Valores financeiros extensos no gráfico de faturas devem se adaptar ao espaço disponível reduzindo a tipografia, sem aumentar a área do gráfico nem truncar centavos.
 
 ## API e dados
 
@@ -127,9 +128,11 @@ Tabelas: `credit_cards`, `credit_card_transactions`, `credit_card_payments`, `cr
 - Dado o pagamento de uma fatura, quando executado, o saldo da conta escolhida é reduzido pelo valor da fatura e a fatura é marcada como paga.
 - Dado lançamentos recorrentes de cartão, quando listados no Cockpit, aparecem pela competência da fatura.
 - Dado uma fatura conciliada e não paga com conta preferencial configurada, quando a conta exibe saldo previsto, então a fatura é considerada pelo vencimento sem duplicar faturas já pagas.
+- Dado o gráfico de faturas com valores extensos, quando exibido, então os valores cabem nos cartões mensais por ajuste responsivo de tipografia, mantendo o tamanho atual da área.
 
 ## Changelog
 
+- `1.6` — 2026-07-24 — Gráfico de faturas passa a adaptar valores financeiros extensos ao espaço disponível sem ampliar a área visual.
 - `1.5` — 2026-07-24 — Valores de lançamentos de cartão padronizados com a fonte compacta dos lançamentos de conta.
 - `1.4` — 2026-07-23 — Integrada a sugestão local de categoria e subcategoria por histórico exato.
 - `1.3` — 2026-07-17 — Lançamentos com competência calculada em fatura paga passam automaticamente para a próxima fatura aberta.

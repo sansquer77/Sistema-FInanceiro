@@ -334,8 +334,6 @@ const simulationForm = document.querySelector("#simulationForm");
 const simulationType = document.querySelector("#simulationType");
 const simulationDate = document.querySelector("#simulationDate");
 const simulationAccount = document.querySelector("#simulationAccount");
-const simulationCategory = document.querySelector("#simulationCategory");
-const simulationSubcategory = document.querySelector("#simulationSubcategory");
 const simulationSeriesKind = document.querySelector("#simulationSeriesKind");
 const simulationInstallmentCountLabel = document.querySelector("#simulationInstallmentCountLabel");
 const simulationInstallmentCount = document.querySelector("#simulationInstallmentCount");
@@ -742,8 +740,6 @@ const simulationsView = registerSimulationsView({
     simulationType,
     simulationDate,
     simulationAccount,
-    simulationCategory,
-    simulationSubcategory,
     simulationSeriesKind,
     simulationInstallmentCountLabel,
     simulationInstallmentCount,

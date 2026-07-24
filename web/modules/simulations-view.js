@@ -16,8 +16,6 @@ export function registerSimulationsView({
     simulationType,
     simulationDate,
     simulationAccount,
-    simulationCategory,
-    simulationSubcategory,
     simulationSeriesKind,
     simulationInstallmentCountLabel,
     simulationInstallmentCount,
@@ -37,10 +35,7 @@ export function registerSimulationsView({
   simulationForm.addEventListener("submit", handleSubmit);
   resetSimulationButton.addEventListener("click", resetForm);
   simulationSeriesKind.addEventListener("change", syncSeriesFields);
-  simulationType.addEventListener("change", () => {
-    loadSimulationCategoriesForCurrentType();
-  });
-  simulationCategory.addEventListener("change", renderSimulationSubcategories);
+  simulationType.addEventListener("change", clearSimulationResult);
   simulationAccount.addEventListener("change", () => {
     const account = state.accounts.find((entry) => String(entry.id) === simulationAccount.value);
     if (account) {
@@ -49,10 +44,7 @@ export function registerSimulationsView({
   });
 
   async function loadSimulationFormData() {
-    const [accountsResponse] = await Promise.all([
-      api("/api/checking-accounts"),
-      loadSimulationCategoriesForCurrentType(),
-    ]);
+    const accountsResponse = await api("/api/checking-accounts");
     state.accounts = accountsResponse.accounts || [];
     renderAccounts();
     if (state.selectedAccountId) {
@@ -65,14 +57,6 @@ export function registerSimulationsView({
     simulationDate.value = new Date().toISOString().slice(0, 10);
   }
 
-  async function loadSimulationCategoriesForCurrentType() {
-    const group = simulationType.value === "income" ? "income" : "expense";
-    const categoriesResponse = await api(`/api/categories?group=${group}`);
-    state.categories = categoriesResponse.categories || [];
-    renderCategories();
-    renderSimulationSubcategories();
-  }
-
   function renderAccounts() {
     const selectedValue = simulationAccount.value;
     simulationAccount.innerHTML = state.accounts.map((account) => (
@@ -82,32 +66,6 @@ export function registerSimulationsView({
       simulationAccount.value = String(selectedValue);
     } else if (state.accounts[0]) {
       simulationAccount.value = String(state.accounts[0].id);
-    }
-  }
-
-  function renderCategories() {
-    const selectedValue = simulationCategory.value;
-    simulationCategory.innerHTML = state.categories.map((category) => (
-      `<option value="${category.id}">${escapeHtml(category.name)}</option>`
-    )).join("");
-    if (state.categories.some((category) => String(category.id) === String(selectedValue))) {
-      simulationCategory.value = String(selectedValue);
-    } else if (state.categories[0]) {
-      simulationCategory.value = String(state.categories[0].id);
-    }
-    renderSimulationSubcategories();
-  }
-
-  function renderSimulationSubcategories() {
-    const selectedCategoryId = simulationCategory.value;
-    const category = state.categories.find((entry) => String(entry.id) === String(selectedCategoryId));
-    const subcategories = category ? category.subcategories || [] : [];
-    const selectedValue = simulationSubcategory.value;
-    simulationSubcategory.innerHTML = '<option value="">Sem subcategoria</option>' + subcategories.map((subcategory) => (
-      `<option value="${subcategory.id}">${escapeHtml(subcategory.name)}</option>`
-    )).join("");
-    if (subcategories.some((subcategory) => String(subcategory.id) === String(selectedValue))) {
-      simulationSubcategory.value = String(selectedValue);
     }
   }
 
@@ -132,6 +90,7 @@ export function registerSimulationsView({
   function clearSimulationResult() {
     simulationCurrentBalance.textContent = "-";
     simulationProjectedBalance.textContent = "-";
+    applyAmountTone(simulationProjectedBalance, 0);
     if (simulationDifference) {
       simulationDifference.textContent = "-";
     }
@@ -158,7 +117,9 @@ export function registerSimulationsView({
     const account = state.accounts.find((entry) => String(entry.id) === String(response.scenario?.account_id));
     const currency = account?.currency || "BRL";
     simulationCurrentBalance.textContent = formatMoney((accountImpact.current_balance_cents || 0) / 100, currency);
-    simulationProjectedBalance.textContent = formatMoney((accountImpact.projected_balance_cents || 0) / 100, currency);
+    const projectedBalanceCents = accountImpact.projected_balance_cents || 0;
+    simulationProjectedBalance.textContent = formatMoney(projectedBalanceCents / 100, currency);
+    applyAmountTone(simulationProjectedBalance, projectedBalanceCents);
     if (simulationDifference) {
       simulationDifference.textContent = formatMoney((accountImpact.difference_cents || 0) / 100, currency);
     }
@@ -168,7 +129,7 @@ export function registerSimulationsView({
     simulationVirtualItems.innerHTML = (response.virtual_items || []).map((item) => `
       <article class="simulation-item">
         <div>
-          <strong>${escapeHtml(item.description)}</strong>
+          <strong>${escapeHtml(item.description || virtualItemLabel(response.scenario, item))}</strong>
           <small>${escapeHtml(item.date)} · ${item.occurrence_index}/${item.occurrence_total}</small>
         </div>
         <strong>${item.impact_sign}${formatMoney(Math.abs((item.impact_cents || 0) / 100), currency)}</strong>
@@ -209,19 +170,49 @@ export function registerSimulationsView({
         </svg>
         ${forecastPoints}
         ${simulatedPoints}
-        ${rows.map((row) => `
+        ${rows.map((row) => {
+          const simulatedText = formatMoney(Math.abs(row.simulatedAmount), currency);
+          const forecastText = formatMoney(Math.abs(row.forecastAmount), currency);
+          return `
           <button class="invoice-history-card ${row.index === 0 ? "current" : ""}" type="button" role="listitem" aria-current="${row.index === 0 ? "true" : "false"}">
             <span>${escapeHtml(row.label)}</span>
-            <strong class="${row.simulatedAmount < 0 ? "danger-text" : row.simulatedAmount > 0 ? "positive-text" : ""}">${formatMoney(Math.abs(row.simulatedAmount), currency)}</strong>
-            <small>${formatMoney(Math.abs(row.forecastAmount), currency)}</small>
+            <strong class="${chartAmountSizeClass(simulatedText)} ${row.simulatedAmount < 0 ? "danger-text" : row.simulatedAmount > 0 ? "positive-text" : ""}">${simulatedText}</strong>
+            <small class="${chartAmountSizeClass(forecastText)}">${forecastText}</small>
           </button>
-        `).join("")}
+        `;
+        }).join("")}
       </div>
       <div class="simulation-chart-legend">
         <span><i class="legend-line forecast"></i>Saldo previsto da conta</span>
         <span><i class="legend-line simulated"></i>Saldo com simulação</span>
       </div>
     `;
+  }
+
+  function applyAmountTone(element, amountCents) {
+    element.classList.toggle("danger-text", amountCents < 0);
+    element.classList.toggle("positive-text", amountCents > 0);
+    element.closest(".summary-card")?.classList.toggle("danger", amountCents < 0);
+    element.closest(".summary-card")?.classList.toggle("positive", amountCents > 0);
+  }
+
+  function virtualItemLabel(scenario = {}, item = {}) {
+    const base = scenario.type === "income" ? "Receita simulada" : "Despesa simulada";
+    return item.occurrence_total > 1 ? `${base} (${item.occurrence_index}/${item.occurrence_total})` : base;
+  }
+
+  function chartAmountSizeClass(text) {
+    const length = String(text || "").replace(/\s/g, "").length;
+    if (length >= 18) {
+      return "chart-amount-xxs";
+    }
+    if (length >= 15) {
+      return "chart-amount-xs";
+    }
+    if (length >= 12) {
+      return "chart-amount-sm";
+    }
+    return "";
   }
 
   function simulationBalanceHistoryRows(series, currency) {

@@ -652,14 +652,31 @@ export function registerTransactionsView({
           <path class="invoice-history-line future" d="${futurePath}"></path>
         </svg>
         ${points}
-        ${rows.map((row) => `
+        ${rows.map((row) => {
+          const amountText = formatMoney(Math.abs(row.amount), row.currency);
+          return `
           <button class="invoice-history-card ${row.isCurrent ? "current" : ""}" type="button" data-transaction-balance-month="${escapeHtml(row.month)}" role="listitem" aria-current="${row.isCurrent ? "true" : "false"}">
             <span>${escapeHtml(row.label)}</span>
-            <strong class="${row.amount < 0 ? "danger-text" : row.amount > 0 ? "positive-text" : ""}">${formatMoney(Math.abs(row.amount), row.currency)}</strong>
+            <strong class="${chartAmountSizeClass(amountText)} ${row.amount < 0 ? "danger-text" : row.amount > 0 ? "positive-text" : ""}">${amountText}</strong>
           </button>
-        `).join("")}
+        `;
+        }).join("")}
       </div>
     `;
+  }
+
+  function chartAmountSizeClass(text) {
+    const length = String(text || "").replace(/\s/g, "").length;
+    if (length >= 18) {
+      return "chart-amount-xxs";
+    }
+    if (length >= 15) {
+      return "chart-amount-xs";
+    }
+    if (length >= 12) {
+      return "chart-amount-sm";
+    }
+    return "";
   }
 
   function balanceHistoryRows(account, transactions) {

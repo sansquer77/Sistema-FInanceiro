@@ -1067,17 +1067,6 @@
                       <select name="account_id" id="simulationAccount" required></select>
                     </label>
                   </div>
-                  <label>Descrição
-                    <input name="description" id="simulationDescription" type="text" placeholder="Ex.: novo contrato" required>
-                  </label>
-                  <div class="field-row">
-                    <label>Categoria
-                      <select name="category_id" id="simulationCategory"></select>
-                    </label>
-                    <label>Subcategoria
-                      <select name="subcategory_id" id="simulationSubcategory"></select>
-                    </label>
-                  </div>
                   <div class="field-row">
                     <label>Recorrência
                       <select name="series_kind" id="simulationSeriesKind">
@@ -1118,8 +1107,8 @@
                     <span>Saldo atual</span>
                     <strong id="simulationCurrentBalance">R$ 0,00</strong>
                   </div>
-                  <div class="summary-card positive">
-                    <span>Saldo projetado</span>
+                  <div class="summary-card" id="simulationProjectedBalanceCard">
+                    <span>Saldo projetado no mês</span>
                     <strong id="simulationProjectedBalance">R$ 0,00</strong>
                   </div>
                 </div>

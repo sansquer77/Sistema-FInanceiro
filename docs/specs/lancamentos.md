@@ -2,7 +2,7 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 1.9
+versao: 2.0
 atualizado: 2026-07-24
 relacionados:
   - "[[contas-correntes]]"
@@ -76,6 +76,7 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 - Em lançamentos parcelados, o valor informado é o total da compra/lançamento e deve ser dividido pela quantidade de parcelas. Ex.: R$ 500 em 5x gera 5 lançamentos de R$ 100.
 - Em lançamentos recorrentes, cada ocorrência futura deve manter exatamente o valor informado. Ex.: R$ 500 recorrente por 5 ocorrências gera 5 lançamentos de R$ 500.
 - Ao final de cada grupo diário na tela de Lançamentos, `Saldo previsto` considera todos os lançamentos até a data e `Saldo conciliado` considera somente lançamentos com `reconciled_at`, ambos partindo do saldo inicial da conta selecionada.
+- Valores financeiros extensos no gráfico de histórico/projeção de saldos devem se adaptar ao espaço disponível reduzindo a tipografia, sem aumentar a área do gráfico nem truncar centavos.
 - Indicadores compactos distinguem visualmente valores previstos e conciliados sem introduzir novas cores semânticas.
 - Cada lançamento exibe estado textual `Conciliado` ou `Pendente`, além da ação por ícone.
 - Busca e filtro de conciliação permanecem ativos ao alternar temporariamente de módulo ou editar um lançamento.
@@ -126,9 +127,11 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dado um cabeçalho diário, quando acionado, então alterna o conteúdo do dia e informa o estado por `aria-expanded`.
 - Dado um grupo diário longo, quando a página é rolada dentro dele, então o cabeçalho da data permanece brevemente visível.
 - Dado o gráfico de histórico/projeção de saldos, quando exibido, então cada cartão mensal mostra o mês no topo e não exibe marcadores `Previsto` ou `Conciliado` dentro da área do gráfico.
+- Dado o gráfico de histórico/projeção de saldos com valores extensos, quando exibido, então os valores cabem nos cartões mensais por ajuste responsivo de tipografia, mantendo o tamanho atual da área.
 
 ## Changelog
 
+- `2.0` — 2026-07-24 — Gráfico de saldos passa a adaptar valores financeiros extensos ao espaço disponível sem ampliar a área visual.
 - `1.9` — 2026-07-24 — Grupos diários passam a abrir inicialmente de hoje em diante, mantendo datas passadas recolhidas.
 - `1.8` — 2026-07-24 — Gráfico de saldos em Lançamentos de Contas volta ao layout do gráfico de cartões, com mês no topo e sem marcadores de previsto/conciliado.
 - `1.7` — 2026-07-24 — Rótulos de saldos diários removem redundância `no dia` e valores de lançamentos ganham fonte mais compacta.

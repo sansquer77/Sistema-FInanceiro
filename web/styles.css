@@ -884,9 +884,22 @@ textarea:focus {
   background: linear-gradient(180deg, color-mix(in srgb, var(--positive) 12%, var(--surface-low)) 0%, color-mix(in srgb, var(--positive) 8%, var(--panel)) 100%);
 }
 
+.summary-card.danger {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--line));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--danger) 12%, var(--surface-low)) 0%, color-mix(in srgb, var(--danger) 8%, var(--panel)) 100%);
+}
+
 .summary-card strong {
   font-size: 20px;
   color: var(--ink);
+}
+
+.summary-card strong.positive-text {
+  color: var(--positive);
+}
+
+.summary-card strong.danger-text {
+  color: var(--danger);
 }
 
 .summary-card span {
@@ -2786,7 +2799,23 @@ textarea:focus {
   font-weight: 900;
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
-  white-space: nowrap;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+.invoice-history-card .chart-amount-sm {
+  font-size: 13.5px;
+}
+
+.invoice-history-card .chart-amount-xs {
+  font-size: 12px;
+  letter-spacing: -0.02em;
+}
+
+.invoice-history-card .chart-amount-xxs {
+  font-size: 10.5px;
+  letter-spacing: -0.04em;
 }
 
 .invoice-history-svg {
@@ -2869,13 +2898,40 @@ textarea:focus {
 
 .simulation-chart .invoice-history-card strong {
   font-size: 13px;
+  line-height: 1.15;
+}
+
+.simulation-chart .invoice-history-card strong.positive-text {
+  color: var(--positive);
+}
+
+.simulation-chart .invoice-history-card strong.danger-text {
+  color: var(--danger);
 }
 
 .simulation-chart .invoice-history-card small {
   color: var(--muted);
   font-size: 11px;
+  line-height: 1.15;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: center;
   font-variant-numeric: tabular-nums;
   text-transform: none;
+}
+
+.simulation-chart .invoice-history-card .chart-amount-sm {
+  font-size: 11.5px;
+}
+
+.simulation-chart .invoice-history-card .chart-amount-xs {
+  font-size: 10.5px;
+  letter-spacing: -0.02em;
+}
+
+.simulation-chart .invoice-history-card .chart-amount-xxs {
+  font-size: 9.5px;
+  letter-spacing: -0.04em;
 }
 
 .simulation-chart .simulation-forecast-line {
