@@ -848,16 +848,26 @@ export function registerTransactionsView({
   }
 
   function dailyBalance(dateKey, transactions = state.transactions) {
-    const balance = getBalanceUntil(dateKey, transactions);
-    const balanceTotal = [...balance.values()].reduce((total, value) => total + Number(value), 0);
-    const balanceClass = balanceTotal < 0 ? "danger-text" : balanceTotal > 0 ? "positive-text" : "";
+    const forecastBalance = getBalanceUntil(dateKey, transactions, false);
+    const reconciledBalance = getBalanceUntil(dateKey, transactions, true);
     const row = document.createElement("div");
     row.className = "daily-balance";
     row.innerHTML = `
-      <span>Saldo no dia</span>
-      <strong class="${balanceClass}">${formatCurrencySummary(balance)}</strong>
+      ${dailyBalanceLine("Saldo previsto no dia", forecastBalance)}
+      ${dailyBalanceLine("Saldo conciliado no dia", reconciledBalance)}
     `;
     return row;
+  }
+
+  function dailyBalanceLine(label, balance) {
+    const total = [...balance.values()].reduce((sum, value) => sum + Number(value), 0);
+    const balanceClass = total < 0 ? "danger-text" : total > 0 ? "positive-text" : "";
+    return `
+      <div class="daily-balance-line">
+        <span>${label}</span>
+        <strong class="${balanceClass}">${formatCurrencySummary(balance)}</strong>
+      </div>
+    `;
   }
 
   function matchesTransactionSearch(transaction) {

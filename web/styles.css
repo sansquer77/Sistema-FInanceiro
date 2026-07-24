@@ -3321,12 +3321,20 @@ textarea:focus {
 
 .daily-balance {
   display: flex;
+  flex-direction: column;
   justify-content: flex-end;
-  align-items: center;
-  gap: 12px;
+  align-items: flex-end;
+  gap: 4px;
   padding: 2px 4px 8px;
   color: var(--muted);
   font-size: 13px;
+}
+
+.daily-balance-line {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
 }
 
 .daily-balance strong {

@@ -2,8 +2,8 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 1.3
-atualizado: 2026-07-20
+versao: 1.4
+atualizado: 2026-07-24
 relacionados:
   - "[[contas-correntes]]"
   - "[[categorias-tags-gestao]]"
@@ -17,7 +17,7 @@ aliases: ["Lançamentos", "Transações"]
 # Lançamentos
 
 > [!info] Status
-> **implementado** · área: `lancamentos` · atualizado em 2026-07-20 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]]
+> **implementado** · área: `lancamentos` · atualizado em 2026-07-24 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]]
 
 ## Problema
 
@@ -75,6 +75,7 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 - Lançamentos parcelados exibem índice e total (`1/36`, `2/36`...) sem reiniciar a contagem em edições pontuais.
 - Em lançamentos parcelados, o valor informado é o total da compra/lançamento e deve ser dividido pela quantidade de parcelas. Ex.: R$ 500 em 5x gera 5 lançamentos de R$ 100.
 - Em lançamentos recorrentes, cada ocorrência futura deve manter exatamente o valor informado. Ex.: R$ 500 recorrente por 5 ocorrências gera 5 lançamentos de R$ 500.
+- Ao final de cada grupo diário na tela de Lançamentos, `Saldo previsto no dia` considera todos os lançamentos até a data e `Saldo conciliado no dia` considera somente lançamentos com `reconciled_at`, ambos partindo do saldo inicial da conta selecionada.
 
 ## API e dados
 
@@ -101,9 +102,11 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dado `apply_to_future` na edição, quando executado, os dados e saldos das ocorrências futuras não conciliadas são atualizados.
 - Dado um lançamento de série em edição ou exclusão, quando o modal aparece, `Voltar` cancela a ação sem alterar dados.
 - Dado um lançamento listado, quando exibido, mostra conta, tipo, valor, data, categoria, subcategoria, tags e indicação de recorrente/parcelado.
+- Dado um dia com lançamentos conciliados e não conciliados, quando o agrupamento diário é exibido, então mostra separadamente o saldo previsto com todos os lançamentos e o saldo conciliado somente com os conciliados.
 
 ## Changelog
 
+- `1.4` — 2026-07-24 — Agrupamento diário passa a exibir saldos previsto e conciliado separadamente.
 - `1.3` — 2026-07-23 — Integrada a sugestão local de categoria e subcategoria por histórico exato.
 - `1.2` — 2026-07-20 — Modal de decisão explícita documentado para edição e exclusão de séries.
 - `1.1` — 2026-06-29 — Frontmatter, tabela de dados e critérios formalizados; wikilinks adicionados.
