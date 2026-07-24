@@ -2,7 +2,7 @@
 tipo: spec
 area: usuario
 status: implementado
-versao: 1.0
+versao: 1.1
 atualizado: 2026-07-24
 relacionados:
   - "[[frontend-modularizacao]]"
@@ -35,7 +35,7 @@ Usuários finais e mantenedores que usam o Sistema Financeiro localmente, instal
 
 ## Dados
 
-- `descricao`: texto estático e sucinto sobre o objetivo do app.
+- `descricao`: texto estático e sucinto sobre o objetivo do app, sem repetir o título do módulo.
 - `funcionalidades`: lista estática de capacidades principais.
 - `desenvolvedor`: nome do responsável pelo desenvolvimento.
 - `tecnologias`: lista estática de tecnologias usadas.
@@ -55,6 +55,7 @@ Usuários finais e mantenedores que usam o Sistema Financeiro localmente, instal
 - A infraestrutura mínima deve distinguir uso local e uso em rede/LAN.
 - O uso em rede deve ser descrito como adequado apenas para rede confiável; acesso remoto deve usar HTTPS/reverse-proxy.
 - A tela deve respeitar o design system existente, sem introduzir nova identidade visual.
+- O painel principal não deve repetir o rótulo **Sobre** acima de **Sistema Financeiro**, pois o módulo já informa esse contexto no cabeçalho da página.
 
 ## API e dados
 
@@ -79,6 +80,7 @@ Usuários finais e mantenedores que usam o Sistema Financeiro localmente, instal
 
 ## Changelog
 
+- `1.1` — 2026-07-24 — Removida repetição do rótulo Sobre no painel principal.
 - `1.0` — 2026-07-24 — Criada tela **Sobre** no menu Usuário com descrição, funcionalidades, desenvolvimento, tecnologias, contato e infraestrutura mínima.
 
 ## Relacionados

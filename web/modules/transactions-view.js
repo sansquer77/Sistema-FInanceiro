@@ -655,7 +655,6 @@ export function registerTransactionsView({
         ${rows.map((row) => `
           <button class="invoice-history-card ${row.isCurrent ? "current" : ""}" type="button" data-transaction-balance-month="${escapeHtml(row.month)}" role="listitem" aria-current="${row.isCurrent ? "true" : "false"}">
             <span>${escapeHtml(row.label)}</span>
-            <em><span class="balance-kind-badge ${row.offset < 0 ? "reconciled" : "forecast"}"><span aria-hidden="true">${row.offset < 0 ? "✓" : "○"}</span> ${escapeHtml(row.description)}</span></em>
             <strong class="${row.amount < 0 ? "danger-text" : row.amount > 0 ? "positive-text" : ""}">${formatMoney(Math.abs(row.amount), row.currency)}</strong>
           </button>
         `).join("")}
@@ -776,7 +775,7 @@ export function registerTransactionsView({
       return;
     }
     const grouped = groupTransactionsByDate(transactions);
-    const latestDate = [...grouped.keys()].sort().at(-1);
+    const today = todayLocalDateValue();
     for (const [dateKey, items] of grouped.entries()) {
       const group = document.createElement("section");
       const containsHighlightedTransaction = items.some(
@@ -787,7 +786,7 @@ export function registerTransactionsView({
       }
       const isExpanded = compact
         || containsHighlightedTransaction
-        || isTransactionDayExpanded(dateKey, latestDate);
+        || isTransactionDayExpanded(dateKey, today);
       group.className = `transaction-group${compact ? "" : " collapsible-day"}${isExpanded ? "" : " is-collapsed"}`;
       const rows = items.map((transaction) => transactionTemplate(transaction, compact)).join("");
       const heading = document.createElement("h3");
@@ -871,10 +870,10 @@ export function registerTransactionsView({
     return `${state.selectedAccountId || "none"}:${state.transactionMonth}:${dateKey}`;
   }
 
-  function isTransactionDayExpanded(dateKey, latestDate) {
+  function isTransactionDayExpanded(dateKey, today) {
     const key = transactionDayStateKey(dateKey);
     if (!expandedTransactionDays.has(key)) {
-      expandedTransactionDays.set(key, dateKey === latestDate);
+      expandedTransactionDays.set(key, dateKey >= today);
     }
     return expandedTransactionDays.get(key);
   }
@@ -959,8 +958,8 @@ export function registerTransactionsView({
     const row = document.createElement("div");
     row.className = "daily-balance";
     row.innerHTML = `
-      ${dailyBalanceLine("Saldo previsto no dia", forecastBalance)}
-      ${dailyBalanceLine("Saldo conciliado no dia", reconciledBalance)}
+      ${dailyBalanceLine("Saldo previsto", forecastBalance)}
+      ${dailyBalanceLine("Saldo conciliado", reconciledBalance)}
     `;
     return row;
   }
@@ -971,7 +970,7 @@ export function registerTransactionsView({
     const isReconciled = label.includes("conciliado");
     return `
       <div class="daily-balance-line">
-        <span><span class="balance-kind-badge ${isReconciled ? "reconciled" : "forecast"}"><span aria-hidden="true">${isReconciled ? "✓" : "○"}</span> ${isReconciled ? "Conciliado" : "Previsto"}</span> no dia</span>
+        <span><span class="balance-kind-badge ${isReconciled ? "reconciled" : "forecast"}"><span aria-hidden="true">${isReconciled ? "✓" : "○"}</span> ${isReconciled ? "Conciliado" : "Previsto"}</span></span>
         <strong class="${balanceClass}">${formatCurrencySummary(balance)}</strong>
       </div>
     `;

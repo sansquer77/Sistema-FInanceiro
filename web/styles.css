@@ -2808,35 +2808,6 @@ textarea:focus {
   fill: url("#accountBalanceHistoryAreaGradient");
 }
 
-.account-balance-history-chart .invoice-history-card {
-  display: block;
-  padding-bottom: 14px;
-}
-
-.account-balance-history-chart .invoice-history-card span,
-.account-balance-history-chart .invoice-history-card em {
-  position: absolute;
-  right: 12px;
-  left: 12px;
-}
-
-.account-balance-history-chart .invoice-history-card span {
-  bottom: 56px;
-}
-
-.account-balance-history-chart .invoice-history-card em {
-  bottom: 38px;
-  margin-top: 0;
-}
-
-.account-balance-history-chart .invoice-history-card strong {
-  position: absolute;
-  right: 12px;
-  bottom: 14px;
-  left: 12px;
-  font-size: 14px;
-}
-
 .account-balance-history-chart .positive-text {
   color: var(--positive);
 }
@@ -3507,7 +3478,7 @@ textarea:focus {
 
 .transaction-amount strong {
   margin-bottom: 4px;
-  font-size: 17px;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
 

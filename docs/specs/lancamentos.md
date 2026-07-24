@@ -2,7 +2,7 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 1.6
+versao: 1.9
 atualizado: 2026-07-24
 relacionados:
   - "[[contas-correntes]]"
@@ -75,17 +75,19 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 - Lançamentos parcelados exibem índice e total (`1/36`, `2/36`...) sem reiniciar a contagem em edições pontuais.
 - Em lançamentos parcelados, o valor informado é o total da compra/lançamento e deve ser dividido pela quantidade de parcelas. Ex.: R$ 500 em 5x gera 5 lançamentos de R$ 100.
 - Em lançamentos recorrentes, cada ocorrência futura deve manter exatamente o valor informado. Ex.: R$ 500 recorrente por 5 ocorrências gera 5 lançamentos de R$ 500.
-- Ao final de cada grupo diário na tela de Lançamentos, `Saldo previsto no dia` considera todos os lançamentos até a data e `Saldo conciliado no dia` considera somente lançamentos com `reconciled_at`, ambos partindo do saldo inicial da conta selecionada.
+- Ao final de cada grupo diário na tela de Lançamentos, `Saldo previsto` considera todos os lançamentos até a data e `Saldo conciliado` considera somente lançamentos com `reconciled_at`, ambos partindo do saldo inicial da conta selecionada.
 - Indicadores compactos distinguem visualmente valores previstos e conciliados sem introduzir novas cores semânticas.
 - Cada lançamento exibe estado textual `Conciliado` ou `Pendente`, além da ação por ícone.
 - Busca e filtro de conciliação permanecem ativos ao alternar temporariamente de módulo ou editar um lançamento.
 - A busca oferece ação explícita para limpar o texto e a lista informa contagens total, conciliada e pendente no contexto pesquisado.
 - Após criação ou edição, o lançamento retornado pela API recebe destaque visual temporário quando estiver visível pelos filtros atuais.
 - Valores financeiros usam algarismos tabulares, largura consistente e alinhamento à direita para facilitar comparação vertical.
+- Valores de lançamentos usam o mesmo tamanho de fonte dos textos de saldo do grupo diário, preservando densidade visual.
+- O gráfico de histórico/projeção de saldos em Lançamentos de Contas deve manter o mesmo layout do gráfico de faturas de cartão: mês no topo de cada cartão, valor na base e sem marcadores textuais de `Previsto` ou `Conciliado` dentro do gráfico.
 - Categoria e subcategoria são apresentadas como caminho único no formato `Categoria › Subcategoria`.
 - Em telas estreitas, metadados secundários são ocultados, preservando descrição, valor, conta e estado de conciliação.
 - Cabeçalhos de data permanecem visíveis durante a rolagem do respectivo grupo e permitem expandir ou recolher o dia.
-- Ao abrir uma combinação de conta e mês pela primeira vez, somente o dia mais recente inicia expandido; a escolha do usuário é mantida enquanto a sessão estiver ativa.
+- Ao abrir uma combinação de conta e mês pela primeira vez, dias com data igual ou posterior à data local atual iniciam expandidos e datas passadas iniciam recolhidas; a escolha do usuário é mantida enquanto a sessão estiver ativa.
 
 ## API e dados
 
@@ -120,12 +122,16 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dada uma lista de lançamentos, quando os valores são exibidos, então usam algarismos tabulares, coluna com largura consistente e alinhamento à direita.
 - Dado um lançamento categorizado, quando listado, então categoria e subcategoria aparecem como um único caminho separado por `›`.
 - Dada uma tela com até `520px`, quando a lista é exibida, então preserva descrição, valor, conta e conciliação e reduz os demais metadados.
-- Dado um mês com lançamentos em mais de um dia, quando a lista é aberta pela primeira vez, então o dia mais recente está expandido e os anteriores estão recolhidos.
+- Dado um mês com lançamentos em mais de um dia, quando a lista é aberta pela primeira vez, então os dias de hoje e futuros estão expandidos e os dias passados estão recolhidos.
 - Dado um cabeçalho diário, quando acionado, então alterna o conteúdo do dia e informa o estado por `aria-expanded`.
 - Dado um grupo diário longo, quando a página é rolada dentro dele, então o cabeçalho da data permanece brevemente visível.
+- Dado o gráfico de histórico/projeção de saldos, quando exibido, então cada cartão mensal mostra o mês no topo e não exibe marcadores `Previsto` ou `Conciliado` dentro da área do gráfico.
 
 ## Changelog
 
+- `1.9` — 2026-07-24 — Grupos diários passam a abrir inicialmente de hoje em diante, mantendo datas passadas recolhidas.
+- `1.8` — 2026-07-24 — Gráfico de saldos em Lançamentos de Contas volta ao layout do gráfico de cartões, com mês no topo e sem marcadores de previsto/conciliado.
+- `1.7` — 2026-07-24 — Rótulos de saldos diários removem redundância `no dia` e valores de lançamentos ganham fonte mais compacta.
 - `1.6` — 2026-07-24 — Leitura financeira com colunas tabulares, metadados responsivos, caminho de categoria e grupos diários sticky/recolhíveis.
 - `1.5` — 2026-07-24 — Melhorias de UX na leitura de previsto/conciliado, estado por lançamento, busca persistente, filtros, contagem contextual e destaque pós-gravação.
 - `1.4` — 2026-07-24 — Agrupamento diário passa a exibir saldos previsto e conciliado separadamente.
