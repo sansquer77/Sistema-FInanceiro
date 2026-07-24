@@ -406,6 +406,9 @@ def delete_opening_position(user_id: int, position_id: object) -> dict:
 
 
 def redeem_position(user_id: int, data: dict) -> dict:
+    # spec: investimentos-portfolio v1.5 — criterio 9
+    # (em posicao com multiplas origens, o consumo do resgate segue FIFO pela
+    #  data da primeira operacao — candidates.sort abaixo garante essa ordem)
     selector = normalize_redemption_selector(data)
     redemption_value_cents = money_to_cents(data.get("amount", "0"))
     if redemption_value_cents <= 0:
@@ -653,6 +656,9 @@ def close_position(user_id: int, data: dict) -> dict:
 
 
 def should_register_closing_credit(data: dict) -> bool:
+    # spec: investimentos-portfolio v1.5 — criterios 10-11
+    # (a opcao de credito e opt-in explicito e vem desmarcada por padrao no
+    #  formulario, justamente para evitar duplicidade com resgates ja lancados)
     return str(data.get("register_credit") or "").strip().lower() in {"1", "true", "on", "yes", "sim"}
 
 
@@ -1463,6 +1469,9 @@ def savings_additional_monthly_rate(force_refresh: bool = False) -> Decimal:
 
 
 def savings_additional_monthly_rate_from_selic(selic_annual: Decimal) -> Decimal:
+    # spec: investimentos-portfolio v1.5 — secao "Regras > Poupanca"
+    # (TR + 0,5% a.m. quando Selic > 8,5% a.a.; TR + 70% da Selic equivalente
+    #  mensal quando Selic <= 8,5% a.a. — limiar e formula nao sao obvios)
     if selic_annual > Decimal("0.085"):
         return Decimal("0.005")
     return (Decimal("1") + selic_annual * Decimal("0.70")) ** (Decimal("1") / Decimal("12")) - Decimal("1")
@@ -1509,6 +1518,8 @@ def fallback_indexer_annual_rate(indexer: str) -> Decimal:
 
 
 def fixed_income_income_tax_cents(gross_profit_cents: int, days: int) -> int:
+    # spec: investimentos-portfolio v1.5 — criterio 3 (secao "Regras > Renda Fixa":
+    # tabela regressiva de IR, 22,5% a 15% conforme dias corridos desde a aquisicao)
     if gross_profit_cents <= 0:
         return 0
     if days <= 180:
@@ -1523,6 +1534,8 @@ def fixed_income_income_tax_cents(gross_profit_cents: int, days: int) -> int:
 
 
 def fixed_income_iof_tax_cents(gross_profit_cents: int, days: int) -> int:
+    # spec: investimentos-portfolio v1.5 — criterio 3 (secao "Regras > Renda Fixa":
+    # IOF regressivo so incide ate 30 dias corridos desde a aquisicao)
     if gross_profit_cents <= 0 or days >= 30:
         return 0
     daily_rates = {

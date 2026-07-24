@@ -19,10 +19,17 @@ Este projeto segue **Spec Driven Development (SDD)**, documentado em [`docs/sdd.
 3. Atualize docs/arquitetura.md se houver nova rota, tabela, módulo ou fluxo
 4. Se a mudança envolver uma decisão técnica não trivial (biblioteca, trade-off
    de performance/segurança, padrão de dados), registre um ADR em docs/adr/
-5. Implemente a menor mudança que cumpre a spec
-6. Verifique manualmente ou com testes
-7. Atualize status, versao, atualizado e Changelog da spec afetada
+5. Se a spec tiver mais de 6 critérios de aceite ou tocar mais de um módulo de
+   financeiro/, preencha a seção "Plano de implementação" da spec antes de
+   codificar — é a decomposição em passos atômicos que o agente vai seguir
+6. Implemente a menor mudança que cumpre a spec, citando-a em comentário nas
+   regras de negócio não óbvias (ver "Rastreabilidade" abaixo)
+7. Verifique com um teste automatizado por critério de aceite sempre que
+   viável; sinalize na spec os critérios que só podem ser verificados manualmente
+8. Atualize status, versao, atualizado e Changelog da spec afetada
 ```
+
+Este projeto é **spec-anchored**, não spec-as-source: a spec ancora a intenção e os critérios de aceite, mas o código e os testes são a fonte de verdade executável. Se o comportamento real divergir da spec, investigue a causa antes de presumir qual dos dois está errado — e depois de confirmar, atualize a spec (passo 8). Nunca use uma spec desatualizada como justificativa para reintroduzir um comportamento antigo.
 
 **Regra sem exceção:** nenhum arquivo novo de documentação começa como markdown livre. Todo documento novo — spec, ADR, design, roadmap etc. — nasce como cópia de `docs/templates/spec-template.md`, adaptando `tipo`, `area`, título e seções, mas preservando frontmatter, o callout `> [!info] Status`, `Changelog` e `Relacionados`.
 
@@ -48,6 +55,16 @@ Um agente de IA que edita uma spec deve incrementar `versao`, atualizar `atualiz
 - **`docs/specs/`** — comportamento observável pelo usuário: jornada, dados, regras de negócio, API, critérios de aceite (formato dado/quando/então). Não deve conter detalhes de implementação internos.
 - **`docs/adr/`** — por que uma decisão técnica não trivial foi tomada e quais alternativas foram descartadas.
 - **`docs/design/design-system.md`** — tokens visuais que toda a interface deve respeitar.
+
+### Rastreabilidade: código ↔ spec
+
+Para regra de negócio **não óbvia** — qualquer cálculo, validação ou efeito colateral que não seria previsível só lendo o nome da função — cite a spec de origem em comentário logo acima do trecho:
+
+```python
+# spec: investimentos-portfolio v1.3 — critério 4
+```
+
+Formato: `spec: <area>/<slug-do-arquivo em docs/specs/> vX.Y — critério N`, onde N é a posição do critério na lista "Critérios de aceite" da spec. Regras óbvias (validação simples de campo obrigatório etc.) não precisam da citação. Detalhes em [`docs/sdd.md`](docs/sdd.md), seção "Rastreabilidade: código ↔ spec".
 
 ## 2. Stack e restrições arquiteturais (não negociáveis)
 
@@ -112,12 +129,14 @@ Consulte [`docs/design/design-system.md`](docs/design/design-system.md) para a p
 ## 6. Checklist antes de abrir um PR gerado ou assistido por IA
 
 - [ ] A spec correspondente em `docs/specs/` existe e reflete o comportamento implementado (status/versão/changelog atualizados).
+- [ ] Se a spec tinha seção "Plano de implementação", os passos executados foram marcados e cobrem todos os critérios de aceite.
 - [ ] `docs/arquitetura.md` foi atualizado se houve nova rota, tabela ou módulo.
 - [ ] Um ADR foi criado em `docs/adr/` se houve decisão técnica não trivial.
 - [ ] Nenhuma dependência nova de framework web, bundler frontend, ORM ou parser externo foi introduzida sem revisar o ADR correspondente.
 - [ ] Valores monetários seguem centavos inteiros; datas seguem ISO `YYYY-MM-DD`.
 - [ ] Nenhum arquivo de `data/` ou credencial foi commitado.
 - [ ] Regra de negócio está em `financeiro/`, não em `web/`.
+- [ ] Regras de negócio não óbvias citam a spec/critério de origem em comentário.
 - [ ] Cores semânticas do design system foram respeitadas.
 
 ## 7. Referências rápidas

@@ -273,6 +273,9 @@ def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
 
 
 def update_future_series_transactions(conn, user_id: int, existing, transaction: dict) -> None:
+    # spec: lancamentos v1.4 — criterio 7 (apply_to_future)
+    # (propaga apenas para ocorrencias futuras nao conciliadas da mesma serie;
+    #  o delta de data e reaplicado, nao a data absoluta, para preservar o espacamento)
     if not existing["series_id"]:
         return
     is_installment = existing["series_kind"] == "installment" or (
@@ -436,6 +439,9 @@ def delete_transaction(user_id: int, transaction_id: str, apply_to_future: bool 
 
 
 def future_transactions_to_delete(conn, user_id: int, transaction, apply_to_future: bool):
+    # spec: lancamentos v1.4 — criterio 6 (scope=future)
+    # (so remove ocorrencias futuras ainda nao conciliadas da mesma serie;
+    #  uma vez conciliada, a ocorrencia fica fora do alcance da exclusao em cascata)
     if not apply_to_future or not transaction["series_id"]:
         return []
     is_installment = transaction["series_kind"] == "installment" or (
@@ -655,6 +661,9 @@ def decimal_to_micros(value: object) -> int:
 
 
 def build_transaction_occurrences(transaction: dict) -> list[dict]:
+    # spec: lancamentos v1.4 — regra de parcelamento/recorrencia (secao "Regras de negocio")
+    # (parcelado: valor informado e o TOTAL, dividido entre as parcelas via split_cents;
+    #  recorrente: cada ocorrencia mantem o valor informado integralmente — nao dividir)
     start_date = date.fromisoformat(transaction["date"])
     if transaction["series_kind"] == "installment":
         amounts = split_cents(transaction["amount_cents"], transaction["installment_count"])
@@ -890,6 +899,9 @@ def transaction_category_group(conn, user_id: int, transaction_type: str, destin
 
 
 def balance_delta(transaction_type: str, amount_cents: int, side: str) -> int:
+    # spec: lancamentos v1.4 — criterios 1-4
+    # (receita aumenta a conta de origem; despesa/investimento reduzem;
+    #  transferencia/cambio reduzem na origem e aumentam no destino)
     if transaction_type == "income":
         return amount_cents
     if transaction_type in {"expense", "investment"}:
