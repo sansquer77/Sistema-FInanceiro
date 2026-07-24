@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 2.5
-atualizado: 2026-07-23
+versao: 2.6
+atualizado: 2026-07-24
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -47,6 +47,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[specs/importacao-organizze]] | ✅ implementado | Importação |
 | [[specs/recuperacao-senha]] | ✅ implementado | Segurança |
 | [[specs/seguranca-autenticacao]] | ✅ implementado | Segurança |
+| [[specs/sobre-app]] | ✅ implementado | Usuário |
 | [[specs/frontend-modularizacao]] | ✅ implementado | Frontend |
 | [[distribuição]] | ✅ implementado | Distribuição |
 
@@ -97,6 +98,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 
 ## Changelog
 
+- `2.6` — 2026-07-24 — Incluída a spec da tela Sobre no grupo Usuário.
 - `2.5` — 2026-07-23 — MVP de classificação assistida concluído e documentação marcada como implementada.
 - `2.4` — 2026-07-23 — MVP de classificação assistida aprovado e movido para implementação; ADR-0006 adotado.
 - `2.3` — 2026-07-23 — Incluídos a spec e o ADR em rascunho para classificação assistida por hábitos locais.

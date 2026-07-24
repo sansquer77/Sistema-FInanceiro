@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 1.6
-atualizado: 2026-07-23
+versao: 1.7
+atualizado: 2026-07-24
 relacionados:
   - "[[arquitetura]]"
   - "[[visao-produto]]"
@@ -44,6 +44,7 @@ Manter um sistema financeiro local, privado e simples para controlar contas, sal
   - Importação de lançamentos por meio de planilhas de modelo do sistema (`.xlsx`) para contas e cartões.
   - Ver [[importacao-organizze]].
 - **Histórico de Operações**: auditoria funcional somente leitura com filtros, busca, agrupamentos e rastreio de lotes por `operation_batch_id`. Ver [[historico-operacoes]].
+- **Sobre o app**: tela informativa no grupo Usuário com objetivo, funcionalidades, tecnologias, contato e infraestrutura mínima. Ver [[sobre-app]].
 - **Interface web estática**: painéis locais em `web/`, sem dependências externas de frontend. Ver [[arquitetura]] e [[adr/0001-stack-local-sem-framework]].
 - **Distribuição desktop**: pacotes macOS e Windows com instaladores, modo local e launchers opcionais para rede local confiável. Ver [[distribuição]].
 
@@ -112,6 +113,7 @@ Manter um sistema financeiro local, privado e simples para controlar contas, sal
 
 ## Changelog
 
+- `1.7` — 2026-07-24 — Incluída a tela Sobre no escopo implementado do menu Usuário.
 - `1.6` — 2026-07-23 — Incluído o MVP local de classificação assistida por correspondência exata normalizada.
 - `1.5` — 2026-07-09 — Histórico de Operações incluído no escopo implementado e nas regras funcionais.
 - `1.4` — 2026-07-05 — Regras de segurança atualizadas para configuração SMTP criptografada e isolada por usuário.

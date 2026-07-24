@@ -2,8 +2,8 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 1.8
-atualizado: 2026-07-20
+versao: 1.9
+atualizado: 2026-07-24
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
   - "[[arquitetura]]"
@@ -62,6 +62,8 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `transactions-view.js` | Lançamentos: formulário, recorrência, parcelas e câmbio. |
 | `operation-history-view.js` | Histórico de Operações: filtros, busca, agrupamentos e paginação incremental. |
 
+Views estáticas simples, como **Sobre**, podem permanecer declaradas no HTML e roteadas por `app.js` quando não possuem estado próprio, API ou lógica funcional dedicada.
+
 ## Contrato de fábrica para views
 
 ```js
@@ -103,6 +105,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Dado o tema claro ou escuro ativo, quando navega por Cockpit, Contas, Cartões, Lançamentos, Portfólio, Limites, Relatórios, Categorias, Importação e Preferências, os módulos abrem sem erro de console e mantêm contraste legível.
 - Dado viewport mobile, quando abre Preferências, o controle de tema ocupa a largura disponível sem overflow horizontal.
 - Dado uma decisão de edição/exclusão em cascata ou encerramento de posição, quando a interface solicita confirmação, os botões exibem ações explícitas e `Voltar` aborta a operação.
+- Dado o grupo Usuário, quando o item Sobre é acionado, então `app.js` exibe uma view estática sem criar módulo ou endpoint desnecessário.
 
 ## Fora de escopo
 
@@ -121,6 +124,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - `1.6` — 2026-07-01 — Critérios de aceite e cobertura de QA do tema claro/escuro registrados.
 - `1.7` — 2026-07-09 — `operation-history-view.js` registrado como view funcional do Histórico de Operações.
 - `1.8` — 2026-07-20 — `decision-modal.js` registrado como helper reutilizável para decisões e formulários curtos.
+- `1.9` — 2026-07-24 — Tela estática Sobre documentada como view simples roteada por `app.js`.
 
 ## Relacionados
 

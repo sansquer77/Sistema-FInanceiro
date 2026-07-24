@@ -2,7 +2,7 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 1.4
+versao: 1.6
 atualizado: 2026-07-24
 relacionados:
   - "[[contas-correntes]]"
@@ -76,6 +76,16 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 - Em lançamentos parcelados, o valor informado é o total da compra/lançamento e deve ser dividido pela quantidade de parcelas. Ex.: R$ 500 em 5x gera 5 lançamentos de R$ 100.
 - Em lançamentos recorrentes, cada ocorrência futura deve manter exatamente o valor informado. Ex.: R$ 500 recorrente por 5 ocorrências gera 5 lançamentos de R$ 500.
 - Ao final de cada grupo diário na tela de Lançamentos, `Saldo previsto no dia` considera todos os lançamentos até a data e `Saldo conciliado no dia` considera somente lançamentos com `reconciled_at`, ambos partindo do saldo inicial da conta selecionada.
+- Indicadores compactos distinguem visualmente valores previstos e conciliados sem introduzir novas cores semânticas.
+- Cada lançamento exibe estado textual `Conciliado` ou `Pendente`, além da ação por ícone.
+- Busca e filtro de conciliação permanecem ativos ao alternar temporariamente de módulo ou editar um lançamento.
+- A busca oferece ação explícita para limpar o texto e a lista informa contagens total, conciliada e pendente no contexto pesquisado.
+- Após criação ou edição, o lançamento retornado pela API recebe destaque visual temporário quando estiver visível pelos filtros atuais.
+- Valores financeiros usam algarismos tabulares, largura consistente e alinhamento à direita para facilitar comparação vertical.
+- Categoria e subcategoria são apresentadas como caminho único no formato `Categoria › Subcategoria`.
+- Em telas estreitas, metadados secundários são ocultados, preservando descrição, valor, conta e estado de conciliação.
+- Cabeçalhos de data permanecem visíveis durante a rolagem do respectivo grupo e permitem expandir ou recolher o dia.
+- Ao abrir uma combinação de conta e mês pela primeira vez, somente o dia mais recente inicia expandido; a escolha do usuário é mantida enquanto a sessão estiver ativa.
 
 ## API e dados
 
@@ -103,9 +113,21 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dado um lançamento de série em edição ou exclusão, quando o modal aparece, `Voltar` cancela a ação sem alterar dados.
 - Dado um lançamento listado, quando exibido, mostra conta, tipo, valor, data, categoria, subcategoria, tags e indicação de recorrente/parcelado.
 - Dado um dia com lançamentos conciliados e não conciliados, quando o agrupamento diário é exibido, então mostra separadamente o saldo previsto com todos os lançamentos e o saldo conciliado somente com os conciliados.
+- Dado um filtro ou busca ativo, quando o usuário alterna de módulo ou edita um lançamento, então o estado de filtragem é preservado.
+- Dado uma busca preenchida, quando o usuário aciona limpar, então o texto e o resultado filtrado são restaurados.
+- Dada a lista mensal, quando exibida, então informa quantidade total, conciliada e pendente no contexto da busca.
+- Dado um lançamento criado ou atualizado visível pelos filtros, quando a lista é recarregada, então a linha recebe destaque temporário.
+- Dada uma lista de lançamentos, quando os valores são exibidos, então usam algarismos tabulares, coluna com largura consistente e alinhamento à direita.
+- Dado um lançamento categorizado, quando listado, então categoria e subcategoria aparecem como um único caminho separado por `›`.
+- Dada uma tela com até `520px`, quando a lista é exibida, então preserva descrição, valor, conta e conciliação e reduz os demais metadados.
+- Dado um mês com lançamentos em mais de um dia, quando a lista é aberta pela primeira vez, então o dia mais recente está expandido e os anteriores estão recolhidos.
+- Dado um cabeçalho diário, quando acionado, então alterna o conteúdo do dia e informa o estado por `aria-expanded`.
+- Dado um grupo diário longo, quando a página é rolada dentro dele, então o cabeçalho da data permanece brevemente visível.
 
 ## Changelog
 
+- `1.6` — 2026-07-24 — Leitura financeira com colunas tabulares, metadados responsivos, caminho de categoria e grupos diários sticky/recolhíveis.
+- `1.5` — 2026-07-24 — Melhorias de UX na leitura de previsto/conciliado, estado por lançamento, busca persistente, filtros, contagem contextual e destaque pós-gravação.
 - `1.4` — 2026-07-24 — Agrupamento diário passa a exibir saldos previsto e conciliado separadamente.
 - `1.3` — 2026-07-23 — Integrada a sugestão local de categoria e subcategoria por histórico exato.
 - `1.2` — 2026-07-20 — Modal de decisão explícita documentado para edição e exclusão de séries.

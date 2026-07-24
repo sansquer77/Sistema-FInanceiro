@@ -39,7 +39,7 @@ export function formatCategoryPath(transaction) {
   if (!transaction.subcategory_name) {
     return transaction.category_name;
   }
-  return `${transaction.category_name} / ${transaction.subcategory_name}`;
+  return `${transaction.category_name} › ${transaction.subcategory_name}`;
 }
 
 export function cardCategoryPath(transaction) {
@@ -49,7 +49,7 @@ export function cardCategoryPath(transaction) {
   if (!transaction.subcategory_name) {
     return transaction.category_name;
   }
-  return `${transaction.category_name} / ${transaction.subcategory_name}`;
+  return `${transaction.category_name} › ${transaction.subcategory_name}`;
 }
 
 export function recurrenceFrequencyLabel(frequency) {

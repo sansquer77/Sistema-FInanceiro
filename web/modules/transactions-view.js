@@ -84,10 +84,14 @@ export function registerTransactionsView({
     forecastBalanceSummary,
     transactionBalanceHistoryChart,
     transactionSearch,
+    clearTransactionSearchButton,
+    transactionStatusFilterButtons,
+    transactionContextCount,
   } = elements;
   let classificationSuggestionTimer = null;
   let classificationSuggestionRequestId = 0;
   let classificationSelectionTouched = false;
+  const expandedTransactionDays = new Map();
 
   transactionForm.addEventListener("submit", handleTransactionSubmit);
   transactionType.addEventListener("change", () => {
@@ -124,7 +128,23 @@ export function registerTransactionsView({
     openMonthPicker(event.currentTarget, state.transactionMonth, setTransactionMonth);
   });
   nextMonthButton.addEventListener("click", () => shiftTransactionMonth(1));
-  transactionSearch.addEventListener("input", renderTransactions);
+  transactionSearch.value = state.transactionSearch || "";
+  transactionSearch.addEventListener("input", () => {
+    state.transactionSearch = transactionSearch.value;
+    renderTransactions();
+  });
+  clearTransactionSearchButton.addEventListener("click", () => {
+    state.transactionSearch = "";
+    transactionSearch.value = "";
+    renderTransactions();
+    transactionSearch.focus();
+  });
+  transactionStatusFilterButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      state.transactionStatusFilter = button.dataset.transactionStatusFilter || "all";
+      renderTransactions();
+    });
+  });
   transactionList.addEventListener("click", handleTransactionListClick);
   if (transactionBalanceHistoryChart) {
     transactionBalanceHistoryChart.addEventListener("click", handleBalanceHistoryClick);
@@ -250,12 +270,14 @@ export function registerTransactionsView({
         }
         data.apply_to_future = scope === "future";
       }
-      await api(isEditing ? `/api/transactions/${data.id}` : "/api/transactions", {
+      const response = await api(isEditing ? `/api/transactions/${data.id}` : "/api/transactions", {
         method: isEditing ? "PUT" : "POST",
         body: data,
       });
+      state.transactionHighlightId = String(response.transaction?.id || data.id || "");
       resetTransactionForm();
       await refreshAfterTransactionChange();
+      highlightSavedTransaction();
       setMessage(transactionMessage, isEditing ? "Lançamento atualizado." : "Lançamento salvo.", "success");
     } catch (error) {
       setMessage(transactionMessage, error.message, "error");
@@ -549,21 +571,54 @@ export function registerTransactionsView({
       transactionAccount.value = state.selectedAccountId;
     }
     const accountTransactions = selectedAccountTransactions(state.accountTransactions);
+    transactionSearch.value = state.transactionSearch || "";
+    clearTransactionSearchButton.hidden = !state.transactionSearch;
+    renderTransactionStatusFilters();
     const monthTransactions = selectedAccountVisibleTransactions(accountTransactions)
-      .filter((transaction) => transaction.date.startsWith(state.transactionMonth))
-      .filter(matchesTransactionSearch);
+      .filter((transaction) => transaction.date.startsWith(state.transactionMonth));
+    const searchedTransactions = monthTransactions.filter(matchesTransactionSearch);
+    renderTransactionContextCount(searchedTransactions);
+    const visibleTransactions = searchedTransactions.filter(matchesTransactionStatusFilter);
 
     currentBalanceSummary.textContent = formatCurrencySummary(getBalanceUntil(todayLocalDateValue(), accountTransactions, true));
     const forecastLimitDate = monthEndDate(state.transactionMonth);
     forecastBalanceSummary.textContent = formatCurrencySummary(getBalanceUntil(forecastLimitDate, accountTransactions, false));
     if (forecastBalanceLabel) {
       const account = state.accounts.find((entry) => String(entry.id) === String(state.selectedAccountId));
-      forecastBalanceLabel.textContent = accountHasPreferredCardForecast(account, forecastLimitDate)
-        ? "Saldo previsto (inclui despesas conciliadas de cartão)"
-        : "Saldo previsto";
+      const forecastDetail = accountHasPreferredCardForecast(account, forecastLimitDate)
+        ? " Saldo do fim do mês (inclui despesas conciliadas de cartão)"
+        : " Saldo do fim do mês";
+      forecastBalanceLabel.innerHTML = `<span class="balance-kind-badge forecast"><span aria-hidden="true">○</span> Previsto</span>${forecastDetail}`;
     }
     renderBalanceHistory();
-    renderTransactionCollection(transactionList, monthTransactions, false, accountTransactions);
+    renderTransactionCollection(transactionList, visibleTransactions, false, accountTransactions);
+  }
+
+  function renderTransactionStatusFilters() {
+    transactionStatusFilterButtons.forEach((button) => {
+      const isActive = button.dataset.transactionStatusFilter === state.transactionStatusFilter;
+      button.classList.toggle("active", isActive);
+      button.setAttribute("aria-pressed", String(isActive));
+    });
+  }
+
+  function renderTransactionContextCount(transactions) {
+    const reconciled = transactions.filter((transaction) => transaction.reconciled_at).length;
+    const pending = transactions.length - reconciled;
+    const transactionLabel = transactions.length === 1 ? "lançamento" : "lançamentos";
+    const reconciledLabel = reconciled === 1 ? "conciliado" : "conciliados";
+    const pendingLabel = pending === 1 ? "pendente" : "pendentes";
+    transactionContextCount.textContent = `${transactions.length} ${transactionLabel} · ${reconciled} ${reconciledLabel} · ${pending} ${pendingLabel}`;
+  }
+
+  function matchesTransactionStatusFilter(transaction) {
+    if (state.transactionStatusFilter === "reconciled") {
+      return Boolean(transaction.reconciled_at);
+    }
+    if (state.transactionStatusFilter === "pending") {
+      return !transaction.reconciled_at;
+    }
+    return true;
   }
 
   function renderBalanceHistory() {
@@ -600,7 +655,7 @@ export function registerTransactionsView({
         ${rows.map((row) => `
           <button class="invoice-history-card ${row.isCurrent ? "current" : ""}" type="button" data-transaction-balance-month="${escapeHtml(row.month)}" role="listitem" aria-current="${row.isCurrent ? "true" : "false"}">
             <span>${escapeHtml(row.label)}</span>
-            <em>${escapeHtml(row.description)}</em>
+            <em><span class="balance-kind-badge ${row.offset < 0 ? "reconciled" : "forecast"}"><span aria-hidden="true">${row.offset < 0 ? "✓" : "○"}</span> ${escapeHtml(row.description)}</span></em>
             <strong class="${row.amount < 0 ? "danger-text" : row.amount > 0 ? "positive-text" : ""}">${formatMoney(Math.abs(row.amount), row.currency)}</strong>
           </button>
         `).join("")}
@@ -714,20 +769,47 @@ export function registerTransactionsView({
   function renderTransactionCollection(container, transactions, compact, balanceTransactions = transactions) {
     container.innerHTML = "";
     if (transactions.length === 0) {
-      container.append(emptyState("Nenhum lançamento registrado ainda."));
+      const hasActiveFilter = Boolean(state.transactionSearch) || state.transactionStatusFilter !== "all";
+      container.append(emptyState(hasActiveFilter
+        ? "Nenhum lançamento corresponde à busca ou ao filtro atual."
+        : "Nenhum lançamento registrado ainda."));
       return;
     }
     const grouped = groupTransactionsByDate(transactions);
+    const latestDate = [...grouped.keys()].sort().at(-1);
     for (const [dateKey, items] of grouped.entries()) {
       const group = document.createElement("section");
-      group.className = "transaction-group";
+      const containsHighlightedTransaction = items.some(
+        (transaction) => String(transaction.id) === state.transactionHighlightId,
+      );
+      if (containsHighlightedTransaction) {
+        setTransactionDayExpanded(dateKey, true);
+      }
+      const isExpanded = compact
+        || containsHighlightedTransaction
+        || isTransactionDayExpanded(dateKey, latestDate);
+      group.className = `transaction-group${compact ? "" : " collapsible-day"}${isExpanded ? "" : " is-collapsed"}`;
       const rows = items.map((transaction) => transactionTemplate(transaction, compact)).join("");
-      group.innerHTML = `
-        <h3>${formatDate(dateKey)}</h3>
-        <div class="transaction-rows">${rows}</div>
-      `;
+      const heading = document.createElement("h3");
+      if (compact) {
+        heading.textContent = formatDate(dateKey);
+      } else {
+        heading.className = "transaction-day-heading";
+        heading.innerHTML = `
+          <button class="transaction-day-toggle" type="button" data-transaction-day="${escapeHtml(dateKey)}" aria-expanded="${isExpanded}">
+            <span class="transaction-day-chevron" aria-hidden="true">⌄</span>
+            <span>${formatDate(dateKey)}</span>
+            <span class="transaction-day-count">${items.length} ${items.length === 1 ? "lançamento" : "lançamentos"}</span>
+          </button>
+        `;
+      }
+      const content = document.createElement("div");
+      content.className = "transaction-day-content";
+      content.hidden = !isExpanded;
+      content.innerHTML = `<div class="transaction-rows">${rows}</div>`;
+      group.append(heading, content);
       if (!compact) {
-        group.append(dailyBalance(dateKey, balanceTransactions));
+        content.append(dailyBalance(dateKey, balanceTransactions));
       }
       container.append(group);
     }
@@ -755,6 +837,13 @@ export function registerTransactionsView({
   }
 
   function handleTransactionListClick(event) {
+    const dayToggle = event.target.closest("[data-transaction-day]");
+    if (dayToggle) {
+      const dateKey = dayToggle.dataset.transactionDay;
+      setTransactionDayExpanded(dateKey, dayToggle.getAttribute("aria-expanded") !== "true");
+      renderTransactions();
+      return;
+    }
     const editButton = event.target.closest("[data-edit-transaction-id]");
     if (editButton) {
       const transaction = selectedAccountTransactions(state.accountTransactions)
@@ -776,6 +865,22 @@ export function registerTransactionsView({
     if (deleteButton) {
       deleteTransaction(deleteButton.dataset.transactionId);
     }
+  }
+
+  function transactionDayStateKey(dateKey) {
+    return `${state.selectedAccountId || "none"}:${state.transactionMonth}:${dateKey}`;
+  }
+
+  function isTransactionDayExpanded(dateKey, latestDate) {
+    const key = transactionDayStateKey(dateKey);
+    if (!expandedTransactionDays.has(key)) {
+      expandedTransactionDays.set(key, dateKey === latestDate);
+    }
+    return expandedTransactionDays.get(key);
+  }
+
+  function setTransactionDayExpanded(dateKey, isExpanded) {
+    expandedTransactionDays.set(transactionDayStateKey(dateKey), isExpanded);
   }
 
   function transactionTemplate(transaction, compact) {
@@ -801,15 +906,16 @@ export function registerTransactionsView({
         ` : "";
     const conversionDetails = isDestinationView ? convertedAmount : `${destinationConvertedAmount}${convertedAmount}`;
     return `
-      <article class="transaction-row ${signal}">
+      <article class="transaction-row ${signal} ${String(transaction.id) === state.transactionHighlightId ? "recently-saved" : ""}" data-rendered-transaction-id="${transaction.id}">
         <div>
           <strong>${escapeHtml(transaction.description)}</strong>
           <div class="account-meta">
-            <span>${typeLabel}</span>
-            <span>${accountRoute}</span>
-            ${transactionSeriesLabel(transaction) ? `<span>${transactionSeriesLabel(transaction)}</span>` : ""}
-            ${transaction.category_name ? `<span>${escapeHtml(formatCategoryPath(transaction))}</span>` : ""}
-            ${transaction.tags && transaction.tags.length ? `<span>${transaction.tags.map((tag) => `#${escapeHtml(tag)}`).join(" ")}</span>` : ""}
+            <span class="transaction-meta-secondary">${typeLabel}</span>
+            <span class="transaction-account-route">${accountRoute}</span>
+            <span class="reconciliation-status ${isReconciled ? "reconciled" : "pending"}"><span aria-hidden="true">${isReconciled ? "✓" : "○"}</span> ${isReconciled ? "Conciliado" : "Pendente"}</span>
+            ${transactionSeriesLabel(transaction) ? `<span class="transaction-meta-secondary">${transactionSeriesLabel(transaction)}</span>` : ""}
+            ${transaction.category_name ? `<span class="transaction-category-path transaction-meta-secondary">${escapeHtml(formatCategoryPath(transaction))}</span>` : ""}
+            ${transaction.tags && transaction.tags.length ? `<span class="transaction-meta-secondary">${transaction.tags.map((tag) => `#${escapeHtml(tag)}`).join(" ")}</span>` : ""}
           </div>
         </div>
         <div class="transaction-amount">
@@ -862,16 +968,35 @@ export function registerTransactionsView({
   function dailyBalanceLine(label, balance) {
     const total = [...balance.values()].reduce((sum, value) => sum + Number(value), 0);
     const balanceClass = total < 0 ? "danger-text" : total > 0 ? "positive-text" : "";
+    const isReconciled = label.includes("conciliado");
     return `
       <div class="daily-balance-line">
-        <span>${label}</span>
+        <span><span class="balance-kind-badge ${isReconciled ? "reconciled" : "forecast"}"><span aria-hidden="true">${isReconciled ? "✓" : "○"}</span> ${isReconciled ? "Conciliado" : "Previsto"}</span> no dia</span>
         <strong class="${balanceClass}">${formatCurrencySummary(balance)}</strong>
       </div>
     `;
   }
 
+  function highlightSavedTransaction() {
+    if (!state.transactionHighlightId) {
+      return;
+    }
+    const highlightedRow = transactionList.querySelector(
+      `[data-rendered-transaction-id="${state.transactionHighlightId}"]`,
+    );
+    if (!highlightedRow) {
+      state.transactionHighlightId = "";
+      return;
+    }
+    highlightedRow.scrollIntoView({ behavior: "smooth", block: "center" });
+    window.setTimeout(() => {
+      highlightedRow.classList.remove("recently-saved");
+      state.transactionHighlightId = "";
+    }, 2200);
+  }
+
   function matchesTransactionSearch(transaction) {
-    const query = normalizeSearch(transactionSearch.value);
+    const query = normalizeSearch(state.transactionSearch);
     if (!query) {
       return true;
     }

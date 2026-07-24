@@ -79,6 +79,9 @@ const state = {
   selectedAccountId: "",
   cardInvoiceSearch: "",
   cardInvoiceStatusFilter: "all",
+  transactionSearch: "",
+  transactionStatusFilter: "all",
+  transactionHighlightId: "",
   transactions: [],
   accountTransactions: [],
   cockpit: null,
@@ -324,6 +327,9 @@ const forecastBalanceLabel = document.querySelector("#forecastBalanceLabel");
 const forecastBalanceSummary = document.querySelector("#forecastBalanceSummary");
 const transactionBalanceHistoryChart = document.querySelector("#transactionBalanceHistoryChart");
 const transactionSearch = document.querySelector("#transactionSearch");
+const clearTransactionSearchButton = document.querySelector("#clearTransactionSearchButton");
+const transactionStatusFilterButtons = document.querySelectorAll("[data-transaction-status-filter]");
+const transactionContextCount = document.querySelector("#transactionContextCount");
 const simulationForm = document.querySelector("#simulationForm");
 const simulationType = document.querySelector("#simulationType");
 const simulationDate = document.querySelector("#simulationDate");
@@ -359,6 +365,7 @@ const moduleViews = {
   imports: document.querySelector("#importsView"),
   operationHistory: document.querySelector("#operationHistoryView"),
   user: document.querySelector("#userView"),
+  about: document.querySelector("#aboutView"),
 };
 
 const viewTitles = {
@@ -375,6 +382,7 @@ const viewTitles = {
   imports: ["Gestão", "Importação"],
   operationHistory: ["Gestão", "Histórico de Operações"],
   user: ["Usuário", "Preferências"],
+  about: ["Usuário", "Sobre"],
 };
 
 const SIDEBAR_COLLAPSED_KEY = "financeiro.sidebar.collapsed";
@@ -685,6 +693,9 @@ const transactionsView = registerTransactionsView({
     forecastBalanceSummary,
     transactionBalanceHistoryChart,
     transactionSearch,
+    clearTransactionSearchButton,
+    transactionStatusFilterButtons,
+    transactionContextCount,
   },
   api,
   formData,
@@ -892,6 +903,9 @@ function resetSessionState() {
   state.cardTransactions = [];
   state.cardPayments = [];
   state.selectedCreditCardId = "";
+  state.transactionSearch = "";
+  state.transactionStatusFilter = "all";
+  state.transactionHighlightId = "";
   state.transactions = [];
   state.accountTransactions = [];
   state.cockpit = null;

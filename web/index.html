@@ -169,6 +169,10 @@
                 <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.1 2.1-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V20h-3v-.2a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1-2.1-2.1.1-.1A1.7 1.7 0 0 0 5 15a1.7 1.7 0 0 0-1.6-1H3v-3h.4A1.7 1.7 0 0 0 5 10a1.7 1.7 0 0 0-.3-1.9l-.1-.1 2.1-2.1.1.1A1.7 1.7 0 0 0 8.7 6a1.7 1.7 0 0 0 1-1.6V4h3v.4a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1 2.1 2.1-.1.1A1.7 1.7 0 0 0 19 10a1.7 1.7 0 0 0 1.6 1h.4v3h-.4A1.7 1.7 0 0 0 19.4 15Z"></path></svg>
                 <span class="nav-label">Preferências</span>
               </button>
+              <button class="nav-button" type="button" data-view="about" data-short="SB" title="Sobre">
+                <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 10v6"></path><path d="M12 7h.01"></path></svg>
+                <span class="nav-label">Sobre</span>
+              </button>
               <button class="nav-button logout-nav-button" id="logoutButton" type="button" data-short="SA" title="Sair">
                 <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5"></path><path d="M15 12H3"></path><path d="M13 4h6a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6"></path></svg>
                 <span class="nav-label">Sair</span>
@@ -726,7 +730,7 @@
               <div class="invoice-history-chart account-balance-history-chart" id="transactionBalanceHistoryChart" aria-label="Histórico de saldos previstos"></div>
               <div class="month-balance-summary">
                 <div>
-                  <span>Saldo atual</span>
+                  <span><span class="balance-kind-badge reconciled"><span aria-hidden="true">✓</span> Conciliado</span> Saldo atual</span>
                   <strong id="currentBalanceSummary">R$ 0,00</strong>
                 </div>
                 <div>
@@ -734,9 +738,20 @@
                   <strong id="forecastBalanceSummary">R$ 0,00</strong>
                 </div>
               </div>
-              <label class="transaction-search">Buscar lançamento
-                <input id="transactionSearch" type="search" placeholder="Descrição, conta, categoria, tag...">
-              </label>
+              <div class="transaction-list-toolbar">
+                <label class="transaction-search">Buscar lançamento
+                  <span class="search-input-wrap">
+                    <input id="transactionSearch" type="search" placeholder="Descrição, conta, categoria, tag...">
+                    <button class="clear-search-button" id="clearTransactionSearchButton" type="button" aria-label="Limpar busca" title="Limpar busca" hidden>×</button>
+                  </span>
+                </label>
+                <div class="segmented-control" role="group" aria-label="Filtrar conciliação dos lançamentos">
+                  <button class="active" type="button" data-transaction-status-filter="all">Todos</button>
+                  <button type="button" data-transaction-status-filter="pending">Pendentes</button>
+                  <button type="button" data-transaction-status-filter="reconciled">Conciliados</button>
+                </div>
+              </div>
+              <p class="transaction-context-count" id="transactionContextCount" aria-live="polite"></p>
               <div class="transaction-list" id="transactionList"></div>
             </section>
           </div>
@@ -1430,6 +1445,79 @@
                 <button class="danger" type="submit">Apagar minha conta</button>
               </form>
               <p class="message" id="deleteUserMessage" role="alert"></p>
+            </section>
+          </div>
+        </section>
+
+        <section class="module-view" id="aboutView" hidden>
+          <div class="about-grid">
+            <section class="panel about-hero-panel">
+              <div class="brand">
+                <span class="brand-mark"><img src="/assets/app-icon.png" alt="" aria-hidden="true"></span>
+                <div>
+                  <p class="eyebrow">Sobre</p>
+                  <h2>Sistema Financeiro</h2>
+                  <p>App local para organizar a vida financeira com privacidade, simplicidade e visão prática de contas, cartões, investimentos e planejamento.</p>
+                </div>
+              </div>
+            </section>
+
+            <section class="panel">
+              <h2>Funcionalidades principais</h2>
+              <div class="about-feature-list">
+                <span>Contas, saldos e moedas</span>
+                <span>Lançamentos de contas e cartões</span>
+                <span>Recorrência, parcelamento e conciliação</span>
+                <span>Categorias, subcategorias e tags</span>
+                <span>Limites de gastos e alertas</span>
+                <span>Cockpit e relatórios</span>
+                <span>Portfólio de investimentos</span>
+                <span>Importação de planilhas</span>
+                <span>Histórico de operações</span>
+                <span>Preferências, segurança e recuperação por email</span>
+              </div>
+            </section>
+
+            <section class="panel">
+              <h2>Desenvolvimento</h2>
+              <dl class="about-definition-list">
+                <div>
+                  <dt>Desenvolvedor</dt>
+                  <dd>Cristiano Gaspar</dd>
+                </div>
+                <div>
+                  <dt>Tecnologias</dt>
+                  <dd>Python 3, servidor HTTP da biblioteca padrão, SQLite, HTML, CSS, JavaScript com ES Modules, PyInstaller, SMTP local para recuperação de senha, Yahoo Finance, CoinGecko e Banco Central SGS para cotações e índices.</dd>
+                </div>
+                <div>
+                  <dt>Contato</dt>
+                  <dd><a href="mailto:cristiano_gaspar@outlook.com">cristiano_gaspar@outlook.com</a></dd>
+                </div>
+              </dl>
+            </section>
+
+            <section class="panel about-infrastructure-panel">
+              <h2>Infraestrutura mínima</h2>
+              <div class="about-infrastructure-grid">
+                <div>
+                  <h3>Uso local</h3>
+                  <ul>
+                    <li>macOS ou Windows com o pacote instalado, ou ambiente de desenvolvimento com Python 3.</li>
+                    <li>Navegador moderno para acessar a interface local.</li>
+                    <li>Espaço em disco para o banco SQLite e arquivos locais em <code>data/</code>.</li>
+                    <li>Porta local <code>8010</code> disponível, salvo configuração diferente em <code>APP_PORT</code>.</li>
+                  </ul>
+                </div>
+                <div>
+                  <h3>Uso em rede</h3>
+                  <ul>
+                    <li>Computador host ligado e conectado a uma rede local confiável.</li>
+                    <li>Launcher de rede ou <code>APP_HOST=0.0.0.0</code> com <code>APP_URL</code>, <code>APP_ALLOWED_HOSTS</code> e <code>APP_ALLOWED_ORIGINS</code> ajustados.</li>
+                    <li>Firewall permitindo acesso à porta configurada somente para os dispositivos desejados.</li>
+                    <li>Acesso remoto ou por domínio deve usar reverse-proxy com HTTPS.</li>
+                  </ul>
+                </div>
+              </div>
             </section>
           </div>
         </section>
