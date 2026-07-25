@@ -13,6 +13,7 @@ Este projeto segue **Spec Driven Development (SDD)**, documentado em [`docs/sdd.
 
 ## 1. Fluxo obrigatório para qualquer mudança
 
+<!-- sync:fluxo-8-passos — espelha (resumido) docs/sdd.md, seção "## Fluxo" -->
 ```text
 1. Localize ou crie a spec/documento a partir de docs/templates/spec-template.md
 2. Atualize docs/requisitos.md se o escopo funcional geral mudar
@@ -28,8 +29,11 @@ Este projeto segue **Spec Driven Development (SDD)**, documentado em [`docs/sdd.
    viável; sinalize na spec os critérios que só podem ser verificados manualmente
 8. Atualize status, versao, atualizado e Changelog da spec afetada
 ```
+<!-- /sync:fluxo-8-passos -->
 
+<!-- sync:modelo-spec-anchored — espelha (resumido) docs/sdd.md, seção "## Modelo de maturidade: spec-anchored" -->
 Este projeto é **spec-anchored**, não spec-as-source: a spec ancora a intenção e os critérios de aceite, mas o código e os testes são a fonte de verdade executável. Se o comportamento real divergir da spec, investigue a causa antes de presumir qual dos dois está errado — e depois de confirmar, atualize a spec (passo 8). Nunca use uma spec desatualizada como justificativa para reintroduzir um comportamento antigo.
+<!-- /sync:modelo-spec-anchored -->
 
 **Regra sem exceção:** nenhum arquivo novo de documentação começa como markdown livre. Todo documento novo — spec, ADR, design, roadmap etc. — nasce como cópia de `docs/templates/spec-template.md`, adaptando `tipo`, `area`, título e seções, mas preservando frontmatter, o callout `> [!info] Status`, `Changelog` e `Relacionados`.
 
@@ -52,12 +56,15 @@ Um agente de IA que edita uma spec deve incrementar `versao`, atualizar `atualiz
 
 ### O que é spec vs. ADR vs. design
 
+<!-- sync:spec-vs-adr-vs-design — espelha docs/sdd.md, seção "## Especificações (spec) vs. decisões técnicas (adr) vs. design (design)" -->
 - **`docs/specs/`** — comportamento observável pelo usuário: jornada, dados, regras de negócio, API, critérios de aceite (formato dado/quando/então). Não deve conter detalhes de implementação internos.
 - **`docs/adr/`** — por que uma decisão técnica não trivial foi tomada e quais alternativas foram descartadas.
 - **`docs/design/design-system.md`** — tokens visuais que toda a interface deve respeitar.
+<!-- /sync:spec-vs-adr-vs-design -->
 
 ### Rastreabilidade: código ↔ spec
 
+<!-- sync:rastreabilidade-codigo-spec — espelha (resumido) docs/sdd.md, seção "## Rastreabilidade: código ↔ spec" -->
 Para regra de negócio **não óbvia** — qualquer cálculo, validação ou efeito colateral que não seria previsível só lendo o nome da função — cite a spec de origem em comentário logo acima do trecho:
 
 ```python
@@ -65,6 +72,7 @@ Para regra de negócio **não óbvia** — qualquer cálculo, validação ou efe
 ```
 
 Formato: `spec: <area>/<slug-do-arquivo em docs/specs/> vX.Y — critério N`, onde N é a posição do critério na lista "Critérios de aceite" da spec. Regras óbvias (validação simples de campo obrigatório etc.) não precisam da citação. Detalhes em [`docs/sdd.md`](docs/sdd.md), seção "Rastreabilidade: código ↔ spec".
+<!-- /sync:rastreabilidade-codigo-spec -->
 
 ## 2. Stack e restrições arquiteturais (não negociáveis)
 
@@ -156,4 +164,4 @@ Consulte [`docs/design/design-system.md`](docs/design/design-system.md) para a p
 
 ---
 
-*Este arquivo deve ser mantido em sincronia com `docs/`. Se uma regra aqui ficar desatualizada em relação a uma spec, ADR ou ao design system, corrija este arquivo no mesmo PR que atualizou a documentação.*
+*Este arquivo deve ser mantido em sincronia com `docs/`. Se uma regra aqui ficar desatualizada em relação a uma spec, ADR ou ao design system, corrija este arquivo no mesmo PR que atualizou a documentação. Os blocos marcados com `<!-- sync:NOME -->` têm um par idêntico em `docs/sdd.md` — rode `grep -n "sync:" AGENTS.md docs/sdd.md` para localizar os dois lados antes de editar qualquer um deles.*

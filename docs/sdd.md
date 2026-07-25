@@ -2,7 +2,7 @@
 tipo: metodologia
 area: meta
 status: implementado
-versao: 2.5
+versao: 2.6
 atualizado: 2026-07-24
 relacionados:
   - "[[templates/spec-template|Template de spec]]"
@@ -60,6 +60,7 @@ Cada spec também exibe um callout `> [!info] Status` logo abaixo do título, re
 
 ## Fluxo
 
+<!-- sync:fluxo-8-passos — espelhado (resumido) em AGENTS.md, seção "1. Fluxo obrigatório para qualquer mudança" -->
 1. Criar ou atualizar uma especificação em `specs/` usando [[templates/spec-template|o template]].
 2. Validar jornada do usuário, dados, regras e critérios de aceite.
 3. Atualizar [[requisitos]] se o escopo geral mudar.
@@ -68,9 +69,11 @@ Cada spec também exibe um callout `> [!info] Status` logo abaixo do título, re
 6. Implementar a menor mudança que cumpre a especificação, citando a spec nas regras de negócio não triviais (ver [[#Rastreabilidade: código ↔ spec]]).
 7. Verificar: todo critério de aceite automatizável deve ter um teste correspondente; critérios que só podem ser verificados manualmente (ex.: aparência visual) devem ser sinalizados como tal na própria spec.
 8. Atualizar o `status`, a `versao`, o `atualizado` e o `Changelog` da spec afetada.
+<!-- /sync:fluxo-8-passos -->
 
 ## Modelo de maturidade: spec-anchored
 
+<!-- sync:modelo-spec-anchored — espelhado (resumido) em AGENTS.md, parágrafo logo após o fluxo -->
 Este projeto é **spec-anchored**, não *spec-as-source*: a spec ancora a intenção, o contrato observável e os critérios de aceite de uma funcionalidade, mas **o código e os testes são a fonte de verdade executável**. Nenhuma spec é gerada nem executada automaticamente a partir do código, nem o inverso — a ligação entre os dois é sempre mediada por revisão humana ou de agente.
 
 Na prática, isso significa:
@@ -78,9 +81,11 @@ Na prática, isso significa:
 - Se o comportamento real do app divergir da spec, a causa é investigada antes de presumir qual dos dois está errado — a spec não é automaticamente tratada como correta só por existir.
 - Uma vez confirmado qual é o comportamento correto, a spec é atualizada (passo 8 acima) para voltar a refletir a realidade; ela nunca deve ficar "quase certa" por muito tempo.
 - Um agente de IA não deve usar uma spec desatualizada como justificativa para reintroduzir um comportamento antigo, nem presumir que uma divergência é sempre um bug no código — o comportamento em produção local, coberto por teste, tem precedência sobre uma spec ainda não revalidada.
+<!-- /sync:modelo-spec-anchored -->
 
 ## Rastreabilidade: código ↔ spec
 
+<!-- sync:rastreabilidade-codigo-spec — espelhado (resumido) em AGENTS.md, seção "Rastreabilidade: código ↔ spec" -->
 `arquitetura.md` mapeia módulo → spec, mas esse mapeamento é grosso demais para achar *qual regra específica* motivou um trecho de código. Para regra de negócio **não óbvia** — qualquer cálculo, validação ou efeito colateral que não seria previsível só lendo o nome da função — o código cita a spec de origem em comentário, logo acima do trecho relevante:
 
 ```python
@@ -100,6 +105,7 @@ Formato: `spec: <area>/<slug-do-arquivo em specs/> vX.Y — critério N` (o núm
 O `vX.Y` da citação é um ponteiro, não uma trava: quando uma spec ganha `versao` nova, quem faz o PR busca por `spec: <area>/<slug>` no código e atualiza o número nos comentários que a citam. Na maioria dos casos o `critério N` continua válido — critérios novos costumam ser anexados ao final da lista, não inseridos no meio — mas o número de versão referenciado, se deixado desatualizado, é um sinal falso de que a citação foi revisada quando não foi.
 
 Isso não substitui a spec nem o ADR — é uma migalha de pão na direção contrária, para quem está no código e precisa achar rápido o "porquê" documentado.
+<!-- /sync:rastreabilidade-codigo-spec -->
 
 ## Regra obrigatória para novos arquivos
 
@@ -124,9 +130,11 @@ rascunho ──▶ em-implementacao ──▶ implementado ──▶ em-revisao 
 
 ## Especificações (`spec`) vs. decisões técnicas (`adr`) vs. design (`design`)
 
+<!-- sync:spec-vs-adr-vs-design — espelhado em AGENTS.md, seção "O que é spec vs. ADR vs. design" -->
 - **`specs/`** descreve **comportamento observável pelo usuário**: jornada, dados, regras de negócio, API e critérios de aceite. Não deve depender de detalhes de implementação internos.
 - **`adr/`** registra **por que** uma decisão técnica foi tomada (ex.: não usar framework web, modularizar o frontend em ES Modules) e quais alternativas foram descartadas. Specs podem linkar um ADR para justificar uma restrição técnica.
 - **`design/`** guarda os tokens visuais (cores, tipografia, espaçamento, formas) que toda a interface deve respeitar — é referência de UI, não de regra de negócio.
+<!-- /sync:spec-vs-adr-vs-design -->
 
 ## Critérios para uma boa spec
 
@@ -139,6 +147,7 @@ rascunho ──▶ em-implementacao ──▶ implementado ──▶ em-revisao 
 
 ## Changelog
 
+- `2.6` — 2026-07-24 — Adicionados marcadores `<!-- sync:NOME -->` ao redor dos quatro blocos duplicados com AGENTS.md (fluxo de 8 passos, modelo spec-anchored, spec-vs-adr-vs-design, rastreabilidade código↔spec), para tornar o par grep-ável e reduzir risco de drift entre os dois arquivos.
 - `2.5` — 2026-07-24 — "Rastreabilidade: código ↔ spec" ganhou regra explícita: quando a spec citada muda de `versao`, o `vX.Y` do comentário no código deve ser atualizado no mesmo PR (checklist do AGENTS.md espelha essa regra).
 - `2.4` — 2026-07-24 — Adicionada a seção "Rastreabilidade: código ↔ spec", com convenção de comentário (`spec: area/slug vX.Y — critério N`) para regras de negócio não óbvias; passo 6 do fluxo passa a referenciá-la.
 - `2.3` — 2026-07-24 — Adicionado o modelo de maturidade "spec-anchored" (código e testes como fonte de verdade executável; spec ancora intenção e critérios de aceite). Passo de verificação do fluxo detalhado para exigir teste correspondente a cada critério de aceite automatizável.
