@@ -836,8 +836,8 @@ def get_category_evolution(user_id: int, category_id: int, subcategory_id: int |
         elif period == "ytd":
             date_filter = "AND period_month >= strftime('%Y-01', 'now')"
         
-        subcat_filter_t = "AND subcategory_id = ?" if subcategory_id else ""
-        subcat_filter_c = "AND subcategory_id = ?" if subcategory_id else ""
+        subcat_filter_t = "AND transactions.subcategory_id = ?" if subcategory_id else ""
+        subcat_filter_c = "AND credit_card_transactions.subcategory_id = ?" if subcategory_id else ""
         
         params = [user_id, category_id]
         if subcategory_id:
@@ -850,12 +850,19 @@ def get_category_evolution(user_id: int, category_id: int, subcategory_id: int |
             WITH combined AS (
                 SELECT 
                     strftime('%Y-%m', date) AS period_month,
-                    amount_cents
+                    transactions.amount_cents
                 FROM transactions
-                WHERE user_id = ? 
-                  AND category_id = ?
+                LEFT JOIN credit_card_payments
+                    ON credit_card_payments.transaction_id = transactions.id
+                    AND credit_card_payments.user_id = transactions.user_id
+                WHERE transactions.user_id = ?
+                  AND transactions.category_id = ?
                   {subcat_filter_t}
-                  AND archived_at IS NULL
+                  AND transactions.archived_at IS NULL
+                  -- spec: relatorios/relatorios v1.3 — criterio 6
+                  -- pagamento de fatura fica fora da evolucao para nao duplicar
+                  -- os lancamentos detalhados do cartao.
+                  AND credit_card_payments.id IS NULL
                   
                 UNION ALL
                 
@@ -863,10 +870,10 @@ def get_category_evolution(user_id: int, category_id: int, subcategory_id: int |
                     invoice_month AS period_month,
                     amount_cents
                 FROM credit_card_transactions
-                WHERE user_id = ?
-                  AND category_id = ?
+                WHERE credit_card_transactions.user_id = ?
+                  AND credit_card_transactions.category_id = ?
                   {subcat_filter_c}
-                  AND archived_at IS NULL
+                  AND credit_card_transactions.archived_at IS NULL
             )
             SELECT 
                 period_month AS month,

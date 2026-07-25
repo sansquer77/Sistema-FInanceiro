@@ -6,6 +6,34 @@ from app import cockpit_payload
 
 
 class CockpitPayloadTest(unittest.TestCase):
+    def test_credit_card_payment_transaction_is_excluded_from_expense_totals(self) -> None:
+        payload = cockpit_payload([
+            {
+                "type": "expense",
+                "amount": 100,
+                "amount_brl": 100,
+                "category_name": "Serviços Financeiros e Impostos",
+                "subcategory_name": "Pagamento de Fatura de Cartão",
+                "is_credit_card_payment": True,
+            },
+            {
+                "type": "expense",
+                "amount": 100,
+                "amount_brl": 100,
+                "category_name": "Transporte",
+                "subcategory_name": "Lavagem e cuidados com o carro",
+            },
+        ])
+
+        self.assertEqual(payload["month_totals"]["expense"], 100)
+        self.assertEqual(payload["top_expenses"], [
+            {
+                "label": "Transporte / Lavagem e cuidados com o carro",
+                "total": 100.0,
+                "count": 1,
+            },
+        ])
+
     def test_planning_keeps_original_values_separated_by_currency(self) -> None:
         payload = cockpit_payload([
             {

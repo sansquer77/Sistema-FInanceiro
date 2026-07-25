@@ -2,8 +2,8 @@
 tipo: spec
 area: relatorios
 status: implementado
-versao: 1.2
-atualizado: 2026-07-09
+versao: 1.3
+atualizado: 2026-07-24
 relacionados:
   - "[[lancamentos]]"
   - "[[cartoes]]"
@@ -17,7 +17,7 @@ aliases: ["Relatórios", "Cockpit"]
 # Relatórios
 
 > [!info] Status
-> **implementado** · área: `relatorios` · atualizado em 2026-06-30 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[limites-gastos]]
+> **implementado** · área: `relatorios` · atualizado em 2026-07-24 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[limites-gastos]]
 
 ## Problema
 
@@ -55,6 +55,7 @@ Qualquer usuário autenticado localmente que queira analisar seus gastos e recei
 - O relatório de subcategorias agrupa por `Categoria / Subcategoria`.
 - O relatório de tags considera lançamentos de contas e cartões com tag, mesmo quando não houver subcategoria.
 - **Lançamentos de cartão entram nos relatórios pela competência da fatura (`invoice_month`), não pela data da compra.** Ver [[cartoes]].
+- Pagamentos de fatura gerados em conta-corrente reduzem o saldo da conta, mas não entram em análises de despesa, relatórios por categoria/subcategoria/tag, evolução de categoria nem totais do Cockpit, pois os lançamentos detalhados do cartão já representam o consumo.
 - Relatórios exibem totais por moeda quando houver movimentações multimoeda.
 - O planejamento do Cockpit separa receitas recorrentes, investimentos planejados e despesas recorrentes por moeda, exibindo os valores originais sem somar moedas distintas.
 - Percentuais são calculados contra o total da seção.
@@ -73,6 +74,13 @@ Dados de origem: `transactions`, `credit_card_transactions`, `categories`, `subc
 
 Valores aceitos para `periodo`: `3m`, `6m`, `12m`, `ytd` e `all`.
 
+## Plano de implementação
+
+- [x] Identificar pagamentos de fatura em lançamentos de conta pelo vínculo `credit_card_payments.transaction_id`.
+- [x] Excluir esses lançamentos apenas das visões analíticas, preservando o impacto no saldo da conta.
+- [x] Atualizar Cockpit, Relatórios, evolução de categoria e limites para usar a regra analítica sem duplicidade.
+- [x] Cobrir a regra com testes automatizados onde a agregação acontece no backend e validar manualmente as telas.
+
 ## Critérios de aceite
 
 - Dado o usuário alternando o tipo de relatório, quando alterna, o período selecionado é mantido.
@@ -80,12 +88,14 @@ Valores aceitos para `periodo`: `3m`, `6m`, `12m`, `ytd` e `all`.
 - Dado o relatório de categorias, quando exibido, mostra total e percentual por categoria.
 - Dado o relatório de subcategorias, quando exibido, mostra total e percentual por categoria/subcategoria.
 - Dado o relatório de tags, quando exibido, agrega lançamentos por tag, incluindo lançamentos de cartão.
+- Dado uma fatura paga no mês, quando relatórios e Cockpit somam despesas do período, então o pagamento da fatura não é somado como despesa analítica e apenas as despesas detalhadas do cartão entram no total.
 - Dado movimentações em múltiplas moedas, quando exibidas, os totais são separados por moeda.
 - Dado um planejamento mensal com lançamentos em moedas distintas, quando o Cockpit é exibido, cada seção apresenta subtotal e itens por moeda, sem rotular valores estrangeiros como reais.
 - Dado uma categoria com histórico, quando o usuário abre a evolução, o sistema retorna a série mensal do período selecionado.
 
 ## Changelog
 
+- `1.3` — 2026-07-24 — Pagamentos de fatura passam a ser excluídos das análises de despesa para evitar duplicidade com lançamentos detalhados do cartão.
 - `1.2` — 2026-07-09 — Planejamento mensal do Cockpit separado por moeda.
 - `1.1` — 2026-06-30 — Documentação do endpoint de Cockpit e da evolução temporal por categoria/subcategoria.
 - `1.0` — 2026-06-29 — Frontmatter e critérios formalizados.

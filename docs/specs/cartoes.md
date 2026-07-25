@@ -2,7 +2,7 @@
 tipo: spec
 area: cartoes
 status: implementado
-versao: 1.6
+versao: 1.7
 atualizado: 2026-07-24
 relacionados:
   - "[[contas-correntes]]"
@@ -89,6 +89,7 @@ Qualquer usuário autenticado localmente que utilize cartões de crédito para d
 - Lançamentos de cartão entram em relatórios e limites pela competência da fatura (`invoice_month`), não pela data da compra. Ver [[relatorios]], [[limites-gastos]].
 - Faturas não pagas com lançamentos conciliados devem entrar como abatimento no saldo previsto da conta preferencial de pagamento, no mês de vencimento da fatura.
 - Faturas já pagas não devem ser abatidas novamente no saldo previsto da conta preferencial.
+- O lançamento de conta gerado pelo pagamento da fatura deve reduzir o saldo da conta de pagamento, mas deve ser identificado como pagamento de fatura para não entrar em análises de despesa e evitar duplicidade com os lançamentos detalhados do cartão.
 - Valores de lançamentos de cartão usam o mesmo tamanho de fonte compacto dos lançamentos de conta para melhorar a densidade de leitura.
 - Valores financeiros extensos no gráfico de faturas devem se adaptar ao espaço disponível reduzindo a tipografia, sem aumentar a área do gráfico nem truncar centavos.
 
@@ -115,6 +116,13 @@ Qualquer usuário autenticado localmente que utilize cartões de crédito para d
 
 Tabelas: `credit_cards`, `credit_card_transactions`, `credit_card_payments`, `credit_card_transaction_tags`.
 
+## Plano de implementação
+
+- [x] Manter o pagamento da fatura criando lançamento de conta para efeito de saldo.
+- [x] Expor nos lançamentos de conta um indicador derivado do vínculo com `credit_card_payments`.
+- [x] Usar esse indicador para excluir o pagamento agregado das visões analíticas sem apagar o histórico operacional do pagamento.
+- [x] Validar que a fatura continua paga e o saldo da conta continua abatido.
+
 ## Critérios de aceite
 
 - Dado um cartão cadastrado, quando uma despesa é registrada, ela aparece na fatura correta calculada pelo dia de fechamento.
@@ -126,12 +134,14 @@ Tabelas: `credit_cards`, `credit_card_transactions`, `credit_card_payments`, `cr
 - Dado uma fatura com lançamentos conciliados e não conciliados, quando o usuário troca o filtro de conciliação, a lista exibe apenas o status escolhido.
 - Dado um lançamento de cartão criado ou editado com tags, quando a fatura é exibida, então as tags aparecem no lançamento e podem ser usadas na busca.
 - Dado o pagamento de uma fatura, quando executado, o saldo da conta escolhida é reduzido pelo valor da fatura e a fatura é marcada como paga.
+- Dado o pagamento de uma fatura, quando Cockpit, relatórios ou limites de gastos somam despesas analíticas, então o pagamento agregado da fatura é ignorado e os lançamentos detalhados do cartão permanecem considerados.
 - Dado lançamentos recorrentes de cartão, quando listados no Cockpit, aparecem pela competência da fatura.
 - Dado uma fatura conciliada e não paga com conta preferencial configurada, quando a conta exibe saldo previsto, então a fatura é considerada pelo vencimento sem duplicar faturas já pagas.
 - Dado o gráfico de faturas com valores extensos, quando exibido, então os valores cabem nos cartões mensais por ajuste responsivo de tipografia, mantendo o tamanho atual da área.
 
 ## Changelog
 
+- `1.7` — 2026-07-24 — Pagamento de fatura passa a ser identificado para reduzir saldo sem duplicar despesas analíticas.
 - `1.6` — 2026-07-24 — Gráfico de faturas passa a adaptar valores financeiros extensos ao espaço disponível sem ampliar a área visual.
 - `1.5` — 2026-07-24 — Valores de lançamentos de cartão padronizados com a fonte compacta dos lançamentos de conta.
 - `1.4` — 2026-07-23 — Integrada a sugestão local de categoria e subcategoria por histórico exato.

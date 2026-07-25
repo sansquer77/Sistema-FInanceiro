@@ -15,7 +15,9 @@ from financeiro.credit_cards import (
     list_credit_card_transactions,
     pay_credit_card_invoice,
 )
+from financeiro.categories import get_category_evolution
 from financeiro.database import get_connection, initialize_database
+from financeiro.transactions import list_transactions
 
 
 class CreditCardPaymentAtomicityTest(unittest.TestCase):
@@ -82,6 +84,69 @@ class CreditCardPaymentAtomicityTest(unittest.TestCase):
         self.assertEqual(transaction_count, 0)
         self.assertEqual(payment_count, 0)
         self.assertEqual(account_row["current_balance_cents"], 100000)
+
+    def test_invoice_payment_is_flagged_and_excluded_from_category_evolution(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta principal",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "1000,00",
+        })
+        card = create_credit_card(user["id"], {
+            "name": "The One",
+            "issuer": "Banco",
+            "currency": "BRL",
+            "limit": "2000,00",
+            "closing_day": "28",
+            "due_day": "10",
+            "preferred_payment_account_id": str(account["id"]),
+        })
+        create_credit_card_transaction(user["id"], {
+            "credit_card_id": str(card["id"]),
+            "type": "expense",
+            "description": "Lavagem",
+            "amount": "100,00",
+            "date": "2026-07-10",
+            "invoice_month": "2026-07",
+            "category": "Transporte",
+            "subcategory": "Lavagem e cuidados com o carro",
+        })
+
+        payment_result = pay_credit_card_invoice(user["id"], {
+            "credit_card_id": str(card["id"]),
+            "invoice_month": "2026-07",
+            "account_id": str(account["id"]),
+            "payment_date": "2026-07-20",
+        })
+
+        payment_transaction = payment_result["transaction"]
+        self.assertTrue(payment_transaction["is_credit_card_payment"])
+
+        listed_payment = next(
+            transaction
+            for transaction in list_transactions(user["id"], month="2026-07")
+            if transaction["id"] == payment_transaction["id"]
+        )
+        self.assertTrue(listed_payment["is_credit_card_payment"])
+
+        with get_connection() as conn:
+            account_row = conn.execute(
+                "SELECT current_balance_cents FROM checking_accounts WHERE id = ?",
+                (account["id"],),
+            ).fetchone()
+            payment_category = conn.execute(
+                """
+                SELECT id
+                FROM categories
+                WHERE user_id = ? AND name = 'Serviços Financeiros e Impostos'
+                """,
+                (user["id"],),
+            ).fetchone()
+
+        self.assertEqual(account_row["current_balance_cents"], 90000)
+        evolution = get_category_evolution(user["id"], payment_category["id"], period="all")
+        self.assertEqual(evolution, [])
 
     def test_installment_card_transaction_splits_total_amount_across_installments(self) -> None:
         user = create_user("Alice", "alice@example.com", "correct-password")

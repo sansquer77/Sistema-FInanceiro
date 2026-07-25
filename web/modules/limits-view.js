@@ -263,7 +263,7 @@ export function registerLimitsView({
     };
     state.transactions.forEach((transaction) => {
       const month = transaction.date ? transaction.date.slice(0, 7) : "";
-      if (transaction.type !== "expense" || month !== targetMonth) {
+      if (transaction.type !== "expense" || month !== targetMonth || isCreditCardPaymentTransaction(transaction)) {
         return;
       }
       addSpent(month, transaction.category_id, transaction.subcategory_id, Number(transaction.amount_brl || transaction.amount));
@@ -284,6 +284,10 @@ export function registerLimitsView({
 
   function spendingLimitSpentKey(month, categoryId, subcategoryId) {
     return `${month || ""}|${categoryId || ""}|${subcategoryId || ""}`;
+  }
+
+  function isCreditCardPaymentTransaction(transaction) {
+    return Boolean(transaction?.is_credit_card_payment);
   }
 
   return {

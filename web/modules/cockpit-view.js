@@ -103,7 +103,7 @@ export function registerCockpitView({
   function getCurrentMonthTotals() {
     const prefix = currentMonthValue();
     return state.transactions.reduce((totals, transaction) => {
-      if (!transaction.date.startsWith(prefix)) {
+      if (!transaction.date.startsWith(prefix) || isCreditCardPaymentTransaction(transaction)) {
         return totals;
       }
       const amountBrl = Number(transaction.amount_brl || transaction.amount);
@@ -378,7 +378,7 @@ export function registerCockpitView({
     }
     const prefix = currentMonthValue();
     const grouped = groupTransactionsByCategory(state.transactions.filter((transaction) => (
-      transaction.date.startsWith(prefix) && transaction.type === "expense"
+      transaction.date.startsWith(prefix) && transaction.type === "expense" && !isCreditCardPaymentTransaction(transaction)
     )));
     renderDonutListChart(topExpensesChart, rankedChartItems(grouped, 5), {
       empty: "Nenhuma despesa neste mês.",
@@ -413,6 +413,10 @@ export function registerCockpitView({
     return [...totals.entries()]
       .map(([label, total]) => ({ label, total }))
       .sort((a, b) => b.total - a.total);
+  }
+
+  function isCreditCardPaymentTransaction(transaction) {
+    return Boolean(transaction?.is_credit_card_payment);
   }
 
   function rankedChartItems(items, visibleCount) {

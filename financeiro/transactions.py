@@ -74,6 +74,7 @@ def list_transactions(user_id: int, month: str | None = None, account_id: int | 
                 investment_operations.fixed_income_rate_micros AS investment_fixed_income_rate_micros,
                 investment_operations.fixed_income_maturity_date AS investment_fixed_income_maturity_date,
                 investment_operations.savings_anniversaries_json AS investment_savings_anniversaries_json,
+                credit_card_payments.id AS credit_card_payment_id,
                 GROUP_CONCAT(tags.name, '||') AS tag_names
             FROM transactions
             JOIN checking_accounts AS source
@@ -91,6 +92,9 @@ def list_transactions(user_id: int, month: str | None = None, account_id: int | 
             LEFT JOIN investment_operations
                 ON investment_operations.transaction_id = transactions.id
                 AND investment_operations.user_id = transactions.user_id
+            LEFT JOIN credit_card_payments
+                ON credit_card_payments.transaction_id = transactions.id
+                AND credit_card_payments.user_id = transactions.user_id
             LEFT JOIN transaction_tags
                 ON transaction_tags.transaction_id = transactions.id
             LEFT JOIN tags
@@ -1017,6 +1021,7 @@ def fetch_transaction(conn, user_id: int, transaction_id: int) -> dict:
                 investment_operations.fixed_income_rate_micros AS investment_fixed_income_rate_micros,
                 investment_operations.fixed_income_maturity_date AS investment_fixed_income_maturity_date,
                 investment_operations.savings_anniversaries_json AS investment_savings_anniversaries_json,
+                credit_card_payments.id AS credit_card_payment_id,
                 GROUP_CONCAT(tags.name, '||') AS tag_names
             FROM transactions
             JOIN checking_accounts AS source
@@ -1034,6 +1039,9 @@ def fetch_transaction(conn, user_id: int, transaction_id: int) -> dict:
             LEFT JOIN investment_operations
                 ON investment_operations.transaction_id = transactions.id
                 AND investment_operations.user_id = transactions.user_id
+            LEFT JOIN credit_card_payments
+                ON credit_card_payments.transaction_id = transactions.id
+                AND credit_card_payments.user_id = transactions.user_id
             LEFT JOIN transaction_tags
                 ON transaction_tags.transaction_id = transactions.id
             LEFT JOIN tags
@@ -1049,6 +1057,10 @@ def fetch_transaction(conn, user_id: int, transaction_id: int) -> dict:
 
 def format_transaction(transaction: dict) -> dict:
     investment_operation = extract_investment_operation(transaction)
+    # spec: relatorios/relatorios v1.3 — criterio 6
+    # (pagamento de fatura reduz saldo, mas fica fora de analises de despesa
+    #  para nao duplicar os lancamentos detalhados do cartao)
+    transaction["is_credit_card_payment"] = bool(transaction.pop("credit_card_payment_id", None))
     transaction["amount"] = cents_to_money(transaction.pop("amount_cents"))
     transaction["destination_amount"] = cents_to_money(transaction.pop("destination_amount_cents", 0) or 0)
     transaction["exchange_rate_to_brl"] = micros_to_rate(transaction.pop("exchange_rate_micros"))

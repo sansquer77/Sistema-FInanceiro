@@ -175,6 +175,7 @@ export function registerReportsView({
     }
     const items = state.transactions
       .filter((transaction) => transaction.date.startsWith(state.reportMonth))
+      .filter((transaction) => !isCreditCardPaymentTransaction(transaction))
       .filter((transaction) => String(transaction.account_id) === String(account.id));
     const reportItems = items.map(accountTransactionReportItem).filter(Boolean);
     const totals = reportTotals(reportItems);
@@ -252,6 +253,7 @@ export function registerReportsView({
   function reportItemsForMonth(month) {
     const accountItems = state.transactions
       .filter((transaction) => transaction.date.startsWith(month))
+      .filter((transaction) => !isCreditCardPaymentTransaction(transaction))
       .map(accountTransactionReportItem)
       .filter(Boolean);
     const cardItems = state.cardTransactions
@@ -262,6 +264,9 @@ export function registerReportsView({
   }
 
   function accountTransactionReportItem(transaction) {
+    if (isCreditCardPaymentTransaction(transaction)) {
+      return null;
+    }
     const reportType = isInvestmentTransaction(transaction)
       ? "investment"
       : transaction.type === "income" || transaction.type === "expense"
@@ -510,6 +515,9 @@ export function registerReportsView({
     const allowedMonths = new Set(months);
     const totals = new Map(months.map((month) => [month, 0]));
     for (const transaction of state.transactions) {
+      if (isCreditCardPaymentTransaction(transaction)) {
+        continue;
+      }
       addLocalEvolutionTransaction(totals, allowedMonths, context, transaction, transaction.date?.slice(0, 7));
     }
     for (const transaction of state.cardTransactions) {
@@ -539,6 +547,10 @@ export function registerReportsView({
       }
     }
     totals.set(month, (totals.get(month) || 0) + moneyToCents(transaction.amount));
+  }
+
+  function isCreditCardPaymentTransaction(transaction) {
+    return Boolean(transaction?.is_credit_card_payment);
   }
 
   function evolutionMonths(period) {

@@ -1339,6 +1339,8 @@ def cockpit_payload(transactions: list[dict]) -> dict:
         "investment": {},
     }
     for transaction in transactions:
+        if is_credit_card_payment_transaction(transaction):
+            continue
         report_type = cockpit_transaction_type(transaction)
         if not report_type:
             continue
@@ -1361,6 +1363,13 @@ def cockpit_payload(transactions: list[dict]) -> dict:
             "expense": ranked_cockpit_rows(planning["expense"]),
         },
     }
+
+
+def is_credit_card_payment_transaction(transaction: dict) -> bool:
+    # spec: relatorios/relatorios v1.3 — criterio 6
+    # (pagamento de fatura fica fora das analises mensais; a despesa detalhada
+    #  ja esta nos lancamentos do cartao pela competencia da fatura)
+    return bool(transaction.get("is_credit_card_payment"))
 
 
 def cockpit_transaction_type(transaction: dict) -> str:
