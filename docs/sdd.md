@@ -2,7 +2,7 @@
 tipo: metodologia
 area: meta
 status: implementado
-versao: 2.4
+versao: 2.5
 atualizado: 2026-07-24
 relacionados:
   - "[[templates/spec-template|Template de spec]]"
@@ -97,6 +97,8 @@ if quantidade_venda > posicao.quantidade:
 
 Formato: `spec: <area>/<slug-do-arquivo em specs/> vX.Y — critério N` (o número do critério é a posição dele na lista de "Critérios de aceite" da spec). Regras óbvias — um `if` simples de validação de campo obrigatório, por exemplo — não precisam da citação; o objetivo é ancorar as decisões que um agente de IA (ou um humano seis meses depois) não deduziria só olhando o código.
 
+O `vX.Y` da citação é um ponteiro, não uma trava: quando uma spec ganha `versao` nova, quem faz o PR busca por `spec: <area>/<slug>` no código e atualiza o número nos comentários que a citam. Na maioria dos casos o `critério N` continua válido — critérios novos costumam ser anexados ao final da lista, não inseridos no meio — mas o número de versão referenciado, se deixado desatualizado, é um sinal falso de que a citação foi revisada quando não foi.
+
 Isso não substitui a spec nem o ADR — é uma migalha de pão na direção contrária, para quem está no código e precisa achar rápido o "porquê" documentado.
 
 ## Regra obrigatória para novos arquivos
@@ -137,6 +139,7 @@ rascunho ──▶ em-implementacao ──▶ implementado ──▶ em-revisao 
 
 ## Changelog
 
+- `2.5` — 2026-07-24 — "Rastreabilidade: código ↔ spec" ganhou regra explícita: quando a spec citada muda de `versao`, o `vX.Y` do comentário no código deve ser atualizado no mesmo PR (checklist do AGENTS.md espelha essa regra).
 - `2.4` — 2026-07-24 — Adicionada a seção "Rastreabilidade: código ↔ spec", com convenção de comentário (`spec: area/slug vX.Y — critério N`) para regras de negócio não óbvias; passo 6 do fluxo passa a referenciá-la.
 - `2.3` — 2026-07-24 — Adicionado o modelo de maturidade "spec-anchored" (código e testes como fonte de verdade executável; spec ancora intenção e critérios de aceite). Passo de verificação do fluxo detalhado para exigir teste correspondente a cada critério de aceite automatizável.
 - `2.2` — 2026-07-04 — Regra de novos arquivos ampliada: qualquer novo documento do vault deve começar a partir de `docs/templates/spec-template.md`, adaptando o tipo quando não for spec.

@@ -505,7 +505,7 @@ def set_credit_card_transaction_reconciled(user_id: int, transaction_id: str, re
 
 
 def pay_credit_card_invoice(user_id: int, data: dict) -> dict:
-    # spec: cartoes v1.4 — criterio 9
+    # spec: cartoes v1.6 — criterio 9
     # (pagamento reduz o saldo da conta escolhida pelo valor total da fatura
     #  e marca a fatura como paga via credit_card_payments; nao permite pagar 2x)
     card_id = normalize_card_id(data.get("credit_card_id"))
@@ -842,7 +842,7 @@ def shift_month(value: str, delta: int) -> str:
 
 
 def invoice_month_for_transaction_date(card, transaction_date: str) -> str:
-    # spec: cartoes v1.4 — criterio 1
+    # spec: cartoes v1.6 — criterio 1
     # (competencia = mes da data da compra, exceto quando a data e posterior
     #  ao dia de fechamento do cartao: nesse caso a compra entra na fatura seguinte)
     parsed_date = date.fromisoformat(transaction_date)
@@ -859,7 +859,7 @@ def open_invoice_month_for_transaction_date(conn, user_id: int, card, transactio
 
 
 def first_open_invoice_month(conn, user_id: int, card_id: int, invoice_month: str) -> str:
-    # spec: cartoes v1.4 — criterio 2 (secao "Regras": fatura calculada ja paga
+    # spec: cartoes v1.6 — criterio 2 (secao "Regras": fatura calculada ja paga
     # deve avancar automaticamente para a proxima fatura aberta, sem perder o lancamento)
     candidate = invoice_month
     for _ in range(240):
@@ -1021,7 +1021,7 @@ def invoice_balance_cents(conn, user_id: int, card_id: int, invoice_month: str) 
 
 
 def ensure_invoice_is_open(conn, user_id: int, card_id: int, invoice_month: str) -> None:
-    # spec: cartoes v1.4 — secao "Regras": nao e permitido adicionar/editar
+    # spec: cartoes v1.6 — secao "Regras": nao e permitido adicionar/editar
     # lancamentos diretamente em fatura ja paga (fechada)
     row = conn.execute(
         """

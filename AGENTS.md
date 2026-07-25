@@ -137,6 +137,7 @@ Consulte [`docs/design/design-system.md`](docs/design/design-system.md) para a p
 - [ ] Nenhum arquivo de `data/` ou credencial foi commitado.
 - [ ] Regra de negócio está em `financeiro/`, não em `web/`.
 - [ ] Regras de negócio não óbvias citam a spec/critério de origem em comentário.
+- [ ] Se este PR alterou `versao` de uma spec em `docs/specs/`, buscar por `# spec: <area>/<slug> vX.Y` (ou `// spec: ...`) no código e atualizar o número de versão nos comentários que citam essa spec — o critério referenciado normalmente continua válido (novos critérios costumam ser anexados ao final da lista), só o `vX.Y` fica desatualizado.
 - [ ] Cores semânticas do design system foram respeitadas.
 
 ## 7. Referências rápidas
