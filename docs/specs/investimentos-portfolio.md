@@ -2,8 +2,8 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 1.5
-atualizado: 2026-07-20
+versao: 1.7
+atualizado: 2026-07-26
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -16,7 +16,7 @@ aliases: ["Investimentos", "Portfólio"]
 # Investimentos e Portfólio
 
 > [!info] Status
-> **implementado** · área: `investimentos` · atualizado em 2026-07-20 · relacionados: [[contas-correntes]], [[lancamentos]], [[relatorios]]
+> **implementado** · área: `investimentos` · atualizado em 2026-07-26 · relacionados: [[contas-correntes]], [[lancamentos]], [[relatorios]]
 
 ## Problema
 
@@ -58,7 +58,10 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 
 **Renda Fixa:**
 - Pós-fixados/híbridos usam indexadores (CDI, SELIC, IPCA, IGP-M, TR) via API do Banco Central (SGS).
-- Pré-fixados usam a taxa acordada anual; exibem `Pré-fixado` e a taxa antes do vencimento.
+- Pré-fixados usam a taxa acordada anual nominal/efetiva informada no campo de taxa; exibem `Pré-fixado` e a taxa antes do vencimento.
+- No cadastro de renda fixa, a interface deve diferenciar claramente: `Pré-fixada` usa taxa em `% a.a.`; `Pós-fixada` usa taxa como `% do indexador` (ex.: `123` com CDI significa `123% do CDI`); `Híbrida` usa indexador mais taxa em `% a.a.`.
+- Para aplicações como CDB `123% do CDI`, a interface deve orientar o usuário a selecionar modalidade `Pós-fixada`, indexador `CDI` e taxa `123`, evitando cadastrar como `Pré-fixada`.
+- Campos de quantidade e preço médio/unitário não devem ser exibidos para renda fixa, pois o custo total/aporte é a base de cálculo relevante.
 - O sistema calcula e deduz estimativas de IOF (até 30 dias) e IR (tabela regressiva de 22,5% a 15%).
 - Posições de renda fixa com vencimento igual ou anterior à data atual devem gerar alerta visual no menu Portfólio e aviso no Cockpit até que sejam encerradas.
 
@@ -97,12 +100,23 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 
 Tabelas: `investment_opening_positions`, `investment_operations`, `investment_redemptions`, `investment_closed_positions`, `investment_value_overrides`, `transactions`, `checking_accounts`, `quote_cache`.
 
+## Plano de implementação
+
+- [x] Atualizar rótulos e dicas dos campos de renda fixa no lançamento de investimento.
+- [x] Atualizar rótulos e dicas dos campos de renda fixa na posição inicial do Portfólio.
+- [x] Sincronizar as dicas quando o usuário altera a modalidade.
+- [x] Preservar a fórmula e os dados persistidos, alterando apenas a comunicação visual.
+- [x] Validar sintaxe e conferir manualmente os textos no formulário.
+- [x] Ocultar quantidade e preço médio/unitário para renda fixa.
+
 ## Critérios de aceite
 
 - Dado ativos de diferentes classes cadastrados, quando o portfólio é exibido, aparecem agrupados por classe com cotações atualizadas.
 - Dado consolidações por classe, indexador, moeda ou carteira com moedas distintas, quando as barras são exibidas, seu tamanho é calculado pelo valor atual convertido para BRL, enquanto o texto mantém a moeda original.
 - Dado um ativo de renda fixa pós-fixado, quando listado, exibe indexador, taxa e rendimento bruto/líquido com impostos regressivos.
 - Dado um ativo pré-fixado, quando listado, exibe `Pré-fixado` e a taxa anual.
+- Dado o usuário cadastrando renda fixa, quando alterna entre pré-fixada, pós-fixada e híbrida, então o campo de taxa explica a unidade correta e orienta que `123% do CDI` deve ser cadastrado como pós-fixado com indexador CDI.
+- Dado o usuário cadastrando renda fixa, quando seleciona esse tipo de ativo, então campos de quantidade e preço médio/unitário ficam ocultos e não são enviados no formulário.
 - Dado uma posição de renda fixa vencendo hoje ou vencida, quando o usuário navega pelo app, o item Portfólio no menu aparece em estado de alerta e o Cockpit exibe um aviso acionável.
 - Dado uma posição vencida já encerrada, quando o portfólio é recarregado, o alerta de menu e o aviso do Cockpit deixam de considerar essa posição.
 - Dado um ativo em moeda estrangeira, quando listado, é exibido na própria moeda sem conversão visual redundante.
@@ -114,6 +128,8 @@ Tabelas: `investment_opening_positions`, `investment_operations`, `investment_re
 
 ## Changelog
 
+- `1.7` — 2026-07-26 — Campos de quantidade e preço médio/unitário deixam de aparecer nos cadastros de renda fixa.
+- `1.6` — 2026-07-26 — Formulários de renda fixa passam a explicitar a diferença entre taxa pré-fixada em `% a.a.` e percentual do indexador em pós-fixados.
 - `1.5` — 2026-07-20 — UX de encerramento documentado como modal único com data, valor final e opção de crédito.
 - `1.4` — 2026-07-20 — Opção de registrar crédito na conta no encerramento de posição, desmarcada por padrão.
 - `1.3` — 2026-07-20 — Alertas de vencimento de renda fixa no menu Portfólio e no Cockpit documentados.

@@ -23,6 +23,9 @@ export function registerReportsView({
     reportResultSummary,
     reportAccountFilter,
     reportAccountSelect,
+    statementControls,
+    statementScopeSelect,
+    printStatementButton,
     reportContent,
   } = elements;
 
@@ -33,6 +36,11 @@ export function registerReportsView({
     state.reportAccountId = reportAccountSelect.value;
     renderReports();
   });
+  statementScopeSelect.addEventListener("change", () => {
+    state.statementScope = statementScopeSelect.value;
+    renderReports();
+  });
+  printStatementButton.addEventListener("click", () => window.print());
   reportContent.addEventListener("click", handleReportContentClick);
 
   function renderReports() {
@@ -49,6 +57,11 @@ export function registerReportsView({
     reportResultSummary.classList.toggle("danger-text", [...resultTotals.values()].some((total) => total < 0));
     reportResultSummary.classList.toggle("positive-text", [...resultTotals.values()].some((total) => total > 0) && ![...resultTotals.values()].some((total) => total < 0));
     reportAccountFilter.hidden = state.reportTab !== "accounts";
+    statementControls.hidden = state.reportTab !== "statement";
+    renderStatementScopeOptions();
+    printStatementButton.hidden = state.reportTab !== "statement";
+    printStatementButton.disabled = state.reportTab === "statement" && !statementExpenseItems().length;
+    reportContent.classList.toggle("statement-print-area", state.reportTab === "statement");
     if (state.reportTab === "cashflow") {
       renderCashflowReport(items);
       return;
@@ -65,6 +78,10 @@ export function registerReportsView({
       renderSubcategoriesReport(items);
       return;
     }
+    if (state.reportTab === "statement") {
+      renderStatementReport();
+      return;
+    }
     renderCategoriesReport(items);
   }
 
@@ -78,6 +95,26 @@ export function registerReportsView({
       state.reportAccountId = state.accounts[0] ? String(state.accounts[0].id) : "";
     }
     reportAccountSelect.value = state.reportAccountId;
+  }
+
+  function renderStatementScopeOptions() {
+    if (state.reportTab !== "statement") {
+      return;
+    }
+    const options = [
+      '<option value="consolidated">Visão Consolidada</option>',
+      ...state.accounts.map((account) => (
+        `<option value="account:${account.id}">Conta · ${escapeHtml(account.name)} (${escapeHtml(account.currency)})</option>`
+      )),
+      ...state.creditCards.map((card) => (
+        `<option value="card:${card.id}">Cartão · ${escapeHtml(card.name)} (${escapeHtml(card.currency)})</option>`
+      )),
+    ];
+    statementScopeSelect.innerHTML = options.join("");
+    if (![...statementScopeSelect.options].some((option) => option.value === state.statementScope)) {
+      state.statementScope = "consolidated";
+    }
+    statementScopeSelect.value = state.statementScope;
   }
 
   function renderCategoriesReport(items) {
@@ -310,9 +347,259 @@ export function registerReportsView({
       categoryId: transaction.category_id || "",
       subcategoryId: transaction.subcategory_id || "",
       accountId: "",
+      cardId: transaction.credit_card_id || "",
       accountName: transaction.credit_card_name || "Cartão",
       source: "Cartão",
     };
+  }
+
+  function renderStatementReport() {
+    const items = statementExpenseItems();
+    const totalMap = sumStatementMoney(items);
+    const total = items.reduce((sum, item) => sum + item.amount, 0);
+    const monthDaysElapsed = statementElapsedDays(state.reportMonth);
+    const averageMap = divideMoneyTotals(totalMap, Math.max(monthDaysElapsed, 1));
+    const categoryRows = groupReportItems(items, "category").slice(0, 5);
+    const compositionRows = groupReportItems(items, "subcategory");
+    const topCategory = categoryRows[0] || null;
+    const topTransaction = items.slice().sort((a, b) => b.amount - a.amount)[0] || null;
+    const scope = statementScopeInfo();
+    const currencyInfo = statementBaseCurrencyInfo(items, scope);
+    const issuedAt = new Date();
+    reportContent.innerHTML = `
+      <article class="monthly-statement">
+        <header class="statement-header">
+          <img src="assets/app-icon.png" alt="Sistema Financeiro">
+          <div>
+            <h2>Relatório de Despesas Mensal (${escapeHtml(formatMonthLabel(state.reportMonth))})</h2>
+            <p>Conta(s): ${escapeHtml(scope.label)}</p>
+            <p>Moeda Base: ${escapeHtml(currencyInfo.label)}</p>
+            <p>Data de Emissão: ${escapeHtml(formatStatementDateTime(issuedAt))}</p>
+          </div>
+        </header>
+        <section class="statement-kpis" aria-label="Resumo executivo">
+          ${statementKpi("Total de Saídas", formatMoneyTotals(totalMap))}
+          ${statementKpi("Média Diária", formatMoneyTotals(averageMap))}
+          ${statementKpi("Maior Despesa", topCategory ? `${escapeHtml(topCategory.label)} · ${formatMoneyTotals(topCategory.totals)}` : "Sem despesas")}
+          ${statementKpi("Transação de Maior Impacto", topTransaction ? `${escapeHtml(topTransaction.description || topTransaction.category)} · ${formatMoney(topTransaction.amount, topTransaction.currency)}` : "Sem despesas")}
+        </section>
+        <section class="statement-visuals">
+          <div class="statement-chart-card statement-donut-card">
+            <h3>Distribuição por categoria</h3>
+            ${statementDonutChart(categoryRows, total, currencyInfo)}
+          </div>
+          <div class="statement-chart-card">
+            <h3>Gastos por dia do mês</h3>
+            ${statementDailyBars(items, currencyInfo)}
+          </div>
+        </section>
+        <section class="statement-section">
+          <h3>Composição de Despesas</h3>
+          ${statementCompositionTable(compositionRows, totalMap)}
+        </section>
+        <section class="statement-section">
+          <h3>Detalhamento de Lançamentos</h3>
+          ${statementDetailTable(items)}
+        </section>
+        <footer class="statement-footer">
+          <span>Sistema Financeiro</span>
+          <span>Página <span class="statement-page-number"></span> de <span class="statement-page-total"></span></span>
+        </footer>
+      </article>
+    `;
+  }
+
+  function statementKpi(label, value) {
+    return `
+      <div>
+        <span>${escapeHtml(label)}</span>
+        <strong>${value}</strong>
+      </div>
+    `;
+  }
+
+  function statementExpenseItems() {
+    return reportItemsForMonth(state.reportMonth)
+      .filter((item) => item.reportType === "expense")
+      .filter((item) => statementItemMatchesScope(item));
+  }
+
+  function statementItemMatchesScope(item) {
+    const [kind, id] = String(state.statementScope || "consolidated").split(":");
+    if (kind === "account") {
+      return item.source === "Conta" && String(item.accountId) === String(id);
+    }
+    if (kind === "card") {
+      return item.source === "Cartão" && String(item.cardId) === String(id);
+    }
+    return true;
+  }
+
+  function statementScopeInfo() {
+    const [kind, id] = String(state.statementScope || "consolidated").split(":");
+    if (kind === "account") {
+      const account = state.accounts.find((entry) => String(entry.id) === String(id));
+      return account ? { label: account.name, currency: account.currency || "BRL" } : { label: "Conta", currency: "BRL" };
+    }
+    if (kind === "card") {
+      const card = state.creditCards.find((entry) => String(entry.id) === String(id));
+      return card ? { label: card.name, currency: card.currency || "BRL" } : { label: "Cartão", currency: "BRL" };
+    }
+    return { label: "Visão Consolidada", currency: "" };
+  }
+
+  function statementBaseCurrencyInfo(items, scope) {
+    if (scope.currency) {
+      return { label: scope.currency, currency: scope.currency, single: true };
+    }
+    const currencies = [...new Set(items.map((item) => item.currency || "BRL"))].sort();
+    if (currencies.length <= 1) {
+      const currency = currencies[0] || "BRL";
+      return { label: currency, currency, single: true };
+    }
+    return { label: currencies.join(" / "), currency: "", single: false };
+  }
+
+  function statementElapsedDays(month) {
+    const [year, monthNumber] = month.split("-").map(Number);
+    const lastDay = new Date(year, monthNumber, 0).getDate();
+    const today = new Date();
+    const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+    if (month === currentMonth) {
+      return Math.min(today.getDate(), lastDay);
+    }
+    return month < currentMonth ? lastDay : 0;
+  }
+
+  function singleCurrencyTotal(totals) {
+    return [...totals.values()].reduce((sum, amount) => sum + amount, 0);
+  }
+
+  function sumStatementMoney(items) {
+    return items.reduce((totals, item) => addMoneyTotal(totals, item.currency, item.amount), new Map());
+  }
+
+  function divideMoneyTotals(totals, divisor) {
+    const result = new Map();
+    for (const [currency, amount] of totals.entries()) {
+      result.set(currency, amount / divisor);
+    }
+    return result;
+  }
+
+  function statementDonutChart(rows, total, currencyInfo) {
+    if (!rows.length || total <= 0) {
+      return '<div class="empty-state compact">Sem despesas no período.</div>';
+    }
+    if (!currencyInfo.single) {
+      return '<div class="empty-state compact">Gráfico disponível quando o escopo usa uma única moeda.</div>';
+    }
+    const topRows = rows.slice(0, 5);
+    const topTotal = topRows.reduce((sum, row) => sum + singleCurrencyTotal(row.totals), 0);
+    const donutRows = topTotal < total
+      ? [...topRows, { label: "Outros", totals: new Map([[currencyInfo.currency, total - topTotal]]), sortTotal: total - topTotal }]
+      : topRows;
+    let offset = 25;
+    const segments = donutRows.map((row, index) => {
+      const amount = singleCurrencyTotal(row.totals);
+      const dash = Math.max((amount / total) * 100, 0);
+      const segment = `<circle r="15.9155" cx="18" cy="18" style="stroke:${chartColor(index)}; stroke-dasharray:${dash.toFixed(2)} ${Math.max(100 - dash, 0).toFixed(2)}; stroke-dashoffset:${offset.toFixed(2)}"></circle>`;
+      offset -= dash;
+      return segment;
+    }).join("");
+    const legend = donutRows.map((row, index) => {
+      const amount = singleCurrencyTotal(row.totals);
+      return `
+        <li><i style="background:${chartColor(index)}"></i><span>${escapeHtml(row.label)}</span><strong>${formatPercent(total > 0 ? amount / total : 0)}</strong></li>
+      `;
+    }).join("");
+    return `
+      <div class="statement-donut">
+        <svg viewBox="0 0 36 36" aria-hidden="true">
+          <circle r="15.9155" cx="18" cy="18" class="statement-donut-track"></circle>
+          ${segments}
+        </svg>
+        <div class="statement-donut-center">
+          <span>Total Gasto</span>
+          <strong>${formatMoney(total, currencyInfo.currency)}</strong>
+        </div>
+      </div>
+      <ul class="statement-chart-legend">${legend}</ul>
+    `;
+  }
+
+  function statementDailyBars(items, currencyInfo) {
+    if (!currencyInfo.single) {
+      return '<div class="empty-state compact">Histograma disponível quando o escopo usa uma única moeda.</div>';
+    }
+    const days = monthDayRows(state.reportMonth);
+    const totals = new Map(days.map((day) => [day, 0]));
+    for (const item of items) {
+      totals.set(item.date, (totals.get(item.date) || 0) + item.amount);
+    }
+    const max = Math.max(...totals.values(), 1);
+    return `
+      <div class="statement-daily-bars">
+        ${days.map((day) => {
+          const amount = totals.get(day) || 0;
+          return `
+            <div>
+              <span style="height:${Math.max((amount / max) * 100, amount > 0 ? 4 : 0).toFixed(2)}%" title="${escapeHtml(formatDate(day))}: ${formatMoney(amount, currencyInfo.currency)}"></span>
+              <small>${Number(day.slice(-2))}</small>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `;
+  }
+
+  function statementCompositionTable(rows, totalMap) {
+    if (!rows.length) {
+      return '<div class="empty-state compact">Sem composição para o período.</div>';
+    }
+    return `
+      <div class="report-table-wrap">
+        <table class="report-table statement-table">
+          <thead><tr><th>Categoria / Subcategoria</th><th>Total Gasto</th><th>% do Mês</th></tr></thead>
+          <tbody>
+            ${rows.map((row) => {
+              const percent = reportRowPercent(row, totalMap);
+              return `<tr><td>${escapeHtml(row.label.replace(" / ", " › "))}</td><td class="money-cell">${formatMoneyTotals(row.totals)}</td><td class="money-cell">${percent === null ? "Multimoeda" : formatPercent(percent)}</td></tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  function statementDetailTable(items) {
+    if (!items.length) {
+      return '<div class="empty-state compact">Sem lançamentos no período.</div>';
+    }
+    const rows = items.slice().sort((a, b) => a.date.localeCompare(b.date) || b.amount - a.amount).map((item) => `
+      <tr>
+        <td>${formatDate(item.date)}</td>
+        <td>${escapeHtml(item.description || item.category)}</td>
+        <td>${escapeHtml(reportItemClassification(item).replace(" / ", " › "))}</td>
+        <td><span class="statement-tags">${escapeHtml(item.tags.map((tag) => `#${tag}`).join(" "))}</span></td>
+        <td class="money-cell">${formatMoney(item.amount, item.currency)}</td>
+      </tr>
+    `).join("");
+    return `
+      <div class="report-table-wrap">
+        <table class="report-table statement-table">
+          <thead><tr><th>Data</th><th>Descrição</th><th>Categoria / Subcategoria</th><th>Tags</th><th>Valor</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  function formatStatementDateTime(date) {
+    return date.toLocaleString("pt-BR", {
+      dateStyle: "short",
+      timeStyle: "short",
+    });
   }
 
   function reportTotals(items) {

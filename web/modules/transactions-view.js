@@ -61,6 +61,10 @@ export function registerTransactionsView({
     investmentAmount,
     investmentFundFields,
     investmentFixedFields,
+    investmentPricingFields,
+    investmentFixedIncomeMode,
+    investmentFixedIncomeRateLabel,
+    investmentFixedIncomeRateHint,
     transactionCategory,
     transactionCategoryRow,
     transactionSubcategory,
@@ -121,6 +125,7 @@ export function registerTransactionsView({
   transactionForm.elements.date.addEventListener("change", updateTransferExchangeRateState);
   transactionForm.elements.amount.addEventListener("input", updateDestinationAmountFromRate);
   transferExchangeRate.addEventListener("input", updateDestinationAmountFromRate);
+  investmentFixedIncomeMode.addEventListener("change", syncInvestmentFixedIncomeRateHint);
   previousMonthButton.addEventListener("click", () => shiftTransactionMonth(-1));
   todayMonthButton.addEventListener("click", () => setTransactionMonth(currentMonthValue()));
   transactionMonthLabel.addEventListener("click", (event) => {
@@ -1106,6 +1111,7 @@ export function registerTransactionsView({
     const isSavings = isInvestmentSavingsSelection();
     investmentFundFields.hidden = !isInvestment || cat !== "Fundos de Investimentos";
     investmentFixedFields.hidden = !isInvestment || cat !== "Renda Fixa" || isSavings;
+    investmentPricingFields.hidden = isInvestment && (cat === "Renda Fixa" || isSavings);
     for (const field of investmentOperationFields.querySelectorAll("input, select")) {
       field.disabled = !isInvestment;
     }
@@ -1115,6 +1121,10 @@ export function registerTransactionsView({
     for (const field of investmentFixedFields.querySelectorAll("input, select")) {
       field.disabled = !isInvestment || investmentFixedFields.hidden;
     }
+    for (const field of investmentPricingFields.querySelectorAll("input, select")) {
+      field.disabled = investmentPricingFields.hidden;
+    }
+    syncInvestmentFixedIncomeRateHint();
     if (isSavings) {
       transactionForm.elements.investment_asset_identifier.value = "POUPANCA";
       if (!transactionForm.elements.investment_asset_name.value) {
@@ -1216,6 +1226,23 @@ export function registerTransactionsView({
       updateDestinationAmountFromRate();
     } catch (error) {
       transferExchangeRate.placeholder = "Informe a cotação manual";
+    }
+  }
+
+  function syncInvestmentFixedIncomeRateHint() {
+    const mode = investmentFixedIncomeMode.value;
+    if (mode === "pre") {
+      investmentFixedIncomeRateLabel.textContent = "Taxa pré-fixada (% a.a.)";
+      investmentFixedIncomeRateHint.textContent = "Ex.: 12,30 significa 12,30% ao ano. Para CDB 123% do CDI, use pós-fixada.";
+    } else if (mode === "post") {
+      investmentFixedIncomeRateLabel.textContent = "Percentual do indexador (%)";
+      investmentFixedIncomeRateHint.textContent = "Para CDB 123% do CDI, selecione indexador CDI e informe 123.";
+    } else if (mode === "hybrid") {
+      investmentFixedIncomeRateLabel.textContent = "Taxa adicional (% a.a.)";
+      investmentFixedIncomeRateHint.textContent = "Ex.: IPCA + 6,50% a.a.; escolha o indexador e informe apenas a taxa adicional.";
+    } else {
+      investmentFixedIncomeRateLabel.textContent = "Taxa";
+      investmentFixedIncomeRateHint.textContent = "Pré-fixada usa % a.a.; pós-fixada usa % do indexador.";
     }
   }
 

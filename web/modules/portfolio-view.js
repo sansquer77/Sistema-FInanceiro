@@ -33,7 +33,11 @@ export function registerPortfolioView({
     portfolioPensionSubtype,
     portfolioSavingsFields,
     portfolioFixedFields,
+    portfolioPricingFields,
     portfolioFixedIncomeSubtype,
+    portfolioFixedIncomeMode,
+    portfolioFixedIncomeRateLabel,
+    portfolioFixedIncomeRateHint,
     cancelPortfolioAssetButton,
     deletePortfolioAssetButton,
     portfolioCostSummary,
@@ -57,6 +61,7 @@ export function registerPortfolioView({
   portfolioAssetForm.addEventListener("submit", handlePortfolioAssetSubmit);
   portfolioAssetType.addEventListener("change", updatePortfolioAssetTypeState);
   portfolioFixedIncomeSubtype.addEventListener("change", syncPortfolioFixedIncomeSubtype);
+  portfolioFixedIncomeMode.addEventListener("change", syncPortfolioFixedIncomeRateHint);
   portfolioPensionSubtype.addEventListener("change", syncPortfolioPensionSubtype);
   cancelPortfolioAssetButton.addEventListener("click", resetPortfolioAssetForm);
   deletePortfolioAssetButton.addEventListener("click", deletePortfolioAsset);
@@ -260,6 +265,7 @@ export function registerPortfolioView({
     const assetType = portfolioAssetType.value;
     portfolioFundFields.hidden = assetType !== "fund";
     portfolioFixedFields.hidden = assetType !== "fixed_income";
+    portfolioPricingFields.hidden = assetType === "fixed_income" || assetType === "savings";
     portfolioPensionFields.hidden = assetType !== "private_pension";
     portfolioSavingsFields.hidden = assetType !== "savings";
     if (assetType === "fixed_income") {
@@ -287,11 +293,32 @@ export function registerPortfolioView({
       portfolioFixedIncomeSubtype.value = "";
       portfolioPensionSubtype.value = "";
     }
+    for (const field of portfolioPricingFields.querySelectorAll("input, select")) {
+      field.disabled = portfolioPricingFields.hidden;
+    }
+    syncPortfolioFixedIncomeRateHint();
   }
 
   function syncPortfolioFixedIncomeSubtype() {
     if (portfolioAssetType.value === "fixed_income" && portfolioFixedIncomeSubtype.value) {
       portfolioAssetIdentifier.value = portfolioFixedIncomeSubtype.value;
+    }
+  }
+
+  function syncPortfolioFixedIncomeRateHint() {
+    const mode = portfolioFixedIncomeMode.value;
+    if (mode === "pre") {
+      portfolioFixedIncomeRateLabel.textContent = "Taxa pré-fixada (% a.a.)";
+      portfolioFixedIncomeRateHint.textContent = "Ex.: 12,30 significa 12,30% ao ano. Para CDB 123% do CDI, use pós-fixada.";
+    } else if (mode === "post") {
+      portfolioFixedIncomeRateLabel.textContent = "Percentual do indexador (%)";
+      portfolioFixedIncomeRateHint.textContent = "Para CDB 123% do CDI, selecione indexador CDI e informe 123.";
+    } else if (mode === "hybrid") {
+      portfolioFixedIncomeRateLabel.textContent = "Taxa adicional (% a.a.)";
+      portfolioFixedIncomeRateHint.textContent = "Ex.: IPCA + 6,50% a.a.; escolha o indexador e informe apenas a taxa adicional.";
+    } else {
+      portfolioFixedIncomeRateLabel.textContent = "Taxa";
+      portfolioFixedIncomeRateHint.textContent = "Pré-fixada usa % a.a.; pós-fixada usa % do indexador.";
     }
   }
 

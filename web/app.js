@@ -105,6 +105,7 @@ const state = {
   reportMonth: currentMonthValue(),
   reportTab: "categories",
   reportAccountId: "",
+  statementScope: "consolidated",
   transactionSliceRequestId: 0,
   cardInvoiceRequestId: 0,
 };
@@ -207,6 +208,9 @@ const reportInvestmentSummary = document.querySelector("#reportInvestmentSummary
 const reportResultSummary = document.querySelector("#reportResultSummary");
 const reportAccountFilter = document.querySelector("#reportAccountFilter");
 const reportAccountSelect = document.querySelector("#reportAccountSelect");
+const statementControls = document.querySelector("#statementControls");
+const statementScopeSelect = document.querySelector("#statementScopeSelect");
+const printStatementButton = document.querySelector("#printStatementButton");
 const reportContent = document.querySelector("#reportContent");
 const addPortfolioAssetButton = document.querySelector("#addPortfolioAssetButton");
 const refreshPortfolioButton = document.querySelector("#refreshPortfolioButton");
@@ -222,7 +226,11 @@ const portfolioPensionFields = document.querySelector("#portfolioPensionFields")
 const portfolioPensionSubtype = document.querySelector("#portfolioPensionSubtype");
 const portfolioSavingsFields = document.querySelector("#portfolioSavingsFields");
 const portfolioFixedFields = document.querySelector("#portfolioFixedFields");
+const portfolioPricingFields = document.querySelector("#portfolioPricingFields");
 const portfolioFixedIncomeSubtype = document.querySelector("#portfolioFixedIncomeSubtype");
+const portfolioFixedIncomeMode = document.querySelector("#portfolioFixedIncomeMode");
+const portfolioFixedIncomeRateLabel = document.querySelector("#portfolioFixedIncomeRateLabel");
+const portfolioFixedIncomeRateHint = document.querySelector("#portfolioFixedIncomeRateHint");
 const cancelPortfolioAssetButton = document.querySelector("#cancelPortfolioAssetButton");
 const deletePortfolioAssetButton = document.querySelector("#deletePortfolioAssetButton");
 const portfolioCostSummary = document.querySelector("#portfolioCostSummary");
@@ -288,6 +296,10 @@ const investmentOperationFields = document.querySelector("#investmentOperationFi
 const investmentAmount = document.querySelector("#investmentAmount");
 const investmentFundFields = document.querySelector("#investmentFundFields");
 const investmentFixedFields = document.querySelector("#investmentFixedFields");
+const investmentPricingFields = document.querySelector("#investmentPricingFields");
+const investmentFixedIncomeMode = document.querySelector("#investmentFixedIncomeMode");
+const investmentFixedIncomeRateLabel = document.querySelector("#investmentFixedIncomeRateLabel");
+const investmentFixedIncomeRateHint = document.querySelector("#investmentFixedIncomeRateHint");
 const transactionCategory = document.querySelector("#transactionCategory");
 const transactionCategoryRow = document.querySelector("#transactionCategoryRow");
 const transactionSubcategory = document.querySelector("#transactionSubcategory");
@@ -458,6 +470,9 @@ const reportsView = registerReportsView({
     reportResultSummary,
     reportAccountFilter,
     reportAccountSelect,
+    statementControls,
+    statementScopeSelect,
+    printStatementButton,
     reportContent,
   },
   shiftMonth,
@@ -668,6 +683,10 @@ const transactionsView = registerTransactionsView({
     investmentAmount,
     investmentFundFields,
     investmentFixedFields,
+    investmentPricingFields,
+    investmentFixedIncomeMode,
+    investmentFixedIncomeRateLabel,
+    investmentFixedIncomeRateHint,
     transactionCategory,
     transactionCategoryRow,
     transactionSubcategory,
@@ -775,7 +794,11 @@ const portfolioView = registerPortfolioView({
     portfolioPensionSubtype,
     portfolioSavingsFields,
     portfolioFixedFields,
+    portfolioPricingFields,
     portfolioFixedIncomeSubtype,
+    portfolioFixedIncomeMode,
+    portfolioFixedIncomeRateLabel,
+    portfolioFixedIncomeRateHint,
     cancelPortfolioAssetButton,
     deletePortfolioAssetButton,
     portfolioCostSummary,

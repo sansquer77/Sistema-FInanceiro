@@ -611,6 +611,7 @@
                         <option value="pre">Pré-fixada</option>
                         <option value="hybrid">Híbrida</option>
                       </select>
+                      <small class="input-hint">Use pós-fixada para CDBs como 123% do CDI.</small>
                     </label>
                     <label>Indexador
                       <select name="investment_fixed_income_indexer" id="investmentFixedIncomeIndexer">
@@ -622,14 +623,15 @@
                         <option value="TR">TR</option>
                       </select>
                     </label>
-                    <label>Taxa (% a.a.)
+                    <label><span id="investmentFixedIncomeRateLabel">Taxa</span>
                       <input name="investment_fixed_income_rate" id="investmentFixedIncomeRate" type="text" inputmode="decimal" placeholder="Ex.: 6,50">
+                      <small class="input-hint" id="investmentFixedIncomeRateHint">Pré-fixada: taxa anual. Pós-fixada: percentual do indexador.</small>
                     </label>
                     <label>Vencimento
                       <input name="investment_fixed_income_maturity_date" id="investmentFixedIncomeMaturityDate" type="date">
                     </label>
                   </div>
-                  <div class="field-row">
+                  <div class="field-row" id="investmentPricingFields">
                     <label>Quantidade
                       <input name="investment_quantity" id="investmentQuantity" type="text" inputmode="decimal" placeholder="0,000000">
                     </label>
@@ -871,12 +873,13 @@
                   </select>
                 </label>
                 <label>Modalidade
-                  <select name="fixed_income_mode">
+                  <select name="fixed_income_mode" id="portfolioFixedIncomeMode">
                     <option value="">Selecione</option>
                     <option value="post">Pós-fixada</option>
                     <option value="pre">Pré-fixada</option>
                     <option value="hybrid">Híbrida</option>
                   </select>
+                  <small class="input-hint">Use pós-fixada para CDBs como 123% do CDI.</small>
                 </label>
                 <label>Indexador
                   <select name="fixed_income_indexer">
@@ -888,8 +891,9 @@
                     <option value="TR">TR</option>
                   </select>
                 </label>
-                <label>Taxa (% a.a.)
-                  <input name="fixed_income_rate" type="text" inputmode="decimal" placeholder="Ex.: 14,00">
+                <label><span id="portfolioFixedIncomeRateLabel">Taxa</span>
+                  <input name="fixed_income_rate" id="portfolioFixedIncomeRate" type="text" inputmode="decimal" placeholder="Ex.: 14,00">
+                  <small class="input-hint" id="portfolioFixedIncomeRateHint">Pré-fixada: taxa anual. Pós-fixada: percentual do indexador.</small>
                 </label>
                 <label>Vencimento
                   <input name="fixed_income_maturity_date" type="date">
@@ -898,7 +902,7 @@
                   <input name="apply_tax_estimate" type="checkbox" value="1">
                 </label>
               </div>
-              <div class="field-row">
+              <div class="field-row" id="portfolioPricingFields">
                 <label>Quantidade
                   <input name="quantity" type="text" inputmode="decimal" placeholder="0,000000">
                 </label>
@@ -1149,6 +1153,7 @@
               <button class="report-tab" type="button" data-report-tab="cashflow">Entradas x Saídas</button>
               <button class="report-tab" type="button" data-report-tab="accounts">Contas</button>
               <button class="report-tab" type="button" data-report-tab="tags">Tags</button>
+              <button class="report-tab" type="button" data-report-tab="statement">Demonstrativos</button>
             </div>
 
             <div class="report-summary">
@@ -1173,6 +1178,13 @@
             <label class="report-account-filter" id="reportAccountFilter" hidden>Conta
               <select id="reportAccountSelect"></select>
             </label>
+
+            <div class="statement-controls" id="statementControls" hidden>
+              <label>Escopo do demonstrativo
+                <select id="statementScopeSelect"></select>
+              </label>
+              <button class="ghost small-button" type="button" id="printStatementButton">Imprimir / Exportar PDF</button>
+            </div>
           </section>
 
           <section class="panel report-content-panel">
