@@ -10,6 +10,7 @@ export function registerReportsView({
   formatPercent,
   escapeHtml,
   isInvestmentTransaction,
+  isInstallmentTransaction,
   chartColor,
 }) {
   const {
@@ -25,6 +26,9 @@ export function registerReportsView({
     reportAccountSelect,
     statementControls,
     statementScopeSelect,
+    statementCurrencySelect,
+    statementAccountSelect,
+    statementCardSelect,
     printStatementButton,
     reportContent,
   } = elements;
@@ -38,6 +42,19 @@ export function registerReportsView({
   });
   statementScopeSelect.addEventListener("change", () => {
     state.statementScope = statementScopeSelect.value;
+    normalizeStatementSelections();
+    renderReports();
+  });
+  statementCurrencySelect.addEventListener("change", () => {
+    state.statementCurrency = statementCurrencySelect.value;
+    renderReports();
+  });
+  statementAccountSelect.addEventListener("change", () => {
+    state.statementAccountIds = selectedValues(statementAccountSelect);
+    renderReports();
+  });
+  statementCardSelect.addEventListener("change", () => {
+    state.statementCardIds = selectedValues(statementCardSelect);
     renderReports();
   });
   printStatementButton.addEventListener("click", () => window.print());
@@ -59,8 +76,9 @@ export function registerReportsView({
     reportAccountFilter.hidden = state.reportTab !== "accounts";
     statementControls.hidden = state.reportTab !== "statement";
     renderStatementScopeOptions();
+    const statementItems = state.reportTab === "statement" ? statementExpenseItems() : [];
     printStatementButton.hidden = state.reportTab !== "statement";
-    printStatementButton.disabled = state.reportTab === "statement" && !statementExpenseItems().length;
+    printStatementButton.disabled = state.reportTab === "statement" && !statementItems.length;
     reportContent.classList.toggle("statement-print-area", state.reportTab === "statement");
     if (state.reportTab === "cashflow") {
       renderCashflowReport(items);
@@ -101,20 +119,60 @@ export function registerReportsView({
     if (state.reportTab !== "statement") {
       return;
     }
-    const options = [
-      '<option value="consolidated">Visão Consolidada</option>',
-      ...state.accounts.map((account) => (
-        `<option value="account:${account.id}">Conta · ${escapeHtml(account.name)} (${escapeHtml(account.currency)})</option>`
-      )),
-      ...state.creditCards.map((card) => (
-        `<option value="card:${card.id}">Cartão · ${escapeHtml(card.name)} (${escapeHtml(card.currency)})</option>`
-      )),
-    ];
-    statementScopeSelect.innerHTML = options.join("");
     if (![...statementScopeSelect.options].some((option) => option.value === state.statementScope)) {
       state.statementScope = "consolidated";
     }
     statementScopeSelect.value = state.statementScope;
+    const currencies = statementRegisteredCurrencies();
+    statementCurrencySelect.innerHTML = [
+      '<option value="all">Todas as moedas</option>',
+      ...currencies.map((currency) => `<option value="${escapeHtml(currency)}">Consolidado ${escapeHtml(currency)}</option>`),
+    ].join("");
+    if (![...statementCurrencySelect.options].some((option) => option.value === state.statementCurrency)) {
+      state.statementCurrency = "all";
+    }
+    statementCurrencySelect.value = state.statementCurrency;
+    statementAccountSelect.innerHTML = state.accounts.map((account) => (
+      `<option value="${account.id}">${escapeHtml(account.name)} (${escapeHtml(account.currency)})</option>`
+    )).join("");
+    statementCardSelect.innerHTML = state.creditCards.map((card) => (
+      `<option value="${card.id}">${escapeHtml(card.name)} (${escapeHtml(card.currency)})</option>`
+    )).join("");
+    applyMultiSelectValues(statementAccountSelect, state.statementAccountIds);
+    applyMultiSelectValues(statementCardSelect, state.statementCardIds);
+    const selectedMode = state.statementScope === "selected";
+    statementAccountSelect.disabled = !selectedMode || state.accounts.length === 0;
+    statementCardSelect.disabled = !selectedMode || state.creditCards.length === 0;
+    statementAccountSelect.closest("label").hidden = !selectedMode;
+    statementCardSelect.closest("label").hidden = !selectedMode;
+  }
+
+  function statementRegisteredCurrencies() {
+    return [...new Set([
+      ...state.accounts.map((account) => account.currency || "BRL"),
+      ...state.creditCards.map((card) => card.currency || "BRL"),
+    ])].sort();
+  }
+
+  function selectedValues(select) {
+    return [...select.selectedOptions].map((option) => option.value);
+  }
+
+  function applyMultiSelectValues(select, values) {
+    const selected = new Set((values || []).map(String));
+    for (const option of select.options) {
+      option.selected = selected.has(String(option.value));
+    }
+  }
+
+  function normalizeStatementSelections() {
+    if (state.statementScope !== "selected") {
+      return;
+    }
+    const validAccountIds = new Set(state.accounts.map((account) => String(account.id)));
+    const validCardIds = new Set(state.creditCards.map((card) => String(card.id)));
+    state.statementAccountIds = state.statementAccountIds.filter((id) => validAccountIds.has(String(id)));
+    state.statementCardIds = state.statementCardIds.filter((id) => validCardIds.has(String(id)));
   }
 
   function renderCategoriesReport(items) {
@@ -355,31 +413,51 @@ export function registerReportsView({
 
   function renderStatementReport() {
     const items = statementExpenseItems();
+    const sections = statementCurrencySections(items);
+    if (!sections.length) {
+      reportContent.innerHTML = `
+        <article class="monthly-statement">
+          ${statementHeader(statementScopeInfo(), "BRL", new Date())}
+          <div class="empty-state compact">Sem despesas no período para o escopo selecionado.</div>
+        </article>
+      `;
+      return;
+    }
+    const issuedAt = new Date();
+    const scope = statementScopeInfo();
+    reportContent.innerHTML = `
+      <article class="monthly-statement">
+        ${sections.map((section, index) => statementCurrencyReport(section.items, scope, section.currency, issuedAt, index)).join("")}
+        <footer class="statement-footer">
+          <span>Sistema Financeiro</span>
+          <span>Página <span class="statement-page-number"></span> de <span class="statement-page-total"></span></span>
+        </footer>
+      </article>
+    `;
+  }
+
+  function statementCurrencyReport(items, scope, currency, issuedAt, index) {
     const totalMap = sumStatementMoney(items);
     const total = items.reduce((sum, item) => sum + item.amount, 0);
     const monthDaysElapsed = statementElapsedDays(state.reportMonth);
     const averageMap = divideMoneyTotals(totalMap, Math.max(monthDaysElapsed, 1));
+    const accountTotalMap = sumStatementMoney(items.filter((item) => item.source === "Conta"));
+    const cardTotalMap = sumStatementMoney(items.filter((item) => item.source === "Cartão"));
+    const debtTotals = statementDebtTotals(currency);
     const categoryRows = groupReportItems(items, "category").slice(0, 5);
     const compositionRows = groupReportItems(items, "subcategory");
     const topCategory = categoryRows[0] || null;
     const topTransaction = items.slice().sort((a, b) => b.amount - a.amount)[0] || null;
-    const scope = statementScopeInfo();
-    const currencyInfo = statementBaseCurrencyInfo(items, scope);
-    const issuedAt = new Date();
-    reportContent.innerHTML = `
-      <article class="monthly-statement">
-        <header class="statement-header">
-          <img src="assets/app-icon.png" alt="Sistema Financeiro">
-          <div>
-            <h2>Relatório de Despesas Mensal (${escapeHtml(formatMonthLabel(state.reportMonth))})</h2>
-            <p>Conta(s): ${escapeHtml(scope.label)}</p>
-            <p>Moeda Base: ${escapeHtml(currencyInfo.label)}</p>
-            <p>Data de Emissão: ${escapeHtml(formatStatementDateTime(issuedAt))}</p>
-          </div>
-        </header>
+    const currencyInfo = { label: currency, currency, single: true };
+    return `
+      <section class="statement-currency-report ${index > 0 ? "statement-page-break" : ""}">
+        ${statementHeader(scope, currencyInfo.label, issuedAt)}
         <section class="statement-kpis" aria-label="Resumo executivo">
           ${statementKpi("Total de Saídas", formatMoneyTotals(totalMap))}
           ${statementKpi("Média Diária", formatMoneyTotals(averageMap))}
+          ${statementKpi("Saídas em Conta", formatMoneyTotals(accountTotalMap))}
+          ${statementKpi("Despesas em Cartão", formatMoneyTotals(cardTotalMap))}
+          ${statementKpi("Endividamento Atual", formatMoneyTotals(debtTotals))}
           ${statementKpi("Maior Despesa", topCategory ? `${escapeHtml(topCategory.label)} · ${formatMoneyTotals(topCategory.totals)}` : "Sem despesas")}
           ${statementKpi("Transação de Maior Impacto", topTransaction ? `${escapeHtml(topTransaction.description || topTransaction.category)} · ${formatMoney(topTransaction.amount, topTransaction.currency)}` : "Sem despesas")}
         </section>
@@ -395,17 +473,27 @@ export function registerReportsView({
         </section>
         <section class="statement-section">
           <h3>Composição de Despesas</h3>
-          ${statementCompositionTable(compositionRows, totalMap)}
+          ${statementCompositionBySource(items, totalMap)}
         </section>
         <section class="statement-section">
           <h3>Detalhamento de Lançamentos</h3>
           ${statementDetailTable(items)}
         </section>
-        <footer class="statement-footer">
-          <span>Sistema Financeiro</span>
-          <span>Página <span class="statement-page-number"></span> de <span class="statement-page-total"></span></span>
-        </footer>
-      </article>
+      </section>
+    `;
+  }
+
+  function statementHeader(scope, currencyLabel, issuedAt) {
+    return `
+      <header class="statement-header">
+        <img src="assets/app-icon.png" alt="Sistema Financeiro">
+        <div>
+          <h2>Relatório de Despesas Mensal (${escapeHtml(formatMonthLabel(state.reportMonth))})</h2>
+          <p>Escopo: ${escapeHtml(scope.label)}</p>
+          <p>Moeda Base: ${escapeHtml(currencyLabel)}</p>
+          <p>Data de Emissão: ${escapeHtml(formatStatementDateTime(issuedAt))}</p>
+        </div>
+      </header>
     `;
   }
 
@@ -421,43 +509,44 @@ export function registerReportsView({
   function statementExpenseItems() {
     return reportItemsForMonth(state.reportMonth)
       .filter((item) => item.reportType === "expense")
-      .filter((item) => statementItemMatchesScope(item));
+      .filter((item) => statementItemMatchesScope(item))
+      .filter((item) => state.statementCurrency === "all" || item.currency === state.statementCurrency);
+  }
+
+  function statementCurrencySections(items) {
+    const grouped = new Map();
+    for (const item of items) {
+      const currency = item.currency || "BRL";
+      if (!grouped.has(currency)) {
+        grouped.set(currency, []);
+      }
+      grouped.get(currency).push(item);
+    }
+    return [...grouped.entries()]
+      .sort(([currencyA], [currencyB]) => currencyA.localeCompare(currencyB))
+      .map(([currency, currencyItems]) => ({ currency, items: currencyItems }));
   }
 
   function statementItemMatchesScope(item) {
-    const [kind, id] = String(state.statementScope || "consolidated").split(":");
-    if (kind === "account") {
-      return item.source === "Conta" && String(item.accountId) === String(id);
-    }
-    if (kind === "card") {
-      return item.source === "Cartão" && String(item.cardId) === String(id);
+    if (state.statementScope === "selected") {
+      const accountIds = state.statementAccountIds.length ? new Set(state.statementAccountIds.map(String)) : new Set(state.accounts.map((account) => String(account.id)));
+      const cardIds = state.statementCardIds.length ? new Set(state.statementCardIds.map(String)) : new Set(state.creditCards.map((card) => String(card.id)));
+      return (item.source === "Conta" && accountIds.has(String(item.accountId))) || (item.source === "Cartão" && cardIds.has(String(item.cardId)));
     }
     return true;
   }
 
   function statementScopeInfo() {
-    const [kind, id] = String(state.statementScope || "consolidated").split(":");
-    if (kind === "account") {
-      const account = state.accounts.find((entry) => String(entry.id) === String(id));
-      return account ? { label: account.name, currency: account.currency || "BRL" } : { label: "Conta", currency: "BRL" };
-    }
-    if (kind === "card") {
-      const card = state.creditCards.find((entry) => String(entry.id) === String(id));
-      return card ? { label: card.name, currency: card.currency || "BRL" } : { label: "Cartão", currency: "BRL" };
+    if (state.statementScope === "selected") {
+      const accountNames = state.statementAccountIds.length
+        ? state.accounts.filter((account) => state.statementAccountIds.map(String).includes(String(account.id))).map((account) => account.name)
+        : state.accounts.map((account) => account.name);
+      const cardNames = state.statementCardIds.length
+        ? state.creditCards.filter((card) => state.statementCardIds.map(String).includes(String(card.id))).map((card) => card.name)
+        : state.creditCards.map((card) => card.name);
+      return { label: [...accountNames, ...cardNames].join(", ") || "Itens selecionados", currency: "" };
     }
     return { label: "Visão Consolidada", currency: "" };
-  }
-
-  function statementBaseCurrencyInfo(items, scope) {
-    if (scope.currency) {
-      return { label: scope.currency, currency: scope.currency, single: true };
-    }
-    const currencies = [...new Set(items.map((item) => item.currency || "BRL"))].sort();
-    if (currencies.length <= 1) {
-      const currency = currencies[0] || "BRL";
-      return { label: currency, currency, single: true };
-    }
-    return { label: currencies.join(" / "), currency: "", single: false };
   }
 
   function statementElapsedDays(month) {
@@ -553,6 +642,23 @@ export function registerReportsView({
     `;
   }
 
+  function statementCompositionBySource(items, totalMap) {
+    const accountRows = groupReportItems(items.filter((item) => item.source === "Conta"), "subcategory");
+    const cardRows = groupReportItems(items.filter((item) => item.source === "Cartão"), "subcategory");
+    return `
+      <div class="statement-source-grid">
+        <section>
+          <h4>Despesas oriundas de Conta</h4>
+          ${statementCompositionTable(accountRows, totalMap)}
+        </section>
+        <section>
+          <h4>Despesas em Cartão de Crédito</h4>
+          ${statementCompositionTable(cardRows, totalMap)}
+        </section>
+      </div>
+    `;
+  }
+
   function statementCompositionTable(rows, totalMap) {
     if (!rows.length) {
       return '<div class="empty-state compact">Sem composição para o período.</div>';
@@ -580,6 +686,7 @@ export function registerReportsView({
       <tr>
         <td>${formatDate(item.date)}</td>
         <td>${escapeHtml(item.description || item.category)}</td>
+        <td>${escapeHtml(statementItemOriginLabel(item))}</td>
         <td>${escapeHtml(reportItemClassification(item).replace(" / ", " › "))}</td>
         <td><span class="statement-tags">${escapeHtml(item.tags.map((tag) => `#${tag}`).join(" "))}</span></td>
         <td class="money-cell">${formatMoney(item.amount, item.currency)}</td>
@@ -588,11 +695,55 @@ export function registerReportsView({
     return `
       <div class="report-table-wrap">
         <table class="report-table statement-table">
-          <thead><tr><th>Data</th><th>Descrição</th><th>Categoria / Subcategoria</th><th>Tags</th><th>Valor</th></tr></thead>
+          <thead><tr><th>Data</th><th>Descrição</th><th>Origem</th><th>Categoria / Subcategoria</th><th>Tags</th><th>Valor</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
     `;
+  }
+
+  function statementItemOriginLabel(item) {
+    return `${item.source} · ${item.accountName || (item.source === "Cartão" ? "Cartão" : "Conta")}`;
+  }
+
+  function statementDebtTotals(currency) {
+    const totals = new Map();
+    const currentMonth = statementCurrentMonthValue();
+    for (const transaction of state.transactions) {
+      const transactionMonth = transaction.date?.slice(0, 7) || "";
+      if (!isOpenStatementDebt(transaction, transactionMonth, currentMonth)) {
+        continue;
+      }
+      const item = accountTransactionReportItem(transaction);
+      if (!item || !statementItemMatchesScope(item) || item.currency !== currency) {
+        continue;
+      }
+      addMoneyTotal(totals, item.currency, item.amount);
+    }
+    for (const transaction of state.cardTransactions) {
+      const transactionMonth = transaction.invoice_month || transaction.date?.slice(0, 7) || "";
+      if (!isOpenStatementDebt(transaction, transactionMonth, currentMonth)) {
+        continue;
+      }
+      const item = cardTransactionReportItem(transaction);
+      if (!item || !statementItemMatchesScope(item) || item.currency !== currency) {
+        continue;
+      }
+      addMoneyTotal(totals, item.currency, item.amount);
+    }
+    return totals;
+  }
+
+  function isOpenStatementDebt(transaction, transactionMonth, currentMonth) {
+    if (!isInstallmentTransaction(transaction) || transaction.type !== "expense" || transactionMonth < currentMonth) {
+      return false;
+    }
+    return transactionMonth > currentMonth || !transaction.reconciled_at;
+  }
+
+  function statementCurrentMonthValue() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   }
 
   function formatStatementDateTime(date) {

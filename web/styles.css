@@ -2148,15 +2148,20 @@ textarea:focus {
 }
 
 .statement-controls {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(140px, 0.7fr) repeat(2, minmax(160px, 0.9fr)) auto;
   align-items: end;
   gap: 10px;
   margin-top: 16px;
 }
 
 .statement-controls label {
-  flex: 1;
-  max-width: 460px;
+  min-width: 0;
+}
+
+.statement-controls select[multiple] {
+  min-height: 84px;
+  padding: 7px 9px;
 }
 
 .report-content-panel {
@@ -2307,52 +2312,63 @@ textarea:focus {
 
 .monthly-statement {
   display: grid;
-  gap: 18px;
-  padding: 22px;
+  gap: 14px;
+  padding: 18px;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--panel);
   color: var(--text);
 }
 
+.statement-currency-report {
+  display: grid;
+  gap: 12px;
+}
+
+.statement-currency-report + .statement-currency-report {
+  padding-top: 18px;
+  border-top: 1px dashed var(--line);
+}
+
 .statement-header {
   display: grid;
   grid-template-columns: 56px minmax(0, 1fr);
-  gap: 14px;
+  gap: 12px;
   align-items: start;
-  padding-bottom: 14px;
+  padding-bottom: 10px;
   border-bottom: 1px solid var(--line);
 }
 
 .statement-header img {
-  width: 48px;
-  height: 48px;
+  width: 42px;
+  height: 42px;
   border-radius: 12px;
 }
 
 .statement-header h2 {
-  margin: 0 0 6px;
+  margin: 0 0 4px;
+  font-size: 1.15rem;
 }
 
 .statement-header p {
   margin: 2px 0;
   color: var(--muted);
-  font-size: 0.86rem;
+  font-size: 0.8rem;
   font-weight: 800;
 }
 
 .statement-kpis {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
 }
 
 .statement-kpis > div,
 .statement-chart-card {
   display: grid;
-  gap: 6px;
-  min-height: 86px;
-  padding: 12px;
+  gap: 4px;
+  min-height: 70px;
+  padding: 9px 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--bg-alt);
@@ -2360,31 +2376,31 @@ textarea:focus {
 
 .statement-kpis span {
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: 0.66rem;
   font-weight: 900;
   text-transform: uppercase;
 }
 
 .statement-kpis strong {
-  font-size: 0.98rem;
+  font-size: 0.88rem;
   line-height: 1.25;
 }
 
 .statement-visuals {
   display: grid;
   grid-template-columns: minmax(220px, 0.8fr) minmax(320px, 1.2fr);
-  gap: 14px;
+  gap: 10px;
 }
 
 .statement-chart-card h3,
 .statement-section h3 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 0.92rem;
 }
 
 .statement-donut {
   position: relative;
-  width: min(220px, 100%);
+  width: min(170px, 100%);
   margin: 0 auto;
 }
 
@@ -2412,20 +2428,20 @@ textarea:focus {
 
 .statement-donut-center span {
   color: var(--muted);
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   font-weight: 900;
   text-transform: uppercase;
 }
 
 .statement-donut-center strong {
-  font-size: 0.95rem;
+  font-size: 0.82rem;
 }
 
 .statement-chart-legend {
   display: grid;
-  gap: 6px;
+  gap: 4px;
   padding: 0;
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   list-style: none;
 }
 
@@ -2435,7 +2451,7 @@ textarea:focus {
   gap: 8px;
   align-items: center;
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   font-weight: 800;
 }
 
@@ -2449,16 +2465,16 @@ textarea:focus {
   display: grid;
   grid-template-columns: repeat(31, minmax(4px, 1fr));
   align-items: end;
-  gap: 4px;
-  min-height: 210px;
-  padding-top: 12px;
+  gap: 3px;
+  min-height: 165px;
+  padding-top: 8px;
 }
 
 .statement-daily-bars > div {
   display: grid;
   grid-template-rows: minmax(120px, 1fr) auto;
   align-items: end;
-  gap: 4px;
+  gap: 3px;
   height: 100%;
 }
 
@@ -2472,19 +2488,68 @@ textarea:focus {
 
 .statement-daily-bars small {
   color: var(--muted);
-  font-size: 0.58rem;
+  font-size: 0.52rem;
   font-weight: 800;
   text-align: center;
 }
 
 .statement-section {
   display: grid;
+  gap: 8px;
+}
+
+.statement-source-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.statement-source-grid section {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.statement-source-grid h4 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
 }
 
 .statement-table {
   min-width: 0;
+  font-size: 0.82rem;
   font-variant-numeric: tabular-nums;
+}
+
+.statement-table th,
+.statement-table td {
+  padding: 8px 8px;
+}
+
+.monthly-statement .money-cell,
+.monthly-statement .money-stack-line,
+.monthly-statement .money-stack-line em,
+.monthly-statement .statement-chart-legend strong,
+.monthly-statement .statement-donut-center strong {
+  font-size: inherit;
+  font-weight: 700;
+}
+
+.monthly-statement .money-stack-line {
+  gap: 6px;
+}
+
+.monthly-statement .money-stack-line b {
+  font-size: 0.78em;
+  font-weight: 800;
+}
+
+.monthly-statement .statement-kpis strong {
+  font-size: 0.82rem;
+  font-weight: 750;
 }
 
 .statement-table tbody tr:nth-child(even) {
@@ -2493,7 +2558,7 @@ textarea:focus {
 
 .statement-tags {
   color: var(--muted);
-  font-size: 0.82rem;
+  font-size: 0.74rem;
   font-style: italic;
 }
 
@@ -2501,7 +2566,7 @@ textarea:focus {
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  padding-top: 12px;
+  padding-top: 10px;
   border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: 0.76rem;
@@ -4503,6 +4568,10 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 
+  .statement-controls {
+    grid-template-columns: 1fr;
+  }
+
   .subcategory-form,
   .subcategory-item {
     grid-template-columns: 1fr;
@@ -4567,8 +4636,19 @@ textarea:focus {
   }
 
   body:has(.statement-print-area) .monthly-statement {
-    gap: 14px;
-    font-size: 11px;
+    gap: 9px;
+    font-size: 9.6px;
+  }
+
+  body:has(.statement-print-area) .statement-currency-report {
+    gap: 8px;
+  }
+
+  body:has(.statement-print-area) .statement-page-break {
+    break-before: page;
+    page-break-before: always;
+    padding-top: 0;
+    border-top: 0;
   }
 
   body:has(.statement-print-area) .statement-header,
@@ -4582,10 +4662,80 @@ textarea:focus {
     background: #f9fafb;
   }
 
+  body:has(.statement-print-area) .statement-header {
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 8px;
+    padding-bottom: 7px;
+  }
+
+  body:has(.statement-print-area) .statement-header img {
+    width: 34px;
+    height: 34px;
+  }
+
+  body:has(.statement-print-area) .statement-header h2 {
+    font-size: 13px;
+  }
+
+  body:has(.statement-print-area) .statement-header p {
+    font-size: 8.8px;
+  }
+
+  body:has(.statement-print-area) .statement-kpis {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  body:has(.statement-print-area) .statement-kpis > div,
+  body:has(.statement-print-area) .statement-chart-card {
+    min-height: 52px;
+    padding: 6px 7px;
+  }
+
+  body:has(.statement-print-area) .statement-kpis span {
+    font-size: 7.5px;
+  }
+
+  body:has(.statement-print-area) .statement-kpis strong {
+    font-size: inherit;
+    font-weight: 700;
+    line-height: 1.15;
+  }
+
+  body:has(.statement-print-area) .monthly-statement .money-cell,
+  body:has(.statement-print-area) .monthly-statement .money-stack-line,
+  body:has(.statement-print-area) .monthly-statement .money-stack-line em,
+  body:has(.statement-print-area) .monthly-statement .statement-chart-legend strong,
+  body:has(.statement-print-area) .monthly-statement .statement-donut-center strong {
+    font-size: inherit;
+    font-weight: 700;
+  }
+
+  body:has(.statement-print-area) .statement-visuals {
+    gap: 8px;
+  }
+
+  body:has(.statement-print-area) .statement-donut {
+    width: 130px;
+  }
+
+  body:has(.statement-print-area) .statement-daily-bars {
+    min-height: 115px;
+    gap: 2px;
+  }
+
   body:has(.statement-print-area) .statement-table th,
   body:has(.statement-print-area) .statement-table td {
-    padding: 7px 8px;
+    padding: 4px 5px;
     border-color: #d1d5db;
+  }
+
+  body:has(.statement-print-area) .statement-source-grid {
+    gap: 7px;
+  }
+
+  body:has(.statement-print-area) .statement-source-grid h4 {
+    font-size: 8px;
   }
 
   body:has(.statement-print-area) .statement-table tbody tr:nth-child(even) {

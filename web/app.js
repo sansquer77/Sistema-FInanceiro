@@ -106,6 +106,9 @@ const state = {
   reportTab: "categories",
   reportAccountId: "",
   statementScope: "consolidated",
+  statementCurrency: "all",
+  statementAccountIds: [],
+  statementCardIds: [],
   transactionSliceRequestId: 0,
   cardInvoiceRequestId: 0,
 };
@@ -210,6 +213,9 @@ const reportAccountFilter = document.querySelector("#reportAccountFilter");
 const reportAccountSelect = document.querySelector("#reportAccountSelect");
 const statementControls = document.querySelector("#statementControls");
 const statementScopeSelect = document.querySelector("#statementScopeSelect");
+const statementCurrencySelect = document.querySelector("#statementCurrencySelect");
+const statementAccountSelect = document.querySelector("#statementAccountSelect");
+const statementCardSelect = document.querySelector("#statementCardSelect");
 const printStatementButton = document.querySelector("#printStatementButton");
 const reportContent = document.querySelector("#reportContent");
 const addPortfolioAssetButton = document.querySelector("#addPortfolioAssetButton");
@@ -472,6 +478,9 @@ const reportsView = registerReportsView({
     reportAccountSelect,
     statementControls,
     statementScopeSelect,
+    statementCurrencySelect,
+    statementAccountSelect,
+    statementCardSelect,
     printStatementButton,
     reportContent,
   },
@@ -482,6 +491,7 @@ const reportsView = registerReportsView({
   formatPercent,
   escapeHtml,
   isInvestmentTransaction,
+  isInstallmentTransaction,
   chartColor,
 });
 

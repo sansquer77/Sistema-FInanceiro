@@ -1180,8 +1180,20 @@
             </label>
 
             <div class="statement-controls" id="statementControls" hidden>
-              <label>Escopo do demonstrativo
-                <select id="statementScopeSelect"></select>
+              <label>Escopo
+                <select id="statementScopeSelect">
+                  <option value="consolidated">Consolidado — contas e cartões ativos</option>
+                  <option value="selected">Selecionar contas e cartões</option>
+                </select>
+              </label>
+              <label>Moeda
+                <select id="statementCurrencySelect"></select>
+              </label>
+              <label class="statement-multi-field">Contas
+                <select id="statementAccountSelect" multiple></select>
+              </label>
+              <label class="statement-multi-field">Cartões
+                <select id="statementCardSelect" multiple></select>
               </label>
               <button class="ghost small-button" type="button" id="printStatementButton">Imprimir / Exportar PDF</button>
             </div>
