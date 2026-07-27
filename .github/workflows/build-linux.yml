@@ -137,7 +137,7 @@ jobs:
           unzip -Z1 "$ZIP_PATH" | grep -E 'Linux/Aplicativo/SistemaFinanceiro/SistemaFinanceiro$'
 
       - name: Publicar artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: Sistema-Financeiro-Linux
           path: Sistema Financeiro - Distribuicao/Linux/Sistema Financeiro - Distribuicao Linux.zip

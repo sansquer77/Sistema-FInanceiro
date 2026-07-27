@@ -106,7 +106,7 @@ jobs:
           }
 
       - name: Publicar artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: Sistema-Financeiro-Windows
           path: Sistema Financeiro - Distribuicao/Windows/Sistema Financeiro - Distribuicao Windows.zip
