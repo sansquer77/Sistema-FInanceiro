@@ -2,8 +2,8 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 2.0
-atualizado: 2026-07-24
+versao: 2.2
+atualizado: 2026-07-26
 relacionados:
   - "[[contas-correntes]]"
   - "[[categorias-tags-gestao]]"
@@ -17,7 +17,7 @@ aliases: ["Lançamentos", "Transações"]
 # Lançamentos
 
 > [!info] Status
-> **implementado** · área: `lancamentos` · atualizado em 2026-07-24 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]]
+> **implementado** · área: `lancamentos` · atualizado em 2026-07-26 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]]
 
 ## Problema
 
@@ -89,6 +89,9 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 - Em telas estreitas, metadados secundários são ocultados, preservando descrição, valor, conta e estado de conciliação.
 - Cabeçalhos de data permanecem visíveis durante a rolagem do respectivo grupo e permitem expandir ou recolher o dia.
 - Ao abrir uma combinação de conta e mês pela primeira vez, dias com data igual ou posterior à data local atual iniciam expandidos e datas passadas iniciam recolhidas; a escolha do usuário é mantida enquanto a sessão estiver ativa.
+- Campos do formulário de lançamento devem manter altura e alinhamento consistentes dentro da mesma linha, especialmente nos blocos condicionais de investimento/renda fixa; textos auxiliares devem aparecer como linhas de ajuda separadas para não desalinharem inputs e selects.
+- Quando uma linha de formulário tiver apenas um campo visível, esse campo deve ocupar a largura completa da linha para evitar lacunas visuais.
+- Orientações extensas de renda fixa no formulário de investimento devem ficar em helper contextual acionado por ícone discreto, não como texto sempre visível entre campos.
 
 ## API e dados
 
@@ -128,9 +131,14 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dado um grupo diário longo, quando a página é rolada dentro dele, então o cabeçalho da data permanece brevemente visível.
 - Dado o gráfico de histórico/projeção de saldos, quando exibido, então cada cartão mensal mostra o mês no topo e não exibe marcadores `Previsto` ou `Conciliado` dentro da área do gráfico.
 - Dado o gráfico de histórico/projeção de saldos com valores extensos, quando exibido, então os valores cabem nos cartões mensais por ajuste responsivo de tipografia, mantendo o tamanho atual da área.
+- Dado o tipo Investimento selecionado no formulário de Lançamentos, quando campos condicionais de renda fixa são exibidos, então inputs e selects da mesma linha mantêm alturas e alinhamentos consistentes, com dicas exibidas sem deslocar campos vizinhos.
+- Dado qualquer tipo de lançamento de conta, quando uma linha condicional exibe apenas um campo, então esse campo ocupa a linha inteira e o formulário não apresenta coluna vazia.
+- Dado o tipo Investimento com categoria Renda Fixa selecionado, quando o usuário aciona o ícone de ajuda, então vê orientação contextual para pré-fixada, pós-fixada e híbrida sem alterar o alinhamento dos campos.
 
 ## Changelog
 
+- `2.2` — 2026-07-26 — Orientações extensas de renda fixa passam para helper contextual acionado por ícone no formulário de investimento.
+- `2.1` — 2026-07-26 — Blocos condicionais de investimento/renda fixa no formulário passam a separar dicas de campos para preservar alinhamento e altura dos controles.
 - `2.0` — 2026-07-24 — Gráfico de saldos passa a adaptar valores financeiros extensos ao espaço disponível sem ampliar a área visual.
 - `1.9` — 2026-07-24 — Grupos diários passam a abrir inicialmente de hoje em diante, mantendo datas passadas recolhidas.
 - `1.8` — 2026-07-24 — Gráfico de saldos em Lançamentos de Contas volta ao layout do gráfico de cartões, com mês no topo e sem marcadores de previsto/conciliado.

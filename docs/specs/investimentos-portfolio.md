@@ -2,7 +2,7 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 1.7
+versao: 2.0
 atualizado: 2026-07-26
 relacionados:
   - "[[contas-correntes]]"
@@ -59,8 +59,8 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 **Renda Fixa:**
 - Pós-fixados/híbridos usam indexadores (CDI, SELIC, IPCA, IGP-M, TR) via API do Banco Central (SGS).
 - Pré-fixados usam a taxa acordada anual nominal/efetiva informada no campo de taxa; exibem `Pré-fixado` e a taxa antes do vencimento.
-- No cadastro de renda fixa, a interface deve diferenciar claramente: `Pré-fixada` usa taxa em `% a.a.`; `Pós-fixada` usa taxa como `% do indexador` (ex.: `123` com CDI significa `123% do CDI`); `Híbrida` usa indexador mais taxa em `% a.a.`.
-- Para aplicações como CDB `123% do CDI`, a interface deve orientar o usuário a selecionar modalidade `Pós-fixada`, indexador `CDI` e taxa `123`, evitando cadastrar como `Pré-fixada`.
+- No cadastro de renda fixa, a interface deve diferenciar claramente: `Pré-fixada` usa taxa em `% a.a.`; `Pós-fixada` usa percentual do indexador (ex.: `123` com CDI significa `123% do CDI`, enquanto vazio/zero representa `100% do CDI`); `Híbrida` usa indexador mais taxa adicional em `% a.a.`.
+- Para aplicações como CDB `123% do CDI`, a interface deve orientar o usuário a selecionar modalidade `Pós-fixada`, indexador `CDI` e percentual `123`, evitando cadastrar como `Pré-fixada` ou `Híbrida`; essa orientação deve ficar em helper contextual acionado por ícone discreto para preservar espaço e alinhamento do formulário, com exemplos objetivos de pré-fixada, pós-fixada e híbrida.
 - Campos de quantidade e preço médio/unitário não devem ser exibidos para renda fixa, pois o custo total/aporte é a base de cálculo relevante.
 - O sistema calcula e deduz estimativas de IOF (até 30 dias) e IR (tabela regressiva de 22,5% a 15%).
 - Posições de renda fixa com vencimento igual ou anterior à data atual devem gerar alerta visual no menu Portfólio e aviso no Cockpit até que sejam encerradas.
@@ -108,6 +108,9 @@ Tabelas: `investment_opening_positions`, `investment_operations`, `investment_re
 - [x] Preservar a fórmula e os dados persistidos, alterando apenas a comunicação visual.
 - [x] Validar sintaxe e conferir manualmente os textos no formulário.
 - [x] Ocultar quantidade e preço médio/unitário para renda fixa.
+- [x] Substituir dicas fixas por helper contextual acionado por ícone no cadastro de renda fixa.
+- [x] Explicitar que pós-fixado usa percentual do indexador, com vazio/zero representando 100%, enquanto híbrido usa taxa adicional.
+- [x] Incluir exemplos de pré-fixada, pós-fixada e híbrida no helper contextual.
 
 ## Critérios de aceite
 
@@ -115,7 +118,9 @@ Tabelas: `investment_opening_positions`, `investment_operations`, `investment_re
 - Dado consolidações por classe, indexador, moeda ou carteira com moedas distintas, quando as barras são exibidas, seu tamanho é calculado pelo valor atual convertido para BRL, enquanto o texto mantém a moeda original.
 - Dado um ativo de renda fixa pós-fixado, quando listado, exibe indexador, taxa e rendimento bruto/líquido com impostos regressivos.
 - Dado um ativo pré-fixado, quando listado, exibe `Pré-fixado` e a taxa anual.
-- Dado o usuário cadastrando renda fixa, quando alterna entre pré-fixada, pós-fixada e híbrida, então o campo de taxa explica a unidade correta e orienta que `123% do CDI` deve ser cadastrado como pós-fixado com indexador CDI.
+- Dado o usuário cadastrando renda fixa, quando alterna entre pré-fixada, pós-fixada e híbrida, então o campo explica a unidade correta e orienta que `123% do CDI` deve ser cadastrado como pós-fixado com indexador CDI e percentual 123, enquanto CDI puro pode ficar vazio/zero para representar 100%.
+- Dado o usuário cadastrando renda fixa, quando precisa de orientação sobre pré-fixada, pós-fixada ou híbrida, então um ícone discreto abre um helper contextual sem ocupar espaço permanente no formulário.
+- Dado o helper contextual de renda fixa aberto, quando exibido, então apresenta exemplos de preenchimento para pré-fixada, pós-fixada e híbrida.
 - Dado o usuário cadastrando renda fixa, quando seleciona esse tipo de ativo, então campos de quantidade e preço médio/unitário ficam ocultos e não são enviados no formulário.
 - Dado uma posição de renda fixa vencendo hoje ou vencida, quando o usuário navega pelo app, o item Portfólio no menu aparece em estado de alerta e o Cockpit exibe um aviso acionável.
 - Dado uma posição vencida já encerrada, quando o portfólio é recarregado, o alerta de menu e o aviso do Cockpit deixam de considerar essa posição.
@@ -128,6 +133,9 @@ Tabelas: `investment_opening_positions`, `investment_operations`, `investment_re
 
 ## Changelog
 
+- `2.0` — 2026-07-26 — Helper contextual de renda fixa passa a trazer exemplos explícitos para pré-fixada, pós-fixada e híbrida.
+- `1.9` — 2026-07-26 — Texto de renda fixa clarifica que pós-fixado usa percentual do indexador, vazio/zero representa 100% e híbrido usa taxa adicional.
+- `1.8` — 2026-07-26 — Orientações de renda fixa passam a ficar em helper contextual acionado por ícone, preservando espaço e alinhamento dos campos.
 - `1.7` — 2026-07-26 — Campos de quantidade e preço médio/unitário deixam de aparecer nos cadastros de renda fixa.
 - `1.6` — 2026-07-26 — Formulários de renda fixa passam a explicitar a diferença entre taxa pré-fixada em `% a.a.` e percentual do indexador em pós-fixados.
 - `1.5` — 2026-07-20 — UX de encerramento documentado como modal único com data, valor final e opção de crédito.

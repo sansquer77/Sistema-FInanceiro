@@ -603,33 +603,47 @@
                       <input name="investment_cnpj" id="investmentCnpj" type="text" placeholder="00.000.000/0000-00 ou alfanumérico">
                     </label>
                   </div>
-                  <div class="field-row investment-fixed-fields" id="investmentFixedFields" hidden>
-                    <label>Modalidade
-                      <select name="investment_fixed_income_mode" id="investmentFixedIncomeMode">
-                        <option value="">Selecione</option>
-                        <option value="post">Pós-fixada</option>
-                        <option value="pre">Pré-fixada</option>
-                        <option value="hybrid">Híbrida</option>
-                      </select>
-                      <small class="input-hint">Use pós-fixada para CDBs como 123% do CDI.</small>
-                    </label>
-                    <label>Indexador
-                      <select name="investment_fixed_income_indexer" id="investmentFixedIncomeIndexer">
-                        <option value="">Selecione</option>
-                        <option value="CDI">CDI</option>
-                        <option value="SELIC">SELIC</option>
-                        <option value="IPCA">IPCA</option>
-                        <option value="IGP-M">IGP-M</option>
-                        <option value="TR">TR</option>
-                      </select>
-                    </label>
-                    <label><span id="investmentFixedIncomeRateLabel">Taxa</span>
-                      <input name="investment_fixed_income_rate" id="investmentFixedIncomeRate" type="text" inputmode="decimal" placeholder="Ex.: 6,50">
-                      <small class="input-hint" id="investmentFixedIncomeRateHint">Pré-fixada: taxa anual. Pós-fixada: percentual do indexador.</small>
-                    </label>
-                    <label>Vencimento
-                      <input name="investment_fixed_income_maturity_date" id="investmentFixedIncomeMaturityDate" type="date">
-                    </label>
+                  <div class="investment-fixed-fields" id="investmentFixedFields" hidden>
+                    <div class="field-row">
+                      <label>Modalidade
+                        <select name="investment_fixed_income_mode" id="investmentFixedIncomeMode">
+                          <option value="">Selecione</option>
+                          <option value="post">Pós-fixada</option>
+                          <option value="pre">Pré-fixada</option>
+                          <option value="hybrid">Híbrida</option>
+                        </select>
+                      </label>
+                      <label>Indexador
+                        <select name="investment_fixed_income_indexer" id="investmentFixedIncomeIndexer">
+                          <option value="">Selecione</option>
+                          <option value="CDI">CDI</option>
+                          <option value="SELIC">SELIC</option>
+                          <option value="IPCA">IPCA</option>
+                          <option value="IGP-M">IGP-M</option>
+                          <option value="TR">TR</option>
+                        </select>
+                      </label>
+                    </div>
+                    <details class="field-helper">
+                      <summary aria-label="Ajuda sobre modalidade de renda fixa">i</summary>
+                      <div>
+                        <strong>Como preencher renda fixa</strong>
+                        <ul>
+                          <li><b>Pré-fixada:</b> CDB 12,30% a.a. → taxa 12,30.</li>
+                          <li><b>Pós-fixada:</b> CDB 123% do CDI → indexador CDI e percentual 123; CDI puro pode ficar vazio.</li>
+                          <li><b>Híbrida:</b> IPCA + 6,50% a.a. → indexador IPCA e taxa adicional 6,50.</li>
+                        </ul>
+                        <p id="investmentFixedIncomeRateHint">Escolha a modalidade para ver a orientação específica.</p>
+                      </div>
+                    </details>
+                    <div class="field-row">
+                      <label><span id="investmentFixedIncomeRateLabel">Taxa</span>
+                        <input name="investment_fixed_income_rate" id="investmentFixedIncomeRate" type="text" inputmode="decimal" placeholder="Ex.: 6,50">
+                      </label>
+                      <label>Vencimento
+                        <input name="investment_fixed_income_maturity_date" id="investmentFixedIncomeMaturityDate" type="date">
+                      </label>
+                    </div>
                   </div>
                   <div class="field-row" id="investmentPricingFields">
                     <label>Quantidade
@@ -855,52 +869,68 @@
                   <textarea name="savings_anniversaries" rows="4" placeholder="2026-01-05; 1000,00&#10;2026-01-20; 500,00"></textarea>
                 </label>
               </div>
-              <div class="field-row" id="portfolioFixedFields" hidden>
-                <label>Subcategoria
-                  <select id="portfolioFixedIncomeSubtype">
-                    <option value="">Selecione</option>
-                    <option value="CDB">CDB</option>
-                    <option value="LCI">LCI</option>
-                    <option value="LCA">LCA</option>
-                    <option value="LC">LC</option>
-                    <option value="Tesouro Selic">Tesouro Selic</option>
-                    <option value="Tesouro Prefixado">Tesouro Prefixado</option>
-                    <option value="Tesouro IPCA+">Tesouro IPCA+</option>
-                    <option value="Debenture">Debenture</option>
-                    <option value="CRI">CRI</option>
-                    <option value="CRA">CRA</option>
-                    <option value="Cofrinho">Cofrinho</option>
-                  </select>
-                </label>
-                <label>Modalidade
-                  <select name="fixed_income_mode" id="portfolioFixedIncomeMode">
-                    <option value="">Selecione</option>
-                    <option value="post">Pós-fixada</option>
-                    <option value="pre">Pré-fixada</option>
-                    <option value="hybrid">Híbrida</option>
-                  </select>
-                  <small class="input-hint">Use pós-fixada para CDBs como 123% do CDI.</small>
-                </label>
-                <label>Indexador
-                  <select name="fixed_income_indexer">
-                    <option value="">Selecione</option>
-                    <option value="CDI">CDI</option>
-                    <option value="SELIC">SELIC</option>
-                    <option value="IPCA">IPCA</option>
-                    <option value="IGP-M">IGP-M</option>
-                    <option value="TR">TR</option>
-                  </select>
-                </label>
-                <label><span id="portfolioFixedIncomeRateLabel">Taxa</span>
-                  <input name="fixed_income_rate" id="portfolioFixedIncomeRate" type="text" inputmode="decimal" placeholder="Ex.: 14,00">
-                  <small class="input-hint" id="portfolioFixedIncomeRateHint">Pré-fixada: taxa anual. Pós-fixada: percentual do indexador.</small>
-                </label>
-                <label>Vencimento
-                  <input name="fixed_income_maturity_date" type="date">
-                </label>
-                <label class="checkbox-label">Aplicar estimativa de IR/IOF nesta posição inicial
-                  <input name="apply_tax_estimate" type="checkbox" value="1">
-                </label>
+              <div class="portfolio-fixed-fields" id="portfolioFixedFields" hidden>
+                <div class="field-row">
+                  <label>Subcategoria
+                    <select id="portfolioFixedIncomeSubtype">
+                      <option value="">Selecione</option>
+                      <option value="CDB">CDB</option>
+                      <option value="LCI">LCI</option>
+                      <option value="LCA">LCA</option>
+                      <option value="LC">LC</option>
+                      <option value="Tesouro Selic">Tesouro Selic</option>
+                      <option value="Tesouro Prefixado">Tesouro Prefixado</option>
+                      <option value="Tesouro IPCA+">Tesouro IPCA+</option>
+                      <option value="Debenture">Debenture</option>
+                      <option value="CRI">CRI</option>
+                      <option value="CRA">CRA</option>
+                      <option value="Cofrinho">Cofrinho</option>
+                    </select>
+                  </label>
+                  <label>Modalidade
+                    <select name="fixed_income_mode" id="portfolioFixedIncomeMode">
+                      <option value="">Selecione</option>
+                      <option value="post">Pós-fixada</option>
+                      <option value="pre">Pré-fixada</option>
+                      <option value="hybrid">Híbrida</option>
+                    </select>
+                  </label>
+                </div>
+                <details class="field-helper">
+                  <summary aria-label="Ajuda sobre modalidade de renda fixa">i</summary>
+                  <div>
+                    <strong>Como preencher renda fixa</strong>
+                    <ul>
+                      <li><b>Pré-fixada:</b> CDB 12,30% a.a. → taxa 12,30.</li>
+                      <li><b>Pós-fixada:</b> CDB 123% do CDI → indexador CDI e percentual 123; CDI puro pode ficar vazio.</li>
+                      <li><b>Híbrida:</b> IPCA + 6,50% a.a. → indexador IPCA e taxa adicional 6,50.</li>
+                    </ul>
+                    <p id="portfolioFixedIncomeRateHint">Escolha a modalidade para ver a orientação específica.</p>
+                  </div>
+                </details>
+                <div class="field-row">
+                  <label>Indexador
+                    <select name="fixed_income_indexer">
+                      <option value="">Selecione</option>
+                      <option value="CDI">CDI</option>
+                      <option value="SELIC">SELIC</option>
+                      <option value="IPCA">IPCA</option>
+                      <option value="IGP-M">IGP-M</option>
+                      <option value="TR">TR</option>
+                    </select>
+                  </label>
+                  <label><span id="portfolioFixedIncomeRateLabel">Taxa</span>
+                    <input name="fixed_income_rate" id="portfolioFixedIncomeRate" type="text" inputmode="decimal" placeholder="Ex.: 14,00">
+                  </label>
+                </div>
+                <div class="field-row">
+                  <label>Vencimento
+                    <input name="fixed_income_maturity_date" type="date">
+                  </label>
+                  <label class="checkbox-label">Aplicar estimativa de IR/IOF nesta posição inicial
+                    <input name="apply_tax_estimate" type="checkbox" value="1">
+                  </label>
+                </div>
               </div>
               <div class="field-row" id="portfolioPricingFields">
                 <label>Quantidade

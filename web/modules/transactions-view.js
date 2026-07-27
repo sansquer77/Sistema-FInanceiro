@@ -1233,16 +1233,16 @@ export function registerTransactionsView({
     const mode = investmentFixedIncomeMode.value;
     if (mode === "pre") {
       investmentFixedIncomeRateLabel.textContent = "Taxa pré-fixada (% a.a.)";
-      investmentFixedIncomeRateHint.textContent = "Ex.: 12,30 significa 12,30% ao ano. Para CDB 123% do CDI, use pós-fixada.";
+      investmentFixedIncomeRateHint.textContent = "Pré-fixada: informe a taxa anual contratada. Ex.: 12,30 significa 12,30% a.a.; não use esta modalidade para CDB 123% do CDI.";
     } else if (mode === "post") {
-      investmentFixedIncomeRateLabel.textContent = "Percentual do indexador (%)";
-      investmentFixedIncomeRateHint.textContent = "Para CDB 123% do CDI, selecione indexador CDI e informe 123.";
+      investmentFixedIncomeRateLabel.textContent = "% do indexador (opcional)";
+      investmentFixedIncomeRateHint.textContent = "Pós-fixada: sem taxa adicional. Deixe vazio para 100% do indexador puro; para CDB 123% do CDI, selecione CDI e digite 123.";
     } else if (mode === "hybrid") {
       investmentFixedIncomeRateLabel.textContent = "Taxa adicional (% a.a.)";
-      investmentFixedIncomeRateHint.textContent = "Ex.: IPCA + 6,50% a.a.; escolha o indexador e informe apenas a taxa adicional.";
+      investmentFixedIncomeRateHint.textContent = "Híbrida: indexador + taxa adicional anual. Ex.: IPCA + 6,50% a.a. deve ser preenchido com indexador IPCA e taxa adicional 6,50.";
     } else {
       investmentFixedIncomeRateLabel.textContent = "Taxa";
-      investmentFixedIncomeRateHint.textContent = "Pré-fixada usa % a.a.; pós-fixada usa % do indexador.";
+      investmentFixedIncomeRateHint.textContent = "Escolha a modalidade para ver como preencher: pré-fixada usa taxa anual, pós-fixada usa percentual do indexador (vazio = 100%) e híbrida usa indexador mais taxa adicional.";
     }
   }
 
