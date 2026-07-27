@@ -22,6 +22,7 @@ from financeiro.accounts import (
     restore_checking_account,
     update_checking_account,
 )
+from financeiro.app_metadata import APP_NAME, APP_VERSION, app_info
 from financeiro.auth import (
     clear_user_launches,
     create_session,
@@ -210,10 +211,13 @@ def allowed_origin_values() -> set[str]:
 
 
 class AppHandler(BaseHTTPRequestHandler):
-    server_version = "SistemaFinanceiro/0.1"
+    server_version = f"{APP_NAME.replace(' ', '')}/{APP_VERSION}"
 
     def do_GET(self) -> None:
         path = self.route_path()
+        if path == "/api/app-info":
+            self.handle_app_info()
+            return
         if path.startswith("/api/me"):
             self.handle_me()
             return
@@ -518,6 +522,9 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_json(save_email_config(user["id"], data))
         except SecureConfigError as exc:
             raise ApiError(str(exc) or "Configuracao de email invalida.") from exc
+
+    def handle_app_info(self) -> None:
+        self.send_json(app_info())
 
     def handle_list_accounts(self) -> None:
         user = self.require_user()

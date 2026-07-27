@@ -2,8 +2,8 @@
 tipo: spec
 area: usuario
 status: implementado
-versao: 1.1
-atualizado: 2026-07-24
+versao: 1.3
+atualizado: 2026-07-27
 relacionados:
   - "[[frontend-modularizacao]]"
   - "[[../arquitetura|Arquitetura]]"
@@ -16,7 +16,7 @@ aliases: ["Sobre o App", "Sobre"]
 # Sobre o App
 
 > [!info] Status
-> **implementado** · área: `usuario` · atualizado em 2026-07-24 · relacionados: [[frontend-modularizacao]], [[../arquitetura|Arquitetura]], [[../distribuição|Distribuicao]], [[../requisitos|Requisitos]]
+> **implementado** · área: `usuario` · atualizado em 2026-07-27 · relacionados: [[frontend-modularizacao]], [[../arquitetura|Arquitetura]], [[../distribuição|Distribuicao]], [[../requisitos|Requisitos]]
 
 ## Problema
 
@@ -38,6 +38,7 @@ Usuários finais e mantenedores que usam o Sistema Financeiro localmente, instal
 - `descricao`: texto estático e sucinto sobre o objetivo do app, sem repetir o título do módulo.
 - `funcionalidades`: lista estática de capacidades principais.
 - `desenvolvedor`: nome do responsável pelo desenvolvimento.
+- `versao_atual`: versão atual do sistema exibida para identificação do que está rodando, lida dos metadados centralizados do app.
 - `tecnologias`: lista estática de tecnologias usadas.
 - `contato`: e-mail para dúvidas, sugestões e bugs.
 - `infraestrutura_minima`: requisitos mínimos para uso local e em rede.
@@ -50,8 +51,10 @@ Usuários finais e mantenedores que usam o Sistema Financeiro localmente, instal
 - As funcionalidades devem cobrir contas, cartões, lançamentos, categorias/tags, limites, relatórios, cockpit, portfólio, importação, histórico e preferências/segurança.
 - Os dados de desenvolvimento devem informar:
   - Desenvolvedor: Cristiano Gaspar.
+  - Versão atual do sistema, a partir do endpoint de metadados do app.
   - Tecnologias utilizadas no app.
   - Contato: `cristiano_gaspar@outlook.com`.
+- A versão de produto deve partir de `1.0.50` e evoluir preferencialmente em `1.0.n` para correções e ajustes incrementais; mudanças funcionais maiores podem justificar evolução `1.y`.
 - A infraestrutura mínima deve distinguir uso local e uso em rede/LAN.
 - O uso em rede deve ser descrito como adequado apenas para rede confiável; acesso remoto deve usar HTTPS/reverse-proxy.
 - A tela deve respeitar o design system existente, sem introduzir nova identidade visual.
@@ -59,7 +62,7 @@ Usuários finais e mantenedores que usam o Sistema Financeiro localmente, instal
 
 ## API e dados
 
-- Nenhum endpoint novo.
+- `GET /api/app-info`: retorna metadados públicos do app, incluindo `name` e `version`.
 - Nenhuma tabela nova.
 - Nenhum dado persistido.
 
@@ -67,19 +70,21 @@ Usuários finais e mantenedores que usam o Sistema Financeiro localmente, instal
 
 - Dado um usuário autenticado, quando abre o menu **Usuário**, então vê o item **Sobre**.
 - Dado o item **Sobre**, quando acionado, então a tela exibe título e conteúdo informativo sem formulário mutável.
-- Dada a tela **Sobre**, quando lida, então contém descrição sucinta, funcionalidades principais, dados de desenvolvimento, tecnologias, contato e infraestrutura mínima.
+- Dada a tela **Sobre**, quando lida, então contém descrição sucinta, funcionalidades principais, versão atual, dados de desenvolvimento, tecnologias, contato e infraestrutura mínima.
 - Dado o app em viewport estreita, quando a tela **Sobre** é aberta, então o conteúdo permanece legível e sem overflow horizontal.
 - Dado o app em tema claro ou escuro, quando a tela **Sobre** é aberta, então usa os tokens visuais existentes e mantém contraste legível.
 
 ## Fora de escopo
 
 - Tela de changelog/versionamento automático.
-- Captura automática de versão do pacote ou commit.
+- Captura automática de commit.
 - Formulário de contato, envio de e-mail ou abertura de cliente externo.
 - Diagnóstico automático da máquina ou da rede.
 
 ## Changelog
 
+- `1.3` — 2026-07-27 — Versão do sistema centralizada em metadado do backend, exposta via endpoint e exibida na tela Sobre; versão inicial convencionada como `1.0.50`.
+- `1.2` — 2026-07-27 — Tela Sobre passa a exibir a versão atual do sistema para identificação do app em execução.
 - `1.1` — 2026-07-24 — Removida repetição do rótulo Sobre no painel principal.
 - `1.0` — 2026-07-24 — Criada tela **Sobre** no menu Usuário com descrição, funcionalidades, desenvolvimento, tecnologias, contato e infraestrutura mínima.
 

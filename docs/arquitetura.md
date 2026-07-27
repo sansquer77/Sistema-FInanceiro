@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 1.7
-atualizado: 2026-07-23
+versao: 1.8
+atualizado: 2026-07-27
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -102,6 +102,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 
 | Método | Rota | Descrição |
 |---|---|---|
+| `GET` | `/api/app-info` | Metadados públicos do app, incluindo nome e versão atual. |
 | `GET` | `/api/me` | Dados do usuário autenticado. |
 | `POST` | `/api/register` | Cadastro de novo usuário. |
 | `POST` | `/api/login` | Login com e-mail e senha. |
@@ -417,6 +418,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `1.8` — 2026-07-27 — Documentado endpoint público `/api/app-info` para metadados centralizados de nome e versão do app.
 - `1.7` — 2026-07-23 — Documentados módulo, rota, colunas, índices e fluxo do MVP de classificação assistida local.
 - `1.6` — 2026-07-09 — Histórico de Operações documentado na arquitetura com view, módulo Python e rotas de auditoria.
 - `1.5` — 2026-07-05 — Configuração SMTP documentada como preferência criptografada por usuário autenticado.

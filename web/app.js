@@ -89,6 +89,7 @@ const state = {
   tags: [],
   spendingLimits: [],
   currentSpendingLimits: [],
+  appInfo: null,
   portfolio: null,
   portfolioDirty: true,
   portfolioLoading: false,
@@ -366,6 +367,7 @@ const simulationChart = document.querySelector("#simulationChart");
 const simulationVirtualItems = document.querySelector("#simulationVirtualItems");
 const simulationWarnings = document.querySelector("#simulationWarnings");
 const resetSimulationButton = document.querySelector("#resetSimulationButton");
+const aboutAppVersion = document.querySelector("#aboutAppVersion");
 const navButtons = document.querySelectorAll("[data-view]");
 const moduleViews = {
   cockpit: document.querySelector("#cockpitView"),
@@ -908,6 +910,7 @@ const userAdminViewController = registerUserAdminView({
 boot();
 
 async function boot() {
+  await loadAppInfo();
   try {
     const response = await api("/api/me");
     state.user = response.user;
@@ -919,6 +922,21 @@ async function boot() {
     return;
   }
   await loadDashboard();
+}
+
+async function loadAppInfo() {
+  try {
+    state.appInfo = await api("/api/app-info");
+  } catch (error) {
+    state.appInfo = { version: "1.0.50" };
+  }
+  renderAppInfo();
+}
+
+function renderAppInfo() {
+  if (aboutAppVersion) {
+    aboutAppVersion.textContent = state.appInfo?.version || "1.0.50";
+  }
 }
 
 function resetSessionState() {
