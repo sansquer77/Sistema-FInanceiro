@@ -2,7 +2,7 @@
 tipo: spec
 area: usuario
 status: implementado
-versao: 1.3
+versao: 1.4
 atualizado: 2026-07-27
 relacionados:
   - "[[frontend-modularizacao]]"
@@ -46,7 +46,7 @@ Usuários finais e mantenedores que usam o Sistema Financeiro localmente, instal
 ## Regras
 
 - A tela **Sobre** deve ficar no grupo **Usuário** do menu lateral.
-- A tela deve ser somente leitura e não deve criar endpoints, tabelas, arquivos de dados ou chamadas externas.
+- A tela deve ser somente leitura e não deve criar tabelas, arquivos de dados ou chamadas externas.
 - O conteúdo deve mencionar o objetivo principal: controle financeiro local, privado e simples.
 - As funcionalidades devem cobrir contas, cartões, lançamentos, categorias/tags, limites, relatórios, cockpit, portfólio, importação, histórico e preferências/segurança.
 - Os dados de desenvolvimento devem informar:
@@ -59,6 +59,7 @@ Usuários finais e mantenedores que usam o Sistema Financeiro localmente, instal
 - O uso em rede deve ser descrito como adequado apenas para rede confiável; acesso remoto deve usar HTTPS/reverse-proxy.
 - A tela deve respeitar o design system existente, sem introduzir nova identidade visual.
 - O painel principal não deve repetir o rótulo **Sobre** acima de **Sistema Financeiro**, pois o módulo já informa esse contexto no cabeçalho da página.
+- O texto descritivo do painel principal deve aproveitar a largura disponível do card antes de quebrar linha, evitando sensação de coluna estreita em telas largas.
 
 ## API e dados
 
@@ -73,6 +74,7 @@ Usuários finais e mantenedores que usam o Sistema Financeiro localmente, instal
 - Dada a tela **Sobre**, quando lida, então contém descrição sucinta, funcionalidades principais, versão atual, dados de desenvolvimento, tecnologias, contato e infraestrutura mínima.
 - Dado o app em viewport estreita, quando a tela **Sobre** é aberta, então o conteúdo permanece legível e sem overflow horizontal.
 - Dado o app em tema claro ou escuro, quando a tela **Sobre** é aberta, então usa os tokens visuais existentes e mantém contraste legível.
+- Dada uma viewport larga, quando a tela **Sobre** é aberta, então a descrição do app no painel principal ocupa a largura disponível do card sem quebra prematura.
 
 ## Fora de escopo
 
@@ -83,6 +85,7 @@ Usuários finais e mantenedores que usam o Sistema Financeiro localmente, instal
 
 ## Changelog
 
+- `1.4` — 2026-07-27 — Ajustado layout do texto descritivo no painel principal para usar melhor a largura disponível; versão do app elevada para `1.0.51`.
 - `1.3` — 2026-07-27 — Versão do sistema centralizada em metadado do backend, exposta via endpoint e exibida na tela Sobre; versão inicial convencionada como `1.0.50`.
 - `1.2` — 2026-07-27 — Tela Sobre passa a exibir a versão atual do sistema para identificação do app em execução.
 - `1.1` — 2026-07-24 — Removida repetição do rótulo Sobre no painel principal.
