@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 2.6
-atualizado: 2026-07-24
+versao: 2.8
+atualizado: 2026-07-27
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -53,6 +53,17 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 
 ---
 
+## Specs em outros status
+
+> Specs `rascunho`, `em-implementacao` ou `depreciado` ficam na mesma pasta `specs/` das demais — o status é sempre o campo `status` do frontmatter (e a tag `status/<valor>`), nunca a localização do arquivo. Use o painel de tags do Obsidian para filtrar por status sem depender desta tabela.
+
+| Spec | Status | Área |
+|---|---|---|
+| [[specs/imposto-renda]] | ❌ depreciado — custo de manter regras fiscais atualizadas não compensa para uso familiar | Investimentos |
+| [[specs/exportacao-dados]] | ❌ depreciado — arquivo SQLite já acessível por leitor genérico ou agente de IA | Exportação |
+
+---
+
 ## ADRs — Decisões técnicas
 
 | ADR | Decisão |
@@ -98,6 +109,8 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 
 ## Changelog
 
+- `2.8` — 2026-07-27 — Adicionada [[specs/exportacao-dados]] (depreciada) à seção "Specs em outros status".
+- `2.7` — 2026-07-27 — Adicionada seção "Specs em outros status" para dar visibilidade a specs fora de `implementado` (ex.: `depreciado`) sem criar pasta separada por status — reforça que o status vive no frontmatter/tag, não na localização do arquivo.
 - `2.6` — 2026-07-24 — Incluída a spec da tela Sobre no grupo Usuário.
 - `2.5` — 2026-07-23 — MVP de classificação assistida concluído e documentação marcada como implementada.
 - `2.4` — 2026-07-23 — MVP de classificação assistida aprovado e movido para implementação; ADR-0006 adotado.

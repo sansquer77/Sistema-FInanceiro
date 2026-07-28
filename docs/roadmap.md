@@ -2,8 +2,8 @@
 tipo: roadmap
 area: meta
 status: implementado
-versao: 1.2
-atualizado: 2026-07-04
+versao: 1.5
+atualizado: 2026-07-27
 relacionados:
   - "[[visao-produto]]"
   - "[[requisitos]]"
@@ -15,7 +15,7 @@ aliases: ["Roadmap", "Replicação Local"]
 # Roadmap
 
 > [!info] Status
-> **implementado** (todos os módulos planejados concluídos) · área: `meta` · atualizado em 2026-07-04
+> **implementado** (módulos 1–12 concluídos; módulos 14 e 15 descartados) · área: `meta` · atualizado em 2026-07-27
 
 Este documento organiza a evolução do Sistema Financeiro e serve de histórico de decisões de sequenciamento. Módulos planejados que ainda não iniciaram ficam com status `planejado`.
 
@@ -47,7 +47,8 @@ Este documento organiza a evolução do Sistema Financeiro e serve de histórico
 | 11 | Modularização do frontend em ES Modules nativos sem build step. | ✅ Implementado | [[adr/0002-modularizacao-frontend]] |
 | 12 | Distribuição desktop macOS/Windows, instaladores, zips limpos e launchers local/LAN. | ✅ Implementado | [[distribuição]] |
 | 13 | Conciliação automática de arquivos OFX bancários. | 🔲 Planejado | — |
-| 14 | Exportação direta de dados em outros formatos. | 🔲 Planejado | — |
+| 14 | Exportação direta de dados em outros formatos. | ❌ Descartado — arquivo SQLite já é acessível por leitor genérico ou agente de IA, sem justificar dependência nova | [[exportacao-dados]] |
+| 15 | Imposto de Renda (IR): apuração mensal de DARF por classe de ativo do Portfólio e relatório anual de apoio à declaração IRPF. | ❌ Descartado — custo de manutenção das regras fiscais não compensa para uso familiar | [[imposto-renda]] |
 
 ---
 
@@ -66,7 +67,6 @@ Este documento organiza a evolução do Sistema Financeiro e serve de histórico
 ## Próximas prioridades sugeridas
 
 1. **Conciliação OFX** — permitir que arquivos exportados de bancos sejam conciliados automaticamente com os lançamentos existentes.
-2. **Exportação de dados** — permitir exportar lançamentos, cartões ou portfólio em formatos como `.csv` ou `.xlsx`.
 
 Antes de iniciar qualquer item acima, criar spec em `specs/` seguindo [[sdd]] e atualizar esta tabela.
 
@@ -121,6 +121,9 @@ A implementação local não copia a interface de nenhum produto externo. Reprod
 
 ## Changelog
 
+- `1.5` — 2026-07-27 — Módulo 14 (Exportação de dados) marcado como descartado desde a criação da spec: o arquivo SQLite já é acessível por leitor genérico ou agente de IA, sem justificar dependência nova (`xlsxwriter`); removido das próximas prioridades sugeridas. Spec [[exportacao-dados]] mantida como registro do design cogitado.
+- `1.4` — 2026-07-27 — Módulo 15 (Imposto de Renda) marcado como descartado: complexidade de manter regras fiscais atualizadas não compensa o ganho para um sistema de uso familiar; spec [[imposto-renda]] mantida como registro histórico.
+- `1.3` — 2026-07-27 — Adicionado módulo 15 (Imposto de Renda) em status "Em especificação", com spec [[imposto-renda]].
 - `1.2` — 2026-07-04 — Roadmap inclui distribuição desktop macOS/Windows e regra de criação de documentos a partir do template.
 - `1.1` — 2026-06-29 — Consolidação de `replicacao-local.md` neste arquivo; adição de frontmatter, status por módulo e próximas prioridades.
 - `1.0` — versão original.
