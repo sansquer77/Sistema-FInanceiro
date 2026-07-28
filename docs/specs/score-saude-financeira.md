@@ -2,7 +2,7 @@
 tipo: spec
 area: score-saude-financeira
 status: rascunho
-versao: 0.8
+versao: 0.9
 atualizado: 2026-07-28
 relacionados:
   - "[[relatorios]]"
@@ -53,6 +53,9 @@ Qualquer usuário autenticado localmente que deseje entender sua saúde financei
 | `meses_reserva` | decimal | Quantidade de meses cobertos pela reserva elegível frente à média de despesas de consumo dos últimos 3 meses. |
 | `maior_concentracao_portfolio_pct` | decimal | Percentual da maior concentração por classe ou ativo na carteira cadastrada. |
 | `concentracao_poupanca_pct` | decimal | Percentual da carteira cadastrada concentrado em Poupança. |
+| `dividas_total_aberto_cents` | inteiro | Estoque total de dívidas parceladas abertas, como contexto informativo herdado do Cockpit. |
+| `dividas_parcelas_mes_cents` | inteiro | Soma das parcelas de dívidas com competência/vencimento no mês consultado, usada no cálculo do pilar de Endividamento. |
+| `comprometimento_divida_mes_pct` | decimal | Percentual `dividas_parcelas_mes_cents / receitas do mês`, usado para pontuar Endividamento. |
 | `paz_financeira_base_receita_cents` | inteiro | Receita recorrente mensal usada como base para os cards informativos; se ausente, receita do mês com menor confiança. |
 | `paz_financeira_confianca` | texto | `alta` quando usa receitas recorrentes mensais; `menor` quando usa receita do mês como fallback. |
 | `paz_independencia_cents` | inteiro | Referência informativa de patrimônio para independência mensal: base de receita × 175. |
@@ -67,7 +70,7 @@ Qualquer usuário autenticado localmente que deseje entender sua saúde financei
   - **Taxa de Poupança / Aporte (250 pts / peso 25%)**: A taxa de poupança considera `(receitas do mês - despesas de consumo do mês) / receitas do mês`. Lançamentos do tipo investimento/aporte, transferências, câmbio e pagamentos de fatura de cartão não são tratados como despesa para este pilar. Pontuação máxima de 250 pts é alcançada ao poupar/aportar >= 30% da renda.
   - **Reserva de Emergência (250 pts / peso 25%)**: Considera apenas posições do Portfólio marcadas explicitamente pelo usuário como aptas à reserva de emergência, inclusive Poupança. Contas-correntes, carteiras, renda fixa sem marcação, renda variável, cripto, previdência privada e outros ativos não entram neste pilar. A fórmula é `valor elegível como reserva / média mensal de despesas de consumo dos últimos 3 meses`. Pontuação máxima de 250 pts para reserva >= 6 meses; 0 pts para reserva igual a 0; entre 0 e 6 meses a pontuação cresce proporcionalmente.
   - **Marcação de reserva no Portfólio**: O Portfólio deve oferecer um metadado explícito, como `emergency_reserve_eligible`, para que o usuário marque uma posição como parte da reserva. Essa marcação pode ser disponibilizada para Poupança, Renda Fixa com liquidez diária e Tesouro Selic quando representado no Portfólio, mas nenhuma posição entra automaticamente sem decisão explícita do usuário.
-  - **Comprometimento de Renda / Endividamento (200 pts / peso 20%)**: Usa o mesmo conceito do card de **Dívidas** do Cockpit: soma das compras parceladas futuras ainda em aberto, em contas e cartões, sem incluir despesas avulsas do mês nem pagamento de fatura de cartão. O percentual de comprometimento é calculado como `dívidas parceladas em aberto / receitas do mês`. Pontuação máxima de 200 pts quando o comprometimento for <= 20%; cai linearmente para 0 pts se for >= 60%.
+  - **Comprometimento de Renda / Endividamento (200 pts / peso 20%)**: Usa o conceito de dívida parcelada do card de **Dívidas** do Cockpit, mas calcula o comprometimento pela soma das parcelas com competência/vencimento no mês consultado, não pelo saldo total futuro em aberto. O percentual de comprometimento é `parcelas de dívidas do mês / receitas do mês`. O estoque total de dívidas parceladas abertas pode ser exibido como contexto informativo, mas não entra diretamente no percentual do pilar. Pontuação máxima de 200 pts quando o comprometimento mensal for <= 20%; cai linearmente para 0 pts se for >= 60%.
   - **Aderência aos Limites (150 pts / peso 15%)**: Calcula o percentual de categorias com limites cadastrados que não foram estourados no mês. Pontuação máxima de 150 pts se 100% das categorias estiverem dentro da meta. Se não houver limites cadastrados, atribui nota neutra proporcional (75 pts).
   - **Concentração da Carteira Cadastrada (150 pts / peso 15%)**: Mede concentração objetiva do Portfólio cadastrado, sem emitir aconselhamento financeiro personalizado. O pilar avalia a maior concentração por classe ou ativo e penaliza sobreconcentração, especialmente quando uma única classe ou ativo ultrapassa 70% da carteira. A interface deve apresentar mensagens textuais e explicativas, como `Você tem alta concentração do seu portfólio em Renda Fixa (xx%).`, sem prescrever compra ou venda de ativos.
   - **Concentração em Poupança**: Quando Poupança representar mais de 25% do Portfólio cadastrado, o pilar deve aplicar penalidade adicional e exibir mensagem explicativa, por exemplo: `Poupança representa xx% do seu portfólio; há produtos com melhor relação de rendimento e liquidez que podem ser avaliados conforme seu perfil.` Essa mensagem deve ser educativa, não uma recomendação personalizada de investimento.
@@ -100,7 +103,7 @@ Tabelas: consulta `transactions`, `credit_card_transactions`, `spending_limits`,
 - Dado um usuário com saldo em conta-corrente de R$ 50.000,00 e nenhuma posição do Portfólio marcada explicitamente como reserva, quando o score é consultado, então o pilar de Reserva não considera o saldo da conta-corrente como reserva de emergência.
 - Dado um usuário sem lançamentos no mês de referência, quando a API é acionada, então o sistema retorna um indicador com status neutro/dados insuficientes sem gerar divisão por zero.
 - Dado um usuário com 3 limites cadastrados sendo 1 estourado no mês, quando avaliado a aderência aos limites, então a nota do pilar corresponde a 66.6% da pontuação máxima do pilar (100 de 150 pts).
-- Dado um usuário com receitas de R$ 10.000,00 e card de Dívidas do Cockpit totalizando R$ 3.000,00, quando o score é consultado, então o comprometimento de renda considerado para Endividamento é 30%.
+- Dado um usuário com receitas de R$ 10.000,00, dívida parcelada total aberta de R$ 80.000,00 e parcelas com competência/vencimento no mês somando R$ 3.000,00, quando o score é consultado, então o comprometimento de renda considerado para Endividamento é 30%, pois o estoque total de dívida é apenas contexto.
 - Dado um usuário com 80% do Portfólio cadastrado concentrado em Renda Fixa, quando o score é consultado, então o pilar de Concentração da Carteira registra sobreconcentração e retorna mensagem explicativa informando o percentual concentrado, sem recomendar compra ou venda de ativos.
 - Dado um usuário com 30% do Portfólio cadastrado concentrado em Poupança, quando o score é consultado, então o pilar de Concentração da Carteira aplica penalidade adicional por Poupança acima de 25% e retorna mensagem educativa sobre avaliar alternativas conforme o perfil.
 - Dado um usuário com receitas recorrentes mensais de R$ 10.000,00, quando a seção Paz Financeira é exibida, então os cards informativos mostram Independência mensal de R$ 1.750.000,00, Reserva estimada de R$ 60.000,00, Recorrentes saudáveis de R$ 5.000,00 e Lazer saudável de R$ 3.000,00, sem alterar a pontuação do score.
@@ -130,6 +133,7 @@ Nenhuma pendência conhecida.
 
 ## Changelog
 
+- `0.9` — 2026-07-28 — Pilar de Endividamento passa a calcular comprometimento por serviço mensal da dívida (`parcelas do mês / receitas`), mantendo o estoque total de dívidas parceladas apenas como contexto informativo.
 - `0.8` — 2026-07-28 — Incluído gráfico nativo de barras horizontais para tornar os 5 pilares mais visuais, com lista de dados `pilares`, fallback textual acessível e alinhamento ao design system; status/tag alinhados como rascunho.
 - `0.7` — 2026-07-27 — Incluída seção informativa Paz Financeira, sem impacto no score, baseada em receitas recorrentes ou receita do mês com menor confiança, com quatro cards de referência para planejamento.
 - `0.6` — 2026-07-27 — Pilar de Diversificação reformulado como Concentração da Carteira Cadastrada, com mensagens explicativas não prescritivas e penalidade adicional para Poupança acima de 25% do Portfólio.
