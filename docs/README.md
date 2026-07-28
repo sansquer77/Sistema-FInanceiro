@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 2.8
+versao: 2.9
 atualizado: 2026-07-27
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -59,6 +59,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 
 | Spec | Status | Área |
 |---|---|---|
+| [[specs/score-saude-financeira]] | 🚧 em-implementacao | Diagnóstico |
 | [[specs/imposto-renda]] | ❌ depreciado — custo de manter regras fiscais atualizadas não compensa para uso familiar | Investimentos |
 | [[specs/exportacao-dados]] | ❌ depreciado — arquivo SQLite já acessível por leitor genérico ou agente de IA | Exportação |
 
@@ -109,6 +110,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 
 ## Changelog
 
+- `2.9` — 2026-07-27 — Adicionada [[specs/score-saude-financeira]] em status `em-implementacao`.
 - `2.8` — 2026-07-27 — Adicionada [[specs/exportacao-dados]] (depreciada) à seção "Specs em outros status".
 - `2.7` — 2026-07-27 — Adicionada seção "Specs em outros status" para dar visibilidade a specs fora de `implementado` (ex.: `depreciado`) sem criar pasta separada por status — reforça que o status vive no frontmatter/tag, não na localização do arquivo.
 - `2.6` — 2026-07-24 — Incluída a spec da tela Sobre no grupo Usuário.

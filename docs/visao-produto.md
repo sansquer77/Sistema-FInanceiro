@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 1.3
+versao: 1.4
 atualizado: 2026-07-27
 relacionados:
   - "[[requisitos]]"
@@ -56,9 +56,11 @@ O Organizze serve como referência de clareza: módulos financeiros separados, s
 | Segurança: bloqueio de tentativas, headers defensivos, validação de origem | [[seguranca-autenticacao]] |
 | Distribuição desktop macOS/Windows com instaladores e launchers local/LAN | [[distribuição]] |
 
-### Planejados
+### Em desenvolvimento
 
-Nenhum módulo funcional planejado no momento. Itens avaliados e descartados por baixa relação ganho/complexidade ficam registrados no [[roadmap]].
+| Módulo | Spec |
+|---|---|
+| Score de Saúde Financeira: indicador de 0 a 1000 e diagnósticos por pilar | [[specs/score-saude-financeira]] |
 
 ## Estado atual
 
@@ -68,6 +70,7 @@ As próximas evoluções devem ser definidas a partir de novas dores observadas 
 
 ## Changelog
 
+- `1.4` — 2026-07-27 — Adicionada spec [[specs/score-saude-financeira]] na seção de módulos em desenvolvimento.
 - `1.3` — 2026-07-27 — Removidos OFX e exportação direta da lista de planejados; decisões descartadas passam a ficar centralizadas no [[roadmap]].
 - `1.2` — 2026-07-04 — Estado de produto atualizado com distribuição desktop e launchers local/LAN.
 - `1.1` — 2026-06-29 — Frontmatter, tabela de módulos com links para specs e separação de "planejados".
