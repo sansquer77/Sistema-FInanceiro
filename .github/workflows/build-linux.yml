@@ -141,4 +141,5 @@ jobs:
         with:
           name: Sistema-Financeiro-Linux
           path: Sistema Financeiro - Distribuicao/Linux/Sistema Financeiro - Distribuicao Linux.zip
+          archive: false
           if-no-files-found: error

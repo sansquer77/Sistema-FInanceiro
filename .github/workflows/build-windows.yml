@@ -53,17 +53,23 @@ jobs:
       - name: Montar pacote de distribuicao
         shell: pwsh
         run: |
-          $packageRoot = "Sistema Financeiro - Distribuicao\Windows"
+          $sourceRoot = "Sistema Financeiro - Distribuicao\Windows"
+          $packageRoot = "artifact-output\Windows"
           $appRoot = "$packageRoot\Aplicativo"
           $runtimeRoot = "$appRoot\SistemaFinanceiro"
 
-          if (Test-Path $runtimeRoot) {
-            Remove-Item $runtimeRoot -Recurse -Force
+          if (Test-Path "artifact-output") {
+            Remove-Item "artifact-output" -Recurse -Force
           }
 
-          Copy-Item "dist\SistemaFinanceiro" $runtimeRoot -Recurse
+          New-Item -ItemType Directory -Path $appRoot | Out-Null
 
-          Copy-Item README.md "$appRoot\README.md" -Force
+          Copy-Item "$sourceRoot\Instalar Sistema Financeiro.bat" "$packageRoot\Instalar Sistema Financeiro.bat" -Force
+          Copy-Item "$sourceRoot\README-INSTALACAO-WINDOWS.md" "$packageRoot\README-INSTALACAO-WINDOWS.md" -Force
+          Copy-Item "$sourceRoot\configurar_windows.ps1" "$packageRoot\configurar_windows.ps1" -Force
+          Copy-Item "$sourceRoot\Aplicativo\Abrir Sistema Financeiro.bat" "$appRoot\Abrir Sistema Financeiro.bat" -Force
+          Copy-Item "$sourceRoot\Aplicativo\Abrir Sistema Financeiro na Rede.bat" "$appRoot\Abrir Sistema Financeiro na Rede.bat" -Force
+          Copy-Item "dist\SistemaFinanceiro" $runtimeRoot -Recurse
 
           $forbidden = @("data", "tests", "docs", "__pycache__")
           foreach ($name in $forbidden) {
@@ -77,23 +83,23 @@ jobs:
       - name: Compactar pacote Windows
         shell: pwsh
         run: |
-          $zipPath = "Sistema Financeiro - Distribuicao\Windows\Sistema Financeiro - Distribuicao Windows.zip"
+          $zipPath = "artifact-output\Sistema Financeiro - Distribuicao Windows.zip"
           if (Test-Path $zipPath) {
             Remove-Item $zipPath -Force
           }
 
           Compress-Archive `
-            -Path "Sistema Financeiro - Distribuicao\Windows" `
+            -Path "artifact-output\Windows" `
             -DestinationPath $zipPath `
             -Force
 
       - name: Validar conteudo do zip
         shell: pwsh
         run: |
-          $zipPath = "Sistema Financeiro - Distribuicao\Windows\Sistema Financeiro - Distribuicao Windows.zip"
+          $zipPath = "artifact-output\Sistema Financeiro - Distribuicao Windows.zip"
           $items = tar -tf $zipPath
 
-          $blocked = $items | Select-String '(^|/)(data|tests|docs|__pycache__|\.DS_Store|_CodeSignature|\._[^/]*)(/|$)'
+          $blocked = $items | Select-String '(^|/)(data|tests|docs|__pycache__|\.DS_Store|_CodeSignature|__MACOSX|\._[^/]*)(/|$)|Windows/Aplicativo/app.py|Windows/Aplicativo/financeiro/|Windows/Aplicativo/web/| 2'
           if ($blocked) {
             Write-Error "O pacote contem arquivos ou pastas proibidas: $blocked"
             exit 1
@@ -109,5 +115,6 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: Sistema-Financeiro-Windows
-          path: Sistema Financeiro - Distribuicao/Windows/Sistema Financeiro - Distribuicao Windows.zip
+          path: artifact-output/Sistema Financeiro - Distribuicao Windows.zip
+          archive: false
           if-no-files-found: error

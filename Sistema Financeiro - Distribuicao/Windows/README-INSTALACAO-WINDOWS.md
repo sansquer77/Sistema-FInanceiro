@@ -5,16 +5,9 @@ Este pacote instala uma copia limpa do Sistema Financeiro em um computador Windo
 ## Requisitos
 
 - Windows 10 ou superior.
-- Python 3 instalado e disponivel no PATH.
 - Porta local `8010` livre.
 
-Se o Python nao estiver instalado, baixe em:
-
-`https://www.python.org/downloads/windows/`
-
-Durante a instalacao do Python, marque a opcao:
-
-`Add python.exe to PATH`
+O pacote ja inclui o runtime executavel do app. Nao e necessario instalar Python no computador de destino.
 
 ## Como instalar
 
@@ -60,7 +53,7 @@ Use este modo quando outros computadores ou celulares da mesma rede Wi-Fi/LAN pr
 
 Observacoes:
 
-- O Windows pode pedir permissao de firewall para permitir conexoes de entrada do Python.
+- O Windows pode pedir permissao de firewall para permitir conexoes de entrada do Sistema Financeiro.
 - Todos os dispositivos precisam estar na mesma rede.
 - Use este modo apenas em rede confiavel. Para acesso fora da rede local, prefira reverse-proxy com HTTPS.
 

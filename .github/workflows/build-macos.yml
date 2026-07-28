@@ -87,4 +87,5 @@ jobs:
         with:
           name: Sistema-Financeiro-MacOS
           path: Sistema Financeiro - Distribuicao/MacOS/Sistema Financeiro - Distribuicao MacOS.zip
+          archive: false
           if-no-files-found: error

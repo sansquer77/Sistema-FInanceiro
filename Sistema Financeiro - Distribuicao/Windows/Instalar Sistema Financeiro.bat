@@ -6,8 +6,7 @@ set "SOURCE_DIR=%PACKAGE_DIR%Aplicativo"
 set "DEST_DIR=%USERPROFILE%\Documents\Sistema Financeiro"
 set "LAUNCHER_PATH=%DEST_DIR%\Abrir Sistema Financeiro.bat"
 set "LAN_LAUNCHER_PATH=%DEST_DIR%\Abrir Sistema Financeiro na Rede.bat"
-set "ICON_PATH=%DEST_DIR%\web\assets\app-icon.ico"
-set "PYTHON_CHECK="
+set "ICON_PATH=%DEST_DIR%\SistemaFinanceiro\SistemaFinanceiro.exe"
 
 echo Instalando Sistema Financeiro para Windows...
 echo.
@@ -17,31 +16,6 @@ if not exist "%SOURCE_DIR%" (
   echo.
   pause
   exit /b 1
-)
-
-where py >nul 2>nul
-if not errorlevel 1 (
-  set "PYTHON_CHECK=py -3"
-  py -3 --version >nul 2>nul
-  if errorlevel 1 set "PYTHON_CHECK="
-)
-
-if not defined PYTHON_CHECK (
-  where python >nul 2>nul
-  if not errorlevel 1 (
-    set "PYTHON_CHECK=python"
-    python --version >nul 2>nul
-    if errorlevel 1 set "PYTHON_CHECK="
-  )
-)
-
-if not defined PYTHON_CHECK (
-  echo Aviso: Python 3 nao encontrado no PATH.
-  echo.
-  echo O app precisa do Python 3 instalado para abrir.
-  echo Instale em https://www.python.org/downloads/windows/
-  echo Marque a opcao "Add python.exe to PATH" durante a instalacao.
-  echo.
 )
 
 if not exist "%DEST_DIR%" mkdir "%DEST_DIR%"
