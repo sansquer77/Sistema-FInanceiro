@@ -510,7 +510,13 @@ textarea:focus {
 }
 
 .dashboard-main {
+  width: 100%;
   min-width: 0;
+}
+
+.module-view {
+  width: 100%;
+  max-width: none;
 }
 
 .app-sidebar {
@@ -1544,6 +1550,8 @@ textarea:focus {
 }
 
 .financial-health-panel {
+  grid-column: 1 / -1;
+  width: 100%;
   margin-top: 18px;
 }
 
