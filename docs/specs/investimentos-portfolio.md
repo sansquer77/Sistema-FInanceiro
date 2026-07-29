@@ -2,8 +2,8 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.0
-atualizado: 2026-07-26
+versao: 2.1
+atualizado: 2026-07-28
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -16,7 +16,7 @@ aliases: ["Investimentos", "Portfólio"]
 # Investimentos e Portfólio
 
 > [!info] Status
-> **implementado** · área: `investimentos` · atualizado em 2026-07-26 · relacionados: [[contas-correntes]], [[lancamentos]], [[relatorios]]
+> **implementado** · área: `investimentos` · atualizado em 2026-07-28 · relacionados: [[contas-correntes]], [[lancamentos]], [[relatorios]]
 
 ## Problema
 
@@ -55,6 +55,7 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 - As barras dos cards de consolidação usam sempre o valor atual normalizado para BRL apenas para escala visual; para moedas diferentes de BRL, a normalização usa a cotação do fechamento anterior.
 - Posição inicial cadastrada no Portfólio não movimenta conta.
 - Operação de investimento criada por lançamento de conta afeta o saldo da conta.
+- Posições iniciais elegíveis podem ser marcadas explicitamente como parte da reserva de emergência para uso analítico pelo [[score-saude-financeira]]; nenhuma posição entra automaticamente nessa reserva.
 
 **Renda Fixa:**
 - Pós-fixados/híbridos usam indexadores (CDI, SELIC, IPCA, IGP-M, TR) via API do Banco Central (SGS).
@@ -64,6 +65,7 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 - Campos de quantidade e preço médio/unitário não devem ser exibidos para renda fixa, pois o custo total/aporte é a base de cálculo relevante.
 - O sistema calcula e deduz estimativas de IOF (até 30 dias) e IR (tabela regressiva de 22,5% a 15%).
 - Posições de renda fixa com vencimento igual ou anterior à data atual devem gerar alerta visual no menu Portfólio e aviso no Cockpit até que sejam encerradas.
+- Posições iniciais de renda fixa podem ser marcadas explicitamente como reserva de emergência quando o usuário entender que têm liquidez compatível, sem inferência automática pelo sistema.
 
 **Poupança (`savings`):**
 - Não aparece como subcategoria de Renda Fixa no formulário.
@@ -71,6 +73,7 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 - Lançamentos classificados como Poupança geram automaticamente um aniversário na data do lançamento.
 - Cálculo: TR + 0,5% a.m. quando Selic > 8,5% a.a.; TR + 70% da Selic equivalente mensal quando Selic ≤ 8,5% a.a.
 - Não há cálculo de IOF/IR para Poupança.
+- Posições de Poupança podem ser marcadas explicitamente como reserva de emergência, mas a marcação deve ser decisão do usuário.
 
 **Previdência Privada (`private_pension`):**
 - Lançamentos classificados como `Previdência Privada`, `PGBL` ou `VGBL` geram operações do tipo `private_pension`.
@@ -98,7 +101,7 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 | `POST` | `/api/portfolio/close` |
 | `PUT` | `/api/portfolio/value` |
 
-Tabelas: `investment_opening_positions`, `investment_operations`, `investment_redemptions`, `investment_closed_positions`, `investment_value_overrides`, `transactions`, `checking_accounts`, `quote_cache`.
+Tabelas: `investment_opening_positions` (inclui `emergency_reserve_eligible` para posições iniciais elegíveis), `investment_operations`, `investment_redemptions`, `investment_closed_positions`, `investment_value_overrides`, `transactions`, `checking_accounts`, `quote_cache`.
 
 ## Plano de implementação
 
@@ -130,9 +133,12 @@ Tabelas: `investment_opening_positions`, `investment_operations`, `investment_re
 - Dado um encerramento sem a opção de crédito, quando executado, a posição vai para o histórico sem criar lançamento financeiro.
 - Dado um encerramento com a opção de crédito marcada, quando executado, o sistema cria uma receita na conta da carteira e soma o valor final ao saldo da conta.
 - Dado o modal de encerramento aberto, quando o usuário escolhe `Voltar`, a posição permanece aberta e nenhum lançamento é criado.
+- Dado o usuário cadastrando ou editando uma posição inicial de Poupança ou Renda Fixa, quando marca `Usar esta posição como reserva de emergência`, então a posição é persistida com `emergency_reserve_eligible = 1` e essa marcação volta preenchida ao editar.
+- Dado o usuário cadastrando outro tipo de ativo, quando envia o formulário, então o sistema ignora qualquer valor de `emergency_reserve_eligible` e persiste a posição como não elegível para reserva.
 
 ## Changelog
 
+- `2.1` — 2026-07-28 — Posições iniciais de Poupança e Renda Fixa podem ser marcadas explicitamente como elegíveis para reserva de emergência, com persistência em `investment_opening_positions`.
 - `2.0` — 2026-07-26 — Helper contextual de renda fixa passa a trazer exemplos explícitos para pré-fixada, pós-fixada e híbrida.
 - `1.9` — 2026-07-26 — Texto de renda fixa clarifica que pós-fixado usa percentual do indexador, vazio/zero representa 100% e híbrido usa taxa adicional.
 - `1.8` — 2026-07-26 — Orientações de renda fixa passam a ficar em helper contextual acionado por ícone, preservando espaço e alinhamento dos campos.

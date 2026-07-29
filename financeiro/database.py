@@ -327,6 +327,7 @@ def initialize_database() -> None:
                 fixed_income_rate_micros INTEGER NOT NULL DEFAULT 0 CHECK (fixed_income_rate_micros >= 0),
                 fixed_income_maturity_date TEXT,
                 apply_tax_estimate INTEGER NOT NULL DEFAULT 0 CHECK (apply_tax_estimate IN (0, 1)),
+                emergency_reserve_eligible INTEGER NOT NULL DEFAULT 0 CHECK (emergency_reserve_eligible IN (0, 1)),
                 savings_anniversaries_json TEXT,
                 notes TEXT,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -519,6 +520,7 @@ def initialize_database() -> None:
         ensure_column(conn, "investment_operations", "savings_anniversaries_json", "TEXT")
         ensure_column(conn, "investment_opening_positions", "fixed_income_maturity_date", "TEXT")
         ensure_column(conn, "investment_opening_positions", "apply_tax_estimate", "INTEGER NOT NULL DEFAULT 0")
+        ensure_column(conn, "investment_opening_positions", "emergency_reserve_eligible", "INTEGER NOT NULL DEFAULT 0")
         ensure_column(conn, "investment_opening_positions", "savings_anniversaries_json", "TEXT")
         ensure_column(conn, "checking_accounts", "account_type", "TEXT NOT NULL DEFAULT 'liquidity'")
         ensure_column(conn, "categories", "group_type", "TEXT NOT NULL DEFAULT 'expense'")

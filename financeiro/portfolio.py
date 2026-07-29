@@ -104,6 +104,7 @@ def get_portfolio(user_id: int, force_refresh: bool = False) -> dict:
                 'operation' AS source_type,
                 investment_operations.id AS source_id,
                 1 AS apply_tax_estimate,
+                0 AS emergency_reserve_eligible,
                 transactions.date,
                 transactions.description,
                 transactions.amount_cents,
@@ -156,6 +157,7 @@ def get_portfolio(user_id: int, force_refresh: bool = False) -> dict:
                 investment_opening_positions.fixed_income_rate_micros,
                 investment_opening_positions.fixed_income_maturity_date,
                 investment_opening_positions.apply_tax_estimate,
+                investment_opening_positions.emergency_reserve_eligible,
                 investment_opening_positions.savings_anniversaries_json,
                 investment_opening_positions.acquisition_date AS date,
                 'Posicao inicial' AS description,
@@ -255,8 +257,8 @@ def create_opening_position(user_id: int, data: dict) -> dict:
                 acquisition_date, quantity_micros, unit_price_cents, total_cost_cents,
                 exchange_rate_micros, fixed_income_mode, fixed_income_indexer,
                 fixed_income_rate_micros, fixed_income_maturity_date,
-                apply_tax_estimate, savings_anniversaries_json, notes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                apply_tax_estimate, emergency_reserve_eligible, savings_anniversaries_json, notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 user_id,
@@ -275,6 +277,7 @@ def create_opening_position(user_id: int, data: dict) -> dict:
                 position["fixed_income_rate_micros"],
                 position["fixed_income_maturity_date"],
                 position["apply_tax_estimate"],
+                position["emergency_reserve_eligible"],
                 position["savings_anniversaries_json"],
                 position["notes"],
             ),
@@ -315,7 +318,8 @@ def update_opening_position(user_id: int, position_id: object, data: dict) -> di
                 acquisition_date = ?, quantity_micros = ?, unit_price_cents = ?, total_cost_cents = ?,
                 exchange_rate_micros = ?, fixed_income_mode = ?, fixed_income_indexer = ?,
                 fixed_income_rate_micros = ?, fixed_income_maturity_date = ?,
-                apply_tax_estimate = ?, savings_anniversaries_json = ?, notes = ?,
+                apply_tax_estimate = ?, emergency_reserve_eligible = ?,
+                savings_anniversaries_json = ?, notes = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND user_id = ?
             """,
@@ -335,6 +339,7 @@ def update_opening_position(user_id: int, position_id: object, data: dict) -> di
                 position["fixed_income_rate_micros"],
                 position["fixed_income_maturity_date"],
                 position["apply_tax_estimate"],
+                position["emergency_reserve_eligible"],
                 position["savings_anniversaries_json"],
                 position["notes"],
                 normalized_id,
@@ -709,6 +714,7 @@ def current_portfolio_positions(user_id: int, force_refresh: bool = False) -> li
             SELECT investment_operations.*, 'operation' AS source_type, investment_operations.id AS source_id,
                 1 AS apply_tax_estimate, transactions.date, transactions.description, transactions.amount_cents,
                 transactions.exchange_rate_micros, transactions.amount_brl_cents,
+                0 AS emergency_reserve_eligible,
                 checking_accounts.name AS account_name, checking_accounts.currency AS account_currency
             FROM investment_operations
             JOIN transactions ON transactions.id = investment_operations.transaction_id
@@ -739,7 +745,8 @@ def current_portfolio_positions(user_id: int, force_refresh: bool = False) -> li
                 0 AS brokerage_fee_cents, 0 AS exchange_fee_cents, 0 AS tax_cents, 0 AS other_costs_cents,
                 investment_opening_positions.fixed_income_mode, investment_opening_positions.fixed_income_indexer,
                 investment_opening_positions.fixed_income_rate_micros, investment_opening_positions.fixed_income_maturity_date,
-                investment_opening_positions.apply_tax_estimate, investment_opening_positions.savings_anniversaries_json,
+                investment_opening_positions.apply_tax_estimate, investment_opening_positions.emergency_reserve_eligible,
+                investment_opening_positions.savings_anniversaries_json,
                 investment_opening_positions.acquisition_date AS date,
                 'Posicao inicial' AS description, investment_opening_positions.total_cost_cents AS amount_cents,
                 investment_opening_positions.exchange_rate_micros, 0 AS amount_brl_cents,
@@ -938,9 +945,17 @@ def normalize_opening_position_payload(data: dict) -> dict:
         "fixed_income_rate_micros": decimal_to_micros(data.get("fixed_income_rate")),
         "fixed_income_maturity_date": normalize_optional_date(data.get("fixed_income_maturity_date")),
         "apply_tax_estimate": 1 if str(data.get("apply_tax_estimate") or "").strip().lower() in {"1", "true", "on", "yes"} else 0,
+        "emergency_reserve_eligible": normalize_emergency_reserve_eligible(data, asset_type),
         "savings_anniversaries_json": serialize_savings_anniversaries(savings_anniversaries),
         "notes": empty_to_none(data.get("notes")),
     }
+
+
+def normalize_emergency_reserve_eligible(data: dict, asset_type: str) -> int:
+    # spec: investimentos/investimentos-portfolio v2.1 — critérios 16 e 17
+    if asset_type not in {"fixed_income", "savings"}:
+        return 0
+    return 1 if str(data.get("emergency_reserve_eligible") or "").strip().lower() in {"1", "true", "on", "yes"} else 0
 
 
 def normalize_savings_anniversaries(value: object, default_date: str) -> list[dict]:
@@ -1168,6 +1183,8 @@ def build_positions(rows) -> list[dict]:
         position["total_cost_cents"] += total_cost_cents
         position["total_cost_brl_cents"] += convert_to_brl_cents(total_cost_cents, int(row["exchange_rate_micros"] or 1000000))
         position["savings_anniversaries"].extend(source_savings_anniversaries)
+        if row.get("emergency_reserve_eligible"):
+            position["emergency_reserve_eligible"] = True
         position["sources"].append({
             "source_type": row["source_type"],
             "source_id": row["source_id"],
@@ -1180,6 +1197,7 @@ def build_positions(rows) -> list[dict]:
             "total_cost_cents": total_cost_cents,
             "total_cost_brl_cents": convert_to_brl_cents(total_cost_cents, int(row["exchange_rate_micros"] or 1000000)),
             "unit_price_cents": int(row["unit_price_cents"] or 0),
+            "emergency_reserve_eligible": bool(row.get("emergency_reserve_eligible") or 0),
             "savings_anniversaries": source_savings_anniversaries,
         })
         position["operations_count"] += 1
@@ -1242,6 +1260,7 @@ def empty_position(row, asset_type: str, identifier: str) -> dict:
         "fixed_income_rate": micros_to_decimal(row["fixed_income_rate_micros"]),
         "fixed_income_maturity_date": row["fixed_income_maturity_date"],
         "apply_tax_estimate": bool(row["apply_tax_estimate"] or 0),
+        "emergency_reserve_eligible": bool(row.get("emergency_reserve_eligible") or 0),
         "market_label": "Brasil" if row["account_currency"] == "BRL" else "Exterior",
         "quantity": Decimal("0"),
         "invested_cents": 0,
@@ -1906,6 +1925,7 @@ def format_quoted_position(position: dict) -> dict:
     position["fixed_income_net_value"] = cents_to_money(position["fixed_income_net_value_cents"])
     position["fixed_income_maturity_date"] = position.get("fixed_income_maturity_date")
     position["apply_tax_estimate"] = bool(position.get("apply_tax_estimate"))
+    position["emergency_reserve_eligible"] = bool(position.get("emergency_reserve_eligible"))
     position["day_result"] = cents_to_money(position["day_result_cents"])
     position["day_result_brl"] = cents_to_money(position["day_result_brl_cents"])
     return position
@@ -2009,6 +2029,7 @@ def format_position_sources(position: dict) -> list[dict]:
             "current_value_brl": cents_to_money(source_current_value_brl_cents),
             "current_value_cents": source_current_value_cents,
             "current_value_brl_cents": source_current_value_brl_cents,
+            "emergency_reserve_eligible": bool(source.get("emergency_reserve_eligible")),
             "savings_anniversaries": format_savings_anniversaries(source.get("savings_anniversaries") or []),
         })
     return formatted

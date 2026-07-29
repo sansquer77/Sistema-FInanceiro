@@ -55,6 +55,7 @@ export function registerPortfolioView({
     portfolioHistory,
     portfolioGroupFilter,
   } = elements;
+  const portfolioEmergencyReserveFields = portfolioAssetForm.querySelector("#portfolioEmergencyReserveFields");
 
   addPortfolioAssetButton.addEventListener("click", showPortfolioAssetForm);
   refreshPortfolioButton.addEventListener("click", () => loadPortfolio({ refreshMessage: true }));
@@ -191,6 +192,7 @@ export function registerPortfolioView({
     portfolioAssetForm.elements.fixed_income_rate.value = decimalInputValue(position.fixed_income_rate);
     portfolioAssetForm.elements.fixed_income_maturity_date.value = position.fixed_income_maturity_date || "";
     portfolioAssetForm.elements.apply_tax_estimate.checked = Boolean(position.apply_tax_estimate);
+    portfolioAssetForm.elements.emergency_reserve_eligible.checked = Boolean(position.emergency_reserve_eligible);
     portfolioAssetForm.elements.savings_anniversaries.value = savingsAnniversariesInputValue(position.savings_anniversaries);
     portfolioAssetForm.elements.quantity.value = decimalInputValue(position.quantity);
     portfolioAssetForm.elements.unit_price.value = moneyInputValue(position.average_price);
@@ -263,11 +265,21 @@ export function registerPortfolioView({
 
   function updatePortfolioAssetTypeState() {
     const assetType = portfolioAssetType.value;
+    const canBeEmergencyReserve = assetType === "fixed_income" || assetType === "savings";
     portfolioFundFields.hidden = assetType !== "fund";
     portfolioFixedFields.hidden = assetType !== "fixed_income";
     portfolioPricingFields.hidden = assetType === "fixed_income" || assetType === "savings";
     portfolioPensionFields.hidden = assetType !== "private_pension";
     portfolioSavingsFields.hidden = assetType !== "savings";
+    if (portfolioEmergencyReserveFields) {
+      portfolioEmergencyReserveFields.hidden = !canBeEmergencyReserve;
+      for (const field of portfolioEmergencyReserveFields.querySelectorAll("input")) {
+        field.disabled = !canBeEmergencyReserve;
+        if (!canBeEmergencyReserve) {
+          field.checked = false;
+        }
+      }
+    }
     if (assetType === "fixed_income") {
       portfolioAssetIdentifierLabel.hidden = true;
       const matchedSubtype = [...portfolioFixedIncomeSubtype.options].find((option) => option.value === portfolioAssetIdentifier.value);
@@ -812,6 +824,7 @@ export function registerPortfolioView({
       options.child ? formatDate(position.first_operation_date) : "",
       !options.parent && !options.child && position.asset_name && position.asset_name !== identifier ? position.asset_name : "",
       position.cnpj ? `CNPJ ${position.cnpj}` : "",
+      position.emergency_reserve_eligible ? "Reserva de emergência" : "",
       portfolioFixedIncomeDetail(position),
       position.fixed_income_maturity_date ? `Venc. ${formatDate(position.fixed_income_maturity_date)}` : "",
     ].filter(Boolean).join(" · ");

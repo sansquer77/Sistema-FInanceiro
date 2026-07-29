@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 1.8
-atualizado: 2026-07-27
+versao: 1.9
+atualizado: 2026-07-28
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -16,7 +16,7 @@ tags: [arquitetura, meta]
 # Arquitetura
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-07-09 · relacionados: [[requisitos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
+> **implementado** · área: `meta` · atualizado em 2026-07-28 · relacionados: [[requisitos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
 
 ## Visão geral
 
@@ -227,7 +227,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `classification_suggestions.py` | Normalização de descrições e sugestão local por histórico exato indexado. Ver [[classificacao-assistida]]. |
 | `credit_cards.py` | Cartões, faturas mensais, transações e pagamentos. Ver [[cartoes]]. |
 | `spending_limits.py` | Metas e orçamentos mensais. Ver [[limites-gastos]]. |
-| `portfolio.py` | Consolidação de investimentos, precificação e impostos. Ver [[investimentos-portfolio]]. |
+| `portfolio.py` | Consolidação de investimentos, precificação, impostos e metadado de reserva de emergência. Ver [[investimentos-portfolio]]. |
 | `imports.py` | Leitura de exportações Organizze e planilhas modelo. Ver [[importacao-organizze]]. |
 | `operation_logs.py` | Auditoria funcional das operações do usuário. Ver [[historico-operacoes]]. |
 | `emailer.py` | Envio SMTP do código de recuperação de senha. Ver [[recuperacao-senha]]. |
@@ -260,7 +260,7 @@ Conexões SQLite são abertas com `journal_mode=WAL`, `busy_timeout` curto e `fo
 | `transaction_tags` | `transactions.py` — Ver [[lancamentos]]. |
 | `credit_card_transaction_tags` | `credit_cards.py` — Ver [[cartoes]]. |
 | `spending_limits` | `spending_limits.py` — Ver [[limites-gastos]]. |
-| `investment_opening_positions` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
+| `investment_opening_positions` | `portfolio.py` — inclui `emergency_reserve_eligible` para reserva de emergência explícita. Ver [[investimentos-portfolio]]. |
 | `investment_operations` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
 | `investment_redemptions` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
 | `investment_closed_positions` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
@@ -418,6 +418,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `1.9` — 2026-07-28 — Documentado metadado `emergency_reserve_eligible` em posições iniciais do Portfólio para suporte ao Score de Saúde Financeira.
 - `1.8` — 2026-07-27 — Documentado endpoint público `/api/app-info` para metadados centralizados de nome e versão do app.
 - `1.7` — 2026-07-23 — Documentados módulo, rota, colunas, índices e fluxo do MVP de classificação assistida local.
 - `1.6` — 2026-07-09 — Histórico de Operações documentado na arquitetura com view, módulo Python e rotas de auditoria.

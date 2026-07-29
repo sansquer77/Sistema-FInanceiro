@@ -1,8 +1,8 @@
 ---
 tipo: spec
 area: score-saude-financeira
-status: rascunho
-versao: 0.9
+status: em-implementacao
+versao: 1.0
 atualizado: 2026-07-28
 relacionados:
   - "[[relatorios]]"
@@ -11,14 +11,14 @@ relacionados:
   - "[[cartoes]]"
   - "[[contas-correntes]]"
   - "[[arquitetura]]"
-tags: [spec, "area/score-saude-financeira", "status/rascunho"]
+tags: [spec, "area/score-saude-financeira", "status/em-implementacao"]
 aliases: ["Score de Saúde Financeira", "Diagnóstico Financeiro", "Financial Health Score"]
 ---
 
 # Score de Saúde Financeira
 
 > [!info] Status
-> **rascunho** · área: `score-saude-financeira` · atualizado em 2026-07-28 · relacionados: [[relatorios]], [[limites-gastos]], [[investimentos-portfolio]], [[cartoes]], [[contas-correntes]]
+> **em-implementacao** · área: `score-saude-financeira` · atualizado em 2026-07-28 · relacionados: [[relatorios]], [[limites-gastos]], [[investimentos-portfolio]], [[cartoes]], [[contas-correntes]]
 
 ## Problema
 
@@ -124,7 +124,7 @@ Nenhuma pendência conhecida.
 
 ## Plano de implementação
 
-- [ ] Passo 1 — Adicionar metadado explícito de elegibilidade para reserva de emergência no Portfólio, com migração idempotente e campo de marcação na UI de posições elegíveis. Fecha: critérios 2 e 3.
+- [x] Passo 1 — Adicionar metadado explícito de elegibilidade para reserva de emergência no Portfólio, com migração idempotente e campo de marcação na UI de posições elegíveis. Fecha: critérios 2 e 3.
 - [ ] Passo 2 — Criar módulo Python `financeiro/financial_health.py` implementando as funções atômicas de cálculo de cada pilar (com a distribuição 25/25/20/15/15), a lista `pilares` e a seção informativa Paz Financeira em centavos inteiros. Fecha: critérios 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 e 11.
 - [ ] Passo 3 — Adicionar as rotas `GET /api/financial-health-score` e `GET /api/financial-health-score/history` em `app.py` com validação de sessão e origem. Fecha: critério 11.
 - [ ] Passo 4 — Criar os testes unitários automatizados em `tests/test_financial_health.py` validando os pilares, Paz Financeira e casos de borda. Fecha: critérios 1, 2, 3, 4, 5, 6, 7, 8, 9 e 10.
@@ -133,6 +133,7 @@ Nenhuma pendência conhecida.
 
 ## Changelog
 
+- `1.0` — 2026-07-28 — Iniciada implantação: Portfólio passa a persistir metadado explícito de elegibilidade para reserva de emergência em posições iniciais elegíveis.
 - `0.9` — 2026-07-28 — Pilar de Endividamento passa a calcular comprometimento por serviço mensal da dívida (`parcelas do mês / receitas`), mantendo o estoque total de dívidas parceladas apenas como contexto informativo.
 - `0.8` — 2026-07-28 — Incluído gráfico nativo de barras horizontais para tornar os 5 pilares mais visuais, com lista de dados `pilares`, fallback textual acessível e alinhamento ao design system; status/tag alinhados como rascunho.
 - `0.7` — 2026-07-27 — Incluída seção informativa Paz Financeira, sem impacto no score, baseada em receitas recorrentes ou receita do mês com menor confiança, com quatro cards de referência para planejamento.
