@@ -103,8 +103,30 @@ def calculate_financial_health_score(user_id: int, month: object | None = None) 
     }
 
 
+def calculate_financial_health_score_history(user_id: int, months: object | None = None) -> list[dict]:
+    # spec: score-saude-financeira v1.5 — critérios 12 e 13
+    raw_months = 6 if months is None else months
+    try:
+        months_count = int(raw_months)
+    except (ValueError, TypeError):
+        raise FinancialHealthError("O parametro months deve ser um numero inteiro entre 1 e 36.")
+    if months_count < 1 or months_count > 36:
+        raise FinancialHealthError("O parametro months deve estar entre 1 e 36.")
+    reference_month = normalize_month()
+    history = []
+    for candidate_month in trailing_months(reference_month, months_count):
+        entry = calculate_financial_health_score(user_id, candidate_month)
+        history.append({
+            "month": entry["month"],
+            "score_total": entry["score_total"],
+            "nivel": entry["nivel"],
+            "dados_insuficientes": entry["dados_insuficientes"],
+        })
+    return history
+
+
 def calculate_savings_pillar(income_cents: int, consumption_expenses_cents: int) -> dict:
-    # spec: score-saude-financeira v1.1 — critério 1
+    # spec: score-saude-financeira v1.5 — critérios 1 e 4
     if income_cents <= 0:
         return pillar_result(
             "poupanca",
@@ -125,7 +147,7 @@ def calculate_savings_pillar(income_cents: int, consumption_expenses_cents: int)
 
 
 def calculate_reserve_pillar(eligible_reserve_cents: int, average_monthly_expenses_cents: int) -> dict:
-    # spec: score-saude-financeira v1.1 — critérios 2 e 3
+    # spec: score-saude-financeira v1.5 — critérios 2, 3 e 4
     if average_monthly_expenses_cents <= 0:
         return pillar_result(
             "reserva",
@@ -147,7 +169,7 @@ def calculate_reserve_pillar(eligible_reserve_cents: int, average_monthly_expens
 
 
 def calculate_debt_pillar(month_installments_cents: int, income_cents: int) -> dict:
-    # spec: score-saude-financeira v1.1 — critério 6
+    # spec: score-saude-financeira v1.5 — critérios 4 e 6
     if income_cents <= 0:
         return pillar_result(
             "endividamento",
@@ -172,15 +194,15 @@ def calculate_debt_pillar(month_installments_cents: int, income_cents: int) -> d
 
 
 def calculate_limits_pillar(total_limits: int, within_limits: int) -> dict:
-    # spec: score-saude-financeira v1.1 — critério 5
+    # spec: score-saude-financeira v1.5 — critérios 5 e 6
     if total_limits <= 0:
         return pillar_result(
             "limites",
-            PILLAR_LIMITS_MAX // 2,
+            0,
             total_limites=0,
             limites_dentro=0,
             dados_insuficientes=True,
-            mensagem="Sem limites cadastrados no mês; nota neutra aplicada.",
+            mensagem="Você ainda não cadastrou limites de gastos. Definir metas mensais por categoria ajuda a acompanhar e equilibrar seus gastos.",
         )
     adherence = Decimal(max(0, min(within_limits, total_limits))) / Decimal(total_limits)
     score = int((adherence * PILLAR_LIMITS_MAX).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
@@ -195,7 +217,7 @@ def calculate_limits_pillar(total_limits: int, within_limits: int) -> dict:
 
 
 def calculate_portfolio_concentration_pillar(positions: list[dict]) -> dict:
-    # spec: score-saude-financeira v1.1 — critérios 7 e 8
+    # spec: score-saude-financeira v1.5 — critérios 7 e 8
     totals_by_class: dict[str, int] = {}
     totals_by_asset: dict[str, int] = {}
     total_cents = 0
@@ -247,7 +269,7 @@ def calculate_portfolio_concentration_pillar(positions: list[dict]) -> dict:
 
 
 def calculate_financial_peace(recurring_income_cents: int, month_income_cents: int) -> dict:
-    # spec: score-saude-financeira v1.1 — critérios 9 e 10
+    # spec: score-saude-financeira v1.5 — critérios 9 e 10
     base = max(0, recurring_income_cents)
     confidence = "alta"
     notice = "Base calculada por receitas recorrentes mensais."
@@ -255,15 +277,18 @@ def calculate_financial_peace(recurring_income_cents: int, month_income_cents: i
         base = max(0, month_income_cents)
         confidence = "menor" if base > 0 else "indisponivel"
         notice = "Sem receitas recorrentes cadastradas; usa receitas do mês com menor confiança." if base > 0 else "Sem receitas para estimar Paz Financeira."
+    disclaimer = "Estas são referências simplificadas baseadas em boas práticas. A real necessidade varia conforme estilo de vida, localização e objetivos. Consulte um assessor para planejamento personalizado."
     return {
         "base_receita_cents": base,
         "confianca": confidence,
         "aviso": notice,
         "independencia_mensal_cents": base * 175,
+        "independencia_mensal_legenda": "Patrimônio estimado (usando heurística de 175x sua receita mensal) para gerar renda passiva mensal equivalente à sua receita atual.",
         "reserva_estimada_cents": base * 6,
         "recorrentes_saudaveis_cents": multiply_cents(base, Decimal("0.5")),
         "lazer_saudavel_cents": multiply_cents(base, Decimal("0.3")),
-        "mensagem": "Estimativas para nortear planejamento, baseadas em boas práticas gerais; não são regras fixas nem recomendações personalizadas.",
+        "mensagem": "Estimativas para nortear planejamento, baseadas em boas práticas gerais; não são regras fixas, metas ou recomendações personalizadas.",
+        "disclaimer": disclaimer,
     }
 
 
@@ -345,7 +370,7 @@ def emergency_reserve_cents_from_positions(positions: list[dict]) -> int:
 
 
 def fetch_debt_context(conn, user_id: int, month: str) -> dict:
-    # spec: score-saude-financeira v1.1 — critério 6
+    # spec: score-saude-financeira v1.5 — critério 6
     month_installments = conn.execute(
         """
         SELECT COALESCE(SUM(amount_cents), 0) AS total
