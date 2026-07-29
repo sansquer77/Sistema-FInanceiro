@@ -16,6 +16,12 @@
   --secondary-dark: #a04100;
   --positive: #10b981;
   --danger: #ef4444;
+  --color-success: #10b981;
+  --color-success-text: #ffffff;
+  --color-warning: #f59e0b;
+  --color-warning-text: #1f2937;
+  --color-error: #ef4444;
+  --color-error-text: #ffffff;
   --bg-alt: #f2f3ff;
   --soft: #dbe1ff;
   --shadow: none;
@@ -92,6 +98,12 @@
   --secondary-dark: #ffb16b;
   --positive: #34d399;
   --danger: #fb7185;
+  --color-success: #34d399;
+  --color-success-text: #101114;
+  --color-warning: #fbbf24;
+  --color-warning-text: #101114;
+  --color-error: #fb7185;
+  --color-error-text: #101114;
   --bg-alt: #1f222a;
   --soft: #273757;
   --shadow: none;
@@ -1631,11 +1643,15 @@ textarea:focus {
 
 .financial-health-score-card.level-bom strong,
 .financial-health-score-card.level-excelente strong {
-  color: var(--positive);
+  color: var(--color-success, var(--positive));
+}
+
+.financial-health-score-card.level-atencao strong {
+  color: var(--color-warning, var(--secondary));
 }
 
 .financial-health-score-card.level-critico strong {
-  color: var(--danger);
+  color: var(--color-error, var(--danger));
 }
 
 .financial-health-score-card span {
@@ -1718,11 +1734,15 @@ textarea:focus {
 
 .financial-health-pillar-row.level-bom .financial-health-bar i,
 .financial-health-pillar-row.level-excelente .financial-health-bar i {
-  background: var(--positive);
+  background: var(--color-success, var(--positive));
+}
+
+.financial-health-pillar-row.level-atencao .financial-health-bar i {
+  background: var(--color-warning, var(--secondary));
 }
 
 .financial-health-pillar-row.level-critico .financial-health-bar i {
-  background: var(--danger);
+  background: var(--color-error, var(--danger));
 }
 
 .financial-health-detail-grid,
@@ -1744,7 +1764,11 @@ textarea:focus {
 
 .financial-health-detail-card.level-bom,
 .financial-health-detail-card.level-excelente {
-  border-color: color-mix(in srgb, var(--positive) 35%, var(--line));
+  border-color: color-mix(in srgb, var(--color-success, var(--positive)) 35%, var(--line));
+}
+
+.financial-health-detail-card.level-atencao {
+  border-color: color-mix(in srgb, var(--color-warning, var(--secondary)) 35%, var(--line));
 }
 
 .financial-health-detail-card.level-critico {
@@ -1771,13 +1795,18 @@ textarea:focus {
 
 .financial-health-detail-card.level-bom header > span,
 .financial-health-detail-card.level-excelente header > span {
-  border-color: color-mix(in srgb, var(--positive) 50%, var(--line));
-  color: var(--positive);
+  border-color: color-mix(in srgb, var(--color-success, var(--positive)) 50%, var(--line));
+  color: var(--color-success, var(--positive));
+}
+
+.financial-health-detail-card.level-atencao header > span {
+  border-color: color-mix(in srgb, var(--color-warning, var(--secondary)) 50%, var(--line));
+  color: var(--color-warning, var(--secondary));
 }
 
 .financial-health-detail-card.level-critico header > span {
   border-color: var(--danger-border);
-  color: var(--danger);
+  color: var(--color-error, var(--danger));
 }
 
 .financial-health-detail-card small,

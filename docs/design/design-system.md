@@ -2,8 +2,8 @@
 tipo: design
 area: meta
 status: implementado
-versao: 1.9
-atualizado: 2026-07-20
+versao: 2.0
+atualizado: 2026-07-29
 relacionados:
   - "[[arquitetura]]"
   - "[[specs/frontend-modularizacao]]"
@@ -14,7 +14,7 @@ aliases: ["Design System", "Tokens Visuais", "Precisão Institucional"]
 # Design System — Precisão Institucional
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-07-20 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]]
+> **implementado** · área: `meta` · atualizado em 2026-07-29 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]]
 
 ## Personalidade da marca
 
@@ -64,6 +64,26 @@ Autoritária, sistemática e altamente técnica. A interface deve evocar confiab
 | **Vermelho** | `#EF4444` | **Todos** os números negativos (saldos e lançamentos) e alertas críticos. |
 | **Verde** | `#10B981` | **Somente** saldos positivos e indicadores de saúde financeira. |
 | **Preto** | `#131b2e` | Números positivos em **itens de lançamento** (entradas). |
+
+### Tokens semânticos para gráficos e estados
+
+Para garantir contraste acessível (WCAG AA ≥ 4.5:1 para texto) em ambos os temas, os elementos coloridos que carregam significado financeiro devem preferir os tokens semânticos abaixo em vez de literais. Os valores de fallback refletem a intenção no tema claro; o tema escuro faz override quando necessário.
+
+| Token | Fallback claro | Uso | Texto sobre o token |
+|---|---|---|---|
+| `--color-success` | `#10B981` | Indicadores saudáveis, barras de score "bom", saldos positivos em gráficos. | `--color-success-text` → `#ffffff` |
+| `--color-success-text` | `#ffffff` | Texto/ícone sobre fundo de sucesso. | Override escuro quando o fallback não atinge contraste. |
+| `--color-warning` | `#F59E0B` | Estados de atenção, badges de alerta moderado. | `--color-warning-text` → `#1f2937` |
+| `--color-warning-text` | `#1f2937` | Texto/ícone sobre fundo de aviso. | Deve manter contraste ≥ 4.5:1 sobre `--color-warning`. |
+| `--color-error` | `#EF4444` | Estados críticos, erros, saldos negativos em gráficos. | `--color-error-text` → `#ffffff` |
+| `--color-error-text` | `#ffffff` | Texto/ícone sobre fundo de erro. | Override escuro quando o fallback não atinge contraste. |
+
+Regras de aplicação:
+- Use `var(--color-success)` no lugar de `#10B981` em novos componentes e no gráfico de pilares do Score de Saúde Financeira.
+- Use `var(--color-error)` no lugar de `#EF4444` para estados críticos e saldos negativos.
+- Use `var(--color-warning)` para estados de atenção, substituindo literais como `#F59E0B`.
+- Sempre pare fundo semântico com seu respectivo `*-text` para garantir contraste.
+- O tema escuro deve fazer override dos tokens acima (por exemplo, `--color-success: #34d399`) e, quando necessário, ajustar `--color-success-text` para `#101114` para manter contraste.
 
 ### Estado / Erro
 
@@ -259,6 +279,7 @@ Grade de linha de base: **4px** (todos os valores são múltiplos de 4px).
 - `1.6` — 2026-07-08 — Hierarquia de títulos definida para impedir repetição entre o cabeçalho do módulo e o primeiro painel.
 - `1.7` — 2026-07-09 — Diretrizes de espaçamento e compactação do menu de navegação documentadas.
 - `1.8` — 2026-07-17 — Comportamento sticky dos formulários de lançamento em contas e cartões documentado.
+- `2.0` — 2026-07-29 — Adicionados tokens semânticos acessíveis (`--color-success`, `--color-success-text`, `--color-warning`, `--color-warning-text`, `--color-error`, `--color-error-text`) com fallback e overrides de tema escuro para garantir contraste WCAG AA em gráficos e indicadores de status; regras de aplicação e pares texto/fundo documentados.
 - `1.9` — 2026-07-20 — Padrão de modais de decisão definido para substituir prompts/confirms nativos em decisões financeiras e de cascata.
 
 ## Relacionados
