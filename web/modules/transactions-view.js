@@ -405,7 +405,7 @@ export function registerTransactionsView({
     transactionAmount.required = true;
     transactionAmountRow.hidden = false;
     transactionFormTitle.textContent = "Novo lançamento";
-    cancelTransactionEditButton.hidden = true;
+    cancelTransactionEditButton.hidden = false;
     transactionForm.querySelector('button[type="submit"]').textContent = "Salvar lançamento";
     seriesKind.disabled = false;
     updateSeriesState();
@@ -555,9 +555,17 @@ export function registerTransactionsView({
     const category = selectedTransactionCategory();
     const subcategories = category ? category.subcategories || [] : [];
     transactionSubcategory.innerHTML = '<option value="">Sem subcategoria</option>' + subcategories.map((subcategory) => (
-      `<option value="${escapeHtml(subcategory.name)}">${escapeHtml(subcategory.name)}</option>`
+      `<option value="${escapeHtml(subcategory.name)}">${escapeHtml(transactionSubcategoryDisplayName(subcategory.name))}</option>`
     )).join("");
     transactionSubcategory.disabled = subcategories.length === 0;
+  }
+
+  function transactionSubcategoryDisplayName(name) {
+    const normalized = normalizeSearch(name);
+    if (normalized.startsWith("poupanca")) {
+      return "Poupança";
+    }
+    return name;
   }
 
   function renderTransactionTagOptions() {

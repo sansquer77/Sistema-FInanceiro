@@ -312,6 +312,39 @@ textarea {
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
+input[type="checkbox"] {
+  width: auto;
+  min-height: 0;
+  padding: 0;
+}
+
+.checkbox-label {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.checkbox-label.compact-checkbox {
+  justify-self: start;
+  width: auto;
+  min-height: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-low);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.checkbox-label.compact-checkbox input[type="checkbox"] {
+  inline-size: 14px;
+  block-size: 14px;
+  margin: 0;
+}
+
 input:hover,
 select:hover,
 textarea:hover {

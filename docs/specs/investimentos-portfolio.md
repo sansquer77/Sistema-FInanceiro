@@ -2,8 +2,8 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.1
-atualizado: 2026-07-28
+versao: 2.2
+atualizado: 2026-07-29
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -16,7 +16,7 @@ aliases: ["Investimentos", "Portfólio"]
 # Investimentos e Portfólio
 
 > [!info] Status
-> **implementado** · área: `investimentos` · atualizado em 2026-07-28 · relacionados: [[contas-correntes]], [[lancamentos]], [[relatorios]]
+> **implementado** · área: `investimentos` · atualizado em 2026-07-29 · relacionados: [[contas-correntes]], [[lancamentos]], [[relatorios]]
 
 ## Problema
 
@@ -74,6 +74,7 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 - Cálculo: TR + 0,5% a.m. quando Selic > 8,5% a.a.; TR + 70% da Selic equivalente mensal quando Selic ≤ 8,5% a.a.
 - Não há cálculo de IOF/IR para Poupança.
 - Posições de Poupança podem ser marcadas explicitamente como reserva de emergência, mas a marcação deve ser decisão do usuário.
+- A marcação de reserva de emergência deve ser visualmente discreta no formulário, com peso menor que campos financeiros principais.
 
 **Previdência Privada (`private_pension`):**
 - Lançamentos classificados como `Previdência Privada`, `PGBL` ou `VGBL` geram operações do tipo `private_pension`.
@@ -135,9 +136,11 @@ Tabelas: `investment_opening_positions` (inclui `emergency_reserve_eligible` par
 - Dado o modal de encerramento aberto, quando o usuário escolhe `Voltar`, a posição permanece aberta e nenhum lançamento é criado.
 - Dado o usuário cadastrando ou editando uma posição inicial de Poupança ou Renda Fixa, quando marca `Usar esta posição como reserva de emergência`, então a posição é persistida com `emergency_reserve_eligible = 1` e essa marcação volta preenchida ao editar.
 - Dado o usuário cadastrando outro tipo de ativo, quando envia o formulário, então o sistema ignora qualquer valor de `emergency_reserve_eligible` e persiste a posição como não elegível para reserva.
+- Dado o formulário de posição inicial com opção de reserva visível, quando exibido, então a marcação aparece como controle compacto/discreto e não compete visualmente com os campos principais.
 
 ## Changelog
 
+- `2.2` — 2026-07-29 — Checkbox de reserva de emergência no Portfólio passa a usar apresentação compacta e discreta.
 - `2.1` — 2026-07-28 — Posições iniciais de Poupança e Renda Fixa podem ser marcadas explicitamente como elegíveis para reserva de emergência, com persistência em `investment_opening_positions`.
 - `2.0` — 2026-07-26 — Helper contextual de renda fixa passa a trazer exemplos explícitos para pré-fixada, pós-fixada e híbrida.
 - `1.9` — 2026-07-26 — Texto de renda fixa clarifica que pós-fixado usa percentual do indexador, vazio/zero representa 100% e híbrido usa taxa adicional.

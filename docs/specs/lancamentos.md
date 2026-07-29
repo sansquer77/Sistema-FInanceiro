@@ -2,7 +2,7 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 2.2
+versao: 2.3
 atualizado: 2026-07-26
 relacionados:
   - "[[contas-correntes]]"
@@ -92,6 +92,8 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 - Campos do formulário de lançamento devem manter altura e alinhamento consistentes dentro da mesma linha, especialmente nos blocos condicionais de investimento/renda fixa; textos auxiliares devem aparecer como linhas de ajuda separadas para não desalinharem inputs e selects.
 - Quando uma linha de formulário tiver apenas um campo visível, esse campo deve ocupar a largura completa da linha para evitar lacunas visuais.
 - Orientações extensas de renda fixa no formulário de investimento devem ficar em helper contextual acionado por ícone discreto, não como texto sempre visível entre campos.
+- O formulário de Lançamentos de Contas deve exibir ação `Cancelar` também durante novo cadastro, permitindo limpar a entrada atual e retornar ao estado inicial sem depender de salvar ou navegar.
+- No formulário de investimento, subcategorias de Poupança devem ser exibidas no combo apenas como `Poupança`, mesmo que o nome técnico/histórico da subcategoria contenha observações antigas; o valor interno deve ser preservado para não alterar históricos.
 
 ## API e dados
 
@@ -134,9 +136,12 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dado o tipo Investimento selecionado no formulário de Lançamentos, quando campos condicionais de renda fixa são exibidos, então inputs e selects da mesma linha mantêm alturas e alinhamentos consistentes, com dicas exibidas sem deslocar campos vizinhos.
 - Dado qualquer tipo de lançamento de conta, quando uma linha condicional exibe apenas um campo, então esse campo ocupa a linha inteira e o formulário não apresenta coluna vazia.
 - Dado o tipo Investimento com categoria Renda Fixa selecionado, quando o usuário aciona o ícone de ajuda, então vê orientação contextual para pré-fixada, pós-fixada e híbrida sem alterar o alinhamento dos campos.
+- Dado um novo lançamento de conta em preenchimento, quando o usuário aciona `Cancelar`, então o formulário é limpo e volta ao estado inicial sem criar lançamento.
+- Dado o tipo Investimento com subcategoria de Poupança cadastrada com texto complementar antigo, quando o combo de subcategoria é exibido, então a opção aparece como `Poupança`, preservando o valor interno original.
 
 ## Changelog
 
+- `2.3` — 2026-07-29 — Formulário de Lançamentos passa a exibir `Cancelar` também em novo cadastro e simplifica a exibição de subcategorias de Poupança no combo.
 - `2.2` — 2026-07-26 — Orientações extensas de renda fixa passam para helper contextual acionado por ícone no formulário de investimento.
 - `2.1` — 2026-07-26 — Blocos condicionais de investimento/renda fixa no formulário passam a separar dicas de campos para preservar alinhamento e altura dos controles.
 - `2.0` — 2026-07-24 — Gráfico de saldos passa a adaptar valores financeiros extensos ao espaço disponível sem ampliar a área visual.
