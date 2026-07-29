@@ -40,7 +40,7 @@ def calculate_financial_health_score(user_id: int, month: object | None = None) 
         average_expenses_cents = fetch_average_consumption_expenses(conn, user_id, normalized_month, months=3)
         debt_context = fetch_debt_context(conn, user_id, normalized_month)
         limits_context = fetch_limits_context(conn, user_id, normalized_month)
-        recurring_income_cents = fetch_recurring_income_cents(conn, user_id, normalized_month)
+        recurring_income_context = fetch_recurring_income_reference(conn, user_id, normalized_month)
     portfolio_positions = current_portfolio_positions(user_id, force_refresh=False)
     eligible_reserve_cents = emergency_reserve_cents_from_positions(portfolio_positions)
 
@@ -62,7 +62,7 @@ def calculate_financial_health_score(user_id: int, month: object | None = None) 
     )
     concentration_pillar = calculate_portfolio_concentration_pillar(portfolio_positions)
     paz_financeira = calculate_financial_peace(
-        recurring_income_cents,
+        recurring_income_context,
         month_summary["income_cents"],
     )
     pillars = build_pillars([
@@ -94,6 +94,7 @@ def calculate_financial_health_score(user_id: int, month: object | None = None) 
         "comprometimento_divida_mes_pct": debt_pillar["comprometimento_pct"],
         "paz_financeira_base_receita_cents": paz_financeira["base_receita_cents"],
         "paz_financeira_confianca": paz_financeira["confianca"],
+        "paz_financeira_meses_receita_recorrente": paz_financeira["meses_receita_recorrente"],
         "paz_independencia_cents": paz_financeira["independencia_mensal_cents"],
         "paz_reserva_estimada_cents": paz_financeira["reserva_estimada_cents"],
         "paz_recorrentes_saudaveis_cents": paz_financeira["recorrentes_saudaveis_cents"],
@@ -104,7 +105,7 @@ def calculate_financial_health_score(user_id: int, month: object | None = None) 
 
 
 def calculate_financial_health_score_history(user_id: int, months: object | None = None) -> list[dict]:
-    # spec: score-saude-financeira v2.1 — critérios 12, 13 e 14
+    # spec: score-saude-financeira v2.3 — critérios 15, 16 e 17
     raw_months = str(months or "").strip()
     if not raw_months:
         raise FinancialHealthError("O parametro months deve ser informado com valor entre 1 e 36.")
@@ -128,7 +129,7 @@ def calculate_financial_health_score_history(user_id: int, months: object | None
 
 
 def calculate_savings_pillar(income_cents: int, consumption_expenses_cents: int) -> dict:
-    # spec: score-saude-financeira v2.1 — critérios 1 e 4
+    # spec: score-saude-financeira v2.3 — critérios 1 e 4
     if income_cents <= 0:
         return pillar_result(
             "poupanca",
@@ -149,7 +150,7 @@ def calculate_savings_pillar(income_cents: int, consumption_expenses_cents: int)
 
 
 def calculate_reserve_pillar(eligible_reserve_cents: int, average_monthly_expenses_cents: int) -> dict:
-    # spec: score-saude-financeira v2.1 — critérios 2, 3 e 4
+    # spec: score-saude-financeira v2.3 — critérios 2, 3 e 4
     if average_monthly_expenses_cents <= 0:
         return pillar_result(
             "reserva",
@@ -171,7 +172,7 @@ def calculate_reserve_pillar(eligible_reserve_cents: int, average_monthly_expens
 
 
 def calculate_debt_pillar(month_installments_cents: int, income_cents: int) -> dict:
-    # spec: score-saude-financeira v2.1 — critérios 4 e 6
+    # spec: score-saude-financeira v2.3 — critérios 4 e 7
     if income_cents <= 0:
         return pillar_result(
             "endividamento",
@@ -196,7 +197,7 @@ def calculate_debt_pillar(month_installments_cents: int, income_cents: int) -> d
 
 
 def calculate_limits_pillar(total_limits: int, within_limits: int) -> dict:
-    # spec: score-saude-financeira v2.1 — critérios 5 e 6
+    # spec: score-saude-financeira v2.3 — critérios 5 e 6
     if total_limits <= 0:
         return pillar_result(
             "limites",
@@ -219,7 +220,7 @@ def calculate_limits_pillar(total_limits: int, within_limits: int) -> dict:
 
 
 def calculate_portfolio_concentration_pillar(positions: list[dict]) -> dict:
-    # spec: score-saude-financeira v2.1 — critérios 7, 8 e 9
+    # spec: score-saude-financeira v2.3 — critérios 8, 9 e 10
     totals_by_class: dict[str, int] = {}
     totals_by_asset: dict[str, int] = {}
     total_cents = 0
@@ -274,11 +275,22 @@ def calculate_portfolio_concentration_pillar(positions: list[dict]) -> dict:
     )
 
 
-def calculate_financial_peace(recurring_income_cents: int, month_income_cents: int) -> dict:
-    # spec: score-saude-financeira v2.1 — critérios 9 e 10
-    base = max(0, recurring_income_cents)
-    confidence = "alta"
-    notice = "Base calculada por receitas recorrentes mensais."
+def calculate_financial_peace(recurring_income_reference: dict | int, month_income_cents: int) -> dict:
+    # spec: score-saude-financeira v2.3 — critérios 11 e 12
+    if isinstance(recurring_income_reference, dict):
+        base = max(0, int(recurring_income_reference.get("average_cents") or 0))
+        months_with_income = int(recurring_income_reference.get("months_with_income") or 0)
+        window_months = int(recurring_income_reference.get("window_months") or 12)
+    else:
+        base = max(0, int(recurring_income_reference or 0))
+        months_with_income = 12 if base > 0 else 0
+        window_months = 12
+    confidence = "alta" if months_with_income >= 12 else "intermediaria"
+    notice = (
+        "Base calculada pela média das receitas recorrentes mensais dos últimos 12 meses."
+        if confidence == "alta"
+        else f"Base calculada pela média de {months_with_income} mês(es) com receitas recorrentes nos últimos {window_months} meses."
+    )
     if base <= 0:
         base = max(0, month_income_cents)
         confidence = "menor" if base > 0 else "indisponivel"
@@ -291,6 +303,8 @@ def calculate_financial_peace(recurring_income_cents: int, month_income_cents: i
     return {
         "base_receita_cents": base,
         "confianca": confidence,
+        "meses_receita_recorrente": months_with_income,
+        "janela_meses_receita_recorrente": window_months,
         "aviso": notice,
         "independencia_mensal_cents": base * 175,
         "independencia_mensal_legenda": "Patrimônio estimado (usando heurística de 175x sua receita mensal) para gerar renda passiva mensal equivalente à sua receita atual.",
@@ -379,7 +393,7 @@ def emergency_reserve_cents_from_positions(positions: list[dict]) -> int:
 
 
 def fetch_debt_context(conn, user_id: int, month: str) -> dict:
-    # spec: score-saude-financeira v2.1 — critério 6
+    # spec: score-saude-financeira v2.3 — critério 6
     month_installments = conn.execute(
         """
         SELECT COALESCE(SUM(amount_cents), 0) AS total
@@ -512,21 +526,36 @@ def fetch_expenses_by_limit_key(conn, user_id: int, month: str) -> dict[tuple[in
     return expenses
 
 
-def fetch_recurring_income_cents(conn, user_id: int, month: str) -> int:
-    start, end = month_bounds(month)
-    row = conn.execute(
+def fetch_recurring_income_reference(conn, user_id: int, month: str, months: int = 12) -> dict:
+    # spec: score-saude-financeira v2.3 — critérios 11 e 12
+    months_list = trailing_months(month, months)
+    first_month, last_month = months_list[0], months_list[-1]
+    start, _ = month_bounds(first_month)
+    _, end = month_bounds(last_month)
+    rows = conn.execute(
         """
-        SELECT COALESCE(SUM(amount_brl_cents), 0) AS total
+        SELECT substr(date, 1, 7) AS month, COALESCE(SUM(amount_brl_cents), 0) AS total
         FROM transactions
         WHERE user_id = ?
             AND archived_at IS NULL
             AND type = 'income'
             AND series_kind = 'recurring'
             AND date BETWEEN ? AND ?
+        GROUP BY substr(date, 1, 7)
         """,
         (user_id, start, end),
-    ).fetchone()
-    return int(row["total"] or 0)
+    ).fetchall()
+    totals_by_month = {row["month"]: int(row["total"] or 0) for row in rows}
+    positive_totals = [totals_by_month.get(candidate_month, 0) for candidate_month in months_list if totals_by_month.get(candidate_month, 0) > 0]
+    total = sum(positive_totals)
+    months_with_income = len(positive_totals)
+    average = int((Decimal(total) / Decimal(months_with_income)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)) if months_with_income else 0
+    return {
+        "average_cents": average,
+        "months_with_income": months_with_income,
+        "window_months": months,
+        "total_cents": total,
+    }
 
 
 def add_typed_rows(totals: dict, rows) -> None:

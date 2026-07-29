@@ -21,6 +21,7 @@ from financeiro.financial_health import (
     calculate_savings_pillar,
     build_pillars,
     emergency_reserve_cents_from_positions,
+    fetch_recurring_income_reference,
 )
 from financeiro.portfolio import current_portfolio_positions
 from financeiro.transactions import create_transaction
@@ -54,14 +55,14 @@ class FinancialHealthCalculationTest(unittest.TestCase):
         self.assertEqual(pillar["score"], 150)
 
     def test_limits_score_uses_share_inside_limit(self) -> None:
-        # spec: score-saude-financeira v2.1 — critério 5
+        # spec: score-saude-financeira v2.3 — critério 5
         pillar = calculate_limits_pillar(3, 2)
 
         self.assertEqual(pillar["score"], 100)
         self.assertEqual(pillar["aderencia_pct"], 66.67)
 
     def test_limits_score_is_zero_when_no_limits_defined(self) -> None:
-        # spec: score-saude-financeira v2.1 — critério 6
+        # spec: score-saude-financeira v2.3 — critério 6
         pillar = calculate_limits_pillar(0, 0)
 
         self.assertEqual(pillar["score"], 0)
@@ -69,7 +70,7 @@ class FinancialHealthCalculationTest(unittest.TestCase):
         self.assertIn("não cadastrou limites", pillar["mensagem"])
 
     def test_portfolio_concentration_penalizes_high_class_and_savings(self) -> None:
-        # spec: score-saude-financeira v2.1 — critérios 7 e 9
+        # spec: score-saude-financeira v2.3 — critérios 8 e 10
         pillar = calculate_portfolio_concentration_pillar([
             {"asset_type": "fixed_income", "asset_name": "CDB", "current_value_brl_cents": 500_000},
             {"asset_type": "savings", "asset_name": "Poupança", "current_value_brl_cents": 300_000},
@@ -81,7 +82,7 @@ class FinancialHealthCalculationTest(unittest.TestCase):
         self.assertEqual(pillar["concentracao_poupanca_pct"], 30.0)
 
     def test_portfolio_concentration_explains_high_fixed_income_without_prescription(self) -> None:
-        # spec: score-saude-financeira v2.1 — critério 7
+        # spec: score-saude-financeira v2.3 — critério 8
         pillar = calculate_portfolio_concentration_pillar([
             {"asset_type": "fixed_income", "asset_name": "CDB 1", "current_value_brl_cents": 400_000},
             {"asset_type": "fixed_income", "asset_name": "CDB 2", "current_value_brl_cents": 400_000},
@@ -95,7 +96,7 @@ class FinancialHealthCalculationTest(unittest.TestCase):
         self.assertNotIn("venda", pillar["mensagem"].lower())
 
     def test_portfolio_concentration_explains_high_single_asset_without_prescription(self) -> None:
-        # spec: score-saude-financeira v2.1 — critério 8
+        # spec: score-saude-financeira v2.3 — critério 9
         pillar = calculate_portfolio_concentration_pillar([
             {"asset_type": "fixed_income", "asset_name": "CDB", "current_value_brl_cents": 650_000},
             {"asset_type": "stock", "asset_name": "PETR4", "current_value_brl_cents": 350_000},
@@ -108,11 +109,13 @@ class FinancialHealthCalculationTest(unittest.TestCase):
         self.assertNotIn("venda", pillar["mensagem"].lower())
 
     def test_financial_peace_uses_recurring_income_or_month_fallback(self) -> None:
-        # spec: score-saude-financeira v2.1 — critérios 9 e 10
-        recurring = calculate_financial_peace(1_000_000, 800_000)
-        fallback = calculate_financial_peace(0, 800_000)
+        # spec: score-saude-financeira v2.3 — critérios 11 e 14
+        recurring = calculate_financial_peace({"average_cents": 1_000_000, "months_with_income": 12, "window_months": 12}, 800_000)
+        partial = calculate_financial_peace({"average_cents": 900_000, "months_with_income": 6, "window_months": 12}, 800_000)
+        fallback = calculate_financial_peace({"average_cents": 0, "months_with_income": 0, "window_months": 12}, 800_000)
 
         self.assertEqual(recurring["confianca"], "alta")
+        self.assertEqual(recurring["meses_receita_recorrente"], 12)
         self.assertEqual(recurring["independencia_mensal_cents"], 175_000_000)
         self.assertIn("175x", recurring["independencia_mensal_legenda"])
         self.assertEqual(recurring["reserva_estimada_cents"], 6_000_000)
@@ -120,6 +123,9 @@ class FinancialHealthCalculationTest(unittest.TestCase):
         self.assertEqual(recurring["lazer_saudavel_cents"], 300_000)
         self.assertIn("não são regras fixas", recurring["mensagem"])
         self.assertIn("Consulte um assessor", recurring["mensagem"])
+        self.assertEqual(partial["confianca"], "intermediaria")
+        self.assertEqual(partial["base_receita_cents"], 900_000)
+        self.assertIn("6 mês(es)", partial["aviso"])
         self.assertEqual(fallback["confianca"], "menor")
         self.assertEqual(fallback["base_receita_cents"], 800_000)
         self.assertIn("Consulte um assessor", fallback["mensagem"])
@@ -137,7 +143,7 @@ class FinancialHealthCalculationTest(unittest.TestCase):
         self.assertIn("Taxa de Poupança", encoded)
 
     def test_pillars_return_neutral_scores_when_denominator_is_zero(self) -> None:
-        # spec: score-saude-financeira v2.1 — critério 4
+        # spec: score-saude-financeira v2.3 — critério 4
         savings = calculate_savings_pillar(0, 0)
         reserve = calculate_reserve_pillar(0, 0)
         debt = calculate_debt_pillar(0, 0)
@@ -155,7 +161,7 @@ class FinancialHealthCalculationTest(unittest.TestCase):
         self.assertTrue(debt["dados_insuficientes"])
 
     def test_score_history_rejects_months_out_of_bounds(self) -> None:
-        # spec: score-saude-financeira v2.1 — critérios 13 e 14
+        # spec: score-saude-financeira v2.3 — critérios 16 e 17
         with self.assertRaises(FinancialHealthError) as context:
             calculate_financial_health_score_history(1, 1000)
         self.assertIn("entre 1 e 36", str(context.exception.message))
@@ -188,7 +194,7 @@ class FinancialHealthDatabaseIntegrationTest(unittest.TestCase):
         self.tempdir.cleanup()
 
     def test_score_payload_uses_database_facts_and_is_json_serializable(self) -> None:
-        # spec: score-saude-financeira v2.1 — critérios 1, 2, 5, 6, 9, 10 e 12
+        # spec: score-saude-financeira v2.3 — critérios 1, 2, 5, 6, 11, 14 e 15
         user = create_user("Alice", "alice@example.com", "strong-password")
         with database.get_connection() as conn:
             account_id = conn.execute(
@@ -261,8 +267,43 @@ class FinancialHealthDatabaseIntegrationTest(unittest.TestCase):
         self.assertEqual(payload["comprometimento_divida_mes_pct"], 30.0)
         self.assertEqual(payload["pilar_limites"], 150)
         self.assertEqual(payload["paz_financeira_base_receita_cents"], 1_000_000)
+        self.assertEqual(payload["paz_financeira_confianca"], "intermediaria")
+        self.assertEqual(payload["paz_financeira_meses_receita_recorrente"], 1)
         self.assertEqual(len(payload["pilares"]), 5)
         json.dumps(payload, ensure_ascii=False)
+
+    def test_financial_peace_reference_uses_12_month_recurring_average_ignoring_plr(self) -> None:
+        # spec: score-saude-financeira v2.3 — critérios 11, 12 e 13
+        user = create_user("Carla", "carla@example.com", "strong-password")
+        with database.get_connection() as conn:
+            account_id = conn.execute(
+                """
+                INSERT INTO checking_accounts (
+                    user_id, name, bank_name, account_type, currency,
+                    initial_balance_cents, current_balance_cents
+                ) VALUES (?, 'Conta', 'Banco', 'liquidity', 'BRL', 0, 0)
+                """,
+                (user["id"],),
+            ).lastrowid
+            rows = []
+            for month in range(8, 13):
+                rows.append((user["id"], "income", f"Receita recorrente 2025-{month:02d}", "receita recorrente", 900_000, 900_000, f"2025-{month:02d}-05", account_id, "recurring"))
+            for month in range(1, 8):
+                rows.append((user["id"], "income", f"Receita recorrente 2026-{month:02d}", "receita recorrente", 1_100_000, 1_100_000, f"2026-{month:02d}-05", account_id, "recurring"))
+            rows.append((user["id"], "income", "PLR", "plr", 5_000_000, 5_000_000, "2026-07-20", account_id, "single"))
+            conn.executemany(
+                """
+                INSERT INTO transactions (
+                    user_id, type, description, normalized_description, amount_cents,
+                    amount_brl_cents, date, account_id, series_kind
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                rows,
+            )
+            reference = fetch_recurring_income_reference(conn, user["id"], "2026-07")
+
+        self.assertEqual(reference["months_with_income"], 12)
+        self.assertEqual(reference["average_cents"], 1_016_667)
 
     def test_account_investment_operation_marked_as_reserve_counts_in_score(self) -> None:
         # spec: investimentos/investimentos-portfolio v2.4 — critério 19

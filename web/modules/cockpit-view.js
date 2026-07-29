@@ -218,7 +218,7 @@ export function registerCockpitView({
           </article>
         `).join("")}
       </div>
-      <p class="financial-peace-note">ⓘ Valores baseados na receita de referência (${formatCents(data.paz_financeira_base_receita_cents)}) · confiança ${escapeHtml(financialPeaceConfidenceLabel(data.paz_financeira_confianca))}. ${escapeHtml(peace.mensagem || "")}</p>
+      <p class="financial-peace-note">ⓘ Valores baseados na receita de referência (${formatCents(data.paz_financeira_base_receita_cents)}) · confiança ${escapeHtml(financialPeaceConfidenceLabel(data.paz_financeira_confianca))}. ${escapeHtml(peace.aviso || "")} ${escapeHtml(peace.mensagem || "")}</p>
     `;
   }
 
@@ -258,6 +258,9 @@ export function registerCockpitView({
     }
     if (value === "menor") {
       return "menor";
+    }
+    if (value === "intermediaria") {
+      return "intermediária";
     }
     return "indisponível";
   }
