@@ -22,6 +22,8 @@ from financeiro.financial_health import (
     build_pillars,
     emergency_reserve_cents_from_positions,
 )
+from financeiro.portfolio import current_portfolio_positions
+from financeiro.transactions import create_transaction
 
 
 class FinancialHealthCalculationTest(unittest.TestCase):
@@ -261,6 +263,57 @@ class FinancialHealthDatabaseIntegrationTest(unittest.TestCase):
         self.assertEqual(payload["paz_financeira_base_receita_cents"], 1_000_000)
         self.assertEqual(len(payload["pilares"]), 5)
         json.dumps(payload, ensure_ascii=False)
+
+    def test_account_investment_operation_marked_as_reserve_counts_in_score(self) -> None:
+        # spec: investimentos/investimentos-portfolio v2.4 — critério 19
+        user = create_user("Bob", "bob@example.com", "strong-password")
+        with database.get_connection() as conn:
+            account_id = conn.execute(
+                """
+                INSERT INTO checking_accounts (
+                    user_id, name, bank_name, account_type, currency,
+                    initial_balance_cents, current_balance_cents
+                ) VALUES (?, 'Conta Investimento', 'Banco', 'investment', 'BRL', 1000000, 1000000)
+                """,
+                (user["id"],),
+            ).lastrowid
+            expense_category_id = conn.execute(
+                "INSERT INTO categories (user_id, name, group_type) VALUES (?, 'Mercado', 'expense')",
+                (user["id"],),
+            ).lastrowid
+            conn.executemany(
+                """
+                INSERT INTO transactions (
+                    user_id, type, description, normalized_description, amount_cents,
+                    amount_brl_cents, date, account_id, category_id, series_kind
+                ) VALUES (?, 'expense', ?, ?, 100000, 100000, ?, ?, ?, 'single')
+                """,
+                [
+                    (user["id"], "Mercado maio", "mercado maio", "2026-05-10", account_id, expense_category_id),
+                    (user["id"], "Mercado junho", "mercado junho", "2026-06-10", account_id, expense_category_id),
+                    (user["id"], "Mercado julho", "mercado julho", "2026-07-10", account_id, expense_category_id),
+                ],
+            )
+
+        created = create_transaction(user["id"], {
+            "type": "investment",
+            "description": "Aporte Poupança",
+            "amount": "500,00",
+            "investment_amount": "500,00",
+            "date": "2026-07-15",
+            "account_id": str(account_id),
+            "category": "Renda Fixa",
+            "subcategory": "Poupança",
+            "investment_asset_name": "Poupança",
+            "investment_emergency_reserve_eligible": "1",
+        })
+
+        self.assertTrue(created["investment_operation"]["emergency_reserve_eligible"])
+        positions = current_portfolio_positions(user["id"])
+        self.assertEqual(emergency_reserve_cents_from_positions(positions), 50_000)
+
+        payload = calculate_financial_health_score(user["id"], "2026-07")
+        self.assertEqual(payload["reserva_elegivel_cents"], 50_000)
 
 
 if __name__ == "__main__":

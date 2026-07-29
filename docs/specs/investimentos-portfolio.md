@@ -2,7 +2,7 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.2
+versao: 2.6
 atualizado: 2026-07-29
 relacionados:
   - "[[contas-correntes]]"
@@ -55,7 +55,7 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 - As barras dos cards de consolidação usam sempre o valor atual normalizado para BRL apenas para escala visual; para moedas diferentes de BRL, a normalização usa a cotação do fechamento anterior.
 - Posição inicial cadastrada no Portfólio não movimenta conta.
 - Operação de investimento criada por lançamento de conta afeta o saldo da conta.
-- Posições iniciais elegíveis podem ser marcadas explicitamente como parte da reserva de emergência para uso analítico pelo [[score-saude-financeira]]; nenhuma posição entra automaticamente nessa reserva.
+- Posições iniciais e operações de aporte elegíveis podem ser marcadas explicitamente como parte da reserva de emergência para uso analítico pelo [[score-saude-financeira]]; nenhuma posição ou aporte entra automaticamente nessa reserva.
 
 **Renda Fixa:**
 - Pós-fixados/híbridos usam indexadores (CDI, SELIC, IPCA, IGP-M, TR) via API do Banco Central (SGS).
@@ -65,7 +65,7 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 - Campos de quantidade e preço médio/unitário não devem ser exibidos para renda fixa, pois o custo total/aporte é a base de cálculo relevante.
 - O sistema calcula e deduz estimativas de IOF (até 30 dias) e IR (tabela regressiva de 22,5% a 15%).
 - Posições de renda fixa com vencimento igual ou anterior à data atual devem gerar alerta visual no menu Portfólio e aviso no Cockpit até que sejam encerradas.
-- Posições iniciais de renda fixa podem ser marcadas explicitamente como reserva de emergência quando o usuário entender que têm liquidez compatível, sem inferência automática pelo sistema.
+- Posições iniciais e aportes de renda fixa podem ser marcados explicitamente como reserva de emergência quando o usuário entender que têm liquidez compatível, sem inferência automática pelo sistema.
 
 **Poupança (`savings`):**
 - Não aparece como subcategoria de Renda Fixa no formulário.
@@ -73,8 +73,9 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 - Lançamentos classificados como Poupança geram automaticamente um aniversário na data do lançamento.
 - Cálculo: TR + 0,5% a.m. quando Selic > 8,5% a.a.; TR + 70% da Selic equivalente mensal quando Selic ≤ 8,5% a.a.
 - Não há cálculo de IOF/IR para Poupança.
-- Posições de Poupança podem ser marcadas explicitamente como reserva de emergência, mas a marcação deve ser decisão do usuário.
+- Posições e aportes de Poupança podem ser marcados explicitamente como reserva de emergência, mas a marcação deve ser decisão do usuário.
 - A marcação de reserva de emergência deve ser visualmente discreta no formulário, com peso menor que campos financeiros principais.
+- Em aportes de Poupança criados por Lançamentos de Contas, o formulário deve ocultar campos não aplicáveis como quantidade, preço unitário, renda fixa, CNPJ, corretagem, emolumentos, impostos e outros custos.
 
 **Previdência Privada (`private_pension`):**
 - Lançamentos classificados como `Previdência Privada`, `PGBL` ou `VGBL` geram operações do tipo `private_pension`.
@@ -86,6 +87,7 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 
 **Resgates e encerramentos:**
 - Resgates retornam valor para a conta da carteira. Em posições com múltiplas origens, consumo segue FIFO.
+- Resgates e atualização manual de valor atual devem usar modais internos do app, com campos rotulados, valor padrão preenchido e ação secundária de cancelamento, evitando prompts nativos do navegador.
 - Encerramento move a posição para Histórico com os valores no momento do resgate/fechamento.
 - No encerramento, o usuário informa data, valor final e pode optar por registrar o valor final como receita na conta da carteira em um modal único de decisão.
 - A opção de registrar crédito deve ficar desmarcada por padrão para evitar duplicidade com resgates ou créditos já lançados.
@@ -102,7 +104,7 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 | `POST` | `/api/portfolio/close` |
 | `PUT` | `/api/portfolio/value` |
 
-Tabelas: `investment_opening_positions` (inclui `emergency_reserve_eligible` para posições iniciais elegíveis), `investment_operations`, `investment_redemptions`, `investment_closed_positions`, `investment_value_overrides`, `transactions`, `checking_accounts`, `quote_cache`.
+Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emergency_reserve_eligible` para posições/aportes elegíveis), `investment_redemptions`, `investment_closed_positions`, `investment_value_overrides`, `transactions`, `checking_accounts`, `quote_cache`.
 
 ## Plano de implementação
 
@@ -129,17 +131,26 @@ Tabelas: `investment_opening_positions` (inclui `emergency_reserve_eligible` par
 - Dado uma posição de renda fixa vencendo hoje ou vencida, quando o usuário navega pelo app, o item Portfólio no menu aparece em estado de alerta e o Cockpit exibe um aviso acionável.
 - Dado uma posição vencida já encerrada, quando o portfólio é recarregado, o alerta de menu e o aviso do Cockpit deixam de considerar essa posição.
 - Dado um ativo em moeda estrangeira, quando listado, é exibido na própria moeda sem conversão visual redundante.
+- Dado um ativo em moeda estrangeira com valor atual informado manualmente, quando o resultado e a rentabilidade são exibidos, então a diferença entre valor atual e custo é calculada na moeda original do ativo; valores normalizados em BRL podem aparecer apenas como informação secundária ou escala visual.
 - Dado uma posição com múltiplas origens, quando expandida, exibe os lançamentos/posições que a compõem.
 - Dado um resgate realizado, quando executado, o valor retorna à conta de origem e a posição é atualizada via FIFO.
+- Dado o usuário clicando em `Resgatar`, quando o formulário é aberto, então o sistema exibe um modal interno com data e valor do resgate preenchidos por padrão, além de ação de cancelar sem alterar a posição.
+- Dado o usuário clicando em `Atualizar valor atual`, quando o formulário é aberto, então o sistema exibe um modal interno com data e valor atual preenchidos por padrão, além de ação de cancelar sem alterar a posição.
 - Dado um encerramento sem a opção de crédito, quando executado, a posição vai para o histórico sem criar lançamento financeiro.
 - Dado um encerramento com a opção de crédito marcada, quando executado, o sistema cria uma receita na conta da carteira e soma o valor final ao saldo da conta.
 - Dado o modal de encerramento aberto, quando o usuário escolhe `Voltar`, a posição permanece aberta e nenhum lançamento é criado.
 - Dado o usuário cadastrando ou editando uma posição inicial de Poupança ou Renda Fixa, quando marca `Usar esta posição como reserva de emergência`, então a posição é persistida com `emergency_reserve_eligible = 1` e essa marcação volta preenchida ao editar.
 - Dado o usuário cadastrando outro tipo de ativo, quando envia o formulário, então o sistema ignora qualquer valor de `emergency_reserve_eligible` e persiste a posição como não elegível para reserva.
 - Dado o formulário de posição inicial com opção de reserva visível, quando exibido, então a marcação aparece como controle compacto/discreto e não compete visualmente com os campos principais.
+- Dado o usuário cadastrando ou editando um aporte de Poupança ou Renda Fixa em Lançamentos de Contas, quando marca `Usar este aporte como reserva de emergência`, então a operação é persistida com `emergency_reserve_eligible = 1`, aparece marcada ao editar o lançamento e passa a compor a reserva elegível do Portfólio/Score.
+- Dado o usuário cadastrando ou editando um aporte de Poupança em Lançamentos de Contas, quando o formulário é exibido, então os campos não aplicáveis à Poupança ficam ocultos/desabilitados e não competem com os campos essenciais.
 
 ## Changelog
 
+- `2.6` — 2026-07-29 — Resgate e atualização manual de valor atual passam a ser documentados como modais internos consistentes com a identidade visual do app.
+- `2.5` — 2026-07-29 — Resultado e rentabilidade de ativos em moeda estrangeira com valor manual ficam explicitamente calculados na moeda original; BRL permanece apenas como referência secundária/escala visual.
+- `2.4` — 2026-07-29 — Aportes de Poupança em Lançamentos de Contas passam a ocultar campos não aplicáveis no formulário de investimento.
+- `2.3` — 2026-07-29 — Operações de aporte de Poupança e Renda Fixa criadas por Lançamentos de Contas também podem ser marcadas como reserva de emergência.
 - `2.2` — 2026-07-29 — Checkbox de reserva de emergência no Portfólio passa a usar apresentação compacta e discreta.
 - `2.1` — 2026-07-28 — Posições iniciais de Poupança e Renda Fixa podem ser marcadas explicitamente como elegíveis para reserva de emergência, com persistência em `investment_opening_positions`.
 - `2.0` — 2026-07-26 — Helper contextual de renda fixa passa a trazer exemplos explícitos para pré-fixada, pós-fixada e híbrida.

@@ -73,6 +73,7 @@ def list_transactions(user_id: int, month: str | None = None, account_id: int | 
                 investment_operations.fixed_income_indexer AS investment_fixed_income_indexer,
                 investment_operations.fixed_income_rate_micros AS investment_fixed_income_rate_micros,
                 investment_operations.fixed_income_maturity_date AS investment_fixed_income_maturity_date,
+                investment_operations.emergency_reserve_eligible AS investment_emergency_reserve_eligible,
                 investment_operations.savings_anniversaries_json AS investment_savings_anniversaries_json,
                 credit_card_payments.id AS credit_card_payment_id,
                 GROUP_CONCAT(tags.name, '||') AS tag_names
@@ -277,7 +278,7 @@ def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
 
 
 def update_future_series_transactions(conn, user_id: int, existing, transaction: dict) -> None:
-    # spec: lancamentos v2.0 — criterio 7 (apply_to_future)
+    # spec: lancamentos v2.5 — criterio 7 (apply_to_future)
     # (propaga apenas para ocorrencias futuras nao conciliadas da mesma serie;
     #  o delta de data e reaplicado, nao a data absoluta, para preservar o espacamento)
     if not existing["series_id"]:
@@ -443,7 +444,7 @@ def delete_transaction(user_id: int, transaction_id: str, apply_to_future: bool 
 
 
 def future_transactions_to_delete(conn, user_id: int, transaction, apply_to_future: bool):
-    # spec: lancamentos v2.0 — criterio 6 (scope=future)
+    # spec: lancamentos v2.5 — criterio 6 (scope=future)
     # (so remove ocorrencias futuras ainda nao conciliadas da mesma serie;
     #  uma vez conciliada, a ocorrencia fica fora do alcance da exclusao em cascata)
     if not apply_to_future or not transaction["series_id"]:
@@ -623,6 +624,7 @@ def normalize_investment_operation(data: dict, amount_cents: int, transaction_ty
         "fixed_income_indexer": empty_to_none(data.get("investment_fixed_income_indexer")),
         "fixed_income_rate_micros": decimal_to_micros(data.get("investment_fixed_income_rate")),
         "fixed_income_maturity_date": normalize_optional_date(data.get("investment_fixed_income_maturity_date")),
+        "emergency_reserve_eligible": normalize_investment_emergency_reserve_eligible(data, asset_type),
         "savings_anniversaries_json": serialize_savings_anniversary(data.get("date"), invested_amount_cents) if asset_type == "savings" else None,
     }
 
@@ -635,6 +637,13 @@ def normalize_investment_asset_hint(category: str, subcategory: str, asset_ident
     )
     replacements = str.maketrans("áàâãéêíóôõúç", "aaaaeeiooouc")
     return raw.translate(replacements)
+
+
+def normalize_investment_emergency_reserve_eligible(data: dict, asset_type: str) -> int:
+    # spec: investimentos/investimentos-portfolio v2.6 — critérios 21 e 23
+    if asset_type not in {"fixed_income", "savings"}:
+        return 0
+    return 1 if str(data.get("investment_emergency_reserve_eligible") or "").strip().lower() in {"1", "true", "on", "yes"} else 0
 
 
 def serialize_savings_anniversary(transaction_date: object, amount_cents: int) -> str | None:
@@ -665,7 +674,7 @@ def decimal_to_micros(value: object) -> int:
 
 
 def build_transaction_occurrences(transaction: dict) -> list[dict]:
-    # spec: lancamentos v2.0 — regra de parcelamento/recorrencia (secao "Regras de negocio")
+    # spec: lancamentos v2.5 — regra de parcelamento/recorrencia (secao "Regras de negocio")
     # (parcelado: valor informado e o TOTAL, dividido entre as parcelas via split_cents;
     #  recorrente: cada ocorrencia mantem o valor informado integralmente — nao dividir)
     start_date = date.fromisoformat(transaction["date"])
@@ -903,7 +912,7 @@ def transaction_category_group(conn, user_id: int, transaction_type: str, destin
 
 
 def balance_delta(transaction_type: str, amount_cents: int, side: str) -> int:
-    # spec: lancamentos v2.0 — criterios 1-4
+    # spec: lancamentos v2.5 — criterios 1-4
     # (receita aumenta a conta de origem; despesa/investimento reduzem;
     #  transferencia/cambio reduzem na origem e aumentam no destino)
     if transaction_type == "income":
@@ -946,8 +955,8 @@ def upsert_investment_operation(conn, user_id: int, transaction_id: int, account
             quantity_micros, unit_price_cents, invested_amount_cents, brokerage_fee_cents,
             exchange_fee_cents, tax_cents, other_costs_cents, fixed_income_mode,
             fixed_income_indexer, fixed_income_rate_micros, fixed_income_maturity_date,
-            savings_anniversaries_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            emergency_reserve_eligible, savings_anniversaries_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(transaction_id) DO UPDATE SET
             account_id = excluded.account_id,
             asset_type = excluded.asset_type,
@@ -965,6 +974,7 @@ def upsert_investment_operation(conn, user_id: int, transaction_id: int, account
             fixed_income_indexer = excluded.fixed_income_indexer,
             fixed_income_rate_micros = excluded.fixed_income_rate_micros,
             fixed_income_maturity_date = excluded.fixed_income_maturity_date,
+            emergency_reserve_eligible = excluded.emergency_reserve_eligible,
             savings_anniversaries_json = excluded.savings_anniversaries_json,
             updated_at = CURRENT_TIMESTAMP
         """,
@@ -987,6 +997,7 @@ def upsert_investment_operation(conn, user_id: int, transaction_id: int, account
             operation["fixed_income_indexer"],
             operation["fixed_income_rate_micros"],
             operation["fixed_income_maturity_date"],
+            operation["emergency_reserve_eligible"],
             operation["savings_anniversaries_json"],
         ),
     )
@@ -1020,6 +1031,7 @@ def fetch_transaction(conn, user_id: int, transaction_id: int) -> dict:
                 investment_operations.fixed_income_indexer AS investment_fixed_income_indexer,
                 investment_operations.fixed_income_rate_micros AS investment_fixed_income_rate_micros,
                 investment_operations.fixed_income_maturity_date AS investment_fixed_income_maturity_date,
+                investment_operations.emergency_reserve_eligible AS investment_emergency_reserve_eligible,
                 investment_operations.savings_anniversaries_json AS investment_savings_anniversaries_json,
                 credit_card_payments.id AS credit_card_payment_id,
                 GROUP_CONCAT(tags.name, '||') AS tag_names
@@ -1090,6 +1102,7 @@ def extract_investment_operation(transaction: dict) -> dict | None:
         "fixed_income_indexer": transaction.pop("investment_fixed_income_indexer", None),
         "fixed_income_rate": micros_to_decimal(transaction.pop("investment_fixed_income_rate_micros", 0) or 0),
         "fixed_income_maturity_date": transaction.pop("investment_fixed_income_maturity_date", None),
+        "emergency_reserve_eligible": bool(transaction.pop("investment_emergency_reserve_eligible", 0) or 0),
         "savings_anniversaries": parse_savings_anniversaries(transaction.pop("investment_savings_anniversaries_json", None)),
     }
     if not asset_type:

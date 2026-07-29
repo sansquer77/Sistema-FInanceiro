@@ -62,6 +62,9 @@ export function registerTransactionsView({
     investmentFundFields,
     investmentFixedFields,
     investmentPricingFields,
+    investmentEmergencyReserveFields,
+    investmentTradingCostFields,
+    investmentTaxCostFields,
     investmentFixedIncomeMode,
     investmentFixedIncomeRateLabel,
     investmentFixedIncomeRateHint,
@@ -485,6 +488,9 @@ export function registerTransactionsView({
       }
     }
     transactionForm.elements.investment_fixed_income_mode.value = "";
+    if (transactionForm.elements.investment_emergency_reserve_eligible) {
+      transactionForm.elements.investment_emergency_reserve_eligible.checked = false;
+    }
     if (!operation) {
       updateInvestmentFieldState();
       return;
@@ -502,6 +508,9 @@ export function registerTransactionsView({
     transactionForm.elements.investment_fixed_income_indexer.value = operation.fixed_income_indexer || "";
     transactionForm.elements.investment_fixed_income_rate.value = decimalInputValue(operation.fixed_income_rate);
     transactionForm.elements.investment_fixed_income_maturity_date.value = operation.fixed_income_maturity_date || "";
+    if (transactionForm.elements.investment_emergency_reserve_eligible) {
+      transactionForm.elements.investment_emergency_reserve_eligible.checked = Boolean(operation.emergency_reserve_eligible);
+    }
     updateInvestmentFieldState();
   }
 
@@ -1117,9 +1126,19 @@ export function registerTransactionsView({
     const isInvestment = transactionType.value === "investment";
     const cat = transactionCategory.value;
     const isSavings = isInvestmentSavingsSelection();
+    const canBeEmergencyReserve = isInvestment && (cat === "Renda Fixa" || isSavings);
     investmentFundFields.hidden = !isInvestment || cat !== "Fundos de Investimentos";
     investmentFixedFields.hidden = !isInvestment || cat !== "Renda Fixa" || isSavings;
     investmentPricingFields.hidden = isInvestment && (cat === "Renda Fixa" || isSavings);
+    if (investmentTradingCostFields) {
+      investmentTradingCostFields.hidden = !isInvestment || isSavings;
+    }
+    if (investmentTaxCostFields) {
+      investmentTaxCostFields.hidden = !isInvestment || isSavings;
+    }
+    if (investmentEmergencyReserveFields) {
+      investmentEmergencyReserveFields.hidden = !canBeEmergencyReserve;
+    }
     for (const field of investmentOperationFields.querySelectorAll("input, select")) {
       field.disabled = !isInvestment;
     }
@@ -1131,6 +1150,24 @@ export function registerTransactionsView({
     }
     for (const field of investmentPricingFields.querySelectorAll("input, select")) {
       field.disabled = investmentPricingFields.hidden;
+    }
+    if (investmentTradingCostFields) {
+      for (const field of investmentTradingCostFields.querySelectorAll("input, select")) {
+        field.disabled = investmentTradingCostFields.hidden;
+      }
+    }
+    if (investmentTaxCostFields) {
+      for (const field of investmentTaxCostFields.querySelectorAll("input, select")) {
+        field.disabled = investmentTaxCostFields.hidden;
+      }
+    }
+    if (investmentEmergencyReserveFields) {
+      for (const field of investmentEmergencyReserveFields.querySelectorAll("input")) {
+        field.disabled = !canBeEmergencyReserve;
+        if (!canBeEmergencyReserve) {
+          field.checked = false;
+        }
+      }
     }
     syncInvestmentFixedIncomeRateHint();
     if (isSavings) {

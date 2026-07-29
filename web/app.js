@@ -308,6 +308,9 @@ const investmentAmount = document.querySelector("#investmentAmount");
 const investmentFundFields = document.querySelector("#investmentFundFields");
 const investmentFixedFields = document.querySelector("#investmentFixedFields");
 const investmentPricingFields = document.querySelector("#investmentPricingFields");
+const investmentEmergencyReserveFields = document.querySelector("#investmentEmergencyReserveFields");
+const investmentTradingCostFields = document.querySelector("#investmentTradingCostFields");
+const investmentTaxCostFields = document.querySelector("#investmentTaxCostFields");
 const investmentFixedIncomeMode = document.querySelector("#investmentFixedIncomeMode");
 const investmentFixedIncomeRateLabel = document.querySelector("#investmentFixedIncomeRateLabel");
 const investmentFixedIncomeRateHint = document.querySelector("#investmentFixedIncomeRateHint");
@@ -712,6 +715,9 @@ const transactionsView = registerTransactionsView({
     investmentFundFields,
     investmentFixedFields,
     investmentPricingFields,
+    investmentEmergencyReserveFields,
+    investmentTradingCostFields,
+    investmentTaxCostFields,
     investmentFixedIncomeMode,
     investmentFixedIncomeRateLabel,
     investmentFixedIncomeRateHint,

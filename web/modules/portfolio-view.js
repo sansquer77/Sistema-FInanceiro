@@ -229,12 +229,30 @@ export function registerPortfolioView({
   }
 
   async function redeemPortfolioPosition(position) {
-    const rawAmount = window.prompt("Valor do resgate", moneyInputValue(position.current_value));
-    if (rawAmount === null) {
-      return;
-    }
-    const rawDate = window.prompt("Data do resgate", todayLocalDateValue());
-    if (rawDate === null) {
+    const result = await decisionModal.form({
+      title: "Resgatar posição",
+      message: `${position.asset_name || position.asset_identifier || "Ativo"} · ${position.account_name || "Carteira"} (${position.currency || "BRL"})`,
+      fields: [
+        {
+          name: "date",
+          label: "Data do resgate",
+          type: "date",
+          value: todayLocalDateValue(),
+          required: true,
+        },
+        {
+          name: "amount",
+          label: `Valor do resgate (${position.currency || "BRL"})`,
+          type: "text",
+          inputMode: "decimal",
+          value: moneyInputValue(position.current_value),
+          required: true,
+          help: "Informe o valor que retornará para a conta da carteira.",
+        },
+      ],
+      primaryLabel: "Registrar resgate",
+    });
+    if (!result) {
       return;
     }
     setMessage(portfolioMessage, "Efetuando resgate...");
@@ -248,8 +266,8 @@ export function registerPortfolioView({
           asset_identifier: position.asset_identifier || "",
           asset_name: position.asset_name || "",
           cnpj: position.cnpj || "",
-          amount: rawAmount,
-          date: rawDate,
+          amount: result.amount,
+          date: result.date,
         },
       });
       state.portfolio = response;
@@ -440,7 +458,8 @@ export function registerPortfolioView({
     const chartTotal = portfolioGroupChartTotal(rows);
     container.innerHTML = rows.map((row, index) => {
       const chartValue = Number(row.chart_current_brl || row.current_brl || 0);
-      const result = Number(row.result_brl);
+      const currentValue = Number(row.current_brl || 0);
+      const result = Number(row.result_brl || 0);
       const currency = row.currency || "BRL";
       const percent = chartTotal > 0 ? chartValue / chartTotal : 0;
       return `
@@ -450,7 +469,7 @@ export function registerPortfolioView({
             <span>${row.count} posição(ões)</span>
           </div>
           <div class="portfolio-group-value">
-            <strong>${formatMoney(row.current_brl, currency)}</strong>
+            <strong>${formatMoney(currentValue, currency)}</strong>
             <span class="${result < 0 ? "danger-text" : "positive-text"}">${formatMoney(row.result_brl, currency)} · ${Number(row.result_percent).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%</span>
           </div>
           <div class="report-bar"><span style="width:${Math.max(percent * 100, 2)}%; background:${chartColor(index)}"></span></div>
@@ -575,8 +594,8 @@ export function registerPortfolioView({
   }
 
   function portfolioGroupHeader(group, collapsed) {
-    const currentValue = group.positions.reduce((total, position) => total + Number(position.current_value_brl || 0), 0);
-    const totalCost = group.positions.reduce((total, position) => total + Number(position.total_cost_brl || 0), 0);
+    const currentValue = group.positions.reduce((total, position) => total + Number(position.current_value || 0), 0);
+    const totalCost = group.positions.reduce((total, position) => total + Number(position.total_cost || 0), 0);
     const result = currentValue - totalCost;
     const resultPercent = totalCost > 0 ? result / totalCost : 0;
     const groupKind = state.portfolioGroup === "account_name" ? "Carteira" : "Grupo";
@@ -802,10 +821,10 @@ export function registerPortfolioView({
   }
 
   function portfolioPositionRow(position, options = {}) {
-    const result = Number(position.current_value_brl || 0) - Number(position.total_cost_brl || 0);
-    const resultPercent = Number(position.total_cost_brl) > 0 ? result / Number(position.total_cost_brl) : 0;
-    const dayResult = Number(position.day_result_brl || 0);
-    const dayBase = Number(position.current_value_brl || 0) - dayResult;
+    const result = Number(position.current_value || 0) - Number(position.total_cost || 0);
+    const resultPercent = Number(position.total_cost) > 0 ? result / Number(position.total_cost) : 0;
+    const dayResult = Number(position.day_result || 0);
+    const dayBase = Number(position.current_value || 0) - dayResult;
     const dayPercent = dayBase > 0 ? dayResult / dayBase : 0;
     const quoteStatus = position.quote_status === "ok" ? position.quote_source : position.quote_status;
     const quoteText = portfolioQuoteText(position);
@@ -863,7 +882,7 @@ export function registerPortfolioView({
         <td class="money-cell">${formatMoney(position.total_cost, position.currency)}${portfolioSecondaryMoney(position.total_cost, position.total_cost_brl, position.currency)}</td>
         <td class="money-cell portfolio-quote-cell"><span class="portfolio-primary">${quoteText}</span><span title="${escapeHtml(quoteStatusLabel)}">${escapeHtml(quoteStatusLabel)}</span></td>
         <td class="money-cell">${formatMoney(position.current_value_cents / 100, position.currency)}${valueDetail}</td>
-        <td class="money-cell ${dayResult < 0 ? "danger-text" : "positive-text"}">${formatMoney(position.day_result_brl, position.currency)}<span>${formatPercent(dayPercent)}</span></td>
+        <td class="money-cell ${dayResult < 0 ? "danger-text" : "positive-text"}">${formatMoney(dayResult, position.currency)}<span>${formatPercent(dayPercent)}</span></td>
         <td class="money-cell ${result < 0 ? "danger-text" : "positive-text"}">${formatMoney(result, position.currency)}<span>${formatPercent(resultPercent)}</span></td>
         <td><div class="portfolio-actions">${redeemAction}${valueAction}${closeAction}${actions}</div></td>
       </tr>
@@ -1052,12 +1071,30 @@ export function registerPortfolioView({
   }
 
   async function editPortfolioCurrentValue(position) {
-    const rawAmount = window.prompt("Valor atual da posição", moneyInputValue(position.current_value));
-    if (rawAmount === null) {
-      return;
-    }
-    const rawDate = window.prompt("Data da atualização", todayLocalDateValue());
-    if (rawDate === null) {
+    const result = await decisionModal.form({
+      title: "Atualizar valor atual",
+      message: `${position.asset_name || position.asset_identifier || "Ativo"} · ${position.account_name || "Carteira"} (${position.currency || "BRL"})`,
+      fields: [
+        {
+          name: "quote_date",
+          label: "Data da atualização",
+          type: "date",
+          value: todayLocalDateValue(),
+          required: true,
+        },
+        {
+          name: "current_value",
+          label: `Valor atual (${position.currency || "BRL"})`,
+          type: "text",
+          inputMode: "decimal",
+          value: moneyInputValue(position.current_value),
+          required: true,
+          help: "Use o valor total atual da posição informado pela instituição.",
+        },
+      ],
+      primaryLabel: "Atualizar valor",
+    });
+    if (!result) {
       return;
     }
     setMessage(portfolioMessage, "Atualizando valor atual...");
@@ -1066,8 +1103,8 @@ export function registerPortfolioView({
         method: "PUT",
         body: {
           ...position,
-          current_value: rawAmount,
-          quote_date: rawDate,
+          current_value: result.current_value,
+          quote_date: result.quote_date,
         },
       });
       state.portfolio = response;

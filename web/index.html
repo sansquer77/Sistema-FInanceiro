@@ -670,7 +670,12 @@
                       <input name="investment_unit_price" id="investmentUnitPrice" type="text" inputmode="decimal" placeholder="0,00">
                     </label>
                   </div>
-                  <div class="field-row">
+                  <div class="field-row" id="investmentEmergencyReserveFields" hidden>
+                    <label class="checkbox-label compact-checkbox">Usar este aporte como reserva de emergência
+                      <input name="investment_emergency_reserve_eligible" type="checkbox" value="1">
+                    </label>
+                  </div>
+                  <div class="field-row" id="investmentTradingCostFields">
                     <label>Tx. corretagem
                       <input name="investment_brokerage_fee" type="text" inputmode="decimal" placeholder="0,00">
                     </label>
@@ -678,7 +683,7 @@
                       <input name="investment_exchange_fee" type="text" inputmode="decimal" placeholder="0,00">
                     </label>
                   </div>
-                  <div class="field-row">
+                  <div class="field-row" id="investmentTaxCostFields">
                     <label>Impostos
                       <input name="investment_tax" type="text" inputmode="decimal" placeholder="0,00">
                     </label>

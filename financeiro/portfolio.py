@@ -104,7 +104,6 @@ def get_portfolio(user_id: int, force_refresh: bool = False) -> dict:
                 'operation' AS source_type,
                 investment_operations.id AS source_id,
                 1 AS apply_tax_estimate,
-                0 AS emergency_reserve_eligible,
                 transactions.date,
                 transactions.description,
                 transactions.amount_cents,
@@ -714,7 +713,6 @@ def current_portfolio_positions(user_id: int, force_refresh: bool = False) -> li
             SELECT investment_operations.*, 'operation' AS source_type, investment_operations.id AS source_id,
                 1 AS apply_tax_estimate, transactions.date, transactions.description, transactions.amount_cents,
                 transactions.exchange_rate_micros, transactions.amount_brl_cents,
-                0 AS emergency_reserve_eligible,
                 checking_accounts.name AS account_name, checking_accounts.currency AS account_currency
             FROM investment_operations
             JOIN transactions ON transactions.id = investment_operations.transaction_id
@@ -952,7 +950,7 @@ def normalize_opening_position_payload(data: dict) -> dict:
 
 
 def normalize_emergency_reserve_eligible(data: dict, asset_type: str) -> int:
-    # spec: investimentos/investimentos-portfolio v2.1 — critérios 16 e 17
+    # spec: investimentos/investimentos-portfolio v2.6 — critérios 20 e 21
     if asset_type not in {"fixed_income", "savings"}:
         return 0
     return 1 if str(data.get("emergency_reserve_eligible") or "").strip().lower() in {"1", "true", "on", "yes"} else 0

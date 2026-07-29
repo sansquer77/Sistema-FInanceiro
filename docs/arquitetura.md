@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 2.1
+versao: 2.2
 atualizado: 2026-07-29
 relacionados:
   - "[[requisitos]]"
@@ -269,7 +269,7 @@ Conexões SQLite são abertas com `journal_mode=WAL`, `busy_timeout` curto e `fo
 | `credit_card_transaction_tags` | `credit_cards.py` — Ver [[cartoes]]. |
 | `spending_limits` | `spending_limits.py` — Ver [[limites-gastos]]. |
 | `investment_opening_positions` | `portfolio.py` — inclui `emergency_reserve_eligible` para reserva de emergência explícita. Ver [[investimentos-portfolio]]. |
-| `investment_operations` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
+| `investment_operations` | `transactions.py` grava aportes e `portfolio.py` consolida; inclui `emergency_reserve_eligible` para reserva de emergência explícita em aportes. Ver [[investimentos-portfolio]]. |
 | `investment_redemptions` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
 | `investment_closed_positions` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
 | `investment_value_overrides` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
@@ -426,6 +426,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `2.2` — 2026-07-29 — Documentado metadado `emergency_reserve_eligible` também em `investment_operations`, permitindo marcar aportes de Renda Fixa/Poupança como reserva de emergência.
 - `2.1` — 2026-07-29 — Documentadas rotas do Score de Saúde Financeira (`/api/financial-health-score` e `/api/financial-health-score/history`) e a validação de `months` (1-36) no histórico; descrição de `financial_health.py` atualizada para incluir função de histórico.
 - `2.0` — 2026-07-28 — Documentado módulo `financial_health.py` como núcleo analítico do Score de Saúde Financeira.
 - `1.9` — 2026-07-28 — Documentado metadado `emergency_reserve_eligible` em posições iniciais do Portfólio para suporte ao Score de Saúde Financeira.

@@ -2,7 +2,7 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 2.3
+versao: 2.5
 atualizado: 2026-07-29
 relacionados:
   - "[[contas-correntes]]"
@@ -94,6 +94,8 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 - Orientações extensas de renda fixa no formulário de investimento devem ficar em helper contextual acionado por ícone discreto, não como texto sempre visível entre campos.
 - O formulário de Lançamentos de Contas deve exibir ação `Cancelar` também durante novo cadastro, permitindo limpar a entrada atual e retornar ao estado inicial sem depender de salvar ou navegar.
 - No formulário de investimento, subcategorias de Poupança devem ser exibidas no combo apenas como `Poupança`, mesmo que o nome técnico/histórico da subcategoria contenha observações antigas; o valor interno deve ser preservado para não alterar históricos.
+- No formulário de investimento de Lançamentos de Contas, aportes de Renda Fixa ou Poupança devem exibir marcador compacto `Usar este aporte como reserva de emergência`, persistindo essa decisão na operação de investimento. A marcação não aparece nem é enviada para outros tipos de ativo.
+- O formulário de investimento deve se adaptar ao ativo selecionado para reduzir dúvidas: quando o aporte for Poupança, campos de quantidade, preço unitário, renda fixa, CNPJ, corretagem, emolumentos, impostos e outros custos ficam ocultos/desabilitados, pois não são aplicáveis.
 
 ## API e dados
 
@@ -138,9 +140,13 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dado o tipo Investimento com categoria Renda Fixa selecionado, quando o usuário aciona o ícone de ajuda, então vê orientação contextual para pré-fixada, pós-fixada e híbrida sem alterar o alinhamento dos campos.
 - Dado um novo lançamento de conta em preenchimento, quando o usuário aciona `Cancelar`, então o formulário é limpo e volta ao estado inicial sem criar lançamento.
 - Dado o tipo Investimento com subcategoria de Poupança cadastrada com texto complementar antigo, quando o combo de subcategoria é exibido, então a opção aparece como `Poupança`, preservando o valor interno original.
+- Dado um aporte de Renda Fixa ou Poupança criado em Lançamentos de Contas, quando o usuário marca `Usar este aporte como reserva de emergência` e salva, então a operação de investimento fica marcada como reserva e a opção volta preenchida ao editar o lançamento.
+- Dado o tipo Investimento com subcategoria Poupança selecionada, quando o formulário é exibido, então apenas campos aplicáveis à Poupança permanecem visíveis, ocultando/desabilitando quantidade, preço unitário, renda fixa, CNPJ, corretagem, emolumentos, impostos e outros custos.
 
 ## Changelog
 
+- `2.5` — 2026-07-29 — Formulário de investimento em Lançamentos de Contas passa a ocultar campos não aplicáveis a aportes de Poupança.
+- `2.4` — 2026-07-29 — Aportes de Renda Fixa e Poupança em Lançamentos de Contas passam a expor marcador de reserva de emergência.
 - `2.3` — 2026-07-29 — Formulário de Lançamentos passa a exibir `Cancelar` também em novo cadastro e simplifica a exibição de subcategorias de Poupança no combo.
 - `2.2` — 2026-07-26 — Orientações extensas de renda fixa passam para helper contextual acionado por ícone no formulário de investimento.
 - `2.1` — 2026-07-26 — Blocos condicionais de investimento/renda fixa no formulário passam a separar dicas de campos para preservar alinhamento e altura dos controles.
