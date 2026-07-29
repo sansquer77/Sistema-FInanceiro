@@ -1,11 +1,18 @@
 from __future__ import annotations
 
 import json
+import tempfile
 import unittest
+from pathlib import Path
+from unittest import mock
 
+from financeiro import database
+from financeiro.auth import create_user
+from financeiro.database import initialize_database
 from financeiro.financial_health import (
     FinancialHealthError,
     calculate_debt_pillar,
+    calculate_financial_health_score,
     calculate_financial_health_score_history,
     calculate_financial_peace,
     calculate_limits_pillar,
@@ -45,14 +52,14 @@ class FinancialHealthCalculationTest(unittest.TestCase):
         self.assertEqual(pillar["score"], 150)
 
     def test_limits_score_uses_share_inside_limit(self) -> None:
-        # spec: score-saude-financeira v1.4 — critério 5
+        # spec: score-saude-financeira v1.9 — critério 5
         pillar = calculate_limits_pillar(3, 2)
 
         self.assertEqual(pillar["score"], 100)
         self.assertEqual(pillar["aderencia_pct"], 66.67)
 
     def test_limits_score_is_zero_when_no_limits_defined(self) -> None:
-        # spec: score-saude-financeira v1.4 — critério 6
+        # spec: score-saude-financeira v1.9 — critério 6
         pillar = calculate_limits_pillar(0, 0)
 
         self.assertEqual(pillar["score"], 0)
@@ -60,6 +67,7 @@ class FinancialHealthCalculationTest(unittest.TestCase):
         self.assertIn("não cadastrou limites", pillar["mensagem"])
 
     def test_portfolio_concentration_penalizes_high_class_and_savings(self) -> None:
+        # spec: score-saude-financeira v1.9 — critérios 7 e 9
         pillar = calculate_portfolio_concentration_pillar([
             {"asset_type": "fixed_income", "asset_name": "CDB", "current_value_brl_cents": 500_000},
             {"asset_type": "savings", "asset_name": "Poupança", "current_value_brl_cents": 300_000},
@@ -70,8 +78,35 @@ class FinancialHealthCalculationTest(unittest.TestCase):
         self.assertIn("Poupança representa", pillar["mensagem"])
         self.assertEqual(pillar["concentracao_poupanca_pct"], 30.0)
 
+    def test_portfolio_concentration_explains_high_fixed_income_without_prescription(self) -> None:
+        # spec: score-saude-financeira v1.9 — critério 7
+        pillar = calculate_portfolio_concentration_pillar([
+            {"asset_type": "fixed_income", "asset_name": "CDB 1", "current_value_brl_cents": 400_000},
+            {"asset_type": "fixed_income", "asset_name": "CDB 2", "current_value_brl_cents": 400_000},
+            {"asset_type": "stock", "asset_name": "PETR4", "current_value_brl_cents": 200_000},
+        ])
+
+        self.assertLess(pillar["score"], 150)
+        self.assertEqual(pillar["maior_concentracao_pct"], 80.0)
+        self.assertIn("Renda Fixa", pillar["mensagem"])
+        self.assertNotIn("compre", pillar["mensagem"].lower())
+        self.assertNotIn("venda", pillar["mensagem"].lower())
+
+    def test_portfolio_concentration_explains_high_single_asset_without_prescription(self) -> None:
+        # spec: score-saude-financeira v1.9 — critério 8
+        pillar = calculate_portfolio_concentration_pillar([
+            {"asset_type": "fixed_income", "asset_name": "CDB", "current_value_brl_cents": 650_000},
+            {"asset_type": "stock", "asset_name": "PETR4", "current_value_brl_cents": 350_000},
+        ])
+
+        self.assertLess(pillar["score"], 150)
+        self.assertEqual(pillar["maior_concentracao_pct"], 65.0)
+        self.assertIn("CDB", pillar["mensagem"])
+        self.assertNotIn("compre", pillar["mensagem"].lower())
+        self.assertNotIn("venda", pillar["mensagem"].lower())
+
     def test_financial_peace_uses_recurring_income_or_month_fallback(self) -> None:
-        # spec: score-saude-financeira v1.3 — critérios 9 e 10
+        # spec: score-saude-financeira v1.9 — critérios 9 e 10
         recurring = calculate_financial_peace(1_000_000, 800_000)
         fallback = calculate_financial_peace(0, 800_000)
 
@@ -100,7 +135,7 @@ class FinancialHealthCalculationTest(unittest.TestCase):
         self.assertIn("Taxa de Poupança", encoded)
 
     def test_pillars_return_neutral_scores_when_denominator_is_zero(self) -> None:
-        # spec: score-saude-financeira v1.2 — critério 4
+        # spec: score-saude-financeira v1.9 — critério 4
         savings = calculate_savings_pillar(0, 0)
         reserve = calculate_reserve_pillar(0, 0)
         debt = calculate_debt_pillar(0, 0)
@@ -118,7 +153,7 @@ class FinancialHealthCalculationTest(unittest.TestCase):
         self.assertTrue(debt["dados_insuficientes"])
 
     def test_score_history_rejects_months_out_of_bounds(self) -> None:
-        # spec: score-saude-financeira v1.5 — critérios 12 e 13
+        # spec: score-saude-financeira v1.9 — critérios 13 e 14
         with self.assertRaises(FinancialHealthError) as context:
             calculate_financial_health_score_history(1, 1000)
         self.assertIn("entre 1 e 36", str(context.exception.message))
@@ -130,6 +165,102 @@ class FinancialHealthCalculationTest(unittest.TestCase):
         with self.assertRaises(FinancialHealthError) as context:
             calculate_financial_health_score_history(1, "abc")
         self.assertIn("entre 1 e 36", str(context.exception.message))
+
+        with self.assertRaises(FinancialHealthError) as context:
+            calculate_financial_health_score_history(1, None)
+        self.assertIn("deve ser informado", str(context.exception.message))
+
+
+class FinancialHealthDatabaseIntegrationTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.original_data_dir = database.DATA_DIR
+        self.original_db_path = database.DB_PATH
+        database.DATA_DIR = Path(self.tempdir.name)
+        database.DB_PATH = database.DATA_DIR / "test-finance.db"
+        initialize_database()
+
+    def tearDown(self) -> None:
+        database.DATA_DIR = self.original_data_dir
+        database.DB_PATH = self.original_db_path
+        self.tempdir.cleanup()
+
+    def test_score_payload_uses_database_facts_and_is_json_serializable(self) -> None:
+        # spec: score-saude-financeira v1.9 — critérios 1, 2, 5, 6, 9, 10 e 12
+        user = create_user("Alice", "alice@example.com", "strong-password")
+        with database.get_connection() as conn:
+            account_id = conn.execute(
+                """
+                INSERT INTO checking_accounts (
+                    user_id, name, bank_name, account_type, currency,
+                    initial_balance_cents, current_balance_cents
+                ) VALUES (?, 'Conta', 'Banco', 'liquidity', 'BRL', 0, 0)
+                """,
+                (user["id"],),
+            ).lastrowid
+            category_id = conn.execute(
+                "INSERT INTO categories (user_id, name, group_type) VALUES (?, 'Mercado', 'expense')",
+                (user["id"],),
+            ).lastrowid
+            card_id = conn.execute(
+                """
+                INSERT INTO credit_cards (
+                    user_id, name, issuer, currency, limit_cents, closing_day, due_day
+                ) VALUES (?, 'Cartão', 'Banco', 'BRL', 500000, 10, 20)
+                """,
+                (user["id"],),
+            ).lastrowid
+            conn.executemany(
+                """
+                INSERT INTO transactions (
+                    user_id, type, description, normalized_description, amount_cents,
+                    amount_brl_cents, date, account_id, category_id, series_kind
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    (user["id"], "income", "Salário", "salario", 1_000_000, 1_000_000, "2026-07-05", account_id, None, "recurring"),
+                    (user["id"], "expense", "Mercado maio", "mercado maio", 500_000, 500_000, "2026-05-10", account_id, category_id, "single"),
+                    (user["id"], "expense", "Mercado junho", "mercado junho", 500_000, 500_000, "2026-06-10", account_id, category_id, "single"),
+                    (user["id"], "expense", "Mercado julho", "mercado julho", 200_000, 200_000, "2026-07-10", account_id, category_id, "single"),
+                ],
+            )
+            conn.execute(
+                """
+                INSERT INTO credit_card_transactions (
+                    user_id, credit_card_id, type, description, normalized_description,
+                    amount_cents, date, invoice_month, series_kind, installment_index,
+                    installment_count, category_id
+                ) VALUES (?, ?, 'expense', 'Parcela', 'parcela', 300000, '2026-07-12', '2026-07', 'installment', 1, 10, ?)
+                """,
+                (user["id"], card_id, category_id),
+            )
+            conn.execute(
+                """
+                INSERT INTO spending_limits (user_id, month, category_id, limit_amount_cents)
+                VALUES (?, '2026-07', ?, 600000)
+                """,
+                (user["id"], category_id),
+            )
+
+        with mock.patch(
+            "financeiro.financial_health.current_portfolio_positions",
+            return_value=[
+                {"asset_type": "fixed_income", "asset_name": "CDB", "current_value_brl_cents": 3_000_000, "emergency_reserve_eligible": True},
+                {"asset_type": "stock", "asset_name": "PETR4", "current_value_brl_cents": 1_000_000, "emergency_reserve_eligible": False},
+            ],
+        ):
+            payload = calculate_financial_health_score(user["id"], "2026-07")
+
+        self.assertEqual(payload["receitas_cents"], 1_000_000)
+        self.assertEqual(payload["despesas_consumo_cents"], 500_000)
+        self.assertEqual(payload["reserva_elegivel_cents"], 3_000_000)
+        self.assertEqual(payload["meses_reserva"], 6.0)
+        self.assertEqual(payload["dividas_parcelas_mes_cents"], 300_000)
+        self.assertEqual(payload["comprometimento_divida_mes_pct"], 30.0)
+        self.assertEqual(payload["pilar_limites"], 150)
+        self.assertEqual(payload["paz_financeira_base_receita_cents"], 1_000_000)
+        self.assertEqual(len(payload["pilares"]), 5)
+        json.dumps(payload, ensure_ascii=False)
 
 
 if __name__ == "__main__":

@@ -72,6 +72,11 @@ from financeiro.credit_cards import (
 )
 from financeiro.database import initialize_database
 from financeiro.database import get_connection
+from financeiro.financial_health import (
+    FinancialHealthError,
+    calculate_financial_health_score,
+    calculate_financial_health_score_history,
+)
 from financeiro.imports import import_organizze_transactions, import_system_template, system_import_template
 from financeiro.operation_logs import create_operation_log, get_operation_log, list_operation_logs
 from financeiro.portfolio import close_position, create_opening_position, delete_opening_position, get_portfolio, redeem_position, update_opening_position, update_position_value_override
@@ -265,6 +270,12 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/cockpit":
             self.handle_cockpit()
+            return
+        if path == "/api/financial-health-score":
+            self.handle_financial_health_score()
+            return
+        if path == "/api/financial-health-score/history":
+            self.handle_financial_health_score_history()
             return
         if path == "/api/portfolio":
             self.handle_portfolio()
@@ -576,6 +587,30 @@ class AppHandler(BaseHTTPRequestHandler):
         transactions = list_transactions(user["id"], month=month)
         card_transactions = list_credit_card_transactions(user["id"], invoice_month=month)
         self.send_json(cockpit_payload([*transactions, *card_transactions]))
+
+    def handle_financial_health_score(self) -> None:
+        # spec: score-saude-financeira v1.9 — critério 12
+        if not self.validate_read_source():
+            return
+        user = self.require_user()
+        query = parse_qs(urlsplit(self.path).query)
+        month = (query.get("month") or [date.today().strftime("%Y-%m")])[0]
+        try:
+            self.send_json(calculate_financial_health_score(user["id"], month))
+        except FinancialHealthError as exc:
+            self.send_json({"error": exc.message}, exc.status)
+
+    def handle_financial_health_score_history(self) -> None:
+        # spec: score-saude-financeira v1.9 — critérios 13 e 14
+        if not self.validate_read_source():
+            return
+        user = self.require_user()
+        query = parse_qs(urlsplit(self.path).query)
+        months = (query.get("months") or [None])[0]
+        try:
+            self.send_json({"history": calculate_financial_health_score_history(user["id"], months)})
+        except FinancialHealthError as exc:
+            self.send_json({"error": exc.message}, exc.status)
 
     def handle_exchange_rate(self) -> None:
         self.require_user()
@@ -1203,6 +1238,16 @@ class AppHandler(BaseHTTPRequestHandler):
             return False
         origin = self.headers.get("Origin")
         if not origin or not self.is_allowed_origin(origin):
+            self.send_json({"error": "Origem da requisicao nao permitida."}, HTTPStatus.FORBIDDEN)
+            return False
+        return True
+
+    def validate_read_source(self) -> bool:
+        if not self.is_allowed_host(self.headers.get("Host", "")):
+            self.send_json({"error": "Origem da requisicao nao permitida."}, HTTPStatus.FORBIDDEN)
+            return False
+        origin = self.headers.get("Origin")
+        if origin and not self.is_allowed_origin(origin):
             self.send_json({"error": "Origem da requisicao nao permitida."}, HTTPStatus.FORBIDDEN)
             return False
         return True

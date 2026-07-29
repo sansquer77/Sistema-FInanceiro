@@ -256,6 +256,23 @@
               <div class="chart-panel" id="cashDistributionChart"></div>
             </section>
           </div>
+
+          <section class="panel financial-health-panel" id="financialHealthPanel">
+            <div class="financial-health-header">
+              <div>
+                <h2>Saúde Financeira</h2>
+                <p class="muted-copy">Diagnóstico mensal baseado em poupança, reserva, endividamento, limites e concentração da carteira.</p>
+              </div>
+              <div class="month-navigator financial-health-month">
+                <button class="ghost small-button" type="button" id="previousFinancialHealthMonthButton" aria-label="Mês anterior">&lt;</button>
+                <button class="month-label" type="button" id="financialHealthMonthLabel" aria-haspopup="dialog"></button>
+                <button class="ghost small-button" type="button" id="nextFinancialHealthMonthButton" aria-label="Próximo mês">&gt;</button>
+              </div>
+            </div>
+            <div class="financial-health-content" id="financialHealthContent">
+              <div class="empty-state compact">Carregando score de saúde financeira...</div>
+            </div>
+          </section>
         </section>
 
         <section class="module-view" id="accountsView" hidden>

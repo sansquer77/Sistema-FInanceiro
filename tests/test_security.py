@@ -474,6 +474,66 @@ class RequestSourceProtectionTest(unittest.TestCase):
         handler = object.__new__(app.AppHandler)
         self.assertFalse(handler.is_allowed_host("sistema-financeiro.localhost:not-a-port"))
 
+    def test_read_source_accepts_allowed_host_without_origin(self) -> None:
+        handler = object.__new__(app.AppHandler)
+        handler.headers = {"Host": "sistema-financeiro.localhost:8020"}
+        handler.send_json = mock.Mock()
+        with (
+            mock.patch.object(app, "PORT", 8020),
+            mock.patch.object(app, "PUBLIC_URL", "http://sistema-financeiro.localhost:8020"),
+        ):
+            self.assertTrue(handler.validate_read_source())
+        handler.send_json.assert_not_called()
+
+    def test_read_source_rejects_unknown_origin(self) -> None:
+        handler = object.__new__(app.AppHandler)
+        handler.headers = {
+            "Host": "sistema-financeiro.localhost:8020",
+            "Origin": "http://evil.example:8020",
+        }
+        handler.send_json = mock.Mock()
+        with (
+            mock.patch.object(app, "PORT", 8020),
+            mock.patch.object(app, "PUBLIC_URL", "http://sistema-financeiro.localhost:8020"),
+        ):
+            self.assertFalse(handler.validate_read_source())
+        handler.send_json.assert_called_once_with(
+            {"error": "Origem da requisicao nao permitida."}, HTTPStatus.FORBIDDEN
+        )
+
+
+class FinancialHealthRouteTest(IsolatedDatabaseTest):
+    def test_financial_health_score_requires_session_user(self) -> None:
+        handler = object.__new__(app.AppHandler)
+        handler.headers = {"Host": "sistema-financeiro.localhost:8020"}
+        handler.path = "/api/financial-health-score?month=2026-07"
+        handler.send_json = mock.Mock()
+        with (
+            mock.patch.object(app, "PORT", 8020),
+            mock.patch.object(app, "PUBLIC_URL", "http://sistema-financeiro.localhost:8020"),
+            mock.patch.object(app.AppHandler, "get_cookie", return_value=None),
+        ):
+            with self.assertRaises(app.ApiError) as error:
+                handler.handle_financial_health_score()
+        self.assertEqual(error.exception.status, HTTPStatus.UNAUTHORIZED)
+
+    def test_financial_health_history_invalid_months_returns_bad_request(self) -> None:
+        user = create_user("Alice", "alice@example.com", "strong-password")
+        handler = object.__new__(app.AppHandler)
+        handler.headers = {"Host": "sistema-financeiro.localhost:8020"}
+        handler.path = "/api/financial-health-score/history?months=1000"
+        handler.send_json = mock.Mock()
+        with (
+            mock.patch.object(app, "PORT", 8020),
+            mock.patch.object(app, "PUBLIC_URL", "http://sistema-financeiro.localhost:8020"),
+            mock.patch.object(app.AppHandler, "require_user", return_value=user),
+        ):
+            handler.handle_financial_health_score_history()
+        handler.send_json.assert_called_once_with(
+            {"error": "O parametro months deve estar entre 1 e 36."},
+            HTTPStatus.BAD_REQUEST,
+        )
+
 
 class JsonBodyLimitTest(unittest.TestCase):
     def test_read_json_rejects_invalid_content_length(self) -> None:

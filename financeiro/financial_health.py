@@ -104,8 +104,10 @@ def calculate_financial_health_score(user_id: int, month: object | None = None) 
 
 
 def calculate_financial_health_score_history(user_id: int, months: object | None = None) -> list[dict]:
-    # spec: score-saude-financeira v1.5 — critérios 12 e 13
-    raw_months = 6 if months is None else months
+    # spec: score-saude-financeira v1.9 — critérios 12, 13 e 14
+    raw_months = str(months or "").strip()
+    if not raw_months:
+        raise FinancialHealthError("O parametro months deve ser informado com valor entre 1 e 36.")
     try:
         months_count = int(raw_months)
     except (ValueError, TypeError):
@@ -126,7 +128,7 @@ def calculate_financial_health_score_history(user_id: int, months: object | None
 
 
 def calculate_savings_pillar(income_cents: int, consumption_expenses_cents: int) -> dict:
-    # spec: score-saude-financeira v1.5 — critérios 1 e 4
+    # spec: score-saude-financeira v1.9 — critérios 1 e 4
     if income_cents <= 0:
         return pillar_result(
             "poupanca",
@@ -147,7 +149,7 @@ def calculate_savings_pillar(income_cents: int, consumption_expenses_cents: int)
 
 
 def calculate_reserve_pillar(eligible_reserve_cents: int, average_monthly_expenses_cents: int) -> dict:
-    # spec: score-saude-financeira v1.5 — critérios 2, 3 e 4
+    # spec: score-saude-financeira v1.9 — critérios 2, 3 e 4
     if average_monthly_expenses_cents <= 0:
         return pillar_result(
             "reserva",
@@ -169,7 +171,7 @@ def calculate_reserve_pillar(eligible_reserve_cents: int, average_monthly_expens
 
 
 def calculate_debt_pillar(month_installments_cents: int, income_cents: int) -> dict:
-    # spec: score-saude-financeira v1.5 — critérios 4 e 6
+    # spec: score-saude-financeira v1.9 — critérios 4 e 6
     if income_cents <= 0:
         return pillar_result(
             "endividamento",
@@ -194,7 +196,7 @@ def calculate_debt_pillar(month_installments_cents: int, income_cents: int) -> d
 
 
 def calculate_limits_pillar(total_limits: int, within_limits: int) -> dict:
-    # spec: score-saude-financeira v1.5 — critérios 5 e 6
+    # spec: score-saude-financeira v1.9 — critérios 5 e 6
     if total_limits <= 0:
         return pillar_result(
             "limites",
@@ -217,7 +219,7 @@ def calculate_limits_pillar(total_limits: int, within_limits: int) -> dict:
 
 
 def calculate_portfolio_concentration_pillar(positions: list[dict]) -> dict:
-    # spec: score-saude-financeira v1.5 — critérios 7 e 8
+    # spec: score-saude-financeira v1.9 — critérios 7, 8 e 9
     totals_by_class: dict[str, int] = {}
     totals_by_asset: dict[str, int] = {}
     total_cents = 0
@@ -244,17 +246,21 @@ def calculate_portfolio_concentration_pillar(positions: list[dict]) -> dict:
         )
     largest_class_cents = max(totals_by_class.values(), default=0)
     largest_asset_cents = max(totals_by_asset.values(), default=0)
-    largest_ratio = Decimal(max(largest_class_cents, largest_asset_cents)) / Decimal(total_cents)
+    class_ratio = Decimal(largest_class_cents) / Decimal(total_cents)
+    asset_ratio = Decimal(largest_asset_cents) / Decimal(total_cents)
     savings_ratio = Decimal(savings_cents) / Decimal(total_cents)
     score = PILLAR_PORTFOLIO_CONCENTRATION_MAX
-    if largest_ratio > Decimal("0.70"):
-        excess = min(Decimal("0.30"), largest_ratio - Decimal("0.70"))
+    if class_ratio > Decimal("0.70"):
+        excess = min(Decimal("0.30"), class_ratio - Decimal("0.70"))
         score -= int((excess / Decimal("0.30") * Decimal("60")).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    if asset_ratio > Decimal("0.60"):
+        excess = min(Decimal("0.40"), asset_ratio - Decimal("0.60"))
+        score -= int((excess / Decimal("0.40") * Decimal("40")).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
     if savings_ratio > Decimal("0.25"):
         excess = min(Decimal("0.75"), savings_ratio - Decimal("0.25"))
         score -= int((excess / Decimal("0.75") * Decimal("40")).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
     message = "Carteira cadastrada sem concentração elevada pelos limites objetivos definidos."
-    if largest_ratio > Decimal("0.70"):
+    if class_ratio > Decimal("0.70") or asset_ratio > Decimal("0.60"):
         label, cents = largest_concentration_label(totals_by_class, totals_by_asset)
         message = f"Você tem alta concentração do portfólio em {label} ({percent(Decimal(cents) / Decimal(total_cents))}%)."
     if savings_ratio > Decimal("0.25"):
@@ -262,14 +268,14 @@ def calculate_portfolio_concentration_pillar(positions: list[dict]) -> dict:
     return pillar_result(
         "concentracao_portfolio",
         clamp_score(score, PILLAR_PORTFOLIO_CONCENTRATION_MAX),
-        maior_concentracao_pct=percent(largest_ratio),
+        maior_concentracao_pct=percent(max(class_ratio, asset_ratio)),
         concentracao_poupanca_pct=percent(savings_ratio),
         mensagem=message,
     )
 
 
 def calculate_financial_peace(recurring_income_cents: int, month_income_cents: int) -> dict:
-    # spec: score-saude-financeira v1.5 — critérios 9 e 10
+    # spec: score-saude-financeira v1.9 — critérios 9 e 10
     base = max(0, recurring_income_cents)
     confidence = "alta"
     notice = "Base calculada por receitas recorrentes mensais."
@@ -370,7 +376,7 @@ def emergency_reserve_cents_from_positions(positions: list[dict]) -> int:
 
 
 def fetch_debt_context(conn, user_id: int, month: str) -> dict:
-    # spec: score-saude-financeira v1.5 — critério 6
+    # spec: score-saude-financeira v1.9 — critério 6
     month_installments = conn.execute(
         """
         SELECT COALESCE(SUM(amount_cents), 0) AS total

@@ -1,7 +1,11 @@
 export function registerCockpitView({
   state,
   elements,
+  api,
   currentMonthValue,
+  formatMonthLabel,
+  shiftMonth,
+  openMonthPicker,
   formatMoney,
   formatPercent,
   emptyState,
@@ -29,7 +33,18 @@ export function registerCockpitView({
     cashDistributionChart,
     cockpitPortfolioByType,
     cockpitPortfolioMaturityAlert,
+    financialHealthMonthLabel,
+    previousFinancialHealthMonthButton,
+    nextFinancialHealthMonthButton,
+    financialHealthContent,
   } = elements;
+  let financialHealthRequestId = 0;
+
+  previousFinancialHealthMonthButton?.addEventListener("click", () => setFinancialHealthMonth(shiftMonth(state.financialHealthMonth, -1)));
+  nextFinancialHealthMonthButton?.addEventListener("click", () => setFinancialHealthMonth(shiftMonth(state.financialHealthMonth, 1)));
+  financialHealthMonthLabel?.addEventListener("click", () => {
+    openMonthPicker(financialHealthMonthLabel, state.financialHealthMonth, setFinancialHealthMonth);
+  });
 
   function renderCockpit() {
     const totals = getCurrencyTotals();
@@ -46,6 +61,206 @@ export function registerCockpitView({
     renderPortfolioMaturityAlerts();
     renderTopExpensesChart();
     renderTopIncomeChart();
+    renderFinancialHealth();
+  }
+
+  function setFinancialHealthMonth(month) {
+    if (!month || month === state.financialHealthMonth) {
+      return;
+    }
+    state.financialHealthMonth = month;
+    state.financialHealth = null;
+    state.financialHealthError = "";
+    renderFinancialHealth();
+    loadFinancialHealth().catch((error) => {
+      state.financialHealthLoading = false;
+      state.financialHealthError = error.message;
+      renderFinancialHealth();
+    });
+  }
+
+  async function loadFinancialHealth() {
+    const requestId = ++financialHealthRequestId;
+    state.financialHealthLoading = true;
+    state.financialHealthError = "";
+    renderFinancialHealth();
+    const month = state.financialHealthMonth || currentMonthValue();
+    const response = await api(`/api/financial-health-score?month=${encodeURIComponent(month)}`);
+    if (requestId !== financialHealthRequestId) {
+      return;
+    }
+    state.financialHealth = response;
+    state.financialHealthLoading = false;
+    state.financialHealthError = "";
+    renderFinancialHealth();
+  }
+
+  function renderFinancialHealth() {
+    if (!financialHealthContent || !financialHealthMonthLabel) {
+      return;
+    }
+    if (!state.financialHealthMonth) {
+      state.financialHealthMonth = currentMonthValue();
+    }
+    financialHealthMonthLabel.textContent = formatMonthLabel(state.financialHealthMonth);
+    const data = state.financialHealth;
+    if (!data || data.month !== state.financialHealthMonth) {
+      if (!state.financialHealthLoading && !state.financialHealthError) {
+        loadFinancialHealth().catch((error) => {
+          state.financialHealthLoading = false;
+          state.financialHealthError = error.message;
+          renderFinancialHealth();
+        });
+      }
+      financialHealthContent.innerHTML = `<div class="empty-state compact">${escapeHtml(state.financialHealthError || "Carregando score de saúde financeira...")}</div>`;
+      return;
+    }
+    financialHealthContent.innerHTML = `
+      <div class="financial-health-score-card ${financialHealthLevelClass(data.nivel)}">
+        <strong>${Number(data.score_total || 0).toLocaleString("pt-BR")}</strong>
+        <span>${escapeHtml(financialHealthLevelLabel(data.nivel))}</span>
+        <small>Score de 0 a 1000</small>
+      </div>
+
+      <section class="financial-health-section">
+        <h3>Seus Pilares</h3>
+        <div class="financial-health-pillars" role="list" aria-label="Pontuação dos pilares de saúde financeira">
+          ${(data.pilares || []).map((pillar) => financialHealthPillarBar(pillar)).join("")}
+        </div>
+      </section>
+
+      <section class="financial-health-section">
+        <h3>🔍 Análise detalhada dos pilares</h3>
+        <div class="financial-health-detail-grid">
+          ${(data.pilares || []).map((pillar) => financialHealthPillarDetail(pillar, data)).join("")}
+        </div>
+      </section>
+
+      <section class="financial-health-section financial-peace-section">
+        <h3>💡 Planeje sua Paz Financeira <span>(referências)</span></h3>
+        ${financialPeaceCards(data)}
+      </section>
+    `;
+  }
+
+  function financialHealthPillarBar(pillar) {
+    const score = Number(pillar.score || 0);
+    const maxScore = Number(pillar.max_score || 0);
+    const percent = maxScore > 0 ? Math.max(0, Math.min(100, (score / maxScore) * 100)) : 0;
+    return `
+      <article class="financial-health-pillar-row ${financialHealthLevelClass(pillar.nivel)}" role="listitem">
+        <div>
+          <strong>${escapeHtml(pillar.label || "Pilar")}</strong>
+          <span>${Number(pillar.peso_pct || 0).toLocaleString("pt-BR")}%</span>
+        </div>
+        <div class="financial-health-bar" aria-hidden="true">
+          <i style="width:${percent.toFixed(2)}%"></i>
+        </div>
+        <strong>${score.toLocaleString("pt-BR")}/${maxScore.toLocaleString("pt-BR")} pts</strong>
+        <small class="sr-only">${escapeHtml(pillar.label || "Pilar")}: ${score} de ${maxScore} pontos, ${percent.toFixed(1)}%.</small>
+      </article>
+    `;
+  }
+
+  function financialHealthPillarDetail(pillar, data) {
+    const extra = financialHealthPillarExtra(pillar, data);
+    return `
+      <article class="financial-health-detail-card ${financialHealthLevelClass(pillar.nivel)}">
+        <header>
+          <span>${financialHealthLevelIcon(pillar.nivel)}</span>
+          <div>
+            <h4>${escapeHtml(pillar.label || "Pilar")}</h4>
+            <small>${escapeHtml(financialHealthLevelLabel(pillar.nivel))}</small>
+          </div>
+        </header>
+        <p>Sua pontuação: <strong>${Number(pillar.score || 0).toLocaleString("pt-BR")} / ${Number(pillar.max_score || 0).toLocaleString("pt-BR")} pts</strong>.</p>
+        ${extra ? `<p>${extra}</p>` : ""}
+        <p>${escapeHtml(pillar.mensagem || "Indicador calculado com base nos dados cadastrados.")}</p>
+      </article>
+    `;
+  }
+
+  function financialHealthPillarExtra(pillar, data) {
+    if (pillar.id === "reserva") {
+      const months = Number(data.meses_reserva || pillar.meses_reserva || 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+      return `Reserva marcada cobre <strong>${months} mês(es)</strong> de despesas médias. Valor elegível: <strong>${formatCents(data.reserva_elegivel_cents)}</strong>.`;
+    }
+    if (pillar.id === "endividamento") {
+      return `Parcelas do mês: <strong>${formatCents(data.dividas_parcelas_mes_cents)}</strong> · comprometimento: <strong>${formatDecimalPercent(data.comprometimento_divida_mes_pct)}</strong>.`;
+    }
+    if (pillar.id === "concentracao_portfolio") {
+      return `Maior concentração: <strong>${formatDecimalPercent(data.maior_concentracao_portfolio_pct)}</strong> · Poupança: <strong>${formatDecimalPercent(data.concentracao_poupanca_pct)}</strong>.`;
+    }
+    if (pillar.id === "poupanca") {
+      return `Receitas: <strong>${formatCents(data.receitas_cents)}</strong> · despesas de consumo: <strong>${formatCents(data.despesas_consumo_cents)}</strong>.`;
+    }
+    return "";
+  }
+
+  function financialPeaceCards(data) {
+    const peace = data.paz_financeira || {};
+    const cards = [
+      ["🎯", "Independência mensal (Estimativa)", data.paz_independencia_cents, peace.independencia_mensal_legenda || "Referência aproximada de patrimônio para renda passiva mensal equivalente."],
+      ["🛡️", "Reserva estimada", data.paz_reserva_estimada_cents, "Referência simples de 6 vezes a receita de base."],
+      ["🏠", "Recorrentes saudáveis (Estimativa)", data.paz_recorrentes_saudaveis_cents, "Referência para despesas recorrentes mensais."],
+      ["🎉", "Lazer saudável (Estimativa)", data.paz_lazer_saudavel_cents, "Referência para lazer mensal sem afetar planejamento."],
+    ];
+    return `
+      <div class="financial-peace-grid">
+        ${cards.map(([icon, title, cents, description]) => `
+          <article class="financial-peace-card">
+            <span>${icon}</span>
+            <div>
+              <h4>${escapeHtml(title)}</h4>
+              <strong>${formatCents(cents)}</strong>
+              <p>${escapeHtml(description)}</p>
+            </div>
+          </article>
+        `).join("")}
+      </div>
+      <p class="financial-peace-note">ⓘ Valores baseados na receita de referência (${formatCents(data.paz_financeira_base_receita_cents)}) · confiança ${escapeHtml(financialPeaceConfidenceLabel(data.paz_financeira_confianca))}. ${escapeHtml(peace.mensagem || "")}</p>
+      ${peace.disclaimer ? `<p class="financial-peace-disclaimer">${escapeHtml(peace.disclaimer)}</p>` : ""}
+    `;
+  }
+
+  function formatCents(cents) {
+    return formatMoney(Number(cents || 0) / 100, "BRL");
+  }
+
+  function formatDecimalPercent(value) {
+    return `${Number(value || 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`;
+  }
+
+  function financialHealthLevelLabel(level) {
+    return ({
+      critico: "Crítico",
+      atencao: "Atenção",
+      bom: "Bom",
+      excelente: "Excelente",
+    })[level] || "Atenção";
+  }
+
+  function financialHealthLevelIcon(level) {
+    return ({
+      critico: "●",
+      atencao: "▲",
+      bom: "✓",
+      excelente: "✓",
+    })[level] || "•";
+  }
+
+  function financialHealthLevelClass(level) {
+    return `level-${["critico", "atencao", "bom", "excelente"].includes(level) ? level : "atencao"}`;
+  }
+
+  function financialPeaceConfidenceLabel(value) {
+    if (value === "alta") {
+      return "alta";
+    }
+    if (value === "menor") {
+      return "menor";
+    }
+    return "indisponível";
   }
 
   function renderPortfolioMaturityAlerts() {

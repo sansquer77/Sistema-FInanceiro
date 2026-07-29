@@ -85,6 +85,10 @@ const state = {
   transactions: [],
   accountTransactions: [],
   cockpit: null,
+  financialHealth: null,
+  financialHealthMonth: currentMonthValue(),
+  financialHealthLoading: false,
+  financialHealthError: "",
   categories: [],
   tags: [],
   spendingLimits: [],
@@ -335,6 +339,10 @@ const currencyList = document.querySelector("#currencyList");
 const cockpitPortfolioByType = document.querySelector("#cockpitPortfolioByType");
 const cockpitLimitAlert = document.querySelector("#cockpitLimitAlert");
 const cockpitPortfolioMaturityAlert = document.querySelector("#cockpitPortfolioMaturityAlert");
+const financialHealthMonthLabel = document.querySelector("#financialHealthMonthLabel");
+const previousFinancialHealthMonthButton = document.querySelector("#previousFinancialHealthMonthButton");
+const nextFinancialHealthMonthButton = document.querySelector("#nextFinancialHealthMonthButton");
+const financialHealthContent = document.querySelector("#financialHealthContent");
 const topExpensesChart = document.querySelector("#topExpensesChart");
 const cashDistributionChart = document.querySelector("#cashDistributionChart");
 const previousMonthButton = document.querySelector("#previousMonthButton");
@@ -549,8 +557,16 @@ const cockpitView = registerCockpitView({
     cashDistributionChart,
     cockpitPortfolioByType,
     cockpitPortfolioMaturityAlert,
+    financialHealthMonthLabel,
+    previousFinancialHealthMonthButton,
+    nextFinancialHealthMonthButton,
+    financialHealthContent,
   },
+  api,
   currentMonthValue,
+  formatMonthLabel,
+  shiftMonth,
+  openMonthPicker,
   formatMoney,
   formatPercent,
   emptyState,
@@ -956,6 +972,10 @@ function resetSessionState() {
   state.transactions = [];
   state.accountTransactions = [];
   state.cockpit = null;
+  state.financialHealth = null;
+  state.financialHealthMonth = currentMonthValue();
+  state.financialHealthLoading = false;
+  state.financialHealthError = "";
   state.categories = [];
   state.tags = [];
   state.spendingLimits = [];
@@ -1004,6 +1024,7 @@ async function loadAll() {
     state.cardTransactions = cardTransactionsResponse.transactions;
     state.cardPayments = cardPaymentsResponse.payments || [];
     state.cockpit = cockpitResponse;
+    invalidateFinancialHealth();
     await loadArchivedAccounts();
     await loadArchivedCreditCards();
     await loadClassifications();
@@ -1077,6 +1098,7 @@ async function loadTransactionsAndAccounts() {
   state.cardTransactions = cardTransactionsResponse.transactions;
   state.cardPayments = cardPaymentsResponse.payments || [];
   state.cockpit = cockpitResponse;
+  invalidateFinancialHealth();
   await loadArchivedAccounts();
   await loadArchivedCreditCards();
   await loadClassifications();
@@ -1096,6 +1118,7 @@ async function loadTransactionSlice() {
 async function loadCockpit() {
   const response = await api(`/api/cockpit?month=${encodeURIComponent(currentMonthValue())}`);
   state.cockpit = response;
+  invalidateFinancialHealth();
 }
 
 async function refreshCockpitData() {
@@ -1123,6 +1146,7 @@ async function refreshCockpitData() {
   state.cardTransactions = cardTransactionsResponse.transactions || [];
   state.cardPayments = cardPaymentsResponse.payments || [];
   state.cockpit = cockpitResponse;
+  invalidateFinancialHealth();
   renderBaseViews();
   if (state.view === "cockpit") {
     renderCockpit();
@@ -1135,6 +1159,12 @@ async function loadPortfolio(options = {}) {
 
 function markPortfolioDirty() {
   portfolioView.markPortfolioDirty();
+  invalidateFinancialHealth();
+}
+
+function invalidateFinancialHealth() {
+  state.financialHealth = null;
+  state.financialHealthError = "";
 }
 
 function showPortfolioAssetForm() {
