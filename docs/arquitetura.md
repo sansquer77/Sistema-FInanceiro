@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 1.9
+versao: 2.0
 atualizado: 2026-07-28
 relacionados:
   - "[[requisitos]]"
@@ -228,6 +228,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `credit_cards.py` | Cartões, faturas mensais, transações e pagamentos. Ver [[cartoes]]. |
 | `spending_limits.py` | Metas e orçamentos mensais. Ver [[limites-gastos]]. |
 | `portfolio.py` | Consolidação de investimentos, precificação, impostos e metadado de reserva de emergência. Ver [[investimentos-portfolio]]. |
+| `financial_health.py` | Núcleo analítico do Score de Saúde Financeira: cálculo atômico dos pilares, lista `pilares` e Paz Financeira. Ver [[score-saude-financeira]]. |
 | `imports.py` | Leitura de exportações Organizze e planilhas modelo. Ver [[importacao-organizze]]. |
 | `operation_logs.py` | Auditoria funcional das operações do usuário. Ver [[historico-operacoes]]. |
 | `emailer.py` | Envio SMTP do código de recuperação de senha. Ver [[recuperacao-senha]]. |
@@ -418,6 +419,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `2.0` — 2026-07-28 — Documentado módulo `financial_health.py` como núcleo analítico do Score de Saúde Financeira.
 - `1.9` — 2026-07-28 — Documentado metadado `emergency_reserve_eligible` em posições iniciais do Portfólio para suporte ao Score de Saúde Financeira.
 - `1.8` — 2026-07-27 — Documentado endpoint público `/api/app-info` para metadados centralizados de nome e versão do app.
 - `1.7` — 2026-07-23 — Documentados módulo, rota, colunas, índices e fluxo do MVP de classificação assistida local.

@@ -2,7 +2,7 @@
 tipo: spec
 area: score-saude-financeira
 status: em-implementacao
-versao: 1.0
+versao: 1.1
 atualizado: 2026-07-28
 relacionados:
   - "[[relatorios]]"
@@ -125,7 +125,7 @@ Nenhuma pendência conhecida.
 ## Plano de implementação
 
 - [x] Passo 1 — Adicionar metadado explícito de elegibilidade para reserva de emergência no Portfólio, com migração idempotente e campo de marcação na UI de posições elegíveis. Fecha: critérios 2 e 3.
-- [ ] Passo 2 — Criar módulo Python `financeiro/financial_health.py` implementando as funções atômicas de cálculo de cada pilar (com a distribuição 25/25/20/15/15), a lista `pilares` e a seção informativa Paz Financeira em centavos inteiros. Fecha: critérios 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 e 11.
+- [x] Passo 2 — Criar módulo Python `financeiro/financial_health.py` implementando as funções atômicas de cálculo de cada pilar (com a distribuição 25/25/20/15/15), a lista `pilares` e a seção informativa Paz Financeira em centavos inteiros. Fecha: critérios 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 e 11.
 - [ ] Passo 3 — Adicionar as rotas `GET /api/financial-health-score` e `GET /api/financial-health-score/history` em `app.py` com validação de sessão e origem. Fecha: critério 11.
 - [ ] Passo 4 — Criar os testes unitários automatizados em `tests/test_financial_health.py` validando os pilares, Paz Financeira e casos de borda. Fecha: critérios 1, 2, 3, 4, 5, 6, 7, 8, 9 e 10.
 - [ ] Passo 5 — Implementar a aba dedicada de Saúde Financeira na view do Cockpit (`web/modules/cockpit-view.js` / sub-view dedicada), incluindo gráfico nativo de barras horizontais por pilar e fallback textual acessível. Fecha: critérios 12, 13 e 14.
@@ -133,6 +133,7 @@ Nenhuma pendência conhecida.
 
 ## Changelog
 
+- `1.1` — 2026-07-28 — Criado núcleo `financeiro/financial_health.py` com funções atômicas dos 5 pilares, montagem da lista `pilares`, seção informativa Paz Financeira em centavos inteiros e testes unitários focados.
 - `1.0` — 2026-07-28 — Iniciada implantação: Portfólio passa a persistir metadado explícito de elegibilidade para reserva de emergência em posições iniciais elegíveis.
 - `0.9` — 2026-07-28 — Pilar de Endividamento passa a calcular comprometimento por serviço mensal da dívida (`parcelas do mês / receitas`), mantendo o estoque total de dívidas parceladas apenas como contexto informativo.
 - `0.8` — 2026-07-28 — Incluído gráfico nativo de barras horizontais para tornar os 5 pilares mais visuais, com lista de dados `pilares`, fallback textual acessível e alinhamento ao design system; status/tag alinhados como rascunho.
