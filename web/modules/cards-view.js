@@ -441,7 +441,7 @@ export function registerCardsView({
     cardRecurrenceFrequency.value = "monthly";
     cardRecurrenceCount.value = "12";
     cardTransactionFormTitle.textContent = "Novo lançamento no cartão";
-    cancelCardTransactionEditButton.hidden = true;
+    cancelCardTransactionEditButton.hidden = false;
     cardTransactionForm.querySelector('button[type="submit"]').textContent = "Salvar lançamento";
     updateCardSeriesState();
     renderCardTransactionCategories();

@@ -1783,8 +1783,7 @@ textarea:focus {
 .financial-health-detail-card small,
 .financial-health-detail-card p,
 .financial-peace-card p,
-.financial-peace-note,
-.financial-peace-disclaimer {
+.financial-peace-note {
   margin: 0;
   color: var(--muted);
   font-size: 13px;
@@ -1819,8 +1818,7 @@ textarea:focus {
   font-weight: 950;
 }
 
-.financial-peace-note,
-.financial-peace-disclaimer {
+.financial-peace-note {
   padding-top: 2px;
 }
 

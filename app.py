@@ -589,7 +589,7 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_json(cockpit_payload([*transactions, *card_transactions]))
 
     def handle_financial_health_score(self) -> None:
-        # spec: score-saude-financeira v2.0 — critério 12
+        # spec: score-saude-financeira v2.1 — critério 12
         if not self.validate_read_source():
             return
         user = self.require_user()
@@ -601,7 +601,7 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_json({"error": exc.message}, exc.status)
 
     def handle_financial_health_score_history(self) -> None:
-        # spec: score-saude-financeira v2.0 — critérios 13 e 14
+        # spec: score-saude-financeira v2.1 — critérios 13 e 14
         if not self.validate_read_source():
             return
         user = self.require_user()

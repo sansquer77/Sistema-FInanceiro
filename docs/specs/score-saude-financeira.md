@@ -2,7 +2,7 @@
 tipo: spec
 area: score-saude-financeira
 status: em-implementacao
-versao: 2.0
+versao: 2.1
 atualizado: 2026-07-29
 relacionados:
   - "[[relatorios]]"
@@ -149,6 +149,7 @@ Nenhuma pendência conhecida.
 
 ## Changelog
 
+- `2.1` — 2026-07-29 — Removido campo redundante de disclaimer separado da Paz Financeira, mantendo apenas o rodapé único consolidado.
 - `2.0` — 2026-07-29 — Consolidado o rodapé da seção Paz Financeira para remover redundância entre mensagem e disclaimer, mantendo o caráter informativo e não prescritivo.
 - `1.9` — 2026-07-29 — Implementada seção dedicada de Saúde Financeira no Cockpit seguindo o wireframe aprovado, com seletor mensal, score central, barras nativas dos pilares, cards de análise detalhada, seção Paz Financeira e fallback textual acessível.
 - `1.8` — 2026-07-29 — Detalhada distinção entre concentração por classe (`asset_type`) e por ativo (`asset_name`/`asset_identifier`/`cnpj`), com limites diferentes (70% para classe, 60% para ativo) e origem dos valores vinda do formulário de cadastro; critérios de aceite ajustados.

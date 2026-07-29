@@ -219,7 +219,6 @@ export function registerCockpitView({
         `).join("")}
       </div>
       <p class="financial-peace-note">ⓘ Valores baseados na receita de referência (${formatCents(data.paz_financeira_base_receita_cents)}) · confiança ${escapeHtml(financialPeaceConfidenceLabel(data.paz_financeira_confianca))}. ${escapeHtml(peace.mensagem || "")}</p>
-      ${peace.disclaimer ? `<p class="financial-peace-disclaimer">${escapeHtml(peace.disclaimer)}</p>` : ""}
     `;
   }
 
