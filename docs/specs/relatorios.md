@@ -2,7 +2,7 @@
 tipo: spec
 area: relatorios
 status: implementado
-versao: 1.8
+versao: 1.9
 atualizado: 2026-07-31
 relacionados:
   - "[[lancamentos]]"
@@ -59,8 +59,8 @@ Qualquer usuário autenticado localmente que queira analisar seus gastos e recei
 - Pagamentos de fatura gerados em conta-corrente reduzem o saldo da conta, mas não entram em análises de despesa, relatórios por categoria/subcategoria/tag, evolução de categoria nem totais do Cockpit, pois os lançamentos detalhados do cartão já representam o consumo.
 - Relatórios exibem totais por moeda quando houver movimentações multimoeda.
 - O planejamento do Cockpit separa receitas recorrentes, investimentos planejados e despesas recorrentes por moeda, exibindo os valores originais sem somar moedas distintas.
-- O Cockpit deve separar a visão operacional **Resumo financeiro** e a visão diagnóstica **Saúde Financeira** em abas internas no topo do módulo, evitando que o usuário precise rolar todo o resumo mensal para acessar o score.
-- A aba **Resumo financeiro** é a visão inicial do Cockpit e mantém KPIs, alertas, saldos por moeda, portfólio por tipo, planejamento, dívidas e gráficos de maiores receitas/despesas.
+- O Cockpit deve separar a visão operacional **Situação do mês** e a visão diagnóstica **Saúde Financeira** em abas internas no topo do módulo, evitando que o usuário precise rolar todo o resumo mensal para acessar o score.
+- A aba **Situação do mês** é a visão inicial do Cockpit e mantém KPIs, alertas, saldos por moeda, portfólio por tipo, planejamento, dívidas e gráficos de maiores receitas/despesas.
 - Percentuais são calculados contra o total da seção.
 - Relatório **detalhado** mostra lançamentos individuais.
 - Relatório **sintético** mostra apenas agregados.
@@ -120,11 +120,12 @@ Valores aceitos para `periodo`: `3m`, `6m`, `12m`, `ytd` e `all`.
 - Dado o demonstrativo exibido, quando há despesas de conta e cartão, então o resumo e a composição distinguem as duas origens e o detalhamento mostra a conta ou cartão de cada lançamento.
 - Dado o usuário gerando um demonstrativo, quando existem compras parceladas em aberto, então o resumo executivo exibe o endividamento atual da moeda/seção seguindo a mesma regra do Cockpit.
 - Dado o demonstrativo exibido ou impresso, quando valores monetários aparecem em KPIs, tabelas e legendas, então a fonte dos valores tem tamanho equivalente ao texto descritivo e não domina visualmente o layout.
-- Dado o usuário abrindo o Cockpit, quando a tela é exibida, então vê abas internas para alternar entre **Resumo financeiro** e **Saúde Financeira**, com **Resumo financeiro** ativo por padrão.
+- Dado o usuário abrindo o Cockpit, quando a tela é exibida, então vê abas internas para alternar entre **Situação do mês** e **Saúde Financeira**, com **Situação do mês** ativa por padrão.
 - Dado o usuário alternando para **Saúde Financeira**, quando a aba é ativada, então o score fica acessível sem exigir rolagem pelo resumo mensal.
 
 ## Changelog
 
+- `1.9` — 2026-07-31 — Aba operacional do Cockpit renomeada de `Resumo financeiro` para `Situação do mês` para evitar repetição com o título da página.
 - `1.8` — 2026-07-31 — Cockpit passa a separar Resumo financeiro e Saúde Financeira em abas internas no topo do módulo.
 - `1.7` — 2026-07-26 — Valores monetários do demonstrativo passam a usar tamanho de fonte equivalente ao texto descritivo para melhorar densidade visual.
 - `1.6` — 2026-07-26 — Demonstrativos passam a separar despesas de conta e cartão, mostrar origem no detalhamento e incluir endividamento atual.

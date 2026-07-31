@@ -2,7 +2,7 @@
 tipo: spec
 area: usuario
 status: implementado
-versao: 1.5
+versao: 1.6
 atualizado: 2026-07-31
 relacionados:
   - "[[frontend-modularizacao]]"
@@ -90,6 +90,7 @@ Usuários finais e mantenedores que usam o Sistema Financeiro localmente, instal
 
 ## Changelog
 
+- `1.6` — 2026-07-31 — Versão atual do app elevada para `1.0.52` após ajustes compatíveis de UX no Cockpit.
 - `1.5` — 2026-07-31 — Política de versionamento do produto formalizada com critérios para PATCH, MINOR, MAJOR e casos sem incremento de versão.
 - `1.4` — 2026-07-27 — Ajustado layout do texto descritivo no painel principal para usar melhor a largura disponível; versão do app elevada para `1.0.51`.
 - `1.3` — 2026-07-27 — Versão do sistema centralizada em metadado do backend, exposta via endpoint e exibida na tela Sobre; versão inicial convencionada como `1.0.50`.
