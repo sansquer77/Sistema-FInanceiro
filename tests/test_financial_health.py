@@ -55,14 +55,14 @@ class FinancialHealthCalculationTest(unittest.TestCase):
         self.assertEqual(pillar["score"], 150)
 
     def test_limits_score_uses_share_inside_limit(self) -> None:
-        # spec: score-saude-financeira v2.3 — critério 5
+        # spec: score-saude-financeira v2.4 — critério 5
         pillar = calculate_limits_pillar(3, 2)
 
         self.assertEqual(pillar["score"], 100)
         self.assertEqual(pillar["aderencia_pct"], 66.67)
 
     def test_limits_score_is_zero_when_no_limits_defined(self) -> None:
-        # spec: score-saude-financeira v2.3 — critério 6
+        # spec: score-saude-financeira v2.4 — critério 6
         pillar = calculate_limits_pillar(0, 0)
 
         self.assertEqual(pillar["score"], 0)
@@ -70,7 +70,7 @@ class FinancialHealthCalculationTest(unittest.TestCase):
         self.assertIn("não cadastrou limites", pillar["mensagem"])
 
     def test_portfolio_concentration_penalizes_high_class_and_savings(self) -> None:
-        # spec: score-saude-financeira v2.3 — critérios 8 e 10
+        # spec: score-saude-financeira v2.4 — critérios 8 e 10
         pillar = calculate_portfolio_concentration_pillar([
             {"asset_type": "fixed_income", "asset_name": "CDB", "current_value_brl_cents": 500_000},
             {"asset_type": "savings", "asset_name": "Poupança", "current_value_brl_cents": 300_000},
@@ -82,7 +82,7 @@ class FinancialHealthCalculationTest(unittest.TestCase):
         self.assertEqual(pillar["concentracao_poupanca_pct"], 30.0)
 
     def test_portfolio_concentration_explains_high_fixed_income_without_prescription(self) -> None:
-        # spec: score-saude-financeira v2.3 — critério 8
+        # spec: score-saude-financeira v2.4 — critério 8
         pillar = calculate_portfolio_concentration_pillar([
             {"asset_type": "fixed_income", "asset_name": "CDB 1", "current_value_brl_cents": 400_000},
             {"asset_type": "fixed_income", "asset_name": "CDB 2", "current_value_brl_cents": 400_000},
@@ -96,7 +96,7 @@ class FinancialHealthCalculationTest(unittest.TestCase):
         self.assertNotIn("venda", pillar["mensagem"].lower())
 
     def test_portfolio_concentration_explains_high_single_asset_without_prescription(self) -> None:
-        # spec: score-saude-financeira v2.3 — critério 9
+        # spec: score-saude-financeira v2.4 — critério 9
         pillar = calculate_portfolio_concentration_pillar([
             {"asset_type": "fixed_income", "asset_name": "CDB", "current_value_brl_cents": 650_000},
             {"asset_type": "stock", "asset_name": "PETR4", "current_value_brl_cents": 350_000},
@@ -109,7 +109,7 @@ class FinancialHealthCalculationTest(unittest.TestCase):
         self.assertNotIn("venda", pillar["mensagem"].lower())
 
     def test_financial_peace_uses_recurring_income_or_month_fallback(self) -> None:
-        # spec: score-saude-financeira v2.3 — critérios 11 e 14
+        # spec: score-saude-financeira v2.4 — critérios 11 e 14
         recurring = calculate_financial_peace({"average_cents": 1_000_000, "months_with_income": 12, "window_months": 12}, 800_000)
         partial = calculate_financial_peace({"average_cents": 900_000, "months_with_income": 6, "window_months": 12}, 800_000)
         fallback = calculate_financial_peace({"average_cents": 0, "months_with_income": 0, "window_months": 12}, 800_000)
@@ -143,7 +143,7 @@ class FinancialHealthCalculationTest(unittest.TestCase):
         self.assertIn("Taxa de Poupança", encoded)
 
     def test_pillars_return_neutral_scores_when_denominator_is_zero(self) -> None:
-        # spec: score-saude-financeira v2.3 — critério 4
+        # spec: score-saude-financeira v2.4 — critério 4
         savings = calculate_savings_pillar(0, 0)
         reserve = calculate_reserve_pillar(0, 0)
         debt = calculate_debt_pillar(0, 0)
@@ -161,7 +161,7 @@ class FinancialHealthCalculationTest(unittest.TestCase):
         self.assertTrue(debt["dados_insuficientes"])
 
     def test_score_history_rejects_months_out_of_bounds(self) -> None:
-        # spec: score-saude-financeira v2.3 — critérios 16 e 17
+        # spec: score-saude-financeira v2.4 — critérios 16 e 17
         with self.assertRaises(FinancialHealthError) as context:
             calculate_financial_health_score_history(1, 1000)
         self.assertIn("entre 1 e 36", str(context.exception.message))
@@ -194,7 +194,7 @@ class FinancialHealthDatabaseIntegrationTest(unittest.TestCase):
         self.tempdir.cleanup()
 
     def test_score_payload_uses_database_facts_and_is_json_serializable(self) -> None:
-        # spec: score-saude-financeira v2.3 — critérios 1, 2, 5, 6, 11, 14 e 15
+        # spec: score-saude-financeira v2.4 — critérios 1, 2, 5, 6, 11, 14 e 15
         user = create_user("Alice", "alice@example.com", "strong-password")
         with database.get_connection() as conn:
             account_id = conn.execute(
@@ -273,7 +273,7 @@ class FinancialHealthDatabaseIntegrationTest(unittest.TestCase):
         json.dumps(payload, ensure_ascii=False)
 
     def test_financial_peace_reference_uses_12_month_recurring_average_ignoring_plr(self) -> None:
-        # spec: score-saude-financeira v2.3 — critérios 11, 12 e 13
+        # spec: score-saude-financeira v2.4 — critérios 11, 12 e 13
         user = create_user("Carla", "carla@example.com", "strong-password")
         with database.get_connection() as conn:
             account_id = conn.execute(

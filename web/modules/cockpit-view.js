@@ -26,6 +26,8 @@ export function registerCockpitView({
     monthExpense,
     monthInvestment,
     savingsRate,
+    cockpitTabs,
+    cockpitSummaryPanel,
     currencyList,
     monthlyPlanningList,
     installmentDebtList,
@@ -33,6 +35,7 @@ export function registerCockpitView({
     cashDistributionChart,
     cockpitPortfolioByType,
     cockpitPortfolioMaturityAlert,
+    financialHealthPanel,
     financialHealthMonthLabel,
     previousFinancialHealthMonthButton,
     nextFinancialHealthMonthButton,
@@ -40,6 +43,9 @@ export function registerCockpitView({
   } = elements;
   let financialHealthRequestId = 0;
 
+  cockpitTabs?.forEach((button) => {
+    button.addEventListener("click", () => setCockpitTab(button.dataset.cockpitTab || "summary"));
+  });
   previousFinancialHealthMonthButton?.addEventListener("click", () => setFinancialHealthMonth(shiftMonth(state.financialHealthMonth, -1)));
   nextFinancialHealthMonthButton?.addEventListener("click", () => setFinancialHealthMonth(shiftMonth(state.financialHealthMonth, 1)));
   financialHealthMonthLabel?.addEventListener("click", () => {
@@ -47,6 +53,7 @@ export function registerCockpitView({
   });
 
   function renderCockpit() {
+    renderCockpitTabs();
     const totals = getCurrencyTotals();
     const monthTotals = state.cockpit?.month_totals || getCurrentMonthTotals();
     monthIncome.textContent = formatMoney(monthTotals.income, "BRL");
@@ -61,7 +68,41 @@ export function registerCockpitView({
     renderPortfolioMaturityAlerts();
     renderTopExpensesChart();
     renderTopIncomeChart();
-    renderFinancialHealth();
+    if (activeCockpitTab() === "health") {
+      renderFinancialHealth();
+    }
+  }
+
+  function setCockpitTab(tab) {
+    const nextTab = tab === "health" ? "health" : "summary";
+    if (state.cockpitTab === nextTab) {
+      return;
+    }
+    state.cockpitTab = nextTab;
+    renderCockpitTabs();
+    if (nextTab === "health") {
+      renderFinancialHealth();
+    }
+  }
+
+  function activeCockpitTab() {
+    return state.cockpitTab === "health" ? "health" : "summary";
+  }
+
+  function renderCockpitTabs() {
+    const activeTab = activeCockpitTab();
+    cockpitTabs?.forEach((button) => {
+      const isActive = button.dataset.cockpitTab === activeTab;
+      button.classList.toggle("active", isActive);
+      button.setAttribute("aria-selected", isActive ? "true" : "false");
+      button.tabIndex = isActive ? 0 : -1;
+    });
+    if (cockpitSummaryPanel) {
+      cockpitSummaryPanel.hidden = activeTab !== "summary";
+    }
+    if (financialHealthPanel) {
+      financialHealthPanel.hidden = activeTab !== "health";
+    }
   }
 
   function setFinancialHealthMonth(month) {
@@ -99,6 +140,7 @@ export function registerCockpitView({
     if (!financialHealthContent || !financialHealthMonthLabel) {
       return;
     }
+    renderCockpitTabs();
     if (!state.financialHealthMonth) {
       state.financialHealthMonth = currentMonthValue();
     }

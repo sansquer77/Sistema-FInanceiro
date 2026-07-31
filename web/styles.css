@@ -1048,6 +1048,43 @@ textarea:focus {
   box-shadow: var(--control-shadow);
 }
 
+.cockpit-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+  background: var(--surface-container);
+}
+
+.cockpit-tab {
+  min-height: 36px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 900;
+  line-height: 1.1;
+  padding: 0 10px;
+}
+
+.cockpit-tab:hover {
+  background: var(--surface-low);
+  color: var(--text);
+}
+
+.cockpit-tab.active {
+  background: var(--panel);
+  color: var(--accent-dark);
+  box-shadow: var(--control-shadow-sm);
+}
+
+.cockpit-tab-panel[hidden] {
+  display: none;
+}
+
 .cockpit-stack {
   display: grid;
   gap: 18px;
@@ -1597,7 +1634,6 @@ textarea:focus {
 .financial-health-panel {
   grid-column: 1 / -1;
   width: 100%;
-  margin-top: 18px;
 }
 
 .financial-health-header {

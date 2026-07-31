@@ -2,8 +2,8 @@
 tipo: spec
 area: score-saude-financeira
 status: em-implementacao
-versao: 2.3
-atualizado: 2026-07-29
+versao: 2.4
+atualizado: 2026-07-31
 relacionados:
   - "[[relatorios]]"
   - "[[limites-gastos]]"
@@ -18,7 +18,7 @@ aliases: ["Score de Saúde Financeira", "Diagnóstico Financeiro", "Financial He
 # Score de Saúde Financeira
 
 > [!info] Status
-> **em-implementacao** · área: `score-saude-financeira` · atualizado em 2026-07-29 · relacionados: [[relatorios]], [[limites-gastos]], [[investimentos-portfolio]], [[cartoes]], [[contas-correntes]]
+> **em-implementacao** · área: `score-saude-financeira` · atualizado em 2026-07-31 · relacionados: [[relatorios]], [[limites-gastos]], [[investimentos-portfolio]], [[cartoes]], [[contas-correntes]]
 
 ## Problema
 
@@ -79,7 +79,7 @@ Qualquer usuário autenticado localmente que deseje entender sua saúde financei
     - A métrica usada no pilar é `max(maior_concentracao_classe, maior_concentracao_ativo)`, permitindo detectar, por exemplo, que um usuário com 80% em Renda Fixa (classe) é alertado pela classe, mas um usuário com 65% em um único CDB (ativo) é alertado pelo ativo específico.
     - A penalidade é aplicada quando a maior concentração ultrapassa o limite da sua dimensão (70% para classe, 60% para ativo). A interface deve apresentar mensagens textuais e explicativas, como `Você tem alta concentração do seu portfólio em Renda Fixa (xx%).`, sem prescrever compra ou venda de ativos.
   - **Concentração em Poupança**: Quando Poupança representar mais de 25% do Portfólio cadastrado, o pilar deve aplicar penalidade adicional e exibir mensagem explicativa, por exemplo: `Poupança representa xx% do seu portfólio; há produtos com melhor relação de rendimento e liquidez que podem ser avaliados conforme seu perfil.` Essa mensagem deve ser educativa, não uma recomendação personalizada de investimento.
-- **Interface e Navegação**: O Score de Saúde Financeira e suas recomendações acionáveis são exibidos em uma aba dedicada dentro do módulo **Cockpit**, permitindo visualização expandida dos pilares e histórico sem sobrecarregar a visão sintética inicial.
+- **Interface e Navegação**: O Score de Saúde Financeira e suas recomendações acionáveis são exibidos em uma aba dedicada dentro do módulo **Cockpit**, separada da aba **Resumo financeiro**, permitindo acesso direto ao diagnóstico sem exigir rolagem pelos KPIs, saldos, planejamento, dívidas e gráficos do resumo mensal.
 - **Gráfico dos pilares**: A aba deve exibir um gráfico compacto de barras horizontais normalizadas por pilar, usando a lista `pilares`. Cada barra compara `score / max_score`, preserva o peso do pilar no rótulo e permite leitura imediata do desempenho relativo. O gráfico deve usar CSS/SVG nativo, sem biblioteca externa, respeitar os tokens do [[../design/design-system|design system]], usar algarismos tabulares nos números e evitar novas cores semânticas. O estado saudável usa o token semântico `var(--color-success, #10B981)` com texto `var(--color-success-text, #ffffff)` para garantir contraste acessível (WCAG AA) em ambos os temas; estados de atenção/crítico devem usar os tokens semânticos `var(--color-warning, #F59E0B)` e `var(--color-error, #EF4444)` com seus respectivos textos, ou variações neutras do design system quando apropriado.
 - **Acessibilidade do gráfico**: O gráfico deve ter alternativa textual equivalente no próprio DOM, com nome do pilar, pontuação obtida, pontuação máxima e percentual. Em telas estreitas, as barras podem virar lista vertical densa, sem perder os valores.
 - **Paz Financeira (informativo, sem pontuação)**: A aba dedicada deve exibir uma seção **Paz Financeira** que nunca altera o `score_total` nem qualquer pilar. A seção usa como base a **média mensal das receitas recorrentes dos últimos 12 meses**, considerando apenas lançamentos de receita com recorrência mensal (`series_kind = recurring`). Receitas não recorrentes ou pontuais, como PLR, bônus, venda de ativos, restituições ou eventos similares, não entram na base principal. Se houver histórico recorrente parcial, usa a média dos meses disponíveis com confiança intermediária. Se não houver receitas recorrentes, pode usar as receitas do mês consultado como fallback com aviso explícito de menor confiança. Os cards exibidos são apresentados como **estimativas / referências de planejamento**, nunca como metas, obrigações ou recomendações personalizadas de investimento:
@@ -129,6 +129,7 @@ Tabelas: consulta `transactions`, `credit_card_transactions`, `spending_limits`,
 - Dado um usuário autenticado que consulta `/api/financial-health-score/history?months=1000`, quando a API recebe o parâmetro, então retorna `400 Bad Request` com mensagem informando que `months` deve estar entre 1 e 36, sem consultar o banco de dados.
 - Dado um usuário autenticado que consulta `/api/financial-health-score/history?months=12`, quando a API recebe o parâmetro válido, então retorna o histórico dos últimos 12 meses.
 - Dado o Cockpit carregado, quando o usuário seleciona a aba dedicada de Saúde Financeira no tema claro ou escuro, o medidor do Score utiliza o token semântico `var(--color-success, #10B981)` para indicar status saudável, com texto `var(--color-success-text, #ffffff)` para garantir contraste acessível (WCAG AA) em ambos os temas, respeitando o design system.
+- Dado o Cockpit carregado com a aba **Resumo financeiro** ativa, quando o usuário clica em **Saúde Financeira**, então a aba dedicada do score é exibida diretamente, sem o conteúdo do resumo financeiro acima dela.
 - Dado o Cockpit carregado, quando a aba dedicada de Saúde Financeira exibe os pilares, então há um gráfico de barras horizontais com os 5 pilares, cada um exibindo pontuação obtida, pontuação máxima, percentual e peso, sem depender de biblioteca externa.
 - Dado um usuário em viewport estreita ou usando leitor de tela, quando acessa o gráfico dos pilares, então os mesmos dados do gráfico ficam disponíveis em lista textual equivalente e sem overflow horizontal.
 
@@ -152,6 +153,7 @@ Nenhuma pendência conhecida.
 
 ## Changelog
 
+- `2.4` — 2026-07-31 — Saúde Financeira passa a ser acessada por aba interna separada do Resumo financeiro no Cockpit.
 - `2.3` — 2026-07-29 — Paz Financeira passa a usar média mensal das receitas recorrentes dos últimos 12 meses como base principal, com confiança intermediária para histórico parcial e fallback mensal apenas quando não houver recorrências.
 - `2.2` — 2026-07-29 — Especificado uso de tokens semânticos do design system (`--color-success`, `--color-success-text`, `--color-warning`, `--color-error`) no gráfico de pilares e medidor do Score para garantir contraste acessível em ambos os temas; critério de aceite do tema escuro atualizado.
 - `2.1` — 2026-07-29 — Removido campo redundante de disclaimer separado da Paz Financeira, mantendo apenas o rodapé único consolidado.

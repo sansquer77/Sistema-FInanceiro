@@ -190,74 +190,81 @@
           </header>
 
         <section class="module-view" id="cockpitView">
-          <section class="summary-strip">
-            <div class="kpi-income">
-              <span>Receitas do mês</span>
-              <strong id="monthIncome">R$ 0,00</strong>
-            </div>
-            <div class="kpi-expense">
-              <span>Despesas do mês</span>
-              <strong id="monthExpense">R$ 0,00</strong>
-            </div>
-            <div class="kpi-investment">
-              <span>Aportes do mês</span>
-              <strong id="monthInvestment">R$ 0,00</strong>
-            </div>
-            <div class="kpi-rate">
-              <span>Taxa de poupança</span>
-              <strong id="savingsRate">0%</strong>
-            </div>
-          </section>
+          <div class="cockpit-tabs" role="tablist" aria-label="Visões do cockpit">
+            <button class="cockpit-tab active" type="button" role="tab" aria-selected="true" aria-controls="cockpitSummaryPanel" data-cockpit-tab="summary">Resumo financeiro</button>
+            <button class="cockpit-tab" type="button" role="tab" aria-selected="false" aria-controls="financialHealthPanel" data-cockpit-tab="health">Saúde Financeira</button>
+          </div>
 
-          <section class="cockpit-alert limit-alert" id="cockpitLimitAlert" hidden></section>
-          <section class="cockpit-alert portfolio-maturity-alert" id="cockpitPortfolioMaturityAlert" hidden></section>
-
-          <div class="cockpit-stack">
-            <section class="currency-panel">
-              <div class="section-heading">
-                <h2>Saldos por moeda</h2>
+          <div class="cockpit-tab-panel" id="cockpitSummaryPanel" role="tabpanel">
+            <section class="summary-strip">
+              <div class="kpi-income">
+                <span>Receitas do mês</span>
+                <strong id="monthIncome">R$ 0,00</strong>
               </div>
-              <div class="currency-list" id="currencyList"></div>
-              <div class="cockpit-portfolio-summary">
-                <h3>Portfólio por tipo</h3>
-                <div id="cockpitPortfolioByType"></div>
+              <div class="kpi-expense">
+                <span>Despesas do mês</span>
+                <strong id="monthExpense">R$ 0,00</strong>
+              </div>
+              <div class="kpi-investment">
+                <span>Aportes do mês</span>
+                <strong id="monthInvestment">R$ 0,00</strong>
+              </div>
+              <div class="kpi-rate">
+                <span>Taxa de poupança</span>
+                <strong id="savingsRate">0%</strong>
               </div>
             </section>
 
-            <div class="cockpit-grid planning-debt-grid">
-            <section class="panel">
-              <div class="section-heading">
-                <h2>Planejamento do mês</h2>
-              </div>
-              <div class="planning-list" id="monthlyPlanningList"></div>
-            </section>
+            <section class="cockpit-alert limit-alert" id="cockpitLimitAlert" hidden></section>
+            <section class="cockpit-alert portfolio-maturity-alert" id="cockpitPortfolioMaturityAlert" hidden></section>
 
-            <section class="panel">
-              <div class="section-heading">
-                <h2>Dívidas</h2>
+            <div class="cockpit-stack">
+              <section class="currency-panel">
+                <div class="section-heading">
+                  <h2>Saldos por moeda</h2>
+                </div>
+                <div class="currency-list" id="currencyList"></div>
+                <div class="cockpit-portfolio-summary">
+                  <h3>Portfólio por tipo</h3>
+                  <div id="cockpitPortfolioByType"></div>
+                </div>
+              </section>
+
+              <div class="cockpit-grid planning-debt-grid">
+              <section class="panel">
+                <div class="section-heading">
+                  <h2>Planejamento do mês</h2>
+                </div>
+                <div class="planning-list" id="monthlyPlanningList"></div>
+              </section>
+
+              <section class="panel">
+                <div class="section-heading">
+                  <h2>Dívidas</h2>
+                </div>
+                <div class="planning-list" id="installmentDebtList"></div>
+              </section>
               </div>
-              <div class="planning-list" id="installmentDebtList"></div>
-            </section>
+            </div>
+
+            <div class="cockpit-grid analytics-grid">
+              <section class="panel">
+                <div class="section-heading">
+                  <h2>Maiores despesas do mês</h2>
+                </div>
+                <div class="chart-panel" id="topExpensesChart"></div>
+              </section>
+
+              <section class="panel">
+                <div class="section-heading">
+                  <h2>Maiores receitas do mês</h2>
+                </div>
+                <div class="chart-panel" id="cashDistributionChart"></div>
+              </section>
             </div>
           </div>
 
-          <div class="cockpit-grid analytics-grid">
-            <section class="panel">
-              <div class="section-heading">
-                <h2>Maiores despesas do mês</h2>
-              </div>
-              <div class="chart-panel" id="topExpensesChart"></div>
-            </section>
-
-            <section class="panel">
-              <div class="section-heading">
-                <h2>Maiores receitas do mês</h2>
-              </div>
-              <div class="chart-panel" id="cashDistributionChart"></div>
-            </section>
-          </div>
-
-          <section class="panel financial-health-panel" id="financialHealthPanel">
+          <section class="panel financial-health-panel cockpit-tab-panel" id="financialHealthPanel" role="tabpanel" hidden>
             <div class="financial-health-header">
               <div>
                 <h2>Saúde Financeira</h2>

@@ -85,6 +85,7 @@ const state = {
   transactions: [],
   accountTransactions: [],
   cockpit: null,
+  cockpitTab: "summary",
   financialHealth: null,
   financialHealthMonth: currentMonthValue(),
   financialHealthLoading: false,
@@ -338,10 +339,13 @@ const monthIncome = document.querySelector("#monthIncome");
 const monthExpense = document.querySelector("#monthExpense");
 const monthInvestment = document.querySelector("#monthInvestment");
 const savingsRate = document.querySelector("#savingsRate");
+const cockpitTabs = document.querySelectorAll("[data-cockpit-tab]");
+const cockpitSummaryPanel = document.querySelector("#cockpitSummaryPanel");
 const currencyList = document.querySelector("#currencyList");
 const cockpitPortfolioByType = document.querySelector("#cockpitPortfolioByType");
 const cockpitLimitAlert = document.querySelector("#cockpitLimitAlert");
 const cockpitPortfolioMaturityAlert = document.querySelector("#cockpitPortfolioMaturityAlert");
+const financialHealthPanel = document.querySelector("#financialHealthPanel");
 const financialHealthMonthLabel = document.querySelector("#financialHealthMonthLabel");
 const previousFinancialHealthMonthButton = document.querySelector("#previousFinancialHealthMonthButton");
 const nextFinancialHealthMonthButton = document.querySelector("#nextFinancialHealthMonthButton");
@@ -553,6 +557,8 @@ const cockpitView = registerCockpitView({
     monthExpense,
     monthInvestment,
     savingsRate,
+    cockpitTabs,
+    cockpitSummaryPanel,
     currencyList,
     monthlyPlanningList,
     installmentDebtList,
@@ -560,6 +566,7 @@ const cockpitView = registerCockpitView({
     cashDistributionChart,
     cockpitPortfolioByType,
     cockpitPortfolioMaturityAlert,
+    financialHealthPanel,
     financialHealthMonthLabel,
     previousFinancialHealthMonthButton,
     nextFinancialHealthMonthButton,
@@ -978,6 +985,7 @@ function resetSessionState() {
   state.transactions = [];
   state.accountTransactions = [];
   state.cockpit = null;
+  state.cockpitTab = "summary";
   state.financialHealth = null;
   state.financialHealthMonth = currentMonthValue();
   state.financialHealthLoading = false;
