@@ -2,7 +2,7 @@
 tipo: spec
 area: score-saude-financeira
 status: em-implementacao
-versao: 2.5
+versao: 2.9
 atualizado: 2026-07-31
 relacionados:
   - "[[relatorios]]"
@@ -80,6 +80,7 @@ Qualquer usuário autenticado localmente que deseje entender sua saúde financei
     - A penalidade é aplicada quando a maior concentração ultrapassa o limite da sua dimensão (70% para classe, 60% para ativo). A interface deve apresentar mensagens textuais e explicativas, como `Você tem alta concentração do seu portfólio em Renda Fixa (xx%).`, sem prescrever compra ou venda de ativos.
   - **Concentração em Poupança**: Quando Poupança representar mais de 25% do Portfólio cadastrado, o pilar deve aplicar penalidade adicional e exibir mensagem explicativa, por exemplo: `Poupança representa xx% do seu portfólio; há produtos com melhor relação de rendimento e liquidez que podem ser avaliados conforme seu perfil.` Essa mensagem deve ser educativa, não uma recomendação personalizada de investimento.
 - **Interface e Navegação**: O Score de Saúde Financeira e suas recomendações acionáveis são exibidos em uma aba dedicada dentro do módulo **Cockpit**, separada da aba **Situação do mês**, permitindo acesso direto ao diagnóstico sem exigir rolagem pelos KPIs, saldos, planejamento, dívidas e gráficos do resumo mensal.
+- **Ajuda contextual da Taxa de Poupança**: O KPI/card de **Taxa de poupança** na aba **Situação do mês**, a linha do pilar em **Seus Pilares** e o card detalhado do pilar **Taxa de Poupança** devem exibir um pequeno indicador `i` discreto e acessível. Ao receber hover, foco de teclado ou clique/foco, o indicador deve abrir uma caixa de ajuda visível explicando a fórmula `(receitas do mês - despesas de consumo do mês) / receitas do mês`, deixando claro que investimentos/aportes, transferências, câmbio e pagamentos de fatura não entram como despesa de consumo para este pilar.
 - **Gráfico dos pilares**: A aba deve exibir um gráfico compacto de barras horizontais normalizadas por pilar, usando a lista `pilares`. Cada barra compara `score / max_score`, preserva o peso do pilar no rótulo e permite leitura imediata do desempenho relativo. O gráfico deve usar CSS/SVG nativo, sem biblioteca externa, respeitar os tokens do [[../design/design-system|design system]], usar algarismos tabulares nos números e evitar novas cores semânticas. O estado saudável usa o token semântico `var(--color-success, #10B981)` com texto `var(--color-success-text, #ffffff)` para garantir contraste acessível (WCAG AA) em ambos os temas; estados de atenção/crítico devem usar os tokens semânticos `var(--color-warning, #F59E0B)` e `var(--color-error, #EF4444)` com seus respectivos textos, ou variações neutras do design system quando apropriado.
 - **Acessibilidade do gráfico**: O gráfico deve ter alternativa textual equivalente no próprio DOM, com nome do pilar, pontuação obtida, pontuação máxima e percentual. Em telas estreitas, as barras podem virar lista vertical densa, sem perder os valores.
 - **Paz Financeira (informativo, sem pontuação)**: A aba dedicada deve exibir uma seção **Paz Financeira** que nunca altera o `score_total` nem qualquer pilar. A seção usa como base a **média mensal das receitas recorrentes dos últimos 12 meses**, considerando apenas lançamentos de receita com recorrência mensal (`series_kind = recurring`). Receitas não recorrentes ou pontuais, como PLR, bônus, venda de ativos, restituições ou eventos similares, não entram na base principal. Se houver histórico recorrente parcial, usa a média dos meses disponíveis com confiança intermediária. Se não houver receitas recorrentes, pode usar as receitas do mês consultado como fallback com aviso explícito de menor confiança. Os cards exibidos são apresentados como **estimativas / referências de planejamento**, nunca como metas, obrigações ou recomendações personalizadas de investimento:
@@ -132,6 +133,8 @@ Tabelas: consulta `transactions`, `credit_card_transactions`, `spending_limits`,
 - Dado o Cockpit carregado com a aba **Situação do mês** ativa, quando o usuário clica em **Saúde Financeira**, então a aba dedicada do score é exibida diretamente, sem o conteúdo do resumo financeiro acima dela.
 - Dado o Cockpit carregado, quando a aba dedicada de Saúde Financeira exibe os pilares, então há um gráfico de barras horizontais com os 5 pilares, cada um exibindo pontuação obtida, pontuação máxima, percentual e peso, sem depender de biblioteca externa.
 - Dado um usuário em viewport estreita ou usando leitor de tela, quando acessa o gráfico dos pilares, então os mesmos dados do gráfico ficam disponíveis em lista textual equivalente e sem overflow horizontal.
+- Dado o Cockpit carregado na aba **Situação do mês**, quando o usuário visualiza o KPI/card **Taxa de poupança**, então há um pequeno indicador `i` que abre uma caixa de ajuda textual acessível em hover, foco ou clique/foco, explicando a fórmula e as exclusões do cálculo.
+- Dado o Cockpit carregado na aba Saúde Financeira, quando o usuário visualiza a linha do pilar ou o card detalhado de **Taxa de Poupança**, então há um pequeno indicador `i` que abre uma caixa de ajuda textual acessível em hover, foco ou clique/foco, explicando a fórmula e as exclusões do cálculo.
 
 ## Pendências
 
@@ -148,11 +151,15 @@ Nenhuma pendência conhecida.
 - [x] Passo 2 — Criar módulo Python `financeiro/financial_health.py` implementando as funções atômicas de cálculo de cada pilar (com a distribuição 25/25/20/15/15), a lista `pilares` e a seção informativa Paz Financeira em centavos inteiros. Fecha: critérios 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 e 11.
 - [x] Passo 3 — Adicionar as rotas `GET /api/financial-health-score` e `GET /api/financial-health-score/history` em `app.py` com validação de sessão e origem. Fecha: critérios 12, 13 e 14.
 - [x] Passo 4 — Criar os testes unitários automatizados em `tests/test_financial_health.py` validando os pilares, Paz Financeira e casos de borda. Fecha: critérios 1, 2, 3, 4, 5, 6, 7, 8, 9 e 10.
-- [x] Passo 5 — Implementar a aba dedicada de Saúde Financeira na view do Cockpit (`web/modules/cockpit-view.js` / sub-view dedicada), incluindo gráfico nativo de barras horizontais por pilar e fallback textual acessível. Fecha: critérios 15, 16 e 17.
+- [x] Passo 5 — Implementar a aba dedicada de Saúde Financeira na view do Cockpit (`web/modules/cockpit-view.js` / sub-view dedicada), incluindo gráfico nativo de barras horizontais por pilar, fallback textual acessível e ajuda contextual da Taxa de Poupança. Fecha: critérios 15, 16, 17, 22 e 23.
 - [ ] Passo 6 — Atualizar `docs/arquitetura.md` e `docs/requisitos.md` com as novas rotas, módulo e metadado de reserva no Portfólio.
 
 ## Changelog
 
+- `2.9` — 2026-07-31 — Indicador `i` da Taxa de Poupança passa a abrir caixa de ajuda visual em hover, foco de teclado ou clique/foco, em vez de depender apenas do tooltip nativo.
+- `2.8` — 2026-07-31 — Ajuda contextual de Taxa de Poupança passa a aparecer também no KPI/card da aba "Situação do mês".
+- `2.7` — 2026-07-31 — Ajuda contextual de Taxa de Poupança passa a aparecer também na linha do pilar em "Seus Pilares", além do card detalhado.
+- `2.6` — 2026-07-31 — Adicionada ajuda contextual no card detalhado de Taxa de Poupança para explicar fórmula e exclusões do cálculo.
 - `2.5` — 2026-07-31 — Referência da aba operacional do Cockpit atualizada para `Situação do mês`, mantendo Saúde Financeira como aba diagnóstica separada.
 - `2.4` — 2026-07-31 — Saúde Financeira passa a ser acessada por aba interna separada do Resumo financeiro no Cockpit.
 - `2.3` — 2026-07-29 — Paz Financeira passa a usar média mensal das receitas recorrentes dos últimos 12 meses como base principal, com confiança intermediária para histórico parcial e fallback mensal apenas quando não houver recorrências.

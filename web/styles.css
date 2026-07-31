@@ -1829,6 +1829,98 @@ textarea:focus {
   font-weight: 900;
 }
 
+.financial-health-detail-card h4,
+.pillar-label-with-help,
+.kpi-label-with-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.summary-strip .kpi-label-with-help {
+  align-self: start;
+}
+
+.inline-help-icon {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--panel) 70%, var(--muted) 8%);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: help;
+  user-select: none;
+}
+
+.inline-help-icon:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.inline-help-icon::after {
+  position: absolute;
+  z-index: 40;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  width: min(280px, 72vw);
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--tooltip-surface);
+  color: var(--tooltip-text);
+  box-shadow: var(--shadow);
+  content: attr(data-tooltip);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: 0;
+  text-align: left;
+  text-transform: none;
+  white-space: normal;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.inline-help-icon::before {
+  position: absolute;
+  z-index: 41;
+  left: 50%;
+  bottom: calc(100% + 3px);
+  width: 9px;
+  height: 9px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--tooltip-surface);
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px) rotate(45deg);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.inline-help-icon:hover::after,
+.inline-help-icon:focus::after,
+.inline-help-icon:hover::before,
+.inline-help-icon:focus::before {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.inline-help-icon:hover::before,
+.inline-help-icon:focus::before {
+  transform: translate(-50%, 0) rotate(45deg);
+}
+
 .financial-health-detail-card.level-bom header > span,
 .financial-health-detail-card.level-excelente header > span {
   border-color: color-mix(in srgb, var(--color-success, var(--positive)) 50%, var(--line));

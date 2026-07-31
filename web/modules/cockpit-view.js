@@ -189,10 +189,14 @@ export function registerCockpitView({
     const score = Number(pillar.score || 0);
     const maxScore = Number(pillar.max_score || 0);
     const percent = maxScore > 0 ? Math.max(0, Math.min(100, (score / maxScore) * 100)) : 0;
+    const help = financialHealthPillarHelp(pillar);
     return `
       <article class="financial-health-pillar-row ${financialHealthLevelClass(pillar.nivel)}" role="listitem">
         <div>
-          <strong>${escapeHtml(pillar.label || "Pilar")}</strong>
+          <strong class="pillar-label-with-help">
+            ${escapeHtml(pillar.label || "Pilar")}
+            ${help ? inlineHelpIcon(help) : ""}
+          </strong>
           <span>${Number(pillar.peso_pct || 0).toLocaleString("pt-BR")}%</span>
         </div>
         <div class="financial-health-bar" aria-hidden="true">
@@ -206,12 +210,16 @@ export function registerCockpitView({
 
   function financialHealthPillarDetail(pillar, data) {
     const extra = financialHealthPillarExtra(pillar, data);
+    const help = financialHealthPillarHelp(pillar);
     return `
       <article class="financial-health-detail-card ${financialHealthLevelClass(pillar.nivel)}">
         <header>
           <span>${financialHealthLevelIcon(pillar.nivel)}</span>
           <div>
-            <h4>${escapeHtml(pillar.label || "Pilar")}</h4>
+            <h4>
+              ${escapeHtml(pillar.label || "Pilar")}
+              ${help ? inlineHelpIcon(help) : ""}
+            </h4>
             <small>${escapeHtml(financialHealthLevelLabel(pillar.nivel))}</small>
           </div>
         </header>
@@ -220,6 +228,17 @@ export function registerCockpitView({
         <p>${escapeHtml(pillar.mensagem || "Indicador calculado com base nos dados cadastrados.")}</p>
       </article>
     `;
+  }
+
+  function inlineHelpIcon(help) {
+    return `<button class="inline-help-icon" type="button" aria-label="${escapeHtml(help)}" title="${escapeHtml(help)}" data-tooltip="${escapeHtml(help)}">i</button>`;
+  }
+
+  function financialHealthPillarHelp(pillar) {
+    if (pillar.id === "poupanca") {
+      return "Taxa de poupança = (receitas do mês - despesas de consumo do mês) / receitas do mês. Investimentos/aportes, transferências, câmbio e pagamentos de fatura não entram como despesa de consumo.";
+    }
+    return "";
   }
 
   function financialHealthPillarExtra(pillar, data) {
