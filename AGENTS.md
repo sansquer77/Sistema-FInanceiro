@@ -113,7 +113,12 @@ Veja o mapeamento completo de rotas e tabelas em [`docs/arquitetura.md`](docs/ar
 
 - **Dinheiro sempre em centavos** (inteiro) — nunca `float` para valores monetários.
 - **Datas de lançamento em ISO `YYYY-MM-DD`**.
-- **Versão do app centralizada** em `financeiro/app_metadata.py` e exposta por `/api/app-info`. A versão de produto parte de `1.0.50`; correções e ajustes incrementais evoluem em `1.0.n`, enquanto mudanças funcionais maiores podem justificar evolução `1.y`. Ao concluir mudanças, sugira explicitamente se o incremento recomendado é patch (`1.0.n`) ou minor (`1.y`), sem atualizar a constante automaticamente salvo pedido do usuário ou spec aplicável.
+- **Versão do app centralizada** em `financeiro/app_metadata.py` e exposta por `/api/app-info`. A versão de produto parte de `1.0.50` e segue versionamento semântico:
+  - `PATCH` (`3.0.5` → `3.0.6`): correção compatível, segurança, desempenho ou ajuste operacional sem nova capacidade relevante para o usuário.
+  - `MINOR` (`3.0.5` → `3.1.0`): nova funcionalidade ou capacidade relevante, compatível com os fluxos e dados existentes.
+  - `MAJOR` (`3.0.5` → `4.0.0`): mudança incompatível em fluxo, regra, dados, configuração ou operação que exija migração/ação dos usuários ou operadores.
+  - Mudanças somente em documentação, testes, comentários ou refatorações sem efeito observável não incrementam a versão do produto.
+  Ao concluir mudanças, sugira explicitamente se o incremento recomendado é `PATCH`, `MINOR`, `MAJOR` ou nenhum incremento, sem atualizar a constante automaticamente salvo pedido do usuário ou spec aplicável.
 - Escritas que alteram saldo usam **deltas atômicos** (`saldo = saldo + delta`) ou uma transação SQLite curta e imediata que protege a leitura prévia. Nunca segurar uma conexão aberta durante uma chamada externa (SMTP, cotação, importação em lote).
 - Novas tabelas e colunas são criadas **de forma idempotente** em `financeiro/database.py` — migrações devem rodar seguramente em bancos já existentes.
 - Erros de domínio retornam mensagem amigável + status HTTP, **sem vazar detalhes internos** (stack trace, SQL, caminho de arquivo).

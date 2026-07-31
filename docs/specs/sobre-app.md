@@ -2,8 +2,8 @@
 tipo: spec
 area: usuario
 status: implementado
-versao: 1.4
-atualizado: 2026-07-27
+versao: 1.5
+atualizado: 2026-07-31
 relacionados:
   - "[[frontend-modularizacao]]"
   - "[[../arquitetura|Arquitetura]]"
@@ -16,7 +16,7 @@ aliases: ["Sobre o App", "Sobre"]
 # Sobre o App
 
 > [!info] Status
-> **implementado** · área: `usuario` · atualizado em 2026-07-27 · relacionados: [[frontend-modularizacao]], [[../arquitetura|Arquitetura]], [[../distribuição|Distribuicao]], [[../requisitos|Requisitos]]
+> **implementado** · área: `usuario` · atualizado em 2026-07-31 · relacionados: [[frontend-modularizacao]], [[../arquitetura|Arquitetura]], [[../distribuição|Distribuicao]], [[../requisitos|Requisitos]]
 
 ## Problema
 
@@ -54,7 +54,12 @@ Usuários finais e mantenedores que usam o Sistema Financeiro localmente, instal
   - Versão atual do sistema, a partir do endpoint de metadados do app.
   - Tecnologias utilizadas no app.
   - Contato: `cristiano_gaspar@outlook.com`.
-- A versão de produto deve partir de `1.0.50` e evoluir preferencialmente em `1.0.n` para correções e ajustes incrementais; mudanças funcionais maiores podem justificar evolução `1.y`.
+- A versão de produto deve partir de `1.0.50`, ficar centralizada em `financeiro/app_metadata.py`, ser exposta por `/api/app-info` e seguir versionamento semântico:
+  - `PATCH` (`3.0.5` → `3.0.6`): correção compatível, segurança, desempenho ou ajuste operacional sem nova capacidade relevante para o usuário.
+  - `MINOR` (`3.0.5` → `3.1.0`): nova funcionalidade ou capacidade relevante, compatível com os fluxos e dados existentes.
+  - `MAJOR` (`3.0.5` → `4.0.0`): mudança incompatível em fluxo, regra, dados, configuração ou operação que exija migração/ação dos usuários ou operadores.
+  - Mudanças somente em documentação, testes, comentários ou refatorações sem efeito observável não incrementam a versão do produto.
+- Agentes e mantenedores devem sugerir explicitamente o incremento recomendado (`PATCH`, `MINOR`, `MAJOR` ou nenhum incremento) ao concluir mudanças, sem atualizar a constante automaticamente salvo pedido explícito ou spec aplicável.
 - A infraestrutura mínima deve distinguir uso local e uso em rede/LAN.
 - O uso em rede deve ser descrito como adequado apenas para rede confiável; acesso remoto deve usar HTTPS/reverse-proxy.
 - A tela deve respeitar o design system existente, sem introduzir nova identidade visual.
@@ -85,6 +90,7 @@ Usuários finais e mantenedores que usam o Sistema Financeiro localmente, instal
 
 ## Changelog
 
+- `1.5` — 2026-07-31 — Política de versionamento do produto formalizada com critérios para PATCH, MINOR, MAJOR e casos sem incremento de versão.
 - `1.4` — 2026-07-27 — Ajustado layout do texto descritivo no painel principal para usar melhor a largura disponível; versão do app elevada para `1.0.51`.
 - `1.3` — 2026-07-27 — Versão do sistema centralizada em metadado do backend, exposta via endpoint e exibida na tela Sobre; versão inicial convencionada como `1.0.50`.
 - `1.2` — 2026-07-27 — Tela Sobre passa a exibir a versão atual do sistema para identificação do app em execução.
