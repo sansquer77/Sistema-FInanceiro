@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 1.8
+versao: 1.9
 atualizado: 2026-08-02
 relacionados:
   - "[[arquitetura]]"
@@ -83,6 +83,7 @@ Manter um sistema financeiro local, privado e simples para controlar contas, sal
 - Ao trocar ou redefinir a senha, todas as sessões ativas do usuário são encerradas.
 - Toda mutação exige `Host` e `Origin` válidos como proteção contra CSRF.
 - A configuração SMTP fica criptografada por usuário em `data/email_config_user_{id}.enc`.
+- Segredos de integrações opcionais de IA ficam criptografados por usuário em `data/ai_config_user_{id}.enc` e nunca são retornados pela API.
 - A chave local fica em `data/email_config.key` ou na variável `SISTEMA_FINANCEIRO_CONFIG_KEY`.
 - Pacotes distribuíveis não incluem credenciais SMTP; cada usuário configura seu próprio remetente localmente.
 - Arquivos de runtime em `data/` não devem ser versionados.
@@ -114,6 +115,7 @@ Manter um sistema financeiro local, privado e simples para controlar contas, sal
 
 ## Changelog
 
+- `1.9` — 2026-08-02 — Regras de segurança atualizadas para prever armazenamento criptografado local de segredos de integrações opcionais de IA.
 - `1.8` — 2026-08-02 — Cockpit documentado como resumo mensal navegável por seletor de mês, preservando faturas de cartão por competência mesmo após pagamento.
 - `1.7` — 2026-07-24 — Incluída a tela Sobre no escopo implementado do menu Usuário.
 - `1.6` — 2026-07-23 — Incluído o MVP local de classificação assistida por correspondência exata normalizada.

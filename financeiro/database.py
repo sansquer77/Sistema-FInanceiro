@@ -451,6 +451,23 @@ def initialize_database() -> None:
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
+            CREATE TABLE IF NOT EXISTS user_ai_settings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
+                provider TEXT NOT NULL DEFAULT 'custom' CHECK (provider IN ('openai', 'anthropic', 'google', 'custom', 'local')),
+                base_url TEXT NOT NULL DEFAULT '',
+                model TEXT NOT NULL DEFAULT '',
+                auth_type TEXT NOT NULL DEFAULT 'bearer' CHECK (auth_type IN ('none', 'bearer')),
+                timeout_seconds INTEGER NOT NULL DEFAULT 10 CHECK (timeout_seconds BETWEEN 1 AND 60),
+                temperature_micros INTEGER NOT NULL DEFAULT 200000 CHECK (temperature_micros BETWEEN 0 AND 2000000),
+                max_tokens INTEGER NOT NULL DEFAULT 700 CHECK (max_tokens BETWEEN 1 AND 4000),
+                secret_config_path TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (user_id)
+            );
+
             CREATE UNIQUE INDEX IF NOT EXISTS idx_spending_limits_category
             ON spending_limits (user_id, month, category_id)
             WHERE subcategory_id IS NULL;
@@ -527,6 +544,7 @@ def initialize_database() -> None:
         ensure_column(conn, "checking_accounts", "account_type", "TEXT NOT NULL DEFAULT 'liquidity'")
         ensure_column(conn, "categories", "group_type", "TEXT NOT NULL DEFAULT 'expense'")
         ensure_operation_logs(conn)
+        ensure_ai_settings(conn)
         migrate_category_unique_constraint(conn)
         migrate_transaction_type_constraint(conn)
         migrate_transaction_tags(conn)
@@ -576,6 +594,38 @@ def ensure_operation_logs(conn: sqlite3.Connection) -> None:
     ensure_column(conn, "operation_logs", "operation_batch_id", "TEXT")
     ensure_column(conn, "operation_logs", "account_id", "INTEGER REFERENCES checking_accounts(id) ON DELETE SET NULL")
     ensure_column(conn, "operation_logs", "credit_card_id", "INTEGER REFERENCES credit_cards(id) ON DELETE SET NULL")
+
+
+def ensure_ai_settings(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS user_ai_settings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
+            provider TEXT NOT NULL DEFAULT 'custom' CHECK (provider IN ('openai', 'anthropic', 'google', 'custom', 'local')),
+            base_url TEXT NOT NULL DEFAULT '',
+            model TEXT NOT NULL DEFAULT '',
+            auth_type TEXT NOT NULL DEFAULT 'bearer' CHECK (auth_type IN ('none', 'bearer')),
+            timeout_seconds INTEGER NOT NULL DEFAULT 10 CHECK (timeout_seconds BETWEEN 1 AND 60),
+            temperature_micros INTEGER NOT NULL DEFAULT 200000 CHECK (temperature_micros BETWEEN 0 AND 2000000),
+            max_tokens INTEGER NOT NULL DEFAULT 700 CHECK (max_tokens BETWEEN 1 AND 4000),
+            secret_config_path TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (user_id)
+        )
+        """
+    )
+    ensure_column(conn, "user_ai_settings", "enabled", "INTEGER NOT NULL DEFAULT 0")
+    ensure_column(conn, "user_ai_settings", "provider", "TEXT NOT NULL DEFAULT 'custom'")
+    ensure_column(conn, "user_ai_settings", "base_url", "TEXT NOT NULL DEFAULT ''")
+    ensure_column(conn, "user_ai_settings", "model", "TEXT NOT NULL DEFAULT ''")
+    ensure_column(conn, "user_ai_settings", "auth_type", "TEXT NOT NULL DEFAULT 'bearer'")
+    ensure_column(conn, "user_ai_settings", "timeout_seconds", "INTEGER NOT NULL DEFAULT 10")
+    ensure_column(conn, "user_ai_settings", "temperature_micros", "INTEGER NOT NULL DEFAULT 200000")
+    ensure_column(conn, "user_ai_settings", "max_tokens", "INTEGER NOT NULL DEFAULT 700")
+    ensure_column(conn, "user_ai_settings", "secret_config_path", "TEXT NOT NULL DEFAULT ''")
 
 
 def row_to_dict(row: sqlite3.Row | None) -> dict | None:

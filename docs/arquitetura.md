@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 2.3
+versao: 2.4
 atualizado: 2026-08-02
 relacionados:
   - "[[requisitos]]"
@@ -239,7 +239,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `imports.py` | Leitura de exportações Organizze e planilhas modelo. Ver [[importacao-organizze]]. |
 | `operation_logs.py` | Auditoria funcional das operações do usuário. Ver [[historico-operacoes]]. |
 | `emailer.py` | Envio SMTP do código de recuperação de senha. Ver [[recuperacao-senha]]. |
-| `secure_config.py` | Armazenamento criptografado da configuração SMTP local. Ver [[recuperacao-senha]]. |
+| `secure_config.py` | Armazenamento criptografado da configuração SMTP local e de segredos de IA por usuário. Ver [[recuperacao-senha]], [[tendencias-saude-financeira]]. |
 
 ---
 
@@ -274,8 +274,11 @@ Conexões SQLite são abertas com `journal_mode=WAL`, `busy_timeout` curto e `fo
 | `investment_closed_positions` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
 | `investment_value_overrides` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
 | `quote_cache` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
+| `user_ai_settings` | `secure_config.py` — metadados não secretos de configuração opcional de IA por usuário; segredo fica em arquivo criptografado local. Ver [[tendencias-saude-financeira]]. |
 
 `transactions` e `credit_card_transactions` persistem `normalized_description` para a classificação assistida. Bancos existentes são retroalimentados de forma idempotente durante a inicialização.
+
+`user_ai_settings` armazena somente provedor, endpoint/base URL, modelo, estado ligado/desligado, autenticação e parâmetros operacionais. Chaves de API de IA são salvas fora do banco em `data/ai_config_user_{id}.enc`, criptografadas com o mesmo material de chave local usado por `secure_config.py`; APIs nunca devem retornar o segredo.
 
 ### Índices principais
 
@@ -428,6 +431,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `2.4` — 2026-08-02 — Documentada a tabela `user_ai_settings` e o armazenamento criptografado local de segredos de IA por usuário para a futura aba de Tendências.
 - `2.3` — 2026-08-02 — Fluxo do Cockpit documentado com seletor mensal compartilhado e faturas de cartão preservadas por competência após pagamento.
 - `2.2` — 2026-07-29 — Documentado metadado `emergency_reserve_eligible` também em `investment_operations`, permitindo marcar aportes de Renda Fixa/Poupança como reserva de emergência.
 - `2.1` — 2026-07-29 — Documentadas rotas do Score de Saúde Financeira (`/api/financial-health-score` e `/api/financial-health-score/history`) e a validação de `months` (1-36) no histórico; descrição de `financial_health.py` atualizada para incluir função de histórico.

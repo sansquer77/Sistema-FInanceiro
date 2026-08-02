@@ -26,6 +26,33 @@ EMAIL_PROVIDER_PRESETS = {
         "use_tls": True,
     },
 }
+AI_PROVIDER_PRESETS = {
+    "openai": {
+        "label": "OpenAI / ChatGPT",
+        "base_url": "https://api.openai.com/v1",
+        "auth_type": "bearer",
+    },
+    "anthropic": {
+        "label": "Anthropic / Claude",
+        "base_url": "https://api.anthropic.com/v1",
+        "auth_type": "bearer",
+    },
+    "google": {
+        "label": "Google / Gemini",
+        "base_url": "https://generativelanguage.googleapis.com/v1beta",
+        "auth_type": "bearer",
+    },
+    "custom": {
+        "label": "Custom / Local",
+        "base_url": "",
+        "auth_type": "bearer",
+    },
+    "local": {
+        "label": "Local",
+        "base_url": "",
+        "auth_type": "none",
+    },
+}
 
 
 class SecureConfigError(Exception):
@@ -38,6 +65,10 @@ def email_config_path(user_id: int) -> Path:
 
 def email_config_key_path() -> Path:
     return database.DATA_DIR / "email_config.key"
+
+
+def ai_secret_config_path(user_id: int) -> Path:
+    return database.DATA_DIR / f"ai_config_user_{int(user_id)}.enc"
 
 
 def load_encrypted_config(path: Path, key_path: Path | None = None) -> dict:
@@ -150,6 +181,180 @@ def save_email_config(user_id: int, data: dict) -> dict:
 
 def load_email_config(user_id: int) -> dict:
     return load_encrypted_config(email_config_path(user_id))
+
+
+def ai_provider_presets() -> list[dict]:
+    return [
+        {
+            "provider": key,
+            "label": str(value["label"]),
+            "base_url": str(value["base_url"]),
+            "auth_type": str(value["auth_type"]),
+        }
+        for key, value in AI_PROVIDER_PRESETS.items()
+    ]
+
+
+def ai_settings_status(user_id: int) -> dict:
+    with database.get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT enabled, provider, base_url, model, auth_type, timeout_seconds,
+                   temperature_micros, max_tokens, secret_config_path
+            FROM user_ai_settings
+            WHERE user_id = ?
+            """,
+            (user_id,),
+        ).fetchone()
+    if row is None:
+        return default_ai_settings_status()
+    secret_path = Path(str(row["secret_config_path"] or "")) if row["secret_config_path"] else ai_secret_config_path(user_id)
+    return {
+        "configured": bool(row["model"]) and (str(row["auth_type"]) == "none" or secret_path.exists()),
+        "enabled": bool(row["enabled"]),
+        "provider": str(row["provider"] or "custom"),
+        "base_url": str(row["base_url"] or ""),
+        "model": str(row["model"] or ""),
+        "auth_type": str(row["auth_type"] or "bearer"),
+        "has_api_key": secret_path.exists(),
+        "timeout_seconds": int(row["timeout_seconds"] or 10),
+        "temperature": micros_to_decimal(row["temperature_micros"], "0.2"),
+        "max_tokens": int(row["max_tokens"] or 700),
+        "presets": ai_provider_presets(),
+        "contract": "openai_chat_completions",
+    }
+
+
+def default_ai_settings_status() -> dict:
+    return {
+        "configured": False,
+        "enabled": False,
+        "provider": "custom",
+        "base_url": "",
+        "model": "",
+        "auth_type": "bearer",
+        "has_api_key": False,
+        "timeout_seconds": 10,
+        "temperature": 0.2,
+        "max_tokens": 700,
+        "presets": ai_provider_presets(),
+        "contract": "openai_chat_completions",
+    }
+
+
+def save_ai_settings(user_id: int, data: dict) -> dict:
+    provider = normalize_ai_provider(data.get("provider"))
+    preset = AI_PROVIDER_PRESETS[provider]
+    enabled = bool(data.get("enabled", False))
+    base_url = str(data.get("base_url") or preset["base_url"]).strip().rstrip("/")
+    model = str(data.get("model") or "").strip()
+    auth_type = str(data.get("auth_type") or preset["auth_type"]).strip().lower()
+    api_key = str(data.get("api_key") or "").strip()
+    timeout_seconds = normalize_int(data.get("timeout_seconds"), 10, 1, 60, "Timeout invalido.")
+    temperature_micros = normalize_temperature_micros(data.get("temperature"))
+    max_tokens = normalize_int(data.get("max_tokens"), 700, 1, 4000, "Limite de tokens invalido.")
+    if auth_type not in {"none", "bearer"}:
+        raise SecureConfigError("Tipo de autenticacao de IA invalido.")
+    if provider in {"custom", "local"} and not base_url:
+        raise SecureConfigError("Informe a URL base da IA customizada/local.")
+    if provider in {"openai", "anthropic", "google"} and not base_url:
+        raise SecureConfigError("URL base do provedor de IA invalida.")
+    if enabled and not model:
+        raise SecureConfigError("Informe o modelo de IA.")
+
+    secret_path = ai_secret_config_path(user_id)
+    existing_key = ""
+    if secret_path.exists():
+        try:
+            existing_key = str(load_encrypted_config(secret_path).get("api_key") or "")
+        except SecureConfigError:
+            existing_key = ""
+    effective_key = api_key or existing_key
+    if enabled and auth_type == "bearer" and not effective_key:
+        raise SecureConfigError("Informe a chave de API para ativar a IA.")
+    if auth_type == "bearer" and effective_key:
+        save_encrypted_config({"api_key": effective_key}, secret_path)
+    elif auth_type == "none" and secret_path.exists():
+        secret_path.unlink()
+
+    # spec: tendencias-saude-financeira v0.7 — critérios 17, 21, 23, 27 e 28
+    with database.get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO user_ai_settings (
+                user_id, enabled, provider, base_url, model, auth_type,
+                timeout_seconds, temperature_micros, max_tokens, secret_config_path
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                enabled = excluded.enabled,
+                provider = excluded.provider,
+                base_url = excluded.base_url,
+                model = excluded.model,
+                auth_type = excluded.auth_type,
+                timeout_seconds = excluded.timeout_seconds,
+                temperature_micros = excluded.temperature_micros,
+                max_tokens = excluded.max_tokens,
+                secret_config_path = excluded.secret_config_path,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (
+                user_id,
+                1 if enabled else 0,
+                provider,
+                base_url,
+                model,
+                auth_type,
+                timeout_seconds,
+                temperature_micros,
+                max_tokens,
+                str(secret_path),
+            ),
+        )
+    return ai_settings_status(user_id)
+
+
+def load_ai_settings(user_id: int) -> dict:
+    status = ai_settings_status(user_id)
+    api_key = ""
+    if status["has_api_key"]:
+        api_key = str(load_encrypted_config(ai_secret_config_path(user_id)).get("api_key") or "")
+    return {**status, "api_key": api_key}
+
+
+def normalize_ai_provider(value: object) -> str:
+    provider = str(value or "custom").strip().lower()
+    if provider not in AI_PROVIDER_PRESETS:
+        raise SecureConfigError("Provedor de IA invalido.")
+    return provider
+
+
+def normalize_int(value: object, default: int, minimum: int, maximum: int, message: str) -> int:
+    try:
+        normalized = int(value if value not in (None, "") else default)
+    except (TypeError, ValueError) as exc:
+        raise SecureConfigError(message) from exc
+    if normalized < minimum or normalized > maximum:
+        raise SecureConfigError(message)
+    return normalized
+
+
+def normalize_temperature_micros(value: object) -> int:
+    raw = str(value if value not in (None, "") else "0.2").strip().replace(",", ".")
+    try:
+        parsed = float(raw)
+    except ValueError as exc:
+        raise SecureConfigError("Temperatura de IA invalida.") from exc
+    if parsed < 0 or parsed > 2:
+        raise SecureConfigError("Temperatura de IA invalida.")
+    return int(round(parsed * 1_000_000))
+
+
+def micros_to_decimal(value: object, default: str) -> float:
+    try:
+        return round(int(value) / 1_000_000, 4)
+    except (TypeError, ValueError):
+        return float(default)
 
 
 def email_provider_presets() -> list[dict]:

@@ -1,8 +1,8 @@
 ---
 tipo: spec
 area: tendencias-saude-financeira
-status: rascunho
-versao: 0.6
+status: em-implementacao
+versao: 0.7
 atualizado: 2026-08-02
 relacionados:
   - "[[score-saude-financeira]]"
@@ -13,14 +13,14 @@ relacionados:
   - "[[../adr/0003-sqlite-fonte-de-verdade|ADR-0003]]"
   - "[[../adr/0005-smtp-criptografado-local|ADR-0005]]"
   - "[[../adr/0006-classificacao-assistida-local|ADR-0006]]"
-tags: [spec, "area/tendencias-saude-financeira", "status/rascunho"]
+tags: [spec, "area/tendencias-saude-financeira", "status/em-implementacao"]
 aliases: ["Tendências de Saúde Financeira", "Achados Financeiros", "Insights Financeiros"]
 ---
 
 # Tendências e Achados de Saúde Financeira
 
 > [!info] Status
-> **rascunho** · área: `tendencias-saude-financeira` · atualizado em 2026-08-02 · relacionados: [[score-saude-financeira]], [[relatorios]], [[lancamentos]], [[cartoes]]
+> **em-implementacao** · área: `tendencias-saude-financeira` · atualizado em 2026-08-02 · relacionados: [[score-saude-financeira]], [[relatorios]], [[lancamentos]], [[cartoes]]
 
 ## Problema
 
@@ -120,10 +120,13 @@ Proposta para implementação futura:
 | `PUT` | `/api/ai-settings` | Atualiza fornecedor, endpoint, modelo, estado ligado/desligado e chave criptografada. |
 | `POST` | `/api/financial-health-trends/ai-summary` | Reescreve achados estruturados com IA quando a configuração estiver ativa. |
 
-Tabelas propostas:
+Tabelas:
 
-- `user_ai_settings`: configuração criptografada por usuário para provedor de IA, endpoint, modelo, estado ligado/desligado e metadados não secretos.
+- `user_ai_settings`: configuração por usuário para provedor de IA, endpoint/base URL, modelo, estado ligado/desligado e metadados não secretos.
+- `data/ai_config_user_{id}.enc`: arquivo local criptografado por usuário para armazenar o segredo de API, seguindo o padrão de chave local de [[../adr/0005-smtp-criptografado-local|ADR-0005]].
 - Reuso das tabelas `transactions`, `credit_card_transactions`, `credit_card_payments`, `categories`, `subcategories`, `tags`, `operation_logs`, `checking_accounts` e `credit_cards`.
+
+A tabela `user_ai_settings` é criada de forma idempotente no passo 2 para preparar as Preferências de IA. As rotas e a UI de configuração continuam previstas para os passos 4 e 5.
 
 Decisão para a primeira implementação: usar rota separada (`GET /api/financial-health-trends?month=AAAA-MM`) para facilitar manutenção, isolamento de responsabilidades e evolução independente do Score. A visualização deve ser uma aba própria do Cockpit, chamada **Tendências**, e não um bloco interno da aba **Saúde Financeira**.
 
@@ -215,8 +218,8 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 
 ## Plano de implementação
 
-- [ ] Passo 1 — Atualizar specs afetadas e resolver pendências obrigatórias antes de codificar. Fecha: critérios 1 a 28.
-- [ ] Passo 2 — Criar armazenamento local criptografado de configuração de IA por usuário, seguindo o padrão de segurança aplicável. Fecha: critérios 10, 11, 13, 15, 16 e 20.
+- [x] Passo 1 — Atualizar specs afetadas e resolver pendências obrigatórias antes de codificar. Fecha: critérios 1 a 28.
+- [x] Passo 2 — Criar armazenamento local criptografado de configuração de IA por usuário, seguindo o padrão de segurança aplicável. Fecha: critérios 17, 18, 19, 21, 23, 27 e 28.
 - [ ] Passo 3 — Implementar núcleo local de cálculo de tendências em Python, com série mensal, Budget x Realizado, achados estruturados em centavos inteiros, eventos pontuais e confiança. Fecha: critérios 1, 3, 4, 5, 6, 7, 8, 9, 13, 22, 25, 26, 27 e 28.
 - [ ] Passo 4 — Criar rotas autenticadas e validadas para tendências e preferências de IA. Fecha: critérios 1, 12, 13, 14, 15, 16, 17, 18 e 19.
 - [ ] Passo 5 — Adicionar UI em Preferências para ligar/desligar IA, escolher provedor em combo e salvar configuração sem expor segredos. Fecha: critérios 10, 11, 12, 13, 15, 16 e 20.
@@ -226,6 +229,7 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 
 ## Changelog
 
+- `0.7` — 2026-08-02 — Iniciada implementação dos passos 1 e 2: documentação alinhada e armazenamento local criptografado de configuração de IA por usuário definido como fundação para Preferências e tendências futuras.
 - `0.6` — 2026-08-02 — Registrada decisão de tratar Tendências como aba própria do Cockpit, com gráfico mês a mês de receitas x despesas x saldo e tabela Budget x Realizado baseada nos Limites existentes.
 - `0.5` — 2026-07-31 — Definidos sinais iniciais de eventos pontuais por categorias/subcategorias existentes, com palavras-chave e tags apenas como reforço, removendo a última pendência conhecida.
 - `0.4` — 2026-07-31 — Definida reescrita automática por IA quando configurada e descartada marcação manual de evento pontual para preservar simplicidade do cadastro.

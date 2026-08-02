@@ -33,7 +33,7 @@ from financeiro.credit_cards import (
 )
 from financeiro.database import initialize_database
 from financeiro.portfolio import PortfolioError, create_opening_position, update_opening_position
-from financeiro.secure_config import email_config_status, save_email_config
+from financeiro.secure_config import ai_settings_status, load_ai_settings, email_config_status, save_ai_settings, save_email_config
 from financeiro.spending_limits import SpendingLimitError, create_spending_limit, list_spending_limits, update_spending_limit
 from financeiro.transactions import TransactionError, create_transaction, update_transaction
 
@@ -353,6 +353,62 @@ class IdorProtectionTest(IsolatedDatabaseTest):
         self.assertEqual(owner_status["sender"], "owner-smtp@example.com")
         self.assertFalse(other_status["configured"])
         self.assertEqual(other_status["sender"], "")
+
+    def test_ai_settings_store_secret_encrypted_and_hide_api_key(self) -> None:
+        owner = create_user("Owner", "owner@example.com", "strong-password")
+
+        status = save_ai_settings(owner["id"], {
+            "enabled": True,
+            "provider": "openai",
+            "model": "gpt-test",
+            "api_key": "sk-local-secret",
+        })
+
+        self.assertTrue(status["configured"])
+        self.assertTrue(status["enabled"])
+        self.assertTrue(status["has_api_key"])
+        self.assertNotIn("api_key", status)
+        encrypted = database.DATA_DIR / f"ai_config_user_{owner['id']}.enc"
+        self.assertTrue(encrypted.exists())
+        self.assertNotIn("sk-local-secret", encrypted.read_text(encoding="utf-8"))
+
+        loaded = load_ai_settings(owner["id"])
+        self.assertEqual(loaded["api_key"], "sk-local-secret")
+
+    def test_ai_settings_are_isolated_per_user(self) -> None:
+        owner = create_user("Owner", "owner@example.com", "strong-password")
+        other_user = create_user("Other", "other@example.com", "strong-password")
+
+        save_ai_settings(owner["id"], {
+            "enabled": True,
+            "provider": "custom",
+            "base_url": "http://127.0.0.1:11434/v1",
+            "model": "local-model",
+            "api_key": "local-secret",
+        })
+
+        owner_status = ai_settings_status(owner["id"])
+        other_status = ai_settings_status(other_user["id"])
+
+        self.assertTrue(owner_status["configured"])
+        self.assertEqual(owner_status["provider"], "custom")
+        self.assertFalse(other_status["configured"])
+        self.assertFalse(other_status["has_api_key"])
+
+    def test_ai_settings_allow_local_provider_without_api_key(self) -> None:
+        owner = create_user("Owner", "owner@example.com", "strong-password")
+
+        status = save_ai_settings(owner["id"], {
+            "enabled": True,
+            "provider": "local",
+            "base_url": "http://127.0.0.1:11434/v1",
+            "model": "local-model",
+            "auth_type": "none",
+        })
+
+        self.assertTrue(status["configured"])
+        self.assertTrue(status["enabled"])
+        self.assertFalse(status["has_api_key"])
 
 
 class SessionCookieTest(unittest.TestCase):
