@@ -11,7 +11,14 @@ from financeiro.categories import get_or_create_category, get_or_create_subcateg
 from financeiro.classification_suggestions import normalize_description
 from financeiro.database import begin_immediate, get_connection, row_to_dict
 from financeiro.operation_logs import create_operation_log_with_conn
-from financeiro.transactions import create_transaction_with_conn, normalize_optional_tags, split_cents
+from financeiro.transactions import (
+    convert_to_brl_cents,
+    create_transaction_with_conn,
+    micros_to_rate,
+    normalize_optional_tags,
+    resolve_exchange_rate_micros,
+    split_cents,
+)
 
 CARD_TRANSACTION_TYPES = {"income", "expense"}
 CARD_SERIES_KINDS = {"single", "installment", "recurring"}
@@ -225,6 +232,7 @@ def create_credit_card_transaction_with_conn(conn: sqlite3.Connection, user_id: 
     begin_immediate(conn)
     card = get_active_credit_card(conn, user_id, transaction["credit_card_id"])
     transaction["invoice_month"] = open_invoice_month_for_transaction_date(conn, user_id, card, transaction["date"])
+    exchange_rate_micros = resolve_exchange_rate_micros(card["currency"], transaction["date"], transaction["exchange_rate"])
     category_id = get_or_create_category(conn, user_id, transaction["category"], transaction["type"])
     subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
     tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
@@ -236,10 +244,11 @@ def create_credit_card_transaction_with_conn(conn: sqlite3.Connection, user_id: 
         cursor = conn.execute(
             """
             INSERT INTO credit_card_transactions (
-                user_id, credit_card_id, type, description, normalized_description, amount_cents, date,
+                user_id, credit_card_id, type, description, normalized_description, amount_cents,
+                exchange_rate_micros, amount_brl_cents, date,
                 invoice_month, series_id, series_kind, installment_index,
                 installment_count, recurrence_frequency, category_id, subcategory_id, notes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 user_id,
@@ -248,6 +257,8 @@ def create_credit_card_transaction_with_conn(conn: sqlite3.Connection, user_id: 
                 occurrence["description"],
                 normalize_description(occurrence["description"]),
                 occurrence["amount_cents"],
+                exchange_rate_micros,
+                convert_to_brl_cents(occurrence["amount_cents"], exchange_rate_micros),
                 occurrence["date"],
                 occurrence["invoice_month"],
                 series_id,
@@ -288,6 +299,8 @@ def update_credit_card_transaction(user_id: int, transaction_id: str, data: dict
         if card["id"] != existing["credit_card_id"]:
             raise CreditCardError("Nao e possivel mover lancamento entre cartoes.")
         transaction["invoice_month"] = open_invoice_month_for_transaction_date(conn, user_id, card, transaction["date"])
+        exchange_rate_micros = resolve_exchange_rate_micros(card["currency"], transaction["date"], transaction["exchange_rate"])
+        amount_brl_cents = convert_to_brl_cents(transaction["amount_cents"], exchange_rate_micros)
         if transaction["invoice_month"] != existing["invoice_month"]:
             ensure_invoice_is_open(conn, user_id, existing["credit_card_id"], transaction["invoice_month"])
         category_id = get_or_create_category(conn, user_id, transaction["category"], transaction["type"])
@@ -296,7 +309,8 @@ def update_credit_card_transaction(user_id: int, transaction_id: str, data: dict
         conn.execute(
             """
             UPDATE credit_card_transactions
-            SET type = ?, description = ?, normalized_description = ?, amount_cents = ?, date = ?, invoice_month = ?, category_id = ?,
+            SET type = ?, description = ?, normalized_description = ?, amount_cents = ?,
+                exchange_rate_micros = ?, amount_brl_cents = ?, date = ?, invoice_month = ?, category_id = ?,
                 subcategory_id = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND user_id = ? AND archived_at IS NULL
             """,
@@ -305,6 +319,8 @@ def update_credit_card_transaction(user_id: int, transaction_id: str, data: dict
                 transaction["description"],
                 normalize_description(transaction["description"]),
                 transaction["amount_cents"],
+                exchange_rate_micros,
+                amount_brl_cents,
                 transaction["date"],
                 transaction["invoice_month"],
                 category_id,
@@ -348,7 +364,7 @@ def move_credit_card_transaction_invoice(user_id: int, transaction_id: str, dire
             """,
             (target_month, normalized_id, user_id),
         )
-        # spec: tendencias-saude-financeira v1.2 — critério 13
+        # spec: tendencias-saude-financeira v1.9 — critério 13
         # (registra movimento de fatura para detecção posterior de antecipação
         #  de parcelas no núcleo de tendências)
         create_operation_log_with_conn(
@@ -402,10 +418,13 @@ def update_future_card_series(
         shifted_date = (date.fromisoformat(row["date"]) + date_delta).isoformat()
         card = get_active_credit_card(conn, user_id, row["credit_card_id"])
         ensure_not_before_previous_closed_invoice(conn, user_id, card, row["invoice_month"], shifted_date)
+        exchange_rate_micros = resolve_exchange_rate_micros(card["currency"], shifted_date, transaction["exchange_rate"])
+        amount_brl_cents = convert_to_brl_cents(transaction["amount_cents"], exchange_rate_micros)
         conn.execute(
             """
             UPDATE credit_card_transactions
-            SET type = ?, description = ?, normalized_description = ?, amount_cents = ?, date = ?, category_id = ?,
+            SET type = ?, description = ?, normalized_description = ?, amount_cents = ?,
+                exchange_rate_micros = ?, amount_brl_cents = ?, date = ?, category_id = ?,
                 subcategory_id = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND user_id = ? AND archived_at IS NULL
             """,
@@ -414,6 +433,8 @@ def update_future_card_series(
                 transaction["description"],
                 normalize_description(transaction["description"]),
                 transaction["amount_cents"],
+                exchange_rate_micros,
+                amount_brl_cents,
                 shifted_date,
                 category_id,
                 subcategory_id,
@@ -748,6 +769,7 @@ def normalize_card_transaction_payload(data: dict) -> dict:
         "type": transaction_type,
         "description": description,
         "amount_cents": amount_cents,
+        "exchange_rate": data.get("exchange_rate_to_brl") or data.get("exchange_rate"),
         "date": normalize_date(data.get("date")),
         "invoice_month": normalize_month(data.get("invoice_month")),
         "category": normalize_name(data.get("category"), "Informe a categoria."),
@@ -1108,6 +1130,8 @@ def format_card_transaction(transaction: dict, currency: str) -> dict:
         transaction["series_kind"] = "installment"
         transaction["recurrence_frequency"] = None
     transaction["amount"] = cents_to_money(transaction.pop("amount_cents"))
+    transaction["exchange_rate_to_brl"] = micros_to_rate(transaction.pop("exchange_rate_micros", 1000000))
+    transaction["amount_brl"] = cents_to_money(transaction.pop("amount_brl_cents", money_to_cents(transaction["amount"])))
     transaction["card_currency"] = transaction.pop("card_currency", currency) or currency
     raw_tags = transaction.pop("tag_names", "") or ""
     transaction["tags"] = [tag for tag in raw_tags.split("||") if tag]

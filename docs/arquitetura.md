@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 2.8
+versao: 2.9
 atualizado: 2026-08-02
 relacionados:
   - "[[requisitos]]"
@@ -287,7 +287,7 @@ Conexões SQLite são abertas com `journal_mode=WAL`, `busy_timeout` curto e `fo
 | `quote_cache` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
 | `user_ai_settings` | `secure_config.py` — metadados não secretos de configuração opcional de IA por usuário; segredo fica em arquivo criptografado local. Ver [[tendencias-saude-financeira]]. |
 
-`transactions` e `credit_card_transactions` persistem `normalized_description` para a classificação assistida. Bancos existentes são retroalimentados de forma idempotente durante a inicialização.
+`transactions` e `credit_card_transactions` persistem `normalized_description` para a classificação assistida. Ambas também mantêm valor normalizado em BRL (`amount_brl_cents`); em moedas estrangeiras sem cotação manual, a normalização usa a última PTAX de venda disponível até a data do lançamento. Bancos existentes são retroalimentados de forma idempotente durante a inicialização.
 
 `user_ai_settings` armazena somente provedor, endpoint/base URL, modelo, estado ligado/desligado, autenticação e parâmetros operacionais. Chaves de API de IA são salvas fora do banco em `data/ai_config_user_{id}.enc`, criptografadas com o mesmo material de chave local usado por `secure_config.py`; APIs nunca devem retornar o segredo.
 
@@ -442,6 +442,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `2.9` — 2026-08-02 — Documentada normalização em BRL de lançamentos de conta e cartão por cotação manual ou última PTAX de venda disponível, incluindo `amount_brl_cents` em cartões.
 - `2.8` — 2026-08-02 — Documentada aba **Tendências** no Cockpit (`trendsPanel`, `trends-view.js`) integrada à rota `GET /api/financial-health-trends` com gráfico mês a mês, Budget x Realizado e achados local.
 - `2.7` — 2026-08-02 — Documentada UI de Preferências para configuração de IA (`aiConfigForm`, `user-admin-view.js`) integrada às rotas `/api/ai-settings`.
 - `2.6` — 2026-08-02 — Documentadas rotas de Tendências (`/api/financial-health-trends`, `/api/ai-settings`, `/api/financial-health-trends/ai-summary`) e módulo `financeiro/ai_summary.py`.

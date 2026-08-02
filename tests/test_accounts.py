@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
+import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from financeiro import database
 from financeiro.accounts import create_checking_account, list_checking_accounts
@@ -79,6 +81,7 @@ class AccountBalanceListingTest(unittest.TestCase):
             "type": "income",
             "description": "Dividendos",
             "amount": "31,67",
+            "exchange_rate_to_brl": "1,000000",
             "date": date.today().isoformat(),
             "account_id": str(account["id"]),
             "category": "Rendimentos",
@@ -87,6 +90,7 @@ class AccountBalanceListingTest(unittest.TestCase):
             "type": "income",
             "description": "Dividendos futuros",
             "amount": "122,33",
+            "exchange_rate_to_brl": "1,000000",
             "date": (date.today() + timedelta(days=30)).isoformat(),
             "account_id": str(account["id"]),
             "category": "Rendimentos",
@@ -97,6 +101,64 @@ class AccountBalanceListingTest(unittest.TestCase):
 
         self.assertEqual(listed_account["stored_current_balance"], "156.26")
         self.assertEqual(listed_account["current_balance"], "33.93")
+
+    def test_foreign_currency_transaction_without_manual_rate_uses_latest_ptax(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta USD",
+            "bank_name": "Corretora",
+            "currency": "USD",
+            "initial_balance": "0,00",
+        })
+        response_mock = mock.Mock()
+        response_mock.__enter__ = mock.Mock(return_value=response_mock)
+        response_mock.__exit__ = mock.Mock(return_value=False)
+        response_mock.read.return_value = json.dumps({
+            "value": [
+                {"cotacaoVenda": 5.10, "dataHoraCotacao": "2026-07-14 13:10:00.000"},
+                {"cotacaoVenda": 5.25, "dataHoraCotacao": "2026-07-15 13:10:00.000"},
+            ]
+        }).encode("utf-8")
+
+        with mock.patch("financeiro.transactions.urlopen", return_value=response_mock) as urlopen_mock:
+            transaction = create_transaction(user["id"], {
+                "type": "income",
+                "description": "Dividendos",
+                "amount": "10,00",
+                "date": "2026-07-15",
+                "account_id": str(account["id"]),
+                "category": "Rendimentos",
+            })
+
+        self.assertEqual(transaction["exchange_rate_to_brl"], "5.250000")
+        self.assertEqual(transaction["amount_brl"], "52.50")
+        request_url = urlopen_mock.call_args.args[0].full_url
+        self.assertIn("CotacaoMoedaPeriodo", request_url)
+        self.assertIn("@moeda='USD'", request_url)
+
+    def test_manual_foreign_currency_rate_does_not_call_ptax(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta USD",
+            "bank_name": "Corretora",
+            "currency": "USD",
+            "initial_balance": "0,00",
+        })
+
+        with mock.patch("financeiro.transactions.urlopen") as urlopen_mock:
+            transaction = create_transaction(user["id"], {
+                "type": "income",
+                "description": "Dividendos",
+                "amount": "10,00",
+                "exchange_rate_to_brl": "5,123456",
+                "date": "2026-07-15",
+                "account_id": str(account["id"]),
+                "category": "Rendimentos",
+            })
+
+        self.assertEqual(transaction["exchange_rate_to_brl"], "5.123456")
+        self.assertEqual(transaction["amount_brl"], "51.23")
+        urlopen_mock.assert_not_called()
 
     def test_transfer_updates_destination_account_balance(self) -> None:
         user = create_user("Alice", "alice@example.com", "correct-password")

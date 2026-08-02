@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 1.9
+versao: 2.0
 atualizado: 2026-08-02
 relacionados:
   - "[[arquitetura]]"
@@ -26,7 +26,7 @@ Manter um sistema financeiro local, privado e simples para controlar contas, sal
 - **Gestão de Perfil**: alteração de e-mail, alteração de senha e exclusão da conta do usuário autenticado.
 - **Recuperação de senha**: código temporário enviado por e-mail SMTP configurado localmente de forma segura, com assistente para Gmail e Outlook/Microsoft usando senha de app. Ver [[recuperacao-senha]].
 - **Contas-correntes**: cadastro, edição, listagem, arquivamento e restauração de contas com suporte a naturezas distintas (`liquidity` - liquidez, `wallet` - carteira física, `investment` - investimento) e moedas múltiplas (`BRL`, `USD`, `EUR`, `GBP`). Ver [[contas-correntes]].
-- **Lançamentos normais**: receitas, despesas, transferências, câmbio e investimentos manuais com impacto em saldo e suporte a taxas de câmbio históricas quando houver conversão entre moedas. Ver [[lancamentos]].
+- **Lançamentos normais**: receitas, despesas, transferências, câmbio e investimentos manuais com impacto em saldo e suporte a taxas de câmbio históricas quando houver conversão entre moedas; lançamentos de conta ou cartão em moeda estrangeira sem cotação manual usam a última PTAX de venda disponível até a data do lançamento para normalização em BRL. Ver [[lancamentos]] e [[cartoes]].
 - **Recorrência e Parcelamento**: suporte a séries de lançamentos periódicos ou parcelados com acompanhamento de índice de parcelas e conciliação bancária (`reconciled_at`). Ver [[lancamentos]].
 - **Cartões de Crédito**: cadastro de cartões com limite, emissor, bandeira, fechamento, vencimento e conta preferencial de pagamento. Lançamentos de despesas e receitas no cartão por fatura mensal (formato `AAAA-MM`), conciliação de lançamentos, compras parceladas/recorrentes, movimentação entre faturas e fluxo de pagamento de fatura integrado às contas-correntes. Ver [[cartoes]].
 - **Limites de Gastos (Metas/Budgets)**: estabelecimento de limites de despesas mensais por categoria e subcategoria. Ver [[limites-gastos]].
@@ -115,6 +115,7 @@ Manter um sistema financeiro local, privado e simples para controlar contas, sal
 
 ## Changelog
 
+- `2.0` — 2026-08-02 — Lançamentos de conta ou cartão em moeda estrangeira sem cotação manual passam a usar a última PTAX de venda disponível até a data do lançamento para normalização em BRL.
 - `1.9` — 2026-08-02 — Regras de segurança atualizadas para prever armazenamento criptografado local de segredos de integrações opcionais de IA.
 - `1.8` — 2026-08-02 — Cockpit documentado como resumo mensal navegável por seletor de mês, preservando faturas de cartão por competência mesmo após pagamento.
 - `1.7` — 2026-07-24 — Incluída a tela Sobre no escopo implementado do menu Usuário.

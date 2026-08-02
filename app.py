@@ -72,7 +72,7 @@ from financeiro.credit_cards import (
 )
 from financeiro.database import initialize_database
 from financeiro.database import get_connection
-from financeiro.ai_summary import generate_ai_summary
+from financeiro.ai_summary import ai_summary_enabled, generate_ai_summary
 from financeiro.financial_health import (
     FinancialHealthError,
     calculate_financial_health_score,
@@ -633,26 +633,28 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_json({"error": exc.message}, exc.status)
 
     def handle_financial_health_trends(self) -> None:
-        # spec: tendencias-saude-financeira v1.2 — critérios 1, 3, 4, 5, 6, 7, 13, 25, 26, 27 e 28
+        # spec: tendencias-saude-financeira v1.9 — critérios 1, 3, 4, 5, 6, 7, 13, 17, 25, 26, 27 e 28
         if not self.validate_read_source():
             return
         user = self.require_user()
         query = parse_qs(urlsplit(self.path).query)
         month = (query.get("month") or [date.today().strftime("%Y-%m")])[0]
         try:
-            self.send_json(calculate_trends(user["id"], month))
+            payload = calculate_trends(user["id"], month)
+            payload["ia_ativa"] = ai_summary_enabled(user["id"])
+            self.send_json(payload)
         except TrendsError as exc:
             self.send_json({"error": exc.message}, exc.status)
 
     def handle_ai_settings_status(self) -> None:
-        # spec: tendencias-saude-financeira v1.2 — critérios 17, 18 e 19
+        # spec: tendencias-saude-financeira v1.9 — critérios 17, 18 e 19
         if not self.validate_read_source():
             return
         user = self.require_user()
         self.send_json(ai_settings_status(user["id"]))
 
     def handle_save_ai_settings(self) -> None:
-        # spec: tendencias-saude-financeira v1.2 — critérios 17, 18, 19, 21, 23, 27 e 28
+        # spec: tendencias-saude-financeira v1.9 — critérios 17, 18, 19, 21, 23, 27 e 28
         user = self.require_user()
         data = self.read_json()
         try:
@@ -661,7 +663,7 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_json({"error": str(exc) or "Configuracao de IA invalida."}, HTTPStatus.BAD_REQUEST)
 
     def handle_ai_summary(self) -> None:
-        # spec: tendencias-saude-financeira v1.2 — critérios 12, 13, 14, 16 e 17
+        # spec: tendencias-saude-financeira v1.9 — critérios 12, 13, 14, 16 e 17
         user = self.require_user()
         data = self.read_json()
         month = data.get("month") or date.today().strftime("%Y-%m")

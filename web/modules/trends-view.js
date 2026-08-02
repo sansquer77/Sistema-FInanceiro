@@ -1,4 +1,4 @@
-// spec: tendencias-saude-financeira v1.2 — critérios 1, 2, 3, 4, 5, 6, 7, 10, 20, 21, 25, 26, 27 e 28
+// spec: tendencias-saude-financeira v1.9 — critérios 1, 2, 3, 4, 5, 6, 7, 10, 12, 13, 14, 16, 17, 20, 21, 25, 26, 27 e 28
 export function registerTrendsView({
   elements,
   api,
@@ -42,6 +42,12 @@ export function registerTrendsView({
         return;
       }
       currentData = response;
+      if (currentData.ia_ativa) {
+        await loadAISummary(requestId, month);
+      } else {
+        currentData.ia_usada = false;
+        currentData.ia_resumo = null;
+      }
       loading = false;
       error = "";
     } catch (err) {
@@ -52,6 +58,30 @@ export function registerTrendsView({
       error = err.message || "Não foi possível carregar as tendências.";
     }
     render();
+  }
+
+  async function loadAISummary(requestId, month) {
+    try {
+      const aiResponse = await api("/api/financial-health-trends/ai-summary", {
+        method: "POST",
+        body: { month },
+      });
+      if (requestId !== trendsRequestId) {
+        return;
+      }
+      currentData.ia_usada = aiResponse.ia_usada === true;
+      currentData.ia_resumo = aiResponse.resumo_ia || null;
+      if (aiResponse.resumo_local && !currentData.resumo_local) {
+        currentData.resumo_local = aiResponse.resumo_local;
+      }
+    } catch (err) {
+      if (requestId !== trendsRequestId) {
+        return;
+      }
+      currentData.ia_usada = false;
+      currentData.ia_resumo = null;
+      currentData.ia_erro = err.message || "IA indisponível";
+    }
   }
 
   function render() {
@@ -97,10 +127,13 @@ export function registerTrendsView({
     const warning = currentData.multi_currency_warning
       ? `<span class="trends-warning">${escapeHtml(currentData.multi_currency_warning)}</span>`
       : "";
+    const aiBadge = currentData.ia_ativa
+      ? `<span class="trends-ai-badge">IA ${currentData.ia_usada ? "ativa" : "fallback"}</span>`
+      : "";
     trendsMeta.innerHTML = `
-      <span>Mês de referência: <strong>${escapeHtml(formatMonthLabel(currentData.month))}</strong></span>
+      <span>Mês: <strong>${escapeHtml(formatMonthLabel(currentData.month))}</strong></span>
       <span>Confiança: <strong>${escapeHtml(confidenceLabel)}</strong></span>
-      <span>Histórico: <strong>${Number(currentData.historico_meses_disponiveis || 0).toLocaleString("pt-BR")} mês(es)</strong></span>
+      ${aiBadge}
       ${warning}
     `;
   }
@@ -241,7 +274,12 @@ export function registerTrendsView({
 
   function renderFindings() {
     const findings = currentData.achados || [];
-    if (findings.length === 0) {
+    const hasIaSummary = currentData.ia_usada && currentData.ia_resumo;
+    const summaryText = hasIaSummary ? currentData.ia_resumo : currentData.resumo_local;
+    const aiNotice = currentData.ia_ativa && !currentData.ia_usada
+      ? `<small class="trends-ai-notice">Resumo local — IA não respondeu ou está desligada.</small>`
+      : "";
+    if (findings.length === 0 && !summaryText) {
       return `
         <section class="trends-findings-section">
           <h3>Tendências e achados</h3>
@@ -252,6 +290,8 @@ export function registerTrendsView({
     return `
       <section class="trends-findings-section">
         <h3>Tendências e achados</h3>
+        ${summaryText ? renderSummaryText(summaryText) : ""}
+        ${aiNotice}
         <div class="trends-findings-list">
           ${findings.map((finding) => {
             const severityClass = finding.severidade === "atencao" ? "warning" : "info";
@@ -267,9 +307,35 @@ export function registerTrendsView({
             `;
           }).join("")}
         </div>
-        ${currentData.resumo_local ? `<p class="trends-local-summary">${escapeHtml(currentData.resumo_local)}</p>` : ""}
       </section>
     `;
+  }
+
+  function renderSummaryText(text) {
+    const sentences = splitSummarySentences(text);
+    if (sentences.length === 0) {
+      return "";
+    }
+    const intro = sentences[0];
+    const items = sentences.slice(1);
+    return `
+      <div class="trends-summary-text">
+        <p>${escapeHtml(intro)}</p>
+        ${items.length ? `
+          <ul>
+            ${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+          </ul>
+        ` : ""}
+      </div>
+    `;
+  }
+
+  function splitSummarySentences(text) {
+    return String(text || "")
+      .replace(/\s+/g, " ")
+      .split(/(?<=\.)\s+/)
+      .map((item) => item.trim())
+      .filter(Boolean);
   }
 
   return {

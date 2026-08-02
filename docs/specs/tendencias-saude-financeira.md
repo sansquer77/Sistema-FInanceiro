@@ -1,8 +1,8 @@
 ---
 tipo: spec
 area: tendencias-saude-financeira
-status: em-implementacao
-versao: 1.2
+status: implementado
+versao: 1.9
 atualizado: 2026-08-02
 relacionados:
   - "[[score-saude-financeira]]"
@@ -13,14 +13,14 @@ relacionados:
   - "[[../adr/0003-sqlite-fonte-de-verdade|ADR-0003]]"
   - "[[../adr/0005-smtp-criptografado-local|ADR-0005]]"
   - "[[../adr/0006-classificacao-assistida-local|ADR-0006]]"
-tags: [spec, "area/tendencias-saude-financeira", "status/em-implementacao"]
+tags: [spec, "area/tendencias-saude-financeira", "status/implementado"]
 aliases: ["Tendências de Saúde Financeira", "Achados Financeiros", "Insights Financeiros"]
 ---
 
 # Tendências e Achados de Saúde Financeira
 
 > [!info] Status
-> **em-implementacao** · área: `tendencias-saude-financeira` · atualizado em 2026-08-02 · relacionados: [[score-saude-financeira]], [[relatorios]], [[lancamentos]], [[cartoes]]
+> **implementado** · área: `tendencias-saude-financeira` · atualizado em 2026-08-02 · relacionados: [[score-saude-financeira]], [[relatorios]], [[lancamentos]], [[cartoes]]
 
 ## Problema
 
@@ -228,11 +228,17 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 - [x] Passo 4 — Criar rotas autenticadas e validadas para tendências e preferências de IA. Fecha: critérios 1, 12, 13, 14, 15, 16, 17, 18 e 19.
 - [x] Passo 5 — Adicionar UI em Preferências para ligar/desligar IA, escolher provedor em combo e salvar configuração sem expor segredos. Fecha: critérios 10, 11, 12, 13, 15, 16 e 20.
 - [x] Passo 6 — Adicionar aba **Tendências** no Cockpit, com gráfico mês a mês, tabela Budget x Realizado e bloco **Tendências e achados**, preservando identidade visual e leitura local sem IA. Fecha: critérios 1, 2, 3, 4, 5, 6, 7, 10, 20, 21, 25, 26, 27 e 28.
-- [ ] Passo 7 — Implementar reescrita automática opcional por IA com payload minimizado, timeout curto e fallback local. Fecha: critérios 12, 13, 14, 16 e 17.
-- [ ] Passo 8 — Criar testes automatizados para núcleo local, segurança de preferências, fallback de IA e isolamento por usuário. Fecha: critérios 1 a 28.
+- [x] Passo 7 — Implementar reescrita automática opcional por IA com payload minimizado, timeout curto e fallback local. Fecha: critérios 12, 13, 14, 16 e 17.
+- [x] Passo 8 — Criar testes automatizados para núcleo local, segurança de preferências, fallback de IA e isolamento por usuário. Fecha: critérios 1 a 28.
 
 ## Changelog
 
+- `1.9` — 2026-08-02 — Aviso multi-moeda passa a indicar que a base BRL usa valores normalizados por cotação manual ou pela última PTAX de venda disponível.
+- `1.8` — 2026-08-02 — Aviso multi-moeda ajustado para aparecer sempre como último ponto do resumo e explicitar que a análise usa valores em BRL já normalizados nos lançamentos.
+- `1.7` — 2026-08-02 — Melhorada a leitura da aba Tendências: achados de eventos pontuais e antecipações passam a ser agrupados para evitar cards repetidos, e o resumo textual é exibido como introdução e lista de pontos.
+- `1.6` — 2026-08-02 — Versão do app ajustada para incremento MINOR e tratamento de erro da configuração de IA endurecido para não exibir mensagem genérica quando a resposta não vier em JSON; rota `PUT /api/ai-settings` coberta pelo fluxo real com origem válida.
+- `1.5` — 2026-08-02 — Ajustada a rota de tendências para refletir `ia_ativa` quando a IA está ligada e configurada, permitindo a reescrita automática no Cockpit; adicionada cobertura automatizada para evitar regressão.
+- `1.4` — 2026-08-02 — Passos 7 e 8 finalizados: reescrita opcional por IA validada com payload minimizado, fallback local e cobertura automatizada de núcleo local, preferências seguras, IA e isolamento por usuário.
 - `1.2` — 2026-08-02 — Passo 6 concluído: aba **Tendências** no Cockpit com gráfico mês a mês, tabela Budget x Realizado e bloco Tendências e achados, leitura local sem IA.
 - `1.1` — 2026-08-02 — Passo 5 concluído: UI em Preferências para ligar/desligar IA, escolher provedor em combo e salvar configuração sem expor segredos.
 - `1.0` — 2026-08-02 — Passo 4 concluído: rotas autenticadas `/api/financial-health-trends`, `/api/ai-settings`, `/api/financial-health-trends/ai-summary` e módulo de reescrita por IA com fallback local.

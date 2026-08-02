@@ -1049,27 +1049,40 @@ textarea:focus {
 }
 
 .cockpit-toolbar {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
   gap: 12px;
   margin-bottom: 16px;
 }
 
+.cockpit-toolbar .cockpit-tabs {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .cockpit-tabs {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: nowrap;
   gap: 4px;
   padding: 4px;
   border-radius: 8px;
   background: var(--surface-container);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.cockpit-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .cockpit-month {
   flex-wrap: nowrap;
+  flex-shrink: 0;
 }
 
 .cockpit-tab {
+  flex: 1 1 auto;
+  min-width: 0;
   min-height: 36px;
   border: 0;
   border-radius: 6px;
@@ -1079,6 +1092,9 @@ textarea:focus {
   font-weight: 900;
   line-height: 1.1;
   padding: 0 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .cockpit-tab:hover {
@@ -5573,7 +5589,8 @@ textarea:focus {
   line-height: 1.5;
 }
 
-.trends-local-summary {
+.trends-local-summary,
+.trends-summary-text {
   margin: 0;
   padding: 12px 14px;
   border: 1px solid var(--line);
@@ -5582,6 +5599,42 @@ textarea:focus {
   font-size: 13px;
   color: var(--text);
   line-height: 1.5;
+}
+
+.trends-summary-text p {
+  margin: 0 0 8px;
+  font-weight: 700;
+}
+
+.trends-summary-text ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.trends-summary-text li {
+  padding-left: 2px;
+}
+
+.trends-ai-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-container);
+  color: var(--accent-dark);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.trends-ai-notice {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
 }
 
 @media print {

@@ -199,6 +199,8 @@ def initialize_database() -> None:
                 type TEXT NOT NULL CHECK (type IN ('income', 'expense')),
                 description TEXT NOT NULL,
                 amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+                exchange_rate_micros INTEGER NOT NULL DEFAULT 1000000 CHECK (exchange_rate_micros > 0),
+                amount_brl_cents INTEGER NOT NULL DEFAULT 0 CHECK (amount_brl_cents >= 0),
                 date TEXT NOT NULL,
                 invoice_month TEXT NOT NULL,
                 series_id TEXT,
@@ -526,6 +528,15 @@ def initialize_database() -> None:
         ensure_column(conn, "transactions", "normalized_description", "TEXT")
         ensure_column(conn, "credit_card_transactions", "reconciled_at", "TEXT")
         ensure_column(conn, "credit_card_transactions", "normalized_description", "TEXT")
+        ensure_column(conn, "credit_card_transactions", "exchange_rate_micros", "INTEGER NOT NULL DEFAULT 1000000")
+        ensure_column(conn, "credit_card_transactions", "amount_brl_cents", "INTEGER NOT NULL DEFAULT 0")
+        conn.execute(
+            """
+            UPDATE credit_card_transactions
+            SET amount_brl_cents = amount_cents
+            WHERE amount_brl_cents = 0
+            """
+        )
         ensure_column(conn, "credit_card_transactions", "series_id", "TEXT")
         ensure_column(conn, "credit_card_transactions", "series_kind", "TEXT NOT NULL DEFAULT 'single'")
         migrate_session_tokens(conn)

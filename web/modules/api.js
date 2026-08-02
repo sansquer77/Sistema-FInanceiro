@@ -18,10 +18,10 @@ export async function api(path, options = {}) {
   } catch (error) {
     throw new Error(`Nao foi possivel falar com o servidor local. Abra pelo endereco ${window.location.origin}.`);
   }
-  const payload = await response.json().catch(() => ({}));
+  const payload = await parseResponsePayload(response);
   if (!response.ok) {
     handleUnauthorized(response, path, options);
-    throw new Error(payload.error || "Algo nao saiu como esperado.");
+    throw new Error(payload.error || `Erro ${response.status}: ${response.statusText || "falha na requisicao"}.`);
   }
   resetUnauthorizedStateOnAuthSuccess(path);
   return payload;
@@ -38,12 +38,24 @@ export async function upload(path, body) {
   } catch (error) {
     throw new Error(`Nao foi possivel falar com o servidor local. Abra pelo endereco ${window.location.origin}.`);
   }
-  const payload = await response.json().catch(() => ({}));
+  const payload = await parseResponsePayload(response);
   if (!response.ok) {
     handleUnauthorized(response, path, {});
-    throw new Error(payload.error || "Algo nao saiu como esperado.");
+    throw new Error(payload.error || `Erro ${response.status}: ${response.statusText || "falha na requisicao"}.`);
   }
   return payload;
+}
+
+async function parseResponsePayload(response) {
+  const text = await response.text().catch(() => "");
+  if (!text) {
+    return {};
+  }
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    return { error: text.trim() };
+  }
 }
 
 function handleUnauthorized(response, path, options) {

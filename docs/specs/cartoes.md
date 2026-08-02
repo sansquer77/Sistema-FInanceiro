@@ -2,7 +2,7 @@
 tipo: spec
 area: cartoes
 status: implementado
-versao: 2.2
+versao: 2.3
 atualizado: 2026-08-02
 relacionados:
   - "[[contas-correntes]]"
@@ -77,6 +77,7 @@ Qualquer usuário autenticado localmente que utilize cartões de crédito para d
 - O sistema não deve perder silenciosamente lançamentos de cartão quando a competência original estiver fechada.
 - Moedas do cartão e da conta de pagamento da fatura devem ser idênticas.
 - A conta preferencial de pagamento, quando informada, deve ter a mesma moeda do cartão.
+- Lançamentos em cartão de moeda estrangeira persistem valor normalizado em BRL pela cotação informada manualmente; quando ela não for informada, o sistema consulta a última PTAX de venda disponível até a data do lançamento.
 - Lançamentos de cartão podem ser únicos, parcelados ou recorrentes.
 - O formulário manual de lançamento no cartão deve oferecer o campo `Tag`, com as mesmas sugestões de tags usadas em lançamentos de contas e suporte a múltiplas tags separadas por vírgula.
 - Em novos lançamentos, descrições com histórico exato e confiança suficiente podem preencher categoria e subcategoria sem sobrescrever escolhas manuais. Ver [[classificacao-assistida]].
@@ -149,6 +150,7 @@ Tabelas: `credit_cards`, `credit_card_transactions`, `credit_card_payments`, `cr
 
 ## Changelog
 
+- `2.3` — 2026-08-02 — Lançamentos de cartão em moeda estrangeira passam a gravar valor normalizado em BRL por cotação manual ou pela última PTAX de venda disponível.
 - `2.2` — 2026-08-02 — Gráfico de faturas e resumo de fatura ganham ajustes responsivos para telas de 14 polegadas (e breakpoints intermediários), evitando quebra de linha em valores extensos e melhorando a densidade dos cartões de resumo.
 - `2.1` — 2026-08-02 — Rótulo do seletor mensal da fatura passa a usar formato fixo `MM/AAAA`.
 - `2.0` — 2026-08-02 — Seletor mensal de Faturas/Lançamentos de Cartões padronizado com botões compactos por ícone.

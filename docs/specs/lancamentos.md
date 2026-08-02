@@ -2,7 +2,7 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 2.8
+versao: 2.9
 atualizado: 2026-08-02
 relacionados:
   - "[[contas-correntes]]"
@@ -62,6 +62,7 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 - **Investimento**: reduz a liquidez da conta quando for aporte e pode criar/atualizar a posição no portfólio. Ver [[investimentos-portfolio]].
 - **Transferência**: reduz saldo da origem, aumenta saldo do destino. Exige contas diferentes com a mesma moeda.
 - **Câmbio**: movimentação entre contas de moedas diferentes; registra valor de origem, valor de destino e cotação ajustável.
+- Lançamentos em conta de moeda estrangeira normalizam o valor em BRL pela cotação informada manualmente; quando ela não for informada, o sistema consulta a última PTAX de venda disponível até a data do lançamento. Se a PTAX estiver indisponível, o usuário deve informar a cotação manualmente.
 - Valor deve ser maior que zero.
 - Categoria é obrigatória para receitas, despesas e investimentos. Transferências e câmbio não exigem categoria.
 - Em novos lançamentos, descrições com histórico exato e confiança suficiente podem preencher categoria e subcategoria sem sobrescrever escolhas manuais. Ver [[classificacao-assistida]].
@@ -119,6 +120,7 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dado uma despesa criada, quando listada, o saldo da conta diminui pelo valor informado.
 - Dado uma transferência criada, quando listada, origem e destino são atualizados corretamente.
 - Dado um câmbio criado, quando listado, origem reduz pelo valor de origem e destino aumenta pelo valor de destino.
+- Dado um lançamento em moeda estrangeira sem cotação manual, quando criado ou importado, então o valor em BRL usa a última PTAX de venda disponível até a data do lançamento.
 - Dado um lançamento excluído, quando consultado, o saldo volta ao estado anterior.
 - Dado `scope=future` na exclusão, quando executado, as parcelas/recorrências futuras não conciliadas são removidas e os saldos revertidos.
 - Dado `apply_to_future` na edição, quando executado, os dados e saldos das ocorrências futuras não conciliadas são atualizados.
@@ -149,6 +151,7 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 
 ## Changelog
 
+- `2.9` — 2026-08-02 — Lançamentos em moeda estrangeira sem cotação manual passam a consultar a última PTAX de venda disponível até a data do lançamento para normalizar valores em BRL.
 - `2.8` — 2026-08-02 — Gráfico de saldos em Lançamentos de Contas ganha ajustes responsivos para telas de 14 polegadas (e breakpoints intermediários), evitando quebra de linha em valores extensos sem truncar centavos.
 - `2.7` — 2026-08-02 — Rótulo do seletor mensal passa a usar formato fixo `MM/AAAA`.
 - `2.6` — 2026-08-02 — Seletor mensal de Lançamentos de Contas padronizado com botões compactos por ícone.

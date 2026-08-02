@@ -6,6 +6,7 @@ from http import HTTPStatus
 import json
 import sqlite3
 from uuid import uuid4
+from urllib.parse import quote
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -20,7 +21,11 @@ FIXED_INCOME_MODES = {"pre", "post", "hybrid"}
 SERIES_KINDS = {"single", "installment", "recurring"}
 RECURRENCE_FREQUENCIES = {"weekly", "monthly", "quarterly", "semiannual", "annual"}
 EXCHANGE_RATE_SCALE = Decimal("1000000")
-FRANKFURTER_RATE_URL = "https://api.frankfurter.dev/v2/rate/{base}/BRL"
+PTAX_RATE_URL = (
+    "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/"
+    "CotacaoMoedaPeriodo(moeda=@moeda,dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)"
+    "?@moeda='{currency}'&@dataInicial='{start}'&@dataFinalCotacao='{end}'&$format=json"
+)
 
 
 class TransactionError(Exception):
@@ -278,7 +283,7 @@ def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
 
 
 def update_future_series_transactions(conn, user_id: int, existing, transaction: dict) -> None:
-    # spec: lancamentos v2.5 — criterio 7 (apply_to_future)
+    # spec: lancamentos v2.9 — criterio 7 (apply_to_future)
     # (propaga apenas para ocorrencias futuras nao conciliadas da mesma serie;
     #  o delta de data e reaplicado, nao a data absoluta, para preservar o espacamento)
     if not existing["series_id"]:
@@ -444,7 +449,7 @@ def delete_transaction(user_id: int, transaction_id: str, apply_to_future: bool 
 
 
 def future_transactions_to_delete(conn, user_id: int, transaction, apply_to_future: bool):
-    # spec: lancamentos v2.5 — criterio 6 (scope=future)
+    # spec: lancamentos v2.9 — criterio 6 (scope=future)
     # (so remove ocorrencias futuras ainda nao conciliadas da mesma serie;
     #  uma vez conciliada, a ocorrencia fica fora do alcance da exclusao em cascata)
     if not apply_to_future or not transaction["series_id"]:
@@ -674,7 +679,7 @@ def decimal_to_micros(value: object) -> int:
 
 
 def build_transaction_occurrences(transaction: dict) -> list[dict]:
-    # spec: lancamentos v2.5 — regra de parcelamento/recorrencia (secao "Regras de negocio")
+    # spec: lancamentos v2.9 — regra de parcelamento/recorrencia (secao "Regras de negocio")
     # (parcelado: valor informado e o TOTAL, dividido entre as parcelas via split_cents;
     #  recorrente: cada ocorrencia mantem o valor informado integralmente — nao dividir)
     start_date = date.fromisoformat(transaction["date"])
@@ -798,17 +803,29 @@ def get_exchange_rate_to_brl(currency: str, transaction_date: str | None = None)
     if normalized_currency == "BRL":
         return Decimal("1")
     query_date = normalize_date(transaction_date) if transaction_date else date.today().isoformat()
-    url = f"{FRANKFURTER_RATE_URL.format(base=normalized_currency)}?date={query_date}"
+    url = ptax_period_url(normalized_currency, query_date)
     request = Request(url, headers={"User-Agent": "SistemaFinanceiro/0.1"})
     try:
         with urlopen(request, timeout=5) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
-        raise TransactionError("Nao foi possivel consultar a cotacao. Informe a cotacao manualmente.") from exc
+        raise TransactionError("Nao foi possivel consultar a PTAX. Informe a cotacao manualmente.") from exc
     try:
-        return parse_exchange_rate(payload["rate"])
+        quotes = payload.get("value") or []
+        latest = sorted(quotes, key=lambda item: str(item.get("dataHoraCotacao") or ""))[-1]
+        return parse_exchange_rate(latest["cotacaoVenda"])
     except (KeyError, TypeError, InvalidOperation) as exc:
-        raise TransactionError("Cotacao nao encontrada para esta moeda. Informe a cotacao manualmente.") from exc
+        raise TransactionError("PTAX nao encontrada para esta moeda/data. Informe a cotacao manualmente.") from exc
+
+
+def ptax_period_url(currency: str, transaction_date: str) -> str:
+    end_date = date.fromisoformat(normalize_date(transaction_date))
+    start_date = end_date - timedelta(days=10)
+    return PTAX_RATE_URL.format(
+        currency=quote(currency, safe=""),
+        start=start_date.strftime("%m-%d-%Y"),
+        end=end_date.strftime("%m-%d-%Y"),
+    )
 
 
 def resolve_exchange_rate_micros(currency: str, transaction_date: str, raw_rate: object) -> int:
@@ -817,7 +834,7 @@ def resolve_exchange_rate_micros(currency: str, transaction_date: str, raw_rate:
         return rate_to_micros(Decimal("1"))
     if str(raw_rate or "").strip():
         return rate_to_micros(parse_exchange_rate(raw_rate))
-    return rate_to_micros(Decimal("1"))
+    return rate_to_micros(get_exchange_rate_to_brl(normalized_currency, transaction_date))
 
 
 def parse_exchange_rate(value: object) -> Decimal:
@@ -912,7 +929,7 @@ def transaction_category_group(conn, user_id: int, transaction_type: str, destin
 
 
 def balance_delta(transaction_type: str, amount_cents: int, side: str) -> int:
-    # spec: lancamentos v2.5 — criterios 1-4
+    # spec: lancamentos v2.9 — criterios 1-4
     # (receita aumenta a conta de origem; despesa/investimento reduzem;
     #  transferencia/cambio reduzem na origem e aumentam no destino)
     if transaction_type == "income":
