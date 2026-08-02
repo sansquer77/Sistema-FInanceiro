@@ -2,7 +2,7 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 2.6
+versao: 2.7
 atualizado: 2026-08-02
 relacionados:
   - "[[contas-correntes]]"
@@ -86,6 +86,7 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 - Valores de lançamentos usam o mesmo tamanho de fonte dos textos de saldo do grupo diário, preservando densidade visual.
 - O gráfico de histórico/projeção de saldos em Lançamentos de Contas deve manter o mesmo layout do gráfico de faturas de cartão: mês no topo de cada cartão, valor na base e sem marcadores textuais de `Previsto` ou `Conciliado` dentro do gráfico.
 - O seletor mensal de Lançamentos de Contas deve usar botões compactos por ícone para mês anterior, mês atual e próximo mês, preservando rótulos acessíveis.
+- O rótulo do mês no seletor mensal deve usar o formato compacto `MM/AAAA`.
 - Categoria e subcategoria são apresentadas como caminho único no formato `Categoria › Subcategoria`.
 - Em telas estreitas, metadados secundários são ocultados, preservando descrição, valor, conta e estado de conciliação.
 - Cabeçalhos de data permanecem visíveis durante a rolagem do respectivo grupo e permitem expandir ou recolher o dia.
@@ -137,6 +138,7 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dado o gráfico de histórico/projeção de saldos, quando exibido, então cada cartão mensal mostra o mês no topo e não exibe marcadores `Previsto` ou `Conciliado` dentro da área do gráfico.
 - Dado o gráfico de histórico/projeção de saldos com valores extensos, quando exibido, então os valores cabem nos cartões mensais por ajuste responsivo de tipografia, mantendo o tamanho atual da área.
 - Dado o usuário visualizando o seletor mensal de Lançamentos de Contas, quando os botões de navegação aparecem, então usam ícones compactos com rótulo acessível em vez de palavras longas.
+- Dado o usuário visualizando o seletor mensal de Lançamentos de Contas, quando o mês é exibido, então o rótulo usa o formato `MM/AAAA`.
 - Dado o tipo Investimento selecionado no formulário de Lançamentos, quando campos condicionais de renda fixa são exibidos, então inputs e selects da mesma linha mantêm alturas e alinhamentos consistentes, com dicas exibidas sem deslocar campos vizinhos.
 - Dado qualquer tipo de lançamento de conta, quando uma linha condicional exibe apenas um campo, então esse campo ocupa a linha inteira e o formulário não apresenta coluna vazia.
 - Dado o tipo Investimento com categoria Renda Fixa selecionado, quando o usuário aciona o ícone de ajuda, então vê orientação contextual para pré-fixada, pós-fixada e híbrida sem alterar o alinhamento dos campos.
@@ -147,6 +149,7 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 
 ## Changelog
 
+- `2.7` — 2026-08-02 — Rótulo do seletor mensal passa a usar formato fixo `MM/AAAA`.
 - `2.6` — 2026-08-02 — Seletor mensal de Lançamentos de Contas padronizado com botões compactos por ícone.
 - `2.5` — 2026-07-29 — Formulário de investimento em Lançamentos de Contas passa a ocultar campos não aplicáveis a aportes de Poupança.
 - `2.4` — 2026-07-29 — Aportes de Renda Fixa e Poupança em Lançamentos de Contas passam a expor marcador de reserva de emergência.

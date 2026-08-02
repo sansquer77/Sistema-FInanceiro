@@ -4,6 +4,7 @@ export function registerCockpitView({
   api,
   currentMonthValue,
   formatMonthLabel,
+  formatMonthShortLabel,
   shiftMonth,
   openMonthPicker,
   formatMoney,
@@ -111,7 +112,7 @@ export function registerCockpitView({
 
   function renderCockpitMonthLabel() {
     if (cockpitMonthLabel) {
-      cockpitMonthLabel.textContent = formatMonthLabel(cockpitMonthValue());
+      cockpitMonthLabel.textContent = formatMonthShortLabel(cockpitMonthValue());
     }
   }
 

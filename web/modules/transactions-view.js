@@ -12,6 +12,7 @@ export function registerTransactionsView({
   formatMoney,
   formatDate,
   formatMonthLabel,
+  formatMonthShortLabel,
   formatCategoryPath,
   moneyInputValue,
   parseDecimalInput,
@@ -587,7 +588,7 @@ export function registerTransactionsView({
   }
 
   function renderTransactions() {
-    transactionMonthLabel.textContent = formatMonthLabel(state.transactionMonth);
+    transactionMonthLabel.textContent = formatMonthShortLabel(state.transactionMonth);
     ensureSelectedAccount();
     if (state.selectedAccountId && transactionAccount.value !== state.selectedAccountId) {
       transactionAccount.value = state.selectedAccountId;

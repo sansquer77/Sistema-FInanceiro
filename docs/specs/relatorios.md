@@ -2,7 +2,7 @@
 tipo: spec
 area: relatorios
 status: implementado
-versao: 2.2
+versao: 2.3
 atualizado: 2026-08-02
 relacionados:
   - "[[lancamentos]]"
@@ -63,6 +63,7 @@ Qualquer usuário autenticado localmente que queira analisar seus gastos e recei
 - A aba **Situação do mês** é a visão inicial do Cockpit e mantém KPIs, alertas, saldos por moeda, portfólio por tipo, planejamento, dívidas e gráficos de maiores receitas/despesas.
 - O Cockpit deve ter um seletor de mês no topo do módulo, compartilhado pelas abas internas que dependem de competência mensal, começando por **Situação do mês** e **Saúde Financeira**.
 - O seletor de mês do Cockpit deve seguir o mesmo padrão visual dos seletores mensais de Lançamentos, com botões compactos por ícone para mês anterior, mês atual e próximo mês.
+- Rótulos de seletores mensais devem usar o formato compacto `MM/AAAA` para manter largura visual estável.
 - Ao trocar o mês do Cockpit, a aba **Situação do mês** deve recalcular KPIs, maiores receitas/despesas, limites, planejamento, dívidas e totais por moeda com base no mês selecionado.
 - O mês inicial do Cockpit deve ser o mês corrente.
 - A leitura do Cockpit para meses passados deve funcionar como fotografia analítica do período, sem esconder despesas de cartão apenas porque a fatura foi paga posteriormente.
@@ -154,6 +155,7 @@ O ponto crítico é cartão de crédito: a fatura pertence ao mês de competênc
 - Dado o usuário abrindo o Cockpit, quando a tela é exibida, então o seletor de mês inicia no mês corrente.
 - Dado o usuário navegando para outro mês no Cockpit, quando aciona o botão de mês atual, então o Cockpit retorna ao mês corrente.
 - Dado o usuário visualizando seletores mensais, quando os botões de navegação aparecem, então usam ícones compactos com rótulo acessível em vez de palavras longas.
+- Dado o usuário visualizando o seletor mensal, quando o mês é exibido, então o rótulo usa o formato `MM/AAAA`.
 - Dado o usuário selecionando outro mês no Cockpit, quando a aba **Situação do mês** é exibida, então KPIs, saldos, limites, planejamento, dívidas e gráficos refletem o mês selecionado.
 - Dado o usuário selecionando outro mês no Cockpit, quando alterna para **Saúde Financeira**, então o score é calculado para o mesmo mês selecionado.
 - Dado uma fatura de cartão pertencente ao mês selecionado, quando ela já tiver sido paga, então o Cockpit continua considerando os lançamentos detalhados do cartão como despesa analítica daquele mês.
@@ -163,6 +165,7 @@ O ponto crítico é cartão de crédito: a fatura pertence ao mês de competênc
 
 ## Changelog
 
+- `2.3` — 2026-08-02 — Rótulos dos seletores mensais passam a usar formato fixo `MM/AAAA` para manter largura visual estável.
 - `2.2` — 2026-08-02 — Seletor mensal do Cockpit padronizado com os seletores de Lançamentos, incluindo botão de mês atual e botões compactos por ícone.
 - `2.1` — 2026-08-02 — Implementado seletor mensal no Cockpit, sincronizando Situação do mês e Saúde Financeira e preservando faturas por competência mesmo após pagamento.
 - `2.0` — 2026-08-02 — Spec colocada em revisão para avaliar Cockpit com seletor mensal, mantendo faturas de cartão por competência mesmo após pagamento e exigindo rótulos de saldo vinculados ao mês selecionado.

@@ -6,6 +6,7 @@ export function registerReportsView({
   shiftMonth,
   formatDate,
   formatMonthLabel,
+  formatMonthShortLabel,
   formatMoney,
   formatPercent,
   escapeHtml,
@@ -61,7 +62,7 @@ export function registerReportsView({
   reportContent.addEventListener("click", handleReportContentClick);
 
   function renderReports() {
-    reportMonthLabel.textContent = formatMonthLabel(state.reportMonth);
+    reportMonthLabel.textContent = formatMonthShortLabel(state.reportMonth);
     reportTabs.forEach((button) => button.classList.toggle("active", button.dataset.reportTab === state.reportTab));
     renderReportAccountOptions();
     const items = reportItemsForMonth(state.reportMonth);

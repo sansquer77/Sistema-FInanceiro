@@ -19,6 +19,11 @@ export function formatMonthLabel(value) {
   return new Date(year, month - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 }
 
+export function formatMonthShortLabel(value) {
+  const [year, month] = String(value || "").split("-");
+  return month && year ? `${month}/${year}` : "";
+}
+
 export function isValidMonthValue(value) {
   return /^\d{4}-\d{2}$/.test(String(value || ""));
 }

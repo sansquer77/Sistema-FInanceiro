@@ -6,6 +6,7 @@ export function registerLimitsView({
   currentMonthValue,
   shiftMonth,
   formatMonthLabel,
+  formatMonthShortLabel,
   formatMoney,
   formatPercent,
   formData,
@@ -114,7 +115,7 @@ export function registerLimitsView({
   }
 
   function renderLimits() {
-    limitMonthLabel.textContent = formatMonthLabel(state.limitMonth);
+    limitMonthLabel.textContent = formatMonthShortLabel(state.limitMonth);
     limitMonthInput.value = state.limitMonth;
     renderLimitCategories();
     renderSpendingLimitList();

@@ -11,6 +11,7 @@ export function registerCardsView({
   formatMoney,
   formatDate,
   formatMonthLabel,
+  formatMonthShortLabel,
   currentMonthValue,
   shiftMonth,
   todayLocalDateValue,
@@ -528,7 +529,7 @@ export function registerCardsView({
     renderCardTransactionCategories();
     renderCardTransactionTagOptions();
     renderCardPaymentAccounts();
-    cardInvoiceMonthLabel.textContent = formatMonthLabel(state.cardInvoiceMonth);
+    cardInvoiceMonthLabel.textContent = formatMonthShortLabel(state.cardInvoiceMonth);
     cardTransactionForm.elements.credit_card_id.value = state.selectedCreditCardId;
     cardTransactionForm.elements.invoice_month.value = state.cardInvoiceMonth;
     cardInvoicePaymentForm.elements.credit_card_id.value = state.selectedCreditCardId;

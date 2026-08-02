@@ -2518,7 +2518,7 @@ textarea:focus {
   display: grid;
   place-items: center;
   min-height: 34px;
-  min-width: 150px;
+  min-width: 88px;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--panel);

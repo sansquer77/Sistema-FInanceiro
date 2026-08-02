@@ -2,8 +2,8 @@
 tipo: spec
 area: limites
 status: implementado
-versao: 1.1
-atualizado: 2026-07-08
+versao: 1.2
+atualizado: 2026-08-02
 relacionados:
   - "[[categorias-tags-gestao]]"
   - "[[cartoes]]"
@@ -16,7 +16,7 @@ aliases: ["Limites de Gastos", "Budgets", "Metas"]
 # Limites de Gastos
 
 > [!info] Status
-> **implementado** · área: `limites` · atualizado em 2026-07-08 · relacionados: [[categorias-tags-gestao]], [[cartoes]], [[relatorios]]
+> **implementado** · área: `limites` · atualizado em 2026-08-02 · relacionados: [[categorias-tags-gestao]], [[cartoes]], [[relatorios]]
 
 ## Problema
 
@@ -54,6 +54,7 @@ Qualquer usuário autenticado localmente que queira controlar seu orçamento de 
 - Pagamentos de fatura não removem o consumo do limite — o limite mede competência/gasto da fatura, não a quitação.
 - É permitida apenas uma única definição por mês inicial (`AAAA-MM`), categoria e subcategoria (restrição UNIQUE no banco).
 - O limite deve ser um valor monetário positivo maior que zero.
+- O seletor mensal da tela de Limites deve usar botões compactos por ícone e rótulo no formato `MM/AAAA`.
 
 ## API e dados
 
@@ -75,9 +76,11 @@ Tabelas: `spending_limits`, `categories`, `subcategories`.
 - Dado a exclusão de um limite, quando executada, nenhuma transação financeira é afetada.
 - Dado despesas de cartão na fatura aberta do mês, quando computadas, impactam o limite da categoria/subcategoria correspondente.
 - Dado um limite ultrapassado no mês corrente, quando exibido, o menu de Limites e o Cockpit exibem alertas visuais.
+- Dado o usuário visualizando o seletor mensal de Limites, quando o mês é exibido, então o rótulo usa o formato `MM/AAAA`.
 
 ## Changelog
 
+- `1.2` — 2026-08-02 — Seletor mensal de Limites padronizado com botões compactos por ícone e rótulo `MM/AAAA`.
 - `1.1` — 2026-07-08 — Limites passam a ser documentados como recorrentes, com `month` representando início de vigência.
 - `1.0` — 2026-06-29 — Frontmatter e critérios formalizados.
 
