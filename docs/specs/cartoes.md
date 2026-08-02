@@ -2,7 +2,7 @@
 tipo: spec
 area: cartoes
 status: implementado
-versao: 2.1
+versao: 2.2
 atualizado: 2026-08-02
 relacionados:
   - "[[contas-correntes]]"
@@ -141,7 +141,7 @@ Tabelas: `credit_cards`, `credit_card_transactions`, `credit_card_payments`, `cr
 - Dado o pagamento de uma fatura, quando Cockpit, relatórios ou limites de gastos somam despesas analíticas, então o pagamento agregado da fatura é ignorado e os lançamentos detalhados do cartão permanecem considerados.
 - Dado lançamentos recorrentes de cartão, quando listados no Cockpit, aparecem pela competência da fatura.
 - Dado uma fatura conciliada e não paga com conta preferencial configurada, quando a conta exibe saldo previsto, então a fatura é considerada pelo vencimento sem duplicar faturas já pagas.
-- Dado o gráfico de faturas com valores extensos, quando exibido, então os valores cabem nos cartões mensais por ajuste responsivo de tipografia, mantendo o tamanho atual da área.
+- Dado o gráfico de faturas com valores extensos, quando exibido em telas de 14 polegadas ou menores, então os valores cabem nos cartões mensais por ajuste responsivo de tipografia e de largura mínima dos cartões, mantendo o tamanho atual da área e sem truncar centavos.
 - Dado o usuário visualizando o seletor mensal da fatura, quando os botões de navegação aparecem, então usam ícones compactos com rótulo acessível em vez de palavras longas.
 - Dado o usuário visualizando o seletor mensal da fatura, quando o mês é exibido, então o rótulo usa o formato `MM/AAAA`.
 - Dado qualquer tipo de lançamento no cartão, quando campos condicionais de parcela ou recorrência são exibidos ou ocultados, então os campos visíveis mantêm altura/alinhamento consistentes e linhas unitárias ocupam a largura completa.
@@ -149,6 +149,7 @@ Tabelas: `credit_cards`, `credit_card_transactions`, `credit_card_payments`, `cr
 
 ## Changelog
 
+- `2.2` — 2026-08-02 — Gráfico de faturas e resumo de fatura ganham ajustes responsivos para telas de 14 polegadas (e breakpoints intermediários), evitando quebra de linha em valores extensos e melhorando a densidade dos cartões de resumo.
 - `2.1` — 2026-08-02 — Rótulo do seletor mensal da fatura passa a usar formato fixo `MM/AAAA`.
 - `2.0` — 2026-08-02 — Seletor mensal de Faturas/Lançamentos de Cartões padronizado com botões compactos por ícone.
 - `1.9` — 2026-07-29 — Formulário de Lançamentos de Cartões passa a exibir `Cancelar` também em novo cadastro, em variante discreta.

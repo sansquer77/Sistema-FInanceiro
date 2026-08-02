@@ -206,10 +206,10 @@ export function registerSimulationsView({
     if (length >= 18) {
       return "chart-amount-xxs";
     }
-    if (length >= 15) {
+    if (length >= 13) {
       return "chart-amount-xs";
     }
-    if (length >= 12) {
+    if (length >= 10) {
       return "chart-amount-sm";
     }
     return "";

@@ -2,7 +2,7 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 2.7
+versao: 2.8
 atualizado: 2026-08-02
 relacionados:
   - "[[contas-correntes]]"
@@ -136,7 +136,7 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dado um cabeçalho diário, quando acionado, então alterna o conteúdo do dia e informa o estado por `aria-expanded`.
 - Dado um grupo diário longo, quando a página é rolada dentro dele, então o cabeçalho da data permanece brevemente visível.
 - Dado o gráfico de histórico/projeção de saldos, quando exibido, então cada cartão mensal mostra o mês no topo e não exibe marcadores `Previsto` ou `Conciliado` dentro da área do gráfico.
-- Dado o gráfico de histórico/projeção de saldos com valores extensos, quando exibido, então os valores cabem nos cartões mensais por ajuste responsivo de tipografia, mantendo o tamanho atual da área.
+- Dado o gráfico de histórico/projeção de saldos com valores extensos, quando exibido em qualquer tamanho de tela, então os valores cabem nos cartões mensais por ajuste responsivo de tipografia e de largura mínima dos cartões, mantendo o tamanho atual da área e sem truncar centavos.
 - Dado o usuário visualizando o seletor mensal de Lançamentos de Contas, quando os botões de navegação aparecem, então usam ícones compactos com rótulo acessível em vez de palavras longas.
 - Dado o usuário visualizando o seletor mensal de Lançamentos de Contas, quando o mês é exibido, então o rótulo usa o formato `MM/AAAA`.
 - Dado o tipo Investimento selecionado no formulário de Lançamentos, quando campos condicionais de renda fixa são exibidos, então inputs e selects da mesma linha mantêm alturas e alinhamentos consistentes, com dicas exibidas sem deslocar campos vizinhos.
@@ -149,6 +149,7 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 
 ## Changelog
 
+- `2.8` — 2026-08-02 — Gráfico de saldos em Lançamentos de Contas ganha ajustes responsivos para telas de 14 polegadas (e breakpoints intermediários), evitando quebra de linha em valores extensos sem truncar centavos.
 - `2.7` — 2026-08-02 — Rótulo do seletor mensal passa a usar formato fixo `MM/AAAA`.
 - `2.6` — 2026-08-02 — Seletor mensal de Lançamentos de Contas padronizado com botões compactos por ícone.
 - `2.5` — 2026-07-29 — Formulário de investimento em Lançamentos de Contas passa a ocultar campos não aplicáveis a aportes de Poupança.

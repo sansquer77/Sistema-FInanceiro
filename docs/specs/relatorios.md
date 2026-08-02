@@ -2,7 +2,7 @@
 tipo: spec
 area: relatorios
 status: implementado
-versao: 2.3
+versao: 2.4
 atualizado: 2026-08-02
 relacionados:
   - "[[lancamentos]]"
@@ -162,9 +162,11 @@ O ponto crítico é cartão de crédito: a fatura pertence ao mês de competênc
 - Dado uma fatura de cartão paga por lançamento em conta-corrente, quando o Cockpit calcula despesas analíticas do mês, então o pagamento agregado da fatura permanece excluído para evitar duplicidade.
 - Dado uma fatura paga em mês posterior ao da competência, quando o usuário consulta o mês da competência, então o consumo da fatura continua aparecendo naquele mês e o pagamento aparece apenas como efeito de saldo na conta pagadora.
 - Dado o usuário visualizando saldos no Cockpit com mês diferente do mês corrente, quando os saldos forem exibidos, então os rótulos indicam claramente o mês selecionado.
+- Dado o usuário visualizando o Cockpit ou Relatórios em telas de 14 polegadas ou menores, quando os painéis de KPIs, demonstrativos e gráficos são exibidos, então os grids de 4 ou 6 colunas se reorganizam em 2 ou 3 colunas e os gráficos do demonstrativo empilham verticalmente para evitar compressão e quebra de layout.
 
 ## Changelog
 
+- `2.4` — 2026-08-02 — Cockpit e Relatórios ganham ajustes responsivos para telas de 14 polegadas (e breakpoints intermediários): KPIs de 4/6 colunas passam para 2/3 colunas, gráficos do demonstrativo empilham verticalmente e o demonstrativo evita compressão em viewports intermediárias.
 - `2.3` — 2026-08-02 — Rótulos dos seletores mensais passam a usar formato fixo `MM/AAAA` para manter largura visual estável.
 - `2.2` — 2026-08-02 — Seletor mensal do Cockpit padronizado com os seletores de Lançamentos, incluindo botão de mês atual e botões compactos por ícone.
 - `2.1` — 2026-08-02 — Implementado seletor mensal no Cockpit, sincronizando Situação do mês e Saúde Financeira e preservando faturas por competência mesmo após pagamento.

@@ -3646,7 +3646,8 @@ textarea:focus {
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
   max-width: 100%;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  white-space: nowrap;
   text-align: center;
 }
 
@@ -3662,6 +3663,74 @@ textarea:focus {
 .invoice-history-card .chart-amount-xxs {
   font-size: 10.5px;
   letter-spacing: -0.04em;
+}
+
+@media (max-width: 1440px) {
+  .invoice-history-card strong {
+    font-size: 14px;
+  }
+  .invoice-history-card .chart-amount-sm {
+    font-size: 12px;
+  }
+  .invoice-history-card .chart-amount-xs {
+    font-size: 11px;
+  }
+  .invoice-history-card .chart-amount-xxs {
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 1280px) {
+  .invoice-history-rail {
+    min-width: 640px;
+    min-height: 156px;
+  }
+  .invoice-history-card {
+    min-height: 148px;
+    padding: 14px 10px 12px;
+  }
+  .invoice-history-card span {
+    font-size: 16px;
+  }
+  .invoice-history-card strong {
+    font-size: 13px;
+  }
+  .invoice-history-card .chart-amount-sm {
+    font-size: 11px;
+  }
+  .invoice-history-card .chart-amount-xs {
+    font-size: 9px;
+  }
+  .invoice-history-card .chart-amount-xxs {
+    font-size: 8px;
+  }
+}
+
+@media (max-width: 860px) {
+  .invoice-history-rail {
+    min-width: 520px;
+    min-height: 140px;
+  }
+  .invoice-history-card {
+    min-height: 132px;
+    padding: 12px 8px 10px;
+    border-radius: 14px;
+  }
+  .invoice-history-card span {
+    font-size: 14px;
+  }
+  .invoice-history-card strong {
+    font-size: 12px;
+  }
+  .invoice-history-card .chart-amount-sm {
+    font-size: 10px;
+  }
+  .invoice-history-card .chart-amount-xs {
+    font-size: 8px;
+  }
+  .invoice-history-card .chart-amount-xxs {
+    font-size: 7px;
+  }
 }
 
 .invoice-history-svg {
@@ -4588,6 +4657,33 @@ textarea:focus {
 
 [hidden] {
   display: none !important;
+}
+
+@media (max-width: 1280px) {
+  .summary-strip,
+  .card-invoice-summary,
+  .report-summary,
+  .account-report-header,
+  .import-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .limit-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .portfolio-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .statement-visuals,
+  .statement-source-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .statement-kpis {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 860px) {
