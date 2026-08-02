@@ -2,7 +2,7 @@
 tipo: spec
 area: tendencias-saude-financeira
 status: em-implementacao
-versao: 0.7
+versao: 1.2
 atualizado: 2026-08-02
 relacionados:
   - "[[score-saude-financeira]]"
@@ -108,6 +108,9 @@ Usuário autenticado que consulta o Cockpit e deseja entender, em linguagem simp
 - Lançamentos de cartão devem entrar pela competência da fatura (`invoice_month`) nas análises mensais, conforme [[relatorios]].
 - Sugestões devem ser explicativas e não prescritivas, evitando tom de aconselhamento financeiro personalizado.
 - Em moeda estrangeira ou cenário multi-moeda, a primeira versão deve evitar misturar moedas sem explicação; quando necessário, gerar achados por moeda ou usar os valores normalizados já definidos pelo Score.
+- O sistema deve identificar despesas recorrentes mensais na categoria `Assinaturas e Serviços` e suas subcategorias, agregando o custo mensal por subcategoria para sinalizar o peso relativo no orçamento.
+- O achado de assinaturas e serviços deve ser explicativo e não prescritivo, apontando o valor mensal por subcategoria e sugerindo que o usuário avalie o uso, sem recomendar cancelamento ou classificar a despesa como problema.
+- Lançamentos de cartão de crédito recorrentes mensais na categoria `Assinaturas e Serviços` também devem entrar na agregação, pela competência da fatura (`invoice_month`).
 
 ## API e dados
 
@@ -186,6 +189,7 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 - Dado um usuário com pagamentos de fatura em conta-corrente, quando as despesas do mês são agregadas, então esses pagamentos não são somados como despesa analítica.
 - Dado um usuário com lançamentos de cartão, quando a tendência mensal é calculada, então os valores entram pela competência da fatura (`invoice_month`).
 - Dado um usuário em cenário multi-moeda, quando houver dados em mais de uma moeda, então o sistema não mistura moedas sem indicar a base usada.
+- Dado um usuário com despesas recorrentes mensais na categoria `Assinaturas e Serviços`, quando consulta a aba **Tendências**, então o sistema exibe o custo mensal agregado por subcategoria como achado estruturado em centavos, sem recomendar cancelamento.
 - Dado um usuário que acessa Preferências de IA, quando abre o campo de provedor, então visualiza as opções principais `OpenAI / ChatGPT`, `Anthropic / Claude`, `Google / Gemini` e `Custom / Local`.
 - Dado um usuário que seleciona `Custom / Local` como provedor de IA, quando a tela de configuração é exibida, então campos adicionais de endpoint/base URL, modelo, autenticação e contrato de payload ficam disponíveis.
 - Dado um usuário que seleciona `Custom / Local`, quando configura a integração, então o endpoint deve ser tratado como compatível com OpenAI Chat Completions em `{base_url}/chat/completions`.
@@ -220,15 +224,20 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 
 - [x] Passo 1 — Atualizar specs afetadas e resolver pendências obrigatórias antes de codificar. Fecha: critérios 1 a 28.
 - [x] Passo 2 — Criar armazenamento local criptografado de configuração de IA por usuário, seguindo o padrão de segurança aplicável. Fecha: critérios 17, 18, 19, 21, 23, 27 e 28.
-- [ ] Passo 3 — Implementar núcleo local de cálculo de tendências em Python, com série mensal, Budget x Realizado, achados estruturados em centavos inteiros, eventos pontuais e confiança. Fecha: critérios 1, 3, 4, 5, 6, 7, 8, 9, 13, 22, 25, 26, 27 e 28.
-- [ ] Passo 4 — Criar rotas autenticadas e validadas para tendências e preferências de IA. Fecha: critérios 1, 12, 13, 14, 15, 16, 17, 18 e 19.
-- [ ] Passo 5 — Adicionar UI em Preferências para ligar/desligar IA, escolher provedor em combo e salvar configuração sem expor segredos. Fecha: critérios 10, 11, 12, 13, 15, 16 e 20.
-- [ ] Passo 6 — Adicionar aba **Tendências** no Cockpit, com gráfico mês a mês, tabela Budget x Realizado e bloco **Tendências e achados**, preservando identidade visual e leitura local sem IA. Fecha: critérios 1, 2, 3, 4, 5, 6, 7, 10, 20, 21, 25, 26, 27 e 28.
+- [x] Passo 3 — Implementar núcleo local de cálculo de tendências em Python, com série mensal, Budget x Realizado, achados estruturados em centavos inteiros, eventos pontuais, assinaturas e serviços recorrentes, e confiança. Fecha: critérios 1, 3, 4, 5, 6, 7, 8, 9, 13, 22, 25, 26, 27, 28 e 29.
+- [x] Passo 4 — Criar rotas autenticadas e validadas para tendências e preferências de IA. Fecha: critérios 1, 12, 13, 14, 15, 16, 17, 18 e 19.
+- [x] Passo 5 — Adicionar UI em Preferências para ligar/desligar IA, escolher provedor em combo e salvar configuração sem expor segredos. Fecha: critérios 10, 11, 12, 13, 15, 16 e 20.
+- [x] Passo 6 — Adicionar aba **Tendências** no Cockpit, com gráfico mês a mês, tabela Budget x Realizado e bloco **Tendências e achados**, preservando identidade visual e leitura local sem IA. Fecha: critérios 1, 2, 3, 4, 5, 6, 7, 10, 20, 21, 25, 26, 27 e 28.
 - [ ] Passo 7 — Implementar reescrita automática opcional por IA com payload minimizado, timeout curto e fallback local. Fecha: critérios 12, 13, 14, 16 e 17.
 - [ ] Passo 8 — Criar testes automatizados para núcleo local, segurança de preferências, fallback de IA e isolamento por usuário. Fecha: critérios 1 a 28.
 
 ## Changelog
 
+- `1.2` — 2026-08-02 — Passo 6 concluído: aba **Tendências** no Cockpit com gráfico mês a mês, tabela Budget x Realizado e bloco Tendências e achados, leitura local sem IA.
+- `1.1` — 2026-08-02 — Passo 5 concluído: UI em Preferências para ligar/desligar IA, escolher provedor em combo e salvar configuração sem expor segredos.
+- `1.0` — 2026-08-02 — Passo 4 concluído: rotas autenticadas `/api/financial-health-trends`, `/api/ai-settings`, `/api/financial-health-trends/ai-summary` e módulo de reescrita por IA com fallback local.
+- `0.9` — 2026-08-02 — Adicionado ao núcleo de tendências o achado de Assinaturas e Serviços recorrentes, agregando custo mensal por subcategoria de forma explicativa e não prescritiva.
+- `0.8` — 2026-08-02 — Passo 3 concluído: núcleo local de tendências (`financeiro/trends.py`) calcula série mensal, Budget x Realizado, achados estruturados, eventos pontuais e confiança; antecipação de parcelas passa a ser registrada no histórico operacional ao mover fatura de cartão.
 - `0.7` — 2026-08-02 — Iniciada implementação dos passos 1 e 2: documentação alinhada e armazenamento local criptografado de configuração de IA por usuário definido como fundação para Preferências e tendências futuras.
 - `0.6` — 2026-08-02 — Registrada decisão de tratar Tendências como aba própria do Cockpit, com gráfico mês a mês de receitas x despesas x saldo e tabela Budget x Realizado baseada nos Limites existentes.
 - `0.5` — 2026-07-31 — Definidos sinais iniciais de eventos pontuais por categorias/subcategorias existentes, com palavras-chave e tags apenas como reforço, removendo a última pendência conhecida.

@@ -10,6 +10,7 @@ from financeiro.accounts import SUPPORTED_CURRENCIES, cents_to_money, empty_to_n
 from financeiro.categories import get_or_create_category, get_or_create_subcategory, get_or_create_tag, normalize_name
 from financeiro.classification_suggestions import normalize_description
 from financeiro.database import begin_immediate, get_connection, row_to_dict
+from financeiro.operation_logs import create_operation_log_with_conn
 from financeiro.transactions import create_transaction_with_conn, normalize_optional_tags, split_cents
 
 CARD_TRANSACTION_TYPES = {"income", "expense"}
@@ -346,6 +347,24 @@ def move_credit_card_transaction_invoice(user_id: int, transaction_id: str, dire
             WHERE id = ? AND user_id = ? AND archived_at IS NULL
             """,
             (target_month, normalized_id, user_id),
+        )
+        # spec: tendencias-saude-financeira v1.2 — critério 13
+        # (registra movimento de fatura para detecção posterior de antecipação
+        #  de parcelas no núcleo de tendências)
+        create_operation_log_with_conn(
+            conn,
+            user_id,
+            module="cards",
+            operation_type="move",
+            entity_type="credit_card_transaction",
+            entity_id=str(normalized_id),
+            credit_card_id=card["id"],
+            description=f"Lancamento movido para fatura {target_month}",
+            metadata={
+                "previous_invoice_month": existing["invoice_month"],
+                "target_invoice_month": target_month,
+                "amount_cents": int(existing["amount_cents"] or 0),
+            },
         )
         row = fetch_card_transaction(conn, user_id, normalized_id)
     return format_card_transaction(row, card["currency"])

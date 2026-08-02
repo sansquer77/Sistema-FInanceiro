@@ -2,8 +2,8 @@
 tipo: spec
 area: distribuicao
 status: implementado
-versao: 1.7
-atualizado: 2026-07-27
+versao: 1.8
+atualizado: 2026-08-02
 relacionados:
   - "[[sdd]]"
   - "[[templates/spec-template|Template de spec]]"
@@ -16,7 +16,7 @@ aliases: ["Distribuicao", "Pacotes de Distribuicao", "Instalador macOS", "Instal
 # Distribuicao
 
 > [!info] Status
-> **implementado** · área: `distribuicao` · atualizado em 2026-07-27 · relacionados: [[sdd]], [[templates/spec-template|Template de spec]], [[arquitetura]], [[requisitos]]
+> **implementado** · área: `distribuicao` · atualizado em 2026-08-02 · relacionados: [[sdd]], [[templates/spec-template|Template de spec]], [[arquitetura]], [[requisitos]]
 
 ## Problema
 
@@ -60,6 +60,7 @@ Usuario final que vai instalar o Sistema Financeiro em outro computador e manten
 | `Sistema Financeiro - Distribuicao/Windows/README-INSTALACAO-WINDOWS.md` | documento | Instrui instalacao, primeiro uso, dados nao incluidos, URL local e atualizacao no Windows. |
 | `Sistema Financeiro - Distribuicao/Windows/configurar_windows.ps1` | script | Configura o arquivo `hosts` em clientes Windows para acessar `sistema-financeiro.net`. |
 | `Sistema Financeiro - Distribuicao/Windows/Sistema Financeiro - Distribuicao Windows.zip` | arquivo zip | Zip final do Windows, gerado a partir de `Sistema Financeiro - Distribuicao/Windows/`. |
+| `Sistema Financeiro - Distribuicao/Linux/README-INSTALACAO-LINUX.md` | documento | Instrui instalacao, execucao local e acesso em rede para Linux Ubuntu. |
 
 ## Regras
 
@@ -71,6 +72,8 @@ Usuario final que vai instalar o Sistema Financeiro em outro computador e manten
 - O pacote macOS deve usar o runtime one-folder gerado por PyInstaller em `MacOS/Aplicativo/SistemaFinanceiro/`, sem expor `app.py`, `financeiro/` ou `web/` como arvore fonte de runtime.
 - O pacote Windows gerado por GitHub Actions deve usar runtime PyInstaller em `Windows/Aplicativo/SistemaFinanceiro/`, sem expor `app.py`, `financeiro/` ou `web/` como arvore fonte de runtime.
 - Os atalhos Windows devem executar `SistemaFinanceiro/SistemaFinanceiro.exe`, nunca `python app.py`, para evitar uso acidental de arquivos fonte antigos.
+- Cada pacote deve conter um unico README de usuario final na raiz da plataforma, com instrucoes separadas em modulos de execucao local e execucao em rede.
+- Os pacotes nao devem incluir `Aplicativo/README.md` de desenvolvimento, pois ele menciona `python app.py`, `docs/` e estrutura fonte que nao pertencem ao runtime distribuido.
 - O pacote macOS tambem deve conter `Sistema Financeiro.app` dentro de `MacOS/Aplicativo/`.
 - O bundle `Sistema Financeiro.app` dentro da distribuicao macOS deve usar launcher portatil baseado em `$HOME/Documents/Sistema Financeiro`, chamando `SistemaFinanceiro/SistemaFinanceiro` e nao caminhos absolutos da maquina de desenvolvimento.
 - O launcher do app e `MacOS/Instalar Sistema Financeiro.command` devem ter permissao de execucao.
@@ -118,6 +121,8 @@ Arquivos e diretorios afetados:
 - Dado o pacote macOS gerado, quando inspecionado, entao o runtime principal e `Aplicativo/SistemaFinanceiro/SistemaFinanceiro` e nao `Aplicativo/app.py`.
 - Dado o pacote Windows gerado por GitHub Actions, quando inspecionado, entao o runtime principal e `Aplicativo/SistemaFinanceiro/SistemaFinanceiro.exe` e nao `Aplicativo/app.py`.
 - Dado o launcher Windows local, quando inspecionado, entao ele executa `SistemaFinanceiro.exe` e nao `python app.py`.
+- Dado qualquer pacote gerado, quando o usuario abrir o README de instalacao na raiz da plataforma, entao encontra secoes separadas para execucao local e execucao em rede.
+- Dado qualquer pacote gerado, quando inspecionado, entao nao existe `Aplicativo/README.md` de desenvolvimento.
 - Dado o pacote macOS instalado, quando o usuario executa `Abrir Sistema Financeiro na Rede.command`, entao o app sobe em `0.0.0.0`, mostra uma URL com IP local e permite acesso de outros dispositivos da mesma rede.
 - Dado o pacote Windows instalado, quando o usuario executa o atalho `Sistema Financeiro Rede`, entao o app sobe em `0.0.0.0`, abre uma URL com IP local e permite acesso de outros dispositivos da mesma rede.
 - Dado um cliente macOS/Linux, quando `configurar_mac.sh` e executado, entao `192.168.1.212 sistema-financeiro.net` fica presente em `/etc/hosts`.
@@ -140,6 +145,7 @@ Arquivos e diretorios afetados:
 
 ## Changelog
 
+- `1.8` — 2026-08-02 — Pacotes passam a manter apenas README de instalacao na raiz da plataforma, separado por execucao local e execucao em rede, removendo README de desenvolvimento de `Aplicativo/`.
 - `1.7` — 2026-07-27 — Pacote Windows gerado por GitHub Actions passa a ser montado em staging limpo com runtime PyInstaller, sem arvore fonte e com launchers apontando para `SistemaFinanceiro.exe`.
 - `1.6` — 2026-07-06 — Inclusao de servidor Linux em `sistema-financeiro.net:8030`, scripts de hosts para clientes e regras padrao de Host/Origin.
 - `1.5` — 2026-07-04 — Normalizacao de hosts/origens permitidos documentada para modo rede e launchers LAN.

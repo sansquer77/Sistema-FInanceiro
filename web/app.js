@@ -293,6 +293,18 @@ const themePreference = document.querySelector("#themePreference");
 const emailMessage = document.querySelector("#emailMessage");
 const passwordMessage = document.querySelector("#passwordMessage");
 const emailConfigMessage = document.querySelector("#emailConfigMessage");
+const aiConfigForm = document.querySelector("#aiConfigForm");
+const aiConfigEnabled = document.querySelector("#aiConfigEnabled");
+const aiConfigProvider = document.querySelector("#aiConfigProvider");
+const aiConfigCustomFields = document.querySelector("#aiConfigCustomFields");
+const aiConfigBaseUrl = document.querySelector("#aiConfigBaseUrl");
+const aiConfigModel = document.querySelector("#aiConfigModel");
+const aiConfigAuthType = document.querySelector("#aiConfigAuthType");
+const aiConfigApiKey = document.querySelector("#aiConfigApiKey");
+const aiConfigTimeout = document.querySelector("#aiConfigTimeout");
+const aiConfigTemperature = document.querySelector("#aiConfigTemperature");
+const aiConfigMaxTokens = document.querySelector("#aiConfigMaxTokens");
+const aiConfigMessage = document.querySelector("#aiConfigMessage");
 const clearLaunchesMessage = document.querySelector("#clearLaunchesMessage");
 const deleteUserMessage = document.querySelector("#deleteUserMessage");
 const monthlyPlanningList = document.querySelector("#monthlyPlanningList");
@@ -353,6 +365,9 @@ const cockpitLimitAlert = document.querySelector("#cockpitLimitAlert");
 const cockpitPortfolioMaturityAlert = document.querySelector("#cockpitPortfolioMaturityAlert");
 const financialHealthPanel = document.querySelector("#financialHealthPanel");
 const financialHealthContent = document.querySelector("#financialHealthContent");
+const trendsPanel = document.querySelector("#trendsPanel");
+const trendsContent = document.querySelector("#trendsContent");
+const trendsMeta = document.querySelector("#trendsMeta");
 const topExpensesChart = document.querySelector("#topExpensesChart");
 const cashDistributionChart = document.querySelector("#cashDistributionChart");
 const previousMonthButton = document.querySelector("#previousMonthButton");
@@ -577,6 +592,9 @@ const cockpitView = registerCockpitView({
     cockpitPortfolioMaturityAlert,
     financialHealthPanel,
     financialHealthContent,
+    trendsPanel,
+    trendsContent,
+    trendsMeta,
   },
   api,
   currentMonthValue,
@@ -925,12 +943,24 @@ const userAdminViewController = registerUserAdminView({
     emailConfigProvider,
     emailConfigManualFields,
     emailConfigPreset,
+    aiConfigForm,
+    aiConfigEnabled,
+    aiConfigProvider,
+    aiConfigCustomFields,
+    aiConfigBaseUrl,
+    aiConfigModel,
+    aiConfigAuthType,
+    aiConfigApiKey,
+    aiConfigTimeout,
+    aiConfigTemperature,
+    aiConfigMaxTokens,
     clearLaunchesForm,
     deleteUserForm,
     themePreference,
     emailMessage,
     passwordMessage,
     emailConfigMessage,
+    aiConfigMessage,
     clearLaunchesMessage,
     deleteUserMessage,
     userName,
@@ -1299,6 +1329,7 @@ function showModule(view) {
     emailForm.elements.email.value = state.user.email;
     userAdminViewController.syncThemePreference();
     userAdminViewController.loadEmailConfigStatus();
+    userAdminViewController.loadAIConfigStatus();
   }
 }
 

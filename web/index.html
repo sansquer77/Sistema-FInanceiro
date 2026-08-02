@@ -194,6 +194,7 @@
             <div class="cockpit-tabs" role="tablist" aria-label="Visões do cockpit">
               <button class="cockpit-tab active" type="button" role="tab" aria-selected="true" aria-controls="cockpitSummaryPanel" data-cockpit-tab="summary">Situação do mês</button>
               <button class="cockpit-tab" type="button" role="tab" aria-selected="false" aria-controls="financialHealthPanel" data-cockpit-tab="health">Saúde Financeira</button>
+              <button class="cockpit-tab" type="button" role="tab" aria-selected="false" aria-controls="trendsPanel" data-cockpit-tab="trends">Tendências</button>
             </div>
             <div class="month-navigator cockpit-month">
               <button class="ghost small-button month-icon-button" type="button" id="previousCockpitMonthButton" aria-label="Mês anterior" title="Mês anterior">‹</button>
@@ -284,6 +285,19 @@
             </div>
             <div class="financial-health-content" id="financialHealthContent">
               <div class="empty-state compact">Carregando score de saúde financeira...</div>
+            </div>
+          </section>
+
+          <section class="panel trends-panel cockpit-tab-panel" id="trendsPanel" role="tabpanel" hidden>
+            <div class="trends-header">
+              <div>
+                <h2>Tendências</h2>
+                <p class="muted-copy">Análise mensal local: evolução de receitas e despesas, Budget x Realizado e achados do mês.</p>
+              </div>
+              <div class="trends-meta" id="trendsMeta"></div>
+            </div>
+            <div class="trends-content" id="trendsContent">
+              <div class="empty-state compact">Carregando tendências...</div>
             </div>
           </section>
         </section>
@@ -1496,6 +1510,54 @@
                 <button class="primary" type="submit">Salvar configuração</button>
               </form>
               <p class="message" id="emailConfigMessage" role="alert"></p>
+            </section>
+
+            <section class="panel">
+              <h2>Inteligência artificial (opcional)</h2>
+              <p class="form-help">A IA só reescreve o resumo local de Tendências de forma mais natural. Todos os cálculos e achados continuam feitos localmente.</p>
+              <form id="aiConfigForm" class="form">
+                <label class="checkbox-field">
+                  <input name="enabled" id="aiConfigEnabled" type="checkbox" value="1">
+                  <span>Ativar reescrita de resumo por IA</span>
+                </label>
+                <label>Provedor
+                  <select name="provider" id="aiConfigProvider">
+                    <option value="openai">OpenAI / ChatGPT</option>
+                    <option value="anthropic">Anthropic / Claude</option>
+                    <option value="google">Google / Gemini</option>
+                    <option value="custom">Custom / Local</option>
+                    <option value="local">Local</option>
+                  </select>
+                </label>
+                <div id="aiConfigCustomFields" hidden>
+                  <label>URL base
+                    <input name="base_url" id="aiConfigBaseUrl" type="url" placeholder="http://localhost:1234/v1">
+                  </label>
+                  <label>Modelo
+                    <input name="model" id="aiConfigModel" type="text" placeholder="modelo">
+                  </label>
+                  <label>Tipo de autenticação
+                    <select name="auth_type" id="aiConfigAuthType">
+                      <option value="none">Nenhuma</option>
+                      <option value="bearer">Bearer (API key)</option>
+                    </select>
+                  </label>
+                  <label>API key
+                    <input name="api_key" id="aiConfigApiKey" type="password" placeholder="Deixe em branco para manter a atual">
+                  </label>
+                  <label>Timeout (segundos)
+                    <input name="timeout_seconds" id="aiConfigTimeout" type="number" min="1" max="60" value="10">
+                  </label>
+                  <label>Temperature
+                    <input name="temperature" id="aiConfigTemperature" type="number" min="0" max="2" step="0.1" value="0.2">
+                  </label>
+                  <label>Max tokens
+                    <input name="max_tokens" id="aiConfigMaxTokens" type="number" min="1" max="4000" value="700">
+                  </label>
+                </div>
+                <button class="primary" type="submit">Salvar configuração de IA</button>
+              </form>
+              <p class="message" id="aiConfigMessage" role="alert"></p>
             </section>
 
             <section class="panel danger-zone">

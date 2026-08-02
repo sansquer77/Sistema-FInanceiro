@@ -1,3 +1,5 @@
+import { registerTrendsView } from "./trends-view.js";
+
 export function registerCockpitView({
   state,
   elements,
@@ -43,8 +45,20 @@ export function registerCockpitView({
     cockpitPortfolioMaturityAlert,
     financialHealthPanel,
     financialHealthContent,
+    trendsPanel,
+    trendsContent,
+    trendsMeta,
   } = elements;
   let financialHealthRequestId = 0;
+
+  const trendsView = registerTrendsView({
+    elements: { trendsPanel, trendsContent, trendsMeta },
+    api,
+    formatMoney,
+    formatPercent,
+    escapeHtml,
+    formatMonthLabel: formatMonthLabel || formatMonthShortLabel,
+  });
 
   cockpitTabs?.forEach((button) => {
     button.addEventListener("click", () => setCockpitTab(button.dataset.cockpitTab || "summary"));
@@ -76,10 +90,14 @@ export function registerCockpitView({
     if (activeCockpitTab() === "health") {
       renderFinancialHealth();
     }
+    if (activeCockpitTab() === "trends") {
+      trendsView.renderTrends(cockpitMonthValue());
+    }
   }
 
   function setCockpitTab(tab) {
-    const nextTab = tab === "health" ? "health" : "summary";
+    const allowedTabs = new Set(["summary", "health", "trends"]);
+    const nextTab = allowedTabs.has(tab) ? tab : "summary";
     if (state.cockpitTab === nextTab) {
       return;
     }
@@ -88,10 +106,14 @@ export function registerCockpitView({
     if (nextTab === "health") {
       renderFinancialHealth();
     }
+    if (nextTab === "trends") {
+      trendsView.renderTrends(cockpitMonthValue());
+    }
   }
 
   function activeCockpitTab() {
-    return state.cockpitTab === "health" ? "health" : "summary";
+    const allowedTabs = new Set(["summary", "health", "trends"]);
+    return allowedTabs.has(state.cockpitTab) ? state.cockpitTab : "summary";
   }
 
   function renderCockpitTabs() {
@@ -107,6 +129,9 @@ export function registerCockpitView({
     }
     if (financialHealthPanel) {
       financialHealthPanel.hidden = activeTab !== "health";
+    }
+    if (trendsPanel) {
+      trendsPanel.hidden = activeTab !== "trends";
     }
   }
 
@@ -132,6 +157,8 @@ export function registerCockpitView({
     state.cockpit = null;
     state.financialHealth = null;
     state.financialHealthError = "";
+    state.trendsData = null;
+    state.trendsError = "";
     renderCockpit();
     if (typeof onCockpitMonthChanged === "function") {
       onCockpitMonthChanged().catch((error) => {

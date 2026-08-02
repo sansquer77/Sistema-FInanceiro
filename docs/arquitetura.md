@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 2.4
+versao: 2.8
 atualizado: 2026-08-02
 relacionados:
   - "[[requisitos]]"
@@ -198,6 +198,15 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `GET` | `/api/cockpit?month=AAAA-MM` |
 | `GET` | `/api/reports/category-evolution?category_id={id}&subcategory_id={id}&period={periodo}` |
 
+#### Rotas — Tendências e IA → [[tendencias-saude-financeira]]
+
+| Método | Rota |
+|---|---|
+| `GET` | `/api/financial-health-trends?month=AAAA-MM` |
+| `GET` | `/api/ai-settings` |
+| `PUT` | `/api/ai-settings` |
+| `POST` | `/api/financial-health-trends/ai-summary` |
+
 #### Rotas — Score de Saúde Financeira → [[score-saude-financeira]]
 
 | Método | Rota |
@@ -236,6 +245,8 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `spending_limits.py` | Metas e orçamentos mensais. Ver [[limites-gastos]]. |
 | `portfolio.py` | Consolidação de investimentos, precificação, impostos e metadado de reserva de emergência. Ver [[investimentos-portfolio]]. |
 | `financial_health.py` | Núcleo analítico do Score de Saúde Financeira: cálculo atômico dos pilares, lista `pilares`, Paz Financeira e função de histórico com validação de `months` (1-36). Ver [[score-saude-financeira]]. |
+| `trends.py` | Núcleo local de Tendências e Achados: série mensal, Budget x Realizado, achados estruturados, eventos pontuais, assinaturas/serviços recorrentes, confiança e resumo determinístico. Ver [[tendencias-saude-financeira]]. |
+| `ai_summary.py` | Reescrita opcional do resumo por IA com payload minimizado, timeout curto e fallback para resumo local. Ver [[tendencias-saude-financeira]]. |
 | `imports.py` | Leitura de exportações Organizze e planilhas modelo. Ver [[importacao-organizze]]. |
 | `operation_logs.py` | Auditoria funcional das operações do usuário. Ver [[historico-operacoes]]. |
 | `emailer.py` | Envio SMTP do código de recuperação de senha. Ver [[recuperacao-senha]]. |
@@ -431,6 +442,10 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `2.8` — 2026-08-02 — Documentada aba **Tendências** no Cockpit (`trendsPanel`, `trends-view.js`) integrada à rota `GET /api/financial-health-trends` com gráfico mês a mês, Budget x Realizado e achados local.
+- `2.7` — 2026-08-02 — Documentada UI de Preferências para configuração de IA (`aiConfigForm`, `user-admin-view.js`) integrada às rotas `/api/ai-settings`.
+- `2.6` — 2026-08-02 — Documentadas rotas de Tendências (`/api/financial-health-trends`, `/api/ai-settings`, `/api/financial-health-trends/ai-summary`) e módulo `financeiro/ai_summary.py`.
+- `2.5` — 2026-08-02 — Documentado módulo `financeiro/trends.py` como núcleo local de cálculo de tendências para a aba Tendências.
 - `2.4` — 2026-08-02 — Documentada a tabela `user_ai_settings` e o armazenamento criptografado local de segredos de IA por usuário para a futura aba de Tendências.
 - `2.3` — 2026-08-02 — Fluxo do Cockpit documentado com seletor mensal compartilhado e faturas de cartão preservadas por competência após pagamento.
 - `2.2` — 2026-07-29 — Documentado metadado `emergency_reserve_eligible` também em `investment_operations`, permitindo marcar aportes de Renda Fixa/Poupança como reserva de emergência.

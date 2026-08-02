@@ -16,7 +16,23 @@ O pacote ja inclui o runtime executavel do app. Nao e necessario instalar Python
 3. Se o Windows SmartScreen perguntar, escolha `Mais informacoes` e depois `Executar assim mesmo`.
 4. Ao final, use o icone `Sistema Financeiro` criado na Area de Trabalho.
 
-## Acessar servidor Linux
+## Modulo 1 - Execucao local
+
+Use este modo para rodar o sistema apenas neste computador Windows.
+
+1. Abra `Sistema Financeiro` pela Area de Trabalho.
+2. O app iniciara o servidor local e abrira o navegador em:
+
+   `http://127.0.0.1:8010`
+
+3. Clique em `Criar acesso` e cadastre o primeiro usuario.
+4. Cadastre suas contas, cartoes, categorias e lancamentos.
+
+## Modulo 2 - Execucao em rede
+
+Existem dois cenarios de rede.
+
+### Acessar o servidor Linux central
 
 Use esta opcao quando o Sistema Financeiro estiver rodando no servidor `192.168.1.212`.
 
@@ -29,17 +45,7 @@ Use esta opcao quando o Sistema Financeiro estiver rodando no servidor `192.168.
 
 Se o certificado SSL for autoassinado, o navegador pode pedir confirmacao de seguranca no primeiro acesso.
 
-## Primeiro uso local
-
-1. Abra `Sistema Financeiro` pela Area de Trabalho.
-2. O app iniciara o servidor local e abrira o navegador em:
-
-   `http://127.0.0.1:8010`
-
-3. Clique em `Criar acesso` e cadastre o primeiro usuario.
-4. Cadastre suas contas, cartoes, categorias e lancamentos.
-
-## Uso na rede local
+### Expor este Windows para outros dispositivos da LAN
 
 Use este modo quando outros computadores ou celulares da mesma rede Wi-Fi/LAN precisarem acessar o sistema.
 

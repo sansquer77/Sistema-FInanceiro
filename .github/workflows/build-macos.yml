@@ -48,7 +48,6 @@ jobs:
 
           rm -rf "$RUNTIME_ROOT"
           cp -R "dist/SistemaFinanceiro" "$RUNTIME_ROOT"
-          cp README.md "$APP_ROOT/README.md"
 
           find "$PACKAGE_ROOT" \( \
             -name data -o \

@@ -11,6 +11,7 @@ export function registerUserAdminView(context) {
     onShowAuth,
   } = context;
   let emailConfigPresets = [];
+  let aiConfigPresets = [];
 
   function syncThemePreference() {
     if (!elements.themePreference || !theme) {
@@ -80,6 +81,102 @@ export function registerUserAdminView(context) {
       setMessage(elements.emailConfigMessage, `Recuperação configurada para ${status.sender}.`, "success");
     } else if (!elements.emailConfigMessage.textContent) {
       setMessage(elements.emailConfigMessage, "Recuperação por email ainda não configurada neste Mac.", "");
+    }
+  }
+
+  function isAICustomProvider() {
+    if (!elements.aiConfigProvider) {
+      return false;
+    }
+    const value = elements.aiConfigProvider.value;
+    return value === "custom" || value === "local";
+  }
+
+  function renderAIConfigFields() {
+    if (!elements.aiConfigCustomFields) {
+      return;
+    }
+    elements.aiConfigCustomFields.hidden = !isAICustomProvider();
+  }
+
+  function applyAIPreset() {
+    if (!elements.aiConfigProvider) {
+      return;
+    }
+    const preset = aiConfigPresets.find((item) => item.provider === elements.aiConfigProvider.value);
+    if (!preset) {
+      return;
+    }
+    if (elements.aiConfigBaseUrl && !elements.aiConfigBaseUrl.value) {
+      elements.aiConfigBaseUrl.value = preset.base_url || "";
+    }
+    if (elements.aiConfigAuthType && !elements.aiConfigAuthType.value) {
+      elements.aiConfigAuthType.value = preset.auth_type || "bearer";
+    }
+  }
+
+  async function loadAIConfigStatus() {
+    if (!elements.aiConfigForm) {
+      return;
+    }
+    try {
+      const status = await api("/api/ai-settings");
+      aiConfigPresets = status.presets || [];
+      elements.aiConfigEnabled.checked = status.enabled === true;
+      elements.aiConfigProvider.value = status.provider || "custom";
+      elements.aiConfigBaseUrl.value = status.base_url || "";
+      elements.aiConfigModel.value = status.model || "";
+      elements.aiConfigAuthType.value = status.auth_type || "bearer";
+      elements.aiConfigApiKey.value = "";
+      if (elements.aiConfigTimeout) {
+        elements.aiConfigTimeout.value = String(status.timeout_seconds || 10);
+      }
+      if (elements.aiConfigTemperature) {
+        elements.aiConfigTemperature.value = String(status.temperature || 0.2);
+      }
+      if (elements.aiConfigMaxTokens) {
+        elements.aiConfigMaxTokens.value = String(status.max_tokens || 700);
+      }
+      renderAIConfigFields();
+      if (status.configured && status.enabled) {
+        setMessage(elements.aiConfigMessage, "IA ativada para reescrita de resumo.", "success");
+      } else if (status.configured) {
+        setMessage(elements.aiConfigMessage, "IA configurada, mas desligada. Ative para usar a reescrita.", "");
+      } else {
+        setMessage(elements.aiConfigMessage, "IA não configurada.", "");
+      }
+    } catch (error) {
+      setMessage(elements.aiConfigMessage, error.message, "error");
+    }
+  }
+
+  async function handleAIConfigSubmit(event) {
+    event.preventDefault();
+    setMessage(elements.aiConfigMessage, "");
+    const data = {
+      enabled: elements.aiConfigEnabled ? elements.aiConfigEnabled.checked : false,
+      provider: elements.aiConfigProvider ? elements.aiConfigProvider.value : "custom",
+      base_url: elements.aiConfigBaseUrl ? elements.aiConfigBaseUrl.value : "",
+      model: elements.aiConfigModel ? elements.aiConfigModel.value : "",
+      auth_type: elements.aiConfigAuthType ? elements.aiConfigAuthType.value : "bearer",
+      api_key: elements.aiConfigApiKey ? elements.aiConfigApiKey.value : "",
+      timeout_seconds: elements.aiConfigTimeout ? parseInt(elements.aiConfigTimeout.value, 10) || 10 : 10,
+      temperature: elements.aiConfigTemperature ? parseFloat(elements.aiConfigTemperature.value) || 0.2 : 0.2,
+      max_tokens: elements.aiConfigMaxTokens ? parseInt(elements.aiConfigMaxTokens.value, 10) || 700 : 700,
+    };
+    const customProvider = isAICustomProvider();
+    if (!customProvider && aiConfigPresets.length > 0) {
+      data.base_url = "";
+      data.auth_type = aiConfigPresets.find((item) => item.provider === data.provider)?.auth_type || "bearer";
+    }
+    try {
+      const status = await api("/api/ai-settings", { method: "PUT", body: data });
+      elements.aiConfigApiKey.value = "";
+      aiConfigPresets = status.presets || aiConfigPresets;
+      await loadAIConfigStatus();
+      setMessage(elements.aiConfigMessage, "Configuração de IA salva.", "success");
+    } catch (error) {
+      setMessage(elements.aiConfigMessage, error.message, "error");
     }
   }
 
@@ -174,6 +271,15 @@ export function registerUserAdminView(context) {
     elements.emailConfigForm.addEventListener("submit", handleEmailConfigSubmit);
     elements.emailConfigProvider.addEventListener("change", () => renderEmailConfigHelp());
   }
+  if (elements.aiConfigForm) {
+    elements.aiConfigForm.addEventListener("submit", handleAIConfigSubmit);
+    elements.aiConfigProvider.addEventListener("change", () => {
+      renderAIConfigFields();
+      if (isAICustomProvider()) {
+        applyAIPreset();
+      }
+    });
+  }
   if (elements.themePreference) {
     elements.themePreference.addEventListener("click", handleThemePreferenceClick);
     syncThemePreference();
@@ -183,6 +289,7 @@ export function registerUserAdminView(context) {
 
   return {
     loadEmailConfigStatus,
+    loadAIConfigStatus,
     syncThemePreference,
   };
 }

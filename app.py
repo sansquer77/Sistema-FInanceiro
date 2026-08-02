@@ -72,6 +72,7 @@ from financeiro.credit_cards import (
 )
 from financeiro.database import initialize_database
 from financeiro.database import get_connection
+from financeiro.ai_summary import generate_ai_summary
 from financeiro.financial_health import (
     FinancialHealthError,
     calculate_financial_health_score,
@@ -80,8 +81,15 @@ from financeiro.financial_health import (
 from financeiro.imports import import_organizze_transactions, import_system_template, system_import_template
 from financeiro.operation_logs import create_operation_log, get_operation_log, list_operation_logs
 from financeiro.portfolio import close_position, create_opening_position, delete_opening_position, get_portfolio, redeem_position, update_opening_position, update_position_value_override
-from financeiro.secure_config import SecureConfigError, email_config_status, save_email_config
+from financeiro.secure_config import (
+    SecureConfigError,
+    ai_settings_status,
+    email_config_status,
+    save_ai_settings,
+    save_email_config,
+)
 from financeiro.simulations import simulate_butterfly_effect
+from financeiro.trends import TrendsError, calculate_trends
 from financeiro.spending_limits import (
     create_spending_limit,
     delete_spending_limit,
@@ -277,6 +285,12 @@ class AppHandler(BaseHTTPRequestHandler):
         if path == "/api/financial-health-score/history":
             self.handle_financial_health_score_history()
             return
+        if path == "/api/financial-health-trends":
+            self.handle_financial_health_trends()
+            return
+        if path == "/api/ai-settings":
+            self.handle_ai_settings_status()
+            return
         if path == "/api/portfolio":
             self.handle_portfolio()
             return
@@ -373,6 +387,9 @@ class AppHandler(BaseHTTPRequestHandler):
         if path == "/api/simulations/butterfly-effect":
             self.handle_simulate_butterfly_effect()
             return
+        if path == "/api/financial-health-trends/ai-summary":
+            self.handle_ai_summary()
+            return
         self.send_json({"error": "Rota nao encontrada."}, HTTPStatus.NOT_FOUND)
 
     def do_PUT(self) -> None:
@@ -417,6 +434,9 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path.startswith("/api/spending-limits/"):
             self.handle_update_spending_limit()
+            return
+        if path == "/api/ai-settings":
+            self.handle_save_ai_settings()
             return
         self.send_json({"error": "Rota nao encontrada."}, HTTPStatus.NOT_FOUND)
 
@@ -611,6 +631,51 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_json({"history": calculate_financial_health_score_history(user["id"], months)})
         except FinancialHealthError as exc:
             self.send_json({"error": exc.message}, exc.status)
+
+    def handle_financial_health_trends(self) -> None:
+        # spec: tendencias-saude-financeira v1.2 — critérios 1, 3, 4, 5, 6, 7, 13, 25, 26, 27 e 28
+        if not self.validate_read_source():
+            return
+        user = self.require_user()
+        query = parse_qs(urlsplit(self.path).query)
+        month = (query.get("month") or [date.today().strftime("%Y-%m")])[0]
+        try:
+            self.send_json(calculate_trends(user["id"], month))
+        except TrendsError as exc:
+            self.send_json({"error": exc.message}, exc.status)
+
+    def handle_ai_settings_status(self) -> None:
+        # spec: tendencias-saude-financeira v1.2 — critérios 17, 18 e 19
+        if not self.validate_read_source():
+            return
+        user = self.require_user()
+        self.send_json(ai_settings_status(user["id"]))
+
+    def handle_save_ai_settings(self) -> None:
+        # spec: tendencias-saude-financeira v1.2 — critérios 17, 18, 19, 21, 23, 27 e 28
+        user = self.require_user()
+        data = self.read_json()
+        try:
+            self.send_json(save_ai_settings(user["id"], data))
+        except SecureConfigError as exc:
+            self.send_json({"error": str(exc) or "Configuracao de IA invalida."}, HTTPStatus.BAD_REQUEST)
+
+    def handle_ai_summary(self) -> None:
+        # spec: tendencias-saude-financeira v1.2 — critérios 12, 13, 14, 16 e 17
+        user = self.require_user()
+        data = self.read_json()
+        month = data.get("month") or date.today().strftime("%Y-%m")
+        try:
+            trends = calculate_trends(user["id"], month)
+        except TrendsError as exc:
+            self.send_json({"error": exc.message}, exc.status)
+            return
+        summary = generate_ai_summary(user["id"], trends)
+        self.send_json({
+            "resumo_ia": summary,
+            "resumo_local": trends["resumo_local"],
+            "ia_usada": summary is not None,
+        })
 
     def handle_exchange_rate(self) -> None:
         self.require_user()
