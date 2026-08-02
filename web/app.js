@@ -297,6 +297,13 @@ const aiConfigForm = document.querySelector("#aiConfigForm");
 const aiConfigEnabled = document.querySelector("#aiConfigEnabled");
 const aiConfigProvider = document.querySelector("#aiConfigProvider");
 const aiConfigCustomFields = document.querySelector("#aiConfigCustomFields");
+const aiConfigBaseUrlField = document.querySelector("#aiConfigBaseUrlField");
+const aiConfigModelField = document.querySelector("#aiConfigModelField");
+const aiConfigAuthTypeField = document.querySelector("#aiConfigAuthTypeField");
+const aiConfigApiKeyField = document.querySelector("#aiConfigApiKeyField");
+const aiConfigTimeoutField = document.querySelector("#aiConfigTimeoutField");
+const aiConfigTemperatureField = document.querySelector("#aiConfigTemperatureField");
+const aiConfigMaxTokensField = document.querySelector("#aiConfigMaxTokensField");
 const aiConfigBaseUrl = document.querySelector("#aiConfigBaseUrl");
 const aiConfigModel = document.querySelector("#aiConfigModel");
 const aiConfigAuthType = document.querySelector("#aiConfigAuthType");
@@ -947,6 +954,13 @@ const userAdminViewController = registerUserAdminView({
     aiConfigEnabled,
     aiConfigProvider,
     aiConfigCustomFields,
+    aiConfigBaseUrlField,
+    aiConfigModelField,
+    aiConfigAuthTypeField,
+    aiConfigApiKeyField,
+    aiConfigTimeoutField,
+    aiConfigTemperatureField,
+    aiConfigMaxTokensField,
     aiConfigBaseUrl,
     aiConfigModel,
     aiConfigAuthType,

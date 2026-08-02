@@ -1529,29 +1529,29 @@
                     <option value="local">Local</option>
                   </select>
                 </label>
-                <div id="aiConfigCustomFields" hidden>
-                  <label>URL base
+                <div id="aiConfigCustomFields" class="ai-config-fields" hidden>
+                  <label id="aiConfigBaseUrlField">URL base
                     <input name="base_url" id="aiConfigBaseUrl" type="url" placeholder="http://localhost:1234/v1">
                   </label>
-                  <label>Modelo
+                  <label id="aiConfigModelField">Modelo
                     <input name="model" id="aiConfigModel" type="text" placeholder="modelo">
                   </label>
-                  <label>Tipo de autenticação
+                  <label id="aiConfigAuthTypeField">Tipo de autenticação
                     <select name="auth_type" id="aiConfigAuthType">
                       <option value="none">Nenhuma</option>
                       <option value="bearer">Bearer (API key)</option>
                     </select>
                   </label>
-                  <label>API key
+                  <label id="aiConfigApiKeyField">API key
                     <input name="api_key" id="aiConfigApiKey" type="password" placeholder="Deixe em branco para manter a atual">
                   </label>
-                  <label>Timeout (segundos)
+                  <label id="aiConfigTimeoutField">Timeout (segundos)
                     <input name="timeout_seconds" id="aiConfigTimeout" type="number" min="1" max="60" value="10">
                   </label>
-                  <label>Temperature
+                  <label id="aiConfigTemperatureField">Temperature
                     <input name="temperature" id="aiConfigTemperature" type="number" min="0" max="2" step="0.1" value="0.2">
                   </label>
-                  <label>Max tokens
+                  <label id="aiConfigMaxTokensField">Max tokens
                     <input name="max_tokens" id="aiConfigMaxTokens" type="number" min="1" max="4000" value="700">
                   </label>
                 </div>

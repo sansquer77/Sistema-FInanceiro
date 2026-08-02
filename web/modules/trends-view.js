@@ -1,4 +1,4 @@
-// spec: tendencias-saude-financeira v1.9 — critérios 1, 2, 3, 4, 5, 6, 7, 10, 12, 13, 14, 16, 17, 20, 21, 25, 26, 27 e 28
+// spec: tendencias-saude-financeira v2.1 — critérios 1, 2, 3, 4, 5, 6, 7, 10, 12, 13, 14, 16, 17, 20, 21, 25, 26, 27 e 28
 export function registerTrendsView({
   elements,
   api,
@@ -105,8 +105,8 @@ export function registerTrendsView({
       ${renderSummaryCard()}
       ${renderSeriesChart()}
       <div class="trends-grid">
-        ${renderBudgetActualTable()}
         ${renderFindings()}
+        ${renderBudgetActualTable()}
       </div>
     `;
   }
@@ -124,9 +124,6 @@ export function registerTrendsView({
       intermediaria: "intermediária",
       baixa: "baixa",
     }[currentData.confianca] || currentData.confianca || "indisponível";
-    const warning = currentData.multi_currency_warning
-      ? `<span class="trends-warning">${escapeHtml(currentData.multi_currency_warning)}</span>`
-      : "";
     const aiBadge = currentData.ia_ativa
       ? `<span class="trends-ai-badge">IA ${currentData.ia_usada ? "ativa" : "fallback"}</span>`
       : "";
@@ -134,7 +131,6 @@ export function registerTrendsView({
       <span>Mês: <strong>${escapeHtml(formatMonthLabel(currentData.month))}</strong></span>
       <span>Confiança: <strong>${escapeHtml(confidenceLabel)}</strong></span>
       ${aiBadge}
-      ${warning}
     `;
   }
 

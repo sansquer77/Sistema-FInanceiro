@@ -25,7 +25,7 @@ SYSTEM_PROMPT = (
 
 def generate_ai_summary(user_id: int, trends_payload: dict) -> str | None:
     """
-    spec: tendencias-saude-financeira v1.9 — critérios 12, 13, 14, 16 e 17
+    spec: tendencias-saude-financeira v2.1 — critérios 12, 13, 14, 16 e 17
     Reescreve o resumo local com IA, usando payload minimizado, timeout curto e
     fallback imediato para None quando a IA estiver indisponível ou retornar conteúdo inválido.
     """
@@ -35,7 +35,7 @@ def generate_ai_summary(user_id: int, trends_payload: dict) -> str | None:
 
     api_key = ""
     if settings["has_api_key"]:
-        # spec: tendencias-saude-financeira v1.9 — critério 28
+        # spec: tendencias-saude-financeira v2.1 — critério 28
         # O segredo nunca deve transitar na API; aqui é usado apenas para a requisição externa.
         full = load_ai_settings(user_id)
         api_key = str(full.get("api_key") or "").strip()
@@ -68,7 +68,7 @@ def generate_ai_summary(user_id: int, trends_payload: dict) -> str | None:
         method="POST",
     )
 
-    # spec: tendencias-saude-financeira v1.9 — critério 16
+    # spec: tendencias-saude-financeira v2.1 — critério 16
     # Nenhuma chamada de IA pode manter conexão SQLite aberta durante a requisição externa.
     # (a conexão já foi fechada antes de chamar esta função)
     timeout = int(settings.get("timeout_seconds") or SUMMARY_TIMEOUT_SECONDS)

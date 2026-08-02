@@ -92,11 +92,36 @@ export function registerUserAdminView(context) {
     return value === "custom" || value === "local";
   }
 
+  function currentAIPreset() {
+    if (!elements.aiConfigProvider) {
+      return null;
+    }
+    return aiConfigPresets.find((item) => item.provider === elements.aiConfigProvider.value) || null;
+  }
+
+  function setAIFieldVisibility(element, visible) {
+    if (!element) {
+      return;
+    }
+    element.hidden = !visible;
+  }
+
   function renderAIConfigFields() {
     if (!elements.aiConfigCustomFields) {
       return;
     }
-    elements.aiConfigCustomFields.hidden = !isAICustomProvider();
+    const customProvider = isAICustomProvider();
+    const preset = currentAIPreset();
+    const authType = elements.aiConfigAuthType?.value || preset?.auth_type || "bearer";
+    const requiresApiKey = authType === "bearer";
+    elements.aiConfigCustomFields.hidden = false;
+    setAIFieldVisibility(elements.aiConfigBaseUrlField, customProvider);
+    setAIFieldVisibility(elements.aiConfigAuthTypeField, customProvider);
+    setAIFieldVisibility(elements.aiConfigModelField, true);
+    setAIFieldVisibility(elements.aiConfigApiKeyField, requiresApiKey);
+    setAIFieldVisibility(elements.aiConfigTimeoutField, customProvider);
+    setAIFieldVisibility(elements.aiConfigTemperatureField, customProvider);
+    setAIFieldVisibility(elements.aiConfigMaxTokensField, customProvider);
   }
 
   function applyAIPreset() {
@@ -107,10 +132,10 @@ export function registerUserAdminView(context) {
     if (!preset) {
       return;
     }
-    if (elements.aiConfigBaseUrl && !elements.aiConfigBaseUrl.value) {
+    if (elements.aiConfigBaseUrl) {
       elements.aiConfigBaseUrl.value = preset.base_url || "";
     }
-    if (elements.aiConfigAuthType && !elements.aiConfigAuthType.value) {
+    if (elements.aiConfigAuthType) {
       elements.aiConfigAuthType.value = preset.auth_type || "bearer";
     }
   }
@@ -274,11 +299,12 @@ export function registerUserAdminView(context) {
   if (elements.aiConfigForm) {
     elements.aiConfigForm.addEventListener("submit", handleAIConfigSubmit);
     elements.aiConfigProvider.addEventListener("change", () => {
+      applyAIPreset();
       renderAIConfigFields();
-      if (isAICustomProvider()) {
-        applyAIPreset();
-      }
     });
+    if (elements.aiConfigAuthType) {
+      elements.aiConfigAuthType.addEventListener("change", renderAIConfigFields);
+    }
   }
   if (elements.themePreference) {
     elements.themePreference.addEventListener("click", handleThemePreferenceClick);

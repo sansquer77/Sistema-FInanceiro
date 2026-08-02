@@ -2,7 +2,7 @@
 tipo: spec
 area: tendencias-saude-financeira
 status: implementado
-versao: 1.9
+versao: 2.1
 atualizado: 2026-08-02
 relacionados:
   - "[[score-saude-financeira]]"
@@ -79,6 +79,7 @@ Usuário autenticado que consulta o Cockpit e deseja entender, em linguagem simp
 - O botão de ligar/desligar IA deve ficar em **Preferências** e vir desligado por padrão.
 - A configuração de IA deve oferecer um combo de provedor com as opções principais `OpenAI / ChatGPT`, `Anthropic / Claude`, `Google / Gemini` e `Custom / Local`.
 - Quando o usuário selecionar um provedor principal, a interface deve exibir apenas os campos necessários para aquele fornecedor conhecido, preservando simplicidade.
+- Para provedores externos conhecidos que exigem chave (`OpenAI / ChatGPT`, `Anthropic / Claude` e `Google / Gemini`), a interface deve exibir os campos `Modelo` e `API key`, sem expor `base_url` e `auth_type` ao usuário.
 - Quando o usuário selecionar `Custom / Local`, a interface deve abrir campos adicionais para configurar endpoint/base URL, modelo, formato de autenticação e contrato de payload compatível.
 - Na primeira versão, `Custom / Local` deve exigir compatibilidade com o contrato **OpenAI Chat Completions** (`/v1/chat/completions`), por ser o formato mais comum entre servidores locais e gateways compatíveis, como Ollama, LM Studio, LocalAI, LiteLLM e proxies equivalentes.
 - A configuração mínima de `Custom / Local` deve conter `base_url`, `model`, `auth_type` (`none` ou `bearer`), `api_key` opcional, `timeout_seconds` curto, `temperature` baixa e `max_tokens` limitado.
@@ -108,6 +109,7 @@ Usuário autenticado que consulta o Cockpit e deseja entender, em linguagem simp
 - Lançamentos de cartão devem entrar pela competência da fatura (`invoice_month`) nas análises mensais, conforme [[relatorios]].
 - Sugestões devem ser explicativas e não prescritivas, evitando tom de aconselhamento financeiro personalizado.
 - Em moeda estrangeira ou cenário multi-moeda, a primeira versão deve evitar misturar moedas sem explicação; quando necessário, gerar achados por moeda ou usar os valores normalizados já definidos pelo Score.
+- O aviso de cenário multi-moeda deve aparecer apenas no bloco **Tendências e achados**, preferencialmente como último ponto do resumo textual, evitando repetição na linha de metadados da aba.
 - O sistema deve identificar despesas recorrentes mensais na categoria `Assinaturas e Serviços` e suas subcategorias, agregando o custo mensal por subcategoria para sinalizar o peso relativo no orçamento.
 - O achado de assinaturas e serviços deve ser explicativo e não prescritivo, apontando o valor mensal por subcategoria e sugerindo que o usuário avalie o uso, sem recomendar cancelamento ou classificar a despesa como problema.
 - Lançamentos de cartão de crédito recorrentes mensais na categoria `Assinaturas e Serviços` também devem entrar na agregação, pela competência da fatura (`invoice_month`).
@@ -189,8 +191,10 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 - Dado um usuário com pagamentos de fatura em conta-corrente, quando as despesas do mês são agregadas, então esses pagamentos não são somados como despesa analítica.
 - Dado um usuário com lançamentos de cartão, quando a tendência mensal é calculada, então os valores entram pela competência da fatura (`invoice_month`).
 - Dado um usuário em cenário multi-moeda, quando houver dados em mais de uma moeda, então o sistema não mistura moedas sem indicar a base usada.
+- Dado um usuário em cenário multi-moeda, quando visualiza a aba **Tendências**, então o aviso de moeda aparece uma única vez no bloco **Tendências e achados**.
 - Dado um usuário com despesas recorrentes mensais na categoria `Assinaturas e Serviços`, quando consulta a aba **Tendências**, então o sistema exibe o custo mensal agregado por subcategoria como achado estruturado em centavos, sem recomendar cancelamento.
 - Dado um usuário que acessa Preferências de IA, quando abre o campo de provedor, então visualiza as opções principais `OpenAI / ChatGPT`, `Anthropic / Claude`, `Google / Gemini` e `Custom / Local`.
+- Dado um usuário que seleciona `OpenAI / ChatGPT`, `Anthropic / Claude` ou `Google / Gemini`, quando a tela de configuração é exibida, então visualiza os campos `Modelo` e `API key`, sem precisar configurar endpoint ou tipo de autenticação.
 - Dado um usuário que seleciona `Custom / Local` como provedor de IA, quando a tela de configuração é exibida, então campos adicionais de endpoint/base URL, modelo, autenticação e contrato de payload ficam disponíveis.
 - Dado um usuário que seleciona `Custom / Local`, quando configura a integração, então o endpoint deve ser tratado como compatível com OpenAI Chat Completions em `{base_url}/chat/completions`.
 - Dado um usuário que seleciona `Custom / Local`, quando a reescrita por IA é executada, então o sistema envia payload não-streaming com `model`, `messages`, `temperature` e `max_tokens`, e lê apenas `choices[0].message.content`.
@@ -233,6 +237,8 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 
 ## Changelog
 
+- `2.1` — 2026-08-02 — Aviso multi-moeda deixa de aparecer duplicado na linha de metadados e o layout prioriza Tendências e achados na coluna principal.
+- `2.0` — 2026-08-02 — Preferências de IA passam a exibir `Modelo` e `API key` também para OpenAI, Anthropic e Google, mantendo endpoint e autenticação avançados restritos a Custom/Local.
 - `1.9` — 2026-08-02 — Aviso multi-moeda passa a indicar que a base BRL usa valores normalizados por cotação manual ou pela última PTAX de venda disponível.
 - `1.8` — 2026-08-02 — Aviso multi-moeda ajustado para aparecer sempre como último ponto do resumo e explicitar que a análise usa valores em BRL já normalizados nos lançamentos.
 - `1.7` — 2026-08-02 — Melhorada a leitura da aba Tendências: achados de eventos pontuais e antecipações passam a ser agrupados para evitar cards repetidos, e o resumo textual é exibido como introdução e lista de pontos.
