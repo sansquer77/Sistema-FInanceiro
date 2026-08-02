@@ -1,7 +1,11 @@
 export function registerCockpitView({
   state,
   elements,
+  api,
   currentMonthValue,
+  formatMonthLabel,
+  shiftMonth,
+  openMonthPicker,
   formatMoney,
   formatPercent,
   emptyState,
@@ -12,23 +16,46 @@ export function registerCockpitView({
   chartColor,
   getCurrencyTotals,
   renderLimitAlerts,
+  onCockpitMonthChanged,
   loadPortfolio,
   portfolioTotalsByCurrency,
+  portfolioMaturityAlerts,
+  goToPortfolio,
 }) {
   const {
     monthIncome,
     monthExpense,
     monthInvestment,
     savingsRate,
+    cockpitTabs,
+    cockpitSummaryPanel,
+    cockpitMonthLabel,
+    previousCockpitMonthButton,
+    nextCockpitMonthButton,
     currencyList,
     monthlyPlanningList,
     installmentDebtList,
     topExpensesChart,
     cashDistributionChart,
     cockpitPortfolioByType,
+    cockpitPortfolioMaturityAlert,
+    financialHealthPanel,
+    financialHealthContent,
   } = elements;
+  let financialHealthRequestId = 0;
+
+  cockpitTabs?.forEach((button) => {
+    button.addEventListener("click", () => setCockpitTab(button.dataset.cockpitTab || "summary"));
+  });
+  previousCockpitMonthButton?.addEventListener("click", () => setCockpitMonth(shiftMonth(cockpitMonthValue(), -1)));
+  nextCockpitMonthButton?.addEventListener("click", () => setCockpitMonth(shiftMonth(cockpitMonthValue(), 1)));
+  cockpitMonthLabel?.addEventListener("click", () => {
+    openMonthPicker(cockpitMonthLabel, cockpitMonthValue(), setCockpitMonth);
+  });
 
   function renderCockpit() {
+    renderCockpitTabs();
+    renderCockpitMonthLabel();
     const totals = getCurrencyTotals();
     const monthTotals = state.cockpit?.month_totals || getCurrentMonthTotals();
     monthIncome.textContent = formatMoney(monthTotals.income, "BRL");
@@ -40,14 +67,338 @@ export function registerCockpitView({
     renderMonthlyPlanning();
     renderInstallmentDebts();
     renderLimitAlerts();
+    renderPortfolioMaturityAlerts();
     renderTopExpensesChart();
     renderTopIncomeChart();
+    if (activeCockpitTab() === "health") {
+      renderFinancialHealth();
+    }
+  }
+
+  function setCockpitTab(tab) {
+    const nextTab = tab === "health" ? "health" : "summary";
+    if (state.cockpitTab === nextTab) {
+      return;
+    }
+    state.cockpitTab = nextTab;
+    renderCockpitTabs();
+    if (nextTab === "health") {
+      renderFinancialHealth();
+    }
+  }
+
+  function activeCockpitTab() {
+    return state.cockpitTab === "health" ? "health" : "summary";
+  }
+
+  function renderCockpitTabs() {
+    const activeTab = activeCockpitTab();
+    cockpitTabs?.forEach((button) => {
+      const isActive = button.dataset.cockpitTab === activeTab;
+      button.classList.toggle("active", isActive);
+      button.setAttribute("aria-selected", isActive ? "true" : "false");
+      button.tabIndex = isActive ? 0 : -1;
+    });
+    if (cockpitSummaryPanel) {
+      cockpitSummaryPanel.hidden = activeTab !== "summary";
+    }
+    if (financialHealthPanel) {
+      financialHealthPanel.hidden = activeTab !== "health";
+    }
+  }
+
+  function renderCockpitMonthLabel() {
+    if (cockpitMonthLabel) {
+      cockpitMonthLabel.textContent = formatMonthLabel(cockpitMonthValue());
+    }
+  }
+
+  function cockpitMonthValue() {
+    if (!state.cockpitMonth) {
+      state.cockpitMonth = currentMonthValue();
+    }
+    return state.cockpitMonth;
+  }
+
+  function setCockpitMonth(month) {
+    if (!month || month === cockpitMonthValue()) {
+      return;
+    }
+    state.cockpitMonth = month;
+    state.financialHealthMonth = month;
+    state.cockpit = null;
+    state.financialHealth = null;
+    state.financialHealthError = "";
+    renderCockpit();
+    if (typeof onCockpitMonthChanged === "function") {
+      onCockpitMonthChanged().catch((error) => {
+        state.financialHealthLoading = false;
+        state.financialHealthError = error.message;
+        renderCockpit();
+      });
+    }
+  }
+
+  async function loadFinancialHealth() {
+    const requestId = ++financialHealthRequestId;
+    state.financialHealthLoading = true;
+    state.financialHealthError = "";
+    renderFinancialHealth();
+    const month = cockpitMonthValue();
+    state.financialHealthMonth = month;
+    const response = await api(`/api/financial-health-score?month=${encodeURIComponent(month)}`);
+    if (requestId !== financialHealthRequestId) {
+      return;
+    }
+    state.financialHealth = response;
+    state.financialHealthLoading = false;
+    state.financialHealthError = "";
+    renderFinancialHealth();
+  }
+
+  function renderFinancialHealth() {
+    if (!financialHealthContent) {
+      return;
+    }
+    renderCockpitTabs();
+    state.financialHealthMonth = cockpitMonthValue();
+    const data = state.financialHealth;
+    if (!data || data.month !== state.financialHealthMonth) {
+      if (!state.financialHealthLoading && !state.financialHealthError) {
+        loadFinancialHealth().catch((error) => {
+          state.financialHealthLoading = false;
+          state.financialHealthError = error.message;
+          renderFinancialHealth();
+        });
+      }
+      financialHealthContent.innerHTML = `<div class="empty-state compact">${escapeHtml(state.financialHealthError || "Carregando score de saúde financeira...")}</div>`;
+      return;
+    }
+    financialHealthContent.innerHTML = `
+      <div class="financial-health-score-card ${financialHealthLevelClass(data.nivel)}">
+        <strong>${Number(data.score_total || 0).toLocaleString("pt-BR")}</strong>
+        <span>${escapeHtml(financialHealthLevelLabel(data.nivel))}</span>
+        <small>Score de 0 a 1000</small>
+      </div>
+
+      <section class="financial-health-section">
+        <h3>Seus Pilares</h3>
+        <div class="financial-health-pillars" role="list" aria-label="Pontuação dos pilares de saúde financeira">
+          ${(data.pilares || []).map((pillar) => financialHealthPillarBar(pillar)).join("")}
+        </div>
+      </section>
+
+      <section class="financial-health-section">
+        <h3>🔍 Análise detalhada dos pilares</h3>
+        <div class="financial-health-detail-grid">
+          ${(data.pilares || []).map((pillar) => financialHealthPillarDetail(pillar, data)).join("")}
+        </div>
+      </section>
+
+      <section class="financial-health-section financial-peace-section">
+        <h3>💡 Planeje sua Paz Financeira <span>(referências)</span></h3>
+        ${financialPeaceCards(data)}
+      </section>
+    `;
+  }
+
+  function financialHealthPillarBar(pillar) {
+    const score = Number(pillar.score || 0);
+    const maxScore = Number(pillar.max_score || 0);
+    const percent = maxScore > 0 ? Math.max(0, Math.min(100, (score / maxScore) * 100)) : 0;
+    const help = financialHealthPillarHelp(pillar);
+    return `
+      <article class="financial-health-pillar-row ${financialHealthLevelClass(pillar.nivel)}" role="listitem">
+        <div>
+          <strong class="pillar-label-with-help">
+            ${escapeHtml(pillar.label || "Pilar")}
+            ${help ? inlineHelpIcon(help) : ""}
+          </strong>
+          <span>${Number(pillar.peso_pct || 0).toLocaleString("pt-BR")}%</span>
+        </div>
+        <div class="financial-health-bar" aria-hidden="true">
+          <i style="width:${percent.toFixed(2)}%"></i>
+        </div>
+        <strong>${score.toLocaleString("pt-BR")}/${maxScore.toLocaleString("pt-BR")} pts</strong>
+        <small class="sr-only">${escapeHtml(pillar.label || "Pilar")}: ${score} de ${maxScore} pontos, ${percent.toFixed(1)}%.</small>
+      </article>
+    `;
+  }
+
+  function financialHealthPillarDetail(pillar, data) {
+    const extra = financialHealthPillarExtra(pillar, data);
+    const help = financialHealthPillarHelp(pillar);
+    return `
+      <article class="financial-health-detail-card ${financialHealthLevelClass(pillar.nivel)}">
+        <header>
+          <span>${financialHealthLevelIcon(pillar.nivel)}</span>
+          <div>
+            <h4>
+              ${escapeHtml(pillar.label || "Pilar")}
+              ${help ? inlineHelpIcon(help) : ""}
+            </h4>
+            <small>${escapeHtml(financialHealthLevelLabel(pillar.nivel))}</small>
+          </div>
+        </header>
+        <p>Sua pontuação: <strong>${Number(pillar.score || 0).toLocaleString("pt-BR")} / ${Number(pillar.max_score || 0).toLocaleString("pt-BR")} pts</strong>.</p>
+        ${extra ? `<p>${extra}</p>` : ""}
+        <p>${escapeHtml(pillar.mensagem || "Indicador calculado com base nos dados cadastrados.")}</p>
+      </article>
+    `;
+  }
+
+  function inlineHelpIcon(help) {
+    return `<button class="inline-help-icon" type="button" aria-label="${escapeHtml(help)}" title="${escapeHtml(help)}" data-tooltip="${escapeHtml(help)}">i</button>`;
+  }
+
+  function financialHealthPillarHelp(pillar) {
+    if (pillar.id === "poupanca") {
+      return "Taxa de poupança = (receitas do mês - despesas de consumo do mês) / receitas do mês. Investimentos/aportes, transferências, câmbio e pagamentos de fatura não entram como despesa de consumo.";
+    }
+    return "";
+  }
+
+  function financialHealthPillarExtra(pillar, data) {
+    if (pillar.id === "reserva") {
+      const months = Number(data.meses_reserva || pillar.meses_reserva || 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+      return `Reserva marcada cobre <strong>${months} mês(es)</strong> de despesas médias. Valor elegível: <strong>${formatCents(data.reserva_elegivel_cents)}</strong>.`;
+    }
+    if (pillar.id === "endividamento") {
+      return `Parcelas do mês: <strong>${formatCents(data.dividas_parcelas_mes_cents)}</strong> · comprometimento: <strong>${formatDecimalPercent(data.comprometimento_divida_mes_pct)}</strong>.`;
+    }
+    if (pillar.id === "concentracao_portfolio") {
+      return `Maior concentração: <strong>${formatDecimalPercent(data.maior_concentracao_portfolio_pct)}</strong> · Poupança: <strong>${formatDecimalPercent(data.concentracao_poupanca_pct)}</strong>.`;
+    }
+    if (pillar.id === "poupanca") {
+      return `Receitas: <strong>${formatCents(data.receitas_cents)}</strong> · despesas de consumo: <strong>${formatCents(data.despesas_consumo_cents)}</strong>.`;
+    }
+    return "";
+  }
+
+  function financialPeaceCards(data) {
+    const peace = data.paz_financeira || {};
+    const cards = [
+      ["🎯", "Independência mensal (Estimativa)", data.paz_independencia_cents, peace.independencia_mensal_legenda || "Referência aproximada de patrimônio para renda passiva mensal equivalente."],
+      ["🛡️", "Reserva estimada", data.paz_reserva_estimada_cents, "Referência simples de 6 vezes a receita de base."],
+      ["🏠", "Recorrentes saudáveis (Estimativa)", data.paz_recorrentes_saudaveis_cents, "Referência para despesas recorrentes mensais."],
+      ["🎉", "Lazer saudável (Estimativa)", data.paz_lazer_saudavel_cents, "Referência para lazer mensal sem afetar planejamento."],
+    ];
+    return `
+      <div class="financial-peace-grid">
+        ${cards.map(([icon, title, cents, description]) => `
+          <article class="financial-peace-card">
+            <span>${icon}</span>
+            <div>
+              <h4>${escapeHtml(title)}</h4>
+              <strong>${formatCents(cents)}</strong>
+              <p>${escapeHtml(description)}</p>
+            </div>
+          </article>
+        `).join("")}
+      </div>
+      <p class="financial-peace-note">ⓘ Valores baseados na receita de referência (${formatCents(data.paz_financeira_base_receita_cents)}) · confiança ${escapeHtml(financialPeaceConfidenceLabel(data.paz_financeira_confianca))}. ${escapeHtml(peace.aviso || "")} ${escapeHtml(peace.mensagem || "")}</p>
+    `;
+  }
+
+  function formatCents(cents) {
+    return formatMoney(Number(cents || 0) / 100, "BRL");
+  }
+
+  function formatDecimalPercent(value) {
+    return `${Number(value || 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`;
+  }
+
+  function financialHealthLevelLabel(level) {
+    return ({
+      critico: "Crítico",
+      atencao: "Atenção",
+      bom: "Bom",
+      excelente: "Excelente",
+    })[level] || "Atenção";
+  }
+
+  function financialHealthLevelIcon(level) {
+    return ({
+      critico: "●",
+      atencao: "▲",
+      bom: "✓",
+      excelente: "✓",
+    })[level] || "•";
+  }
+
+  function financialHealthLevelClass(level) {
+    return `level-${["critico", "atencao", "bom", "excelente"].includes(level) ? level : "atencao"}`;
+  }
+
+  function financialPeaceConfidenceLabel(value) {
+    if (value === "alta") {
+      return "alta";
+    }
+    if (value === "menor") {
+      return "menor";
+    }
+    if (value === "intermediaria") {
+      return "intermediária";
+    }
+    return "indisponível";
+  }
+
+  function renderPortfolioMaturityAlerts() {
+    const alerts = portfolioMaturityAlerts();
+    if (alerts.length > 0) {
+      setPortfolioNavAlert(true);
+    }
+    if (!cockpitPortfolioMaturityAlert) {
+      return;
+    }
+    if (!state.portfolio && state.portfolioDirty) {
+      cockpitPortfolioMaturityAlert.hidden = true;
+      cockpitPortfolioMaturityAlert.innerHTML = "";
+      loadPortfolio();
+      return;
+    }
+    if (state.portfolioLoading) {
+      cockpitPortfolioMaturityAlert.hidden = true;
+      cockpitPortfolioMaturityAlert.innerHTML = "";
+      return;
+    }
+    setPortfolioNavAlert(alerts.length > 0);
+    if (alerts.length === 0) {
+      cockpitPortfolioMaturityAlert.hidden = true;
+      cockpitPortfolioMaturityAlert.innerHTML = "";
+      return;
+    }
+    const overdueCount = alerts.filter((alert) => alert.status === "overdue").length;
+    const dueTodayCount = alerts.length - overdueCount;
+    const headline = [
+      overdueCount ? `${overdueCount} vencido(s)` : "",
+      dueTodayCount ? `${dueTodayCount} vencendo hoje` : "",
+    ].filter(Boolean).join(" e ");
+    const first = alerts[0];
+    cockpitPortfolioMaturityAlert.hidden = false;
+    cockpitPortfolioMaturityAlert.innerHTML = `
+      <button class="cockpit-alert-card portfolio-maturity-alert-card" type="button" data-go-portfolio>
+        <span class="cockpit-alert-beacon" aria-hidden="true"></span>
+        <span>
+          <strong>${escapeHtml(headline || `${alerts.length} ativo(s) vencendo`)}</strong>
+          <small>${escapeHtml(first.label)} · ${escapeHtml(first.accountName)} · venc. ${formatDate(first.maturityDate)}</small>
+        </span>
+        <b>Ver portfólio</b>
+      </button>
+    `;
+    cockpitPortfolioMaturityAlert.querySelector("[data-go-portfolio]").addEventListener("click", goToPortfolio);
+  }
+
+  function setPortfolioNavAlert(active) {
+    document.querySelectorAll('[data-view="portfolio"]').forEach((button) => {
+      button.classList.toggle("has-alert", active);
+    });
   }
 
   function getCurrentMonthTotals() {
-    const prefix = currentMonthValue();
+    const prefix = cockpitMonthValue();
     return state.transactions.reduce((totals, transaction) => {
-      if (!transaction.date.startsWith(prefix)) {
+      if (!transaction.date.startsWith(prefix) || isCreditCardPaymentTransaction(transaction)) {
         return totals;
       }
       const amountBrl = Number(transaction.amount_brl || transaction.amount);
@@ -68,6 +419,7 @@ export function registerCockpitView({
 
   function renderCurrencyTotals(totals) {
     currencyList.innerHTML = "";
+    const monthLabel = formatMonthLabel(cockpitMonthValue());
     if (totals.size === 0) {
       currencyList.append(emptyState("Nenhuma moeda cadastrada ainda.", true));
       return;
@@ -95,7 +447,7 @@ export function registerCockpitView({
         <div class="currency-section-header">
           <div>
             <span>${escapeHtml(currency)}</span>
-            <em>Previsto</em>
+            <em>Previsto em ${escapeHtml(monthLabel)}</em>
           </div>
           <strong class="${amounts.current < 0 ? "danger-text" : ""}">${formatMoney(amounts.current, currency)}</strong>
         </div>
@@ -128,20 +480,21 @@ export function registerCockpitView({
   }
 
   function renderMonthlyPlanning() {
+    const monthLabel = formatMonthLabel(cockpitMonthValue());
     if (state.cockpit?.planning) {
       monthlyPlanningList.innerHTML = "";
       monthlyPlanningList.append(
-        planningSectionFromRows("Receitas recorrentes", state.cockpit.planning.income || [], "income"),
-        planningSectionFromRows("Investimentos planejados", state.cockpit.planning.investment || [], "investment"),
-        planningSectionFromRows("Despesas recorrentes", state.cockpit.planning.expense || [], "expense"),
+        planningSectionFromRows(`Receitas recorrentes · ${monthLabel}`, state.cockpit.planning.income || [], "income"),
+        planningSectionFromRows(`Investimentos planejados · ${monthLabel}`, state.cockpit.planning.investment || [], "investment"),
+        planningSectionFromRows(`Despesas recorrentes · ${monthLabel}`, state.cockpit.planning.expense || [], "expense"),
       );
       return;
     }
-    const prefix = currentMonthValue();
+    const prefix = cockpitMonthValue();
     const sections = [
-      ["Receitas recorrentes", "income", (transaction) => transaction.type === "income" && transaction.series_kind === "recurring"],
-      ["Investimentos planejados", "investment", (transaction) => isInvestmentTransaction(transaction) && transaction.series_kind !== "single"],
-      ["Despesas recorrentes", "expense", (transaction) => transaction.type === "expense" && transaction.series_kind === "recurring"],
+      [`Receitas recorrentes · ${monthLabel}`, "income", (transaction) => transaction.type === "income" && transaction.series_kind === "recurring"],
+      [`Investimentos planejados · ${monthLabel}`, "investment", (transaction) => isInvestmentTransaction(transaction) && transaction.series_kind !== "single"],
+      [`Despesas recorrentes · ${monthLabel}`, "expense", (transaction) => transaction.type === "expense" && transaction.series_kind === "recurring"],
     ];
     monthlyPlanningList.innerHTML = "";
     for (const [title, kind, predicate] of sections) {
@@ -214,7 +567,7 @@ export function registerCockpitView({
     if (!installmentDebtList) {
       return;
     }
-    const currentMonth = currentMonthValue();
+    const currentMonth = cockpitMonthValue();
     const rows = new Map();
     for (const transaction of state.transactions) {
       const transactionMonth = transaction.date.slice(0, 7);
@@ -240,7 +593,7 @@ export function registerCockpitView({
       installmentDebtList.innerHTML = `
         <section class="planning-section">
           <div class="planning-section-header">
-            <h3>Total em aberto</h3>
+            <h3>Total em aberto desde ${escapeHtml(formatMonthLabel(currentMonth))}</h3>
             <strong class="danger-text">${formatMoney(0, "BRL")}</strong>
           </div>
           <div class="empty-state compact">Nenhuma compra parcelada em aberto.</div>
@@ -252,7 +605,7 @@ export function registerCockpitView({
     installmentDebtList.innerHTML = `
       <section class="planning-section">
         <div class="planning-section-header">
-          <h3>Total em aberto</h3>
+          <h3>Total em aberto desde ${escapeHtml(formatMonthLabel(currentMonth))}</h3>
           <strong class="danger-text">${formatDebtTotals(debtTotals)}</strong>
         </div>
         ${debts.map((row) => `
@@ -320,9 +673,9 @@ export function registerCockpitView({
       });
       return;
     }
-    const prefix = currentMonthValue();
+    const prefix = cockpitMonthValue();
     const grouped = groupTransactionsByCategory(state.transactions.filter((transaction) => (
-      transaction.date.startsWith(prefix) && transaction.type === "expense"
+      transaction.date.startsWith(prefix) && transaction.type === "expense" && !isCreditCardPaymentTransaction(transaction)
     )));
     renderDonutListChart(topExpensesChart, rankedChartItems(grouped, 5), {
       empty: "Nenhuma despesa neste mês.",
@@ -338,7 +691,7 @@ export function registerCockpitView({
       });
       return;
     }
-    const prefix = currentMonthValue();
+    const prefix = cockpitMonthValue();
     const grouped = groupTransactionsByCategory(state.transactions.filter((transaction) => (
       transaction.date.startsWith(prefix) && transaction.type === "income"
     )));
@@ -357,6 +710,10 @@ export function registerCockpitView({
     return [...totals.entries()]
       .map(([label, total]) => ({ label, total }))
       .sort((a, b) => b.total - a.total);
+  }
+
+  function isCreditCardPaymentTransaction(transaction) {
+    return Boolean(transaction?.is_credit_card_payment);
   }
 
   function rankedChartItems(items, visibleCount) {
@@ -469,6 +826,7 @@ export function registerCockpitView({
   return {
     renderCockpit,
     renderLimitAlerts,
+    renderPortfolioMaturityAlerts,
     renderCockpitPortfolioByType,
   };
 }

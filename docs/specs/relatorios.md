@@ -2,8 +2,8 @@
 tipo: spec
 area: relatorios
 status: implementado
-versao: 1.9
-atualizado: 2026-07-31
+versao: 2.2
+atualizado: 2026-08-02
 relacionados:
   - "[[lancamentos]]"
   - "[[cartoes]]"
@@ -17,7 +17,7 @@ aliases: ["Relatórios", "Cockpit"]
 # Relatórios
 
 > [!info] Status
-> **implementado** · área: `relatorios` · atualizado em 2026-07-31 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[limites-gastos]]
+> **implementado** · área: `relatorios` · atualizado em 2026-08-02 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[limites-gastos]]
 
 ## Problema
 
@@ -61,6 +61,16 @@ Qualquer usuário autenticado localmente que queira analisar seus gastos e recei
 - O planejamento do Cockpit separa receitas recorrentes, investimentos planejados e despesas recorrentes por moeda, exibindo os valores originais sem somar moedas distintas.
 - O Cockpit deve separar a visão operacional **Situação do mês** e a visão diagnóstica **Saúde Financeira** em abas internas no topo do módulo, evitando que o usuário precise rolar todo o resumo mensal para acessar o score.
 - A aba **Situação do mês** é a visão inicial do Cockpit e mantém KPIs, alertas, saldos por moeda, portfólio por tipo, planejamento, dívidas e gráficos de maiores receitas/despesas.
+- O Cockpit deve ter um seletor de mês no topo do módulo, compartilhado pelas abas internas que dependem de competência mensal, começando por **Situação do mês** e **Saúde Financeira**.
+- O seletor de mês do Cockpit deve seguir o mesmo padrão visual dos seletores mensais de Lançamentos, com botões compactos por ícone para mês anterior, mês atual e próximo mês.
+- Ao trocar o mês do Cockpit, a aba **Situação do mês** deve recalcular KPIs, maiores receitas/despesas, limites, planejamento, dívidas e totais por moeda com base no mês selecionado.
+- O mês inicial do Cockpit deve ser o mês corrente.
+- A leitura do Cockpit para meses passados deve funcionar como fotografia analítica do período, sem esconder despesas de cartão apenas porque a fatura foi paga posteriormente.
+- Faturas de cartão devem impactar o Cockpit pela competência da fatura (`invoice_month`) do mês selecionado, preservando o valor da fatura daquele mês tanto em leituras previstas quanto conciliadas quando aplicável.
+- Faturas pagas devem continuar aparecendo nos totais analíticos do mês de competência por meio dos lançamentos detalhados do cartão; o pagamento agregado gerado na conta permanece excluído das despesas analíticas para evitar duplicidade.
+- O status de pagamento da fatura afeta o saldo operacional da conta de pagamento na data do pagamento, mas não altera retroativamente o consumo analítico do mês da fatura.
+- Os rótulos do Cockpit devem deixar claro quando os valores representam o mês selecionado, usando textos como `Saldo previsto em Julho/2026`, `Saldo conciliado em Julho/2026` ou equivalente, para reduzir ambiguidade com o saldo atual.
+- Quando o usuário selecionar mês futuro, o Cockpit deve priorizar planejamento, recorrências, parcelas futuras e faturas previstas; dados realizados inexistentes devem aparecer como zero ou estado vazio, sem simular lançamentos não existentes fora das regras já cadastradas.
 - Percentuais são calculados contra o total da seção.
 - Relatório **detalhado** mostra lançamentos individuais.
 - Relatório **sintético** mostra apenas agregados.
@@ -83,7 +93,21 @@ Qualquer usuário autenticado localmente que queira analisar seus gastos e recei
 
 Dados de origem: `transactions`, `credit_card_transactions`, `categories`, `subcategories`, `tags`, `transaction_tags`, `credit_card_transaction_tags`, `checking_accounts`.
 
+Parâmetro do Cockpit:
+
+| Parâmetro | Formato | Regra |
+|---|---|---|
+| `month` | `AAAA-MM` | Opcional. Quando ausente, usa o mês corrente. Quando informado, orienta todas as leituras mensais do Cockpit. |
+
 Valores aceitos para `periodo`: `3m`, `6m`, `12m`, `ytd` e `all`.
+
+## Proposta em revisão — Cockpit mensal
+
+> Inspiração visual/UX: referência externa indicada pelo usuário em vídeo do YouTube, aproximadamente entre 12:00 e 12:08. Como a referência externa pode não estar disponível para consulta textual permanente, a decisão registrada aqui é descrita pelo comportamento desejado no app, não pelo conteúdo do vídeo.
+
+A proposta é transformar o Cockpit em uma visão mensal navegável por seletor de mês, mantendo a aba **Situação do mês** como leitura operacional do período escolhido e a aba **Saúde Financeira** sincronizada ao mesmo mês. Essa mudança deve reduzir a dependência do “agora” e permitir revisitar meses fechados com a mesma consistência dos Relatórios.
+
+O ponto crítico é cartão de crédito: a fatura pertence ao mês de competência (`invoice_month`) e deve continuar representando o consumo daquele mês mesmo depois de paga. Portanto, a quitação da fatura não deve apagar nem reduzir a despesa analítica do mês selecionado; ela deve apenas aparecer como efeito operacional no saldo da conta de pagamento.
 
 ## Plano de implementação
 
@@ -103,6 +127,11 @@ Valores aceitos para `periodo`: `3m`, `6m`, `12m`, `ytd` e `all`.
 - [x] Incluir origem detalhada com nome da conta/cartão no detalhamento.
 - [x] Incluir endividamento atual no resumo executivo usando a regra de parcelados em aberto do Cockpit.
 - [x] Igualar o tamanho visual dos valores ao texto descritivo no demonstrativo.
+- [x] Avaliar e implementar seletor mensal no topo do Cockpit, com mês corrente como padrão.
+- [x] Sincronizar **Situação do mês** e **Saúde Financeira** com o mês selecionado.
+- [x] Revisar agregações do Cockpit para garantir que faturas de cartão pagas continuem consideradas por `invoice_month`.
+- [x] Revisar rótulos de saldo para explicitar o mês selecionado e evitar ambiguidade com saldo atual.
+- [x] Criar testes automatizados para Cockpit mensal, especialmente fatura paga em mês selecionado e exclusão do pagamento agregado.
 
 ## Critérios de aceite
 
@@ -122,9 +151,21 @@ Valores aceitos para `periodo`: `3m`, `6m`, `12m`, `ytd` e `all`.
 - Dado o demonstrativo exibido ou impresso, quando valores monetários aparecem em KPIs, tabelas e legendas, então a fonte dos valores tem tamanho equivalente ao texto descritivo e não domina visualmente o layout.
 - Dado o usuário abrindo o Cockpit, quando a tela é exibida, então vê abas internas para alternar entre **Situação do mês** e **Saúde Financeira**, com **Situação do mês** ativa por padrão.
 - Dado o usuário alternando para **Saúde Financeira**, quando a aba é ativada, então o score fica acessível sem exigir rolagem pelo resumo mensal.
+- Dado o usuário abrindo o Cockpit, quando a tela é exibida, então o seletor de mês inicia no mês corrente.
+- Dado o usuário navegando para outro mês no Cockpit, quando aciona o botão de mês atual, então o Cockpit retorna ao mês corrente.
+- Dado o usuário visualizando seletores mensais, quando os botões de navegação aparecem, então usam ícones compactos com rótulo acessível em vez de palavras longas.
+- Dado o usuário selecionando outro mês no Cockpit, quando a aba **Situação do mês** é exibida, então KPIs, saldos, limites, planejamento, dívidas e gráficos refletem o mês selecionado.
+- Dado o usuário selecionando outro mês no Cockpit, quando alterna para **Saúde Financeira**, então o score é calculado para o mesmo mês selecionado.
+- Dado uma fatura de cartão pertencente ao mês selecionado, quando ela já tiver sido paga, então o Cockpit continua considerando os lançamentos detalhados do cartão como despesa analítica daquele mês.
+- Dado uma fatura de cartão paga por lançamento em conta-corrente, quando o Cockpit calcula despesas analíticas do mês, então o pagamento agregado da fatura permanece excluído para evitar duplicidade.
+- Dado uma fatura paga em mês posterior ao da competência, quando o usuário consulta o mês da competência, então o consumo da fatura continua aparecendo naquele mês e o pagamento aparece apenas como efeito de saldo na conta pagadora.
+- Dado o usuário visualizando saldos no Cockpit com mês diferente do mês corrente, quando os saldos forem exibidos, então os rótulos indicam claramente o mês selecionado.
 
 ## Changelog
 
+- `2.2` — 2026-08-02 — Seletor mensal do Cockpit padronizado com os seletores de Lançamentos, incluindo botão de mês atual e botões compactos por ícone.
+- `2.1` — 2026-08-02 — Implementado seletor mensal no Cockpit, sincronizando Situação do mês e Saúde Financeira e preservando faturas por competência mesmo após pagamento.
+- `2.0` — 2026-08-02 — Spec colocada em revisão para avaliar Cockpit com seletor mensal, mantendo faturas de cartão por competência mesmo após pagamento e exigindo rótulos de saldo vinculados ao mês selecionado.
 - `1.9` — 2026-07-31 — Aba operacional do Cockpit renomeada de `Resumo financeiro` para `Situação do mês` para evitar repetição com o título da página.
 - `1.8` — 2026-07-31 — Cockpit passa a separar Resumo financeiro e Saúde Financeira em abas internas no topo do módulo.
 - `1.7` — 2026-07-26 — Valores monetários do demonstrativo passam a usar tamanho de fonte equivalente ao texto descritivo para melhorar densidade visual.

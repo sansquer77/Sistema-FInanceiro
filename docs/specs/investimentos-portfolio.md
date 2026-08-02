@@ -2,8 +2,8 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.6
-atualizado: 2026-07-29
+versao: 2.7
+atualizado: 2026-07-31
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -64,6 +64,9 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 - Para aplicações como CDB `123% do CDI`, a interface deve orientar o usuário a selecionar modalidade `Pós-fixada`, indexador `CDI` e percentual `123`, evitando cadastrar como `Pré-fixada` ou `Híbrida`; essa orientação deve ficar em helper contextual acionado por ícone discreto para preservar espaço e alinhamento do formulário, com exemplos objetivos de pré-fixada, pós-fixada e híbrida.
 - Campos de quantidade e preço médio/unitário não devem ser exibidos para renda fixa, pois o custo total/aporte é a base de cálculo relevante.
 - O sistema calcula e deduz estimativas de IOF (até 30 dias) e IR (tabela regressiva de 22,5% a 15%).
+- Para títulos do Tesouro Direto, o sistema mantém o cálculo de rentabilidade **na curva**, usando a taxa contratada cadastrada, sem tentar igualar a marcação a mercado exibida pelo site do Tesouro em resgate antecipado.
+- Para títulos do Tesouro Direto padrão (Prefixado, IPCA+ e Selic), o sistema calcula e deduz uma **Taxa B3 estimada** de 0,20% a.a. pro rata sobre o valor da posição estimado na curva. Para Tesouro Selic, aplica isenção simplificada até R$ 10.000,00 sobre a posição; acima desse valor, a estimativa incide apenas sobre o excedente. Para Tesouro RendA+ e Tesouro Educa+, o sistema não calcula automaticamente a taxa B3 na primeira versão, pois essas modalidades possuem regras específicas por prazo, resgate antecipado e faixa de recebimento.
+- O módulo Portfólio deve exibir nota discreta informando que diferenças frente ao site do Tesouro podem ocorrer por marcação a mercado em resgate antecipado, provisão oficial de taxas e regras específicas do título.
 - Posições de renda fixa com vencimento igual ou anterior à data atual devem gerar alerta visual no menu Portfólio e aviso no Cockpit até que sejam encerradas.
 - Posições iniciais e aportes de renda fixa podem ser marcados explicitamente como reserva de emergência quando o usuário entender que têm liquidez compatível, sem inferência automática pelo sistema.
 
@@ -144,9 +147,12 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado o formulário de posição inicial com opção de reserva visível, quando exibido, então a marcação aparece como controle compacto/discreto e não compete visualmente com os campos principais.
 - Dado o usuário cadastrando ou editando um aporte de Poupança ou Renda Fixa em Lançamentos de Contas, quando marca `Usar este aporte como reserva de emergência`, então a operação é persistida com `emergency_reserve_eligible = 1`, aparece marcada ao editar o lançamento e passa a compor a reserva elegível do Portfólio/Score.
 - Dado o usuário cadastrando ou editando um aporte de Poupança em Lançamentos de Contas, quando o formulário é exibido, então os campos não aplicáveis à Poupança ficam ocultos/desabilitados e não competem com os campos essenciais.
+- Dado uma posição de Tesouro Prefixado, IPCA+ ou Selic padrão com cálculo na curva, quando o Portfólio calcula o valor líquido, então deduz a Taxa B3 estimada de 0,20% a.a. pro rata, aplicando isenção simplificada de R$ 10.000,00 apenas para Tesouro Selic.
+- Dado uma posição de Tesouro Direto exibida no Portfólio, quando o usuário lê a listagem, então há nota discreta informando que o cálculo é na curva e pode divergir da marcação a mercado do site do Tesouro.
 
 ## Changelog
 
+- `2.7` — 2026-07-31 — Tesouro Direto mantém rentabilidade na curva pela taxa contratada, passa a deduzir Taxa B3 estimada em títulos padrão e exibe nota sobre diferenças frente à marcação a mercado oficial.
 - `2.6` — 2026-07-29 — Resgate e atualização manual de valor atual passam a ser documentados como modais internos consistentes com a identidade visual do app.
 - `2.5` — 2026-07-29 — Resultado e rentabilidade de ativos em moeda estrangeira com valor manual ficam explicitamente calculados na moeda original; BRL permanece apenas como referência secundária/escala visual.
 - `2.4` — 2026-07-29 — Aportes de Poupança em Lançamentos de Contas passam a ocultar campos não aplicáveis no formulário de investimento.

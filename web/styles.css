@@ -1048,14 +1048,25 @@ textarea:focus {
   box-shadow: var(--control-shadow);
 }
 
+.cockpit-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
 .cockpit-tabs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 4px;
   padding: 4px;
-  margin-bottom: 16px;
   border-radius: 8px;
   background: var(--surface-container);
+}
+
+.cockpit-month {
+  flex-wrap: nowrap;
 }
 
 .cockpit-tab {
@@ -3335,6 +3346,17 @@ textarea:focus {
   -webkit-line-clamp: 2;
 }
 
+.portfolio-footnote {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-low);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .portfolio-quote-cell span {
   -webkit-line-clamp: 1;
 }
@@ -4538,6 +4560,15 @@ textarea:focus {
   font-size: 13px;
 }
 
+.month-icon-button {
+  width: 34px;
+  min-width: 34px;
+  padding: 0;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1;
+}
+
 .card-actions {
   display: flex;
   gap: 8px;
@@ -4593,6 +4624,14 @@ textarea:focus {
   .financial-health-header,
   .financial-health-pillar-row {
     grid-template-columns: 1fr;
+  }
+
+  .cockpit-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .cockpit-month {
+    justify-content: flex-start;
   }
 
   .financial-health-header {

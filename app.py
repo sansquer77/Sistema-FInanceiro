@@ -1418,7 +1418,7 @@ def cockpit_payload(transactions: list[dict]) -> dict:
 
 
 def is_credit_card_payment_transaction(transaction: dict) -> bool:
-    # spec: relatorios/relatorios v1.3 — criterio 6
+    # spec: relatorios/relatorios v2.1 — critério 6
     # (pagamento de fatura fica fora das analises mensais; a despesa detalhada
     #  ja esta nos lancamentos do cartao pela competencia da fatura)
     return bool(transaction.get("is_credit_card_payment"))

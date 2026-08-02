@@ -497,7 +497,8 @@ export function registerPortfolioView({
       return;
     }
     const grouped = groupPortfolioPositions(positions);
-    portfolioPositions.innerHTML = grouped.map((group) => {
+    const hasTreasuryDirect = positions.some((position) => isTreasuryDirectPosition(position));
+    portfolioPositions.innerHTML = `${grouped.map((group) => {
       const collapsed = state.portfolioCollapsedGroups.has(group.key);
       return `
       ${group.label ? portfolioGroupHeader(group, collapsed) : ""}
@@ -525,7 +526,19 @@ export function registerPortfolioView({
         </table>
       </div>
     `;
-    }).join("");
+    }).join("")}${hasTreasuryDirect ? portfolioTreasuryNote() : ""}`;
+  }
+
+  function portfolioTreasuryNote() {
+    return `
+      <p class="portfolio-footnote">
+        Tesouro Direto: valores de renda fixa são estimados na curva pela taxa contratada cadastrada. Diferenças frente ao site do Tesouro podem ocorrer por marcação a mercado em resgate antecipado, provisão oficial de taxas e regras específicas do título. A Taxa B3 exibida é estimada em 0,20% a.a. pro rata, com isenção simplificada para Tesouro Selic até R$ 10.000,00 e sem estimativa automática para Renda+/Educa+.
+      </p>
+    `;
+  }
+
+  function isTreasuryDirectPosition(position) {
+    return `${position.asset_identifier || ""} ${position.asset_name || ""}`.toUpperCase().includes("TESOURO");
   }
 
   function handlePortfolioPositionsClick(event) {
@@ -852,12 +865,14 @@ export function registerPortfolioView({
       : options.child ? '<span class="portfolio-child-marker"></span>' : "";
     const fixedIncomeIof = Number(position.fixed_income_iof_tax || 0);
     const fixedIncomeTax = Number(position.fixed_income_income_tax || 0);
-    const hasFixedIncomeTax = position.asset_type === "fixed_income" && (fixedIncomeIof > 0 || fixedIncomeTax > 0);
+    const fixedIncomeCustodyFee = Number(position.fixed_income_custody_fee || 0);
+    const hasFixedIncomeTax = position.asset_type === "fixed_income" && (fixedIncomeIof > 0 || fixedIncomeTax > 0 || fixedIncomeCustodyFee > 0);
     const valueDetail = hasFixedIncomeTax
       ? `<span title="${escapeHtml([
         `Bruto ${formatMoney(position.fixed_income_gross_value || position.current_value, position.currency)}`,
         fixedIncomeIof > 0 ? `IOF estimado -${formatMoney(position.fixed_income_iof_tax, position.currency)}` : "",
         `IR estimado -${formatMoney(position.fixed_income_income_tax, position.currency)}`,
+        fixedIncomeCustodyFee > 0 ? `Taxa B3 estimada -${formatMoney(position.fixed_income_custody_fee, position.currency)}` : "",
         `Líquido ${formatMoney(position.fixed_income_net_value, position.currency)}`,
       ].filter(Boolean).join(" · "))}">Líquido ${formatMoney(position.fixed_income_net_value, position.currency)}</span>`
       : portfolioSecondaryMoney(position.current_value, position.current_value_brl, position.currency);

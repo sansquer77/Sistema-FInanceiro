@@ -190,9 +190,17 @@
           </header>
 
         <section class="module-view" id="cockpitView">
-          <div class="cockpit-tabs" role="tablist" aria-label="Visões do cockpit">
-            <button class="cockpit-tab active" type="button" role="tab" aria-selected="true" aria-controls="cockpitSummaryPanel" data-cockpit-tab="summary">Situação do mês</button>
-            <button class="cockpit-tab" type="button" role="tab" aria-selected="false" aria-controls="financialHealthPanel" data-cockpit-tab="health">Saúde Financeira</button>
+          <div class="cockpit-toolbar">
+            <div class="cockpit-tabs" role="tablist" aria-label="Visões do cockpit">
+              <button class="cockpit-tab active" type="button" role="tab" aria-selected="true" aria-controls="cockpitSummaryPanel" data-cockpit-tab="summary">Situação do mês</button>
+              <button class="cockpit-tab" type="button" role="tab" aria-selected="false" aria-controls="financialHealthPanel" data-cockpit-tab="health">Saúde Financeira</button>
+            </div>
+            <div class="month-navigator cockpit-month">
+              <button class="ghost small-button month-icon-button" type="button" id="previousCockpitMonthButton" aria-label="Mês anterior" title="Mês anterior">‹</button>
+              <button class="month-label" type="button" id="cockpitMonthLabel" aria-haspopup="dialog"></button>
+              <button class="ghost small-button month-icon-button" type="button" id="todayCockpitMonthButton" aria-label="Mês atual" title="Mês atual">●</button>
+              <button class="ghost small-button month-icon-button" type="button" id="nextCockpitMonthButton" aria-label="Próximo mês" title="Próximo mês">›</button>
+            </div>
           </div>
 
           <div class="cockpit-tab-panel" id="cockpitSummaryPanel" role="tabpanel">
@@ -272,11 +280,6 @@
               <div>
                 <h2>Saúde Financeira</h2>
                 <p class="muted-copy">Diagnóstico mensal baseado em poupança, reserva, endividamento, limites e concentração da carteira.</p>
-              </div>
-              <div class="month-navigator financial-health-month">
-                <button class="ghost small-button" type="button" id="previousFinancialHealthMonthButton" aria-label="Mês anterior">&lt;</button>
-                <button class="month-label" type="button" id="financialHealthMonthLabel" aria-haspopup="dialog"></button>
-                <button class="ghost small-button" type="button" id="nextFinancialHealthMonthButton" aria-label="Próximo mês">&gt;</button>
               </div>
             </div>
             <div class="financial-health-content" id="financialHealthContent">
@@ -434,10 +437,10 @@
             <div class="section-heading">
               <h2>Fatura do cartão</h2>
               <div class="month-navigator">
-                <button class="ghost small-button" type="button" id="previousCardInvoiceButton">Anterior</button>
+                <button class="ghost small-button month-icon-button" type="button" id="previousCardInvoiceButton" aria-label="Mês anterior" title="Mês anterior">‹</button>
                 <button class="month-label" type="button" id="cardInvoiceMonthLabel" aria-haspopup="dialog"></button>
-                <button class="ghost small-button" type="button" id="todayCardInvoiceButton">Hoje</button>
-                <button class="ghost small-button" type="button" id="nextCardInvoiceButton">Próxima</button>
+                <button class="ghost small-button month-icon-button" type="button" id="todayCardInvoiceButton" aria-label="Mês atual" title="Mês atual">●</button>
+                <button class="ghost small-button month-icon-button" type="button" id="nextCardInvoiceButton" aria-label="Próximo mês" title="Próximo mês">›</button>
               </div>
             </div>
 
@@ -769,10 +772,10 @@
               <div class="section-heading">
                 <h2>Lançamentos</h2>
                 <div class="month-navigator">
-                  <button class="ghost small-button" type="button" id="previousMonthButton">Anterior</button>
+                  <button class="ghost small-button month-icon-button" type="button" id="previousMonthButton" aria-label="Mês anterior" title="Mês anterior">‹</button>
                   <button class="month-label" type="button" id="transactionMonthLabel" aria-haspopup="dialog"></button>
-                  <button class="ghost small-button" type="button" id="todayMonthButton">Hoje</button>
-                  <button class="ghost small-button" type="button" id="nextMonthButton">Próximo</button>
+                  <button class="ghost small-button month-icon-button" type="button" id="todayMonthButton" aria-label="Mês atual" title="Mês atual">●</button>
+                  <button class="ghost small-button month-icon-button" type="button" id="nextMonthButton" aria-label="Próximo mês" title="Próximo mês">›</button>
                 </div>
               </div>
               <div class="invoice-history-chart account-balance-history-chart" id="transactionBalanceHistoryChart" aria-label="Histórico de saldos previstos"></div>
@@ -1048,9 +1051,9 @@
             <div class="section-heading">
               <h2>Resumo mensal</h2>
               <div class="month-navigator">
-                <button class="ghost small-button" type="button" id="previousLimitMonthButton">Anterior</button>
+                <button class="ghost small-button month-icon-button" type="button" id="previousLimitMonthButton" aria-label="Mês anterior" title="Mês anterior">‹</button>
                 <strong id="limitMonthLabel"></strong>
-                <button class="ghost small-button" type="button" id="nextLimitMonthButton">Próximo</button>
+                <button class="ghost small-button month-icon-button" type="button" id="nextLimitMonthButton" aria-label="Próximo mês" title="Próximo mês">›</button>
               </div>
             </div>
 
@@ -1208,9 +1211,9 @@
             <div class="section-heading">
               <h2>Resumo do período</h2>
               <div class="month-navigator">
-                <button class="ghost small-button" type="button" id="previousReportMonthButton">Anterior</button>
+                <button class="ghost small-button month-icon-button" type="button" id="previousReportMonthButton" aria-label="Mês anterior" title="Mês anterior">‹</button>
                 <strong id="reportMonthLabel"></strong>
-                <button class="ghost small-button" type="button" id="nextReportMonthButton">Próximo</button>
+                <button class="ghost small-button month-icon-button" type="button" id="nextReportMonthButton" aria-label="Próximo mês" title="Próximo mês">›</button>
               </div>
             </div>
 

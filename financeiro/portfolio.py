@@ -821,6 +821,7 @@ def aggregate_backend_positions(positions: list[dict]) -> dict:
         "fixed_income_gross_value_cents",
         "fixed_income_iof_tax_cents",
         "fixed_income_income_tax_cents",
+        "fixed_income_custody_fee_cents",
         "fixed_income_net_value_cents",
         "day_result_cents",
         "day_result_brl_cents",
@@ -950,7 +951,7 @@ def normalize_opening_position_payload(data: dict) -> dict:
 
 
 def normalize_emergency_reserve_eligible(data: dict, asset_type: str) -> int:
-    # spec: investimentos/investimentos-portfolio v2.6 — critérios 20 e 21
+    # spec: investimentos/investimentos-portfolio v2.7 — critérios 20 e 21
     if asset_type not in {"fixed_income", "savings"}:
         return 0
     return 1 if str(data.get("emergency_reserve_eligible") or "").strip().lower() in {"1", "true", "on", "yes"} else 0
@@ -1081,6 +1082,7 @@ def apply_value_overrides(user_id: int, positions: list[dict]) -> None:
         position["fixed_income_gross_value_cents"] = 0
         position["fixed_income_iof_tax_cents"] = 0
         position["fixed_income_income_tax_cents"] = 0
+        position["fixed_income_custody_fee_cents"] = 0
         position["fixed_income_net_value_cents"] = current_value_cents
         position["day_result_cents"] = 0
         position["day_result_brl_cents"] = 0
@@ -1270,6 +1272,7 @@ def empty_position(row, asset_type: str, identifier: str) -> dict:
         "fixed_income_gross_value_cents": 0,
         "fixed_income_iof_tax_cents": 0,
         "fixed_income_income_tax_cents": 0,
+        "fixed_income_custody_fee_cents": 0,
         "fixed_income_net_value_cents": 0,
         "savings_anniversaries": [],
         "day_result_cents": 0,
@@ -1373,12 +1376,13 @@ def apply_fixed_income_value(position: dict, force_refresh: bool = False) -> Non
     gross_cents = int(gross.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
     iof_tax_cents = 0
     income_tax_cents = 0
+    custody_fee_cents = fixed_income_custody_fee_cents(position, gross_cents, days)
     net_cents = gross_cents
     if should_apply_fixed_income_taxes(position):
         gross_profit_cents = max(gross_cents - position["total_cost_cents"], 0)
         iof_tax_cents = fixed_income_iof_tax_cents(gross_profit_cents, days)
         income_tax_cents = fixed_income_income_tax_cents(max(gross_profit_cents - iof_tax_cents, 0), days)
-        net_cents = max(gross_cents - iof_tax_cents - income_tax_cents, 0)
+        net_cents = max(gross_cents - iof_tax_cents - income_tax_cents - custody_fee_cents, 0)
     position["quote"] = fixed_income_quote_label(mode, indexer, annual_rate, rate_factor)
     position["quote_source"] = fallback_source or source
     position["quote_status"] = status
@@ -1388,6 +1392,7 @@ def apply_fixed_income_value(position: dict, force_refresh: bool = False) -> Non
     position["fixed_income_gross_value_cents"] = gross_cents
     position["fixed_income_iof_tax_cents"] = iof_tax_cents
     position["fixed_income_income_tax_cents"] = income_tax_cents
+    position["fixed_income_custody_fee_cents"] = custody_fee_cents
     position["fixed_income_net_value_cents"] = net_cents
     position["day_result_cents"] = 0
     position["day_result_brl_cents"] = 0
@@ -1436,6 +1441,7 @@ def apply_savings_value(position: dict, force_refresh: bool = False) -> None:
     position["fixed_income_gross_value_cents"] = current_cents
     position["fixed_income_iof_tax_cents"] = 0
     position["fixed_income_income_tax_cents"] = 0
+    position["fixed_income_custody_fee_cents"] = 0
     position["fixed_income_net_value_cents"] = current_cents
     position["day_result_cents"] = 0
     position["day_result_brl_cents"] = 0
@@ -1548,6 +1554,35 @@ def fixed_income_income_tax_cents(gross_profit_cents: int, days: int) -> int:
     else:
         tax_rate = Decimal("0.15")
     return int((Decimal(gross_profit_cents) * tax_rate).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
+def fixed_income_custody_fee_cents(position: dict, gross_cents: int, days: int) -> int:
+    # spec: investimentos/investimentos-portfolio v2.7 — critério 25
+    # Tesouro Direto tem taxa B3 de custodia provisionada diariamente. O app
+    # estima a taxa na curva, sem tentar reproduzir marcacao a mercado oficial.
+    if gross_cents <= 0 or days <= 0 or not is_treasury_direct_position(position):
+        return 0
+    treasury_name = treasury_position_name(position)
+    if "RENDA+" in treasury_name or "RENDA +" in treasury_name or "EDUCA+" in treasury_name or "EDUCA +" in treasury_name:
+        return 0
+    fee_base_cents = gross_cents
+    if "SELIC" in treasury_name:
+        fee_base_cents = max(gross_cents - 1_000_000, 0)
+    if fee_base_cents <= 0:
+        return 0
+    return int((Decimal(fee_base_cents) * Decimal("0.002") * Decimal(days) / Decimal("365")).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
+def is_treasury_direct_position(position: dict) -> bool:
+    name = treasury_position_name(position)
+    return "TESOURO" in name
+
+
+def treasury_position_name(position: dict) -> str:
+    return " ".join([
+        str(position.get("asset_identifier") or ""),
+        str(position.get("asset_name") or ""),
+    ]).upper()
 
 
 def fixed_income_iof_tax_cents(gross_profit_cents: int, days: int) -> int:
@@ -1920,6 +1955,7 @@ def format_quoted_position(position: dict) -> dict:
     position["fixed_income_gross_value"] = cents_to_money(position["fixed_income_gross_value_cents"])
     position["fixed_income_iof_tax"] = cents_to_money(position["fixed_income_iof_tax_cents"])
     position["fixed_income_income_tax"] = cents_to_money(position["fixed_income_income_tax_cents"])
+    position["fixed_income_custody_fee"] = cents_to_money(position["fixed_income_custody_fee_cents"])
     position["fixed_income_net_value"] = cents_to_money(position["fixed_income_net_value_cents"])
     position["fixed_income_maturity_date"] = position.get("fixed_income_maturity_date")
     position["apply_tax_estimate"] = bool(position.get("apply_tax_estimate"))

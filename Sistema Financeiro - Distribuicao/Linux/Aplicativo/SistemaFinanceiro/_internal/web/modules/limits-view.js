@@ -44,8 +44,8 @@ export function registerLimitsView({
     state.spendingLimits = response.limits;
   }
 
-  async function loadCurrentSpendingLimits() {
-    const response = await api(`/api/spending-limits?month=${encodeURIComponent(currentMonthValue())}`);
+  async function loadCurrentSpendingLimits(month = currentMonthValue()) {
+    const response = await api(`/api/spending-limits?month=${encodeURIComponent(month)}`);
     state.currentSpendingLimits = response.limits;
   }
 
@@ -196,8 +196,8 @@ export function registerLimitsView({
     limitAvailableSummary.classList.toggle("danger-text", totals.spent > totals.limit && totals.limit > 0);
   }
 
-  function renderLimitAlerts() {
-    const exceededRows = exceededCurrentLimitRows();
+  function renderLimitAlerts(month = currentMonthValue()) {
+    const exceededRows = exceededCurrentLimitRows(month);
     navButtons.forEach((button) => {
       if (button.dataset.view === "limits") {
         button.classList.toggle("has-alert", exceededRows.length > 0);
@@ -227,8 +227,8 @@ export function registerLimitsView({
     cockpitLimitAlert.querySelector("[data-go-limits]").addEventListener("click", goToLimits);
   }
 
-  function exceededCurrentLimitRows() {
-    return spendingLimitRows(state.currentSpendingLimits, currentMonthValue())
+  function exceededCurrentLimitRows(month = currentMonthValue()) {
+    return spendingLimitRows(state.currentSpendingLimits, month)
       .filter((row) => row.percent > 1)
       .sort((a, b) => Math.abs(b.remaining) - Math.abs(a.remaining));
   }
@@ -263,7 +263,7 @@ export function registerLimitsView({
     };
     state.transactions.forEach((transaction) => {
       const month = transaction.date ? transaction.date.slice(0, 7) : "";
-      if (transaction.type !== "expense" || month !== targetMonth) {
+      if (transaction.type !== "expense" || month !== targetMonth || isCreditCardPaymentTransaction(transaction)) {
         return;
       }
       addSpent(month, transaction.category_id, transaction.subcategory_id, Number(transaction.amount_brl || transaction.amount));
@@ -284,6 +284,10 @@ export function registerLimitsView({
 
   function spendingLimitSpentKey(month, categoryId, subcategoryId) {
     return `${month || ""}|${categoryId || ""}|${subcategoryId || ""}`;
+  }
+
+  function isCreditCardPaymentTransaction(transaction) {
+    return Boolean(transaction?.is_credit_card_payment);
   }
 
   return {

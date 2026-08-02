@@ -86,6 +86,7 @@ const state = {
   accountTransactions: [],
   cockpit: null,
   cockpitTab: "summary",
+  cockpitMonth: currentMonthValue(),
   financialHealth: null,
   financialHealthMonth: currentMonthValue(),
   financialHealthLoading: false,
@@ -341,14 +342,15 @@ const monthInvestment = document.querySelector("#monthInvestment");
 const savingsRate = document.querySelector("#savingsRate");
 const cockpitTabs = document.querySelectorAll("[data-cockpit-tab]");
 const cockpitSummaryPanel = document.querySelector("#cockpitSummaryPanel");
+const cockpitMonthLabel = document.querySelector("#cockpitMonthLabel");
+const previousCockpitMonthButton = document.querySelector("#previousCockpitMonthButton");
+const todayCockpitMonthButton = document.querySelector("#todayCockpitMonthButton");
+const nextCockpitMonthButton = document.querySelector("#nextCockpitMonthButton");
 const currencyList = document.querySelector("#currencyList");
 const cockpitPortfolioByType = document.querySelector("#cockpitPortfolioByType");
 const cockpitLimitAlert = document.querySelector("#cockpitLimitAlert");
 const cockpitPortfolioMaturityAlert = document.querySelector("#cockpitPortfolioMaturityAlert");
 const financialHealthPanel = document.querySelector("#financialHealthPanel");
-const financialHealthMonthLabel = document.querySelector("#financialHealthMonthLabel");
-const previousFinancialHealthMonthButton = document.querySelector("#previousFinancialHealthMonthButton");
-const nextFinancialHealthMonthButton = document.querySelector("#nextFinancialHealthMonthButton");
 const financialHealthContent = document.querySelector("#financialHealthContent");
 const topExpensesChart = document.querySelector("#topExpensesChart");
 const cashDistributionChart = document.querySelector("#cashDistributionChart");
@@ -559,6 +561,10 @@ const cockpitView = registerCockpitView({
     savingsRate,
     cockpitTabs,
     cockpitSummaryPanel,
+    cockpitMonthLabel,
+    previousCockpitMonthButton,
+    todayCockpitMonthButton,
+    nextCockpitMonthButton,
     currencyList,
     monthlyPlanningList,
     installmentDebtList,
@@ -567,9 +573,6 @@ const cockpitView = registerCockpitView({
     cockpitPortfolioByType,
     cockpitPortfolioMaturityAlert,
     financialHealthPanel,
-    financialHealthMonthLabel,
-    previousFinancialHealthMonthButton,
-    nextFinancialHealthMonthButton,
     financialHealthContent,
   },
   api,
@@ -586,7 +589,8 @@ const cockpitView = registerCockpitView({
   isInvestmentTransaction,
   chartColor,
   getCurrencyTotals,
-  renderLimitAlerts: () => limitsView.renderLimitAlerts(),
+  renderLimitAlerts: () => limitsView.renderLimitAlerts(cockpitMonthValue()),
+  onCockpitMonthChanged: refreshCockpitData,
   loadPortfolio,
   portfolioTotalsByCurrency,
   portfolioMaturityAlerts: () => portfolioView.portfolioMaturityAlerts(),
@@ -986,8 +990,9 @@ function resetSessionState() {
   state.accountTransactions = [];
   state.cockpit = null;
   state.cockpitTab = "summary";
+  state.cockpitMonth = currentMonthValue();
   state.financialHealth = null;
-  state.financialHealthMonth = currentMonthValue();
+  state.financialHealthMonth = state.cockpitMonth;
   state.financialHealthLoading = false;
   state.financialHealthError = "";
   state.categories = [];
@@ -1027,7 +1032,7 @@ async function loadAll() {
       api("/api/transactions"),
       api("/api/credit-card-transactions"),
       api("/api/credit-card-payments"),
-      api(`/api/cockpit?month=${encodeURIComponent(currentMonthValue())}`),
+      api(`/api/cockpit?month=${encodeURIComponent(cockpitMonthValue())}`),
     ]);
     state.accounts = accountsResponse.accounts;
     state.creditCards = creditCardsResponse.cards;
@@ -1101,7 +1106,7 @@ async function loadTransactionsAndAccounts() {
     api("/api/transactions"),
     api("/api/credit-card-transactions"),
     api("/api/credit-card-payments"),
-    api(`/api/cockpit?month=${encodeURIComponent(currentMonthValue())}`),
+    api(`/api/cockpit?month=${encodeURIComponent(cockpitMonthValue())}`),
   ]);
   state.accounts = accountsResponse.accounts;
   state.creditCards = creditCardsResponse.cards;
@@ -1130,26 +1135,28 @@ async function loadTransactionSlice() {
 }
 
 async function loadCockpit() {
-  const response = await api(`/api/cockpit?month=${encodeURIComponent(currentMonthValue())}`);
+  const response = await api(`/api/cockpit?month=${encodeURIComponent(cockpitMonthValue())}`);
   state.cockpit = response;
   invalidateFinancialHealth();
 }
 
 async function refreshCockpitData() {
   const requestId = ++state.cockpitRefreshRequestId;
-  const month = currentMonthValue();
+  const month = cockpitMonthValue();
   const [
     accountsResponse,
     transactionsResponse,
     cardTransactionsResponse,
     cardPaymentsResponse,
     cockpitResponse,
+    spendingLimitsResponse,
   ] = await Promise.all([
     api("/api/checking-accounts"),
     api("/api/transactions"),
     api("/api/credit-card-transactions"),
     api("/api/credit-card-payments"),
     api(`/api/cockpit?month=${encodeURIComponent(month)}`),
+    api(`/api/spending-limits?month=${encodeURIComponent(month)}`),
   ]);
   if (requestId !== state.cockpitRefreshRequestId) {
     return;
@@ -1160,6 +1167,7 @@ async function refreshCockpitData() {
   state.cardTransactions = cardTransactionsResponse.transactions || [];
   state.cardPayments = cardPaymentsResponse.payments || [];
   state.cockpit = cockpitResponse;
+  state.currentSpendingLimits = spendingLimitsResponse.limits || [];
   invalidateFinancialHealth();
   renderBaseViews();
   if (state.view === "cockpit") {
@@ -1177,6 +1185,7 @@ function markPortfolioDirty() {
 }
 
 function invalidateFinancialHealth() {
+  state.financialHealthMonth = cockpitMonthValue();
   state.financialHealth = null;
   state.financialHealthError = "";
 }
@@ -1211,7 +1220,7 @@ async function loadSpendingLimits() {
 }
 
 async function loadCurrentSpendingLimits() {
-  await limitsView.loadCurrentSpendingLimits();
+  await limitsView.loadCurrentSpendingLimits(cockpitMonthValue());
 }
 
 async function loadCardInvoice() {
@@ -1495,23 +1504,25 @@ async function setCardInvoiceMonth(month) {
 }
 
 function getCurrencyTotals() {
+  const cockpitMonth = cockpitMonthValue();
+  const cockpitLimitDate = monthEndDate(cockpitMonth);
   const totals = new Map();
   for (const account of state.accounts) {
     const row = currencyTotalRow(totals, account.currency);
-    const amount = accountProjectedBalance(account);
+    const amount = accountProjectedBalance(account, cockpitLimitDate);
     row.current += amount;
     row.accounts.push({
       id: account.id,
       name: account.name,
       type: accountTypeLabel(account.account_type),
       amount,
-      reconciled: accountReconciledBalance(account),
+      reconciled: accountReconciledBalance(account, cockpitLimitDate),
     });
   }
   for (const card of state.creditCards) {
     const row = currencyTotalRow(totals, card.currency);
-    const openAmount = cardOpenBalance(card.id, currentInvoiceMonthForCard(card));
-    const reservedAmount = preferredCardForecastAmount(card, currentMonthEndDate());
+    const openAmount = cardInvoiceCompetenceBalance(card.id, cockpitMonth);
+    const reservedAmount = preferredCardForecastAmount(card, cockpitLimitDate);
     const signedAmount = -Math.max(openAmount - reservedAmount, 0);
     const displayedAmount = -Math.max(openAmount, 0);
     row.current += signedAmount;
@@ -1520,7 +1531,7 @@ function getCurrencyTotals() {
       name: card.name,
       issuer: card.issuer,
       amount: displayedAmount,
-      reconciled: -cardReconciledBalance(card.id),
+      reconciled: -cardReconciledBalance(card.id, cockpitMonth),
     });
   }
   return new Map([...totals.entries()].sort(([currencyA], [currencyB]) => currencyA.localeCompare(currencyB)));
@@ -1538,13 +1549,12 @@ function currencyTotalRow(totals, currency) {
   return totals.get(normalizedCurrency);
 }
 
-function accountReconciledBalance(account) {
-  const limitDate = currentMonthEndDate();
+function accountReconciledBalance(account, limitDate) {
   return accountBalanceUntil(account, limitDate, true);
 }
 
-function accountProjectedBalance(account) {
-  return accountBalanceUntil(account, currentMonthEndDate(), false) - preferredCardForecastForAccount(account, currentMonthEndDate());
+function accountProjectedBalance(account, limitDate) {
+  return accountBalanceUntil(account, limitDate, false) - preferredCardForecastForAccount(account, limitDate);
 }
 
 function accountBalanceUntil(account, limitDate, reconciledOnly) {
@@ -1608,12 +1618,6 @@ function preferredCardForecastAmount(card, limitDate) {
   return [...forecastByInvoice.values()].reduce((total, amount) => total + Math.max(amount, 0), 0);
 }
 
-function currentInvoiceMonthForCard(card) {
-  const month = currentMonthValue();
-  const closingDate = cardInvoiceDateValue(month, card.closing_day);
-  return todayLocalDateValue() > closingDate ? shiftMonth(month, 1) : month;
-}
-
 function cardTransactionInvoiceDelta(transaction) {
   const amount = Number(transaction.amount || 0);
   if (transaction.type === "income") {
@@ -1646,14 +1650,26 @@ function cardInvoiceDateValue(invoiceMonth, day) {
   return `${year}-${String(month).padStart(2, "0")}-${String(invoiceDay).padStart(2, "0")}`;
 }
 
-function currentMonthEndDate() {
-  const now = new Date();
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  return `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}-${String(end.getDate()).padStart(2, "0")}`;
+function cardInvoiceCompetenceBalance(cardId, invoiceMonth) {
+  return state.cardTransactions.reduce((total, transaction) => {
+    if (String(transaction.credit_card_id) !== String(cardId) || transaction.invoice_month !== invoiceMonth) {
+      return total;
+    }
+    return total + cardTransactionInvoiceDelta(transaction);
+  }, 0);
 }
 
-function cardReconciledBalance(cardId) {
-  return cardsView.cardReconciledBalance(cardId);
+function cardReconciledBalance(cardId, invoiceMonth) {
+  return state.cardTransactions.reduce((total, transaction) => {
+    if (
+      String(transaction.credit_card_id) !== String(cardId)
+      || transaction.invoice_month !== invoiceMonth
+      || !transaction.reconciled_at
+    ) {
+      return total;
+    }
+    return total + cardTransactionInvoiceDelta(transaction);
+  }, 0);
 }
 
 function cardOpenBalance(cardId, untilInvoiceMonth = null) {
@@ -1662,6 +1678,13 @@ function cardOpenBalance(cardId, untilInvoiceMonth = null) {
 
 function creditCardCurrency(cardId) {
   return cardsView.creditCardCurrency(cardId);
+}
+
+function cockpitMonthValue() {
+  if (!state.cockpitMonth) {
+    state.cockpitMonth = currentMonthValue();
+  }
+  return state.cockpitMonth;
 }
 
 function getBalanceUntil(limitDate, transactions = state.transactions, reconciledOnly = false) {

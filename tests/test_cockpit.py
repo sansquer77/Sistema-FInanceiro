@@ -34,6 +34,45 @@ class CockpitPayloadTest(unittest.TestCase):
             },
         ])
 
+    def test_paid_invoice_month_keeps_card_transactions_in_analytics(self) -> None:
+        payload = cockpit_payload([
+            {
+                "type": "expense",
+                "amount": 500,
+                "amount_brl": 500,
+                "category_name": "Serviços Financeiros",
+                "subcategory_name": "Pagamento de Fatura",
+                "is_credit_card_payment": True,
+            },
+            {
+                "type": "expense",
+                "amount": 350,
+                "amount_brl": 350,
+                "card_currency": "BRL",
+                "invoice_month": "2026-07",
+                "category_name": "Transporte",
+                "subcategory_name": "Estacionamento",
+            },
+            {
+                "type": "expense",
+                "amount": 150,
+                "amount_brl": 150,
+                "card_currency": "BRL",
+                "invoice_month": "2026-07",
+                "category_name": "Assinaturas e Serviços",
+                "subcategory_name": "Armazenamento em Nuvem e Softwares",
+            },
+        ])
+
+        self.assertEqual(payload["month_totals"]["expense"], 500)
+        self.assertEqual(
+            [row["label"] for row in payload["top_expenses"]],
+            [
+                "Transporte / Estacionamento",
+                "Assinaturas e Serviços / Armazenamento em Nuvem e Softwares",
+            ],
+        )
+
     def test_planning_keeps_original_values_separated_by_currency(self) -> None:
         payload = cockpit_payload([
             {

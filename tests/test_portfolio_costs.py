@@ -2,10 +2,29 @@ from __future__ import annotations
 
 import unittest
 
-from financeiro.portfolio import build_positions, format_position, group_positions
+from financeiro.portfolio import build_positions, fixed_income_custody_fee_cents, format_position, group_positions
 
 
 class PortfolioCostTest(unittest.TestCase):
+    def test_treasury_direct_custody_fee_is_estimated_with_selic_exemption(self) -> None:
+        # spec: investimentos/investimentos-portfolio v2.7 — critério 25
+        prefixado = {
+            "asset_identifier": "Tesouro Prefixado",
+            "asset_name": "TESOURO PREFIXADO 2027",
+        }
+        selic = {
+            "asset_identifier": "Tesouro Selic",
+            "asset_name": "TESOURO SELIC 2029",
+        }
+        renda_mais = {
+            "asset_identifier": "Tesouro RendA+",
+            "asset_name": "TESOURO RENDA+ 2045",
+        }
+
+        self.assertEqual(fixed_income_custody_fee_cents(prefixado, 1_000_000, 365), 2000)
+        self.assertEqual(fixed_income_custody_fee_cents(selic, 1_200_000, 365), 400)
+        self.assertEqual(fixed_income_custody_fee_cents(renda_mais, 1_200_000, 365), 0)
+
     def test_variable_income_cost_uses_invested_amount_without_adding_fees_twice(self) -> None:
         positions = build_positions([
             {

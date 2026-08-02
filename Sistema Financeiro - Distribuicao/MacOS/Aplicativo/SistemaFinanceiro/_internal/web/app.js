@@ -1,4 +1,4 @@
-import { api, upload } from "./modules/api.js";
+import { api, configureApi, upload } from "./modules/api.js";
 import {
   currentMonthValue,
   formatDate,
@@ -41,6 +41,7 @@ import {
   isInvestmentTransfer,
 } from "./modules/transaction-kind.js";
 import { openMonthPicker } from "./modules/month-picker.js";
+import { createDecisionModal } from "./modules/decision-modal.js";
 import { applyTheme, setTheme, storedTheme } from "./modules/theme-utils.js";
 import { registerAuthView } from "./modules/auth-view.js";
 import { registerUserAdminView } from "./modules/user-admin-view.js";
@@ -58,6 +59,12 @@ import { registerOperationHistoryView } from "./modules/operation-history-view.j
 
 applyTheme();
 
+const decisionModal = createDecisionModal();
+
+configureApi({
+  onUnauthorized: handleSessionExpired,
+});
+
 const state = {
   user: null,
   accounts: [],
@@ -72,13 +79,23 @@ const state = {
   selectedAccountId: "",
   cardInvoiceSearch: "",
   cardInvoiceStatusFilter: "all",
+  transactionSearch: "",
+  transactionStatusFilter: "all",
+  transactionHighlightId: "",
   transactions: [],
   accountTransactions: [],
   cockpit: null,
+  cockpitTab: "summary",
+  cockpitMonth: currentMonthValue(),
+  financialHealth: null,
+  financialHealthMonth: currentMonthValue(),
+  financialHealthLoading: false,
+  financialHealthError: "",
   categories: [],
   tags: [],
   spendingLimits: [],
   currentSpendingLimits: [],
+  appInfo: null,
   portfolio: null,
   portfolioDirty: true,
   portfolioLoading: false,
@@ -95,6 +112,10 @@ const state = {
   reportMonth: currentMonthValue(),
   reportTab: "categories",
   reportAccountId: "",
+  statementScope: "consolidated",
+  statementCurrency: "all",
+  statementAccountIds: [],
+  statementCardIds: [],
   transactionSliceRequestId: 0,
   cardInvoiceRequestId: 0,
 };
@@ -147,6 +168,8 @@ const cardTransactionFormTitle = document.querySelector("#cardTransactionFormTit
 const cardTransactionType = document.querySelector("#cardTransactionType");
 const cardTransactionCategory = document.querySelector("#cardTransactionCategory");
 const cardTransactionSubcategory = document.querySelector("#cardTransactionSubcategory");
+const cardClassificationSuggestion = document.querySelector("#cardClassificationSuggestion");
+const cardTransactionTagOptions = document.querySelector("#cardTransactionTagOptions");
 const cardSeriesKind = document.querySelector("#cardSeriesKind");
 const cardInstallmentCount = document.querySelector("#cardInstallmentCount");
 const cardInstallmentCountLabel = document.querySelector("#cardInstallmentCountLabel");
@@ -195,6 +218,12 @@ const reportInvestmentSummary = document.querySelector("#reportInvestmentSummary
 const reportResultSummary = document.querySelector("#reportResultSummary");
 const reportAccountFilter = document.querySelector("#reportAccountFilter");
 const reportAccountSelect = document.querySelector("#reportAccountSelect");
+const statementControls = document.querySelector("#statementControls");
+const statementScopeSelect = document.querySelector("#statementScopeSelect");
+const statementCurrencySelect = document.querySelector("#statementCurrencySelect");
+const statementAccountSelect = document.querySelector("#statementAccountSelect");
+const statementCardSelect = document.querySelector("#statementCardSelect");
+const printStatementButton = document.querySelector("#printStatementButton");
 const reportContent = document.querySelector("#reportContent");
 const addPortfolioAssetButton = document.querySelector("#addPortfolioAssetButton");
 const refreshPortfolioButton = document.querySelector("#refreshPortfolioButton");
@@ -210,7 +239,11 @@ const portfolioPensionFields = document.querySelector("#portfolioPensionFields")
 const portfolioPensionSubtype = document.querySelector("#portfolioPensionSubtype");
 const portfolioSavingsFields = document.querySelector("#portfolioSavingsFields");
 const portfolioFixedFields = document.querySelector("#portfolioFixedFields");
+const portfolioPricingFields = document.querySelector("#portfolioPricingFields");
 const portfolioFixedIncomeSubtype = document.querySelector("#portfolioFixedIncomeSubtype");
+const portfolioFixedIncomeMode = document.querySelector("#portfolioFixedIncomeMode");
+const portfolioFixedIncomeRateLabel = document.querySelector("#portfolioFixedIncomeRateLabel");
+const portfolioFixedIncomeRateHint = document.querySelector("#portfolioFixedIncomeRateHint");
 const cancelPortfolioAssetButton = document.querySelector("#cancelPortfolioAssetButton");
 const deletePortfolioAssetButton = document.querySelector("#deletePortfolioAssetButton");
 const portfolioCostSummary = document.querySelector("#portfolioCostSummary");
@@ -276,9 +309,17 @@ const investmentOperationFields = document.querySelector("#investmentOperationFi
 const investmentAmount = document.querySelector("#investmentAmount");
 const investmentFundFields = document.querySelector("#investmentFundFields");
 const investmentFixedFields = document.querySelector("#investmentFixedFields");
+const investmentPricingFields = document.querySelector("#investmentPricingFields");
+const investmentEmergencyReserveFields = document.querySelector("#investmentEmergencyReserveFields");
+const investmentTradingCostFields = document.querySelector("#investmentTradingCostFields");
+const investmentTaxCostFields = document.querySelector("#investmentTaxCostFields");
+const investmentFixedIncomeMode = document.querySelector("#investmentFixedIncomeMode");
+const investmentFixedIncomeRateLabel = document.querySelector("#investmentFixedIncomeRateLabel");
+const investmentFixedIncomeRateHint = document.querySelector("#investmentFixedIncomeRateHint");
 const transactionCategory = document.querySelector("#transactionCategory");
 const transactionCategoryRow = document.querySelector("#transactionCategoryRow");
 const transactionSubcategory = document.querySelector("#transactionSubcategory");
+const transactionClassificationSuggestion = document.querySelector("#transactionClassificationSuggestion");
 const seriesKind = document.querySelector("#seriesKind");
 const seriesKindRow = document.querySelector("#seriesKindRow");
 const installmentCount = document.querySelector("#installmentCount");
@@ -299,9 +340,17 @@ const monthIncome = document.querySelector("#monthIncome");
 const monthExpense = document.querySelector("#monthExpense");
 const monthInvestment = document.querySelector("#monthInvestment");
 const savingsRate = document.querySelector("#savingsRate");
+const cockpitTabs = document.querySelectorAll("[data-cockpit-tab]");
+const cockpitSummaryPanel = document.querySelector("#cockpitSummaryPanel");
+const cockpitMonthLabel = document.querySelector("#cockpitMonthLabel");
+const previousCockpitMonthButton = document.querySelector("#previousCockpitMonthButton");
+const nextCockpitMonthButton = document.querySelector("#nextCockpitMonthButton");
 const currencyList = document.querySelector("#currencyList");
 const cockpitPortfolioByType = document.querySelector("#cockpitPortfolioByType");
 const cockpitLimitAlert = document.querySelector("#cockpitLimitAlert");
+const cockpitPortfolioMaturityAlert = document.querySelector("#cockpitPortfolioMaturityAlert");
+const financialHealthPanel = document.querySelector("#financialHealthPanel");
+const financialHealthContent = document.querySelector("#financialHealthContent");
 const topExpensesChart = document.querySelector("#topExpensesChart");
 const cashDistributionChart = document.querySelector("#cashDistributionChart");
 const previousMonthButton = document.querySelector("#previousMonthButton");
@@ -313,12 +362,13 @@ const forecastBalanceLabel = document.querySelector("#forecastBalanceLabel");
 const forecastBalanceSummary = document.querySelector("#forecastBalanceSummary");
 const transactionBalanceHistoryChart = document.querySelector("#transactionBalanceHistoryChart");
 const transactionSearch = document.querySelector("#transactionSearch");
+const clearTransactionSearchButton = document.querySelector("#clearTransactionSearchButton");
+const transactionStatusFilterButtons = document.querySelectorAll("[data-transaction-status-filter]");
+const transactionContextCount = document.querySelector("#transactionContextCount");
 const simulationForm = document.querySelector("#simulationForm");
 const simulationType = document.querySelector("#simulationType");
 const simulationDate = document.querySelector("#simulationDate");
 const simulationAccount = document.querySelector("#simulationAccount");
-const simulationCategory = document.querySelector("#simulationCategory");
-const simulationSubcategory = document.querySelector("#simulationSubcategory");
 const simulationSeriesKind = document.querySelector("#simulationSeriesKind");
 const simulationInstallmentCountLabel = document.querySelector("#simulationInstallmentCountLabel");
 const simulationInstallmentCount = document.querySelector("#simulationInstallmentCount");
@@ -333,6 +383,7 @@ const simulationChart = document.querySelector("#simulationChart");
 const simulationVirtualItems = document.querySelector("#simulationVirtualItems");
 const simulationWarnings = document.querySelector("#simulationWarnings");
 const resetSimulationButton = document.querySelector("#resetSimulationButton");
+const aboutAppVersion = document.querySelector("#aboutAppVersion");
 const navButtons = document.querySelectorAll("[data-view]");
 const moduleViews = {
   cockpit: document.querySelector("#cockpitView"),
@@ -348,6 +399,7 @@ const moduleViews = {
   imports: document.querySelector("#importsView"),
   operationHistory: document.querySelector("#operationHistoryView"),
   user: document.querySelector("#userView"),
+  about: document.querySelector("#aboutView"),
 };
 
 const viewTitles = {
@@ -364,6 +416,7 @@ const viewTitles = {
   imports: ["Gestão", "Importação"],
   operationHistory: ["Gestão", "Histórico de Operações"],
   user: ["Usuário", "Preferências"],
+  about: ["Usuário", "Sobre"],
 };
 
 const SIDEBAR_COLLAPSED_KEY = "financeiro.sidebar.collapsed";
@@ -441,6 +494,12 @@ const reportsView = registerReportsView({
     reportResultSummary,
     reportAccountFilter,
     reportAccountSelect,
+    statementControls,
+    statementScopeSelect,
+    statementCurrencySelect,
+    statementAccountSelect,
+    statementCardSelect,
+    printStatementButton,
     reportContent,
   },
   shiftMonth,
@@ -450,6 +509,7 @@ const reportsView = registerReportsView({
   formatPercent,
   escapeHtml,
   isInvestmentTransaction,
+  isInstallmentTransaction,
   chartColor,
 });
 
@@ -498,14 +558,26 @@ const cockpitView = registerCockpitView({
     monthExpense,
     monthInvestment,
     savingsRate,
+    cockpitTabs,
+    cockpitSummaryPanel,
+    cockpitMonthLabel,
+    previousCockpitMonthButton,
+    nextCockpitMonthButton,
     currencyList,
     monthlyPlanningList,
     installmentDebtList,
     topExpensesChart,
     cashDistributionChart,
     cockpitPortfolioByType,
+    cockpitPortfolioMaturityAlert,
+    financialHealthPanel,
+    financialHealthContent,
   },
+  api,
   currentMonthValue,
+  formatMonthLabel,
+  shiftMonth,
+  openMonthPicker,
   formatMoney,
   formatPercent,
   emptyState,
@@ -515,9 +587,12 @@ const cockpitView = registerCockpitView({
   isInvestmentTransaction,
   chartColor,
   getCurrencyTotals,
-  renderLimitAlerts: () => limitsView.renderLimitAlerts(),
+  renderLimitAlerts: () => limitsView.renderLimitAlerts(cockpitMonthValue()),
+  onCockpitMonthChanged: refreshCockpitData,
   loadPortfolio,
   portfolioTotalsByCurrency,
+  portfolioMaturityAlerts: () => portfolioView.portfolioMaturityAlerts(),
+  goToPortfolio: () => showModule("portfolio"),
 });
 
 const accountsView = registerAccountsView({
@@ -581,6 +656,8 @@ const cardsView = registerCardsView({
     cardTransactionType,
     cardTransactionCategory,
     cardTransactionSubcategory,
+    cardClassificationSuggestion,
+    cardTransactionTagOptions,
     cardSeriesKind,
     cardInstallmentCount,
     cardInstallmentCountLabel,
@@ -610,6 +687,7 @@ const cardsView = registerCardsView({
   transactionSeriesLabel,
   cardCategoryPath,
   launchActionButton,
+  decisionModal,
   deleteSeriesScope,
   openMonthPicker,
   onCreditCardsChanged: async () => {
@@ -645,9 +723,17 @@ const transactionsView = registerTransactionsView({
     investmentAmount,
     investmentFundFields,
     investmentFixedFields,
+    investmentPricingFields,
+    investmentEmergencyReserveFields,
+    investmentTradingCostFields,
+    investmentTaxCostFields,
+    investmentFixedIncomeMode,
+    investmentFixedIncomeRateLabel,
+    investmentFixedIncomeRateHint,
     transactionCategory,
     transactionCategoryRow,
     transactionSubcategory,
+    transactionClassificationSuggestion,
     seriesKind,
     seriesKindRow,
     installmentCount,
@@ -667,6 +753,9 @@ const transactionsView = registerTransactionsView({
     forecastBalanceSummary,
     transactionBalanceHistoryChart,
     transactionSearch,
+    clearTransactionSearchButton,
+    transactionStatusFilterButtons,
+    transactionContextCount,
   },
   api,
   formData,
@@ -694,11 +783,13 @@ const transactionsView = registerTransactionsView({
   transactionSeriesLabel,
   transactionTypeLabel,
   openMonthPicker,
+  decisionModal,
   ensureSelectedAccount,
   getBalanceUntil,
   accountHasPreferredCardForecast,
   loadCockpit,
   markPortfolioDirty,
+  renderBaseViews,
   renderFinanceViews,
   renderPortfolio,
   renderImportTargets,
@@ -711,8 +802,6 @@ const simulationsView = registerSimulationsView({
     simulationType,
     simulationDate,
     simulationAccount,
-    simulationCategory,
-    simulationSubcategory,
     simulationSeriesKind,
     simulationInstallmentCountLabel,
     simulationInstallmentCount,
@@ -748,7 +837,11 @@ const portfolioView = registerPortfolioView({
     portfolioPensionSubtype,
     portfolioSavingsFields,
     portfolioFixedFields,
+    portfolioPricingFields,
     portfolioFixedIncomeSubtype,
+    portfolioFixedIncomeMode,
+    portfolioFixedIncomeRateLabel,
+    portfolioFixedIncomeRateHint,
     cancelPortfolioAssetButton,
     deletePortfolioAssetButton,
     portfolioCostSummary,
@@ -778,7 +871,11 @@ const portfolioView = registerPortfolioView({
   portfolioQuoteText,
   todayLocalDateValue,
   chartColor,
-  onPortfolioChanged: renderCockpitPortfolioByType,
+  decisionModal,
+  onPortfolioChanged: () => {
+    renderCockpitPortfolioByType();
+    renderPortfolioMaturityAlerts();
+  },
   onPortfolioRedeemed: loadTransactionsAndAccounts,
   editSourceTransaction: editPortfolioSourceTransaction,
 });
@@ -844,6 +941,7 @@ const userAdminViewController = registerUserAdminView({
 boot();
 
 async function boot() {
+  await loadAppInfo();
   try {
     const response = await api("/api/me");
     state.user = response.user;
@@ -857,6 +955,21 @@ async function boot() {
   await loadDashboard();
 }
 
+async function loadAppInfo() {
+  try {
+    state.appInfo = await api("/api/app-info");
+  } catch (error) {
+    state.appInfo = { version: "1.0.50" };
+  }
+  renderAppInfo();
+}
+
+function renderAppInfo() {
+  if (aboutAppVersion) {
+    aboutAppVersion.textContent = state.appInfo?.version || "1.0.50";
+  }
+}
+
 function resetSessionState() {
   state.user = null;
   state.accounts = [];
@@ -868,9 +981,18 @@ function resetSessionState() {
   state.cardTransactions = [];
   state.cardPayments = [];
   state.selectedCreditCardId = "";
+  state.transactionSearch = "";
+  state.transactionStatusFilter = "all";
+  state.transactionHighlightId = "";
   state.transactions = [];
   state.accountTransactions = [];
   state.cockpit = null;
+  state.cockpitTab = "summary";
+  state.cockpitMonth = currentMonthValue();
+  state.financialHealth = null;
+  state.financialHealthMonth = state.cockpitMonth;
+  state.financialHealthLoading = false;
+  state.financialHealthError = "";
   state.categories = [];
   state.tags = [];
   state.spendingLimits = [];
@@ -880,6 +1002,14 @@ function resetSessionState() {
   resetCreditCardForm();
   resetCardTransactionForm();
   resetTransactionForm();
+}
+
+function handleSessionExpired() {
+  resetSessionState();
+  renderBaseViews();
+  renderFinanceViews();
+  renderManagementViews();
+  showAuth("Sessao expirada. Entre novamente para continuar.");
 }
 
 async function loadDashboard() {
@@ -900,7 +1030,7 @@ async function loadAll() {
       api("/api/transactions"),
       api("/api/credit-card-transactions"),
       api("/api/credit-card-payments"),
-      api(`/api/cockpit?month=${encodeURIComponent(currentMonthValue())}`),
+      api(`/api/cockpit?month=${encodeURIComponent(cockpitMonthValue())}`),
     ]);
     state.accounts = accountsResponse.accounts;
     state.creditCards = creditCardsResponse.cards;
@@ -911,6 +1041,7 @@ async function loadAll() {
     state.cardTransactions = cardTransactionsResponse.transactions;
     state.cardPayments = cardPaymentsResponse.payments || [];
     state.cockpit = cockpitResponse;
+    invalidateFinancialHealth();
     await loadArchivedAccounts();
     await loadArchivedCreditCards();
     await loadClassifications();
@@ -973,7 +1104,7 @@ async function loadTransactionsAndAccounts() {
     api("/api/transactions"),
     api("/api/credit-card-transactions"),
     api("/api/credit-card-payments"),
-    api(`/api/cockpit?month=${encodeURIComponent(currentMonthValue())}`),
+    api(`/api/cockpit?month=${encodeURIComponent(cockpitMonthValue())}`),
   ]);
   state.accounts = accountsResponse.accounts;
   state.creditCards = creditCardsResponse.cards;
@@ -984,6 +1115,7 @@ async function loadTransactionsAndAccounts() {
   state.cardTransactions = cardTransactionsResponse.transactions;
   state.cardPayments = cardPaymentsResponse.payments || [];
   state.cockpit = cockpitResponse;
+  invalidateFinancialHealth();
   await loadArchivedAccounts();
   await loadArchivedCreditCards();
   await loadClassifications();
@@ -1001,25 +1133,28 @@ async function loadTransactionSlice() {
 }
 
 async function loadCockpit() {
-  const response = await api(`/api/cockpit?month=${encodeURIComponent(currentMonthValue())}`);
+  const response = await api(`/api/cockpit?month=${encodeURIComponent(cockpitMonthValue())}`);
   state.cockpit = response;
+  invalidateFinancialHealth();
 }
 
 async function refreshCockpitData() {
   const requestId = ++state.cockpitRefreshRequestId;
-  const month = currentMonthValue();
+  const month = cockpitMonthValue();
   const [
     accountsResponse,
     transactionsResponse,
     cardTransactionsResponse,
     cardPaymentsResponse,
     cockpitResponse,
+    spendingLimitsResponse,
   ] = await Promise.all([
     api("/api/checking-accounts"),
     api("/api/transactions"),
     api("/api/credit-card-transactions"),
     api("/api/credit-card-payments"),
     api(`/api/cockpit?month=${encodeURIComponent(month)}`),
+    api(`/api/spending-limits?month=${encodeURIComponent(month)}`),
   ]);
   if (requestId !== state.cockpitRefreshRequestId) {
     return;
@@ -1030,6 +1165,8 @@ async function refreshCockpitData() {
   state.cardTransactions = cardTransactionsResponse.transactions || [];
   state.cardPayments = cardPaymentsResponse.payments || [];
   state.cockpit = cockpitResponse;
+  state.currentSpendingLimits = spendingLimitsResponse.limits || [];
+  invalidateFinancialHealth();
   renderBaseViews();
   if (state.view === "cockpit") {
     renderCockpit();
@@ -1042,6 +1179,13 @@ async function loadPortfolio(options = {}) {
 
 function markPortfolioDirty() {
   portfolioView.markPortfolioDirty();
+  invalidateFinancialHealth();
+}
+
+function invalidateFinancialHealth() {
+  state.financialHealthMonth = cockpitMonthValue();
+  state.financialHealth = null;
+  state.financialHealthError = "";
 }
 
 function showPortfolioAssetForm() {
@@ -1074,7 +1218,7 @@ async function loadSpendingLimits() {
 }
 
 async function loadCurrentSpendingLimits() {
-  await limitsView.loadCurrentSpendingLimits();
+  await limitsView.loadCurrentSpendingLimits(cockpitMonthValue());
 }
 
 async function loadCardInvoice() {
@@ -1104,6 +1248,7 @@ function showModule(view) {
   }
   navButtons.forEach((button) => button.classList.toggle("active", button.dataset.view === view));
   renderLimitAlerts();
+  renderPortfolioMaturityAlerts();
   moduleEyebrow.textContent = viewTitles[view][0];
   pageTitle.textContent = viewTitles[view][1];
   if (view === "cockpit") {
@@ -1241,6 +1386,10 @@ function renderLimitAlerts() {
   cockpitView.renderLimitAlerts();
 }
 
+function renderPortfolioMaturityAlerts() {
+  cockpitView.renderPortfolioMaturityAlerts();
+}
+
 function chartColor(index) {
   const fallbackPalette = ["#14b8a6", "#6366f1", "#f97316", "#ec4899", "#22c55e", "#3b82f6"];
   const tokenName = `--chart-${(index % fallbackPalette.length) + 1}`;
@@ -1353,23 +1502,25 @@ async function setCardInvoiceMonth(month) {
 }
 
 function getCurrencyTotals() {
+  const cockpitMonth = cockpitMonthValue();
+  const cockpitLimitDate = monthEndDate(cockpitMonth);
   const totals = new Map();
   for (const account of state.accounts) {
     const row = currencyTotalRow(totals, account.currency);
-    const amount = accountProjectedBalance(account);
+    const amount = accountProjectedBalance(account, cockpitLimitDate);
     row.current += amount;
     row.accounts.push({
       id: account.id,
       name: account.name,
       type: accountTypeLabel(account.account_type),
       amount,
-      reconciled: accountReconciledBalance(account),
+      reconciled: accountReconciledBalance(account, cockpitLimitDate),
     });
   }
   for (const card of state.creditCards) {
     const row = currencyTotalRow(totals, card.currency);
-    const openAmount = cardOpenBalance(card.id, currentInvoiceMonthForCard(card));
-    const reservedAmount = preferredCardForecastAmount(card, currentMonthEndDate());
+    const openAmount = cardInvoiceCompetenceBalance(card.id, cockpitMonth);
+    const reservedAmount = preferredCardForecastAmount(card, cockpitLimitDate);
     const signedAmount = -Math.max(openAmount - reservedAmount, 0);
     const displayedAmount = -Math.max(openAmount, 0);
     row.current += signedAmount;
@@ -1378,7 +1529,7 @@ function getCurrencyTotals() {
       name: card.name,
       issuer: card.issuer,
       amount: displayedAmount,
-      reconciled: -cardReconciledBalance(card.id),
+      reconciled: -cardReconciledBalance(card.id, cockpitMonth),
     });
   }
   return new Map([...totals.entries()].sort(([currencyA], [currencyB]) => currencyA.localeCompare(currencyB)));
@@ -1396,13 +1547,12 @@ function currencyTotalRow(totals, currency) {
   return totals.get(normalizedCurrency);
 }
 
-function accountReconciledBalance(account) {
-  const limitDate = currentMonthEndDate();
+function accountReconciledBalance(account, limitDate) {
   return accountBalanceUntil(account, limitDate, true);
 }
 
-function accountProjectedBalance(account) {
-  return accountBalanceUntil(account, currentMonthEndDate(), false) - preferredCardForecastForAccount(account, currentMonthEndDate());
+function accountProjectedBalance(account, limitDate) {
+  return accountBalanceUntil(account, limitDate, false) - preferredCardForecastForAccount(account, limitDate);
 }
 
 function accountBalanceUntil(account, limitDate, reconciledOnly) {
@@ -1466,12 +1616,6 @@ function preferredCardForecastAmount(card, limitDate) {
   return [...forecastByInvoice.values()].reduce((total, amount) => total + Math.max(amount, 0), 0);
 }
 
-function currentInvoiceMonthForCard(card) {
-  const month = currentMonthValue();
-  const closingDate = cardInvoiceDateValue(month, card.closing_day);
-  return todayLocalDateValue() > closingDate ? shiftMonth(month, 1) : month;
-}
-
 function cardTransactionInvoiceDelta(transaction) {
   const amount = Number(transaction.amount || 0);
   if (transaction.type === "income") {
@@ -1504,14 +1648,26 @@ function cardInvoiceDateValue(invoiceMonth, day) {
   return `${year}-${String(month).padStart(2, "0")}-${String(invoiceDay).padStart(2, "0")}`;
 }
 
-function currentMonthEndDate() {
-  const now = new Date();
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  return `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}-${String(end.getDate()).padStart(2, "0")}`;
+function cardInvoiceCompetenceBalance(cardId, invoiceMonth) {
+  return state.cardTransactions.reduce((total, transaction) => {
+    if (String(transaction.credit_card_id) !== String(cardId) || transaction.invoice_month !== invoiceMonth) {
+      return total;
+    }
+    return total + cardTransactionInvoiceDelta(transaction);
+  }, 0);
 }
 
-function cardReconciledBalance(cardId) {
-  return cardsView.cardReconciledBalance(cardId);
+function cardReconciledBalance(cardId, invoiceMonth) {
+  return state.cardTransactions.reduce((total, transaction) => {
+    if (
+      String(transaction.credit_card_id) !== String(cardId)
+      || transaction.invoice_month !== invoiceMonth
+      || !transaction.reconciled_at
+    ) {
+      return total;
+    }
+    return total + cardTransactionInvoiceDelta(transaction);
+  }, 0);
 }
 
 function cardOpenBalance(cardId, untilInvoiceMonth = null) {
@@ -1520,6 +1676,13 @@ function cardOpenBalance(cardId, untilInvoiceMonth = null) {
 
 function creditCardCurrency(cardId) {
   return cardsView.creditCardCurrency(cardId);
+}
+
+function cockpitMonthValue() {
+  if (!state.cockpitMonth) {
+    state.cockpitMonth = currentMonthValue();
+  }
+  return state.cockpitMonth;
 }
 
 function getBalanceUntil(limitDate, transactions = state.transactions, reconciledOnly = false) {
@@ -1598,8 +1761,11 @@ function renderCockpitPortfolioByType() {
   cockpitView.renderCockpitPortfolioByType();
 }
 
-function showAuth() {
+function showAuth(message = "") {
   authView.hidden = false;
   dashboardView.hidden = true;
   authViewController.switchAuthMode("login");
+  if (message) {
+    setMessage(authMessage, message, "error");
+  }
 }

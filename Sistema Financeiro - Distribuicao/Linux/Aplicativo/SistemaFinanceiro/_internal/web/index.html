@@ -21,7 +21,7 @@
         document.documentElement.style.colorScheme = theme;
       })();
     </script>
-    <link rel="stylesheet" href="/styles.css?v=113">
+    <link rel="stylesheet" href="/styles.css?v=114">
   </head>
   <body>
     <main class="app-shell">
@@ -169,6 +169,10 @@
                 <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.1 2.1-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V20h-3v-.2a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1-2.1-2.1.1-.1A1.7 1.7 0 0 0 5 15a1.7 1.7 0 0 0-1.6-1H3v-3h.4A1.7 1.7 0 0 0 5 10a1.7 1.7 0 0 0-.3-1.9l-.1-.1 2.1-2.1.1.1A1.7 1.7 0 0 0 8.7 6a1.7 1.7 0 0 0 1-1.6V4h3v.4a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1 2.1 2.1-.1.1A1.7 1.7 0 0 0 19 10a1.7 1.7 0 0 0 1.6 1h.4v3h-.4A1.7 1.7 0 0 0 19.4 15Z"></path></svg>
                 <span class="nav-label">Preferências</span>
               </button>
+              <button class="nav-button" type="button" data-view="about" data-short="SB" title="Sobre">
+                <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 10v6"></path><path d="M12 7h.01"></path></svg>
+                <span class="nav-label">Sobre</span>
+              </button>
               <button class="nav-button logout-nav-button" id="logoutButton" type="button" data-short="SA" title="Sair">
                 <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5"></path><path d="M15 12H3"></path><path d="M13 4h6a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6"></path></svg>
                 <span class="nav-label">Sair</span>
@@ -186,71 +190,101 @@
           </header>
 
         <section class="module-view" id="cockpitView">
-          <section class="summary-strip">
-            <div class="kpi-income">
-              <span>Receitas do mês</span>
-              <strong id="monthIncome">R$ 0,00</strong>
+          <div class="cockpit-toolbar">
+            <div class="cockpit-tabs" role="tablist" aria-label="Visões do cockpit">
+              <button class="cockpit-tab active" type="button" role="tab" aria-selected="true" aria-controls="cockpitSummaryPanel" data-cockpit-tab="summary">Situação do mês</button>
+              <button class="cockpit-tab" type="button" role="tab" aria-selected="false" aria-controls="financialHealthPanel" data-cockpit-tab="health">Saúde Financeira</button>
             </div>
-            <div class="kpi-expense">
-              <span>Despesas do mês</span>
-              <strong id="monthExpense">R$ 0,00</strong>
+            <div class="month-navigator cockpit-month">
+              <button class="ghost small-button" type="button" id="previousCockpitMonthButton" aria-label="Mês anterior">&lt;</button>
+              <button class="month-label" type="button" id="cockpitMonthLabel" aria-haspopup="dialog"></button>
+              <button class="ghost small-button" type="button" id="nextCockpitMonthButton" aria-label="Próximo mês">&gt;</button>
             </div>
-            <div class="kpi-investment">
-              <span>Aportes do mês</span>
-              <strong id="monthInvestment">R$ 0,00</strong>
+          </div>
+
+          <div class="cockpit-tab-panel" id="cockpitSummaryPanel" role="tabpanel">
+            <section class="summary-strip">
+              <div class="kpi-income">
+                <span>Receitas do mês</span>
+                <strong id="monthIncome">R$ 0,00</strong>
+              </div>
+              <div class="kpi-expense">
+                <span>Despesas do mês</span>
+                <strong id="monthExpense">R$ 0,00</strong>
+              </div>
+              <div class="kpi-investment">
+                <span>Aportes do mês</span>
+                <strong id="monthInvestment">R$ 0,00</strong>
+              </div>
+              <div class="kpi-rate">
+                <span class="kpi-label-with-help">
+                  Taxa de poupança
+                  <button class="inline-help-icon" type="button" aria-label="Taxa de poupança = (receitas do mês - despesas de consumo do mês) / receitas do mês. Investimentos/aportes, transferências, câmbio e pagamentos de fatura não entram como despesa de consumo." title="Taxa de poupança = (receitas do mês - despesas de consumo do mês) / receitas do mês. Investimentos/aportes, transferências, câmbio e pagamentos de fatura não entram como despesa de consumo." data-tooltip="Taxa de poupança = (receitas do mês - despesas de consumo do mês) / receitas do mês. Investimentos/aportes, transferências, câmbio e pagamentos de fatura não entram como despesa de consumo.">i</button>
+                </span>
+                <strong id="savingsRate">0%</strong>
+              </div>
+            </section>
+
+            <section class="cockpit-alert limit-alert" id="cockpitLimitAlert" hidden></section>
+            <section class="cockpit-alert portfolio-maturity-alert" id="cockpitPortfolioMaturityAlert" hidden></section>
+
+            <div class="cockpit-stack">
+              <section class="currency-panel">
+                <div class="section-heading">
+                  <h2>Saldos por moeda</h2>
+                </div>
+                <div class="currency-list" id="currencyList"></div>
+                <div class="cockpit-portfolio-summary">
+                  <h3>Portfólio por tipo</h3>
+                  <div id="cockpitPortfolioByType"></div>
+                </div>
+              </section>
+
+              <div class="cockpit-grid planning-debt-grid">
+              <section class="panel">
+                <div class="section-heading">
+                  <h2>Planejamento do mês</h2>
+                </div>
+                <div class="planning-list" id="monthlyPlanningList"></div>
+              </section>
+
+              <section class="panel">
+                <div class="section-heading">
+                  <h2>Dívidas</h2>
+                </div>
+                <div class="planning-list" id="installmentDebtList"></div>
+              </section>
+              </div>
             </div>
-            <div class="kpi-rate">
-              <span>Taxa de poupança</span>
-              <strong id="savingsRate">0%</strong>
+
+            <div class="cockpit-grid analytics-grid">
+              <section class="panel">
+                <div class="section-heading">
+                  <h2>Maiores despesas do mês</h2>
+                </div>
+                <div class="chart-panel" id="topExpensesChart"></div>
+              </section>
+
+              <section class="panel">
+                <div class="section-heading">
+                  <h2>Maiores receitas do mês</h2>
+                </div>
+                <div class="chart-panel" id="cashDistributionChart"></div>
+              </section>
+            </div>
+          </div>
+
+          <section class="panel financial-health-panel cockpit-tab-panel" id="financialHealthPanel" role="tabpanel" hidden>
+            <div class="financial-health-header">
+              <div>
+                <h2>Saúde Financeira</h2>
+                <p class="muted-copy">Diagnóstico mensal baseado em poupança, reserva, endividamento, limites e concentração da carteira.</p>
+              </div>
+            </div>
+            <div class="financial-health-content" id="financialHealthContent">
+              <div class="empty-state compact">Carregando score de saúde financeira...</div>
             </div>
           </section>
-
-          <section class="limit-alert" id="cockpitLimitAlert" hidden></section>
-
-          <div class="cockpit-stack">
-            <section class="currency-panel">
-              <div class="section-heading">
-                <h2>Saldos por moeda</h2>
-              </div>
-              <div class="currency-list" id="currencyList"></div>
-              <div class="cockpit-portfolio-summary">
-                <h3>Portfólio por tipo</h3>
-                <div id="cockpitPortfolioByType"></div>
-              </div>
-            </section>
-
-            <div class="cockpit-grid planning-debt-grid">
-            <section class="panel">
-              <div class="section-heading">
-                <h2>Planejamento do mês</h2>
-              </div>
-              <div class="planning-list" id="monthlyPlanningList"></div>
-            </section>
-
-            <section class="panel">
-              <div class="section-heading">
-                <h2>Dívidas</h2>
-              </div>
-              <div class="planning-list" id="installmentDebtList"></div>
-            </section>
-            </div>
-          </div>
-
-          <div class="cockpit-grid analytics-grid">
-            <section class="panel">
-              <div class="section-heading">
-                <h2>Maiores despesas do mês</h2>
-              </div>
-              <div class="chart-panel" id="topExpensesChart"></div>
-            </section>
-
-            <section class="panel">
-              <div class="section-heading">
-                <h2>Maiores receitas do mês</h2>
-              </div>
-              <div class="chart-panel" id="cashDistributionChart"></div>
-            </section>
-          </div>
         </section>
 
         <section class="module-view" id="accountsView" hidden>
@@ -451,7 +485,7 @@
           </section>
 
           <div class="workspace card-transaction-workspace">
-            <section class="panel">
+            <section class="panel launch-form-sticky">
               <h2 id="cardTransactionFormTitle">Novo lançamento no cartão</h2>
               <form id="cardTransactionForm" class="form">
                 <input type="hidden" name="id">
@@ -508,12 +542,19 @@
                     <select name="subcategory" id="cardTransactionSubcategory"></select>
                   </label>
                 </div>
+                <p class="field-hint" id="cardClassificationSuggestion" aria-live="polite"></p>
+                <div class="field-row">
+                  <label>Tag
+                    <input name="tags" id="cardTransactionTags" type="text" list="cardTransactionTagOptions" placeholder="Selecione ou digite uma tag">
+                    <datalist id="cardTransactionTagOptions"></datalist>
+                  </label>
+                </div>
                 <label>Observações
                   <textarea name="notes" rows="3"></textarea>
                 </label>
                 <div class="actions">
                   <button class="primary" type="submit">Salvar lançamento</button>
-                  <button class="ghost" id="cancelCardTransactionEditButton" type="button" hidden>Cancelar</button>
+                  <button class="ghost small-button" id="cancelCardTransactionEditButton" type="button">Cancelar</button>
                 </div>
               </form>
             </section>
@@ -539,7 +580,7 @@
 
         <section class="module-view" id="transactionsView" hidden>
           <div class="workspace">
-            <section class="transaction-form-panel">
+            <section class="transaction-form-panel launch-form-sticky">
               <h2 id="transactionFormTitle">Novo lançamento</h2>
               <form id="transactionForm" class="form">
                 <input type="hidden" name="id">
@@ -571,6 +612,7 @@
                     <select name="subcategory" id="transactionSubcategory"></select>
                   </label>
                 </div>
+                <p class="field-hint" id="transactionClassificationSuggestion" aria-live="polite"></p>
                 <div class="investment-fields" id="investmentOperationFields" hidden>
                   <div class="field-row">
                     <label>Valor investido
@@ -590,33 +632,49 @@
                       <input name="investment_cnpj" id="investmentCnpj" type="text" placeholder="00.000.000/0000-00 ou alfanumérico">
                     </label>
                   </div>
-                  <div class="field-row investment-fixed-fields" id="investmentFixedFields" hidden>
-                    <label>Modalidade
-                      <select name="investment_fixed_income_mode" id="investmentFixedIncomeMode">
-                        <option value="">Selecione</option>
-                        <option value="post">Pós-fixada</option>
-                        <option value="pre">Pré-fixada</option>
-                        <option value="hybrid">Híbrida</option>
-                      </select>
-                    </label>
-                    <label>Indexador
-                      <select name="investment_fixed_income_indexer" id="investmentFixedIncomeIndexer">
-                        <option value="">Selecione</option>
-                        <option value="CDI">CDI</option>
-                        <option value="SELIC">SELIC</option>
-                        <option value="IPCA">IPCA</option>
-                        <option value="IGP-M">IGP-M</option>
-                        <option value="TR">TR</option>
-                      </select>
-                    </label>
-                    <label>Taxa (% a.a.)
-                      <input name="investment_fixed_income_rate" id="investmentFixedIncomeRate" type="text" inputmode="decimal" placeholder="Ex.: 6,50">
-                    </label>
-                    <label>Vencimento
-                      <input name="investment_fixed_income_maturity_date" id="investmentFixedIncomeMaturityDate" type="date">
-                    </label>
+                  <div class="investment-fixed-fields" id="investmentFixedFields" hidden>
+                    <div class="field-row">
+                      <label>Modalidade
+                        <select name="investment_fixed_income_mode" id="investmentFixedIncomeMode">
+                          <option value="">Selecione</option>
+                          <option value="post">Pós-fixada</option>
+                          <option value="pre">Pré-fixada</option>
+                          <option value="hybrid">Híbrida</option>
+                        </select>
+                      </label>
+                      <label>Indexador
+                        <select name="investment_fixed_income_indexer" id="investmentFixedIncomeIndexer">
+                          <option value="">Selecione</option>
+                          <option value="CDI">CDI</option>
+                          <option value="SELIC">SELIC</option>
+                          <option value="IPCA">IPCA</option>
+                          <option value="IGP-M">IGP-M</option>
+                          <option value="TR">TR</option>
+                        </select>
+                      </label>
+                    </div>
+                    <details class="field-helper">
+                      <summary aria-label="Ajuda sobre modalidade de renda fixa">i</summary>
+                      <div>
+                        <strong>Como preencher renda fixa</strong>
+                        <ul>
+                          <li><b>Pré-fixada:</b> CDB 12,30% a.a. → taxa 12,30.</li>
+                          <li><b>Pós-fixada:</b> CDB 123% do CDI → indexador CDI e percentual 123; CDI puro pode ficar vazio.</li>
+                          <li><b>Híbrida:</b> IPCA + 6,50% a.a. → indexador IPCA e taxa adicional 6,50.</li>
+                        </ul>
+                        <p id="investmentFixedIncomeRateHint">Escolha a modalidade para ver a orientação específica.</p>
+                      </div>
+                    </details>
+                    <div class="field-row">
+                      <label><span id="investmentFixedIncomeRateLabel">Taxa</span>
+                        <input name="investment_fixed_income_rate" id="investmentFixedIncomeRate" type="text" inputmode="decimal" placeholder="Ex.: 6,50">
+                      </label>
+                      <label>Vencimento
+                        <input name="investment_fixed_income_maturity_date" id="investmentFixedIncomeMaturityDate" type="date">
+                      </label>
+                    </div>
                   </div>
-                  <div class="field-row">
+                  <div class="field-row" id="investmentPricingFields">
                     <label>Quantidade
                       <input name="investment_quantity" id="investmentQuantity" type="text" inputmode="decimal" placeholder="0,000000">
                     </label>
@@ -624,7 +682,12 @@
                       <input name="investment_unit_price" id="investmentUnitPrice" type="text" inputmode="decimal" placeholder="0,00">
                     </label>
                   </div>
-                  <div class="field-row">
+                  <div class="field-row" id="investmentEmergencyReserveFields" hidden>
+                    <label class="checkbox-label compact-checkbox">Usar este aporte como reserva de emergência
+                      <input name="investment_emergency_reserve_eligible" type="checkbox" value="1">
+                    </label>
+                  </div>
+                  <div class="field-row" id="investmentTradingCostFields">
                     <label>Tx. corretagem
                       <input name="investment_brokerage_fee" type="text" inputmode="decimal" placeholder="0,00">
                     </label>
@@ -632,7 +695,7 @@
                       <input name="investment_exchange_fee" type="text" inputmode="decimal" placeholder="0,00">
                     </label>
                   </div>
-                  <div class="field-row">
+                  <div class="field-row" id="investmentTaxCostFields">
                     <label>Impostos
                       <input name="investment_tax" type="text" inputmode="decimal" placeholder="0,00">
                     </label>
@@ -698,7 +761,7 @@
                 </label>
                 <div class="actions">
                   <button class="primary" type="submit">Salvar lançamento</button>
-                  <button class="ghost" id="cancelTransactionEditButton" type="button" hidden>Cancelar</button>
+                  <button class="ghost small-button" id="cancelTransactionEditButton" type="button">Cancelar</button>
                 </div>
               </form>
               <p class="message" id="transactionMessage" role="alert"></p>
@@ -717,7 +780,7 @@
               <div class="invoice-history-chart account-balance-history-chart" id="transactionBalanceHistoryChart" aria-label="Histórico de saldos previstos"></div>
               <div class="month-balance-summary">
                 <div>
-                  <span>Saldo atual</span>
+                  <span><span class="balance-kind-badge reconciled"><span aria-hidden="true">✓</span> Conciliado</span> Saldo atual</span>
                   <strong id="currentBalanceSummary">R$ 0,00</strong>
                 </div>
                 <div>
@@ -725,9 +788,20 @@
                   <strong id="forecastBalanceSummary">R$ 0,00</strong>
                 </div>
               </div>
-              <label class="transaction-search">Buscar lançamento
-                <input id="transactionSearch" type="search" placeholder="Descrição, conta, categoria, tag...">
-              </label>
+              <div class="transaction-list-toolbar">
+                <label class="transaction-search">Buscar lançamento
+                  <span class="search-input-wrap">
+                    <input id="transactionSearch" type="search" placeholder="Descrição, conta, categoria, tag...">
+                    <button class="clear-search-button" id="clearTransactionSearchButton" type="button" aria-label="Limpar busca" title="Limpar busca" hidden>×</button>
+                  </span>
+                </label>
+                <div class="segmented-control" role="group" aria-label="Filtrar conciliação dos lançamentos">
+                  <button class="active" type="button" data-transaction-status-filter="all">Todos</button>
+                  <button type="button" data-transaction-status-filter="pending">Pendentes</button>
+                  <button type="button" data-transaction-status-filter="reconciled">Conciliados</button>
+                </div>
+              </div>
+              <p class="transaction-context-count" id="transactionContextCount" aria-live="polite"></p>
               <div class="transaction-list" id="transactionList"></div>
             </section>
           </div>
@@ -829,52 +903,75 @@
                   <textarea name="savings_anniversaries" rows="4" placeholder="2026-01-05; 1000,00&#10;2026-01-20; 500,00"></textarea>
                 </label>
               </div>
-              <div class="field-row" id="portfolioFixedFields" hidden>
-                <label>Subcategoria
-                  <select id="portfolioFixedIncomeSubtype">
-                    <option value="">Selecione</option>
-                    <option value="CDB">CDB</option>
-                    <option value="LCI">LCI</option>
-                    <option value="LCA">LCA</option>
-                    <option value="LC">LC</option>
-                    <option value="Tesouro Selic">Tesouro Selic</option>
-                    <option value="Tesouro Prefixado">Tesouro Prefixado</option>
-                    <option value="Tesouro IPCA+">Tesouro IPCA+</option>
-                    <option value="Debenture">Debenture</option>
-                    <option value="CRI">CRI</option>
-                    <option value="CRA">CRA</option>
-                    <option value="Cofrinho">Cofrinho</option>
-                  </select>
-                </label>
-                <label>Modalidade
-                  <select name="fixed_income_mode">
-                    <option value="">Selecione</option>
-                    <option value="post">Pós-fixada</option>
-                    <option value="pre">Pré-fixada</option>
-                    <option value="hybrid">Híbrida</option>
-                  </select>
-                </label>
-                <label>Indexador
-                  <select name="fixed_income_indexer">
-                    <option value="">Selecione</option>
-                    <option value="CDI">CDI</option>
-                    <option value="SELIC">SELIC</option>
-                    <option value="IPCA">IPCA</option>
-                    <option value="IGP-M">IGP-M</option>
-                    <option value="TR">TR</option>
-                  </select>
-                </label>
-                <label>Taxa (% a.a.)
-                  <input name="fixed_income_rate" type="text" inputmode="decimal" placeholder="Ex.: 14,00">
-                </label>
-                <label>Vencimento
-                  <input name="fixed_income_maturity_date" type="date">
-                </label>
-                <label class="checkbox-label">Aplicar estimativa de IR/IOF nesta posição inicial
-                  <input name="apply_tax_estimate" type="checkbox" value="1">
+              <div class="portfolio-fixed-fields" id="portfolioFixedFields" hidden>
+                <div class="field-row">
+                  <label>Subcategoria
+                    <select id="portfolioFixedIncomeSubtype">
+                      <option value="">Selecione</option>
+                      <option value="CDB">CDB</option>
+                      <option value="LCI">LCI</option>
+                      <option value="LCA">LCA</option>
+                      <option value="LC">LC</option>
+                      <option value="Tesouro Selic">Tesouro Selic</option>
+                      <option value="Tesouro Prefixado">Tesouro Prefixado</option>
+                      <option value="Tesouro IPCA+">Tesouro IPCA+</option>
+                      <option value="Debenture">Debenture</option>
+                      <option value="CRI">CRI</option>
+                      <option value="CRA">CRA</option>
+                      <option value="Cofrinho">Cofrinho</option>
+                    </select>
+                  </label>
+                  <label>Modalidade
+                    <select name="fixed_income_mode" id="portfolioFixedIncomeMode">
+                      <option value="">Selecione</option>
+                      <option value="post">Pós-fixada</option>
+                      <option value="pre">Pré-fixada</option>
+                      <option value="hybrid">Híbrida</option>
+                    </select>
+                  </label>
+                </div>
+                <details class="field-helper">
+                  <summary aria-label="Ajuda sobre modalidade de renda fixa">i</summary>
+                  <div>
+                    <strong>Como preencher renda fixa</strong>
+                    <ul>
+                      <li><b>Pré-fixada:</b> CDB 12,30% a.a. → taxa 12,30.</li>
+                      <li><b>Pós-fixada:</b> CDB 123% do CDI → indexador CDI e percentual 123; CDI puro pode ficar vazio.</li>
+                      <li><b>Híbrida:</b> IPCA + 6,50% a.a. → indexador IPCA e taxa adicional 6,50.</li>
+                    </ul>
+                    <p id="portfolioFixedIncomeRateHint">Escolha a modalidade para ver a orientação específica.</p>
+                  </div>
+                </details>
+                <div class="field-row">
+                  <label>Indexador
+                    <select name="fixed_income_indexer">
+                      <option value="">Selecione</option>
+                      <option value="CDI">CDI</option>
+                      <option value="SELIC">SELIC</option>
+                      <option value="IPCA">IPCA</option>
+                      <option value="IGP-M">IGP-M</option>
+                      <option value="TR">TR</option>
+                    </select>
+                  </label>
+                  <label><span id="portfolioFixedIncomeRateLabel">Taxa</span>
+                    <input name="fixed_income_rate" id="portfolioFixedIncomeRate" type="text" inputmode="decimal" placeholder="Ex.: 14,00">
+                  </label>
+                </div>
+                <div class="field-row">
+                  <label>Vencimento
+                    <input name="fixed_income_maturity_date" type="date">
+                  </label>
+                  <label class="checkbox-label">Aplicar estimativa de IR/IOF nesta posição inicial
+                    <input name="apply_tax_estimate" type="checkbox" value="1">
+                  </label>
+                </div>
+              </div>
+              <div class="field-row" id="portfolioEmergencyReserveFields" hidden>
+                <label class="checkbox-label compact-checkbox">Usar esta posição como reserva de emergência
+                  <input name="emergency_reserve_eligible" type="checkbox" value="1">
                 </label>
               </div>
-              <div class="field-row">
+              <div class="field-row" id="portfolioPricingFields">
                 <label>Quantidade
                   <input name="quantity" type="text" inputmode="decimal" placeholder="0,000000">
                 </label>
@@ -1043,17 +1140,6 @@
                       <select name="account_id" id="simulationAccount" required></select>
                     </label>
                   </div>
-                  <label>Descrição
-                    <input name="description" id="simulationDescription" type="text" placeholder="Ex.: novo contrato" required>
-                  </label>
-                  <div class="field-row">
-                    <label>Categoria
-                      <select name="category_id" id="simulationCategory"></select>
-                    </label>
-                    <label>Subcategoria
-                      <select name="subcategory_id" id="simulationSubcategory"></select>
-                    </label>
-                  </div>
                   <div class="field-row">
                     <label>Recorrência
                       <select name="series_kind" id="simulationSeriesKind">
@@ -1094,8 +1180,8 @@
                     <span>Saldo atual</span>
                     <strong id="simulationCurrentBalance">R$ 0,00</strong>
                   </div>
-                  <div class="summary-card positive">
-                    <span>Saldo projetado</span>
+                  <div class="summary-card" id="simulationProjectedBalanceCard">
+                    <span>Saldo projetado no mês</span>
                     <strong id="simulationProjectedBalance">R$ 0,00</strong>
                   </div>
                 </div>
@@ -1136,6 +1222,7 @@
               <button class="report-tab" type="button" data-report-tab="cashflow">Entradas x Saídas</button>
               <button class="report-tab" type="button" data-report-tab="accounts">Contas</button>
               <button class="report-tab" type="button" data-report-tab="tags">Tags</button>
+              <button class="report-tab" type="button" data-report-tab="statement">Demonstrativos</button>
             </div>
 
             <div class="report-summary">
@@ -1160,6 +1247,25 @@
             <label class="report-account-filter" id="reportAccountFilter" hidden>Conta
               <select id="reportAccountSelect"></select>
             </label>
+
+            <div class="statement-controls" id="statementControls" hidden>
+              <label>Escopo
+                <select id="statementScopeSelect">
+                  <option value="consolidated">Consolidado — contas e cartões ativos</option>
+                  <option value="selected">Selecionar contas e cartões</option>
+                </select>
+              </label>
+              <label>Moeda
+                <select id="statementCurrencySelect"></select>
+              </label>
+              <label class="statement-multi-field">Contas
+                <select id="statementAccountSelect" multiple></select>
+              </label>
+              <label class="statement-multi-field">Cartões
+                <select id="statementCardSelect" multiple></select>
+              </label>
+              <button class="ghost small-button" type="button" id="printStatementButton">Imprimir / Exportar PDF</button>
+            </div>
           </section>
 
           <section class="panel report-content-panel">
@@ -1421,6 +1527,82 @@
                 <button class="danger" type="submit">Apagar minha conta</button>
               </form>
               <p class="message" id="deleteUserMessage" role="alert"></p>
+            </section>
+          </div>
+        </section>
+
+        <section class="module-view" id="aboutView" hidden>
+          <div class="about-grid">
+            <section class="panel about-hero-panel">
+              <div class="brand">
+                <span class="brand-mark"><img src="/assets/app-icon.png" alt="" aria-hidden="true"></span>
+                <div>
+                  <h2>Sistema Financeiro</h2>
+                  <p>App local para organizar a vida financeira com privacidade, simplicidade e visão prática de contas, cartões, investimentos e planejamento.</p>
+                </div>
+              </div>
+            </section>
+
+            <section class="panel">
+              <h2>Funcionalidades principais</h2>
+              <div class="about-feature-list">
+                <span>Contas, saldos e moedas</span>
+                <span>Lançamentos de contas e cartões</span>
+                <span>Recorrência, parcelamento e conciliação</span>
+                <span>Categorias, subcategorias e tags</span>
+                <span>Limites de gastos e alertas</span>
+                <span>Cockpit e relatórios</span>
+                <span>Portfólio de investimentos</span>
+                <span>Importação de planilhas</span>
+                <span>Histórico de operações</span>
+                <span>Preferências, segurança e recuperação por email</span>
+              </div>
+            </section>
+
+            <section class="panel">
+              <h2>Desenvolvimento</h2>
+              <dl class="about-definition-list">
+                <div>
+                  <dt>Desenvolvedor</dt>
+                  <dd>Cristiano Gaspar</dd>
+                </div>
+                <div>
+                  <dt>Versão atual</dt>
+                  <dd id="aboutAppVersion">Carregando...</dd>
+                </div>
+                <div>
+                  <dt>Tecnologias</dt>
+                  <dd>Python 3, servidor HTTP da biblioteca padrão, SQLite, HTML, CSS, JavaScript com ES Modules, PyInstaller, SMTP local para recuperação de senha, Yahoo Finance, CoinGecko e Banco Central SGS para cotações e índices.</dd>
+                </div>
+                <div>
+                  <dt>Contato</dt>
+                  <dd><a href="mailto:cristiano_gaspar@outlook.com">cristiano_gaspar@outlook.com</a></dd>
+                </div>
+              </dl>
+            </section>
+
+            <section class="panel about-infrastructure-panel">
+              <h2>Infraestrutura mínima</h2>
+              <div class="about-infrastructure-grid">
+                <div>
+                  <h3>Uso local</h3>
+                  <ul>
+                    <li>macOS ou Windows com o pacote instalado, ou ambiente de desenvolvimento com Python 3.</li>
+                    <li>Navegador moderno para acessar a interface local.</li>
+                    <li>Espaço em disco para o banco SQLite e arquivos locais em <code>data/</code>.</li>
+                    <li>Porta local <code>8010</code> disponível, salvo configuração diferente em <code>APP_PORT</code>.</li>
+                  </ul>
+                </div>
+                <div>
+                  <h3>Uso em rede</h3>
+                  <ul>
+                    <li>Computador host ligado e conectado a uma rede local confiável.</li>
+                    <li>Launcher de rede ou <code>APP_HOST=0.0.0.0</code> com <code>APP_URL</code>, <code>APP_ALLOWED_HOSTS</code> e <code>APP_ALLOWED_ORIGINS</code> ajustados.</li>
+                    <li>Firewall permitindo acesso à porta configurada somente para os dispositivos desejados.</li>
+                    <li>Acesso remoto ou por domínio deve usar reverse-proxy com HTTPS.</li>
+                  </ul>
+                </div>
+              </div>
             </section>
           </div>
         </section>

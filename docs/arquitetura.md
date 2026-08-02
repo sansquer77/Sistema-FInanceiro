@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 2.2
-atualizado: 2026-07-29
+versao: 2.3
+atualizado: 2026-08-02
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -374,11 +374,13 @@ Ver [[investimentos-portfolio]].
 
 ### Cockpit e Relatórios
 
-1. `GET /api/cockpit` consolida lançamentos de conta pelo mês e lançamentos de cartão pela fatura (`invoice_month`).
-2. Planejamento do mês considera receitas/despesas/investimentos recorrentes, incluindo recorrências de cartão.
-3. Relatórios no frontend agrupam por categoria, subcategoria, conta, tag e fluxo diário.
-4. Lançamentos de cartão entram em relatórios e limites pela competência da fatura.
-5. `GET /api/reports/category-evolution` retorna séries mensais por categoria/subcategoria para o drawer de evolução, com `periodo` igual a `3m`, `6m`, `12m`, `ytd` ou `all`.
+1. `GET /api/cockpit?month=AAAA-MM` consolida lançamentos de conta pelo mês selecionado e lançamentos de cartão pela fatura (`invoice_month`).
+2. O Cockpit usa um seletor mensal compartilhado pelas abas **Situação do mês** e **Saúde Financeira**.
+3. Planejamento do mês considera receitas/despesas/investimentos recorrentes, incluindo recorrências de cartão.
+4. Faturas de cartão continuam visíveis no Cockpit pelo mês de competência mesmo após pagamento; o pagamento agregado em conta-corrente permanece excluído das despesas analíticas.
+5. Relatórios no frontend agrupam por categoria, subcategoria, conta, tag e fluxo diário.
+6. Lançamentos de cartão entram em relatórios e limites pela competência da fatura.
+7. `GET /api/reports/category-evolution` retorna séries mensais por categoria/subcategoria para o drawer de evolução, com `periodo` igual a `3m`, `6m`, `12m`, `ytd` ou `all`.
 
 Ver [[relatorios]], [[limites-gastos]].
 
@@ -426,6 +428,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `2.3` — 2026-08-02 — Fluxo do Cockpit documentado com seletor mensal compartilhado e faturas de cartão preservadas por competência após pagamento.
 - `2.2` — 2026-07-29 — Documentado metadado `emergency_reserve_eligible` também em `investment_operations`, permitindo marcar aportes de Renda Fixa/Poupança como reserva de emergência.
 - `2.1` — 2026-07-29 — Documentadas rotas do Score de Saúde Financeira (`/api/financial-health-score` e `/api/financial-health-score/history`) e a validação de `months` (1-36) no histórico; descrição de `financial_health.py` atualizada para incluir função de histórico.
 - `2.0` — 2026-07-28 — Documentado módulo `financial_health.py` como núcleo analítico do Score de Saúde Financeira.

@@ -16,6 +16,7 @@ export function registerCockpitView({
   chartColor,
   getCurrencyTotals,
   renderLimitAlerts,
+  onCockpitMonthChanged,
   loadPortfolio,
   portfolioTotalsByCurrency,
   portfolioMaturityAlerts,
@@ -28,6 +29,10 @@ export function registerCockpitView({
     savingsRate,
     cockpitTabs,
     cockpitSummaryPanel,
+    cockpitMonthLabel,
+    previousCockpitMonthButton,
+    todayCockpitMonthButton,
+    nextCockpitMonthButton,
     currencyList,
     monthlyPlanningList,
     installmentDebtList,
@@ -36,9 +41,6 @@ export function registerCockpitView({
     cockpitPortfolioByType,
     cockpitPortfolioMaturityAlert,
     financialHealthPanel,
-    financialHealthMonthLabel,
-    previousFinancialHealthMonthButton,
-    nextFinancialHealthMonthButton,
     financialHealthContent,
   } = elements;
   let financialHealthRequestId = 0;
@@ -46,14 +48,16 @@ export function registerCockpitView({
   cockpitTabs?.forEach((button) => {
     button.addEventListener("click", () => setCockpitTab(button.dataset.cockpitTab || "summary"));
   });
-  previousFinancialHealthMonthButton?.addEventListener("click", () => setFinancialHealthMonth(shiftMonth(state.financialHealthMonth, -1)));
-  nextFinancialHealthMonthButton?.addEventListener("click", () => setFinancialHealthMonth(shiftMonth(state.financialHealthMonth, 1)));
-  financialHealthMonthLabel?.addEventListener("click", () => {
-    openMonthPicker(financialHealthMonthLabel, state.financialHealthMonth, setFinancialHealthMonth);
+  previousCockpitMonthButton?.addEventListener("click", () => setCockpitMonth(shiftMonth(cockpitMonthValue(), -1)));
+  todayCockpitMonthButton?.addEventListener("click", () => setCockpitMonth(currentMonthValue()));
+  nextCockpitMonthButton?.addEventListener("click", () => setCockpitMonth(shiftMonth(cockpitMonthValue(), 1)));
+  cockpitMonthLabel?.addEventListener("click", () => {
+    openMonthPicker(cockpitMonthLabel, cockpitMonthValue(), setCockpitMonth);
   });
 
   function renderCockpit() {
     renderCockpitTabs();
+    renderCockpitMonthLabel();
     const totals = getCurrencyTotals();
     const monthTotals = state.cockpit?.month_totals || getCurrentMonthTotals();
     monthIncome.textContent = formatMoney(monthTotals.income, "BRL");
@@ -105,19 +109,36 @@ export function registerCockpitView({
     }
   }
 
-  function setFinancialHealthMonth(month) {
-    if (!month || month === state.financialHealthMonth) {
+  function renderCockpitMonthLabel() {
+    if (cockpitMonthLabel) {
+      cockpitMonthLabel.textContent = formatMonthLabel(cockpitMonthValue());
+    }
+  }
+
+  function cockpitMonthValue() {
+    if (!state.cockpitMonth) {
+      state.cockpitMonth = currentMonthValue();
+    }
+    return state.cockpitMonth;
+  }
+
+  function setCockpitMonth(month) {
+    if (!month || month === cockpitMonthValue()) {
       return;
     }
+    state.cockpitMonth = month;
     state.financialHealthMonth = month;
+    state.cockpit = null;
     state.financialHealth = null;
     state.financialHealthError = "";
-    renderFinancialHealth();
-    loadFinancialHealth().catch((error) => {
-      state.financialHealthLoading = false;
-      state.financialHealthError = error.message;
-      renderFinancialHealth();
-    });
+    renderCockpit();
+    if (typeof onCockpitMonthChanged === "function") {
+      onCockpitMonthChanged().catch((error) => {
+        state.financialHealthLoading = false;
+        state.financialHealthError = error.message;
+        renderCockpit();
+      });
+    }
   }
 
   async function loadFinancialHealth() {
@@ -125,7 +146,8 @@ export function registerCockpitView({
     state.financialHealthLoading = true;
     state.financialHealthError = "";
     renderFinancialHealth();
-    const month = state.financialHealthMonth || currentMonthValue();
+    const month = cockpitMonthValue();
+    state.financialHealthMonth = month;
     const response = await api(`/api/financial-health-score?month=${encodeURIComponent(month)}`);
     if (requestId !== financialHealthRequestId) {
       return;
@@ -137,14 +159,11 @@ export function registerCockpitView({
   }
 
   function renderFinancialHealth() {
-    if (!financialHealthContent || !financialHealthMonthLabel) {
+    if (!financialHealthContent) {
       return;
     }
     renderCockpitTabs();
-    if (!state.financialHealthMonth) {
-      state.financialHealthMonth = currentMonthValue();
-    }
-    financialHealthMonthLabel.textContent = formatMonthLabel(state.financialHealthMonth);
+    state.financialHealthMonth = cockpitMonthValue();
     const data = state.financialHealth;
     if (!data || data.month !== state.financialHealthMonth) {
       if (!state.financialHealthLoading && !state.financialHealthError) {
@@ -379,7 +398,7 @@ export function registerCockpitView({
   }
 
   function getCurrentMonthTotals() {
-    const prefix = currentMonthValue();
+    const prefix = cockpitMonthValue();
     return state.transactions.reduce((totals, transaction) => {
       if (!transaction.date.startsWith(prefix) || isCreditCardPaymentTransaction(transaction)) {
         return totals;
@@ -402,6 +421,7 @@ export function registerCockpitView({
 
   function renderCurrencyTotals(totals) {
     currencyList.innerHTML = "";
+    const monthLabel = formatMonthLabel(cockpitMonthValue());
     if (totals.size === 0) {
       currencyList.append(emptyState("Nenhuma moeda cadastrada ainda.", true));
       return;
@@ -429,7 +449,7 @@ export function registerCockpitView({
         <div class="currency-section-header">
           <div>
             <span>${escapeHtml(currency)}</span>
-            <em>Previsto</em>
+            <em>Previsto em ${escapeHtml(monthLabel)}</em>
           </div>
           <strong class="${amounts.current < 0 ? "danger-text" : ""}">${formatMoney(amounts.current, currency)}</strong>
         </div>
@@ -462,20 +482,21 @@ export function registerCockpitView({
   }
 
   function renderMonthlyPlanning() {
+    const monthLabel = formatMonthLabel(cockpitMonthValue());
     if (state.cockpit?.planning) {
       monthlyPlanningList.innerHTML = "";
       monthlyPlanningList.append(
-        planningSectionFromRows("Receitas recorrentes", state.cockpit.planning.income || [], "income"),
-        planningSectionFromRows("Investimentos planejados", state.cockpit.planning.investment || [], "investment"),
-        planningSectionFromRows("Despesas recorrentes", state.cockpit.planning.expense || [], "expense"),
+        planningSectionFromRows(`Receitas recorrentes · ${monthLabel}`, state.cockpit.planning.income || [], "income"),
+        planningSectionFromRows(`Investimentos planejados · ${monthLabel}`, state.cockpit.planning.investment || [], "investment"),
+        planningSectionFromRows(`Despesas recorrentes · ${monthLabel}`, state.cockpit.planning.expense || [], "expense"),
       );
       return;
     }
-    const prefix = currentMonthValue();
+    const prefix = cockpitMonthValue();
     const sections = [
-      ["Receitas recorrentes", "income", (transaction) => transaction.type === "income" && transaction.series_kind === "recurring"],
-      ["Investimentos planejados", "investment", (transaction) => isInvestmentTransaction(transaction) && transaction.series_kind !== "single"],
-      ["Despesas recorrentes", "expense", (transaction) => transaction.type === "expense" && transaction.series_kind === "recurring"],
+      [`Receitas recorrentes · ${monthLabel}`, "income", (transaction) => transaction.type === "income" && transaction.series_kind === "recurring"],
+      [`Investimentos planejados · ${monthLabel}`, "investment", (transaction) => isInvestmentTransaction(transaction) && transaction.series_kind !== "single"],
+      [`Despesas recorrentes · ${monthLabel}`, "expense", (transaction) => transaction.type === "expense" && transaction.series_kind === "recurring"],
     ];
     monthlyPlanningList.innerHTML = "";
     for (const [title, kind, predicate] of sections) {
@@ -548,7 +569,7 @@ export function registerCockpitView({
     if (!installmentDebtList) {
       return;
     }
-    const currentMonth = currentMonthValue();
+    const currentMonth = cockpitMonthValue();
     const rows = new Map();
     for (const transaction of state.transactions) {
       const transactionMonth = transaction.date.slice(0, 7);
@@ -574,7 +595,7 @@ export function registerCockpitView({
       installmentDebtList.innerHTML = `
         <section class="planning-section">
           <div class="planning-section-header">
-            <h3>Total em aberto</h3>
+            <h3>Total em aberto desde ${escapeHtml(formatMonthLabel(currentMonth))}</h3>
             <strong class="danger-text">${formatMoney(0, "BRL")}</strong>
           </div>
           <div class="empty-state compact">Nenhuma compra parcelada em aberto.</div>
@@ -586,7 +607,7 @@ export function registerCockpitView({
     installmentDebtList.innerHTML = `
       <section class="planning-section">
         <div class="planning-section-header">
-          <h3>Total em aberto</h3>
+          <h3>Total em aberto desde ${escapeHtml(formatMonthLabel(currentMonth))}</h3>
           <strong class="danger-text">${formatDebtTotals(debtTotals)}</strong>
         </div>
         ${debts.map((row) => `
@@ -654,7 +675,7 @@ export function registerCockpitView({
       });
       return;
     }
-    const prefix = currentMonthValue();
+    const prefix = cockpitMonthValue();
     const grouped = groupTransactionsByCategory(state.transactions.filter((transaction) => (
       transaction.date.startsWith(prefix) && transaction.type === "expense" && !isCreditCardPaymentTransaction(transaction)
     )));
@@ -672,7 +693,7 @@ export function registerCockpitView({
       });
       return;
     }
-    const prefix = currentMonthValue();
+    const prefix = cockpitMonthValue();
     const grouped = groupTransactionsByCategory(state.transactions.filter((transaction) => (
       transaction.date.startsWith(prefix) && transaction.type === "income"
     )));

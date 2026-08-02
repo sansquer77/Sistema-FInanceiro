@@ -306,7 +306,7 @@ class FinancialHealthDatabaseIntegrationTest(unittest.TestCase):
         self.assertEqual(reference["average_cents"], 1_016_667)
 
     def test_account_investment_operation_marked_as_reserve_counts_in_score(self) -> None:
-        # spec: investimentos/investimentos-portfolio v2.4 — critério 19
+        # spec: investimentos/investimentos-portfolio v2.7 — critério 19
         user = create_user("Bob", "bob@example.com", "strong-password")
         with database.get_connection() as conn:
             account_id = conn.execute(

@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 1.7
-atualizado: 2026-07-24
+versao: 1.8
+atualizado: 2026-08-02
 relacionados:
   - "[[arquitetura]]"
   - "[[visao-produto]]"
@@ -14,7 +14,7 @@ tags: [produto, meta]
 # Requisitos
 
 > [!info] Status
-> **implementado** (escopo vivo) · área: `meta` · atualizado em 2026-07-09 · relacionados: [[arquitetura]], [[visao-produto]]
+> **implementado** (escopo vivo) · área: `meta` · atualizado em 2026-08-02 · relacionados: [[arquitetura]], [[visao-produto]]
 
 ## Objetivo
 
@@ -38,7 +38,7 @@ Manter um sistema financeiro local, privado e simples para controlar contas, sal
   - Ver [[investimentos-portfolio]].
 - **Categorias e Tags**: cadastro, edição, listagem e exclusão de categorias (tipo receita, despesa, investimento), subcategorias e múltiplos marcadores (tags) por transação. Ver [[categorias-tags-gestao]].
 - **Classificação Assistida**: sugestão local de categoria e subcategoria por correspondência exata normalizada com o histórico do próprio usuário, sem dependência de internet. Ver [[classificacao-assistida]].
-- **Cockpit e Relatórios**: resumo financeiro mensal, saldos por moeda, planejamento recorrente, dívidas parceladas, portfólio por tipo, maiores receitas/despesas, relatórios por categoria, subcategoria, conta, tag e fluxo diário. Ver [[relatorios]] e [[arquitetura]].
+- **Cockpit e Relatórios**: resumo financeiro mensal com seletor de mês, saldos por moeda, planejamento recorrente, dívidas parceladas, portfólio por tipo, maiores receitas/despesas, relatórios por categoria, subcategoria, conta, tag e fluxo diário. Ver [[relatorios]] e [[arquitetura]].
 - **Importação de Dados**:
   - Leitura e importação de extratos do Organizze em formato `.csv` ou `.xls`.
   - Importação de lançamentos por meio de planilhas de modelo do sistema (`.xlsx`) para contas e cartões.
@@ -71,7 +71,8 @@ Manter um sistema financeiro local, privado e simples para controlar contas, sal
 - Linhas importadas com situação diferente de `Pago` são ignoradas e reportadas.
 - Pagamento de fatura de cartão de crédito só é permitido em contas da mesma moeda do cartão e gera uma transação de despesa automática na conta escolhida.
 - Relatórios e limites consideram lançamentos de cartão pela competência da fatura (`invoice_month`), não pela data da compra.
-- Cockpit considera receitas/despesas/aportes em múltiplas moedas, e o planejamento recorrente inclui lançamentos recorrentes de cartões.
+- Cockpit considera receitas/despesas/aportes em múltiplas moedas no mês selecionado, e o planejamento recorrente inclui lançamentos recorrentes de cartões.
+- Cockpit considera faturas de cartão por competência (`invoice_month`) no mês selecionado, mantendo a fatura visível mesmo após pagamento e excluindo o pagamento agregado das despesas analíticas para evitar duplicidade.
 
 ## Regras de segurança
 
@@ -113,6 +114,7 @@ Manter um sistema financeiro local, privado e simples para controlar contas, sal
 
 ## Changelog
 
+- `1.8` — 2026-08-02 — Cockpit documentado como resumo mensal navegável por seletor de mês, preservando faturas de cartão por competência mesmo após pagamento.
 - `1.7` — 2026-07-24 — Incluída a tela Sobre no escopo implementado do menu Usuário.
 - `1.6` — 2026-07-23 — Incluído o MVP local de classificação assistida por correspondência exata normalizada.
 - `1.5` — 2026-07-09 — Histórico de Operações incluído no escopo implementado e nas regras funcionais.

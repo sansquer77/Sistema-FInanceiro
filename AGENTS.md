@@ -113,6 +113,11 @@ Veja o mapeamento completo de rotas e tabelas em [`docs/arquitetura.md`](docs/ar
 
 - **Dinheiro sempre em centavos** (inteiro) — nunca `float` para valores monetários.
 - **Datas de lançamento em ISO `YYYY-MM-DD`**.
+- **Homologação local oficial**: quando o usuário pedir para atualizar, copiar, publicar, validar ou testar a **homologação**, use exclusivamente a pasta `/Users/sansquer/Documents/Sistema Financeiro`.
+  - Não use `Sistema Financeiro - Distribuicao/`, bundles MacOS/Linux/Windows, instaladores ou pastas empacotadas como destino de homologação, salvo pedido explícito do usuário para atualizar distribuição/pacote.
+  - Antes de copiar arquivos para homologação, confirme que o destino possui a estrutura esperada (`app.py`, `web/`, `financeiro/`).
+  - Preserve dados runtime da homologação: nunca sobrescreva `data/`, bancos SQLite, arquivos `.enc`, chaves locais, logs ou configurações locais.
+  - Ao atualizar homologação, copie apenas os arquivos de código/documentação necessários para a alteração em validação e informe exatamente o que foi copiado.
 - **Versão do app centralizada** em `financeiro/app_metadata.py` e exposta por `/api/app-info`. A versão de produto parte de `1.0.50` e segue versionamento semântico:
   - `PATCH` (`3.0.5` → `3.0.6`): correção compatível, segurança, desempenho ou ajuste operacional sem nova capacidade relevante para o usuário.
   - `MINOR` (`3.0.5` → `3.1.0`): nova funcionalidade ou capacidade relevante, compatível com os fluxos e dados existentes.
