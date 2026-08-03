@@ -43,6 +43,13 @@ import {
 } from "./modules/transaction-kind.js";
 import { openMonthPicker } from "./modules/month-picker.js";
 import { createDecisionModal } from "./modules/decision-modal.js";
+import {
+  applyPrivacyMode,
+  isTypingTarget,
+  observePrivacyMoneyValues,
+  togglePrivacyMode,
+  updatePrivacyToggleButton,
+} from "./modules/privacy-utils.js";
 import { applyTheme, setTheme, storedTheme } from "./modules/theme-utils.js";
 import { registerAuthView } from "./modules/auth-view.js";
 import { registerUserAdminView } from "./modules/user-admin-view.js";
@@ -59,6 +66,7 @@ import { registerSimulationsView } from "./modules/simulations-view.js";
 import { registerOperationHistoryView } from "./modules/operation-history-view.js";
 
 applyTheme();
+applyPrivacyMode();
 
 const decisionModal = createDecisionModal();
 
@@ -360,6 +368,7 @@ const cancelTransactionEditButton = document.querySelector("#cancelTransactionEd
 const formTitle = document.querySelector("#formTitle");
 const moduleEyebrow = document.querySelector("#moduleEyebrow");
 const pageTitle = document.querySelector("#pageTitle");
+const privacyToggleButton = document.querySelector("#privacyToggleButton");
 const monthIncome = document.querySelector("#monthIncome");
 const monthExpense = document.querySelector("#monthExpense");
 const monthInvestment = document.querySelector("#monthInvestment");
@@ -923,6 +932,20 @@ const portfolioView = registerPortfolioView({
 
 navButtons.forEach((button) => button.addEventListener("click", () => showModule(button.dataset.view)));
 sidebarToggle.addEventListener("click", () => toggleSidebar());
+privacyToggleButton?.addEventListener("click", () => {
+  const mode = togglePrivacyMode();
+  updatePrivacyToggleButton(privacyToggleButton, mode);
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key.toLowerCase() !== "p" || event.metaKey || event.ctrlKey || event.altKey || isTypingTarget(event.target)) {
+    return;
+  }
+  event.preventDefault();
+  const mode = togglePrivacyMode();
+  updatePrivacyToggleButton(privacyToggleButton, mode);
+});
+updatePrivacyToggleButton(privacyToggleButton, document.documentElement.dataset.privacy);
+observePrivacyMoneyValues(document.body);
 
 updateAccountTypeState();
 initializeSidebar();

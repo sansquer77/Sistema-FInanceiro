@@ -58,6 +58,7 @@ export function registerPortfolioView({
     portfolioGroupFilter,
   } = elements;
   const portfolioEmergencyReserveFields = portfolioAssetForm.querySelector("#portfolioEmergencyReserveFields");
+  const portfolioAssetName = portfolioAssetForm.elements.asset_name;
 
   addPortfolioAssetButton.addEventListener("click", showPortfolioAssetForm);
   refreshPortfolioButton.addEventListener("click", () => loadPortfolio({ refreshMessage: true }));

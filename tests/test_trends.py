@@ -37,7 +37,7 @@ class TrendsCalculationTest(unittest.TestCase):
         self.tempdir.cleanup()
 
     def test_empty_user_returns_series_and_zero_values(self) -> None:
-        # spec: tendencias-saude-financeira v2.14 — critérios 1, 3, 5, 6, 27 e 28
+        # spec: tendencias-saude-financeira v2.16 — critérios 1, 3, 5, 6, 27 e 28
         user = create_user("T1", "t1@example.com", "strong-password")
         result = calculate_trends(user["id"], "2026-07")
 
@@ -53,7 +53,7 @@ class TrendsCalculationTest(unittest.TestCase):
         json.dumps(result, ensure_ascii=False)
 
     def test_series_includes_account_and_credit_card_by_invoice_month(self) -> None:
-        # spec: tendencias-saude-financeira v2.14 — critérios 3, 25 e 26
+        # spec: tendencias-saude-financeira v2.16 — critérios 3, 25 e 26
         user = create_user("T2", "t2@example.com", "strong-password")
         with database.get_connection() as conn:
             account_id = conn.execute(
@@ -111,7 +111,7 @@ class TrendsCalculationTest(unittest.TestCase):
         self.assertEqual(result["confianca"], "baixa")
 
     def test_foreign_currency_credit_card_uses_ptax_normalized_value(self) -> None:
-        # spec: tendencias-saude-financeira v2.14 — critérios 3, 26 e 27
+        # spec: tendencias-saude-financeira v2.16 — critérios 3, 26 e 27
         user = create_user("T2B", "t2b@example.com", "strong-password")
         card = create_credit_card(user["id"], {
             "name": "Cartão USD",
@@ -145,7 +145,7 @@ class TrendsCalculationTest(unittest.TestCase):
         self.assertEqual(july["expense_cents"], 5_500)
 
     def test_budget_vs_actual_uses_existing_limits(self) -> None:
-        # spec: tendencias-saude-financeira v2.14 — critérios 4 e 5
+        # spec: tendencias-saude-financeira v2.16 — critérios 4 e 5
         user = create_user("T3", "t3@example.com", "strong-password")
         with database.get_connection() as conn:
             account_id = conn.execute(
@@ -191,7 +191,7 @@ class TrendsCalculationTest(unittest.TestCase):
         self.assertIn("acima do limite", limit_finding[0]["titulo"].lower())
 
     def test_point_income_bonus_and_plr(self) -> None:
-        # spec: tendencias-saude-financeira v2.14 — critérios 8 e 9
+        # spec: tendencias-saude-financeira v2.16 — critérios 8 e 9
         user = create_user("T4", "t4@example.com", "strong-password")
         with database.get_connection() as conn:
             account_id = conn.execute(
@@ -241,7 +241,7 @@ class TrendsCalculationTest(unittest.TestCase):
         self.assertTrue(any("pontual" in f["descricao"].lower() for f in point_findings))
 
     def test_point_expense_travel_and_emergency(self) -> None:
-        # spec: tendencias-saude-financeira v2.14 — critério 13
+        # spec: tendencias-saude-financeira v2.16 — critério 13
         user = create_user("T5", "t5@example.com", "strong-password")
         with database.get_connection() as conn:
             account_id = conn.execute(
@@ -290,7 +290,7 @@ class TrendsCalculationTest(unittest.TestCase):
         self.assertTrue(any(e["tipo"] == "manutencao_emergencia" for e in events))
 
     def test_point_event_findings_are_grouped_by_subcategory(self) -> None:
-        # spec: tendencias-saude-financeira v2.14 — critérios 7, 10 e 13
+        # spec: tendencias-saude-financeira v2.16 — critérios 7, 10 e 13
         user = create_user("T5B", "t5b@example.com", "strong-password")
         with database.get_connection() as conn:
             account_id = conn.execute(
@@ -333,7 +333,7 @@ class TrendsCalculationTest(unittest.TestCase):
         self.assertIn("2 lançamento(s)", findings[0]["descricao"])
 
     def test_installment_acceleration_is_detected_from_operation_log(self) -> None:
-        # spec: tendencias-saude-financeira v2.14 — critério 13
+        # spec: tendencias-saude-financeira v2.16 — critério 13
         user = create_user("T6", "t6@example.com", "strong-password")
         with database.get_connection() as conn:
             account_id = conn.execute(
@@ -363,14 +363,26 @@ class TrendsCalculationTest(unittest.TestCase):
             "type": "expense",
             "description": "Notebook Dell",
             "amount": "300,00",
-                "date": "2026-06-05",
-                "invoice_month": "2026-06",
+            "date": "2026-06-05",
+            "invoice_month": "2026-08",
             "category": "Compras Online",
             "series_kind": "installment",
             "installment_count": 3,
         })
 
-        moved = move_credit_card_transaction_invoice(user["id"], str(transaction["id"]), "next")
+        with database.get_connection() as conn:
+            future_installment_id = conn.execute(
+                """
+                SELECT id
+                FROM credit_card_transactions
+                WHERE user_id = ? AND credit_card_id = ? AND invoice_month = '2026-08'
+                ORDER BY id
+                LIMIT 1
+                """,
+                (user["id"], card_id),
+            ).fetchone()["id"]
+
+        moved = move_credit_card_transaction_invoice(user["id"], str(future_installment_id), "previous")
         self.assertEqual(moved["invoice_month"], "2026-07")
 
         result = calculate_trends(user["id"], "2026-07")
@@ -386,8 +398,88 @@ class TrendsCalculationTest(unittest.TestCase):
         self.assertIn("parcelas antecipadas", result["resumo_local"].lower())
         self.assertIn("Notebook Dell", result["resumo_local"])
 
+    def test_installment_postponement_is_not_detected_as_acceleration(self) -> None:
+        # spec: tendencias-saude-financeira v2.16 — critério 13
+        user = create_user("T6B", "t6b@example.com", "strong-password")
+        with database.get_connection() as conn:
+            category_id = conn.execute(
+                "INSERT INTO categories (user_id, name, group_type) VALUES (?, 'Compras Online', 'expense')",
+                (user["id"],),
+            ).lastrowid
+            card_id = conn.execute(
+                """
+                INSERT INTO credit_cards (
+                    user_id, name, issuer, currency, limit_cents, closing_day, due_day
+                ) VALUES (?, 'Cartão', 'Banco', 'BRL', 500000, 10, 20)
+                """,
+                (user["id"],),
+            ).lastrowid
+
+        transaction = create_credit_card_transaction(user["id"], {
+            "credit_card_id": str(card_id),
+            "type": "expense",
+            "description": "Compra postergada",
+            "amount": "120,00",
+            "date": "2026-07-05",
+            "invoice_month": "2026-07",
+            "category": "Compras Online",
+            "series_kind": "installment",
+            "installment_count": 2,
+        })
+
+        moved = move_credit_card_transaction_invoice(user["id"], str(transaction["id"]), "next")
+        self.assertEqual(moved["invoice_month"], "2026-08")
+
+        result = calculate_trends(user["id"], "2026-08")
+        self.assertEqual(result["antecipacao_parcelas"], [])
+        self.assertFalse([finding for finding in result["achados"] if finding["tipo"] == "antecipacao_parcela"])
+
+    def test_future_installments_concentrated_in_invoice_are_detected_as_acceleration(self) -> None:
+        # spec: tendencias-saude-financeira v2.16 — critério 13
+        user = create_user("T6C", "t6c@example.com", "strong-password")
+        with database.get_connection() as conn:
+            card_id = conn.execute(
+                """
+                INSERT INTO credit_cards (
+                    user_id, name, issuer, currency, limit_cents, closing_day, due_day
+                ) VALUES (?, 'Cartão', 'Banco', 'BRL', 500000, 10, 20)
+                """,
+                (user["id"],),
+            ).lastrowid
+
+        create_credit_card_transaction(user["id"], {
+            "credit_card_id": str(card_id),
+            "type": "expense",
+            "description": "BYD Original",
+            "amount": "300,00",
+            "date": "2026-07-05",
+            "invoice_month": "2026-07",
+            "category": "Transporte",
+            "series_kind": "installment",
+            "installment_count": 3,
+        })
+
+        with database.get_connection() as conn:
+            conn.execute(
+                """
+                UPDATE credit_card_transactions
+                SET invoice_month = '2026-07'
+                WHERE user_id = ? AND credit_card_id = ? AND date > '2026-07-31'
+                """,
+                (user["id"], card_id),
+            )
+
+        result = calculate_trends(user["id"], "2026-07")
+        self.assertEqual(len(result["antecipacao_parcelas"]), 2)
+        self.assertEqual(sum(item["valor_cents"] for item in result["antecipacao_parcelas"]), 20000)
+        self.assertTrue(all(item["origem"] == "concentracao_parcelas" for item in result["antecipacao_parcelas"]))
+        acceleration_findings = [finding for finding in result["achados"] if finding["tipo"] == "antecipacao_parcela"]
+        self.assertTrue(acceleration_findings)
+        self.assertIn("BYD Original", acceleration_findings[0]["descricao"])
+        self.assertIn("parcelas antecipadas", result["resumo_local"].lower())
+
     def test_confidence_intermediate_with_three_months(self) -> None:
-        # spec: tendencias-saude-financeira v2.14 — critérios 6 e 22
+        # spec: tendencias-saude-financeira v2.16 — critérios 6 e 22
         user = create_user("T7", "t7@example.com", "strong-password")
         with database.get_connection() as conn:
             account_id = conn.execute(
@@ -427,7 +519,7 @@ class TrendsCalculationTest(unittest.TestCase):
         self.assertEqual(expense_finding[0]["valor_cents"], 200_000)
 
     def test_confidence_high_with_six_months(self) -> None:
-        # spec: tendencias-saude-financeira v2.14 — critérios 6, 22, 96
+        # spec: tendencias-saude-financeira v2.16 — critérios 6, 22, 96
         user = create_user("T8", "t8@example.com", "strong-password")
         with database.get_connection() as conn:
             account_id = conn.execute(
@@ -456,7 +548,7 @@ class TrendsCalculationTest(unittest.TestCase):
         self.assertEqual(result["receitas_base_comparacao_cents"], 1_000_000)
 
     def test_recurring_subscriptions_aggregated_by_subcategory(self) -> None:
-        # spec: tendencias-saude-financeira v2.14 — critério 29
+        # spec: tendencias-saude-financeira v2.16 — critério 29
         user = create_user("T10", "t10@example.com", "strong-password")
         with database.get_connection() as conn:
             account_id = conn.execute(
@@ -521,7 +613,7 @@ class TrendsCalculationTest(unittest.TestCase):
         self.assertIn("R$ 1.800,00", result["resumo_local"])
 
     def test_multi_currency_warning(self) -> None:
-        # spec: tendencias-saude-financeira v2.14 — critério 27
+        # spec: tendencias-saude-financeira v2.16 — critério 27
         user = create_user("T9", "t9@example.com", "strong-password")
         with database.get_connection() as conn:
             conn.executemany(
@@ -582,7 +674,7 @@ class TrendsRouteTest(unittest.TestCase):
         return stack
 
     def test_financial_health_trends_requires_session_user(self) -> None:
-        # spec: tendencias-saude-financeira v2.14 — critério 28
+        # spec: tendencias-saude-financeira v2.16 — critério 28
         handler = self._handler("/api/financial-health-trends?month=2026-07")
         with self._context():
             with self.assertRaises(app.ApiError) as error:
@@ -590,7 +682,7 @@ class TrendsRouteTest(unittest.TestCase):
         self.assertEqual(error.exception.status, HTTPStatus.UNAUTHORIZED)
 
     def test_financial_health_trends_returns_payload(self) -> None:
-        # spec: tendencias-saude-financeira v2.14 — critérios 1 e 3
+        # spec: tendencias-saude-financeira v2.16 — critérios 1 e 3
         user = create_user("RouteUser", "route@example.com", "strong-password")
         handler = self._handler("/api/financial-health-trends?month=2026-07", user=user)
         with self._context(user):
@@ -603,7 +695,7 @@ class TrendsRouteTest(unittest.TestCase):
         self.assertFalse(payload["ia_ativa"])
 
     def test_financial_health_trends_marks_ai_active_when_configured(self) -> None:
-        # spec: tendencias-saude-financeira v2.14 — critérios 12, 17 e 20
+        # spec: tendencias-saude-financeira v2.16 — critérios 12, 17 e 20
         user = create_user("RouteUserAI", "route-ai@example.com", "strong-password")
         from financeiro.secure_config import save_ai_settings
         save_ai_settings(user["id"], {
@@ -622,7 +714,7 @@ class TrendsRouteTest(unittest.TestCase):
         self.assertTrue(payload["ia_ativa"])
 
     def test_ai_settings_requires_session_user(self) -> None:
-        # spec: tendencias-saude-financeira v2.14 — critério 28
+        # spec: tendencias-saude-financeira v2.16 — critério 28
         handler = self._handler("/api/ai-settings")
         with self._context():
             with self.assertRaises(app.ApiError) as error:
@@ -630,7 +722,7 @@ class TrendsRouteTest(unittest.TestCase):
         self.assertEqual(error.exception.status, HTTPStatus.UNAUTHORIZED)
 
     def test_ai_settings_save_and_return_status(self) -> None:
-        # spec: tendencias-saude-financeira v2.14 — critérios 17, 18, 19, 27 e 28
+        # spec: tendencias-saude-financeira v2.16 — critérios 17, 18, 19, 27 e 28
         user = create_user("RouteUser2", "route2@example.com", "strong-password")
         handler = self._handler(
             "/api/ai-settings",
@@ -664,7 +756,7 @@ class TrendsRouteTest(unittest.TestCase):
         self.assertFalse(status2["has_api_key"])
 
     def test_ai_settings_put_route_saves_with_valid_origin(self) -> None:
-        # spec: tendencias-saude-financeira v2.14 — critérios 17, 27 e 28
+        # spec: tendencias-saude-financeira v2.16 — critérios 17, 27 e 28
         user = create_user("RouteUserPut", "route-put@example.com", "strong-password")
         handler = self._handler(
             "/api/ai-settings",
@@ -687,7 +779,7 @@ class TrendsRouteTest(unittest.TestCase):
         self.assertEqual(status["provider"], "local")
 
     def test_ai_summary_requires_session_user(self) -> None:
-        # spec: tendencias-saude-financeira v2.14 — critério 28
+        # spec: tendencias-saude-financeira v2.16 — critério 28
         handler = self._handler("/api/financial-health-trends/ai-summary", body={"month": "2026-07"})
         with self._context():
             with self.assertRaises(app.ApiError) as error:
@@ -695,7 +787,7 @@ class TrendsRouteTest(unittest.TestCase):
         self.assertEqual(error.exception.status, HTTPStatus.UNAUTHORIZED)
 
     def test_ai_summary_returns_fallback_when_ia_disabled(self) -> None:
-        # spec: tendencias-saude-financeira v2.14 — critérios 12 e 17
+        # spec: tendencias-saude-financeira v2.16 — critérios 12 e 17
         user = create_user("RouteUser3", "route3@example.com", "strong-password")
         handler = self._handler("/api/financial-health-trends/ai-summary", user=user, body={"month": "2026-07"})
         with self._context(user):
@@ -706,7 +798,7 @@ class TrendsRouteTest(unittest.TestCase):
         self.assertTrue(payload["resumo_local"])
 
     def test_ai_summary_uses_external_service_when_enabled(self) -> None:
-        # spec: tendencias-saude-financeira v2.14 — critérios 12, 14 e 16
+        # spec: tendencias-saude-financeira v2.16 — critérios 12, 14 e 16
         user = create_user("RouteUser4", "route4@example.com", "strong-password")
         from financeiro.secure_config import save_ai_settings
         save_ai_settings(user["id"], {
@@ -735,7 +827,7 @@ class TrendsRouteTest(unittest.TestCase):
         self.assertIn("/chat/completions", call.args[0].full_url)
 
     def test_ai_summary_minimizes_payload_and_does_not_send_secret(self) -> None:
-        # spec: tendencias-saude-financeira v2.14 — critérios 14, 16, 21, 23 e 28
+        # spec: tendencias-saude-financeira v2.16 — critérios 14, 16, 21, 23 e 28
         user = create_user("RouteUser5", "route5@example.com", "strong-password")
         from financeiro.secure_config import save_ai_settings
         save_ai_settings(user["id"], {
@@ -787,7 +879,7 @@ class TrendsRouteTest(unittest.TestCase):
         self.assertNotIn("orcamento_realizado", serialized_body)
 
     def test_ai_summary_uses_gemini_generate_content_contract(self) -> None:
-        # spec: tendencias-saude-financeira v2.14 — critérios 12, 24 e 32
+        # spec: tendencias-saude-financeira v2.16 — critérios 12, 24 e 32
         user = create_user("GeminiUser", "gemini@example.com", "strong-password")
         from financeiro.secure_config import save_ai_settings
         save_ai_settings(user["id"], {
@@ -822,7 +914,7 @@ class TrendsRouteTest(unittest.TestCase):
         self.assertNotIn("gemini-secret", json.dumps(body, ensure_ascii=False))
 
     def test_ai_summary_accepts_gemini_model_with_models_prefix(self) -> None:
-        # spec: tendencias-saude-financeira v2.14 — critérios 12, 24 e 32
+        # spec: tendencias-saude-financeira v2.16 — critérios 12, 24 e 32
         user = create_user("GeminiPrefixedUser", "gemini-prefixed@example.com", "strong-password")
         from financeiro.secure_config import save_ai_settings
         save_ai_settings(user["id"], {
@@ -848,7 +940,7 @@ class TrendsRouteTest(unittest.TestCase):
         )
 
     def test_ai_summary_uses_anthropic_messages_contract(self) -> None:
-        # spec: tendencias-saude-financeira v2.14 — critérios 12, 24 e 32
+        # spec: tendencias-saude-financeira v2.16 — critérios 12, 24 e 32
         user = create_user("ClaudeUser", "claude@example.com", "strong-password")
         from financeiro.secure_config import save_ai_settings
         save_ai_settings(user["id"], {
@@ -882,7 +974,7 @@ class TrendsRouteTest(unittest.TestCase):
         self.assertNotIn("anthropic-secret", json.dumps(body, ensure_ascii=False))
 
     def test_ai_summary_returns_none_on_provider_failure(self) -> None:
-        # spec: tendencias-saude-financeira v2.14 — critérios 16 e 26
+        # spec: tendencias-saude-financeira v2.16 — critérios 16 e 26
         user = create_user("RouteUser6", "route6@example.com", "strong-password")
         from financeiro.secure_config import save_ai_settings
         save_ai_settings(user["id"], {
@@ -897,7 +989,7 @@ class TrendsRouteTest(unittest.TestCase):
         self.assertIsNone(summary)
 
     def test_minimized_ai_payload_limits_findings_and_events(self) -> None:
-        # spec: tendencias-saude-financeira v2.14 — critérios 14, 21 e 23
+        # spec: tendencias-saude-financeira v2.16 — critérios 14, 21 e 23
         payload = {
             "month": "2026-07",
             "confianca": "intermediaria",

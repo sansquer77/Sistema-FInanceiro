@@ -19,9 +19,14 @@
         }
         document.documentElement.dataset.theme = theme;
         document.documentElement.style.colorScheme = theme;
+        try {
+          document.documentElement.dataset.privacy = localStorage.getItem("sistemaFinanceiro.privacyMode") === "true" ? "true" : "false";
+        } catch (error) {
+          document.documentElement.dataset.privacy = "false";
+        }
       })();
     </script>
-    <link rel="stylesheet" href="/styles.css?v=125">
+    <link rel="stylesheet" href="/styles.css?v=126">
   </head>
   <body>
     <main class="app-shell">
@@ -187,6 +192,7 @@
               <p class="eyebrow" id="moduleEyebrow">Cockpit</p>
               <h1 id="pageTitle">Resumo financeiro</h1>
             </div>
+            <button class="privacy-toggle-button" id="privacyToggleButton" type="button" aria-label="Ocultar valores" aria-pressed="false" title="Ocultar valores (P)">👁️</button>
           </header>
 
         <section class="module-view" id="cockpitView">
@@ -1770,6 +1776,6 @@
         </div>
       </aside>
     </main>
-    <script type="module" src="/app.js?v=125"></script>
+    <script type="module" src="/app.js?v=126"></script>
   </body>
 </html>

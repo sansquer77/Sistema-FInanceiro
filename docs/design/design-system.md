@@ -2,7 +2,7 @@
 tipo: design
 area: meta
 status: implementado
-versao: 2.5
+versao: 2.6
 atualizado: 2026-08-02
 relacionados:
   - "[[arquitetura]]"
@@ -272,6 +272,14 @@ Grade de linha de base: **4px** (todos os valores são múltiplos de 4px).
 - Ativo / Operacional → verde `#10B981`.
 - Inativo / Em atraso / Alerta → vermelho `#EF4444`.
 
+### Modo Privacidade
+
+- O botão global de privacidade deve ficar no cabeçalho superior como ação circular discreta, com estado e rótulo acessível.
+- Valores monetários mascaráveis usam `.money-value` ou `.privacy-mask`.
+- Em `:root[data-privacy="true"]`, valores monetários usam desfoque suave (`filter: blur(7px)`), transição curta (`0.2s`) e `user-select: none`.
+- No hover/foco do valor individual, o desfoque pode reduzir para `blur(0)` para permitir consulta rápida sem desligar o modo global.
+- O blur não deve alterar largura, alinhamento ou densidade dos cards/tabelas; a estrutura visual deve permanecer estável.
+
 ### Formulários de lançamento
 
 - Nas telas de Lançamentos de contas e Lançamentos de cartões, o formulário principal deve permanecer visível no desktop/tablet durante a rolagem da lista, usando comportamento sticky dentro da coluna esquerda.
@@ -300,6 +308,7 @@ Grade de linha de base: **4px** (todos os valores são múltiplos de 4px).
 
 ## Changelog
 
+- `2.6` — 2026-08-02 — Documentado padrão do Modo Privacidade com botão global, valores `.money-value`/`.privacy-mask`, Glass Blur e revelação em hover/foco.
 - `2.5` — 2026-08-02 — Documentado padrão de redução de ruído visual em formulários densos com helper sob demanda, microcopy dinâmica, segmented controls, presets e previews compactos.
 - `2.4` — 2026-08-02 — Documentado padrão premium para diagnóstico visual com gauge, zonas semânticas e cards expansíveis acessíveis.
 - `2.3` — 2026-08-02 — Documentado padrão de movimento para transições de visão com View Transitions API, fallback e respeito a redução de movimento.

@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 3.2
+versao: 3.3
 atualizado: 2026-08-02
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -50,6 +50,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[specs/sobre-app]] | ✅ implementado | Usuário |
 | [[specs/frontend-modularizacao]] | ✅ implementado | Frontend |
 | [[specs/tendencias-saude-financeira]] | ✅ implementado | Diagnóstico |
+| [[specs/privacidade-valores]] | ✅ implementado | Privacidade |
 | [[distribuição]] | ✅ implementado | Distribuição |
 
 ---
@@ -60,6 +61,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 
 | Spec | Status | Área |
 |---|---|---|
+| [[specs/landing-page]] | 📝 rascunho | Institucional |
 | [[specs/score-saude-financeira]] | 🚧 em-implementacao | Diagnóstico |
 | [[specs/imposto-renda]] | ❌ depreciado — custo de manter regras fiscais atualizadas não compensa para uso familiar | Investimentos |
 | [[specs/exportacao-dados]] | ❌ depreciado — arquivo SQLite já acessível por leitor genérico ou agente de IA | Exportação |
@@ -111,6 +113,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 
 ## Changelog
 
+- `3.3` — 2026-08-02 — Adicionada [[specs/privacidade-valores]] como spec implementada do Modo Privacidade.
 - `3.2` — 2026-08-02 — [[specs/tendencias-saude-financeira]] marcada como implementada após conclusão da reescrita opcional por IA, fallback local e testes automatizados.
 - `3.1` — 2026-08-02 — [[specs/tendencias-saude-financeira]] avançou para `em-implementacao` com passo 3 concluído: núcleo local de tendências.
 - `3.0` — 2026-07-31 — Adicionada [[specs/tendencias-saude-financeira]] em status `rascunho` para discutir tendências, achados e uso opcional de IA na Saúde Financeira.

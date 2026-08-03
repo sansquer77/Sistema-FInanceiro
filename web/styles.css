@@ -691,6 +691,42 @@ textarea:focus {
   line-height: 1.1;
 }
 
+.privacy-toggle-button {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 1rem;
+  cursor: pointer;
+  box-shadow: var(--control-shadow-sm);
+}
+
+.privacy-toggle-button:hover,
+.privacy-toggle-button:focus-visible,
+.privacy-toggle-button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--soft);
+}
+
+:root[data-privacy="true"] .money-value,
+:root[data-privacy="true"] .privacy-mask {
+  filter: blur(7px);
+  user-select: none;
+  transition: filter 0.2s ease;
+}
+
+:root[data-privacy="true"] .money-value:hover,
+:root[data-privacy="true"] .money-value:focus,
+:root[data-privacy="true"] .privacy-mask:hover,
+:root[data-privacy="true"] .privacy-mask:focus {
+  filter: blur(0);
+}
+
 .user-area {
   display: flex;
   gap: 12px;

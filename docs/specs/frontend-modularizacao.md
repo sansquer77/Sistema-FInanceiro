@@ -2,7 +2,7 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 2.1
+versao: 2.2
 atualizado: 2026-08-02
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
@@ -44,6 +44,7 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `month-picker.js` | Popover reutilizável de seleção de mês. |
 | `decision-modal.js` | Modal reutilizável para decisões, confirmações explícitas e pequenos formulários. |
 | `theme-utils.js` | Preferência visual local e aplicação de tema no `documentElement`. |
+| `privacy-utils.js` | Preferência visual local de privacidade, aplicação de `data-privacy` e marcação visual de valores monetários. |
 
 ## Views funcionais
 
@@ -85,6 +86,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Novos módulos recebem dependências explicitamente via contrato de fábrica.
 - Cores de UI e gráficos devem vir de tokens CSS compartilhados; literais ficam restritos a marcas/logos externos.
 - Tema visual é uma preferência local: `theme-utils.js` aplica `data-theme` no elemento raiz e persiste em `localStorage`.
+- Modo privacidade é uma preferência local: `privacy-utils.js` aplica `data-privacy` no elemento raiz, persiste em `localStorage` e não altera dados, cálculos ou chamadas de API.
 - O modo escuro deve ser evoluído por tokens em CSS, mantendo views sem ramificações por tema.
 - `user-admin-view.js` apenas orquestra o controle de Preferências; persistência e aplicação do tema permanecem em `theme-utils.js`.
 - Fluxos com decisão financeira, destrutiva ou de cascata devem usar `decision-modal.js`, evitando `window.confirm()` e `window.prompt()` para escolhas de domínio.
@@ -113,6 +115,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Dado o usuário visualizando o menu lateral, quando compara os grupos Cadastro e Lançamentos, então os itens não repetem apenas `Contas` e `Cartões`; eles aparecem como **Minhas Contas**, **Meus Cartões**, **Extrato de Contas** e **Fatura de Cartões**.
 - Dado o usuário acessando um desses itens, quando a tela abre, então o título da página usa o mesmo nome desambiguado do menu.
 - Dado um navegador com suporte a View Transitions API, quando o usuário alterna módulos pelo menu lateral, então a troca visual acontece com transição curta e sem bloquear os carregamentos da tela.
+- Dado o usuário autenticado, quando alterna o modo privacidade, então `privacy-utils.js` aplica `data-privacy` no documento sem alterar endpoints, banco ou regras financeiras.
 - Dado um navegador sem suporte à API ou com redução de movimento ativa, quando o usuário alterna módulos, então a navegação continua funcionando de forma instantânea.
 
 ## Fora de escopo
@@ -123,6 +126,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Changelog
 
+- `2.2` — 2026-08-02 — Registrado `privacy-utils.js` como utilitário local para Modo Privacidade via `data-privacy`, sem backend ou build step.
 - `2.1` — 2026-08-02 — Troca de módulos do dashboard passa a usar View Transitions API como melhoria progressiva, com fallback e respeito a redução de movimento.
 - `2.0` — 2026-08-02 — Navegação lateral passa a documentar rótulos desambiguados para Cadastro e Lançamentos, com títulos de página alinhados.
 - `1.0` — 2026-06-29 — Frontmatter e critérios formalizados; referência cruzada com ADR.
