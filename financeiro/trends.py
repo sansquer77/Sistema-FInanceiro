@@ -10,7 +10,7 @@ from financeiro.transactions import days_in_month
 
 MONTH_PATTERN = re.compile(r"^\d{4}-\d{2}$")
 
-# spec: tendencias-saude-financeira v2.13 — critérios 8, 9 e 13
+# spec: tendencias-saude-financeira v2.14 — critérios 8, 9 e 13
 POINT_INCOME_CATEGORIES = {
     "Freelance e Autônomo",
     "Outras Receitas",
@@ -38,10 +38,10 @@ POINT_EXPENSE_SUBCATEGORIES = {
     "Manutenção, Reparos e Reformas",
 }
 
-# spec: tendencias-saude-financeira v2.13 — critério 29
+# spec: tendencias-saude-financeira v2.14 — critério 29
 SUBSCRIPTIONS_CATEGORY = "Assinaturas e Serviços"
 
-# spec: tendencias-saude-financeira v2.13 — critério 8 (reforço por palavras-chave)
+# spec: tendencias-saude-financeira v2.14 — critério 8 (reforço por palavras-chave)
 POINT_EVENT_KEYWORDS = [
     "plr",
     "bonus",
@@ -63,7 +63,7 @@ class TrendsError(Exception):
 
 def calculate_trends(user_id: int, month: object | None = None, currency: str = "BRL") -> dict:
     """
-    spec: tendencias-saude-financeira v2.13 — critérios 1, 3, 4, 5, 6, 7, 8, 9, 13,
+    spec: tendencias-saude-financeira v2.14 — critérios 1, 3, 4, 5, 6, 7, 8, 9, 13,
           22, 25, 26, 27, 28 e 29
     Núcleo local de cálculo de tendências: série mensal, Budget x Realizado,
     achados estruturados, eventos pontuais, assinaturas/serviços recorrentes e confiança.
@@ -150,7 +150,7 @@ def normalize_month(month: object | None) -> str:
 
 def build_monthly_series(conn, user_id: int, month: str) -> dict[str, dict[str, int]]:
     """
-    spec: tendencias-saude-financeira v2.13 — critério 3
+    spec: tendencias-saude-financeira v2.14 — critério 3
     Constrói série mensal de receitas e despesas analíticas.
     Conta-corrente usa o mês da data; cartão usa invoice_month.
     Pagamentos de fatura são excluídos das despesas analíticas.
@@ -180,7 +180,7 @@ def build_monthly_series(conn, user_id: int, month: str) -> dict[str, dict[str, 
         (user_id, *months_window),
     ).fetchall()
 
-    # spec: tendencias-saude-financeira v2.13 — critério 26
+    # spec: tendencias-saude-financeira v2.14 — critério 26
     # (lançamentos de cartão entram pela competência da fatura)
     card_rows = conn.execute(
         """
@@ -217,7 +217,7 @@ def build_comparison_base(
     confidence: str,
 ) -> dict[str, int]:
     """
-    spec: tendencias-saude-financeira v2.13 — critérios 6, 22 e 95/96
+    spec: tendencias-saude-financeira v2.14 — critérios 6, 22 e 95/96
     Comparação base: média móvel de 3 meses quando histórico suficiente;
     média disponível quando intermediário; mês anterior (ou zero) quando curto.
     """
@@ -249,7 +249,7 @@ def build_comparison_base(
 
 def build_budget_vs_actual(conn, user_id: int, month: str) -> list[dict]:
     """
-    spec: tendencias-saude-financeira v2.13 — critérios 4 e 5
+    spec: tendencias-saude-financeira v2.14 — critérios 4 e 5
     Reaproveita limites vigentes do mês e calcula consumo real por
     categoria/subcategoria.
     """
@@ -404,7 +404,7 @@ def budget_state(used_pct: float) -> str:
 
 def detect_point_events(conn, user_id: int, month: str) -> list[dict]:
     """
-    spec: tendencias-saude-financeira v2.13 — critérios 8, 9 e 13
+    spec: tendencias-saude-financeira v2.14 — critérios 8, 9 e 13
     Identifica receitas e despesas candidatas a eventos pontuais usando
     categorias/subcategorias existentes como sinal principal e palavras-chave
     de descrição/tags como reforço.
@@ -616,7 +616,7 @@ def keyword_match(description: str, tags: str) -> bool:
 
 def detect_installment_acceleration(conn, user_id: int, month: str) -> list[dict]:
     """
-    spec: tendencias-saude-financeira v2.13 — critério 13
+    spec: tendencias-saude-financeira v2.14 — critério 13
     Detecta antecipações de parcelas registradas no histórico operacional
     como "Lancamento movido para fatura yyyy-mm".
     """
@@ -626,8 +626,13 @@ def detect_installment_acceleration(conn, user_id: int, month: str) -> list[dict
             operation_logs.id,
             operation_logs.description,
             operation_logs.metadata_json,
-            operation_logs.created_at
+            operation_logs.created_at,
+            credit_card_transactions.description AS transaction_description,
+            credit_card_transactions.amount_cents AS transaction_amount_cents
         FROM operation_logs
+        LEFT JOIN credit_card_transactions
+            ON credit_card_transactions.id = CAST(operation_logs.entity_id AS INTEGER)
+            AND credit_card_transactions.user_id = operation_logs.user_id
         WHERE operation_logs.user_id = ?
             AND operation_logs.module = 'cards'
             AND operation_logs.operation_type = 'move'
@@ -641,11 +646,13 @@ def detect_installment_acceleration(conn, user_id: int, month: str) -> list[dict
     accelerations = []
     for row in rows:
         metadata = safe_parse_metadata(row["metadata_json"])
-        amount = int(metadata.get("amount_cents") or 0)
+        amount = int(metadata.get("amount_cents") or row["transaction_amount_cents"] or 0)
+        purchase = str(metadata.get("transaction_description") or row["transaction_description"] or "").strip()
         accelerations.append({
             "tipo": "antecipacao_parcela",
             "severidade": "info",
             "descricao": str(row["description"] or "").strip(),
+            "compra": purchase,
             "valor_cents": amount,
             "created_at": str(row["created_at"] or "").strip(),
         })
@@ -664,7 +671,7 @@ def safe_parse_metadata(value: object) -> dict:
 
 def detect_recurring_subscriptions(conn, user_id: int, month: str) -> list[dict]:
     """
-    spec: tendencias-saude-financeira v2.13 — critério 29
+    spec: tendencias-saude-financeira v2.14 — critério 29
     Agrega despesas recorrentes mensais da categoria 'Assinaturas e Serviços'
     por subcategoria (conta-corrente e cartão), sinalizando o peso relativo
     no orçamento sem recomendar cancelamento.
@@ -759,7 +766,7 @@ def build_findings(
     confidence: str,
 ) -> list[dict]:
     """
-    spec: tendencias-saude-financeira v2.13 — critérios 6, 7, 22 e 29
+    spec: tendencias-saude-financeira v2.14 — critérios 6, 7, 13, 22 e 29
     Lista achados estruturados: variação de receita/despesa, limites excedidos,
     eventos pontuais e assinaturas/serviços recorrentes.
     """
@@ -881,19 +888,25 @@ def build_findings(
 
     grouped_acceleration = group_installment_accelerations(acceleration)
     for item in grouped_acceleration:
+        examples_text = ""
+        if item["examples"]:
+            examples_text = f" Compras antecipadas: {format_examples(item['examples'], item['count'])}."
         findings.append({
             "tipo": "antecipacao_parcela",
             "severidade": "info",
             "titulo": "Antecipação de parcelas",
             "descricao": (
-                f"{item['count']} lançamento(s) movidos para esta fatura. "
+                f"{item['count']} lançamento(s) movidos para esta fatura, totalizando {format_cents(item['valor_cents'])}. "
                 "O aumento de despesa deste mês pode estar ligado a antecipação e pode reduzir faturas futuras."
+                f"{examples_text}"
             ),
             "valor_cents": item["valor_cents"],
             "referencia": "historico_operacional",
+            "compras": item["examples"],
+            "quantidade": item["count"],
         })
 
-    # spec: tendencias-saude-financeira v2.13 — critério 29
+    # spec: tendencias-saude-financeira v2.14 — critério 29
     for item in subscriptions:
         label = item["subcategory_name"] or "Assinaturas e Serviços"
         findings.append({
@@ -936,10 +949,25 @@ def group_point_events(point_events: list[dict]) -> list[dict]:
 def group_installment_accelerations(acceleration: list[dict]) -> list[dict]:
     if not acceleration:
         return []
+    examples = []
+    for item in acceleration:
+        purchase = str(item.get("compra") or "").strip()
+        if purchase and purchase not in examples:
+            examples.append(purchase)
     return [{
         "valor_cents": sum(int(item.get("valor_cents") or 0) for item in acceleration),
         "count": len(acceleration),
+        "examples": examples[:5],
     }]
+
+
+def format_examples(examples: list[str], total_count: int) -> str:
+    visible = [str(example).strip() for example in examples[:5] if str(example).strip()]
+    if not visible:
+        return ""
+    remaining = max(0, total_count - len(visible))
+    suffix = f" e mais {remaining} compra(s)" if remaining else ""
+    return f"{', '.join(visible)}{suffix}"
 
 
 def build_local_summary(
@@ -995,6 +1023,19 @@ def build_local_summary(
             f"Assinaturas e serviços recorrentes somam {format_cents(total)} neste mês: {labels}."
         )
 
+    if acceleration:
+        total = sum(int(item.get("valor_cents") or 0) for item in acceleration)
+        purchases = []
+        for item in acceleration:
+            purchase = str(item.get("compra") or "").strip()
+            if purchase and purchase not in purchases:
+                purchases.append(purchase)
+        purchases_text = f" Compras antecipadas: {format_examples(purchases, len(acceleration))}." if purchases else ""
+        parts.append(
+            f"Há {format_cents(total)} em parcelas antecipadas neste mês, o que pode concentrar despesas agora "
+            f"e aliviar faturas futuras.{purchases_text}"
+        )
+
     parts.append("Estas observações são explicativas e não recomendações personalizadas.")
     if multi_currency:
         parts.append(multi_currency)
@@ -1003,7 +1044,7 @@ def build_local_summary(
 
 def determine_confidence(previous_months: list[str]) -> str:
     """
-    spec: tendencias-saude-financeira v2.13 — critérios 94, 95 e 96
+    spec: tendencias-saude-financeira v2.14 — critérios 94, 95 e 96
     """
     count = len(previous_months)
     if count < 3:
@@ -1015,7 +1056,7 @@ def determine_confidence(previous_months: list[str]) -> str:
 
 def detect_multiple_currencies(conn, user_id: int, month: str) -> str | None:
     """
-    spec: tendencias-saude-financeira v2.13 — critério 27
+    spec: tendencias-saude-financeira v2.14 — critério 27
     Detecta se há dados em mais de uma moeda e indica a base usada.
     """
     account_currencies = {

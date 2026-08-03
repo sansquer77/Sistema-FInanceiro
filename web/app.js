@@ -243,8 +243,10 @@ const portfolioFixedFields = document.querySelector("#portfolioFixedFields");
 const portfolioPricingFields = document.querySelector("#portfolioPricingFields");
 const portfolioFixedIncomeSubtype = document.querySelector("#portfolioFixedIncomeSubtype");
 const portfolioFixedIncomeMode = document.querySelector("#portfolioFixedIncomeMode");
+const portfolioFixedIncomeIndexer = document.querySelector("select[name='fixed_income_indexer']");
 const portfolioFixedIncomeRateLabel = document.querySelector("#portfolioFixedIncomeRateLabel");
-const portfolioFixedIncomeRateHint = document.querySelector("#portfolioFixedIncomeRateHint");
+const portfolioFixedIncomeRate = document.querySelector("#portfolioFixedIncomeRate");
+const portfolioFixedIncomePreview = document.querySelector("#portfolioFixedIncomePreview");
 const cancelPortfolioAssetButton = document.querySelector("#cancelPortfolioAssetButton");
 const deletePortfolioAssetButton = document.querySelector("#deletePortfolioAssetButton");
 const portfolioCostSummary = document.querySelector("#portfolioCostSummary");
@@ -334,8 +336,10 @@ const investmentEmergencyReserveFields = document.querySelector("#investmentEmer
 const investmentTradingCostFields = document.querySelector("#investmentTradingCostFields");
 const investmentTaxCostFields = document.querySelector("#investmentTaxCostFields");
 const investmentFixedIncomeMode = document.querySelector("#investmentFixedIncomeMode");
+const investmentFixedIncomeIndexer = document.querySelector("#investmentFixedIncomeIndexer");
 const investmentFixedIncomeRateLabel = document.querySelector("#investmentFixedIncomeRateLabel");
-const investmentFixedIncomeRateHint = document.querySelector("#investmentFixedIncomeRateHint");
+const investmentFixedIncomeRate = document.querySelector("#investmentFixedIncomeRate");
+const investmentFixedIncomePreview = document.querySelector("#investmentFixedIncomePreview");
 const transactionCategory = document.querySelector("#transactionCategory");
 const transactionCategoryRow = document.querySelector("#transactionCategoryRow");
 const transactionSubcategory = document.querySelector("#transactionSubcategory");
@@ -760,8 +764,10 @@ const transactionsView = registerTransactionsView({
     investmentTradingCostFields,
     investmentTaxCostFields,
     investmentFixedIncomeMode,
+    investmentFixedIncomeIndexer,
     investmentFixedIncomeRateLabel,
-    investmentFixedIncomeRateHint,
+    investmentFixedIncomeRate,
+    investmentFixedIncomePreview,
     transactionCategory,
     transactionCategoryRow,
     transactionSubcategory,
@@ -873,8 +879,10 @@ const portfolioView = registerPortfolioView({
     portfolioPricingFields,
     portfolioFixedIncomeSubtype,
     portfolioFixedIncomeMode,
+    portfolioFixedIncomeIndexer,
     portfolioFixedIncomeRateLabel,
-    portfolioFixedIncomeRateHint,
+    portfolioFixedIncomeRate,
+    portfolioFixedIncomePreview,
     cancelPortfolioAssetButton,
     deletePortfolioAssetButton,
     portfolioCostSummary,

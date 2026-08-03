@@ -2,8 +2,8 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.7
-atualizado: 2026-07-31
+versao: 2.8
+atualizado: 2026-08-02
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -16,7 +16,7 @@ aliases: ["Investimentos", "Portfólio"]
 # Investimentos e Portfólio
 
 > [!info] Status
-> **implementado** · área: `investimentos` · atualizado em 2026-07-29 · relacionados: [[contas-correntes]], [[lancamentos]], [[relatorios]]
+> **implementado** · área: `investimentos` · atualizado em 2026-08-02 · relacionados: [[contas-correntes]], [[lancamentos]], [[relatorios]]
 
 ## Problema
 
@@ -62,6 +62,7 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 - Pré-fixados usam a taxa acordada anual nominal/efetiva informada no campo de taxa; exibem `Pré-fixado` e a taxa antes do vencimento.
 - No cadastro de renda fixa, a interface deve diferenciar claramente: `Pré-fixada` usa taxa em `% a.a.`; `Pós-fixada` usa percentual do indexador (ex.: `123` com CDI significa `123% do CDI`, enquanto vazio/zero representa `100% do CDI`); `Híbrida` usa indexador mais taxa adicional em `% a.a.`.
 - Para aplicações como CDB `123% do CDI`, a interface deve orientar o usuário a selecionar modalidade `Pós-fixada`, indexador `CDI` e percentual `123`, evitando cadastrar como `Pré-fixada` ou `Híbrida`; essa orientação deve ficar em helper contextual acionado por ícone discreto para preservar espaço e alinhamento do formulário, com exemplos objetivos de pré-fixada, pós-fixada e híbrida.
+- Formulários de Renda Fixa devem reduzir ruído visual: modalidade por chips de opção única, ajuda longa apenas sob demanda, rótulo/placeholder de taxa dinâmicos, atalhos comuns e preview compacto da configuração.
 - Campos de quantidade e preço médio/unitário não devem ser exibidos para renda fixa, pois o custo total/aporte é a base de cálculo relevante.
 - O sistema calcula e deduz estimativas de IOF (até 30 dias) e IR (tabela regressiva de 22,5% a 15%).
 - Para títulos do Tesouro Direto, o sistema mantém o cálculo de rentabilidade **na curva**, usando a taxa contratada cadastrada, sem tentar igualar a marcação a mercado exibida pelo site do Tesouro em resgate antecipado.
@@ -120,6 +121,7 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - [x] Substituir dicas fixas por helper contextual acionado por ícone no cadastro de renda fixa.
 - [x] Explicitar que pós-fixado usa percentual do indexador, com vazio/zero representando 100%, enquanto híbrido usa taxa adicional.
 - [x] Incluir exemplos de pré-fixada, pós-fixada e híbrida no helper contextual.
+- [x] Reduzir ruído visual dos formulários de renda fixa com chips, microcopy dinâmica, presets e preview.
 
 ## Critérios de aceite
 
@@ -130,6 +132,9 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado o usuário cadastrando renda fixa, quando alterna entre pré-fixada, pós-fixada e híbrida, então o campo explica a unidade correta e orienta que `123% do CDI` deve ser cadastrado como pós-fixado com indexador CDI e percentual 123, enquanto CDI puro pode ficar vazio/zero para representar 100%.
 - Dado o usuário cadastrando renda fixa, quando precisa de orientação sobre pré-fixada, pós-fixada ou híbrida, então um ícone discreto abre um helper contextual sem ocupar espaço permanente no formulário.
 - Dado o helper contextual de renda fixa aberto, quando exibido, então apresenta exemplos de preenchimento para pré-fixada, pós-fixada e híbrida.
+- Dado o usuário cadastrando renda fixa, quando escolhe modalidade por chips, então o valor submetido permanece compatível com a API existente.
+- Dado o usuário cadastrando renda fixa, quando altera modalidade, indexador ou taxa, então a interface atualiza rótulo, placeholder e preview compacto da configuração.
+- Dado o usuário cadastrando renda fixa, quando usa um atalho comum, então modalidade, indexador e taxa são preenchidos automaticamente sem alterar a regra financeira persistida.
 - Dado o usuário cadastrando renda fixa, quando seleciona esse tipo de ativo, então campos de quantidade e preço médio/unitário ficam ocultos e não são enviados no formulário.
 - Dado uma posição de renda fixa vencendo hoje ou vencida, quando o usuário navega pelo app, o item Portfólio no menu aparece em estado de alerta e o Cockpit exibe um aviso acionável.
 - Dado uma posição vencida já encerrada, quando o portfólio é recarregado, o alerta de menu e o aviso do Cockpit deixam de considerar essa posição.
@@ -152,6 +157,7 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 
 ## Changelog
 
+- `2.8` — 2026-08-02 — Formulários de Renda Fixa no Portfólio e Lançamentos ganham redução de ruído visual com chips, microcopy dinâmica, presets e preview.
 - `2.7` — 2026-07-31 — Tesouro Direto mantém rentabilidade na curva pela taxa contratada, passa a deduzir Taxa B3 estimada em títulos padrão e exibe nota sobre diferenças frente à marcação a mercado oficial.
 - `2.6` — 2026-07-29 — Resgate e atualização manual de valor atual passam a ser documentados como modais internos consistentes com a identidade visual do app.
 - `2.5` — 2026-07-29 — Resultado e rentabilidade de ativos em moeda estrangeira com valor manual ficam explicitamente calculados na moeda original; BRL permanece apenas como referência secundária/escala visual.

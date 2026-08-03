@@ -2,7 +2,7 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 2.9
+versao: 3.0
 atualizado: 2026-08-02
 relacionados:
   - "[[contas-correntes]]"
@@ -95,6 +95,10 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 - Campos do formulário de lançamento devem manter altura e alinhamento consistentes dentro da mesma linha, especialmente nos blocos condicionais de investimento/renda fixa; textos auxiliares devem aparecer como linhas de ajuda separadas para não desalinharem inputs e selects.
 - Quando uma linha de formulário tiver apenas um campo visível, esse campo deve ocupar a largura completa da linha para evitar lacunas visuais.
 - Orientações extensas de renda fixa no formulário de investimento devem ficar em helper contextual acionado por ícone discreto, não como texto sempre visível entre campos.
+- No formulário de investimento em Renda Fixa, a modalidade deve ser escolhida por controle compacto de opção única, com o `select` nativo preservado apenas como valor de formulário quando necessário.
+- O campo de taxa de Renda Fixa deve ajustar rótulo e placeholder conforme a modalidade: `Taxa Anual (% a.a.)` para pré-fixada, `Percentual do Indexador (%)` para pós-fixada e `Taxa Adicional Anual (% a.a.)` para híbrida.
+- O formulário de Renda Fixa pode oferecer atalhos discretos para padrões comuns, como `100% do CDI`, `120% do CDI` e `IPCA + 6,5%`, preenchendo modalidade, indexador e taxa sem alterar regras de cálculo.
+- O formulário de Renda Fixa deve exibir uma confirmação compacta em tempo real do título configurado, reduzindo a necessidade de texto explicativo permanente.
 - O formulário de Lançamentos de Contas deve exibir ação `Cancelar` também durante novo cadastro, permitindo limpar a entrada atual e retornar ao estado inicial sem depender de salvar ou navegar.
 - No formulário de investimento, subcategorias de Poupança devem ser exibidas no combo apenas como `Poupança`, mesmo que o nome técnico/histórico da subcategoria contenha observações antigas; o valor interno deve ser preservado para não alterar históricos.
 - No formulário de investimento de Lançamentos de Contas, aportes de Renda Fixa ou Poupança devem exibir marcador compacto `Usar este aporte como reserva de emergência`, persistindo essa decisão na operação de investimento. A marcação não aparece nem é enviada para outros tipos de ativo.
@@ -144,6 +148,10 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dado o tipo Investimento selecionado no formulário de Lançamentos, quando campos condicionais de renda fixa são exibidos, então inputs e selects da mesma linha mantêm alturas e alinhamentos consistentes, com dicas exibidas sem deslocar campos vizinhos.
 - Dado qualquer tipo de lançamento de conta, quando uma linha condicional exibe apenas um campo, então esse campo ocupa a linha inteira e o formulário não apresenta coluna vazia.
 - Dado o tipo Investimento com categoria Renda Fixa selecionado, quando o usuário aciona o ícone de ajuda, então vê orientação contextual para pré-fixada, pós-fixada e híbrida sem alterar o alinhamento dos campos.
+- Dado o tipo Investimento com categoria Renda Fixa selecionado, quando o usuário escolhe a modalidade por chips, então o valor do formulário é atualizado como se o `select` nativo tivesse sido alterado.
+- Dado o tipo Investimento com categoria Renda Fixa selecionado, quando o usuário alterna modalidade, então o campo de taxa muda rótulo e placeholder para a unidade correta.
+- Dado o tipo Investimento com categoria Renda Fixa selecionado, quando o usuário aciona um atalho comum, então modalidade, indexador e taxa são preenchidos e o resumo do título é atualizado.
+- Dado o tipo Investimento com categoria Renda Fixa selecionado, quando modalidade, indexador ou taxa mudam, então a confirmação compacta reflete a configuração atual sem ocupar espaço de ajuda permanente.
 - Dado um novo lançamento de conta em preenchimento, quando o usuário aciona `Cancelar`, então o formulário é limpo e volta ao estado inicial sem criar lançamento.
 - Dado o tipo Investimento com subcategoria de Poupança cadastrada com texto complementar antigo, quando o combo de subcategoria é exibido, então a opção aparece como `Poupança`, preservando o valor interno original.
 - Dado um aporte de Renda Fixa ou Poupança criado em Lançamentos de Contas, quando o usuário marca `Usar este aporte como reserva de emergência` e salva, então a operação de investimento fica marcada como reserva e a opção volta preenchida ao editar o lançamento.
@@ -151,6 +159,7 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 
 ## Changelog
 
+- `3.0` — 2026-08-02 — Formulário de Renda Fixa em Lançamentos reduz ruído visual com modalidade em chips, microcopy dinâmica, atalhos e preview compacto.
 - `2.9` — 2026-08-02 — Lançamentos em moeda estrangeira sem cotação manual passam a consultar a última PTAX de venda disponível até a data do lançamento para normalizar valores em BRL.
 - `2.8` — 2026-08-02 — Gráfico de saldos em Lançamentos de Contas ganha ajustes responsivos para telas de 14 polegadas (e breakpoints intermediários), evitando quebra de linha em valores extensos sem truncar centavos.
 - `2.7` — 2026-08-02 — Rótulo do seletor mensal passa a usar formato fixo `MM/AAAA`.

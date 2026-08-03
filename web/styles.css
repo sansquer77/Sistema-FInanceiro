@@ -2628,6 +2628,141 @@ textarea:focus {
   gap: 12px;
 }
 
+.fixed-income-mode-field {
+  position: relative;
+}
+
+.field-label-with-help {
+  display: inline-flex;
+  position: relative;
+  align-items: center;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.field-helper-button {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--accent-dark);
+  font-size: 0.7rem;
+  font-weight: 900;
+  line-height: 1;
+  cursor: help;
+}
+
+.field-helper-button:hover,
+.field-helper-button:focus-visible {
+  border-color: var(--accent);
+  box-shadow: var(--control-shadow-sm);
+}
+
+.field-popover {
+  position: absolute;
+  z-index: 12;
+  top: 24px;
+  left: 0;
+  display: none;
+  width: min(360px, calc(100vw - 56px));
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: var(--ambient-shadow);
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.38;
+}
+
+.field-label-with-help:hover .field-popover,
+.field-label-with-help:focus-within .field-popover {
+  display: grid;
+  gap: 5px;
+}
+
+.field-popover strong {
+  color: var(--ink);
+  font-size: 0.8rem;
+}
+
+.segmented-control {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--panel) 90%, var(--line));
+}
+
+.segment-btn,
+.chip-preset {
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.segment-btn {
+  padding: 8px 6px;
+}
+
+.segment-btn:hover,
+.segment-btn:focus-visible,
+.segment-btn.active {
+  border-color: var(--line);
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: var(--control-shadow-sm);
+}
+
+.quick-presets {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.quick-presets small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.chip-preset {
+  padding: 5px 8px;
+  border-color: var(--line);
+  background: var(--panel);
+}
+
+.chip-preset:hover,
+.chip-preset:focus-visible {
+  color: var(--ink);
+  border-color: var(--accent);
+}
+
+.fixed-income-preview {
+  margin: 0;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
 .field-helper {
   position: relative;
   justify-self: start;

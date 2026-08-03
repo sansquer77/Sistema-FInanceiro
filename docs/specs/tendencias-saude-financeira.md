@@ -2,7 +2,7 @@
 tipo: spec
 area: tendencias-saude-financeira
 status: implementado
-versao: 2.13
+versao: 2.14
 atualizado: 2026-08-02
 relacionados:
   - "[[score-saude-financeira]]"
@@ -58,6 +58,7 @@ Usuário autenticado que consulta o Cockpit e deseja entender, em linguagem simp
 | `orcamento_realizado` | lista | Linhas da tabela Budget x Realizado, reaproveitando limites vigentes e consumo real por categoria/subcategoria. |
 | `achados` | lista | Sinais estruturados com tipo, severidade, título, descrição, valores em centavos e referência de comparação. |
 | `eventos_pontuais` | lista | Eventos detectados que podem distorcer o mês, como PLR, bônus, férias e antecipação de parcelas. |
+| `antecipacao_parcelas` | lista | Lançamentos movidos para a fatura do mês, com valor em centavos e descrição da compra quando identificável. |
 | `resumo_local` | texto | Texto determinístico gerado por templates locais. |
 | `resumo_ia` | texto opcional | Texto reescrito por IA, quando ativado explicitamente e disponível. |
 | `ia_ativa` | booleano | Indica se a preferência do usuário permite uso de IA para esta função. |
@@ -124,6 +125,8 @@ Usuário autenticado que consulta o Cockpit e deseja entender, em linguagem simp
 - Receitas recorrentes mensais devem ter peso maior para leitura de tendência do que receitas pontuais.
 - O sistema deve identificar antecipações de parcelas em cartão quando houver lançamentos movidos para uma fatura específica, incluindo o padrão de histórico operacional `Lancamento movido para fatura yyyy-mm`.
 - Antecipações de parcelas devem ser descritas como aumento pontual de despesa no mês atual que pode reduzir impacto de faturas futuras, sem classificar automaticamente como problema de consumo.
+- O card de antecipação de parcelas deve exibir o total antecipado em centavos formatado pela interface e a quantidade de lançamentos movidos para a fatura.
+- Quando as compras antecipadas forem identificáveis, o texto explicativo deve citar até 5 descrições; acima disso, deve agrupar o restante para preservar densidade e evitar transformar o resumo em extrato.
 - Pagamentos de fatura em conta-corrente continuam excluídos das despesas analíticas para evitar duplicidade, conforme [[relatorios]].
 - Lançamentos de cartão devem entrar pela competência da fatura (`invoice_month`) nas análises mensais, conforme [[relatorios]].
 - Sugestões devem ser explicativas e não prescritivas, evitando tom de aconselhamento financeiro personalizado.
@@ -218,6 +221,8 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 - Dado um usuário com despesa em `Imprevistos e Emergências Domésticas` ou `Habitação › Manutenção, Reparos e Reformas`, quando a análise de tendências é calculada, então essa despesa é candidata a evento pontual de manutenção, reparo ou emergência doméstica.
 - Dado um usuário com receitas recorrentes mensais, quando a análise compara receitas, então a leitura diferencia receitas recorrentes de receitas pontuais.
 - Dado um usuário com antecipações de parcelas em cartão registradas no histórico como `Lancamento movido para fatura yyyy-mm`, quando o mês consultado concentra esses lançamentos, então o resumo informa que o aumento de despesa pode estar ligado a antecipação e pode reduzir faturas futuras.
+- Dado um usuário com antecipações de parcelas no mês, quando visualiza o card **Antecipação de parcelas**, então o card mostra o total antecipado e a quantidade de lançamentos movidos.
+- Dado um usuário com compras parceladas antecipadas identificáveis, quando visualiza **Tendências e achados**, então o texto explicativo cita as compras antecipadas de forma resumida, limitando a lista para preservar a leitura.
 - Dado um usuário com pagamentos de fatura em conta-corrente, quando as despesas do mês são agregadas, então esses pagamentos não são somados como despesa analítica.
 - Dado um usuário com lançamentos de cartão, quando a tendência mensal é calculada, então os valores entram pela competência da fatura (`invoice_month`).
 - Dado um usuário em cenário multi-moeda, quando houver dados em mais de uma moeda, então o sistema não mistura moedas sem indicar a base usada.
@@ -273,6 +278,7 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 
 ## Changelog
 
+- `2.14` — 2026-08-02 — Card e resumo de antecipação de parcelas passam a exibir total antecipado e compras parceladas identificadas.
 - `2.13` — 2026-08-02 — Tendências e achados passam a evitar duplicidade: receitas, despesas e assinaturas ficam só no texto; cards ficam para limites, eventos e antecipações.
 - `2.12` — 2026-08-02 — Escala do gráfico de Tendências refinada com rótulos compactos e microfrase automática abaixo do gráfico.
 - `2.11` — 2026-08-02 — Gráfico de Evolução mensal evoluído para barras agrupadas de receitas/despesas com linha de saldo, filtro padrão de meses com movimento, eixo Y com negativos sinalizados e tooltip mensal.

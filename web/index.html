@@ -21,7 +21,7 @@
         document.documentElement.style.colorScheme = theme;
       })();
     </script>
-    <link rel="stylesheet" href="/styles.css?v=124">
+    <link rel="stylesheet" href="/styles.css?v=125">
   </head>
   <body>
     <main class="app-shell">
@@ -648,14 +648,28 @@
                     </label>
                   </div>
                   <div class="investment-fixed-fields" id="investmentFixedFields" hidden>
-                    <div class="field-row">
-                      <label>Modalidade
-                        <select name="investment_fixed_income_mode" id="investmentFixedIncomeMode">
+                    <div class="field-row fixed-income-mode-row">
+                      <label class="fixed-income-mode-field">Modalidade
+                        <span class="field-label-with-help">
+                          <button type="button" class="field-helper-button" aria-label="Ajuda sobre modalidade de renda fixa" aria-describedby="investmentFixedIncomeHelp">?</button>
+                          <span class="field-popover" id="investmentFixedIncomeHelp" role="tooltip">
+                            <strong>Guia rápido de Renda Fixa</strong>
+                            <span>Pré-fixada: taxa fixa, ex.: 12,30% a.a.</span>
+                            <span>Pós-fixada: percentual do CDI/Selic, ex.: 100% ou 123% do CDI.</span>
+                            <span>Híbrida: indexador + taxa fixa, ex.: IPCA + 6,50% a.a.</span>
+                          </span>
+                        </span>
+                        <select name="investment_fixed_income_mode" id="investmentFixedIncomeMode" class="sr-only" tabindex="-1" aria-hidden="true">
                           <option value="">Selecione</option>
                           <option value="post">Pós-fixada</option>
                           <option value="pre">Pré-fixada</option>
                           <option value="hybrid">Híbrida</option>
                         </select>
+                        <span class="segmented-control fixed-income-mode-control" role="group" aria-label="Modalidade de Renda Fixa" data-mode-target="investment">
+                          <button type="button" class="segment-btn" data-fixed-income-mode="post">Pós-fixada</button>
+                          <button type="button" class="segment-btn" data-fixed-income-mode="pre">Pré-fixada</button>
+                          <button type="button" class="segment-btn" data-fixed-income-mode="hybrid">Híbrida</button>
+                        </span>
                       </label>
                       <label>Indexador
                         <select name="investment_fixed_income_indexer" id="investmentFixedIncomeIndexer">
@@ -668,18 +682,12 @@
                         </select>
                       </label>
                     </div>
-                    <details class="field-helper">
-                      <summary aria-label="Ajuda sobre modalidade de renda fixa">i</summary>
-                      <div>
-                        <strong>Como preencher renda fixa</strong>
-                        <ul>
-                          <li><b>Pré-fixada:</b> CDB 12,30% a.a. → taxa 12,30.</li>
-                          <li><b>Pós-fixada:</b> CDB 123% do CDI → indexador CDI e percentual 123; CDI puro pode ficar vazio.</li>
-                          <li><b>Híbrida:</b> IPCA + 6,50% a.a. → indexador IPCA e taxa adicional 6,50.</li>
-                        </ul>
-                        <p id="investmentFixedIncomeRateHint">Escolha a modalidade para ver a orientação específica.</p>
-                      </div>
-                    </details>
+                    <div class="quick-presets fixed-income-presets" aria-label="Atalhos comuns de Renda Fixa">
+                      <small>Atalhos comuns:</small>
+                      <button type="button" class="chip-preset" data-fixed-income-preset="post:CDI:100" data-mode-target="investment">100% do CDI</button>
+                      <button type="button" class="chip-preset" data-fixed-income-preset="post:CDI:120" data-mode-target="investment">120% do CDI</button>
+                      <button type="button" class="chip-preset" data-fixed-income-preset="hybrid:IPCA:6,50" data-mode-target="investment">IPCA + 6,5%</button>
+                    </div>
                     <div class="field-row">
                       <label><span id="investmentFixedIncomeRateLabel">Taxa</span>
                         <input name="investment_fixed_income_rate" id="investmentFixedIncomeRate" type="text" inputmode="decimal" placeholder="Ex.: 6,50">
@@ -688,6 +696,7 @@
                         <input name="investment_fixed_income_maturity_date" id="investmentFixedIncomeMaturityDate" type="date">
                       </label>
                     </div>
+                    <p class="fixed-income-preview" id="investmentFixedIncomePreview" aria-live="polite" hidden></p>
                   </div>
                   <div class="field-row" id="investmentPricingFields">
                     <label>Quantidade
@@ -936,27 +945,35 @@
                       <option value="Cofrinho">Cofrinho</option>
                     </select>
                   </label>
-                  <label>Modalidade
-                    <select name="fixed_income_mode" id="portfolioFixedIncomeMode">
+                  <label class="fixed-income-mode-field">Modalidade
+                    <span class="field-label-with-help">
+                      <button type="button" class="field-helper-button" aria-label="Ajuda sobre modalidade de renda fixa" aria-describedby="portfolioFixedIncomeHelp">?</button>
+                      <span class="field-popover" id="portfolioFixedIncomeHelp" role="tooltip">
+                        <strong>Guia rápido de Renda Fixa</strong>
+                        <span>Pré-fixada: taxa fixa, ex.: 12,30% a.a.</span>
+                        <span>Pós-fixada: percentual do CDI/Selic, ex.: 100% ou 123% do CDI.</span>
+                        <span>Híbrida: indexador + taxa fixa, ex.: IPCA + 6,50% a.a.</span>
+                      </span>
+                    </span>
+                    <select name="fixed_income_mode" id="portfolioFixedIncomeMode" class="sr-only" tabindex="-1" aria-hidden="true">
                       <option value="">Selecione</option>
                       <option value="post">Pós-fixada</option>
                       <option value="pre">Pré-fixada</option>
                       <option value="hybrid">Híbrida</option>
                     </select>
+                    <span class="segmented-control fixed-income-mode-control" role="group" aria-label="Modalidade de Renda Fixa" data-mode-target="portfolio">
+                      <button type="button" class="segment-btn" data-fixed-income-mode="post">Pós-fixada</button>
+                      <button type="button" class="segment-btn" data-fixed-income-mode="pre">Pré-fixada</button>
+                      <button type="button" class="segment-btn" data-fixed-income-mode="hybrid">Híbrida</button>
+                    </span>
                   </label>
                 </div>
-                <details class="field-helper">
-                  <summary aria-label="Ajuda sobre modalidade de renda fixa">i</summary>
-                  <div>
-                    <strong>Como preencher renda fixa</strong>
-                    <ul>
-                      <li><b>Pré-fixada:</b> CDB 12,30% a.a. → taxa 12,30.</li>
-                      <li><b>Pós-fixada:</b> CDB 123% do CDI → indexador CDI e percentual 123; CDI puro pode ficar vazio.</li>
-                      <li><b>Híbrida:</b> IPCA + 6,50% a.a. → indexador IPCA e taxa adicional 6,50.</li>
-                    </ul>
-                    <p id="portfolioFixedIncomeRateHint">Escolha a modalidade para ver a orientação específica.</p>
-                  </div>
-                </details>
+                <div class="quick-presets fixed-income-presets" aria-label="Atalhos comuns de Renda Fixa">
+                  <small>Atalhos comuns:</small>
+                  <button type="button" class="chip-preset" data-fixed-income-preset="post:CDI:100" data-mode-target="portfolio">100% do CDI</button>
+                  <button type="button" class="chip-preset" data-fixed-income-preset="post:CDI:120" data-mode-target="portfolio">120% do CDI</button>
+                  <button type="button" class="chip-preset" data-fixed-income-preset="hybrid:IPCA:6,50" data-mode-target="portfolio">IPCA + 6,5%</button>
+                </div>
                 <div class="field-row">
                   <label>Indexador
                     <select name="fixed_income_indexer">
@@ -972,6 +989,7 @@
                     <input name="fixed_income_rate" id="portfolioFixedIncomeRate" type="text" inputmode="decimal" placeholder="Ex.: 14,00">
                   </label>
                 </div>
+                <p class="fixed-income-preview" id="portfolioFixedIncomePreview" aria-live="polite" hidden></p>
                 <div class="field-row">
                   <label>Vencimento
                     <input name="fixed_income_maturity_date" type="date">
@@ -1752,6 +1770,6 @@
         </div>
       </aside>
     </main>
-    <script type="module" src="/app.js?v=124"></script>
+    <script type="module" src="/app.js?v=125"></script>
   </body>
 </html>

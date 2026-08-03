@@ -2,7 +2,7 @@
 tipo: design
 area: meta
 status: implementado
-versao: 2.4
+versao: 2.5
 atualizado: 2026-08-02
 relacionados:
   - "[[arquitetura]]"
@@ -211,6 +211,11 @@ Grade de linha de base: **4px** (todos os valores são múltiplos de 4px).
 - Borda padrão: 1px `--outline`.
 - Foco: borda 2px `--primary`.
 - Erro: borda `--error` com ícone auxiliar.
+- Textos explicativos longos em formulários densos devem ficar sob demanda em helper discreto (`?`, popover ou disclosure equivalente), preservando o alinhamento dos campos.
+- Quando um campo muda de significado conforme uma escolha anterior, prefira microcopy dinâmica no rótulo e placeholder em vez de parágrafos permanentes.
+- Opções curtas e mutuamente exclusivas, como modalidades de Renda Fixa, podem usar segmented control/radio chips para reduzir cliques e manter todas as alternativas visíveis.
+- Atalhos de preenchimento devem ser chips compactos, neutros e opcionais; eles aceleram o input sem substituir campos explícitos.
+- Previews de configuração devem ser badges discretos e textuais, usados para confirmar entendimento do usuário sem introduzir nova regra financeira.
 
 ### Chips / Badges
 
@@ -295,6 +300,7 @@ Grade de linha de base: **4px** (todos os valores são múltiplos de 4px).
 
 ## Changelog
 
+- `2.5` — 2026-08-02 — Documentado padrão de redução de ruído visual em formulários densos com helper sob demanda, microcopy dinâmica, segmented controls, presets e previews compactos.
 - `2.4` — 2026-08-02 — Documentado padrão premium para diagnóstico visual com gauge, zonas semânticas e cards expansíveis acessíveis.
 - `2.3` — 2026-08-02 — Documentado padrão de movimento para transições de visão com View Transitions API, fallback e respeito a redução de movimento.
 - `2.2` — 2026-08-02 — Documentada regra de desambiguação dos nomes do menu lateral e alinhamento entre item de navegação e título da página.

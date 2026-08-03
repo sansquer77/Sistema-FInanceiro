@@ -67,8 +67,10 @@ export function registerTransactionsView({
     investmentTradingCostFields,
     investmentTaxCostFields,
     investmentFixedIncomeMode,
+    investmentFixedIncomeIndexer,
     investmentFixedIncomeRateLabel,
-    investmentFixedIncomeRateHint,
+    investmentFixedIncomeRate,
+    investmentFixedIncomePreview,
     transactionCategory,
     transactionCategoryRow,
     transactionSubcategory,
@@ -130,6 +132,19 @@ export function registerTransactionsView({
   transactionForm.elements.amount.addEventListener("input", updateDestinationAmountFromRate);
   transferExchangeRate.addEventListener("input", updateDestinationAmountFromRate);
   investmentFixedIncomeMode.addEventListener("change", syncInvestmentFixedIncomeRateHint);
+  investmentFixedIncomeIndexer.addEventListener("change", syncInvestmentFixedIncomeRateHint);
+  investmentFixedIncomeRate.addEventListener("input", syncInvestmentFixedIncomeRateHint);
+  transactionForm.elements.investment_asset_identifier.addEventListener("input", syncInvestmentFixedIncomeRateHint);
+  transactionForm.elements.investment_asset_name.addEventListener("input", syncInvestmentFixedIncomeRateHint);
+  transactionForm.querySelectorAll("[data-mode-target='investment'][data-fixed-income-mode]").forEach((button) => {
+    button.addEventListener("click", () => {
+      investmentFixedIncomeMode.value = button.dataset.fixedIncomeMode || "";
+      investmentFixedIncomeMode.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  });
+  transactionForm.querySelectorAll("[data-mode-target='investment'][data-fixed-income-preset]").forEach((button) => {
+    button.addEventListener("click", () => applyInvestmentFixedIncomePreset(button.dataset.fixedIncomePreset || ""));
+  });
   previousMonthButton.addEventListener("click", () => shiftTransactionMonth(-1));
   todayMonthButton.addEventListener("click", () => setTransactionMonth(currentMonthValue()));
   transactionMonthLabel.addEventListener("click", (event) => {
@@ -1278,18 +1293,69 @@ export function registerTransactionsView({
   function syncInvestmentFixedIncomeRateHint() {
     const mode = investmentFixedIncomeMode.value;
     if (mode === "pre") {
-      investmentFixedIncomeRateLabel.textContent = "Taxa pré-fixada (% a.a.)";
-      investmentFixedIncomeRateHint.textContent = "Pré-fixada: informe a taxa anual contratada. Ex.: 12,30 significa 12,30% a.a.; não use esta modalidade para CDB 123% do CDI.";
+      investmentFixedIncomeRateLabel.textContent = "Taxa Anual (% a.a.)";
+      investmentFixedIncomeRate.placeholder = "Ex.: 12,30 (para 12,30% a.a.)";
     } else if (mode === "post") {
-      investmentFixedIncomeRateLabel.textContent = "% do indexador (opcional)";
-      investmentFixedIncomeRateHint.textContent = "Pós-fixada: sem taxa adicional. Deixe vazio para 100% do indexador puro; para CDB 123% do CDI, selecione CDI e digite 123.";
+      investmentFixedIncomeRateLabel.textContent = "Percentual do Indexador (%)";
+      investmentFixedIncomeRate.placeholder = "Ex.: 123 (deixe vazio para 100%)";
     } else if (mode === "hybrid") {
-      investmentFixedIncomeRateLabel.textContent = "Taxa adicional (% a.a.)";
-      investmentFixedIncomeRateHint.textContent = "Híbrida: indexador + taxa adicional anual. Ex.: IPCA + 6,50% a.a. deve ser preenchido com indexador IPCA e taxa adicional 6,50.";
+      investmentFixedIncomeRateLabel.textContent = "Taxa Adicional Anual (% a.a.)";
+      investmentFixedIncomeRate.placeholder = "Ex.: 6,50 (para IPCA + 6,50% a.a.)";
     } else {
       investmentFixedIncomeRateLabel.textContent = "Taxa";
-      investmentFixedIncomeRateHint.textContent = "Escolha a modalidade para ver como preencher: pré-fixada usa taxa anual, pós-fixada usa percentual do indexador (vazio = 100%) e híbrida usa indexador mais taxa adicional.";
+      investmentFixedIncomeRate.placeholder = "Ex.: 6,50";
     }
+    syncFixedIncomeModeButtons(transactionForm, "investment", mode);
+    updateFixedIncomePreview({
+      mode,
+      indexer: investmentFixedIncomeIndexer.value,
+      rate: investmentFixedIncomeRate.value,
+      preview: investmentFixedIncomePreview,
+      fallbackAsset: transactionForm.elements.investment_asset_identifier.value || transactionForm.elements.investment_asset_name.value,
+    });
+  }
+
+  function applyInvestmentFixedIncomePreset(preset) {
+    const [mode, indexer, rate] = preset.split(":");
+    investmentFixedIncomeMode.value = mode || "";
+    investmentFixedIncomeIndexer.value = indexer || "";
+    investmentFixedIncomeRate.value = rate || "";
+    syncInvestmentFixedIncomeRateHint();
+  }
+
+  function syncFixedIncomeModeButtons(scope, target, mode) {
+    scope.querySelectorAll(`[data-mode-target='${target}'][data-fixed-income-mode]`).forEach((button) => {
+      const isActive = button.dataset.fixedIncomeMode === mode;
+      button.classList.toggle("active", isActive);
+      button.setAttribute("aria-pressed", isActive ? "true" : "false");
+    });
+  }
+
+  function updateFixedIncomePreview({ mode, indexer, rate, preview, fallbackAsset }) {
+    if (!preview) {
+      return;
+    }
+    const cleanRate = String(rate || "").trim();
+    const cleanIndexer = String(indexer || "").trim();
+    const assetLabel = String(fallbackAsset || "").trim() || "Título";
+    let text = "";
+    if (mode === "pre") {
+      text = cleanRate
+        ? `${assetLabel} configurado: pré-fixado a ${cleanRate}% a.a.`
+        : `${assetLabel} configurado: pré-fixado com taxa anual a informar.`;
+    } else if (mode === "post") {
+      const percent = cleanRate || "100";
+      text = cleanIndexer
+        ? `${assetLabel} configurado: ${percent}% do ${cleanIndexer}.`
+        : `${assetLabel} configurado: ${percent}% do indexador selecionado.`;
+    } else if (mode === "hybrid") {
+      const rateText = cleanRate ? ` + ${cleanRate}% a.a.` : " + taxa adicional a informar";
+      text = cleanIndexer
+        ? `${assetLabel} configurado: ${cleanIndexer}${rateText}.`
+        : `${assetLabel} configurado: indexador${rateText}.`;
+    }
+    preview.hidden = !text;
+    preview.textContent = text ? `✨ ${text}` : "";
   }
 
   async function exchangeRateToBrl(currency, dateValue) {

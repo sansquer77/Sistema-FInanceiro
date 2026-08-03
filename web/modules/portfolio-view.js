@@ -36,8 +36,10 @@ export function registerPortfolioView({
     portfolioPricingFields,
     portfolioFixedIncomeSubtype,
     portfolioFixedIncomeMode,
+    portfolioFixedIncomeIndexer,
     portfolioFixedIncomeRateLabel,
-    portfolioFixedIncomeRateHint,
+    portfolioFixedIncomeRate,
+    portfolioFixedIncomePreview,
     cancelPortfolioAssetButton,
     deletePortfolioAssetButton,
     portfolioCostSummary,
@@ -63,6 +65,19 @@ export function registerPortfolioView({
   portfolioAssetType.addEventListener("change", updatePortfolioAssetTypeState);
   portfolioFixedIncomeSubtype.addEventListener("change", syncPortfolioFixedIncomeSubtype);
   portfolioFixedIncomeMode.addEventListener("change", syncPortfolioFixedIncomeRateHint);
+  portfolioFixedIncomeIndexer.addEventListener("change", syncPortfolioFixedIncomeRateHint);
+  portfolioFixedIncomeRate.addEventListener("input", syncPortfolioFixedIncomeRateHint);
+  portfolioAssetIdentifier.addEventListener("input", syncPortfolioFixedIncomeRateHint);
+  portfolioAssetName.addEventListener("input", syncPortfolioFixedIncomeRateHint);
+  portfolioAssetForm.querySelectorAll("[data-mode-target='portfolio'][data-fixed-income-mode]").forEach((button) => {
+    button.addEventListener("click", () => {
+      portfolioFixedIncomeMode.value = button.dataset.fixedIncomeMode || "";
+      portfolioFixedIncomeMode.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  });
+  portfolioAssetForm.querySelectorAll("[data-mode-target='portfolio'][data-fixed-income-preset]").forEach((button) => {
+    button.addEventListener("click", () => applyPortfolioFixedIncomePreset(button.dataset.fixedIncomePreset || ""));
+  });
   portfolioPensionSubtype.addEventListener("change", syncPortfolioPensionSubtype);
   cancelPortfolioAssetButton.addEventListener("click", resetPortfolioAssetForm);
   deletePortfolioAssetButton.addEventListener("click", deletePortfolioAsset);
@@ -338,18 +353,69 @@ export function registerPortfolioView({
   function syncPortfolioFixedIncomeRateHint() {
     const mode = portfolioFixedIncomeMode.value;
     if (mode === "pre") {
-      portfolioFixedIncomeRateLabel.textContent = "Taxa pré-fixada (% a.a.)";
-      portfolioFixedIncomeRateHint.textContent = "Pré-fixada: informe a taxa anual contratada. Ex.: 12,30 significa 12,30% a.a.; não use esta modalidade para CDB 123% do CDI.";
+      portfolioFixedIncomeRateLabel.textContent = "Taxa Anual (% a.a.)";
+      portfolioFixedIncomeRate.placeholder = "Ex.: 12,30 (para 12,30% a.a.)";
     } else if (mode === "post") {
-      portfolioFixedIncomeRateLabel.textContent = "% do indexador (opcional)";
-      portfolioFixedIncomeRateHint.textContent = "Pós-fixada: sem taxa adicional. Deixe vazio para 100% do indexador puro; para CDB 123% do CDI, selecione CDI e digite 123.";
+      portfolioFixedIncomeRateLabel.textContent = "Percentual do Indexador (%)";
+      portfolioFixedIncomeRate.placeholder = "Ex.: 123 (deixe vazio para 100%)";
     } else if (mode === "hybrid") {
-      portfolioFixedIncomeRateLabel.textContent = "Taxa adicional (% a.a.)";
-      portfolioFixedIncomeRateHint.textContent = "Híbrida: indexador + taxa adicional anual. Ex.: IPCA + 6,50% a.a. deve ser preenchido com indexador IPCA e taxa adicional 6,50.";
+      portfolioFixedIncomeRateLabel.textContent = "Taxa Adicional Anual (% a.a.)";
+      portfolioFixedIncomeRate.placeholder = "Ex.: 6,50 (para IPCA + 6,50% a.a.)";
     } else {
       portfolioFixedIncomeRateLabel.textContent = "Taxa";
-      portfolioFixedIncomeRateHint.textContent = "Escolha a modalidade para ver como preencher: pré-fixada usa taxa anual, pós-fixada usa percentual do indexador (vazio = 100%) e híbrida usa indexador mais taxa adicional.";
+      portfolioFixedIncomeRate.placeholder = "Ex.: 6,50";
     }
+    syncFixedIncomeModeButtons(portfolioAssetForm, "portfolio", mode);
+    updateFixedIncomePreview({
+      mode,
+      indexer: portfolioFixedIncomeIndexer.value,
+      rate: portfolioFixedIncomeRate.value,
+      preview: portfolioFixedIncomePreview,
+      fallbackAsset: portfolioAssetIdentifier.value || portfolioAssetName.value,
+    });
+  }
+
+  function applyPortfolioFixedIncomePreset(preset) {
+    const [mode, indexer, rate] = preset.split(":");
+    portfolioFixedIncomeMode.value = mode || "";
+    portfolioFixedIncomeIndexer.value = indexer || "";
+    portfolioFixedIncomeRate.value = rate || "";
+    syncPortfolioFixedIncomeRateHint();
+  }
+
+  function syncFixedIncomeModeButtons(scope, target, mode) {
+    scope.querySelectorAll(`[data-mode-target='${target}'][data-fixed-income-mode]`).forEach((button) => {
+      const isActive = button.dataset.fixedIncomeMode === mode;
+      button.classList.toggle("active", isActive);
+      button.setAttribute("aria-pressed", isActive ? "true" : "false");
+    });
+  }
+
+  function updateFixedIncomePreview({ mode, indexer, rate, preview, fallbackAsset }) {
+    if (!preview) {
+      return;
+    }
+    const cleanRate = String(rate || "").trim();
+    const cleanIndexer = String(indexer || "").trim();
+    const assetLabel = String(fallbackAsset || "").trim() || "Título";
+    let text = "";
+    if (mode === "pre") {
+      text = cleanRate
+        ? `${assetLabel} configurado: pré-fixado a ${cleanRate}% a.a.`
+        : `${assetLabel} configurado: pré-fixado com taxa anual a informar.`;
+    } else if (mode === "post") {
+      const percent = cleanRate || "100";
+      text = cleanIndexer
+        ? `${assetLabel} configurado: ${percent}% do ${cleanIndexer}.`
+        : `${assetLabel} configurado: ${percent}% do indexador selecionado.`;
+    } else if (mode === "hybrid") {
+      const rateText = cleanRate ? ` + ${cleanRate}% a.a.` : " + taxa adicional a informar";
+      text = cleanIndexer
+        ? `${assetLabel} configurado: ${cleanIndexer}${rateText}.`
+        : `${assetLabel} configurado: indexador${rateText}.`;
+    }
+    preview.hidden = !text;
+    preview.textContent = text ? `✨ ${text}` : "";
   }
 
   function syncPortfolioPensionSubtype() {
