@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 3.7
+versao: 4.0
 atualizado: 2026-08-03
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -114,6 +114,9 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 
 ## Changelog
 
+- `4.0` — 2026-08-03 — [[specs/landing-page]] avançou para v1.0 com regra de animação/alinhamento da árvore visual no repositório separado da landing.
+- `3.9` — 2026-08-03 — [[specs/landing-page]] atualizada com seção pública de uso em família/rede local confiável.
+- `3.8` — 2026-08-03 — [[specs/landing-page]] atualizada para preservar a árvore visual como metáfora de evolução financeira e evitar linguagem interna de homologação/massa fictícia na copy pública.
 - `3.7` — 2026-08-03 — Registrada a remoção do diretório legado `landing-page/` do repositório principal e atualizada a regra de distribuição para a Landing Page em repositório separado.
 - `3.6` — 2026-08-03 — [[adr/0007-landing-page-institucional-isolada]] e [[specs/landing-page]] atualizadas para registrar que a landing page passa a viver no repositório próprio `sistemafinanceiropage`.
 - `3.5` — 2026-08-03 — [[specs/landing-page]] avançou para `em-implementacao` com adaptação inicial do template v0.app, screenshots demonstrativos e CTA manual por PIX/e-mail.

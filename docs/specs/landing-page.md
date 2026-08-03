@@ -2,7 +2,7 @@
 tipo: spec
 area: landing-page
 status: em-implementacao
-versao: 0.7
+versao: 1.0
 atualizado: 2026-08-03
 relacionados:
   - "[[sobre-app]]"
@@ -32,6 +32,7 @@ Visitante ou usuário interessado que busca entender a proposta de valor, visual
 3. Navega por uma seção visual em formato de **árvore do sistema**, inspirada no modelo “COMPUTE - The Platform to Build & Ship AI Agents” do v0.app, onde cada ramo representa uma capacidade central do app.
 4. Navega pelas seções de destaques:
    - **Privacidade Local Primeiro**: com prévia visual do Modo Privacidade (Glass Blur).
+   - **Uso em Família / Rede Local**: explicando que o app pode rodar em um computador da casa e ser acessado por dispositivos autorizados na mesma rede local.
    - **Saúde Financeira**: demonstrando o Gauge Chart de 0 a 1000 pts e os pilares expansíveis.
    - **Investimentos & Renda Fixa**: exibindo a gestão de ativos (Pré, Pós e Híbridos).
    - **Gestão de Contas, Cartões & Extratos**: apresentando controle de faturas e conciliação.
@@ -61,6 +62,10 @@ Visitante ou usuário interessado que busca entender a proposta de valor, visual
 - A Landing Page deve ser totalmente responsiva, funcionando em dispositivos mobile, tablets e desktops.
 - A página não exige autenticação nem conexão com o banco de dados do aplicativo.
 - Todas as imagens demonstrativas em `sistemafinanceiropage/public/images/` devem utilizar dados fictícios, com nomes, valores, contas, cartões, investimentos, saldos, limites e e-mails diferentes dos dados reais e da base de homologação.
+- A seção de árvore deve preservar a metáfora visual do template original, com uma imagem de árvore em destaque no lado direito em telas amplas, conectando crescimento financeiro, raízes e evolução dos módulos do app.
+- A árvore visual pode ter animação discreta de entrada/flutuação para reforçar sensação premium, mas deve evitar movimento excessivo, não competir com o texto e respeitar `prefers-reduced-motion`.
+- A copy pública da landing não deve mencionar internamente “homologação”, “massa fictícia”, “dados reais” ou termos semelhantes; essas garantias permanecem como regra de produção/documentação, não como texto de marketing.
+- A landing deve conter seção profissional sobre uso em rede local para famílias, deixando claro que o app pode ser instalado em um computador central e acessado por dispositivos autorizados na mesma rede doméstica/confiável, sem prometer serviço em nuvem ou acesso remoto público.
 - A árvore visual deve apresentar o app como um sistema integrado, com tronco central representando o **Sistema Financeiro** e ramos para Contas, Cartões, Cockpit, Saúde Financeira, Tendências, Portfólio, Relatórios, Simulação, Privacidade e Preferências.
 - A seção de exemplos reais deve usar capturas ou mockups fiéis às páginas do app, mas sempre renderizados com massa de dados demonstrativa.
 - As capturas fiéis devem ser geradas preferencialmente a partir de uma instância local isolada do app com `SISTEMA_FINANCEIRO_DATA_DIR` temporário e usuário demonstrativo, sem reutilizar `data/` de desenvolvimento ou homologação.
@@ -83,7 +88,9 @@ Visitante ou usuário interessado que busca entender a proposta de valor, visual
 - Dado um visitante acessando a Landing Page, quando navega pela seção Hero, então encontra uma apresentação clara do produto com mockup responsivo do Cockpit.
 - Dado um visitante visualizando a narrativa principal, quando chega na seção de árvore, então entende as áreas do sistema por ramos visuais conectados ao produto central.
 - Dado a seção de árvore do sistema, quando ela é exibida em tela estreita, então os ramos se reorganizam em cartões/linha vertical sem perda de leitura ou rolagem horizontal.
+- Dado a seção de árvore em telas amplas, quando ela é exibida, então a imagem fica alinhada visualmente ao bloco textual, com animação sutil e sem prejudicar leitura ou acessibilidade.
 - Dado um visitante interessado na privacidade dos dados, quando navega até a seção de Privacidade, então visualiza uma demonstração interativa ou imagem explicativa do Modo Privacidade (Glass Blur).
+- Dado um visitante interessado no uso familiar, quando navega até a seção de rede local, então entende que o app pode ser instalado em um computador da casa e acessado por dispositivos autorizados na mesma rede local confiável.
 - Dado um visitante analisando os recursos de saúde financeira, quando chega na seção de Diagnóstico, então encontra a explicação da pontuação de 0 a 1000 e dos 5 pilares estratégicos.
 - Dado um visitante analisando exemplos do app, quando visualiza capturas ou mockups, então todos os dados exibidos são fictícios e não correspondem à homologação.
 - Dado um visitante interessado em obter uma cópia, quando chega ao CTA final, então visualiza o QR Code PIX, instruções de pagamento e link de contato para solicitar a cópia após o pagamento.
@@ -116,6 +123,9 @@ Visitante ou usuário interessado que busca entender a proposta de valor, visual
 
 ### Changelog
 
+- `1.0` — 2026-08-03 — Registrado o comportamento visual da árvore com alinhamento ao texto, animação sutil e respeito a `prefers-reduced-motion`.
+- `0.9` — 2026-08-03 — Incluída na landing a seção pública “Uso em família” para explicar o uso multiusuário em rede local confiável, mantendo tom profissional e sem prometer serviço em nuvem.
+- `0.8` — 2026-08-03 — Registrado que a landing deve manter a árvore visual do template como metáfora de evolução financeira e remover do texto público menções internas a homologação/massa fictícia.
 - `0.7` — 2026-08-03 — Registrado que o diretório legado `landing-page/` foi removido do repositório do app principal; o repositório `sistemafinanceiropage` permanece como fonte canônica da landing.
 - `0.6` — 2026-08-03 — Alterada a decisão de projeto: a Landing Page passa a viver em repositório próprio (`/Users/sansquer/Documents/GitHub/sistemafinanceiropage`), mantendo este repositório apenas como fonte de documentação/decisão do produto.
 - `0.5` — 2026-08-03 — Template exportado do v0.app adaptado para a apresentação do Sistema Financeiro, com copy institucional, árvore modular, screenshots em `landing-page/public/images/` e CTA manual por PIX/e-mail.
