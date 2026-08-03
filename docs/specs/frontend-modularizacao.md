@@ -2,7 +2,7 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 2.0
+versao: 2.1
 atualizado: 2026-08-02
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
@@ -90,6 +90,8 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Fluxos com decisão financeira, destrutiva ou de cascata devem usar `decision-modal.js`, evitando `window.confirm()` e `window.prompt()` para escolhas de domínio.
 - A navegação lateral deve usar rótulos desambiguados quando dois módulos compartilham o mesmo substantivo de domínio: em **Cadastro**, usar **Minhas Contas** e **Meus Cartões**; em **Lançamentos**, usar **Extrato de Contas** e **Fatura de Cartões**.
 - Os títulos de página controlados por `app.js` devem acompanhar os rótulos desambiguados da navegação para reforçar a intenção da tela ativa.
+- A troca entre módulos do dashboard deve usar `document.startViewTransition()` quando disponível, como melhoria progressiva, preservando fallback instantâneo em navegadores sem suporte.
+- A transição de visão deve respeitar `prefers-reduced-motion: reduce` e nunca aguardar chamadas de API, carregamentos remotos ou cálculos de tela para iniciar a navegação.
 
 ## API e dados
 
@@ -110,6 +112,8 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Dado o grupo Usuário, quando o item Sobre é acionado, então `app.js` exibe uma view estática sem criar módulo ou endpoint desnecessário.
 - Dado o usuário visualizando o menu lateral, quando compara os grupos Cadastro e Lançamentos, então os itens não repetem apenas `Contas` e `Cartões`; eles aparecem como **Minhas Contas**, **Meus Cartões**, **Extrato de Contas** e **Fatura de Cartões**.
 - Dado o usuário acessando um desses itens, quando a tela abre, então o título da página usa o mesmo nome desambiguado do menu.
+- Dado um navegador com suporte a View Transitions API, quando o usuário alterna módulos pelo menu lateral, então a troca visual acontece com transição curta e sem bloquear os carregamentos da tela.
+- Dado um navegador sem suporte à API ou com redução de movimento ativa, quando o usuário alterna módulos, então a navegação continua funcionando de forma instantânea.
 
 ## Fora de escopo
 
@@ -119,6 +123,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Changelog
 
+- `2.1` — 2026-08-02 — Troca de módulos do dashboard passa a usar View Transitions API como melhoria progressiva, com fallback e respeito a redução de movimento.
 - `2.0` — 2026-08-02 — Navegação lateral passa a documentar rótulos desambiguados para Cadastro e Lançamentos, com títulos de página alinhados.
 - `1.0` — 2026-06-29 — Frontmatter e critérios formalizados; referência cruzada com ADR.
 - `1.1` — 2026-06-30 — Responsabilidade de busca/filtro da fatura registrada em `cards-view.js`; consolidações do Portfólio documentadas em `portfolio-view.js`.

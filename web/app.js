@@ -1294,15 +1294,23 @@ function ensureSelectedAccount() {
 }
 
 function showModule(view) {
+  const previousView = state.view;
   state.view = view;
-  for (const [name, element] of Object.entries(moduleViews)) {
-    element.hidden = name !== view;
+  const updateVisibleModule = () => {
+    for (const [name, element] of Object.entries(moduleViews)) {
+      element.hidden = name !== view;
+    }
+    navButtons.forEach((button) => button.classList.toggle("active", button.dataset.view === view));
+    moduleEyebrow.textContent = viewTitles[view][0];
+    pageTitle.textContent = viewTitles[view][1];
+  };
+  if (shouldAnimateModuleTransition(previousView, view)) {
+    document.startViewTransition(updateVisibleModule);
+  } else {
+    updateVisibleModule();
   }
-  navButtons.forEach((button) => button.classList.toggle("active", button.dataset.view === view));
   renderLimitAlerts();
   renderPortfolioMaturityAlerts();
-  moduleEyebrow.textContent = viewTitles[view][0];
-  pageTitle.textContent = viewTitles[view][1];
   if (view === "cockpit") {
     renderCockpit();
     refreshCockpitData().catch((error) => console.error(error));
@@ -1345,6 +1353,13 @@ function showModule(view) {
     userAdminViewController.loadEmailConfigStatus();
     userAdminViewController.loadAIConfigStatus();
   }
+}
+
+function shouldAnimateModuleTransition(previousView, nextView) {
+  if (!previousView || previousView === nextView || typeof document.startViewTransition !== "function") {
+    return false;
+  }
+  return !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
 function initializeSidebar() {

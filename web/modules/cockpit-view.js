@@ -112,7 +112,7 @@ export function registerCockpitView({
   }
 
   function activeCockpitTab() {
-    const allowedTabs = new Set(["summary", "health", "trends"]);
+    const allowedTabs = new Set(["summary", "trends", "health"]);
     return allowedTabs.has(state.cockpitTab) ? state.cockpitTab : "summary";
   }
 
@@ -205,11 +205,7 @@ export function registerCockpitView({
       return;
     }
     financialHealthContent.innerHTML = `
-      <div class="financial-health-score-card ${financialHealthLevelClass(data.nivel)}">
-        <strong>${Number(data.score_total || 0).toLocaleString("pt-BR")}</strong>
-        <span>${escapeHtml(financialHealthLevelLabel(data.nivel))}</span>
-        <small>Score de 0 a 1000</small>
-      </div>
+      ${financialHealthGauge(data)}
 
       <section class="financial-health-section">
         <h3>Seus Pilares</h3>
@@ -228,6 +224,48 @@ export function registerCockpitView({
       <section class="financial-health-section financial-peace-section">
         <h3>💡 Planeje sua Paz Financeira <span>(referências)</span></h3>
         ${financialPeaceCards(data)}
+      </section>
+    `;
+  }
+
+  function financialHealthGauge(data) {
+    const score = Math.max(0, Math.min(1000, Number(data.score_total || 0)));
+    const ratio = score / 1000;
+    const rotation = -90 + ratio * 180;
+    const zone = financialHealthScoreZone(score);
+    return `
+      <section class="financial-health-gauge-card ${zone.className}" aria-label="Score de saúde financeira">
+        <div class="financial-health-gauge-shell">
+          <div
+            class="financial-health-gauge"
+            role="img"
+            aria-label="Score ${score.toLocaleString("pt-BR")} de 1000. Status ${escapeHtml(zone.label)}."
+            style="--score-ratio:${ratio.toFixed(4)}; --needle-rotation:${rotation.toFixed(2)}deg"
+          >
+            <div class="financial-health-gauge-arc" aria-hidden="true"></div>
+            <div class="financial-health-gauge-needle" aria-hidden="true"></div>
+          </div>
+          <div class="financial-health-gauge-scale" aria-hidden="true">
+            <span>0</span>
+            <span>300</span>
+            <span>500</span>
+            <span>750</span>
+            <span>1000</span>
+          </div>
+        </div>
+        <div class="financial-health-gauge-copy">
+          <p class="eyebrow">Diagnóstico do mês</p>
+          <strong class="financial-health-gauge-score">${score.toLocaleString("pt-BR")}</strong>
+          <span class="financial-health-gauge-status">${escapeHtml(zone.label)}</span>
+          <h3>${escapeHtml(zone.title)}</h3>
+          <p>${escapeHtml(zone.meaning)}</p>
+          <div class="financial-health-zone-legend" aria-label="Faixas do score">
+            <span><i class="zone-critico"></i>0–299 Crítico</span>
+            <span><i class="zone-atencao"></i>300–499 Atenção</span>
+            <span><i class="zone-bom"></i>500–749 Moderado</span>
+            <span><i class="zone-excelente"></i>750–1000 Excelente</span>
+          </div>
+        </div>
       </section>
     `;
   }
@@ -258,22 +296,28 @@ export function registerCockpitView({
   function financialHealthPillarDetail(pillar, data) {
     const extra = financialHealthPillarExtra(pillar, data);
     const help = financialHealthPillarHelp(pillar);
+    const levelLabel = financialHealthLevelLabel(pillar.nivel);
+    const score = Number(pillar.score || 0).toLocaleString("pt-BR");
+    const maxScore = Number(pillar.max_score || 0).toLocaleString("pt-BR");
     return `
-      <article class="financial-health-detail-card ${financialHealthLevelClass(pillar.nivel)}">
-        <header>
-          <span>${financialHealthLevelIcon(pillar.nivel)}</span>
+      <details class="financial-health-detail-card ${financialHealthLevelClass(pillar.nivel)}">
+        <summary>
+          <span class="financial-health-status-icon">${financialHealthLevelIcon(pillar.nivel)}</span>
           <div>
             <h4>
               ${escapeHtml(pillar.label || "Pilar")}
               ${help ? inlineHelpIcon(help) : ""}
             </h4>
-            <small>${escapeHtml(financialHealthLevelLabel(pillar.nivel))}</small>
+            <small>${escapeHtml(levelLabel)}</small>
           </div>
-        </header>
-        <p>Sua pontuação: <strong>${Number(pillar.score || 0).toLocaleString("pt-BR")} / ${Number(pillar.max_score || 0).toLocaleString("pt-BR")} pts</strong>.</p>
-        ${extra ? `<p>${extra}</p>` : ""}
-        <p>${escapeHtml(pillar.mensagem || "Indicador calculado com base nos dados cadastrados.")}</p>
-      </article>
+          <strong>${score} / ${maxScore} pts</strong>
+        </summary>
+        <div class="financial-health-detail-body">
+          <p>Sua pontuação: <strong>${score} / ${maxScore} pts</strong>.</p>
+          ${extra ? `<p>${extra}</p>` : ""}
+          <p>${escapeHtml(pillar.mensagem || "Indicador calculado com base nos dados cadastrados.")}</p>
+        </div>
+      </details>
     `;
   }
 
@@ -307,26 +351,34 @@ export function registerCockpitView({
 
   function financialPeaceCards(data) {
     const peace = data.paz_financeira || {};
+    const confidence = financialPeaceConfidenceLabel(data.paz_financeira_confianca);
+    const base = formatCents(data.paz_financeira_base_receita_cents);
     const cards = [
-      ["🎯", "Independência mensal (Estimativa)", data.paz_independencia_cents, peace.independencia_mensal_legenda || "Referência aproximada de patrimônio para renda passiva mensal equivalente."],
-      ["🛡️", "Reserva estimada", data.paz_reserva_estimada_cents, "Referência simples de 6 vezes a receita de base."],
-      ["🏠", "Recorrentes saudáveis (Estimativa)", data.paz_recorrentes_saudaveis_cents, "Referência para despesas recorrentes mensais."],
-      ["🎉", "Lazer saudável (Estimativa)", data.paz_lazer_saudavel_cents, "Referência para lazer mensal sem afetar planejamento."],
+      ["🎯", "Independência mensal", data.paz_independencia_cents, "Receita de referência × 175", peace.independencia_mensal_legenda || "Patrimônio estimado para gerar renda passiva mensal equivalente à receita de referência, usando heurística simplificada."],
+      ["🛡️", "Reserva estimada", data.paz_reserva_estimada_cents, "Receita de referência × 6", "Referência simples de reserva baseada na receita recorrente; o pilar Reserva continua usando despesas reais e posições marcadas."],
+      ["🏠", "Recorrentes saudáveis", data.paz_recorrentes_saudaveis_cents, "Receita de referência × 0,5", "Referência para observar o peso das despesas recorrentes mensais dentro da renda de base."],
+      ["🎉", "Lazer saudável", data.paz_lazer_saudavel_cents, "Receita de referência × 0,3", "Referência aproximada para lazer mensal sem perder de vista o planejamento geral."],
     ];
     return `
       <div class="financial-peace-grid">
-        ${cards.map(([icon, title, cents, description]) => `
-          <article class="financial-peace-card">
-            <span>${icon}</span>
+        ${cards.map(([icon, title, cents, formula, description]) => `
+          <details class="financial-peace-card">
+            <summary>
+              <span>${icon}</span>
+              <div>
+                <h4>${escapeHtml(title)}</h4>
+                <strong>${formatCents(cents)}</strong>
+              </div>
+            </summary>
             <div>
-              <h4>${escapeHtml(title)}</h4>
-              <strong>${formatCents(cents)}</strong>
+              <small>${escapeHtml(formula)}</small>
               <p>${escapeHtml(description)}</p>
+              <p>Base usada: <strong>${base}</strong> · confiança ${escapeHtml(confidence)}.</p>
             </div>
-          </article>
+          </details>
         `).join("")}
       </div>
-      <p class="financial-peace-note">ⓘ Valores baseados na receita de referência (${formatCents(data.paz_financeira_base_receita_cents)}) · confiança ${escapeHtml(financialPeaceConfidenceLabel(data.paz_financeira_confianca))}. ${escapeHtml(peace.aviso || "")} ${escapeHtml(peace.mensagem || "")}</p>
+      <p class="financial-peace-note">ⓘ Valores baseados na receita de referência (${base}) · confiança ${escapeHtml(confidence)}. ${escapeHtml(peace.aviso || "")} ${escapeHtml(peace.mensagem || "")}</p>
     `;
   }
 
@@ -341,23 +393,56 @@ export function registerCockpitView({
   function financialHealthLevelLabel(level) {
     return ({
       critico: "Crítico",
-      atencao: "Atenção",
-      bom: "Bom",
-      excelente: "Excelente",
+      atencao: "Vulnerável / Atenção",
+      bom: "Moderado / Em construção",
+      excelente: "Excelente / Sólido",
     })[level] || "Atenção";
   }
 
   function financialHealthLevelIcon(level) {
     return ({
-      critico: "●",
-      atencao: "▲",
-      bom: "✓",
-      excelente: "✓",
+      critico: "🔴",
+      atencao: "🟠",
+      bom: "🟡",
+      excelente: "🟢",
     })[level] || "•";
   }
 
   function financialHealthLevelClass(level) {
     return `level-${["critico", "atencao", "bom", "excelente"].includes(level) ? level : "atencao"}`;
+  }
+
+  function financialHealthScoreZone(score) {
+    if (score < 300) {
+      return {
+        className: "level-critico",
+        label: "Crítico",
+        title: "Risco elevado",
+        meaning: "Risco elevado de endividamento, ausência de reserva ou orçamento no vermelho. Pede ação imediata nos pilares mais fracos.",
+      };
+    }
+    if (score < 500) {
+      return {
+        className: "level-atencao",
+        label: "Vulnerável / Atenção",
+        title: "Situação instável",
+        meaning: "Há pouca margem de manobra; um imprevisto pode comprometer o mês. Priorize reserva, limites e redução de pressão financeira.",
+      };
+    }
+    if (score < 750) {
+      return {
+        className: "level-bom",
+        label: "Moderado / Em construção",
+        title: "Orçamento sob controle",
+        meaning: "A situação está equilibrada, com oportunidades claras para aumentar reserva, poupança ou consistência dos limites.",
+      };
+    }
+    return {
+      className: "level-excelente",
+      label: "Excelente / Sólido",
+      title: "Saúde financeira sólida",
+      meaning: "Reserva, dívidas, limites e aportes indicam uma base financeira consistente para manter e acompanhar ao longo dos meses.",
+    };
   }
 
   function financialPeaceConfidenceLabel(value) {

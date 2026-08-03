@@ -1,4 +1,4 @@
-// spec: tendencias-saude-financeira v2.10 — critérios 1, 2, 3, 4, 5, 6, 7, 10, 12, 13, 14, 16, 17, 20, 21, 25, 26, 27, 28, 32, 33 e 34
+// spec: tendencias-saude-financeira v2.13 — critérios 1, 2, 3, 4, 5, 6, 7, 10, 12, 13, 14, 16, 17, 20, 21, 25, 26, 27, 28, 32, 33 e 34
 export function registerTrendsView({
   elements,
   api,
@@ -17,6 +17,16 @@ export function registerTrendsView({
   let currentData = null;
   let loading = false;
   let error = "";
+  let chartPeriod = "active";
+
+  trendsContent?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-trends-period]");
+    if (!button) {
+      return;
+    }
+    chartPeriod = button.dataset.trendsPeriod || "active";
+    render();
+  });
 
   function renderTrends(month, force = false) {
     if (!trendsContent || !trendsPanel) {
@@ -162,69 +172,224 @@ export function registerTrendsView({
 
   function renderSeriesChart() {
     const series = currentData.serie_mensal || [];
-    const months = series.map((item) => item.month);
-    if (months.length === 0) {
+    const filteredSeries = filterMonthlySeries(series);
+    const months = filteredSeries.map((item) => item.month);
+    if (filteredSeries.length === 0) {
       return "";
     }
-    const incomes = series.map((item) => Number(item.income_cents || 0));
-    const expenses = series.map((item) => Number(item.expense_cents || 0));
-    const balances = series.map((item) => Number(item.balance_cents || 0));
-    const maxAbs = Math.max(
+    const incomes = filteredSeries.map((item) => Number(item.income_cents || 0));
+    const expenses = filteredSeries.map((item) => Number(item.expense_cents || 0));
+    const balances = filteredSeries.map((item) => Number(item.balance_cents || 0));
+    const rawMaxValue = Math.max(
       1,
-      ...incomes.map((v) => Math.abs(v)),
-      ...expenses.map((v) => Math.abs(v)),
-      ...balances.map((v) => Math.abs(v)),
+      ...incomes,
+      ...expenses,
+      ...balances,
     );
+    const rawMinValue = Math.min(0, ...balances);
+    const maxValue = niceAxisMax(rawMaxValue);
+    const minValue = rawMinValue < 0 ? niceAxisMin(rawMinValue, maxValue) : 0;
+    const range = Math.max(1, maxValue - minValue);
     const width = 700;
-    const height = 240;
-    const padding = { top: 20, right: 16, bottom: 48, left: 56 };
+    const height = 260;
+    const padding = { top: 24, right: 16, bottom: 56, left: 72 };
     const chartWidth = width - padding.left - padding.right;
     const chartHeight = height - padding.top - padding.bottom;
-    const stepX = chartWidth / Math.max(1, months.length - 1);
-    const pointsFor = (values) => values.map((value, index) => {
-      const x = padding.left + index * stepX;
-      const y = padding.top + chartHeight - ((value / maxAbs) * (chartHeight / 2) + chartHeight / 2);
-      return `${x},${y}`;
-    }).join(" ");
-    const linePath = (values) => `<polyline fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" points="${pointsFor(values)}" />`;
-    const yTicks = [-maxAbs, -maxAbs / 2, 0, maxAbs / 2, maxAbs];
-    const yTickLabels = (value) => formatMoney(Math.abs(value) / 100, "BRL");
+    const stepX = chartWidth / Math.max(1, months.length);
+    const groupWidth = Math.max(26, Math.min(58, stepX * 0.58));
+    const barGap = Math.max(3, groupWidth * 0.12);
+    const barWidth = (groupWidth - barGap) / 2;
+    const xCenter = (index) => padding.left + stepX * index + stepX / 2;
+    const yFor = (value) => padding.top + chartHeight - ((value - minValue) / range) * chartHeight;
+    const zeroY = yFor(0);
+    const linePoints = balances.map((value, index) => `${xCenter(index)},${yFor(value)}`).join(" ");
+    const yTicks = buildTicks(minValue, maxValue);
+    const insight = monthlyChartInsight(filteredSeries);
     return `
       <section class="trends-chart-section">
-        <h3>Evolução mensal</h3>
-        <div class="trends-chart">
+        <div class="trends-chart-heading">
+          <h3>Evolução mensal</h3>
+          <div class="trends-chart-periods" aria-label="Período do gráfico">
+            ${renderPeriodButton("active", "Com movimento")}
+            ${renderPeriodButton("3", "3 meses")}
+            ${renderPeriodButton("6", "6 meses")}
+            ${renderPeriodButton("12", "12 meses")}
+          </div>
+        </div>
+        <div class="trends-chart mixed">
           <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Gráfico de evolução de receitas, despesas e saldo">
             <g class="trends-grid-lines">
               ${yTicks.map((value) => {
-                const y = padding.top + chartHeight - ((value / maxAbs) * (chartHeight / 2) + chartHeight / 2);
+                const y = yFor(value);
                 return `<line x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" stroke="currentColor" stroke-opacity="0.15" />`;
               }).join("")}
             </g>
             <g class="trends-axis-y">
               ${yTicks.map((value) => {
-                const y = padding.top + chartHeight - ((value / maxAbs) * (chartHeight / 2) + chartHeight / 2);
-                return `<text x="${padding.left - 8}" y="${y + 4}" text-anchor="end" font-size="10">${escapeHtml(yTickLabels(value))}</text>`;
+                const y = yFor(value);
+                return `<text x="${padding.left - 8}" y="${y + 3}" text-anchor="end" font-size="8.5">${escapeHtml(formatCompactSignedMoney(value))}</text>`;
               }).join("")}
             </g>
             <g class="trends-axis-x">
               ${months.map((month, index) => {
-                const x = padding.left + index * stepX;
+                const x = xCenter(index);
                 const label = month.slice(5, 7) + "/" + month.slice(2, 4);
-                return `<text x="${x}" y="${height - padding.bottom + 20}" text-anchor="${index === 0 ? "start" : index === months.length - 1 ? "end" : "middle"}" font-size="10">${escapeHtml(label)}</text>`;
+                return `<text x="${x}" y="${height - padding.bottom + 26}" text-anchor="middle" font-size="10">${escapeHtml(label)}</text>`;
               }).join("")}
             </g>
-            <g class="trends-series income">${linePath(incomes)}</g>
-            <g class="trends-series expense">${linePath(expenses)}</g>
-            <g class="trends-series balance">${linePath(balances)}</g>
+            <line class="trends-zero-line" x1="${padding.left}" y1="${zeroY}" x2="${width - padding.right}" y2="${zeroY}" />
+            <g class="trends-month-shading">
+              ${filteredSeries.map((item, index) => {
+                const income = Number(item.income_cents || 0);
+                const expense = Number(item.expense_cents || 0);
+                const x = padding.left + stepX * index + stepX * 0.08;
+                return `<rect class="${income >= expense ? "surplus" : "deficit"}" x="${x}" y="${padding.top}" width="${stepX * 0.84}" height="${chartHeight}" rx="8" />`;
+              }).join("")}
+            </g>
+            <g class="trends-bars">
+              ${filteredSeries.map((item, index) => {
+                const income = Number(item.income_cents || 0);
+                const expense = Number(item.expense_cents || 0);
+                const balance = Number(item.balance_cents || 0);
+                const center = xCenter(index);
+                const incomeHeight = Math.max(0, zeroY - yFor(income));
+                const expenseHeight = Math.max(0, zeroY - yFor(expense));
+                const incomeX = center - groupWidth / 2;
+                const expenseX = incomeX + barWidth + barGap;
+                const tooltip = monthlyTooltip(item, income, expense, balance);
+                return `
+                  <g class="trends-month-group">
+                    <title>${escapeHtml(tooltip)}</title>
+                    <rect class="income" x="${incomeX}" y="${zeroY - incomeHeight}" width="${barWidth}" height="${incomeHeight}" rx="3" />
+                    <rect class="expense" x="${expenseX}" y="${zeroY - expenseHeight}" width="${barWidth}" height="${expenseHeight}" rx="3" />
+                  </g>
+                `;
+              }).join("")}
+            </g>
+            <g class="trends-balance-line">
+              <polyline fill="none" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" points="${linePoints}" />
+              ${balances.map((value, index) => {
+                const tooltip = monthlyTooltip(filteredSeries[index], incomes[index], expenses[index], value);
+                return `<circle cx="${xCenter(index)}" cy="${yFor(value)}" r="4"><title>${escapeHtml(tooltip)}</title></circle>`;
+              }).join("")}
+            </g>
           </svg>
           <div class="trends-chart-legend">
             <span class="income"><i></i> Receitas</span>
             <span class="expense"><i></i> Despesas</span>
-            <span class="balance"><i></i> Saldo</span>
+            <span class="balance"><i></i> Saldo líquido</span>
           </div>
+          <p class="trends-chart-insight">${escapeHtml(insight)}</p>
         </div>
       </section>
     `;
+  }
+
+  function renderPeriodButton(value, label) {
+    const active = chartPeriod === value;
+    return `<button class="${active ? "active" : ""}" type="button" data-trends-period="${escapeHtml(value)}" aria-pressed="${active ? "true" : "false"}">${escapeHtml(label)}</button>`;
+  }
+
+  function filterMonthlySeries(series) {
+    const normalized = Array.isArray(series) ? series : [];
+    if (chartPeriod === "active") {
+      const activeMonths = normalized.filter((item) => (
+        Number(item.income_cents || 0) !== 0
+        || Number(item.expense_cents || 0) !== 0
+        || Number(item.balance_cents || 0) !== 0
+      ));
+      return activeMonths.length > 0 ? activeMonths : normalized;
+    }
+    const count = Number(chartPeriod || 12);
+    return normalized.slice(Math.max(0, normalized.length - count));
+  }
+
+  function buildTicks(minValue, maxValue) {
+    if (minValue >= 0) {
+      return [maxValue, maxValue * 0.5, 0];
+    }
+    return [maxValue, maxValue * 0.5, 0, minValue];
+  }
+
+  function niceAxisMax(value) {
+    return niceCeil(Math.max(1, value) * 1.08);
+  }
+
+  function niceAxisMin(value, maxValue) {
+    const min = -niceCeil(Math.abs(value) * 1.25);
+    const minimumVisibleNegative = -Math.max(niceCeil(maxValue * 0.12), niceCeil(Math.abs(value) * 1.25));
+    return Math.min(min, minimumVisibleNegative);
+  }
+
+  function niceCeil(value) {
+    if (value <= 0) {
+      return 0;
+    }
+    const exponent = Math.floor(Math.log10(value));
+    const base = 10 ** exponent;
+    const normalized = value / base;
+    const step = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+    return step * base;
+  }
+
+  function formatSignedMoney(cents) {
+    const value = Number(cents || 0);
+    if (value < 0) {
+      return `-${formatMoney(Math.abs(value) / 100, "BRL")}`;
+    }
+    return formatMoney(value / 100, "BRL");
+  }
+
+  function formatCompactSignedMoney(cents) {
+    const value = Number(cents || 0);
+    if (value === 0) {
+      return "R$ 0";
+    }
+    const sign = value < 0 ? "-" : "";
+    const abs = Math.abs(value);
+    if (abs >= 1_000_000_00) {
+      return `${sign}R$ ${(abs / 100_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mi`;
+    }
+    if (abs >= 1_000_00) {
+      return `${sign}R$ ${(abs / 100_000).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} mil`;
+    }
+    return `${sign}${formatMoney(abs / 100, "BRL")}`;
+  }
+
+  function monthlyTooltip(item, income, expense, balance) {
+    const monthLabel = formatMonthLabel(item.month);
+    const margin = income > 0 ? (balance / income) : 0;
+    const marginText = income > 0 ? ` (${formatPercent(margin)})` : "";
+    return [
+      `📅 ${monthLabel}`,
+      `🟢 Receitas: ${formatMoney(income / 100, "BRL")}`,
+      `🔴 Despesas: ${formatMoney(expense / 100, "BRL")}`,
+      `🔵 Saldo: ${formatSignedMoney(balance)}${marginText}`,
+    ].join("\n");
+  }
+
+  function monthlyChartInsight(series) {
+    if (!Array.isArray(series) || series.length === 0) {
+      return "Sem meses com movimento suficiente para destacar uma tendência.";
+    }
+    const best = series.reduce((selected, item) => Number(item.balance_cents || 0) > Number(selected.balance_cents || 0) ? item : selected, series[0]);
+    const worst = series.reduce((selected, item) => Number(item.balance_cents || 0) < Number(selected.balance_cents || 0) ? item : selected, series[0]);
+    const last = series[series.length - 1];
+    const lastBalance = Number(last.balance_cents || 0);
+    const previous = series.length > 1 ? series[series.length - 2] : null;
+    const previousBalance = previous ? Number(previous.balance_cents || 0) : 0;
+    const bestMonth = formatMonthLabel(best.month);
+    const worstMonth = formatMonthLabel(worst.month);
+    if (lastBalance < 0) {
+      return `${formatMonthLabel(last.month)} fechou em déficit de ${formatSignedMoney(lastBalance)}; o melhor saldo do período foi em ${bestMonth}.`;
+    }
+    if (previous && lastBalance < previousBalance) {
+      return `${formatMonthLabel(last.month)} ainda fechou positivo (${formatSignedMoney(lastBalance)}), mas perdeu força frente ao mês anterior.`;
+    }
+    if (Number(best.balance_cents || 0) > 0) {
+      return `${bestMonth} teve o melhor saldo do período (${formatSignedMoney(Number(best.balance_cents || 0))}); o ponto mais pressionado foi ${worstMonth}.`;
+    }
+    return `O período não teve superávit; ${worstMonth} concentrou o maior déficit (${formatSignedMoney(Number(worst.balance_cents || 0))}).`;
   }
 
   function renderBudgetActualTable() {
@@ -269,7 +434,8 @@ export function registerTrendsView({
 
   function renderFindings() {
     const findings = currentData.achados || [];
-    const cardFindings = findings.filter((finding) => finding.tipo !== "confianca");
+    const textOnlyTypes = new Set(["confianca", "receita", "despesa", "assinatura_servico"]);
+    const cardFindings = findings.filter((finding) => !textOnlyTypes.has(finding.tipo));
     const hasIaSummary = currentData.ia_usada && currentData.ia_resumo;
     const summaryText = hasIaSummary ? currentData.ia_resumo : currentData.resumo_local;
     const aiSummaryMarker = hasIaSummary

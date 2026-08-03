@@ -2,7 +2,7 @@
 tipo: spec
 area: tendencias-saude-financeira
 status: implementado
-versao: 2.10
+versao: 2.13
 atualizado: 2026-08-02
 relacionados:
   - "[[score-saude-financeira]]"
@@ -68,8 +68,17 @@ Usuário autenticado que consulta o Cockpit e deseja entender, em linguagem simp
 - A análise de tendências não pontua no Score principal e não altera nenhum pilar de [[score-saude-financeira]].
 - A análise de tendências deve aparecer em uma aba própria do Cockpit, separada de **Situação do mês** e **Saúde Financeira**, para evitar rolagem excessiva e preservar foco de leitura.
 - As abas analíticas do Cockpit devem aparecer na ordem **Situação**, **Tendências** e **Saúde Financeira**, mantendo a leitura do mês primeiro, os achados comparativos em seguida e o Score ao final.
-- A aba deve priorizar uma leitura visual mês a mês, com gráfico simples de receitas x despesas e indicação de saldo, respeitando as cores semânticas do design system.
+- A aba deve priorizar uma leitura visual mês a mês, com gráfico misto de barras agrupadas para receitas/despesas e linha de saldo líquido, respeitando as cores semânticas do design system.
 - O gráfico mês a mês deve caber na área disponível sem aumentar a altura padrão do Cockpit; rótulos monetários devem se ajustar ou reduzir discretamente quando necessário, como nos demais gráficos do app.
+- O eixo Y do gráfico deve preservar sinal negativo em valores abaixo de zero, exibindo `-R$ ...` quando aplicável.
+- O gráfico não deve forçar escala simétrica se apenas o saldo líquido ficar negativo; despesas e receitas devem ser tratadas como valores positivos em barras, e o campo negativo deve refletir apenas a menor perda/saldo negativo relevante.
+- O eixo Y do gráfico deve usar escala visual confortável, evitando rótulos colados próximos ao zero e usando rótulos compactos quando valores altos prejudicarem a leitura.
+- O gráfico deve evitar espaço morto por meses zerados no início da série; o filtro padrão deve exibir **Apenas meses com movimento**, mantendo atalhos para **3 meses**, **6 meses** e **12 meses**.
+- O saldo líquido deve ser destacado como linha com pontos sobre as barras, e receitas/despesas devem ser barras lado a lado para reduzir cruzamento visual de linhas.
+- O fundo de cada mês pode usar shading discreto para superávit/déficit: verde translúcido quando receitas superam despesas e vermelho translúcido quando despesas superam receitas.
+- Cada mês do gráfico deve oferecer tooltip/descrição no hover com mês, receitas, despesas, saldo líquido e percentual de saldo sobre receita quando houver receita positiva.
+- Abaixo do gráfico deve haver uma microfrase automática, calculada localmente sobre a série exibida, resumindo o principal achado do período, como melhor saldo, perda de força ou déficit no mês mais recente.
+- A seção **Tendências e achados** deve evitar duplicidade entre resumo textual e cards. Achados de variação de receitas, variação de despesas e assinaturas/serviços recorrentes devem aparecer apenas no texto narrativo. Cards devem ficar reservados para limites, eventos pontuais, antecipações e outros itens que precisem de detalhe operacional.
 - A tabela **Budget x Realizado** deve reaproveitar os limites de gastos vigentes do mês consultado, sem criar um novo cadastro de orçamento paralelo.
 - A tabela **Budget x Realizado** deve mostrar, no mínimo, categoria/subcategoria, limite mensal vigente, valor realizado, diferença, percentual usado e estado textual como `Dentro do limite`, `Atenção` ou `Acima do limite`.
 - A coluna de estado da tabela **Budget x Realizado** deve manter alinhamento e largura consistentes entre `Dentro do limite`, `Atenção` e `Acima do limite`, sem molduras, fundos, bordas ou quebras visuais diferentes por tamanho do texto; a atenção deve ser comunicada apenas por cor/texto.
@@ -188,7 +197,16 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 - Dado um usuário com IA desligada nas Preferências, quando consulta a aba **Tendências** no Cockpit, então o bloco **Tendências e achados** é gerado localmente e exibido sem chamada externa.
 - Dado um usuário que acessa o Cockpit, quando visualiza as abas principais, então **Tendências** aparece como aba própria separada de **Situação do mês** e **Saúde Financeira**.
 - Dado um usuário que acessa o Cockpit, quando visualiza as abas principais, então a ordem exibida é **Situação**, **Tendências** e **Saúde Financeira**.
-- Dado um usuário com lançamentos em mais de um mês, quando consulta a aba **Tendências**, então visualiza um gráfico mês a mês de receitas, despesas e saldo do período.
+- Dado um usuário com lançamentos em mais de um mês, quando consulta a aba **Tendências**, então visualiza um gráfico misto mês a mês com barras agrupadas de receitas/despesas e linha de saldo líquido.
+- Dado uma série com saldo negativo, quando o eixo Y exibe valores abaixo de zero, então os rótulos aparecem com sinal negativo e moeda, como `-R$ 38.128,12`.
+- Dado uma série com meses iniciais zerados, quando o filtro padrão do gráfico está ativo, então apenas meses com movimento aparecem para evitar compressão dos dados reais.
+- Dado o usuário usando o gráfico de tendências, quando escolhe os atalhos de período, então pode alternar entre **Com movimento**, **3 meses**, **6 meses** e **12 meses** sem nova chamada à API.
+- Dado um mês com receita maior que despesa, quando o gráfico é exibido, então o fundo daquele mês usa shading verde discreto; quando despesa supera receita, usa shading vermelho discreto.
+- Dado o usuário passando o mouse sobre um mês do gráfico, quando o tooltip nativo aparece, então ele informa mês, receitas, despesas, saldo líquido e percentual do saldo sobre receita quando aplicável.
+- Dado o gráfico com valores elevados e saldo negativo pequeno, quando o eixo Y é exibido, então os rótulos ficam compactos e não se sobrepõem próximos ao zero.
+- Dado o usuário visualizando o gráfico de Tendências, quando a série filtrada é exibida, então uma microfrase abaixo do gráfico resume automaticamente o melhor saldo, pior saldo ou déficit mais recente.
+- Dado a seção **Tendências e achados**, quando o resumo textual já citar receitas, despesas ou assinaturas recorrentes, então esses achados não aparecem novamente como cards.
+- Dado existam limites próximos/estourados, eventos pontuais ou antecipações de parcelas, quando a seção é renderizada, então esses itens podem aparecer como cards por conterem detalhe operacional complementar ao resumo.
 - Dado um usuário com limites cadastrados, quando consulta a aba **Tendências**, então visualiza uma tabela **Budget x Realizado** reaproveitando os limites vigentes e o consumo real por categoria/subcategoria.
 - Dado uma linha acima do limite na tabela **Budget x Realizado**, quando o estado exibido for `Acima do limite`, então o texto fica alinhado com os demais estados e não cria moldura, fundo ou borda visual diferente.
 - Dado um usuário sem limites cadastrados, quando consulta a aba **Tendências**, então visualiza estado vazio explicativo para Budget x Realizado sem bloquear o gráfico e os achados.
@@ -255,6 +273,9 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 
 ## Changelog
 
+- `2.13` — 2026-08-02 — Tendências e achados passam a evitar duplicidade: receitas, despesas e assinaturas ficam só no texto; cards ficam para limites, eventos e antecipações.
+- `2.12` — 2026-08-02 — Escala do gráfico de Tendências refinada com rótulos compactos e microfrase automática abaixo do gráfico.
+- `2.11` — 2026-08-02 — Gráfico de Evolução mensal evoluído para barras agrupadas de receitas/despesas com linha de saldo, filtro padrão de meses com movimento, eixo Y com negativos sinalizados e tooltip mensal.
 - `2.10` — 2026-08-02 — Definida a ordem das abas do Cockpit como Situação, Tendências e Saúde Financeira.
 - `2.9` — 2026-08-02 — Removida colisão com classe global `danger` no Budget x Realizado e refinada a distribuição/alinhamento das colunas numéricas e de estado.
 - `2.8` — 2026-08-02 — Padronizado o alinhamento e a largura da coluna Estado no Budget x Realizado para evitar quebra/moldura visual em `Acima do limite`.

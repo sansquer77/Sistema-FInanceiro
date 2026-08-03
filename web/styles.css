@@ -557,6 +557,15 @@ textarea:focus {
 .dashboard-main {
   width: 100%;
   min-width: 0;
+  view-transition-name: dashboard-main;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(dashboard-main),
+  ::view-transition-new(dashboard-main) {
+    animation-duration: 0.16s;
+    animation-timing-function: ease-out;
+  }
 }
 
 .module-view {
@@ -1685,52 +1694,191 @@ textarea:focus {
   padding-top: 18px;
 }
 
-.financial-health-score-card {
+.financial-health-gauge-card {
+  --health-critical: var(--color-error, #EF4444);
+  --health-attention: #F97316;
+  --health-moderate: #EAB308;
+  --health-solid: var(--color-success, #10B981);
   display: grid;
-  justify-items: center;
-  gap: 5px;
-  padding: 24px;
+  grid-template-columns: minmax(280px, 0.85fr) minmax(0, 1fr);
+  gap: 22px;
+  align-items: center;
+  padding: 22px;
   border: 1px solid var(--line);
-  border-radius: 14px;
-  background: linear-gradient(180deg, var(--panel) 0%, var(--surface-low) 100%);
-  text-align: center;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 18% 18%, color-mix(in srgb, var(--health-solid) 10%, transparent), transparent 34%),
+    linear-gradient(180deg, color-mix(in srgb, var(--panel) 92%, white 8%) 0%, var(--surface-low) 100%);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 45%, transparent);
 }
 
-.financial-health-score-card strong {
+.financial-health-gauge-shell {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+}
+
+.financial-health-gauge {
+  position: relative;
+  width: min(100%, 390px);
+  aspect-ratio: 2 / 1;
+  overflow: hidden;
+}
+
+.financial-health-gauge-arc {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px 999px 0 0;
+  background:
+    conic-gradient(
+      from 270deg at 50% 100%,
+      var(--health-critical) 0deg 54deg,
+      var(--health-attention) 54deg 90deg,
+      var(--health-moderate) 90deg 135deg,
+      var(--health-solid) 135deg 180deg,
+      transparent 180deg 360deg
+    );
+}
+
+.financial-health-gauge-arc::after {
+  position: absolute;
+  right: 13%;
+  bottom: -2px;
+  left: 13%;
+  height: 74%;
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  border-bottom: 0;
+  border-radius: 999px 999px 0 0;
+  background: var(--panel);
+  content: "";
+}
+
+.financial-health-gauge-needle {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  z-index: 2;
+  width: 4px;
+  height: 72%;
+  border-radius: 999px;
+  background: var(--ink);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--panel) 72%, transparent), 0 8px 18px rgb(0 0 0 / 20%);
+  transform: translateX(-50%) rotate(var(--needle-rotation));
+  transform-origin: 50% 100%;
+  transition: transform 0.3s ease-out;
+}
+
+.financial-health-gauge-needle::after {
+  position: absolute;
+  left: 50%;
+  bottom: -9px;
+  width: 18px;
+  height: 18px;
+  border: 3px solid var(--panel);
+  border-radius: 999px;
+  background: var(--ink);
+  content: "";
+  transform: translateX(-50%);
+}
+
+.financial-health-gauge-copy p,
+.financial-health-zone-legend {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.financial-health-gauge-scale {
+  display: flex;
+  justify-content: space-between;
+  width: min(100%, 390px);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.financial-health-gauge-copy {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.financial-health-gauge-score {
+  display: block;
   color: var(--ink);
-  font-size: clamp(42px, 7vw, 68px);
+  font-size: clamp(50px, 6vw, 76px);
   font-weight: 950;
   font-variant-numeric: tabular-nums;
-  line-height: 1;
+  line-height: 0.9;
 }
 
-.financial-health-score-card.level-bom strong,
-.financial-health-score-card.level-excelente strong {
-  color: var(--color-success, var(--positive));
-}
-
-.financial-health-score-card.level-atencao strong {
-  color: var(--color-warning, var(--secondary));
-}
-
-.financial-health-score-card.level-critico strong {
-  color: var(--color-error, var(--danger));
-}
-
-.financial-health-score-card span {
-  padding: 4px 10px;
+.financial-health-gauge-status {
+  justify-self: start;
+  padding: 5px 11px;
   border: 1px solid var(--line);
   border-radius: 999px;
+  background: color-mix(in srgb, var(--panel) 75%, transparent);
   color: var(--ink);
   font-size: 12px;
-  font-weight: 900;
-  letter-spacing: 0.06em;
+  font-weight: 950;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
-.financial-health-score-card small {
+.financial-health-gauge-copy h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(24px, 3vw, 34px);
+  line-height: 1.05;
+}
+
+.financial-health-gauge-copy .eyebrow {
+  margin: 0;
   color: var(--muted);
-  font-weight: 800;
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.financial-health-zone-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.financial-health-zone-legend span {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-low) 70%, transparent);
+}
+
+.financial-health-zone-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.financial-health-zone-legend .zone-critico {
+  background: var(--health-critical);
+}
+
+.financial-health-zone-legend .zone-atencao {
+  background: var(--health-attention);
+}
+
+.financial-health-zone-legend .zone-bom {
+  background: var(--health-moderate);
+}
+
+.financial-health-zone-legend .zone-excelente {
+  background: var(--health-solid);
 }
 
 .financial-health-section {
@@ -1795,13 +1943,16 @@ textarea:focus {
   background: var(--line);
 }
 
-.financial-health-pillar-row.level-bom .financial-health-bar i,
 .financial-health-pillar-row.level-excelente .financial-health-bar i {
   background: var(--color-success, var(--positive));
 }
 
+.financial-health-pillar-row.level-bom .financial-health-bar i {
+  background: #EAB308;
+}
+
 .financial-health-pillar-row.level-atencao .financial-health-bar i {
-  background: var(--color-warning, var(--secondary));
+  background: #F97316;
 }
 
 .financial-health-pillar-row.level-critico .financial-health-bar i {
@@ -1825,13 +1976,16 @@ textarea:focus {
   background: var(--panel);
 }
 
-.financial-health-detail-card.level-bom,
 .financial-health-detail-card.level-excelente {
   border-color: color-mix(in srgb, var(--color-success, var(--positive)) 35%, var(--line));
 }
 
+.financial-health-detail-card.level-bom {
+  border-color: color-mix(in srgb, #EAB308 35%, var(--line));
+}
+
 .financial-health-detail-card.level-atencao {
-  border-color: color-mix(in srgb, var(--color-warning, var(--secondary)) 35%, var(--line));
+  border-color: color-mix(in srgb, #F97316 35%, var(--line));
 }
 
 .financial-health-detail-card.level-critico {
@@ -1839,21 +1993,64 @@ textarea:focus {
   background: color-mix(in srgb, var(--danger-surface) 42%, var(--panel));
 }
 
-.financial-health-detail-card header {
+.financial-health-detail-card summary,
+.financial-peace-card summary {
   display: flex;
   gap: 10px;
   align-items: center;
+  cursor: pointer;
+  list-style: none;
 }
 
-.financial-health-detail-card header > span {
+.financial-health-detail-card summary::-webkit-details-marker,
+.financial-peace-card summary::-webkit-details-marker {
+  display: none;
+}
+
+.financial-health-detail-card summary::after,
+.financial-peace-card summary::after {
+  margin-left: auto;
+  color: var(--muted);
+  content: "⌄";
+  font-size: 16px;
+  font-weight: 900;
+  transition: transform 0.16s ease;
+}
+
+.financial-health-detail-card[open] summary::after,
+.financial-peace-card[open] summary::after {
+  transform: rotate(180deg);
+}
+
+.financial-health-status-icon {
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: 30px;
+  height: 30px;
   border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--muted);
+  font-size: 14px;
   font-weight: 900;
+}
+
+.financial-health-detail-card summary > strong {
+  margin-left: auto;
+  color: var(--ink);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.financial-health-detail-card summary::after {
+  margin-left: 4px;
+}
+
+.financial-health-detail-body {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
 }
 
 .financial-health-detail-card h4,
@@ -1948,18 +2145,22 @@ textarea:focus {
   transform: translate(-50%, 0) rotate(45deg);
 }
 
-.financial-health-detail-card.level-bom header > span,
-.financial-health-detail-card.level-excelente header > span {
+.financial-health-detail-card.level-excelente .financial-health-status-icon {
   border-color: color-mix(in srgb, var(--color-success, var(--positive)) 50%, var(--line));
   color: var(--color-success, var(--positive));
 }
 
-.financial-health-detail-card.level-atencao header > span {
-  border-color: color-mix(in srgb, var(--color-warning, var(--secondary)) 50%, var(--line));
-  color: var(--color-warning, var(--secondary));
+.financial-health-detail-card.level-bom .financial-health-status-icon {
+  border-color: color-mix(in srgb, #EAB308 50%, var(--line));
+  color: #EAB308;
 }
 
-.financial-health-detail-card.level-critico header > span {
+.financial-health-detail-card.level-atencao .financial-health-status-icon {
+  border-color: color-mix(in srgb, #F97316 50%, var(--line));
+  color: #F97316;
+}
+
+.financial-health-detail-card.level-critico .financial-health-status-icon {
   border-color: var(--danger-border);
   color: var(--color-error, var(--danger));
 }
@@ -1987,10 +2188,10 @@ textarea:focus {
 }
 
 .financial-peace-card {
-  grid-template-columns: auto minmax(0, 1fr);
+  align-content: start;
 }
 
-.financial-peace-card > span {
+.financial-peace-card summary > span {
   font-size: 22px;
   line-height: 1;
 }
@@ -2000,6 +2201,16 @@ textarea:focus {
   margin: 3px 0;
   font-size: 18px;
   font-weight: 950;
+}
+
+.financial-peace-card small {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 .financial-peace-note {
@@ -4733,6 +4944,10 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 
+  .financial-health-gauge-card {
+    grid-template-columns: 1fr;
+  }
+
   .financial-health-header,
   .financial-health-pillar-row {
     grid-template-columns: 1fr;
@@ -5407,6 +5622,41 @@ textarea:focus {
   font-size: 18px;
 }
 
+.trends-chart-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.trends-chart-periods {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-low);
+}
+
+.trends-chart-periods button {
+  min-height: 26px;
+  border: 0;
+  border-radius: 999px;
+  padding: 4px 10px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.trends-chart-periods button.active {
+  color: var(--primary);
+  background: var(--panel);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
 .trends-chart {
   padding: 12px;
   border: 1px solid var(--line);
@@ -5422,16 +5672,63 @@ textarea:focus {
   color: var(--text);
 }
 
-.trends-series.income polyline {
-  stroke: var(--positive);
+.trends-axis-y text,
+.trends-axis-x text {
+  fill: var(--muted);
+  font-weight: 750;
 }
 
-.trends-series.expense polyline {
-  stroke: var(--danger);
+.trends-zero-line {
+  stroke: currentColor;
+  stroke-opacity: 0.28;
+  stroke-width: 1.2;
 }
 
-.trends-series.balance polyline {
+.trends-month-shading rect {
+  opacity: 0.15;
+}
+
+.trends-month-shading rect.surplus {
+  fill: var(--positive);
+}
+
+.trends-month-shading rect.deficit {
+  fill: var(--danger);
+}
+
+.trends-bars rect.income {
+  fill: var(--positive);
+}
+
+.trends-bars rect.expense {
+  fill: var(--danger);
+}
+
+.trends-bars rect,
+.trends-balance-line polyline,
+.trends-balance-line circle {
+  transition: opacity 0.16s ease;
+}
+
+.trends-chart.mixed svg:hover .trends-bars rect,
+.trends-chart.mixed svg:hover .trends-balance-line polyline,
+.trends-chart.mixed svg:hover .trends-balance-line circle {
+  opacity: 0.88;
+}
+
+.trends-month-group:hover rect,
+.trends-balance-line circle:hover {
+  opacity: 1;
+}
+
+.trends-balance-line polyline,
+.trends-balance-line circle {
   stroke: var(--accent);
+}
+
+.trends-balance-line circle {
+  fill: var(--panel);
+  stroke-width: 2.2;
 }
 
 .trends-chart-legend {
@@ -5442,6 +5739,18 @@ textarea:focus {
   font-size: 12px;
   font-weight: 800;
   color: var(--muted);
+}
+
+.trends-chart-insight {
+  margin: 8px 0 0;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface-low);
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 800;
+  line-height: 1.35;
 }
 
 .trends-chart-legend span {

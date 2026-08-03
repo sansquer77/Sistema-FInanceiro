@@ -2,8 +2,8 @@
 tipo: spec
 area: score-saude-financeira
 status: em-implementacao
-versao: 2.9
-atualizado: 2026-07-31
+versao: 3.1
+atualizado: 2026-08-02
 relacionados:
   - "[[relatorios]]"
   - "[[limites-gastos]]"
@@ -18,7 +18,7 @@ aliases: ["Score de Saúde Financeira", "Diagnóstico Financeiro", "Financial He
 # Score de Saúde Financeira
 
 > [!info] Status
-> **em-implementacao** · área: `score-saude-financeira` · atualizado em 2026-07-31 · relacionados: [[relatorios]], [[limites-gastos]], [[investimentos-portfolio]], [[cartoes]], [[contas-correntes]]
+> **em-implementacao** · área: `score-saude-financeira` · atualizado em 2026-08-02 · relacionados: [[relatorios]], [[limites-gastos]], [[investimentos-portfolio]], [[cartoes]], [[contas-correntes]]
 
 ## Problema
 
@@ -31,10 +31,10 @@ Qualquer usuário autenticado localmente que deseje entender sua saúde financei
 ## Jornada
 
 1. O usuário acessa o **Cockpit** e clica na aba dedicada de **Saúde Financeira**.
-2. O sistema calcula e exibe a pontuação total (0 a 1000) do mês consultado, categorizada em níveis (Crítico, Atenção, Bom, Excelente).
+2. O sistema calcula e exibe a pontuação total (0 a 1000) do mês consultado em um velocímetro/gauge de diagnóstico, categorizada em níveis (Crítico, Vulnerável/Atenção, Moderado/Em construção, Excelente/Sólido).
 3. O usuário visualiza um gráfico compacto de pilares, permitindo perceber rapidamente quais dimensões puxam o score para cima ou para baixo.
-4. O usuário visualiza o detalhamento dos 5 pilares do score com seus pesos aprovados (Poupança 25%, Reserva 25%, Endividamento 20%, Limites 15%, Concentração da Carteira 15%), acompanhados de recomendações práticas para melhorar cada indicador.
-5. O usuário visualiza a seção informativa **Paz Financeira**, com referências simples para nortear o planejamento de independência, reserva, despesas recorrentes e lazer.
+4. O usuário visualiza o detalhamento dos 5 pilares do score com seus pesos aprovados (Poupança 25%, Reserva 25%, Endividamento 20%, Limites 15%, Concentração da Carteira 15%) em cards expansíveis, permitindo leitura em camadas.
+5. O usuário visualiza a seção informativa **Paz Financeira**, com referências simples para nortear o planejamento de independência, reserva, despesas recorrentes e lazer em cards expansíveis.
 6. O usuário pode consultar o histórico mensal da evolução do seu score e visualizar plano de ação com recomendações sem poluição visual do painel principal do Cockpit.
 
 ## Dados
@@ -43,7 +43,7 @@ Qualquer usuário autenticado localmente que deseje entender sua saúde financei
 |---|---|---|
 | `month` | `AAAA-MM` | Obrigatório. Mês de referência da avaliação. |
 | `score_total` | inteiro | Pontuação consolidada entre `0` e `1000`. |
-| `nivel` | texto | Categoria: `critico` (0-399), `atencao` (400-599), `bom` (600-799), `excelente` (800-1000). |
+| `nivel` | texto | Categoria visual normalizada: `critico` (0-299), `atencao` (300-499), `bom` (500-749), `excelente` (750-1000). |
 | `pilar_poupanca` | inteiro | Pontuação da Taxa de Poupança (0 a 250 pontos; peso 25%). |
 | `pilar_reserva` | inteiro | Pontuação da Reserva de Emergência (0 a 250 pontos; peso 25%). |
 | `pilar_endividamento` | inteiro | Pontuação do Comprometimento de Renda (0 a 200 pontos; peso 20%). |
@@ -80,6 +80,14 @@ Qualquer usuário autenticado localmente que deseje entender sua saúde financei
     - A penalidade é aplicada quando a maior concentração ultrapassa o limite da sua dimensão (70% para classe, 60% para ativo). A interface deve apresentar mensagens textuais e explicativas, como `Você tem alta concentração do seu portfólio em Renda Fixa (xx%).`, sem prescrever compra ou venda de ativos.
   - **Concentração em Poupança**: Quando Poupança representar mais de 25% do Portfólio cadastrado, o pilar deve aplicar penalidade adicional e exibir mensagem explicativa, por exemplo: `Poupança representa xx% do seu portfólio; há produtos com melhor relação de rendimento e liquidez que podem ser avaliados conforme seu perfil.` Essa mensagem deve ser educativa, não uma recomendação personalizada de investimento.
 - **Interface e Navegação**: O Score de Saúde Financeira e suas recomendações acionáveis são exibidos em uma aba dedicada dentro do módulo **Cockpit**, separada da aba **Situação do mês**, permitindo acesso direto ao diagnóstico sem exigir rolagem pelos KPIs, saldos, planejamento, dívidas e gráficos do resumo mensal.
+- **Zonas do Score**: A classificação visual do score total e dos pilares deve usar quatro zonas normalizadas de 0 a 1000:
+  - `0 a 299 pts` — **Crítico** / vermelho: risco elevado de endividamento, ausência de reserva ou orçamento no vermelho; exige atenção imediata.
+  - `300 a 499 pts` — **Vulnerável / Atenção** / laranja: situação instável, com pouca margem de manobra para imprevistos.
+  - `500 a 749 pts` — **Moderado / Em construção** / amarelo: orçamento sob controle, com oportunidades de aumentar poupança, reserva ou disciplina de limites.
+  - `750 a 1000 pts` — **Excelente / Sólido** / verde: saúde financeira sólida, reserva consistente, dívidas controladas e aportes recorrentes.
+- **Velocímetro/Gauge do Score**: A aba **Saúde Financeira** deve substituir o bloco textual central de pontuação por um velocímetro/gauge nativo em CSS/HTML, com escala de 0 a 1000, ponteiro proporcional ao score e legenda das quatro zonas. Para preservar clareza visual, o gauge deve ficar livre de score/status/texto no centro; pontuação, status e interpretação ficam no bloco textual lateral. O gauge deve ser uma melhoria visual sem biblioteca externa e sem alterar a fórmula do score.
+- **Progressive disclosure dos pilares**: Os cards de **Análise detalhada dos pilares** devem ser expansíveis. Fechados, exibem apenas ícone de status, nome do pilar, nível sintético e pontuação (`score / max_score`). Abertos, exibem a explicação, métricas em reais/percentuais e orientação textual.
+- **Progressive disclosure da Paz Financeira**: Os cards da seção **Paz Financeira** devem ser expansíveis. Fechados, exibem ícone, nome da referência e valor em reais. Abertos, exibem fórmula/heurística, base de receita, confiança e texto explicativo não prescritivo.
 - **Ajuda contextual da Taxa de Poupança**: O KPI/card de **Taxa de poupança** na aba **Situação do mês**, a linha do pilar em **Seus Pilares** e o card detalhado do pilar **Taxa de Poupança** devem exibir um pequeno indicador `i` discreto e acessível. Ao receber hover, foco de teclado ou clique/foco, o indicador deve abrir uma caixa de ajuda visível explicando a fórmula `(receitas do mês - despesas de consumo do mês) / receitas do mês`, deixando claro que investimentos/aportes, transferências, câmbio e pagamentos de fatura não entram como despesa de consumo para este pilar.
 - **Gráfico dos pilares**: A aba deve exibir um gráfico compacto de barras horizontais normalizadas por pilar, usando a lista `pilares`. Cada barra compara `score / max_score`, preserva o peso do pilar no rótulo e permite leitura imediata do desempenho relativo. O gráfico deve usar CSS/SVG nativo, sem biblioteca externa, respeitar os tokens do [[../design/design-system|design system]], usar algarismos tabulares nos números e evitar novas cores semânticas. O estado saudável usa o token semântico `var(--color-success, #10B981)` com texto `var(--color-success-text, #ffffff)` para garantir contraste acessível (WCAG AA) em ambos os temas; estados de atenção/crítico devem usar os tokens semânticos `var(--color-warning, #F59E0B)` e `var(--color-error, #EF4444)` com seus respectivos textos, ou variações neutras do design system quando apropriado.
 - **Acessibilidade do gráfico**: O gráfico deve ter alternativa textual equivalente no próprio DOM, com nome do pilar, pontuação obtida, pontuação máxima e percentual. Em telas estreitas, as barras podem virar lista vertical densa, sem perder os valores.
@@ -135,6 +143,13 @@ Tabelas: consulta `transactions`, `credit_card_transactions`, `spending_limits`,
 - Dado um usuário em viewport estreita ou usando leitor de tela, quando acessa o gráfico dos pilares, então os mesmos dados do gráfico ficam disponíveis em lista textual equivalente e sem overflow horizontal.
 - Dado o Cockpit carregado na aba **Situação do mês**, quando o usuário visualiza o KPI/card **Taxa de poupança**, então há um pequeno indicador `i` que abre uma caixa de ajuda textual acessível em hover, foco ou clique/foco, explicando a fórmula e as exclusões do cálculo.
 - Dado o Cockpit carregado na aba Saúde Financeira, quando o usuário visualiza a linha do pilar ou o card detalhado de **Taxa de Poupança**, então há um pequeno indicador `i` que abre uma caixa de ajuda textual acessível em hover, foco ou clique/foco, explicando a fórmula e as exclusões do cálculo.
+- Dado um score total de 280, quando a aba Saúde Financeira é exibida, então o gauge classifica o diagnóstico como **Crítico** dentro da faixa 0–299.
+- Dado um score total de 420, quando a aba Saúde Financeira é exibida, então o gauge classifica o diagnóstico como **Vulnerável / Atenção** dentro da faixa 300–499.
+- Dado um score total de 680, quando a aba Saúde Financeira é exibida, então o gauge classifica o diagnóstico como **Moderado / Em construção** dentro da faixa 500–749.
+- Dado um score total de 820, quando a aba Saúde Financeira é exibida, então o gauge classifica o diagnóstico como **Excelente / Sólido** dentro da faixa 750–1000.
+- Dado a aba Saúde Financeira exibindo o gauge, quando o usuário observa o gráfico, então o centro do velocímetro não exibe texto que concorra com o ponteiro; score, status e interpretação aparecem no bloco lateral.
+- Dado a seção **Análise detalhada dos pilares**, quando a tela carrega, então cada card de pilar aparece em estado recolhido com cabeçalho sintético e pode ser expandido para revelar as métricas e explicações.
+- Dado a seção **Paz Financeira**, quando a tela carrega, então cada card aparece em estado recolhido com ícone, nome e valor, e pode ser expandido para revelar fórmula, base usada e confiança.
 
 ## Pendências
 
@@ -156,6 +171,8 @@ Nenhuma pendência conhecida.
 
 ## Changelog
 
+- `3.1` — 2026-08-02 — Gauge do Score passa a manter o centro livre de texto, movendo pontuação/status para o bloco lateral e removendo redundância visual com a escala.
+- `3.0` — 2026-08-02 — Diagnóstico visual passa a usar gauge de 0 a 1000 com quatro zonas (vermelho, laranja, amarelo, verde) e cards expansíveis para pilares e Paz Financeira.
 - `2.9` — 2026-07-31 — Indicador `i` da Taxa de Poupança passa a abrir caixa de ajuda visual em hover, foco de teclado ou clique/foco, em vez de depender apenas do tooltip nativo.
 - `2.8` — 2026-07-31 — Ajuda contextual de Taxa de Poupança passa a aparecer também no KPI/card da aba "Situação do mês".
 - `2.7` — 2026-07-31 — Ajuda contextual de Taxa de Poupança passa a aparecer também na linha do pilar em "Seus Pilares", além do card detalhado.

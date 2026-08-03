@@ -2,7 +2,7 @@
 tipo: design
 area: meta
 status: implementado
-versao: 2.2
+versao: 2.4
 atualizado: 2026-08-02
 relacionados:
   - "[[arquitetura]]"
@@ -247,6 +247,20 @@ Grade de linha de base: **4px** (todos os valores são múltiplos de 4px).
 - Painéis analíticos com tabelas e cards de leitura, como Tendências, devem priorizar fluxo vertical em largura total antes de dividir conteúdo em colunas, especialmente em telas intermediárias como MacBook Air.
 - A densidade visual deve ser obtida por alinhamento, largura previsível e tipografia tabular, não por redução extrema de legibilidade.
 
+### Movimento e transições
+
+- Transições entre módulos do dashboard devem ser curtas, discretas e funcionais, suavizando a troca de contexto sem competir com os dados financeiros.
+- Use View Transitions API como melhoria progressiva para navegação entre módulos, preservando fallback instantâneo quando indisponível.
+- Respeite `prefers-reduced-motion: reduce`: nesse caso, a navegação não deve aplicar animação.
+- A duração recomendada para transições globais de visão é de aproximadamente `160ms`, com easing suave (`ease-out`), evitando efeitos decorativos longos.
+
+### Diagnóstico visual e disclosure progressivo
+
+- Indicadores executivos de diagnóstico, como o Score de Saúde Financeira, podem usar visualização tipo gauge/velocímetro quando a leitura instantânea for mais importante que a explicação textual completa.
+- Gauges devem preservar escala textual explícita, valor central em algarismos tabulares e legenda das faixas, sem depender exclusivamente de cor.
+- Cards de diagnóstico com explicações longas devem preferir disclosure progressivo (`details/summary` ou equivalente acessível): fechado para síntese, aberto para métricas e orientação.
+- Zonas de saúde financeira usam quatro cores semânticas: vermelho para crítico, laranja para atenção/vulnerável, amarelo para moderado/em construção e verde para excelente/sólido. Essas cores são restritas a diagnóstico/estado, não a botões genéricos.
+
 ### Indicadores de status
 
 - Ponto de 8px.
@@ -281,6 +295,8 @@ Grade de linha de base: **4px** (todos os valores são múltiplos de 4px).
 
 ## Changelog
 
+- `2.4` — 2026-08-02 — Documentado padrão premium para diagnóstico visual com gauge, zonas semânticas e cards expansíveis acessíveis.
+- `2.3` — 2026-08-02 — Documentado padrão de movimento para transições de visão com View Transitions API, fallback e respeito a redução de movimento.
 - `2.2` — 2026-08-02 — Documentada regra de desambiguação dos nomes do menu lateral e alinhamento entre item de navegação e título da página.
 - `2.1` — 2026-08-02 — Documentadas regras para tabelas densas, estados textuais sem moldura, distribuição de colunas e ordem das abas analíticas do Cockpit.
 - `1.0` — 2026-06-29 — Consolidação do design original em tokens tabulados com frontmatter e wikilinks.
