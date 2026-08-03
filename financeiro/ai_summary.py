@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import os
+import ssl
+from urllib.parse import quote
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -25,7 +27,7 @@ SYSTEM_PROMPT = (
 
 def generate_ai_summary(user_id: int, trends_payload: dict) -> str | None:
     """
-    spec: tendencias-saude-financeira v2.1 — critérios 12, 13, 14, 16 e 17
+    spec: tendencias-saude-financeira v2.7 — critérios 12, 13, 14, 16 e 17
     Reescreve o resumo local com IA, usando payload minimizado, timeout curto e
     fallback imediato para None quando a IA estiver indisponível ou retornar conteúdo inválido.
     """
@@ -35,7 +37,7 @@ def generate_ai_summary(user_id: int, trends_payload: dict) -> str | None:
 
     api_key = ""
     if settings["has_api_key"]:
-        # spec: tendencias-saude-financeira v2.1 — critério 28
+        # spec: tendencias-saude-financeira v2.7 — critério 28
         # O segredo nunca deve transitar na API; aqui é usado apenas para a requisição externa.
         full = load_ai_settings(user_id)
         api_key = str(full.get("api_key") or "").strip()
@@ -45,40 +47,106 @@ def generate_ai_summary(user_id: int, trends_payload: dict) -> str | None:
     if not base_url or not model:
         return None
 
-    url = f"{base_url}/chat/completions"
-    headers = {"Content-Type": "application/json"}
-    if settings["auth_type"] == "bearer" and api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
-
     minimized = minimize_trends_payload(trends_payload)
-    body = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": json.dumps(minimized, ensure_ascii=False)},
-        ],
-        "temperature": float(settings.get("temperature") or DEFAULT_TEMPERATURE),
-        "max_tokens": int(settings.get("max_tokens") or MAX_SUMMARY_TOKENS),
-    }
+    request_payload = build_ai_request(settings, api_key, minimized)
 
     request = Request(
-        url,
-        data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
-        headers=headers,
+        request_payload["url"],
+        data=json.dumps(request_payload["body"], ensure_ascii=False).encode("utf-8"),
+        headers=request_payload["headers"],
         method="POST",
     )
 
-    # spec: tendencias-saude-financeira v2.1 — critério 16
+    # spec: tendencias-saude-financeira v2.7 — critério 16
     # Nenhuma chamada de IA pode manter conexão SQLite aberta durante a requisição externa.
     # (a conexão já foi fechada antes de chamar esta função)
     timeout = int(settings.get("timeout_seconds") or SUMMARY_TIMEOUT_SECONDS)
     try:
-        with urlopen(request, timeout=timeout) as response:
+        with urlopen(request, timeout=timeout, context=ai_ssl_context()) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError):
         return None
 
-    return extract_summary_text(payload)
+    return extract_summary_text(payload, provider=str(settings.get("provider") or "custom"))
+
+
+def ai_ssl_context() -> ssl.SSLContext:
+    try:
+        import certifi  # type: ignore
+    except ImportError:
+        return ssl.create_default_context()
+    return ssl.create_default_context(cafile=certifi.where())
+
+
+def build_ai_request(settings: dict, api_key: str, minimized_payload: dict) -> dict:
+    provider = str(settings.get("provider") or "custom")
+    base_url = str(settings.get("base_url") or "").rstrip("/")
+    model = str(settings.get("model") or "").strip()
+    temperature = float(settings.get("temperature") or DEFAULT_TEMPERATURE)
+    max_tokens = int(settings.get("max_tokens") or MAX_SUMMARY_TOKENS)
+    if provider == "google":
+        # spec: tendencias-saude-financeira v2.7 — critérios 12, 24 e 32
+        # Google/Gemini não usa o contrato OpenAI-compatible; usa generateContent.
+        gemini_model = model.removeprefix("models/")
+        headers = {"Content-Type": "application/json"}
+        if api_key:
+            headers["x-goog-api-key"] = api_key
+        return {
+            "url": f"{base_url}/models/{quote(gemini_model, safe='')}:generateContent",
+            "headers": headers,
+            "body": {
+                "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+                "contents": [
+                    {
+                        "role": "user",
+                        "parts": [{"text": json.dumps(minimized_payload, ensure_ascii=False)}],
+                    }
+                ],
+                "generationConfig": {
+                    "temperature": temperature,
+                    "maxOutputTokens": max_tokens,
+                },
+            },
+        }
+    if provider == "anthropic":
+        # spec: tendencias-saude-financeira v2.7 — critérios 12, 24 e 32
+        # Anthropic/Claude usa a Messages API nativa, não Chat Completions.
+        headers = {
+            "Content-Type": "application/json",
+            "anthropic-version": "2023-06-01",
+        }
+        if api_key:
+            headers["x-api-key"] = api_key
+        return {
+            "url": f"{base_url}/messages",
+            "headers": headers,
+            "body": {
+                "model": model,
+                "system": SYSTEM_PROMPT,
+                "messages": [
+                    {"role": "user", "content": json.dumps(minimized_payload, ensure_ascii=False)},
+                ],
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+            },
+        }
+
+    headers = {"Content-Type": "application/json"}
+    if settings["auth_type"] == "bearer" and api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    return {
+        "url": f"{base_url}/chat/completions",
+        "headers": headers,
+        "body": {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": json.dumps(minimized_payload, ensure_ascii=False)},
+            ],
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        },
+    }
 
 
 def minimize_trends_payload(trends_payload: dict) -> dict:
@@ -125,7 +193,22 @@ def minimize_trends_payload(trends_payload: dict) -> dict:
     }
 
 
-def extract_summary_text(payload: dict) -> str | None:
+def extract_summary_text(payload: dict, provider: str = "custom") -> str | None:
+    if provider == "google":
+        try:
+            candidates = payload.get("candidates") or []
+            parts = candidates[0].get("content", {}).get("parts") or []
+            content = "\n".join(str(part.get("text") or "").strip() for part in parts if part.get("text"))
+            return content.strip() or None
+        except (AttributeError, TypeError, IndexError):
+            return None
+    if provider == "anthropic":
+        try:
+            parts = payload.get("content") or []
+            content = "\n".join(str(part.get("text") or "").strip() for part in parts if part.get("type") == "text" and part.get("text"))
+            return content.strip() or None
+        except (AttributeError, TypeError):
+            return None
     try:
         choices = payload.get("choices") or []
         if not choices:

@@ -2,7 +2,7 @@
 tipo: spec
 area: tendencias-saude-financeira
 status: implementado
-versao: 2.1
+versao: 2.7
 atualizado: 2026-08-02
 relacionados:
   - "[[score-saude-financeira]]"
@@ -80,19 +80,26 @@ Usuário autenticado que consulta o Cockpit e deseja entender, em linguagem simp
 - A configuração de IA deve oferecer um combo de provedor com as opções principais `OpenAI / ChatGPT`, `Anthropic / Claude`, `Google / Gemini` e `Custom / Local`.
 - Quando o usuário selecionar um provedor principal, a interface deve exibir apenas os campos necessários para aquele fornecedor conhecido, preservando simplicidade.
 - Para provedores externos conhecidos que exigem chave (`OpenAI / ChatGPT`, `Anthropic / Claude` e `Google / Gemini`), a interface deve exibir os campos `Modelo` e `API key`, sem expor `base_url` e `auth_type` ao usuário.
+- `Google / Gemini` deve usar o contrato nativo do Gemini (`models/{model}:generateContent`) e extrair texto de `candidates[0].content.parts`, sem exigir compatibilidade OpenAI Chat Completions.
+- O modelo do Google/Gemini pode ser informado com ou sem o prefixo `models/`, mas deve corresponder a um modelo válido da API Gemini; caso contrário, o app deve cair em fallback local sem consumo no provedor.
+- `Anthropic / Claude` deve usar o contrato nativo Messages API (`/v1/messages`) e extrair texto de `content[]` com `type=text`, sem exigir compatibilidade OpenAI Chat Completions.
 - Quando o usuário selecionar `Custom / Local`, a interface deve abrir campos adicionais para configurar endpoint/base URL, modelo, formato de autenticação e contrato de payload compatível.
 - Na primeira versão, `Custom / Local` deve exigir compatibilidade com o contrato **OpenAI Chat Completions** (`/v1/chat/completions`), por ser o formato mais comum entre servidores locais e gateways compatíveis, como Ollama, LM Studio, LocalAI, LiteLLM e proxies equivalentes.
 - A configuração mínima de `Custom / Local` deve conter `base_url`, `model`, `auth_type` (`none` ou `bearer`), `api_key` opcional, `timeout_seconds` curto, `temperature` baixa e `max_tokens` limitado.
 - A primeira versão de `Custom / Local` não deve usar streaming nem aceitar contratos arbitrários de payload; suporte a Responses API customizada, contrato próprio do app ou outros formatos fica para evolução futura.
-- Chaves de API devem ser armazenadas criptografadas localmente por usuário, seguindo o mesmo princípio de [[../adr/0005-smtp-criptografado-local|ADR-0005]], nunca em texto puro no banco, frontend, logs ou pacote distribuível.
+- Chaves de API devem ser armazenadas criptografadas localmente por usuário em arquivo dentro da pasta runtime `data/`, seguindo o mesmo princípio de [[../adr/0005-smtp-criptografado-local|ADR-0005]], nunca em texto puro no banco, frontend, logs ou pacote distribuível.
 - A análise local deve usar timeout curto e fallback imediato quando a IA estiver indisponível.
 - Nenhuma chamada de IA pode manter conexão SQLite aberta durante a requisição externa.
 - O usuário deve conseguir desligar a IA sem perder a análise local.
 - Quando a IA estiver ligada e corretamente configurada, a reescrita do resumo deve ser acionada automaticamente ao carregar o bloco **Tendências e achados**, sem exigir um botão adicional.
 - A reescrita automática por IA deve preservar o fallback local: se a chamada falhar, expirar ou retornar conteúdo inválido, o usuário visualiza o resumo local determinístico.
 - Textos enviados à IA devem ser minimizados: somente achados estruturados necessários, sem enviar histórico completo, senhas, tokens, caminhos locais ou dados de outros usuários.
+- Chamadas externas de IA devem validar TLS; quando o Python local não tiver CA padrão funcional, o app pode usar um bundle de CA local disponível no ambiente, sem desativar verificação SSL.
 - A interface deve informar claramente quando o texto foi gerado ou reescrito por IA.
+- Quando o texto do bloco **Tendências e achados** for reescrito por IA, o título do bloco deve exibir um marcador discreto com ícone indicando o uso de IA.
 - Com histórico inferior a 3 meses, a confiança da tendência deve ser `baixa` ou `intermediaria`, e o resumo deve evitar afirmar tendência permanente.
+- O aviso de confiança por histórico curto, como **Histórico curto**, deve ser exibido como texto de seção fora da lista de cards de achados, para preservar hierarquia visual semelhante a **Tendências e achados** e **Budget x Realizado**.
+- A área analítica da aba deve usar fluxo vertical em largura total, na ordem **Tendências e achados**, **Budget x Realizado** e, ao final, os cards/avisos de confiança como **Histórico curto**, evitando colunas lado a lado em telas menores como MacBook Air.
 - Com histórico de 3 a 5 meses, a comparação pode usar média disponível recente, mas deve informar confiança intermediária.
 - Com 6 meses ou mais, a comparação pode usar média móvel de 3 meses, 6 meses ou 12 meses, conforme o contexto do achado.
 - O sistema deve identificar receitas pontuais conhecidas por descrição, categoria, tag ou recorrência ausente, incluindo férias, PLR, bônus, 13º salário, restituição e eventos similares.
@@ -197,6 +204,9 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 - Dado um usuário que seleciona `OpenAI / ChatGPT`, `Anthropic / Claude` ou `Google / Gemini`, quando a tela de configuração é exibida, então visualiza os campos `Modelo` e `API key`, sem precisar configurar endpoint ou tipo de autenticação.
 - Dado um usuário que seleciona `Custom / Local` como provedor de IA, quando a tela de configuração é exibida, então campos adicionais de endpoint/base URL, modelo, autenticação e contrato de payload ficam disponíveis.
 - Dado um usuário que seleciona `Custom / Local`, quando configura a integração, então o endpoint deve ser tratado como compatível com OpenAI Chat Completions em `{base_url}/chat/completions`.
+- Dado um usuário que seleciona `Google / Gemini`, quando a reescrita por IA é executada, então o sistema envia payload para `models/{model}:generateContent` e lê apenas o texto retornado em `candidates[0].content.parts`.
+- Dado um usuário que seleciona `Google / Gemini` e informa modelo com prefixo `models/`, quando a reescrita por IA é executada, então o sistema não duplica o prefixo na URL final.
+- Dado um usuário que seleciona `Anthropic / Claude`, quando a reescrita por IA é executada, então o sistema envia payload para `/v1/messages` e lê apenas textos retornados em `content[]`.
 - Dado um usuário que seleciona `Custom / Local`, quando a reescrita por IA é executada, então o sistema envia payload não-streaming com `model`, `messages`, `temperature` e `max_tokens`, e lê apenas `choices[0].message.content`.
 - Dado um usuário que ativa IA nas Preferências com chave válida, quando solicita resumo por IA, então a IA recebe apenas achados estruturados minimizados e retorna texto sem alterar os valores calculados localmente.
 - Dado um usuário com IA ativa e configurada, quando abre a aba **Tendências**, então a reescrita por IA do bloco **Tendências e achados** é acionada automaticamente após o resumo local estar disponível.
@@ -206,6 +216,9 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 - Dado uma requisição sem sessão válida, quando tenta consultar tendências ou preferências de IA, então o sistema retorna erro de autenticação sem expor dados.
 - Dado uma tentativa de salvar chave de API, quando a configuração é persistida, então o segredo é armazenado criptografado e nunca retornado pela API.
 - Dado o modo local/offline do app, quando nenhuma IA está configurada, então o sistema continua totalmente utilizável.
+- Dado um usuário com IA ativa e resumo reescrito com sucesso, quando visualiza o bloco **Tendências e achados**, então o título do bloco exibe um marcador discreto com ícone indicando IA.
+- Dado um usuário com histórico curto, quando visualiza **Tendências e achados**, então o aviso **Histórico curto** aparece fora dos cards de achados, como texto de seção.
+- Dado um usuário em tela estreita ou intermediária, quando visualiza a aba **Tendências**, então **Tendências e achados**, **Budget x Realizado** e os cards de confiança aparecem em fluxo vertical usando a largura disponível.
 
 ## Pendências
 
@@ -237,6 +250,12 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 
 ## Changelog
 
+- `2.7` — 2026-08-02 — Layout da área analítica de Tendências reorganizado em fluxo vertical full-width: Tendências e achados, Budget x Realizado e cards de confiança ao final.
+- `2.6` — 2026-08-02 — Especificado que chaves de IA ficam criptografadas em arquivo dentro de `data/` e que avisos de confiança por histórico curto aparecem fora dos cards de achados.
+- `2.5` — 2026-08-02 — Chamadas externas de IA passam a usar contexto TLS com bundle de CA local disponível, preservando validação SSL em ambientes Python sem CA padrão funcional.
+- `2.4` — 2026-08-02 — Corrigido o contrato de reescrita por IA para Anthropic/Claude via Messages API e aceito modelo Gemini com ou sem prefixo `models/`.
+- `2.3` — 2026-08-02 — Corrigido o contrato de reescrita por IA para Google/Gemini, usando `generateContent` nativo e extração por `candidates[0].content.parts`.
+- `2.2` — 2026-08-02 — Adicionado marcador discreto com ícone no título de **Tendências e achados** quando o resumo exibido foi reescrito por IA.
 - `2.1` — 2026-08-02 — Aviso multi-moeda deixa de aparecer duplicado na linha de metadados e o layout prioriza Tendências e achados na coluna principal.
 - `2.0` — 2026-08-02 — Preferências de IA passam a exibir `Modelo` e `API key` também para OpenAI, Anthropic e Google, mantendo endpoint e autenticação avançados restritos a Custom/Local.
 - `1.9` — 2026-08-02 — Aviso multi-moeda passa a indicar que a base BRL usa valores normalizados por cotação manual ou pela última PTAX de venda disponível.

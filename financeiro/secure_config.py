@@ -277,7 +277,7 @@ def save_ai_settings(user_id: int, data: dict) -> dict:
     elif auth_type == "none" and secret_path.exists():
         secret_path.unlink()
 
-    # spec: tendencias-saude-financeira v2.1 — critérios 17, 21, 23, 27 e 28
+    # spec: tendencias-saude-financeira v2.7 — critérios 17, 21, 23, 27 e 28
     with database.get_connection() as conn:
         conn.execute(
             """

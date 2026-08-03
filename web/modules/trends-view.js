@@ -1,4 +1,4 @@
-// spec: tendencias-saude-financeira v2.1 — critérios 1, 2, 3, 4, 5, 6, 7, 10, 12, 13, 14, 16, 17, 20, 21, 25, 26, 27 e 28
+// spec: tendencias-saude-financeira v2.7 — critérios 1, 2, 3, 4, 5, 6, 7, 10, 12, 13, 14, 16, 17, 20, 21, 25, 26, 27, 28, 32, 33 e 34
 export function registerTrendsView({
   elements,
   api,
@@ -104,10 +104,9 @@ export function registerTrendsView({
     trendsContent.innerHTML = `
       ${renderSummaryCard()}
       ${renderSeriesChart()}
-      <div class="trends-grid">
-        ${renderFindings()}
-        ${renderBudgetActualTable()}
-      </div>
+      ${renderFindings()}
+      ${renderBudgetActualTable()}
+      ${renderConfidenceNotes()}
     `;
   }
 
@@ -270,12 +269,16 @@ export function registerTrendsView({
 
   function renderFindings() {
     const findings = currentData.achados || [];
+    const cardFindings = findings.filter((finding) => finding.tipo !== "confianca");
     const hasIaSummary = currentData.ia_usada && currentData.ia_resumo;
     const summaryText = hasIaSummary ? currentData.ia_resumo : currentData.resumo_local;
+    const aiSummaryMarker = hasIaSummary
+      ? `<span class="trends-ai-summary-marker" title="Resumo reescrito por IA" aria-label="Resumo reescrito por IA">✨ IA</span>`
+      : "";
     const aiNotice = currentData.ia_ativa && !currentData.ia_usada
       ? `<small class="trends-ai-notice">Resumo local — IA não respondeu ou está desligada.</small>`
       : "";
-    if (findings.length === 0 && !summaryText) {
+    if (cardFindings.length === 0 && !summaryText) {
       return `
         <section class="trends-findings-section">
           <h3>Tendências e achados</h3>
@@ -285,11 +288,12 @@ export function registerTrendsView({
     }
     return `
       <section class="trends-findings-section">
-        <h3>Tendências e achados</h3>
+        <h3 class="trends-findings-title">Tendências e achados ${aiSummaryMarker}</h3>
         ${summaryText ? renderSummaryText(summaryText) : ""}
         ${aiNotice}
-        <div class="trends-findings-list">
-          ${findings.map((finding) => {
+        ${cardFindings.length ? `
+          <div class="trends-findings-list">
+            ${cardFindings.map((finding) => {
             const severityClass = finding.severidade === "atencao" ? "warning" : "info";
             const value = Number(finding.valor_cents || 0);
             return `
@@ -301,8 +305,26 @@ export function registerTrendsView({
                 <p>${escapeHtml(finding.descricao)}</p>
               </article>
             `;
-          }).join("")}
-        </div>
+            }).join("")}
+          </div>
+        ` : ""}
+      </section>
+    `;
+  }
+
+  function renderConfidenceNotes() {
+    const confidenceFindings = (currentData.achados || []).filter((finding) => finding.tipo === "confianca");
+    if (confidenceFindings.length === 0) {
+      return "";
+    }
+    return `
+      <section class="trends-confidence-section">
+        ${confidenceFindings.map((finding) => `
+          <article class="trends-confidence-card">
+            <h3>${escapeHtml(finding.titulo)}</h3>
+            <p>${escapeHtml(finding.descricao)}</p>
+          </article>
+        `).join("")}
       </section>
     `;
   }

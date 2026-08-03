@@ -364,7 +364,7 @@ def move_credit_card_transaction_invoice(user_id: int, transaction_id: str, dire
             """,
             (target_month, normalized_id, user_id),
         )
-        # spec: tendencias-saude-financeira v2.1 — critério 13
+        # spec: tendencias-saude-financeira v2.7 — critério 13
         # (registra movimento de fatura para detecção posterior de antecipação
         #  de parcelas no núcleo de tendências)
         create_operation_log_with_conn(
