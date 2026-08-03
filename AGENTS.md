@@ -118,6 +118,10 @@ Veja o mapeamento completo de rotas e tabelas em [`docs/arquitetura.md`](docs/ar
   - Antes de copiar arquivos para homologação, confirme que o destino possui a estrutura esperada (`app.py`, `web/`, `financeiro/`).
   - Preserve dados runtime da homologação: nunca sobrescreva `data/`, bancos SQLite, arquivos `.enc`, chaves locais, logs ou configurações locais.
   - Ao atualizar homologação, copie apenas os arquivos de código/documentação necessários para a alteração em validação e informe exatamente o que foi copiado.
+- **Landing Page institucional oficial**: a página pública do produto vive em repositório próprio em `/Users/sansquer/Documents/GitHub/sistemafinanceiropage`.
+  - Não use `landing-page/` deste repositório como fonte canônica de código, imagens, dependências, build ou deploy da landing, salvo pedido explícito para consultar/limpar legado.
+  - Ao atualizar textos, imagens, QR Code, layout ou configuração da Landing Page, aplique as mudanças em `/Users/sansquer/Documents/GitHub/sistemafinanceiropage` e mantenha neste repositório apenas as specs/ADRs relacionadas.
+  - O repositório do app principal não deve receber dependências Node, lockfiles, assets ou artefatos gerados da landing.
 - **Versão do app centralizada** em `financeiro/app_metadata.py` e exposta por `/api/app-info`. A versão de produto parte de `1.0.50` e segue versionamento semântico:
   - `PATCH` (`3.0.5` → `3.0.6`): correção compatível, segurança, desempenho ou ajuste operacional sem nova capacidade relevante para o usuário.
   - `MINOR` (`3.0.5` → `3.1.0`): nova funcionalidade ou capacidade relevante, compatível com os fluxos e dados existentes.

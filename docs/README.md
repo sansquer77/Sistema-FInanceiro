@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 3.4
-atualizado: 2026-08-02
+versao: 3.7
+atualizado: 2026-08-03
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -61,7 +61,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 
 | Spec | Status | Área |
 |---|---|---|
-| [[specs/landing-page]] | 📝 rascunho | Institucional |
+| [[specs/landing-page]] | 🚧 em-implementacao | Institucional |
 | [[specs/score-saude-financeira]] | 🚧 em-implementacao | Diagnóstico |
 | [[specs/imposto-renda]] | ❌ depreciado — custo de manter regras fiscais atualizadas não compensa para uso familiar | Investimentos |
 | [[specs/exportacao-dados]] | ❌ depreciado — arquivo SQLite já acessível por leitor genérico ou agente de IA | Exportação |
@@ -78,7 +78,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[adr/0004-importador-xls-sem-dependencia]] | Parser `.xls` implementado sem biblioteca externa. |
 | [[adr/0005-smtp-criptografado-local]] | Configuração SMTP criptografada em arquivo local. |
 | [[adr/0006-classificacao-assistida-local]] | Proposta de classificação assistida por hábitos locais, com IA externa apenas como fallback opcional. |
-| [[adr/0007-landing-page-institucional-isolada]] | Landing Page institucional como subprojeto isolado, deployável pela Vercel fora da distribuição do app. |
+| [[adr/0007-landing-page-institucional-isolada]] | Landing Page institucional em repositório separado, deployável pela Vercel fora da distribuição do app. |
 
 ---
 
@@ -114,6 +114,9 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 
 ## Changelog
 
+- `3.7` — 2026-08-03 — Registrada a remoção do diretório legado `landing-page/` do repositório principal e atualizada a regra de distribuição para a Landing Page em repositório separado.
+- `3.6` — 2026-08-03 — [[adr/0007-landing-page-institucional-isolada]] e [[specs/landing-page]] atualizadas para registrar que a landing page passa a viver no repositório próprio `sistemafinanceiropage`.
+- `3.5` — 2026-08-03 — [[specs/landing-page]] avançou para `em-implementacao` com adaptação inicial do template v0.app, screenshots demonstrativos e CTA manual por PIX/e-mail.
 - `3.4` — 2026-08-02 — Adicionado [[adr/0007-landing-page-institucional-isolada]] para registrar a Landing Page como subprojeto independente com stack própria em `landing-page/`.
 - `3.3` — 2026-08-02 — Adicionada [[specs/privacidade-valores]] como spec implementada do Modo Privacidade.
 - `3.2` — 2026-08-02 — [[specs/tendencias-saude-financeira]] marcada como implementada após conclusão da reescrita opcional por IA, fallback local e testes automatizados.
