@@ -1,4 +1,4 @@
-// spec: tendencias-saude-financeira v2.7 — critérios 1, 2, 3, 4, 5, 6, 7, 10, 12, 13, 14, 16, 17, 20, 21, 25, 26, 27, 28, 32, 33 e 34
+// spec: tendencias-saude-financeira v2.10 — critérios 1, 2, 3, 4, 5, 6, 7, 10, 12, 13, 14, 16, 17, 20, 21, 25, 26, 27, 28, 32, 33 e 34
 export function registerTrendsView({
   elements,
   api,
@@ -251,7 +251,7 @@ export function registerTrendsView({
           ${rows.map((row) => {
             const label = row.subcategory_name ? `${escapeHtml(row.category_name)} › ${escapeHtml(row.subcategory_name)}` : escapeHtml(row.category_name);
             const used = Number(row.percentual_usado || 0);
-            const stateClass = row.estado === "Acima do limite" ? "danger" : row.estado === "Atenção" ? "warning" : "success";
+            const stateClass = row.estado === "Acima do limite" ? "over" : row.estado === "Atenção" ? "warning" : "success";
             return `
               <div class="trends-budget-row ${stateClass}" role="row">
                 <span role="cell">${label}</span>

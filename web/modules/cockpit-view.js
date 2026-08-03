@@ -96,7 +96,7 @@ export function registerCockpitView({
   }
 
   function setCockpitTab(tab) {
-    const allowedTabs = new Set(["summary", "health", "trends"]);
+    const allowedTabs = new Set(["summary", "trends", "health"]);
     const nextTab = allowedTabs.has(tab) ? tab : "summary";
     if (state.cockpitTab === nextTab) {
       return;

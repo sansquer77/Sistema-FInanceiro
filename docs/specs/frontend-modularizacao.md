@@ -2,8 +2,8 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 1.9
-atualizado: 2026-07-24
+versao: 2.0
+atualizado: 2026-08-02
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
   - "[[arquitetura]]"
@@ -14,7 +14,7 @@ aliases: ["Modularização Frontend", "ES Modules"]
 # Modularização do Frontend
 
 > [!info] Status
-> **implementado** · área: `frontend` · atualizado em 2026-07-20 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]]
+> **implementado** · área: `frontend` · atualizado em 2026-08-02 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]]
 
 ## Problema
 
@@ -88,6 +88,8 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - O modo escuro deve ser evoluído por tokens em CSS, mantendo views sem ramificações por tema.
 - `user-admin-view.js` apenas orquestra o controle de Preferências; persistência e aplicação do tema permanecem em `theme-utils.js`.
 - Fluxos com decisão financeira, destrutiva ou de cascata devem usar `decision-modal.js`, evitando `window.confirm()` e `window.prompt()` para escolhas de domínio.
+- A navegação lateral deve usar rótulos desambiguados quando dois módulos compartilham o mesmo substantivo de domínio: em **Cadastro**, usar **Minhas Contas** e **Meus Cartões**; em **Lançamentos**, usar **Extrato de Contas** e **Fatura de Cartões**.
+- Os títulos de página controlados por `app.js` devem acompanhar os rótulos desambiguados da navegação para reforçar a intenção da tela ativa.
 
 ## API e dados
 
@@ -106,6 +108,8 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Dado viewport mobile, quando abre Preferências, o controle de tema ocupa a largura disponível sem overflow horizontal.
 - Dado uma decisão de edição/exclusão em cascata ou encerramento de posição, quando a interface solicita confirmação, os botões exibem ações explícitas e `Voltar` aborta a operação.
 - Dado o grupo Usuário, quando o item Sobre é acionado, então `app.js` exibe uma view estática sem criar módulo ou endpoint desnecessário.
+- Dado o usuário visualizando o menu lateral, quando compara os grupos Cadastro e Lançamentos, então os itens não repetem apenas `Contas` e `Cartões`; eles aparecem como **Minhas Contas**, **Meus Cartões**, **Extrato de Contas** e **Fatura de Cartões**.
+- Dado o usuário acessando um desses itens, quando a tela abre, então o título da página usa o mesmo nome desambiguado do menu.
 
 ## Fora de escopo
 
@@ -115,6 +119,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Changelog
 
+- `2.0` — 2026-08-02 — Navegação lateral passa a documentar rótulos desambiguados para Cadastro e Lançamentos, com títulos de página alinhados.
 - `1.0` — 2026-06-29 — Frontmatter e critérios formalizados; referência cruzada com ADR.
 - `1.1` — 2026-06-30 — Responsabilidade de busca/filtro da fatura registrada em `cards-view.js`; consolidações do Portfólio documentadas em `portfolio-view.js`.
 - `1.2` — 2026-06-30 — Regra de tokenização de cores e gráficos registrada para preparação do modo escuro.

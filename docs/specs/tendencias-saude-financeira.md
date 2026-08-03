@@ -2,7 +2,7 @@
 tipo: spec
 area: tendencias-saude-financeira
 status: implementado
-versao: 2.7
+versao: 2.10
 atualizado: 2026-08-02
 relacionados:
   - "[[score-saude-financeira]]"
@@ -67,10 +67,13 @@ Usuário autenticado que consulta o Cockpit e deseja entender, em linguagem simp
 
 - A análise de tendências não pontua no Score principal e não altera nenhum pilar de [[score-saude-financeira]].
 - A análise de tendências deve aparecer em uma aba própria do Cockpit, separada de **Situação do mês** e **Saúde Financeira**, para evitar rolagem excessiva e preservar foco de leitura.
+- As abas analíticas do Cockpit devem aparecer na ordem **Situação**, **Tendências** e **Saúde Financeira**, mantendo a leitura do mês primeiro, os achados comparativos em seguida e o Score ao final.
 - A aba deve priorizar uma leitura visual mês a mês, com gráfico simples de receitas x despesas e indicação de saldo, respeitando as cores semânticas do design system.
 - O gráfico mês a mês deve caber na área disponível sem aumentar a altura padrão do Cockpit; rótulos monetários devem se ajustar ou reduzir discretamente quando necessário, como nos demais gráficos do app.
 - A tabela **Budget x Realizado** deve reaproveitar os limites de gastos vigentes do mês consultado, sem criar um novo cadastro de orçamento paralelo.
 - A tabela **Budget x Realizado** deve mostrar, no mínimo, categoria/subcategoria, limite mensal vigente, valor realizado, diferença, percentual usado e estado textual como `Dentro do limite`, `Atenção` ou `Acima do limite`.
+- A coluna de estado da tabela **Budget x Realizado** deve manter alinhamento e largura consistentes entre `Dentro do limite`, `Atenção` e `Acima do limite`, sem molduras, fundos, bordas ou quebras visuais diferentes por tamanho do texto; a atenção deve ser comunicada apenas por cor/texto.
+- As colunas numéricas da tabela **Budget x Realizado** devem ficar alinhadas à direita e com largura previsível, deixando a categoria ocupar o espaço flexível principal.
 - Quando houver histórico suficiente, a tabela pode exibir colunas mês a mês para comparação visual do realizado por limite, preservando densidade e leitura em telas menores.
 - Quando não houver limites cadastrados, a aba deve exibir estado vazio explicativo e orientar o usuário a cadastrar limites, sem impedir o uso do gráfico e dos achados.
 - O MVP deve funcionar sem IA externa, internet, chave de API, modelo local ou dependência adicional.
@@ -184,8 +187,10 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 
 - Dado um usuário com IA desligada nas Preferências, quando consulta a aba **Tendências** no Cockpit, então o bloco **Tendências e achados** é gerado localmente e exibido sem chamada externa.
 - Dado um usuário que acessa o Cockpit, quando visualiza as abas principais, então **Tendências** aparece como aba própria separada de **Situação do mês** e **Saúde Financeira**.
+- Dado um usuário que acessa o Cockpit, quando visualiza as abas principais, então a ordem exibida é **Situação**, **Tendências** e **Saúde Financeira**.
 - Dado um usuário com lançamentos em mais de um mês, quando consulta a aba **Tendências**, então visualiza um gráfico mês a mês de receitas, despesas e saldo do período.
 - Dado um usuário com limites cadastrados, quando consulta a aba **Tendências**, então visualiza uma tabela **Budget x Realizado** reaproveitando os limites vigentes e o consumo real por categoria/subcategoria.
+- Dado uma linha acima do limite na tabela **Budget x Realizado**, quando o estado exibido for `Acima do limite`, então o texto fica alinhado com os demais estados e não cria moldura, fundo ou borda visual diferente.
 - Dado um usuário sem limites cadastrados, quando consulta a aba **Tendências**, então visualiza estado vazio explicativo para Budget x Realizado sem bloquear o gráfico e os achados.
 - Dado um usuário com apenas dois meses de histórico, quando consulta tendências, então a análise informa confiança baixa ou intermediária e evita afirmar uma tendência permanente.
 - Dado um usuário com despesas do mês acima do mês anterior, quando existem categorias responsáveis pela maior variação, então o sistema lista as principais categorias/subcategorias com valores em centavos formatados pela interface.
@@ -250,6 +255,9 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 
 ## Changelog
 
+- `2.10` — 2026-08-02 — Definida a ordem das abas do Cockpit como Situação, Tendências e Saúde Financeira.
+- `2.9` — 2026-08-02 — Removida colisão com classe global `danger` no Budget x Realizado e refinada a distribuição/alinhamento das colunas numéricas e de estado.
+- `2.8` — 2026-08-02 — Padronizado o alinhamento e a largura da coluna Estado no Budget x Realizado para evitar quebra/moldura visual em `Acima do limite`.
 - `2.7` — 2026-08-02 — Layout da área analítica de Tendências reorganizado em fluxo vertical full-width: Tendências e achados, Budget x Realizado e cards de confiança ao final.
 - `2.6` — 2026-08-02 — Especificado que chaves de IA ficam criptografadas em arquivo dentro de `data/` e que avisos de confiança por histórico curto aparecem fora dos cards de achados.
 - `2.5` — 2026-08-02 — Chamadas externas de IA passam a usar contexto TLS com bundle de CA local disponível, preservando validação SSL em ambientes Python sem CA padrão funcional.

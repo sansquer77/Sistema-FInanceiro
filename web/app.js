@@ -428,10 +428,10 @@ const moduleViews = {
 
 const viewTitles = {
   cockpit: ["Cockpit", "Resumo financeiro"],
-  accounts: ["Cadastro", "Contas"],
-  creditCards: ["Cadastro", "Cartões"],
-  cardLaunches: ["Lançamentos", "Cartões"],
-  transactions: ["Lançamentos", "Contas"],
+  accounts: ["Cadastro", "Minhas Contas"],
+  creditCards: ["Cadastro", "Meus Cartões"],
+  cardLaunches: ["Lançamentos", "Fatura de Cartões"],
+  transactions: ["Lançamentos", "Extrato de Contas"],
   portfolio: ["Gestão", "Portfólio"],
   limits: ["Gestão", "Limite de gastos"],
   simulations: ["Gestão", "Efeito Borboleta"],

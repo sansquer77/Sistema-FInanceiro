@@ -2,8 +2,8 @@
 tipo: design
 area: meta
 status: implementado
-versao: 2.0
-atualizado: 2026-07-29
+versao: 2.2
+atualizado: 2026-08-02
 relacionados:
   - "[[arquitetura]]"
   - "[[specs/frontend-modularizacao]]"
@@ -14,7 +14,7 @@ aliases: ["Design System", "Tokens Visuais", "Precisão Institucional"]
 # Design System — Precisão Institucional
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-07-29 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]]
+> **implementado** · área: `meta` · atualizado em 2026-08-02 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]]
 
 ## Personalidade da marca
 
@@ -186,6 +186,8 @@ Grade de linha de base: **4px** (todos os valores são múltiplos de 4px).
 - **Gaps**: Grupos separados por `12px`. Itens do mesmo grupo separados por `4px` (`--spacing-xs`).
 - **Botões (`.nav-button`)**: Altura mínima de `32px` para garantir densidade de dados sem comprometer a área de clique.
 - **Hierarquia**: Títulos de grupos (ex: "Cadastro", "Gestão") devem ser concisos e agrupar itens logicamente.
+- Itens de menu não devem repetir o mesmo rótulo em grupos diferentes quando a intenção for distinta; prefira nomes orientados à tarefa, como **Minhas Contas**, **Meus Cartões**, **Extrato de Contas** e **Fatura de Cartões**.
+- O título exibido no cabeçalho da página deve reforçar o mesmo significado do item acionado no menu, evitando que a navegação volte a depender apenas do grupo pai para desambiguação.
 
 ### Botões
 
@@ -231,10 +233,19 @@ Grade de linha de base: **4px** (todos os valores são múltiplos de 4px).
 - Zebra striping: linha alternada com `--surface-container-low` em hover.
 - Cabeçalhos de coluna: `label-md` em maiúsculas.
 - **Colunas numéricas alinhadas à direita** com `font-variant-numeric: tabular-nums`.
+- Colunas de valor, percentual e estado devem ter largura previsível; a coluna descritiva/categoria ocupa o espaço flexível principal.
+- Estados textuais em tabelas densas devem manter alinhamento consistente entre linhas, sem molduras, fundos, bordas ou chips quando a própria cor/texto já comunicar o estado.
+- Evite classes semânticas genéricas em linhas ou containers (`danger`, `warning`, `success`) quando puderem colidir com estilos globais; prefira classes escopadas ao componente ou estados neutros como `over`, `attention`, `on-track`.
 - Notação de cores obrigatória:
   - Números negativos → vermelho `#EF4444`.
   - Saldos positivos → verde `#10B981`.
   - Lançamentos positivos (entradas) → preto `--on-surface`.
+
+### Abas e painéis analíticos
+
+- Abas do Cockpit devem seguir a ordem de leitura: **Situação**, **Tendências** e **Saúde Financeira**.
+- Painéis analíticos com tabelas e cards de leitura, como Tendências, devem priorizar fluxo vertical em largura total antes de dividir conteúdo em colunas, especialmente em telas intermediárias como MacBook Air.
+- A densidade visual deve ser obtida por alinhamento, largura previsível e tipografia tabular, não por redução extrema de legibilidade.
 
 ### Indicadores de status
 
@@ -270,6 +281,8 @@ Grade de linha de base: **4px** (todos os valores são múltiplos de 4px).
 
 ## Changelog
 
+- `2.2` — 2026-08-02 — Documentada regra de desambiguação dos nomes do menu lateral e alinhamento entre item de navegação e título da página.
+- `2.1` — 2026-08-02 — Documentadas regras para tabelas densas, estados textuais sem moldura, distribuição de colunas e ordem das abas analíticas do Cockpit.
 - `1.0` — 2026-06-29 — Consolidação do design original em tokens tabulados com frontmatter e wikilinks.
 - `1.1` — 2026-06-30 — Regras de tokenização para preparação do modo escuro e paleta de gráficos documentadas.
 - `1.2` — 2026-06-30 — Infraestrutura de aplicação de tema com `data-theme` e preferência local documentada.

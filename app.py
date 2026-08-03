@@ -633,7 +633,7 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_json({"error": exc.message}, exc.status)
 
     def handle_financial_health_trends(self) -> None:
-        # spec: tendencias-saude-financeira v2.7 — critérios 1, 3, 4, 5, 6, 7, 13, 17, 25, 26, 27 e 28
+        # spec: tendencias-saude-financeira v2.10 — critérios 1, 3, 4, 5, 6, 7, 13, 17, 25, 26, 27 e 28
         if not self.validate_read_source():
             return
         user = self.require_user()
@@ -647,14 +647,14 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_json({"error": exc.message}, exc.status)
 
     def handle_ai_settings_status(self) -> None:
-        # spec: tendencias-saude-financeira v2.7 — critérios 17, 18 e 19
+        # spec: tendencias-saude-financeira v2.10 — critérios 17, 18 e 19
         if not self.validate_read_source():
             return
         user = self.require_user()
         self.send_json(ai_settings_status(user["id"]))
 
     def handle_save_ai_settings(self) -> None:
-        # spec: tendencias-saude-financeira v2.7 — critérios 17, 18, 19, 21, 23, 27 e 28
+        # spec: tendencias-saude-financeira v2.10 — critérios 17, 18, 19, 21, 23, 27 e 28
         user = self.require_user()
         data = self.read_json()
         try:
@@ -663,7 +663,7 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_json({"error": str(exc) or "Configuracao de IA invalida."}, HTTPStatus.BAD_REQUEST)
 
     def handle_ai_summary(self) -> None:
-        # spec: tendencias-saude-financeira v2.7 — critérios 12, 13, 14, 16 e 17
+        # spec: tendencias-saude-financeira v2.10 — critérios 12, 13, 14, 16 e 17
         user = self.require_user()
         data = self.read_json()
         month = data.get("month") or date.today().strftime("%Y-%m")

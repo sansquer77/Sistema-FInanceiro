@@ -21,7 +21,7 @@
         document.documentElement.style.colorScheme = theme;
       })();
     </script>
-    <link rel="stylesheet" href="/styles.css?v=116">
+    <link rel="stylesheet" href="/styles.css?v=118">
   </head>
   <body>
     <main class="app-shell">
@@ -112,24 +112,24 @@
             </div>
             <div class="nav-group">
               <span>Cadastro</span>
-              <button class="nav-button" type="button" data-view="accounts" data-short="CT" title="Contas">
+              <button class="nav-button" type="button" data-view="accounts" data-short="CT" title="Minhas Contas">
                 <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10h18"></path><path d="M5 10v9"></path><path d="M9 10v9"></path><path d="M15 10v9"></path><path d="M19 10v9"></path><path d="M3 19h18"></path><path d="M12 3 3 8h18Z"></path></svg>
-                <span class="nav-label">Contas</span>
+                <span class="nav-label">Minhas Contas</span>
               </button>
-              <button class="nav-button" type="button" data-view="creditCards" data-short="CC" title="Cartões">
+              <button class="nav-button" type="button" data-view="creditCards" data-short="CC" title="Meus Cartões">
                 <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M3 10h18"></path><path d="M7 15h4"></path></svg>
-                <span class="nav-label">Cartões</span>
+                <span class="nav-label">Meus Cartões</span>
               </button>
             </div>
             <div class="nav-group">
               <span>Lançamentos</span>
-              <button class="nav-button" type="button" data-view="transactions" data-short="LC" title="Lançamentos de contas">
+              <button class="nav-button" type="button" data-view="transactions" data-short="LC" title="Extrato de Contas">
                 <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h14"></path><path d="m17 3 4 4-4 4"></path><path d="M17 17H3"></path><path d="m7 13-4 4 4 4"></path></svg>
-                <span class="nav-label">Contas</span>
+                <span class="nav-label">Extrato de Contas</span>
               </button>
-              <button class="nav-button" type="button" data-view="cardLaunches" data-short="LA" title="Lançamentos de cartões">
+              <button class="nav-button" type="button" data-view="cardLaunches" data-short="LA" title="Fatura de Cartões">
                 <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18H6z"></path><path d="M9 7h6"></path><path d="M9 11h6"></path><path d="M9 15h3"></path></svg>
-                <span class="nav-label">Cartões</span>
+                <span class="nav-label">Fatura de Cartões</span>
               </button>
             </div>
             <div class="nav-group">
@@ -193,8 +193,8 @@
           <div class="cockpit-toolbar">
             <div class="cockpit-tabs" role="tablist" aria-label="Visões do cockpit">
               <button class="cockpit-tab active" type="button" role="tab" aria-selected="true" aria-controls="cockpitSummaryPanel" data-cockpit-tab="summary">Situação</button>
-              <button class="cockpit-tab" type="button" role="tab" aria-selected="false" aria-controls="financialHealthPanel" data-cockpit-tab="health">Saúde</button>
               <button class="cockpit-tab" type="button" role="tab" aria-selected="false" aria-controls="trendsPanel" data-cockpit-tab="trends">Tendências</button>
+              <button class="cockpit-tab" type="button" role="tab" aria-selected="false" aria-controls="financialHealthPanel" data-cockpit-tab="health">Saúde</button>
             </div>
             <div class="month-navigator cockpit-month">
               <button class="ghost small-button month-icon-button" type="button" id="previousCockpitMonthButton" aria-label="Mês anterior" title="Mês anterior">‹</button>
@@ -276,18 +276,6 @@
             </div>
           </div>
 
-          <section class="panel financial-health-panel cockpit-tab-panel" id="financialHealthPanel" role="tabpanel" hidden>
-            <div class="financial-health-header">
-              <div>
-                <h2>Saúde Financeira</h2>
-                <p class="muted-copy">Diagnóstico mensal baseado em poupança, reserva, endividamento, limites e concentração da carteira.</p>
-              </div>
-            </div>
-            <div class="financial-health-content" id="financialHealthContent">
-              <div class="empty-state compact">Carregando score de saúde financeira...</div>
-            </div>
-          </section>
-
           <section class="panel trends-panel cockpit-tab-panel" id="trendsPanel" role="tabpanel" hidden>
             <div class="trends-header">
               <div>
@@ -298,6 +286,18 @@
             </div>
             <div class="trends-content" id="trendsContent">
               <div class="empty-state compact">Carregando tendências...</div>
+            </div>
+          </section>
+
+          <section class="panel financial-health-panel cockpit-tab-panel" id="financialHealthPanel" role="tabpanel" hidden>
+            <div class="financial-health-header">
+              <div>
+                <h2>Saúde Financeira</h2>
+                <p class="muted-copy">Diagnóstico mensal baseado em poupança, reserva, endividamento, limites e concentração da carteira.</p>
+              </div>
+            </div>
+            <div class="financial-health-content" id="financialHealthContent">
+              <div class="empty-state compact">Carregando score de saúde financeira...</div>
             </div>
           </section>
         </section>
@@ -1752,6 +1752,6 @@
         </div>
       </aside>
     </main>
-    <script type="module" src="/app.js?v=116"></script>
+    <script type="module" src="/app.js?v=118"></script>
   </body>
 </html>

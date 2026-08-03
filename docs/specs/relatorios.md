@@ -2,7 +2,7 @@
 tipo: spec
 area: relatorios
 status: implementado
-versao: 2.4
+versao: 2.5
 atualizado: 2026-08-02
 relacionados:
   - "[[lancamentos]]"
@@ -59,9 +59,10 @@ Qualquer usuário autenticado localmente que queira analisar seus gastos e recei
 - Pagamentos de fatura gerados em conta-corrente reduzem o saldo da conta, mas não entram em análises de despesa, relatórios por categoria/subcategoria/tag, evolução de categoria nem totais do Cockpit, pois os lançamentos detalhados do cartão já representam o consumo.
 - Relatórios exibem totais por moeda quando houver movimentações multimoeda.
 - O planejamento do Cockpit separa receitas recorrentes, investimentos planejados e despesas recorrentes por moeda, exibindo os valores originais sem somar moedas distintas.
-- O Cockpit deve separar a visão operacional **Situação do mês** e a visão diagnóstica **Saúde Financeira** em abas internas no topo do módulo, evitando que o usuário precise rolar todo o resumo mensal para acessar o score.
+- O Cockpit deve separar a visão operacional **Situação do mês**, a visão comparativa **Tendências** e a visão diagnóstica **Saúde Financeira** em abas internas no topo do módulo, evitando que o usuário precise rolar todo o resumo mensal para acessar análises complementares.
+- As abas do Cockpit devem aparecer na ordem **Situação**, **Tendências** e **Saúde Financeira**.
 - A aba **Situação do mês** é a visão inicial do Cockpit e mantém KPIs, alertas, saldos por moeda, portfólio por tipo, planejamento, dívidas e gráficos de maiores receitas/despesas.
-- O Cockpit deve ter um seletor de mês no topo do módulo, compartilhado pelas abas internas que dependem de competência mensal, começando por **Situação do mês** e **Saúde Financeira**.
+- O Cockpit deve ter um seletor de mês no topo do módulo, compartilhado pelas abas internas que dependem de competência mensal, começando por **Situação do mês**, **Tendências** e **Saúde Financeira**.
 - O seletor de mês do Cockpit deve seguir o mesmo padrão visual dos seletores mensais de Lançamentos, com botões compactos por ícone para mês anterior, mês atual e próximo mês.
 - Rótulos de seletores mensais devem usar o formato compacto `MM/AAAA` para manter largura visual estável.
 - Ao trocar o mês do Cockpit, a aba **Situação do mês** deve recalcular KPIs, maiores receitas/despesas, limites, planejamento, dívidas e totais por moeda com base no mês selecionado.
@@ -106,7 +107,7 @@ Valores aceitos para `periodo`: `3m`, `6m`, `12m`, `ytd` e `all`.
 
 > Inspiração visual/UX: referência externa indicada pelo usuário em vídeo do YouTube, aproximadamente entre 12:00 e 12:08. Como a referência externa pode não estar disponível para consulta textual permanente, a decisão registrada aqui é descrita pelo comportamento desejado no app, não pelo conteúdo do vídeo.
 
-A proposta é transformar o Cockpit em uma visão mensal navegável por seletor de mês, mantendo a aba **Situação do mês** como leitura operacional do período escolhido e a aba **Saúde Financeira** sincronizada ao mesmo mês. Essa mudança deve reduzir a dependência do “agora” e permitir revisitar meses fechados com a mesma consistência dos Relatórios.
+A proposta é transformar o Cockpit em uma visão mensal navegável por seletor de mês, mantendo a aba **Situação do mês** como leitura operacional do período escolhido e sincronizando **Tendências** e **Saúde Financeira** ao mesmo mês. Essa mudança deve reduzir a dependência do “agora” e permitir revisitar meses fechados com a mesma consistência dos Relatórios.
 
 O ponto crítico é cartão de crédito: a fatura pertence ao mês de competência (`invoice_month`) e deve continuar representando o consumo daquele mês mesmo depois de paga. Portanto, a quitação da fatura não deve apagar nem reduzir a despesa analítica do mês selecionado; ela deve apenas aparecer como efeito operacional no saldo da conta de pagamento.
 
@@ -150,7 +151,7 @@ O ponto crítico é cartão de crédito: a fatura pertence ao mês de competênc
 - Dado o demonstrativo exibido, quando há despesas de conta e cartão, então o resumo e a composição distinguem as duas origens e o detalhamento mostra a conta ou cartão de cada lançamento.
 - Dado o usuário gerando um demonstrativo, quando existem compras parceladas em aberto, então o resumo executivo exibe o endividamento atual da moeda/seção seguindo a mesma regra do Cockpit.
 - Dado o demonstrativo exibido ou impresso, quando valores monetários aparecem em KPIs, tabelas e legendas, então a fonte dos valores tem tamanho equivalente ao texto descritivo e não domina visualmente o layout.
-- Dado o usuário abrindo o Cockpit, quando a tela é exibida, então vê abas internas para alternar entre **Situação do mês** e **Saúde Financeira**, com **Situação do mês** ativa por padrão.
+- Dado o usuário abrindo o Cockpit, quando a tela é exibida, então vê abas internas para alternar entre **Situação do mês**, **Tendências** e **Saúde Financeira**, com **Situação do mês** ativa por padrão e nessa ordem.
 - Dado o usuário alternando para **Saúde Financeira**, quando a aba é ativada, então o score fica acessível sem exigir rolagem pelo resumo mensal.
 - Dado o usuário abrindo o Cockpit, quando a tela é exibida, então o seletor de mês inicia no mês corrente.
 - Dado o usuário navegando para outro mês no Cockpit, quando aciona o botão de mês atual, então o Cockpit retorna ao mês corrente.
@@ -166,6 +167,7 @@ O ponto crítico é cartão de crédito: a fatura pertence ao mês de competênc
 
 ## Changelog
 
+- `2.5` — 2026-08-02 — Ordem das abas do Cockpit documentada como Situação, Tendências e Saúde Financeira, alinhando Relatórios/Cockpit à spec de Tendências.
 - `2.4` — 2026-08-02 — Cockpit e Relatórios ganham ajustes responsivos para telas de 14 polegadas (e breakpoints intermediários): KPIs de 4/6 colunas passam para 2/3 colunas, gráficos do demonstrativo empilham verticalmente e o demonstrativo evita compressão em viewports intermediárias.
 - `2.3` — 2026-08-02 — Rótulos dos seletores mensais passam a usar formato fixo `MM/AAAA` para manter largura visual estável.
 - `2.2` — 2026-08-02 — Seletor mensal do Cockpit padronizado com os seletores de Lançamentos, incluindo botão de mês atual e botões compactos por ícone.
