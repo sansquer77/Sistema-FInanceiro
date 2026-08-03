@@ -2,7 +2,7 @@
 tipo: spec
 area: distribuicao
 status: implementado
-versao: 1.8
+versao: 1.9
 atualizado: 2026-08-02
 relacionados:
   - "[[sdd]]"
@@ -67,6 +67,7 @@ Usuario final que vai instalar o Sistema Financeiro em outro computador e manten
 - O pacote nao deve conter nenhum arquivo ou subdiretorio de `data/`.
 - O pacote nao deve conter nenhum arquivo ou subdiretorio de `tests/`.
 - O pacote final nao deve conter a pasta `docs/`; a documentacao tecnica fica apenas no repositorio de desenvolvimento.
+- O pacote final nao deve conter a pasta `landing-page/`; a Landing Page institucional e subprojeto separado para deploy web e nao faz parte do app instalavel.
 - O pacote nao deve conter `__pycache__/`, `.DS_Store`, `_CodeSignature` ou arquivos AppleDouble `._*`.
 - O pacote nao deve conter banco SQLite, logs, configuracoes SMTP criptografadas, chaves locais, usuarios, contas, cartoes, lancamentos, categorias, tags ou posicoes pessoais.
 - O pacote macOS deve usar o runtime one-folder gerado por PyInstaller em `MacOS/Aplicativo/SistemaFinanceiro/`, sem expor `app.py`, `financeiro/` ou `web/` como arvore fonte de runtime.
@@ -116,6 +117,7 @@ Arquivos e diretorios afetados:
 
 - Dado qualquer pacote gerado, quando o zip for inspecionado, entao nao existe nenhum caminho contendo `/data/` ou `/tests/`.
 - Dado qualquer pacote gerado, quando o zip for inspecionado, entao nao existe nenhum caminho contendo `/docs/`.
+- Dado qualquer pacote gerado, quando o zip for inspecionado, entao nao existe nenhum caminho contendo `/landing-page/`.
 - Dado qualquer pacote gerado, quando o zip for inspecionado, entao nao existem `__pycache__`, `.DS_Store`, `_CodeSignature` ou arquivos `._*`.
 - Dado o bundle `Sistema Financeiro.app` da distribuicao macOS, quando o binario `launcher` for inspecionado, entao ele referencia `$HOME/Documents/Sistema Financeiro` ou formato equivalente portatil, sem caminho absoluto da maquina do mantenedor.
 - Dado o pacote macOS gerado, quando inspecionado, entao o runtime principal e `Aplicativo/SistemaFinanceiro/SistemaFinanceiro` e nao `Aplicativo/app.py`.
@@ -142,9 +144,11 @@ Arquivos e diretorios afetados:
 - Migracao automatica de bancos entre maquinas.
 - Inclusao de dados demonstrativos ou dados reais de usuario.
 - Inclusao de documentacao tecnica, specs, ADRs ou referencias internas nos pacotes finais.
+- Inclusao da Landing Page institucional ou de dependencias Next/React/Tailwind nos pacotes finais.
 
 ## Changelog
 
+- `1.9` — 2026-08-02 — Registrado que `landing-page/` e sua stack institucional ficam fora dos pacotes distribuíveis do app principal.
 - `1.8` — 2026-08-02 — Pacotes passam a manter apenas README de instalacao na raiz da plataforma, separado por execucao local e execucao em rede, removendo README de desenvolvimento de `Aplicativo/`.
 - `1.7` — 2026-07-27 — Pacote Windows gerado por GitHub Actions passa a ser montado em staging limpo com runtime PyInstaller, sem arvore fonte e com launchers apontando para `SistemaFinanceiro.exe`.
 - `1.6` — 2026-07-06 — Inclusao de servidor Linux em `sistema-financeiro.net:8030`, scripts de hosts para clientes e regras padrao de Host/Origin.
