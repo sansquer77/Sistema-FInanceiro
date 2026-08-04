@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 2.7
-atualizado: 2026-07-27
+versao: 2.8
+atualizado: 2026-08-04
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -106,8 +106,13 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | Frontend | HTML + CSS + JavaScript (ES Modules nativos, sem build) |
 | Distribuição | Pacotes macOS e Windows offline-first, com modo local padrão e modo LAN explícito |
 
+## Licença
+
+O Sistema Financeiro é disponibilizado gratuitamente como projeto open source sob a **Apache License 2.0** (`Apache-2.0`). Consulte o arquivo [`LICENSE`](LICENSE) na raiz do repositório.
+
 ## Changelog
 
+- `2.8` — 2026-08-04 — Adicionada seção de licença pública Apache License 2.0 no README do repositório.
 - `2.7` — 2026-07-27 — Adicionada seção "Specs em outros status" para dar visibilidade a specs fora de `implementado` (ex.: `depreciado`) sem criar pasta separada por status — reforça que o status vive no frontmatter/tag, não na localização do arquivo.
 - `2.6` — 2026-07-24 — Incluída a spec da tela Sobre no grupo Usuário.
 - `2.5` — 2026-07-23 — MVP de classificação assistida concluído e documentação marcada como implementada.

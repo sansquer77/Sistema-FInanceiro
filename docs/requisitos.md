@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 2.0
-atualizado: 2026-08-02
+versao: 2.1
+atualizado: 2026-08-04
 relacionados:
   - "[[arquitetura]]"
   - "[[visao-produto]]"
@@ -19,6 +19,8 @@ tags: [produto, meta]
 ## Objetivo
 
 Manter um sistema financeiro local, privado e simples para controlar contas, saldos, lançamentos e classificações financeiras em SQLite, com interface web servida pelo próprio app Python.
+
+O projeto é disponibilizado gratuitamente como software open source sob a Apache License 2.0, sem suporte formal, garantia de atendimento ou compromisso de manutenção para usuários finais.
 
 ## Escopo atual implementado
 
@@ -47,11 +49,13 @@ Manter um sistema financeiro local, privado e simples para controlar contas, sal
 - **Sobre o app**: tela informativa no grupo Usuário com objetivo, funcionalidades, tecnologias, contato e infraestrutura mínima. Ver [[sobre-app]].
 - **Interface web estática**: painéis locais em `web/`, sem dependências externas de frontend. Ver [[arquitetura]] e [[adr/0001-stack-local-sem-framework]].
 - **Distribuição desktop**: pacotes macOS e Windows com instaladores, modo local e launchers opcionais para rede local confiável. Ver [[distribuição]].
+- **Licenciamento open source**: código-fonte e distribuição pública sob Apache License 2.0. Ver [[adr/0008-licenca-apache-2-0]].
 
 ## Fora do escopo atual
 
 - Open Finance, sincronização em nuvem ou integrações bancárias automáticas diretas.
 - Multiusuário concorrente em rede; o modo LAN é apenas exposição local controlada para redes confiáveis, sem transformar o app em serviço multiusuário.
+- Suporte formal, SLA, consultoria, garantia de funcionamento ou compromisso de atendimento a usuários.
 
 ## Regras funcionais
 
@@ -115,6 +119,7 @@ Manter um sistema financeiro local, privado e simples para controlar contas, sal
 
 ## Changelog
 
+- `2.1` — 2026-08-04 — Escopo atualizado para registrar distribuição gratuita como projeto open source sob Apache License 2.0, sem suporte formal.
 - `2.0` — 2026-08-02 — Lançamentos de conta ou cartão em moeda estrangeira sem cotação manual passam a usar a última PTAX de venda disponível até a data do lançamento para normalização em BRL.
 - `1.9` — 2026-08-02 — Regras de segurança atualizadas para prever armazenamento criptografado local de segredos de integrações opcionais de IA.
 - `1.8` — 2026-08-02 — Cockpit documentado como resumo mensal navegável por seletor de mês, preservando faturas de cartão por competência mesmo após pagamento.

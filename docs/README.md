@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 4.0
-atualizado: 2026-08-03
+versao: 4.2
+atualizado: 2026-08-04
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -79,6 +79,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[adr/0005-smtp-criptografado-local]] | Configuração SMTP criptografada em arquivo local. |
 | [[adr/0006-classificacao-assistida-local]] | Proposta de classificação assistida por hábitos locais, com IA externa apenas como fallback opcional. |
 | [[adr/0007-landing-page-institucional-isolada]] | Landing Page institucional em repositório separado, deployável pela Vercel fora da distribuição do app. |
+| [[adr/0008-licenca-apache-2-0]] | App principal disponibilizado gratuitamente como projeto open source sob Apache License 2.0. |
 
 ---
 
@@ -112,8 +113,14 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | Frontend | HTML + CSS + JavaScript (ES Modules nativos, sem build) |
 | Distribuição | Pacotes macOS e Windows offline-first, com modo local padrão e modo LAN explícito |
 
+## Licença
+
+O Sistema Financeiro é disponibilizado gratuitamente como projeto open source sob a **Apache License 2.0** (`Apache-2.0`). Consulte o arquivo [`LICENSE`](../LICENSE) na raiz do repositório.
+
 ## Changelog
 
+- `4.2` — 2026-08-04 — [[specs/landing-page]] atualizada para remover PIX/cobrança e documentar download gratuito via GitHub Releases com contato apenas para sugestões/relatos.
+- `4.1` — 2026-08-04 — Adicionado [[adr/0008-licenca-apache-2-0]] para registrar a adoção da Apache License 2.0 e distribuição gratuita sem suporte formal.
 - `4.0` — 2026-08-03 — [[specs/landing-page]] avançou para v1.0 com regra de animação/alinhamento da árvore visual no repositório separado da landing.
 - `3.9` — 2026-08-03 — [[specs/landing-page]] atualizada com seção pública de uso em família/rede local confiável.
 - `3.8` — 2026-08-03 — [[specs/landing-page]] atualizada para preservar a árvore visual como metáfora de evolução financeira e evitar linguagem interna de homologação/massa fictícia na copy pública.

@@ -2,8 +2,8 @@
 tipo: spec
 area: landing-page
 status: em-implementacao
-versao: 1.0
-atualizado: 2026-08-03
+versao: 1.1
+atualizado: 2026-08-04
 relacionados:
   - "[[sobre-app]]"
   - "[[../design/design-system|Design System]]"
@@ -15,7 +15,7 @@ aliases: ["Landing Page do Produto", "Site Institucional de Apresentação"]
 # Landing Page do Produto e Showcase Visual
 
 > [!info] Status
-> **em-implementacao** · área: `landing-page` · atualizado em 2026-08-03 · relacionados: [[sobre-app]], [[../design/design-system|Design System]], [[../adr/0007-landing-page-institucional-isolada|ADR-0007]]
+> **em-implementacao** · área: `landing-page` · atualizado em 2026-08-04 · relacionados: [[sobre-app]], [[../design/design-system|Design System]], [[../adr/0007-landing-page-institucional-isolada|ADR-0007]]
 
 ### Problema
 
@@ -37,8 +37,9 @@ Visitante ou usuário interessado que busca entender a proposta de valor, visual
    - **Investimentos & Renda Fixa**: exibindo a gestão de ativos (Pré, Pós e Híbridos).
    - **Gestão de Contas, Cartões & Extratos**: apresentando controle de faturas e conciliação.
 5. Em cada área visual, encontra exemplos baseados nas telas reais do aplicativo, sempre com dados fictícios e diferentes da base de homologação.
-6. Na seção de aquisição (Call to Action - CTA), o visitante visualiza o QR Code PIX, instruções de pagamento e uma forma simples de solicitar uma cópia após o pagamento.
-7. O visitante usa o contato informado para enviar comprovante ou solicitar a cópia, sem que a landing page precise validar pagamento automaticamente no MVP.
+6. Na seção de downloads, o visitante encontra os pacotes oficiais gratuitos gerados por GitHub Releases a partir do repositório do app principal.
+7. O visitante encontra um disclaimer claro de que o Sistema Financeiro é um projeto pessoal disponibilizado gratuitamente, sem suporte formal.
+8. O visitante usa o e-mail apenas como canal para sugestões, dúvidas gerais ou relato de problemas, sem expectativa de SLA ou atendimento garantido.
 
 ### Dados
 
@@ -48,7 +49,6 @@ Visitante ou usuário interessado que busca entender a proposta de valor, visual
 - `/Users/sansquer/Documents/GitHub/sistemafinanceiropage/public/images/portfolio-preview.png`: captura de tela da visão de investimentos e renda fixa.
 - `/Users/sansquer/Documents/GitHub/sistemafinanceiropage/public/images/privacy-mode-preview.png`: captura demonstrativa do efeito de mascaramento/desfoque do Modo Privacidade.
 - `/Users/sansquer/Documents/GitHub/sistemafinanceiropage/public/images/cards-preview.png`: captura de tela da gestão de cartões e faturas.
-- `/Users/sansquer/Documents/GitHub/sistemafinanceiropage/public/images/pix-qrcode.jpg`: QR Code PIX informado pelo mantenedor para pagamento.
 - `/Users/sansquer/Documents/GitHub/sistemafinanceiropage/assets/demo-data/`: dados demonstrativos ou fixtures visuais usados para gerar capturas fictícias, sem relação com a base de homologação, caso esse diretório seja usado.
 
 ### Regras
@@ -69,8 +69,9 @@ Visitante ou usuário interessado que busca entender a proposta de valor, visual
 - A árvore visual deve apresentar o app como um sistema integrado, com tronco central representando o **Sistema Financeiro** e ramos para Contas, Cartões, Cockpit, Saúde Financeira, Tendências, Portfólio, Relatórios, Simulação, Privacidade e Preferências.
 - A seção de exemplos reais deve usar capturas ou mockups fiéis às páginas do app, mas sempre renderizados com massa de dados demonstrativa.
 - As capturas fiéis devem ser geradas preferencialmente a partir de uma instância local isolada do app com `SISTEMA_FINANCEIRO_DATA_DIR` temporário e usuário demonstrativo, sem reutilizar `data/` de desenvolvimento ou homologação.
-- A seção de aquisição deve conter QR Code PIX fornecido manualmente pelo mantenedor, valor/instruções quando aplicável e texto claro de que a liberação/cópia é tratada manualmente após confirmação do pagamento.
-- A solicitação de cópia após PIX deve usar um canal simples e externo ao app no MVP, como `mailto:` para o e-mail de contato, evitando cadastro, checkout, backend de pedidos ou armazenamento de comprovantes.
+- A seção de downloads deve indicar que o app é gratuito e apontar para pacotes oficiais publicados em GitHub Releases do repositório do app principal.
+- A landing deve conter disclaimer informando que o Sistema Financeiro é um projeto pessoal open source disponibilizado gratuitamente, sem suporte formal, garantia de atendimento ou obrigação de manutenção.
+- O contato por e-mail deve ser apresentado como canal para sugestões, dúvidas gerais ou relatos de problemas, não como suporte contratado.
 - As cores visuais da landing page devem seguir o guia de identidade do aplicativo (`--bg`, `--panel`, `--accent`, etc.) conforme definido no Design System.
 - A landing page não deve expor prints, nomes, e-mails, saldos, ativos, contas ou cartões reais do desenvolvedor ou de qualquer base de homologação.
 - O diretório legado `landing-page/` foi removido deste repositório do app principal; qualquer recriação desse diretório deve ser tratada como regressão, salvo pedido explícito de migração/consulta histórica.
@@ -81,7 +82,7 @@ Visitante ou usuário interessado que busca entender a proposta de valor, visual
 - Nenhuma alteração em esquemas do SQLite ou modelos do Python backend (`financeiro/`).
 - Conteúdo institucional armazenado no repositório `/Users/sansquer/Documents/GitHub/sistemafinanceiropage`, com dependências, scripts e configuração próprios quando a landing usar Next.js/React.
 - A landing page não deve importar módulos de `web/`, `financeiro/` ou `app.py`; a comunicação com o app principal no MVP é apenas visual/institucional.
-- O CTA de solicitação de cópia pode usar link `mailto:` com assunto pré-preenchido e instruções para anexar comprovante PIX, sem persistência local.
+- O CTA de contato pode usar link `mailto:` com assunto pré-preenchido para sugestões ou relato de problemas, sem persistência local.
 
 ### Critérios de aceite
 
@@ -93,7 +94,8 @@ Visitante ou usuário interessado que busca entender a proposta de valor, visual
 - Dado um visitante interessado no uso familiar, quando navega até a seção de rede local, então entende que o app pode ser instalado em um computador da casa e acessado por dispositivos autorizados na mesma rede local confiável.
 - Dado um visitante analisando os recursos de saúde financeira, quando chega na seção de Diagnóstico, então encontra a explicação da pontuação de 0 a 1000 e dos 5 pilares estratégicos.
 - Dado um visitante analisando exemplos do app, quando visualiza capturas ou mockups, então todos os dados exibidos são fictícios e não correspondem à homologação.
-- Dado um visitante interessado em obter uma cópia, quando chega ao CTA final, então visualiza o QR Code PIX, instruções de pagamento e link de contato para solicitar a cópia após o pagamento.
+- Dado um visitante interessado em baixar o app, quando chega à seção de downloads, então encontra links para os pacotes gratuitos oficiais publicados em GitHub Releases.
+- Dado um visitante lendo a seção de contato, quando avalia o canal de e-mail, então entende que ele serve para sugestões e relatos, sem suporte formal ou SLA.
 - Dado um visitante acessando via smartphone ou dispositivo com tela reduzida, quando rola a página, então todo o layout se adapta de forma fluida sem rolagem horizontal indesejada.
 - Dado o repositório `sistemafinanceiropage`, quando um desenvolvedor roda o build do projeto ou a Vercel publica esse repositório, então os recursos são carregados sem dependência da API backend em execução.
 - Dado o app principal sendo distribuído para usuários finais, quando o pacote é gerado, então o repositório/projeto da landing page não é incluído no pacote.
@@ -101,7 +103,7 @@ Visitante ou usuário interessado que busca entender a proposta de valor, visual
 ### Pendências
 
 - [x] Definir quais elementos visuais do template “COMPUTE - The Platform to Build & Ship AI Agents” serão adaptados, especialmente a árvore/narrativa modular.
-- [x] Definir texto final, valor, chave/QR Code PIX e canal de contato para solicitação de cópia.
+- [x] Definir texto final, política gratuita sem suporte formal e canal de contato para sugestões.
 - [x] Gerar e salvar as imagens de captura de tela em `sistemafinanceiropage/public/images/` utilizando massa fictícia independente da base de homologação.
 - [x] Definir se a landing page será hospedada via Vercel/GitHub Pages ou servida opcionalmente no `app.py`: decisão atual é Vercel com repositório próprio `sistemafinanceiropage`, sem servir pelo `app.py`.
 
@@ -116,13 +118,14 @@ Visitante ou usuário interessado que busca entender a proposta de valor, visual
 
 ### Plano de implementação
 
-- [x] Passo 1 — Definir a narrativa visual da árvore, copy principal e CTA PIX/manual, sem alterar código do app principal. Fecha: critérios 1, 2 e 6.
-- [x] Passo 2 — Criar o repositório `sistemafinanceiropage` com `public/images/`, QR Code PIX e capturas/mockups fictícios dos módulos. Fecha: critérios 4, 5 e 8.
+- [x] Passo 1 — Definir a narrativa visual da árvore, copy principal e CTA de download/contato, sem alterar código do app principal. Fecha: critérios 1, 2 e 6.
+- [x] Passo 2 — Criar o repositório `sistemafinanceiropage` com `public/images/` e capturas/mockups fictícios dos módulos. Fecha: critérios 4, 5 e 8.
 - [x] Passo 3 — Descompactar/adaptar o projeto exportado do v0.app diretamente em `sistemafinanceiropage`, preservando os assets demonstrativos e configurando a Vercel para usar esse repositório. Fecha: critérios 1, 2, 3, 4, 6, 7, 9 e 10.
 - [ ] Passo 4 — Validar acessibilidade, responsividade mobile, contraste visual e ausência de dados reais nas imagens. Fecha: critérios 3, 7, 8 e 9.
 
 ### Changelog
 
+- `1.1` — 2026-08-04 — Atualizada a proposta pública da landing para download gratuito via GitHub Releases, removendo PIX/cobrança e definindo contato como canal de sugestões sem suporte formal.
 - `1.0` — 2026-08-03 — Registrado o comportamento visual da árvore com alinhamento ao texto, animação sutil e respeito a `prefers-reduced-motion`.
 - `0.9` — 2026-08-03 — Incluída na landing a seção pública “Uso em família” para explicar o uso multiusuário em rede local confiável, mantendo tom profissional e sem prometer serviço em nuvem.
 - `0.8` — 2026-08-03 — Registrado que a landing deve manter a árvore visual do template como metáfora de evolução financeira e remover do texto público menções internas a homologação/massa fictícia.
