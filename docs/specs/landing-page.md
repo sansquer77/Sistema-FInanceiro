@@ -2,7 +2,7 @@
 tipo: spec
 area: landing-page
 status: em-implementacao
-versao: 1.2
+versao: 1.4
 atualizado: 2026-08-04
 relacionados:
   - "[[sobre-app]]"
@@ -71,6 +71,9 @@ Visitante ou usuário interessado que busca entender a proposta de valor, visual
 - A seção de exemplos reais deve usar capturas ou mockups fiéis às páginas do app, mas sempre renderizados com massa de dados demonstrativa.
 - As capturas fiéis devem ser geradas preferencialmente a partir de uma instância local isolada do app com `SISTEMA_FINANCEIRO_DATA_DIR` temporário e usuário demonstrativo, sem reutilizar `data/` de desenvolvimento ou homologação.
 - A seção de downloads deve indicar que o app é gratuito e apontar para pacotes oficiais publicados em GitHub Releases do repositório do app principal.
+- A seção de downloads deve buscar a release mais recente do repositório `sansquer77/Sistema-FInanceiro` em Server Component do Next.js com `fetch(..., { next: { revalidate: 3600 } })`, sem token, backend próprio ou chamada por visitante no client.
+- A seção de downloads deve exibir “Versão mais recente: <tag>” e botões “Baixar para Windows”, “Baixar para macOS” e “Baixar para Linux”, mapeando assets da release por nome/plataforma.
+- Cada botão de download deve exibir um símbolo visual do sistema operacional correspondente, preservando leitura profissional e acessibilidade textual.
 - A landing deve conter disclaimer informando que o Sistema Financeiro é um projeto pessoal open source disponibilizado gratuitamente, sem suporte formal, garantia de atendimento ou obrigação de manutenção.
 - O contato por e-mail deve ser apresentado como canal para sugestões, dúvidas gerais ou relatos de problemas, não como suporte contratado.
 - A landing deve informar a licença Apache License 2.0 na área de contato/download.
@@ -98,6 +101,8 @@ Visitante ou usuário interessado que busca entender a proposta de valor, visual
 - Dado um visitante analisando os recursos de saúde financeira, quando chega na seção de Diagnóstico, então encontra a explicação da pontuação de 0 a 1000 e dos 5 pilares estratégicos.
 - Dado um visitante analisando exemplos do app, quando visualiza capturas ou mockups, então todos os dados exibidos são fictícios e não correspondem à homologação.
 - Dado um visitante interessado em baixar o app, quando chega à seção de downloads, então encontra links para os pacotes gratuitos oficiais publicados em GitHub Releases.
+- Dado a API pública do GitHub disponível, quando a landing é renderizada, então a seção de downloads exibe a tag da release mais recente e os links dos assets Windows/macOS/Linux encontrados.
+- Dado a API pública do GitHub indisponível ou sem asset esperado, quando a landing é renderizada, então a seção de downloads continua acessível e aponta para a página geral de releases como fallback.
 - Dado um visitante lendo a seção de contato, quando avalia o canal de e-mail, então entende que ele serve para sugestões e relatos, sem suporte formal ou SLA.
 - Dado um visitante lendo a seção de contato, quando visualiza a contribuição voluntária, então entende que ela é opcional e não condiciona o uso gratuito do app.
 - Dado um visitante acessando via smartphone ou dispositivo com tela reduzida, quando rola a página, então todo o layout se adapta de forma fluida sem rolagem horizontal indesejada.
@@ -129,6 +134,8 @@ Visitante ou usuário interessado que busca entender a proposta de valor, visual
 
 ### Changelog
 
+- `1.4` — 2026-08-04 — Incluído Linux na seção de downloads e definidos símbolos visuais de sistema operacional nos botões Windows, macOS e Linux.
+- `1.3` — 2026-08-04 — Definida a seção de downloads com busca server-side da última GitHub Release, cache de 1h e botões para Windows/macOS com fallback para a página de releases.
 - `1.2` — 2026-08-04 — Incluída na landing a exibição da licença Apache 2.0 e link de contribuição voluntária “Me pague um café se gostou do app”, sem condicionar o uso gratuito.
 - `1.1` — 2026-08-04 — Atualizada a proposta pública da landing para download gratuito via GitHub Releases, removendo PIX/cobrança e definindo contato como canal de sugestões sem suporte formal.
 - `1.0` — 2026-08-03 — Registrado o comportamento visual da árvore com alinhamento ao texto, animação sutil e respeito a `prefers-reduced-motion`.

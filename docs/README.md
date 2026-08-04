@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 4.3
+versao: 4.5
 atualizado: 2026-08-04
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -119,6 +119,8 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `4.5` — 2026-08-04 — [[specs/landing-page]] atualizada para incluir Linux e símbolos de sistema operacional nos botões de download.
+- `4.4` — 2026-08-04 — [[specs/landing-page]] atualizada com downloads oficiais via última GitHub Release, cache server-side de 1h e botões Windows/macOS.
 - `4.3` — 2026-08-04 — [[specs/landing-page]] atualizada para exibir Apache 2.0 na landing e contribuição voluntária via Buy Me a Coffee sem condicionar o uso gratuito.
 - `4.2` — 2026-08-04 — [[specs/landing-page]] atualizada para remover PIX/cobrança e documentar download gratuito via GitHub Releases com contato apenas para sugestões/relatos.
 - `4.1` — 2026-08-04 — Adicionado [[adr/0008-licenca-apache-2-0]] para registrar a adoção da Apache License 2.0 e distribuição gratuita sem suporte formal.
