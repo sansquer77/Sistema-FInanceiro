@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.2
+versao: 3.3
 atualizado: 2026-08-04
 relacionados:
   - "[[requisitos]]"
@@ -105,6 +105,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | Método | Rota | Descrição |
 |---|---|---|
 | `GET` | `/api/app-info` | Metadados públicos do app, incluindo nome e versão atual. |
+| `GET` | `/api/latest-version` | Versão local e versão mais recente publicada no site oficial, com indicação de atualização disponível. |
 | `GET` | `/api/me` | Dados do usuário autenticado. |
 | `POST` | `/api/register` | Cadastro de novo usuário. |
 | `POST` | `/api/login` | Login com e-mail e senha. |
@@ -253,6 +254,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `operation_logs.py` | Auditoria funcional das operações do usuário. Ver [[historico-operacoes]]. |
 | `emailer.py` | Envio SMTP do código de recuperação de senha. Ver [[recuperacao-senha]]. |
 | `secure_config.py` | Armazenamento criptografado da configuração SMTP local e de segredos de IA por usuário. Ver [[recuperacao-senha]], [[tendencias-saude-financeira]]. |
+| `version_check.py` | Consulta a landing page oficial por nova versão, compara com a versão local e mantém cache de 1h. Ver [[alerta-nova-versao]]. |
 
 ---
 
@@ -337,6 +339,16 @@ Conexões SQLite são abertas com `journal_mode=WAL`, `busy_timeout` curto e `fo
 7. A sessão expira definitivamente 30 dias após a criação, sem renovação por atividade.
 
 Ver [[seguranca-autenticacao]], [[recuperacao-senha]].
+
+### Detecção de nova versão
+
+1. O frontend carrega metadados do app (`/api/app-info`) e, em seguida, consulta `/api/latest-version`.
+2. `app.py` chama `financeiro.version_check.latest_version_info()`, que consulta o endpoint `/api/latest-version` da landing page oficial com timeout curto.
+3. O resultado é cacheado por 1 hora para evitar requisições repetidas.
+4. O frontend compara a versão local com a versão publicada e exibe um alerta no Cockpit quando a publicada for maior.
+5. Se a landing page ou a rede estiver indisponível, o app omite o alerta silenciosamente.
+
+Ver [[alerta-nova-versao]].
 
 ### Operação financeira (fluxo comum)
 
@@ -444,6 +456,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.3` — 2026-08-04 — Documentada rota pública `/api/latest-version`, módulo `financeiro/version_check.py` e fluxo de detecção de nova versão no Cockpit.
 - `3.2` — 2026-08-04 — Atualizada descrição de `instructions-view.js` para incluir botões contextuais `?` e responsividade em telas estreitas.
 - `3.1` — 2026-08-04 — Documentada view `instructions-view.js` da central de ajuda, integrada ao menu Usuário e ao orquestrador `web/app.js`.
 - `3.0` — 2026-08-04 — Documentado módulo utilitário `instructions-content.js` com conteúdo estático, offline e versionado da central de ajuda.

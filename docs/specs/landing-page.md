@@ -2,7 +2,7 @@
 tipo: spec
 area: landing-page
 status: em-implementacao
-versao: 1.6
+versao: 1.7
 atualizado: 2026-08-04
 relacionados:
   - "[[sobre-app]]"
@@ -77,6 +77,8 @@ Visitante ou usuário interessado que busca entender a proposta de valor, visual
 - A seção de downloads deve exibir “Versão mais recente: <tag>” e botões “Baixar para Windows”, “Baixar para macOS” e “Baixar para Linux”, mapeando assets da release por nome/plataforma.
 - Cada botão de download deve exibir um símbolo visual do sistema operacional correspondente, preservando leitura profissional e acessibilidade textual.
 - A seção de downloads não deve exibir link textual separado para notas da versão; a navegação principal deve permanecer concentrada nos botões de download por plataforma.
+- A landing deve expor um endpoint público `/api/latest-version` que retorna a versão mais recente e os links de download/release em JSON, para que o app principal possa detectar atualizações sem fazer scraping de HTML.
+- O endpoint `/api/latest-version` deve reutilizar a mesma função `getLatestRelease()` usada na seção de downloads, com cache server-side de 1 hora.
 - A landing deve conter disclaimer informando que o Sistema Financeiro é um projeto pessoal open source disponibilizado gratuitamente, sem suporte formal, garantia de atendimento ou obrigação de manutenção.
 - O contato por e-mail deve ser apresentado como canal para sugestões, dúvidas gerais ou relatos de problemas, não como suporte contratado.
 - A landing deve informar a licença Apache License 2.0 na área de contato/download.
@@ -89,6 +91,8 @@ Visitante ou usuário interessado que busca entender a proposta de valor, visual
 
 - Nenhuma rota backend nova no aplicativo principal.
 - Nenhuma alteração em esquemas do SQLite ou modelos do Python backend (`financeiro/`).
+- A landing page expõe a rota serverless `GET /api/latest-version` no Next.js, retornando JSON com `version`, `download_url` e `release_url` da release mais recente do GitHub, com cache de 1 hora.
+- O endpoint `/api/latest-version` reutiliza a lógica `getLatestRelease()` já existente em `app/page.tsx`.
 - Conteúdo institucional armazenado no repositório `/Users/sansquer/Documents/GitHub/sistemafinanceiropage`, com dependências, scripts e configuração próprios quando a landing usar Next.js/React.
 - A landing page não deve importar módulos de `web/`, `financeiro/` ou `app.py`; a comunicação com o app principal no MVP é apenas visual/institucional.
 - O CTA de contato pode usar link `mailto:` com assunto pré-preenchido para sugestões ou relato de problemas, sem persistência local.
@@ -106,6 +110,8 @@ Visitante ou usuário interessado que busca entender a proposta de valor, visual
 - Dado um visitante lendo a seção “Como começar”, quando seleciona “Portfólio e ativos”, então entende a diferença entre cadastrar a posição do ativo e registrar aportes/resgates pelos lançamentos da conta.
 - Dado um visitante interessado em baixar o app, quando chega à seção de downloads, então encontra links para os pacotes gratuitos oficiais publicados em GitHub Releases.
 - Dado a API pública do GitHub disponível, quando a landing é renderizada, então a seção de downloads exibe a tag da release mais recente e os links dos assets Windows/macOS/Linux encontrados.
+- Dado que o app principal consulta `/api/latest-version`, quando a landing responde, então retorna JSON com `version`, `download_url` e `release_url` da release mais recente.
+- Dado que a API do GitHub está indisponível, quando o endpoint `/api/latest-version` é chamado, então retorna JSON com valores nulos/fallback sem expor stack trace ou erro interno.
 - Dado a API pública do GitHub indisponível ou sem asset esperado, quando a landing é renderizada, então a seção de downloads continua acessível e aponta para a página geral de releases como fallback.
 - Dado um visitante lendo a seção de contato, quando avalia o canal de e-mail, então entende que ele serve para sugestões e relatos, sem suporte formal ou SLA.
 - Dado um visitante lendo a seção de contato, quando visualiza a contribuição voluntária, então entende que ela é opcional e não condiciona o uso gratuito do app.
@@ -135,9 +141,11 @@ Visitante ou usuário interessado que busca entender a proposta de valor, visual
 - [x] Passo 2 — Criar o repositório `sistemafinanceiropage` com `public/images/` e capturas/mockups fictícios dos módulos. Fecha: critérios 4, 5 e 8.
 - [x] Passo 3 — Descompactar/adaptar o projeto exportado do v0.app diretamente em `sistemafinanceiropage`, preservando os assets demonstrativos e configurando a Vercel para usar esse repositório. Fecha: critérios 1, 2, 3, 4, 6, 7, 9 e 10.
 - [ ] Passo 4 — Validar acessibilidade, responsividade mobile, contraste visual e ausência de dados reais nas imagens. Fecha: critérios 3, 7, 8 e 9.
+- [ ] Passo 5 — Criar endpoint `GET /api/latest-version` em `sistemafinanceiropage/app/api/latest-version/route.ts` reutilizando `getLatestRelease()` e com cache de 1 hora. Fecha: critérios 13 e 14.
 
 ### Changelog
 
+- `1.7` — 2026-08-04 — Adicionado endpoint público `/api/latest-version` para que o app principal detecte novas versões sem scraping de HTML.
 - `1.6` — 2026-08-04 — Incluída orientação didática da seção “Como começar”, com destaque para o fluxo correto de cadastro de ativos, aportes e resgates.
 - `1.5` — 2026-08-04 — Removido o link textual separado “Ver notas da versão no GitHub” da seção de downloads, mantendo foco nos botões por plataforma.
 - `1.4` — 2026-08-04 — Incluído Linux na seção de downloads e definidos símbolos visuais de sistema operacional nos botões Windows, macOS e Linux.

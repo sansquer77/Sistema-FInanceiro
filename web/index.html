@@ -218,6 +218,18 @@
           </div>
 
           <div class="cockpit-tab-panel" id="cockpitSummaryPanel" role="tabpanel">
+            <section class="cockpit-alert version-alert" id="cockpitVersionAlert" hidden>
+              <a class="cockpit-alert-card version-alert-card" href="https://sistemafinanceiropage.vercel.app/#downloads" target="_blank" rel="noreferrer">
+                <span class="cockpit-alert-beacon" aria-hidden="true"></span>
+                <span>
+                  <strong>Nova versão disponível</strong>
+                  <small>Atualize para a versão <span id="cockpitVersionAlertVersion"></span> pelo site oficial.</small>
+                </span>
+                <b>Baixar</b>
+              </a>
+              <button class="version-alert-dismiss" type="button" id="cockpitVersionAlertDismiss" aria-label="Dispensar alerta de nova versão">×</button>
+            </section>
+
             <section class="summary-strip">
               <div class="kpi-income">
                 <span>Receitas do mês</span>

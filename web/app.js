@@ -106,6 +106,7 @@ const state = {
   spendingLimits: [],
   currentSpendingLimits: [],
   appInfo: null,
+  latestVersion: null,
   portfolio: null,
   portfolioDirty: true,
   portfolioLoading: false,
@@ -387,8 +388,11 @@ const todayCockpitMonthButton = document.querySelector("#todayCockpitMonthButton
 const nextCockpitMonthButton = document.querySelector("#nextCockpitMonthButton");
 const currencyList = document.querySelector("#currencyList");
 const cockpitPortfolioByType = document.querySelector("#cockpitPortfolioByType");
-const cockpitLimitAlert = document.querySelector("#cockpitLimitAlert");
-const cockpitPortfolioMaturityAlert = document.querySelector("#cockpitPortfolioMaturityAlert");
+  const cockpitLimitAlert = document.querySelector("#cockpitLimitAlert");
+  const cockpitPortfolioMaturityAlert = document.querySelector("#cockpitPortfolioMaturityAlert");
+  const cockpitVersionAlert = document.querySelector("#cockpitVersionAlert");
+  const cockpitVersionAlertVersion = document.querySelector("#cockpitVersionAlertVersion");
+  const cockpitVersionAlertDismiss = document.querySelector("#cockpitVersionAlertDismiss");
 const financialHealthPanel = document.querySelector("#financialHealthPanel");
 const financialHealthContent = document.querySelector("#financialHealthContent");
 const trendsPanel = document.querySelector("#trendsPanel");
@@ -647,6 +651,9 @@ const cockpitView = registerCockpitView({
     cashDistributionChart,
     cockpitPortfolioByType,
     cockpitPortfolioMaturityAlert,
+    cockpitVersionAlert,
+    cockpitVersionAlertVersion,
+    cockpitVersionAlertDismiss,
     financialHealthPanel,
     financialHealthContent,
     trendsPanel,
@@ -1070,6 +1077,7 @@ boot();
 
 async function boot() {
   await loadAppInfo();
+  loadLatestVersion().catch(() => {});
   try {
     const response = await api("/api/me");
     state.user = response.user;
@@ -1096,6 +1104,15 @@ function renderAppInfo() {
   if (aboutAppVersion) {
     aboutAppVersion.textContent = state.appInfo?.version || "1.0.50";
   }
+}
+
+async function loadLatestVersion() {
+  try {
+    state.latestVersion = await api("/api/latest-version");
+  } catch (error) {
+    state.latestVersion = null;
+  }
+  renderCockpit();
 }
 
 function resetSessionState() {

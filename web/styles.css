@@ -1234,6 +1234,77 @@ textarea:focus {
   box-shadow: 0 0 0 5px var(--danger-glow);
 }
 
+.version-alert {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  margin: 14px 0 18px;
+}
+
+.version-alert-card {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  border: 1px solid color-mix(in srgb, var(--info-text) 30%, var(--line));
+  background: color-mix(in srgb, var(--info-text) 8%, var(--panel));
+  color: var(--info-text);
+  text-decoration: none;
+}
+
+.version-alert-card:hover {
+  border-color: color-mix(in srgb, var(--info-text) 52%, var(--line));
+  background: color-mix(in srgb, var(--info-text) 14%, var(--panel));
+}
+
+.version-alert-card .cockpit-alert-beacon {
+  background: var(--info-text);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--info-text) 18%, transparent);
+  animation: version-alert-pulse 2s ease-in-out infinite;
+}
+
+.version-alert-card strong,
+.version-alert-card b {
+  color: var(--info-text);
+}
+
+.version-alert-card small {
+  display: block;
+  margin-top: 2px;
+  color: var(--info-text);
+  font-size: 13px;
+  font-weight: 800;
+  opacity: 0.9;
+}
+
+.version-alert-dismiss {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.version-alert-dismiss:hover {
+  background: var(--surface-low);
+  color: var(--ink);
+}
+
+@keyframes version-alert-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--info-text) 18%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 9px color-mix(in srgb, var(--info-text) 6%, transparent);
+  }
+}
+
 .currency-list {
   display: grid;
   gap: 14px;

@@ -43,6 +43,9 @@ export function registerCockpitView({
     cashDistributionChart,
     cockpitPortfolioByType,
     cockpitPortfolioMaturityAlert,
+    cockpitVersionAlert,
+    cockpitVersionAlertVersion,
+    cockpitVersionAlertDismiss,
     financialHealthPanel,
     financialHealthContent,
     trendsPanel,
@@ -50,6 +53,7 @@ export function registerCockpitView({
     trendsMeta,
   } = elements;
   let financialHealthRequestId = 0;
+  let versionAlertDismissed = false;
 
   const trendsView = registerTrendsView({
     elements: { trendsPanel, trendsContent, trendsMeta },
@@ -69,10 +73,15 @@ export function registerCockpitView({
   cockpitMonthLabel?.addEventListener("click", () => {
     openMonthPicker(cockpitMonthLabel, cockpitMonthValue(), setCockpitMonth);
   });
+  cockpitVersionAlertDismiss?.addEventListener("click", () => {
+    versionAlertDismissed = true;
+    renderVersionAlert();
+  });
 
   function renderCockpit() {
     renderCockpitTabs();
     renderCockpitMonthLabel();
+    renderVersionAlert();
     const totals = getCurrencyTotals();
     const monthTotals = state.cockpit?.month_totals || getCurrentMonthTotals();
     monthIncome.textContent = formatMoney(monthTotals.income, "BRL");
@@ -93,6 +102,21 @@ export function registerCockpitView({
     if (activeCockpitTab() === "trends") {
       trendsView.renderTrends(cockpitMonthValue());
     }
+  }
+
+  function renderVersionAlert() {
+    if (!cockpitVersionAlert) {
+      return;
+    }
+    const info = state.latestVersion;
+    if (versionAlertDismissed || !info || !info.update_available || !info.latest_version) {
+      cockpitVersionAlert.hidden = true;
+      return;
+    }
+    if (cockpitVersionAlertVersion) {
+      cockpitVersionAlertVersion.textContent = info.latest_version;
+    }
+    cockpitVersionAlert.hidden = false;
   }
 
   function setCockpitTab(tab) {
