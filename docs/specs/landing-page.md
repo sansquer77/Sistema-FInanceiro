@@ -2,7 +2,7 @@
 tipo: spec
 area: landing-page
 status: em-implementacao
-versao: 1.5
+versao: 1.6
 atualizado: 2026-08-04
 relacionados:
   - "[[sobre-app]]"
@@ -70,6 +70,8 @@ Visitante ou usuário interessado que busca entender a proposta de valor, visual
 - A árvore visual deve apresentar o app como um sistema integrado, com tronco central representando o **Sistema Financeiro** e ramos para Contas, Cartões, Cockpit, Saúde Financeira, Tendências, Portfólio, Relatórios, Simulação, Privacidade e Preferências.
 - A seção de exemplos reais deve usar capturas ou mockups fiéis às páginas do app, mas sempre renderizados com massa de dados demonstrativa.
 - As capturas fiéis devem ser geradas preferencialmente a partir de uma instância local isolada do app com `SISTEMA_FINANCEIRO_DATA_DIR` temporário e usuário demonstrativo, sem reutilizar `data/` de desenvolvimento ou homologação.
+- A seção “Como começar” deve orientar o visitante por módulos em linguagem didática, explicando a lógica de uso do app sem substituir a documentação completa.
+- A orientação de Portfólio deve deixar claro que o ativo representa a posição cadastrada, enquanto aportes e resgates posteriores são registrados pelos lançamentos da conta para preservar histórico, saldo e relatórios.
 - A seção de downloads deve indicar que o app é gratuito e apontar para pacotes oficiais publicados em GitHub Releases do repositório do app principal.
 - A seção de downloads deve buscar a release mais recente do repositório `sansquer77/Sistema-FInanceiro` em Server Component do Next.js com `fetch(..., { next: { revalidate: 3600 } })`, sem token, backend próprio ou chamada por visitante no client.
 - A seção de downloads deve exibir “Versão mais recente: <tag>” e botões “Baixar para Windows”, “Baixar para macOS” e “Baixar para Linux”, mapeando assets da release por nome/plataforma.
@@ -101,6 +103,7 @@ Visitante ou usuário interessado que busca entender a proposta de valor, visual
 - Dado um visitante interessado no uso familiar, quando navega até a seção de rede local, então entende que o app pode ser instalado em um computador da casa e acessado por dispositivos autorizados na mesma rede local confiável.
 - Dado um visitante analisando os recursos de saúde financeira, quando chega na seção de Diagnóstico, então encontra a explicação da pontuação de 0 a 1000 e dos 5 pilares estratégicos.
 - Dado um visitante analisando exemplos do app, quando visualiza capturas ou mockups, então todos os dados exibidos são fictícios e não correspondem à homologação.
+- Dado um visitante lendo a seção “Como começar”, quando seleciona “Portfólio e ativos”, então entende a diferença entre cadastrar a posição do ativo e registrar aportes/resgates pelos lançamentos da conta.
 - Dado um visitante interessado em baixar o app, quando chega à seção de downloads, então encontra links para os pacotes gratuitos oficiais publicados em GitHub Releases.
 - Dado a API pública do GitHub disponível, quando a landing é renderizada, então a seção de downloads exibe a tag da release mais recente e os links dos assets Windows/macOS/Linux encontrados.
 - Dado a API pública do GitHub indisponível ou sem asset esperado, quando a landing é renderizada, então a seção de downloads continua acessível e aponta para a página geral de releases como fallback.
@@ -135,6 +138,7 @@ Visitante ou usuário interessado que busca entender a proposta de valor, visual
 
 ### Changelog
 
+- `1.6` — 2026-08-04 — Incluída orientação didática da seção “Como começar”, com destaque para o fluxo correto de cadastro de ativos, aportes e resgates.
 - `1.5` — 2026-08-04 — Removido o link textual separado “Ver notas da versão no GitHub” da seção de downloads, mantendo foco nos botões por plataforma.
 - `1.4` — 2026-08-04 — Incluído Linux na seção de downloads e definidos símbolos visuais de sistema operacional nos botões Windows, macOS e Linux.
 - `1.3` — 2026-08-04 — Definida a seção de downloads com busca server-side da última GitHub Release, cache de 1h e botões para Windows/macOS com fallback para a página de releases.

@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 4.6
+versao: 4.9
 atualizado: 2026-08-04
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -61,6 +61,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 
 | Spec | Status | Área |
 |---|---|---|
+| [[specs/instrucoes-app]] | 📝 rascunho | Usuário |
 | [[specs/landing-page]] | 🚧 em-implementacao | Institucional |
 | [[specs/score-saude-financeira]] | 🚧 em-implementacao | Diagnóstico |
 | [[specs/imposto-renda]] | ❌ depreciado — custo de manter regras fiscais atualizadas não compensa para uso familiar | Investimentos |
@@ -119,6 +120,9 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `4.9` — 2026-08-04 — [[specs/instrucoes-app]] atualizada com decisões sobre links internos, botões contextuais `?` e cobertura de todos os módulos operacionais.
+- `4.8` — 2026-08-04 — Adicionada [[specs/instrucoes-app]] em rascunho para orientar o futuro módulo **Instruções** no menu Usuário.
+- `4.7` — 2026-08-04 — [[specs/landing-page]] atualizada com orientação didática da seção “Como começar”, especialmente para o fluxo de Portfólio e ativos.
 - `4.6` — 2026-08-04 — [[specs/landing-page]] atualizada para remover o link textual separado de notas da versão na seção de downloads.
 - `4.5` — 2026-08-04 — [[specs/landing-page]] atualizada para incluir Linux e símbolos de sistema operacional nos botões de download.
 - `4.4` — 2026-08-04 — [[specs/landing-page]] atualizada com downloads oficiais via última GitHub Release, cache server-side de 1h e botões Windows/macOS.
