@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 APP_NAME = "Sistema Financeiro"
-APP_VERSION = "1.1.3"
+APP_VERSION = "1.2.0"
 
 
 def app_info() -> dict[str, str]:

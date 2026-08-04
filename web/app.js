@@ -64,6 +64,7 @@ import { registerPortfolioView } from "./modules/portfolio-view.js";
 import { registerTransactionsView } from "./modules/transactions-view.js";
 import { registerSimulationsView } from "./modules/simulations-view.js";
 import { registerOperationHistoryView } from "./modules/operation-history-view.js";
+import { registerInstructionsView } from "./modules/instructions-view.js";
 
 applyTheme();
 applyPrivacyMode();
@@ -291,6 +292,10 @@ const operationHistoryGroupBy = document.querySelector("#operationHistoryGroupBy
 const operationHistoryList = document.querySelector("#operationHistoryList");
 const operationHistoryMessage = document.querySelector("#operationHistoryMessage");
 const operationHistoryLoadMoreButton = document.querySelector("#operationHistoryLoadMoreButton");
+const instructionsSearch = document.querySelector("#instructionsSearch");
+const instructionsClearSearch = document.querySelector("#instructionsClearSearch");
+const instructionsGroups = document.querySelector("#instructionsGroups");
+const instructionsEmpty = document.querySelector("#instructionsEmpty");
 const emailForm = document.querySelector("#emailForm");
 const passwordForm = document.querySelector("#passwordForm");
 const emailConfigForm = document.querySelector("#emailConfigForm");
@@ -368,6 +373,7 @@ const cancelTransactionEditButton = document.querySelector("#cancelTransactionEd
 const formTitle = document.querySelector("#formTitle");
 const moduleEyebrow = document.querySelector("#moduleEyebrow");
 const pageTitle = document.querySelector("#pageTitle");
+const contextualHelpButton = document.querySelector("#contextualHelpButton");
 const privacyToggleButton = document.querySelector("#privacyToggleButton");
 const monthIncome = document.querySelector("#monthIncome");
 const monthExpense = document.querySelector("#monthExpense");
@@ -436,6 +442,7 @@ const moduleViews = {
   imports: document.querySelector("#importsView"),
   operationHistory: document.querySelector("#operationHistoryView"),
   user: document.querySelector("#userView"),
+  instructions: document.querySelector("#instructionsView"),
   about: document.querySelector("#aboutView"),
 };
 
@@ -453,7 +460,24 @@ const viewTitles = {
   imports: ["Gestão", "Importação"],
   operationHistory: ["Gestão", "Histórico de Operações"],
   user: ["Usuário", "Preferências"],
+  instructions: ["Usuário", "Instruções"],
   about: ["Usuário", "Sobre"],
+};
+
+const CONTEXTUAL_HELP_TOPICS = {
+  cockpit: "entender-cockpit",
+  accounts: "primeira-conta",
+  creditCards: "cadastrar-cartao",
+  cardLaunches: "lancar-compras-cartao",
+  transactions: "primeiro-lancamento",
+  portfolio: "entender-portfolio",
+  limits: "limites-gastos",
+  simulations: "simulacao-borboleta",
+  reports: "relatorios",
+  classifications: "categorias-tags",
+  imports: "importacao-dados",
+  operationHistory: "historico-operacoes",
+  user: "tema-privacidade",
 };
 
 const SIDEBAR_COLLAPSED_KEY = "financeiro.sidebar.collapsed";
@@ -588,6 +612,19 @@ const operationHistoryView = registerOperationHistoryView({
     operationHistoryLoadMoreButton,
   },
   formatDate,
+});
+
+const instructionsView = registerInstructionsView({
+  state,
+  elements: {
+    instructionsSearch,
+    instructionsClearSearch,
+    instructionsGroups,
+    instructionsEmpty,
+  },
+  escapeHtml,
+  emptyState,
+  onNavigateToModule: (route) => showModule(route),
 });
 
 const cockpitView = registerCockpitView({
@@ -935,6 +972,14 @@ sidebarToggle.addEventListener("click", () => toggleSidebar());
 privacyToggleButton?.addEventListener("click", () => {
   const mode = togglePrivacyMode();
   updatePrivacyToggleButton(privacyToggleButton, mode);
+});
+contextualHelpButton?.addEventListener("click", () => {
+  const topicId = contextualHelpButton.dataset.contextualTopic;
+  if (!topicId) {
+    return;
+  }
+  showModule("instructions");
+  instructionsView.openTopic(topicId);
 });
 document.addEventListener("keydown", (event) => {
   if (event.key.toLowerCase() !== "p" || event.metaKey || event.ctrlKey || event.altKey || isTypingTarget(event.target)) {
@@ -1340,6 +1385,11 @@ function showModule(view) {
   } else {
     updateVisibleModule();
   }
+  if (contextualHelpButton) {
+    const contextualTopic = CONTEXTUAL_HELP_TOPICS[view];
+    contextualHelpButton.dataset.contextualTopic = contextualTopic || "";
+    contextualHelpButton.hidden = !contextualTopic;
+  }
   renderLimitAlerts();
   renderPortfolioMaturityAlerts();
   if (view === "cockpit") {
@@ -1377,6 +1427,9 @@ function showModule(view) {
   if (view === "operationHistory") {
     operationHistoryView.renderFilters();
     operationHistoryView.loadOperationLogs({ reset: true });
+  }
+  if (view === "instructions") {
+    instructionsView.renderInstructions();
   }
   if (view === "user" && state.user) {
     emailForm.elements.email.value = state.user.email;

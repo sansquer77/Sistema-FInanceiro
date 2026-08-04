@@ -16,10 +16,26 @@ __pycache__/
 
 # Build artifacts
 build/
+dist/
+
+# Distribution outputs generated locally or by CI
+Sistema Financeiro - Distribuicao/**/*.zip
+Sistema Financeiro - Distribuicao/Linux/
+Sistema Financeiro - Distribuicao/MacOS/Aplicativo/SistemaFinanceiro/
+Sistema Financeiro - Distribuicao/Windows/Aplicativo/SistemaFinanceiro/
+Sistema Financeiro - Distribuicao/Windows/Aplicativo/app.py
+Sistema Financeiro - Distribuicao/Windows/Aplicativo/financeiro/
+Sistema Financeiro - Distribuicao/Windows/Aplicativo/web/app.js
+Sistema Financeiro - Distribuicao/Windows/Aplicativo/web/index.html
+Sistema Financeiro - Distribuicao/Windows/Aplicativo/web/styles.css
+Sistema Financeiro - Distribuicao/Windows/Aplicativo/web/modules/
+Sistema Financeiro - Distribuicao/Windows/Aplicativo/web/assets/app-icon.png
+Sistema Financeiro - Distribuicao/Windows/Aplicativo/web/assets/banks/
 
 # Editors
 .vscode/
 .idea/
+.DS_Store
 
 # Local runtime data
 data/*

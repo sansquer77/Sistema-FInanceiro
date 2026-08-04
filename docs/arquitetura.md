@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 2.9
-atualizado: 2026-08-02
+versao: 3.2
+atualizado: 2026-08-04
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -16,7 +16,7 @@ tags: [arquitetura, meta]
 # Arquitetura
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-07-29 · relacionados: [[requisitos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
+> **implementado** · área: `meta` · atualizado em 2026-08-04 · relacionados: [[requisitos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
 
 ## Visão geral
 
@@ -54,6 +54,7 @@ docs/               Requisitos, arquitetura, specs e referências
 | `transaction-kind.js` | Predicados de tipo de lançamento. |
 | `labels.js` | Labels de domínio usados pela interface. |
 | `month-picker.js` | Popover reutilizável de seleção de mês. |
+| `instructions-content.js` | Conteúdo estático, offline e versionado da central de ajuda. Ver [[instrucoes-app]]. |
 
 **Views funcionais já extraídas:**
 
@@ -71,6 +72,7 @@ docs/               Requisitos, arquitetura, specs e referências
 | `portfolio-view.js` | Ativos: posições, histórico, resgate, encerramento. |
 | `transactions-view.js` | Lançamentos: formulário, recorrência, parcelas, câmbio. |
 | `operation-history-view.js` | Histórico de Operações: filtros, busca, agrupamentos e paginação. |
+| `instructions-view.js` | Central de ajuda: busca, grupos, tópicos expansíveis, links internos e botões contextuais `?` no header. Ver [[instrucoes-app]]. |
 
 > [!tip] Regra de fronteira
 > A interface orquestra formulários, listas e navegação. **Regras financeiras, validações de propriedade e cálculo de saldo ficam no núcleo Python.** Ver [[adr/0002-modularizacao-frontend]].
@@ -442,6 +444,9 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.2` — 2026-08-04 — Atualizada descrição de `instructions-view.js` para incluir botões contextuais `?` e responsividade em telas estreitas.
+- `3.1` — 2026-08-04 — Documentada view `instructions-view.js` da central de ajuda, integrada ao menu Usuário e ao orquestrador `web/app.js`.
+- `3.0` — 2026-08-04 — Documentado módulo utilitário `instructions-content.js` com conteúdo estático, offline e versionado da central de ajuda.
 - `2.9` — 2026-08-02 — Documentada normalização em BRL de lançamentos de conta e cartão por cotação manual ou última PTAX de venda disponível, incluindo `amount_brl_cents` em cartões.
 - `2.8` — 2026-08-02 — Documentada aba **Tendências** no Cockpit (`trendsPanel`, `trends-view.js`) integrada à rota `GET /api/financial-health-trends` com gráfico mês a mês, Budget x Realizado e achados local.
 - `2.7` — 2026-08-02 — Documentada UI de Preferências para configuração de IA (`aiConfigForm`, `user-admin-view.js`) integrada às rotas `/api/ai-settings`.
