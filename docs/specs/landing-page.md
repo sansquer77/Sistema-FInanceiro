@@ -2,7 +2,7 @@
 tipo: spec
 area: landing-page
 status: em-implementacao
-versao: 1.4
+versao: 1.5
 atualizado: 2026-08-04
 relacionados:
   - "[[sobre-app]]"
@@ -74,6 +74,7 @@ Visitante ou usuário interessado que busca entender a proposta de valor, visual
 - A seção de downloads deve buscar a release mais recente do repositório `sansquer77/Sistema-FInanceiro` em Server Component do Next.js com `fetch(..., { next: { revalidate: 3600 } })`, sem token, backend próprio ou chamada por visitante no client.
 - A seção de downloads deve exibir “Versão mais recente: <tag>” e botões “Baixar para Windows”, “Baixar para macOS” e “Baixar para Linux”, mapeando assets da release por nome/plataforma.
 - Cada botão de download deve exibir um símbolo visual do sistema operacional correspondente, preservando leitura profissional e acessibilidade textual.
+- A seção de downloads não deve exibir link textual separado para notas da versão; a navegação principal deve permanecer concentrada nos botões de download por plataforma.
 - A landing deve conter disclaimer informando que o Sistema Financeiro é um projeto pessoal open source disponibilizado gratuitamente, sem suporte formal, garantia de atendimento ou obrigação de manutenção.
 - O contato por e-mail deve ser apresentado como canal para sugestões, dúvidas gerais ou relatos de problemas, não como suporte contratado.
 - A landing deve informar a licença Apache License 2.0 na área de contato/download.
@@ -134,6 +135,7 @@ Visitante ou usuário interessado que busca entender a proposta de valor, visual
 
 ### Changelog
 
+- `1.5` — 2026-08-04 — Removido o link textual separado “Ver notas da versão no GitHub” da seção de downloads, mantendo foco nos botões por plataforma.
 - `1.4` — 2026-08-04 — Incluído Linux na seção de downloads e definidos símbolos visuais de sistema operacional nos botões Windows, macOS e Linux.
 - `1.3` — 2026-08-04 — Definida a seção de downloads com busca server-side da última GitHub Release, cache de 1h e botões para Windows/macOS com fallback para a página de releases.
 - `1.2` — 2026-08-04 — Incluída na landing a exibição da licença Apache 2.0 e link de contribuição voluntária “Me pague um café se gostou do app”, sem condicionar o uso gratuito.
