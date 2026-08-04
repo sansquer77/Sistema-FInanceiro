@@ -7,7 +7,7 @@ on:
       - "v*"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-macos:
@@ -22,6 +22,23 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: "3.13"
+
+      - name: Identificar versao do app
+        id: app-version
+        run: |
+          APP_VERSION=$(python - <<'PY'
+          from financeiro.app_metadata import APP_VERSION
+          print(APP_VERSION)
+          PY
+          )
+          RELEASE_TAG="${GITHUB_REF_NAME}"
+          if [ "${GITHUB_REF_TYPE}" != "tag" ]; then
+            RELEASE_TAG="v${APP_VERSION}"
+          fi
+          ASSET_NAME="MacOS - ${APP_VERSION}.zip"
+          echo "app_version=${APP_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "release_tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "asset_name=${ASSET_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Instalar PyInstaller
         run: python -m pip install --upgrade pip pyinstaller
@@ -62,16 +79,17 @@ jobs:
 
       - name: Compactar pacote MacOS
         run: |
-          ZIP_PATH="Sistema Financeiro - Distribuicao/MacOS/Sistema Financeiro - Distribuicao MacOS.zip"
-          rm -f "$ZIP_PATH" /tmp/sistema-financeiro-macos.zip
+          ZIP_PATH="Sistema Financeiro - Distribuicao/MacOS/${{ steps.app-version.outputs.asset_name }}"
+          find "Sistema Financeiro - Distribuicao/MacOS" -maxdepth 1 -name '*.zip' -delete
+          rm -f /tmp/sistema-financeiro-macos.zip
 
           cd "Sistema Financeiro - Distribuicao"
           /usr/bin/zip -r -X /tmp/sistema-financeiro-macos.zip MacOS
-          mv /tmp/sistema-financeiro-macos.zip "MacOS/Sistema Financeiro - Distribuicao MacOS.zip"
+          mv /tmp/sistema-financeiro-macos.zip "MacOS/${{ steps.app-version.outputs.asset_name }}"
 
       - name: Validar conteudo do zip
         run: |
-          ZIP_PATH="Sistema Financeiro - Distribuicao/MacOS/Sistema Financeiro - Distribuicao MacOS.zip"
+          ZIP_PATH="Sistema Financeiro - Distribuicao/MacOS/${{ steps.app-version.outputs.asset_name }}"
           zip -T "$ZIP_PATH"
 
           if unzip -Z1 "$ZIP_PATH" | grep -E '(^|/)(data|tests|docs|__pycache__|\.DS_Store|_CodeSignature|\._[^/]*)(/|$)|MacOS/Aplicativo/app.py|MacOS/Aplicativo/financeiro/| 2'; then
@@ -84,7 +102,22 @@ jobs:
       - name: Publicar artifact
         uses: actions/upload-artifact@v7
         with:
-          name: Sistema-Financeiro-MacOS
-          path: Sistema Financeiro - Distribuicao/MacOS/Sistema Financeiro - Distribuicao MacOS.zip
+          name: ${{ steps.app-version.outputs.asset_name }}
+          path: Sistema Financeiro - Distribuicao/MacOS/${{ steps.app-version.outputs.asset_name }}
           archive: false
           if-no-files-found: error
+
+      - name: Publicar no GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.app-version.outputs.release_tag }}
+          APP_VERSION: ${{ steps.app-version.outputs.app_version }}
+          ASSET_PATH: Sistema Financeiro - Distribuicao/MacOS/${{ steps.app-version.outputs.asset_name }}
+        run: |
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" \
+              --title "Sistema Financeiro ${APP_VERSION}" \
+              --notes "Pacotes oficiais do Sistema Financeiro ${APP_VERSION}." || true
+          fi
+          gh release view "$RELEASE_TAG" >/dev/null
+          gh release upload "$RELEASE_TAG" "$ASSET_PATH" --clobber

@@ -7,7 +7,7 @@ on:
       - "v*"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-windows:
@@ -22,6 +22,20 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: "3.13"
+
+      - name: Identificar versao do app
+        id: app-version
+        shell: pwsh
+        run: |
+          $appVersion = python -c "from financeiro.app_metadata import APP_VERSION; print(APP_VERSION)"
+          $releaseTag = "${{ github.ref_name }}"
+          if ("${{ github.ref_type }}" -ne "tag") {
+            $releaseTag = "v$appVersion"
+          }
+          $assetName = "Windows - $appVersion.zip"
+          "app_version=$appVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "release_tag=$releaseTag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "asset_name=$assetName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Instalar PyInstaller
         run: python -m pip install --upgrade pip pyinstaller
@@ -83,7 +97,7 @@ jobs:
       - name: Compactar pacote Windows
         shell: pwsh
         run: |
-          $zipPath = "artifact-output\Sistema Financeiro - Distribuicao Windows.zip"
+          $zipPath = "artifact-output\${{ steps.app-version.outputs.asset_name }}"
           if (Test-Path $zipPath) {
             Remove-Item $zipPath -Force
           }
@@ -96,7 +110,7 @@ jobs:
       - name: Validar conteudo do zip
         shell: pwsh
         run: |
-          $zipPath = "artifact-output\Sistema Financeiro - Distribuicao Windows.zip"
+          $zipPath = "artifact-output\${{ steps.app-version.outputs.asset_name }}"
           $items = tar -tf $zipPath
 
           $blocked = $items | Select-String '(^|/)(data|tests|docs|__pycache__|\.DS_Store|_CodeSignature|__MACOSX|\._[^/]*)(/|$)|Windows/Aplicativo/app.py|Windows/Aplicativo/financeiro/|Windows/Aplicativo/web/| 2'
@@ -114,7 +128,30 @@ jobs:
       - name: Publicar artifact
         uses: actions/upload-artifact@v7
         with:
-          name: Sistema-Financeiro-Windows
-          path: artifact-output/Sistema Financeiro - Distribuicao Windows.zip
+          name: ${{ steps.app-version.outputs.asset_name }}
+          path: artifact-output/${{ steps.app-version.outputs.asset_name }}
           archive: false
           if-no-files-found: error
+
+      - name: Publicar no GitHub Releases
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.app-version.outputs.release_tag }}
+          APP_VERSION: ${{ steps.app-version.outputs.app_version }}
+          ASSET_PATH: artifact-output/${{ steps.app-version.outputs.asset_name }}
+        run: |
+          gh release view "$env:RELEASE_TAG" *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create "$env:RELEASE_TAG" `
+              --title "Sistema Financeiro $env:APP_VERSION" `
+              --notes "Pacotes oficiais do Sistema Financeiro $env:APP_VERSION."
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "Release pode ter sido criada por outro workflow; verificando novamente."
+            }
+          }
+          gh release view "$env:RELEASE_TAG"
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+          gh release upload "$env:RELEASE_TAG" "$env:ASSET_PATH" --clobber

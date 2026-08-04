@@ -2,7 +2,7 @@
 tipo: spec
 area: landing-page
 status: em-implementacao
-versao: 1.1
+versao: 1.2
 atualizado: 2026-08-04
 relacionados:
   - "[[sobre-app]]"
@@ -40,6 +40,7 @@ Visitante ou usuário interessado que busca entender a proposta de valor, visual
 6. Na seção de downloads, o visitante encontra os pacotes oficiais gratuitos gerados por GitHub Releases a partir do repositório do app principal.
 7. O visitante encontra um disclaimer claro de que o Sistema Financeiro é um projeto pessoal disponibilizado gratuitamente, sem suporte formal.
 8. O visitante usa o e-mail apenas como canal para sugestões, dúvidas gerais ou relato de problemas, sem expectativa de SLA ou atendimento garantido.
+9. O visitante encontra a licença Apache 2.0 e, se desejar, um link separado para contribuição voluntária.
 
 ### Dados
 
@@ -72,6 +73,8 @@ Visitante ou usuário interessado que busca entender a proposta de valor, visual
 - A seção de downloads deve indicar que o app é gratuito e apontar para pacotes oficiais publicados em GitHub Releases do repositório do app principal.
 - A landing deve conter disclaimer informando que o Sistema Financeiro é um projeto pessoal open source disponibilizado gratuitamente, sem suporte formal, garantia de atendimento ou obrigação de manutenção.
 - O contato por e-mail deve ser apresentado como canal para sugestões, dúvidas gerais ou relatos de problemas, não como suporte contratado.
+- A landing deve informar a licença Apache License 2.0 na área de contato/download.
+- A landing pode exibir link de contribuição voluntária em `https://buymeacoffee.com/sansquerh` com o texto “Me pague um café se gostou do app”, deixando claro que a contribuição é opcional e não condiciona o uso do app.
 - As cores visuais da landing page devem seguir o guia de identidade do aplicativo (`--bg`, `--panel`, `--accent`, etc.) conforme definido no Design System.
 - A landing page não deve expor prints, nomes, e-mails, saldos, ativos, contas ou cartões reais do desenvolvedor ou de qualquer base de homologação.
 - O diretório legado `landing-page/` foi removido deste repositório do app principal; qualquer recriação desse diretório deve ser tratada como regressão, salvo pedido explícito de migração/consulta histórica.
@@ -96,6 +99,7 @@ Visitante ou usuário interessado que busca entender a proposta de valor, visual
 - Dado um visitante analisando exemplos do app, quando visualiza capturas ou mockups, então todos os dados exibidos são fictícios e não correspondem à homologação.
 - Dado um visitante interessado em baixar o app, quando chega à seção de downloads, então encontra links para os pacotes gratuitos oficiais publicados em GitHub Releases.
 - Dado um visitante lendo a seção de contato, quando avalia o canal de e-mail, então entende que ele serve para sugestões e relatos, sem suporte formal ou SLA.
+- Dado um visitante lendo a seção de contato, quando visualiza a contribuição voluntária, então entende que ela é opcional e não condiciona o uso gratuito do app.
 - Dado um visitante acessando via smartphone ou dispositivo com tela reduzida, quando rola a página, então todo o layout se adapta de forma fluida sem rolagem horizontal indesejada.
 - Dado o repositório `sistemafinanceiropage`, quando um desenvolvedor roda o build do projeto ou a Vercel publica esse repositório, então os recursos são carregados sem dependência da API backend em execução.
 - Dado o app principal sendo distribuído para usuários finais, quando o pacote é gerado, então o repositório/projeto da landing page não é incluído no pacote.
@@ -125,6 +129,7 @@ Visitante ou usuário interessado que busca entender a proposta de valor, visual
 
 ### Changelog
 
+- `1.2` — 2026-08-04 — Incluída na landing a exibição da licença Apache 2.0 e link de contribuição voluntária “Me pague um café se gostou do app”, sem condicionar o uso gratuito.
 - `1.1` — 2026-08-04 — Atualizada a proposta pública da landing para download gratuito via GitHub Releases, removendo PIX/cobrança e definindo contato como canal de sugestões sem suporte formal.
 - `1.0` — 2026-08-03 — Registrado o comportamento visual da árvore com alinhamento ao texto, animação sutil e respeito a `prefers-reduced-motion`.
 - `0.9` — 2026-08-03 — Incluída na landing a seção pública “Uso em família” para explicar o uso multiusuário em rede local confiável, mantendo tom profissional e sem prometer serviço em nuvem.
