@@ -600,7 +600,7 @@ def pay_credit_card_invoice(user_id: int, data: dict) -> dict:
                     "notes": notes or f"Pagamento da fatura {invoice_month}.",
                 },
             )
-            # spec: relatorios/relatorios v1.3 — criterio 6
+            # spec: relatorios/relatorios v2.6 — criterio 6
             # (o retorno imediato tambem precisa identificar o pagamento agregado;
             #  o vinculo persistente sera gravado logo abaixo em credit_card_payments)
             payment_transaction["is_credit_card_payment"] = True

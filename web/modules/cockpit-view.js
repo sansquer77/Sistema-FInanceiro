@@ -54,6 +54,7 @@ export function registerCockpitView({
   } = elements;
   let financialHealthRequestId = 0;
   let versionAlertDismissed = false;
+  let activeChartBreakdownClose = null;
 
   const trendsView = registerTrendsView({
     elements: { trendsPanel, trendsContent, trendsMeta },
@@ -861,9 +862,10 @@ export function registerCockpitView({
       return validItems;
     }
     const visible = validItems.slice(0, visibleCount);
-    const othersTotal = validItems.slice(visibleCount).reduce((sum, item) => sum + item.total, 0);
+    const otherItems = validItems.slice(visibleCount);
+    const othersTotal = otherItems.reduce((sum, item) => sum + item.total, 0);
     if (othersTotal > 0) {
-      visible.push({ label: "Outros", total: othersTotal });
+      visible.push({ label: "Outros", total: othersTotal, items: otherItems });
     }
     return visible;
   }
@@ -888,14 +890,83 @@ export function registerCockpitView({
     list.className = "chart-list";
     list.innerHTML = items.map((item, index) => {
       const percent = total ? item.total / total : 0;
+      const content = `
+        <span><i style="background:${chartColor(index)}"></i>${escapeHtml(item.label)}</span>
+        <strong>${formatMoney(item.total, "BRL")} · ${formatPercent(percent)}</strong>
+      `;
+      if (Array.isArray(item.items) && item.items.length > 0) {
+        return `
+          <button class="chart-row chart-row-button" type="button" data-chart-breakdown-index="${index}">
+            ${content}
+          </button>
+        `;
+      }
       return `
         <div class="chart-row">
-          <span><i style="background:${chartColor(index)}"></i>${escapeHtml(item.label)}</span>
-          <strong>${formatMoney(item.total, "BRL")} · ${formatPercent(percent)}</strong>
+          ${content}
         </div>
       `;
     }).join("");
+    list.querySelectorAll("[data-chart-breakdown-index]").forEach((button) => {
+      const item = items[Number(button.dataset.chartBreakdownIndex)];
+      button.addEventListener("click", () => openChartBreakdownModal(item, total, options.totalLabel));
+    });
     container.append(chart, list);
+  }
+
+  function openChartBreakdownModal(item, chartTotal, totalLabel) {
+    closeChartBreakdownModal();
+    const rows = [...(item.items || [])].sort((a, b) => (b.total || 0) - (a.total || 0));
+    const backdrop = document.createElement("div");
+    backdrop.className = "decision-modal-backdrop";
+    backdrop.innerHTML = `
+      <section class="decision-modal cockpit-breakdown-modal" role="dialog" aria-modal="true" aria-labelledby="cockpit-breakdown-title">
+        <div class="decision-modal-header">
+          <h3 id="cockpit-breakdown-title">Detalhes de ${escapeHtml(item.label)}</h3>
+          <p>${escapeHtml(totalLabel || "Total")}: ${formatMoney(item.total || 0, "BRL")} · ${formatPercent(chartTotal ? (item.total || 0) / chartTotal : 0)}</p>
+        </div>
+        <div class="decision-modal-body">
+          <div class="cockpit-breakdown-list">
+            ${rows.map((row) => `
+              <div class="cockpit-breakdown-row">
+                <span>${escapeHtml(row.label || "Sem categoria")}</span>
+                <strong>${formatMoney(row.total || 0, "BRL")}</strong>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+        <div class="decision-modal-actions">
+          <button class="secondary" type="button" data-close-chart-breakdown>Fechar</button>
+        </div>
+      </section>
+    `;
+    const closeButton = backdrop.querySelector("[data-close-chart-breakdown]");
+    const close = () => {
+      document.removeEventListener("keydown", onKeydown);
+      backdrop.remove();
+      activeChartBreakdownClose = null;
+    };
+    const onKeydown = (event) => {
+      if (event.key === "Escape") {
+        close();
+      }
+    };
+    backdrop.addEventListener("click", (event) => {
+      if (event.target === backdrop) {
+        close();
+      }
+    });
+    closeButton?.addEventListener("click", close);
+    document.addEventListener("keydown", onKeydown);
+    document.body.append(backdrop);
+    activeChartBreakdownClose = close;
+    closeButton?.focus();
+  }
+
+  function closeChartBreakdownModal() {
+    if (activeChartBreakdownClose) {
+      activeChartBreakdownClose();
+    }
   }
 
   function donutSvg(items, total) {

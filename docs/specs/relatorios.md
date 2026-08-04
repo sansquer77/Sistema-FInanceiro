@@ -2,8 +2,8 @@
 tipo: spec
 area: relatorios
 status: implementado
-versao: 2.5
-atualizado: 2026-08-02
+versao: 2.6
+atualizado: 2026-08-04
 relacionados:
   - "[[lancamentos]]"
   - "[[cartoes]]"
@@ -17,7 +17,7 @@ aliases: ["Relatórios", "Cockpit"]
 # Relatórios
 
 > [!info] Status
-> **implementado** · área: `relatorios` · atualizado em 2026-08-02 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[limites-gastos]]
+> **implementado** · área: `relatorios` · atualizado em 2026-08-04 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[limites-gastos]]
 
 ## Problema
 
@@ -73,6 +73,7 @@ Qualquer usuário autenticado localmente que queira analisar seus gastos e recei
 - O status de pagamento da fatura afeta o saldo operacional da conta de pagamento na data do pagamento, mas não altera retroativamente o consumo analítico do mês da fatura.
 - Os rótulos do Cockpit devem deixar claro quando os valores representam o mês selecionado, usando textos como `Saldo previsto em Julho/2026`, `Saldo conciliado em Julho/2026` ou equivalente, para reduzir ambiguidade com o saldo atual.
 - Quando o usuário selecionar mês futuro, o Cockpit deve priorizar planejamento, recorrências, parcelas futuras e faturas previstas; dados realizados inexistentes devem aparecer como zero ou estado vazio, sem simular lançamentos não existentes fora das regras já cadastradas.
+- Quando o gráfico **Maiores despesas do mês** exibir a linha agregada `Outros`, essa linha deve permitir abrir um detalhamento com as categorias/subcategorias ocultas no agrupamento e seus respectivos valores.
 - Percentuais são calculados contra o total da seção.
 - Relatório **detalhado** mostra lançamentos individuais.
 - Relatório **sintético** mostra apenas agregados.
@@ -164,9 +165,11 @@ O ponto crítico é cartão de crédito: a fatura pertence ao mês de competênc
 - Dado uma fatura paga em mês posterior ao da competência, quando o usuário consulta o mês da competência, então o consumo da fatura continua aparecendo naquele mês e o pagamento aparece apenas como efeito de saldo na conta pagadora.
 - Dado o usuário visualizando saldos no Cockpit com mês diferente do mês corrente, quando os saldos forem exibidos, então os rótulos indicam claramente o mês selecionado.
 - Dado o usuário visualizando o Cockpit ou Relatórios em telas de 14 polegadas ou menores, quando os painéis de KPIs, demonstrativos e gráficos são exibidos, então os grids de 4 ou 6 colunas se reorganizam em 2 ou 3 colunas e os gráficos do demonstrativo empilham verticalmente para evitar compressão e quebra de layout.
+- Dado o usuário visualizando **Maiores despesas do mês** com a linha `Outros`, quando clica nessa linha, então um pop-up mostra as categorias/subcategorias que compõem `Outros`, com valor de cada item e total agregado, sem alterar os totais do Cockpit.
 
 ## Changelog
 
+- `2.6` — 2026-08-04 — Linha `Outros` em Maiores despesas do mês passa a abrir detalhamento em pop-up com os itens agregados.
 - `2.5` — 2026-08-02 — Ordem das abas do Cockpit documentada como Situação, Tendências e Saúde Financeira, alinhando Relatórios/Cockpit à spec de Tendências.
 - `2.4` — 2026-08-02 — Cockpit e Relatórios ganham ajustes responsivos para telas de 14 polegadas (e breakpoints intermediários): KPIs de 4/6 colunas passam para 2/3 colunas, gráficos do demonstrativo empilham verticalmente e o demonstrativo evita compressão em viewports intermediárias.
 - `2.3` — 2026-08-02 — Rótulos dos seletores mensais passam a usar formato fixo `MM/AAAA` para manter largura visual estável.

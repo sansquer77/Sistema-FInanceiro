@@ -1086,7 +1086,7 @@ def fetch_transaction(conn, user_id: int, transaction_id: int) -> dict:
 
 def format_transaction(transaction: dict) -> dict:
     investment_operation = extract_investment_operation(transaction)
-    # spec: relatorios/relatorios v1.3 — criterio 6
+    # spec: relatorios/relatorios v2.6 — criterio 6
     # (pagamento de fatura reduz saldo, mas fica fora de analises de despesa
     #  para nao duplicar os lancamentos detalhados do cartao)
     transaction["is_credit_card_payment"] = bool(transaction.pop("credit_card_payment_id", None))

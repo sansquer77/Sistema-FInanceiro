@@ -1493,7 +1493,7 @@ def cockpit_payload(transactions: list[dict]) -> dict:
 
 
 def is_credit_card_payment_transaction(transaction: dict) -> bool:
-    # spec: relatorios/relatorios v2.1 — critério 6
+    # spec: relatorios/relatorios v2.6 — critério 6
     # (pagamento de fatura fica fora das analises mensais; a despesa detalhada
     #  ja esta nos lancamentos do cartao pela competencia da fatura)
     return bool(transaction.get("is_credit_card_payment"))
@@ -1539,10 +1539,17 @@ def ranked_cockpit_rows(groups: dict, limit: int | None = None) -> list[dict]:
     )
     if limit and len(rows) > limit:
         visible = rows[:limit]
-        other_total = sum(row["total"] for row in rows[limit:])
-        other_count = sum(row["count"] for row in rows[limit:])
+        other_rows = rows[limit:]
+        other_total = sum(row["total"] for row in other_rows)
+        other_count = sum(row["count"] for row in other_rows)
         if other_total > 0:
-            visible.append({"label": "Outros", "total": other_total, "count": other_count})
+            # spec: relatorios/relatorios v2.6 — critério 28
+            visible.append({
+                "label": "Outros",
+                "total": other_total,
+                "count": other_count,
+                "items": other_rows,
+            })
         return visible
     return rows
 

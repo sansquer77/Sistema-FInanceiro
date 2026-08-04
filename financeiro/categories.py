@@ -859,7 +859,7 @@ def get_category_evolution(user_id: int, category_id: int, subcategory_id: int |
                   AND transactions.category_id = ?
                   {subcat_filter_t}
                   AND transactions.archived_at IS NULL
-                  -- spec: relatorios/relatorios v1.3 — criterio 6
+                  -- spec: relatorios/relatorios v2.6 — criterio 6
                   -- pagamento de fatura fica fora da evolucao para nao duplicar
                   -- os lancamentos detalhados do cartao.
                   AND credit_card_payments.id IS NULL

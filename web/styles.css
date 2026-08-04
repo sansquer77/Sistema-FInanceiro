@@ -1467,6 +1467,23 @@ textarea:focus {
   border-bottom: 1px solid var(--line);
 }
 
+.chart-row-button {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chart-row-button:hover,
+.chart-row-button:focus-visible {
+  background: var(--panel-subtle);
+}
+
 .chart-row:last-child {
   border-bottom: none;
   padding-bottom: 0;
@@ -1489,6 +1506,44 @@ textarea:focus {
 
 .chart-row strong {
   text-align: right;
+  white-space: nowrap;
+}
+
+.cockpit-breakdown-modal {
+  max-height: min(720px, calc(100vh - 48px));
+}
+
+.cockpit-breakdown-list {
+  display: grid;
+  gap: 2px;
+  max-height: min(420px, 55vh);
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.cockpit-breakdown-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.cockpit-breakdown-row:last-child {
+  border-bottom: 0;
+}
+
+.cockpit-breakdown-row span {
+  min-width: 0;
+  color: var(--ink);
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.cockpit-breakdown-row strong {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 

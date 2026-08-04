@@ -73,6 +73,47 @@ class CockpitPayloadTest(unittest.TestCase):
             ],
         )
 
+    def test_top_expenses_others_keeps_breakdown_items(self) -> None:
+        payload = cockpit_payload([
+            {
+                "type": "expense",
+                "amount": amount,
+                "amount_brl": amount,
+                "category_name": category,
+                "subcategory_name": subcategory,
+            }
+            for amount, category, subcategory in [
+                (700, "Moradia", "Aluguel"),
+                (600, "Transporte", "Combustivel"),
+                (500, "Alimentacao", "Mercado"),
+                (400, "Saude", "Farmacia"),
+                (300, "Educacao", "Cursos"),
+                (200, "Lazer", "Cinema"),
+                (100, "Assinaturas", "Streaming"),
+            ]
+        ])
+
+        others = payload["top_expenses"][-1]
+
+        self.assertEqual(others["label"], "Outros")
+        self.assertEqual(others["total"], 300.0)
+        self.assertEqual(others["count"], 2)
+        self.assertEqual(
+            others["items"],
+            [
+                {
+                    "label": "Lazer / Cinema",
+                    "total": 200.0,
+                    "count": 1,
+                },
+                {
+                    "label": "Assinaturas / Streaming",
+                    "total": 100.0,
+                    "count": 1,
+                },
+            ],
+        )
+
     def test_planning_keeps_original_values_separated_by_currency(self) -> None:
         payload = cockpit_payload([
             {

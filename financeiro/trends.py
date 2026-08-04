@@ -158,7 +158,7 @@ def build_monthly_series(conn, user_id: int, month: str) -> dict[str, dict[str, 
     months_window = trailing_months(month, 12)
     series = {m: {"income_cents": 0, "expense_cents": 0} for m in months_window}
 
-    # spec: relatorios/relatorios v1.3 — critério 6
+    # spec: relatorios/relatorios v2.6 — critério 6
     # (pagamento de fatura em conta-corrente fica fora das despesas analíticas)
     account_rows = conn.execute(
         """
