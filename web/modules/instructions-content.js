@@ -1,4 +1,4 @@
-// spec: docs/specs/instrucoes-app.md v0.5 — conteúdo estático da central de ajuda
+// spec: docs/specs/instrucoes-app.md v1.3 — conteúdo estático da central de ajuda
 // Este módulo é puro e sem estado: o conteúdo é versionado no frontend e
 // disponível offline, sem dependência de backend ou internet.
 
@@ -133,12 +133,13 @@ export const INSTRUCTIONS_CONTENT = [
       {
         id: "investimentos-aportes",
         title: "Lançar investimentos e aportes",
-        summary: "Registre aportes em conta de investimento para acompanhar aplicações.",
+        summary: "Registre compras, aportes e aplicações que aumentam uma posição existente ou criam uma nova no Portfólio.",
         content: [
-          "Use o tipo Investimento/Aporte quando enviar dinheiro para uma conta de investimento.",
-          "Esse lançamento sai da conta-corrente e fica disponível para vincular a uma posição no Portfólio. Resgates e dividendos devem ser lançados de acordo com o tipo apropriado.",
+          "No Extrato de Contas, use o tipo Investimento/Aporte quando comprar um ativo, fazer um aporte ou receber uma aplicação. Esse lançamento sai do saldo da conta-corrente e é contabilizado como uma operação do ativo.",
+          "Se já houver uma posição com os mesmos dados (mesma carteira, tipo, ticker/nome, CNPJ, indexador e vencimento) no Portfólio, o aporte é somado a ela. Se não houver, o app cria uma nova posição automaticamente.",
+          "Não é o mesmo que Transferência: uma transferência apenas move saldo entre contas e não cria operação de ativo. Preencha Valor investido, Ativo (ticker/código), Nome do ativo, CNPJ (para fundos), Quantidade e Preço unitário (quando aplicável), além de custos como corretagem, emolumentos, impostos e outros. Resgates e dividendos devem ser lançados com os tipos apropriados.",
         ],
-        searchTerms: ["investimento", "aporte", "resgate", "dividendo", "aplicação"],
+        searchTerms: ["investimento", "aporte", "compra", "aplicação", "posição", "ativo", "transferência", "conta investimento"],
         relatedModule: "Extrato de Contas",
         route: "transactions",
         contextualTopicId: "investimentos-aportes",
@@ -275,12 +276,12 @@ export const INSTRUCTIONS_CONTENT = [
       {
         id: "posicao-movimentacao",
         title: "Diferença entre posição e movimentação",
-        summary: "A posição descreve o ativo; aportes e resgates são registrados pelos lançamentos da conta.",
+        summary: "O Portfólio registra a posição inicial; aportes, compras e resgates são registrados pelos lançamentos da conta.",
         content: [
-          "Quando você cadastra um ativo no Portfólio, está apenas descrevendo a posição (ex.: CDB XYZ, quantidade, valor inicial).",
-          "Aportes, resgates e dividendos devem ser registrados como lançamentos na conta-corrente ou de investimento. O Portfólio consolida essas movimentações para calcular o resultado. Não use o Portfólio como substituto do Extrato de Contas.",
+          "Cadastre um ativo no Portfólio apenas para registrar o que você já possui em carteira antes de começar a usar o app (posição inicial).",
+          "A partir daí, toda nova compra, aporte, resgate ou dividendo deve ser registrado como lançamento na conta-corrente ou de investimento, usando os tipos apropriados. O Portfólio consolida essas movimentações e calcula o resultado. Aportes criam novas posições se o ativo ainda não existir ou somam à posição existente. Não use o Portfólio como substituto do Extrato de Contas.",
         ],
-        searchTerms: ["posição", "movimentação", "aporte", "resgate", "lançamento", "ativo"],
+        searchTerms: ["posição", "movimentação", "aporte", "resgate", "lançamento", "ativo", "posição inicial", "carteira"],
         relatedModule: "Portfólio",
         route: "portfolio",
         contextualTopicId: "posicao-movimentacao",
@@ -315,15 +316,30 @@ export const INSTRUCTIONS_CONTENT = [
       {
         id: "acoes-fundos",
         title: "Ações, fundos, cripto e previdência",
-        summary: "Cadastre outros tipos de ativos com identificador de mercado.",
+        summary: "Cadastre posições iniciais de renda variável, cripto, fundos e previdência que você já possui em carteira.",
         content: [
-          "No Portfólio, escolha o tipo correspondente: Ações (ex.: PETR4), Fundos (ex.: XPML11), Cripto (ex.: BTC), Previdência Privada ou Poupança.",
-          "Para renda variável e cripto, o app busca cotações de mercado. Para fundos, informe o valor da cota e a quantidade.",
+          "Use essa tela apenas para registrar ativos que você já possui antes de começar a usar o app (posição inicial). Aportes e compras futuras devem ser registrados pelo Extrato de Contas como lançamentos do tipo Investimento/Aporte.",
+          "Preencha Carteira (conta onde o ativo está custodiado), Data de aquisição, Custo total do lote, Ativo (ticker ou código, ex.: PETR4, BTC, XPML11) e Nome do ativo. Para fundos, informe também o CNPJ do fundo. Para previdência, escolha a subcategoria PGBL ou VGBL.",
+          "Quando aplicável, preencha Quantidade e Preço médio para que o app acompanhe a evolução. Para ações, fundos e cripto, o app busca cotações de mercado automaticamente.",
         ],
-        searchTerms: ["ações", "fundos", "cripto", "previdência", "poupança", "cotação"],
+        searchTerms: ["ações", "fundos", "cripto", "previdência", "cotação", "posição inicial", "ticker", "quantidade", "preço médio", "CNPJ"],
         relatedModule: "Portfólio",
         route: "portfolio",
         contextualTopicId: "acoes-fundos",
+      },
+      {
+        id: "cadastrar-poupanca",
+        title: "Como cadastrar poupança",
+        summary: "Registre posições de poupança com as datas de aniversário para cálculo automático de rendimento.",
+        content: [
+          "No Portfólio, clique em Novo ativo e escolha o tipo Poupança. Informe a conta, o nome do ativo e o valor investido.",
+          "No campo Aniversários da poupança, cadastre cada data de aniversário seguida do valor aplicado naquele dia, usando o formato AAAA-MM-DD; valor. Por exemplo: 2026-01-05; 1.000,00. Use uma linha para cada aniversário.",
+          "O app usa essas datas para calcular o rendimento mês a mês com a regra da poupança (TR + 0,5% ou TR + 70% da Selic).",
+        ],
+        searchTerms: ["poupança", "aniversário", "rendimento", "data", "formato", "AAAA-MM-DD"],
+        relatedModule: "Portfólio",
+        route: "portfolio",
+        contextualTopicId: "cadastrar-poupanca",
       },
       {
         id: "atualizar-valores",
@@ -459,10 +475,10 @@ export const INSTRUCTIONS_CONTENT = [
         title: "Importação de dados",
         summary: "Traga lançamentos de planilhas do Organizze ou do modelo do próprio sistema.",
         content: [
-          "Em Gestão > Importação, escolha a origem, selecione o arquivo e a conta ou cartão de destino.",
-          "Para o Organizze, use exportações .xls ou .csv. Para o modelo próprio, baixe o arquivo exemplo, preencha e envie. Sempre revise o resultado antes de continuar.",
+          "Em Gestão > Importação, escolha a origem (Organizze ou modelo próprio), selecione o arquivo e a conta ou cartão de destino.",
+          "Para o modelo próprio, baixe o arquivo exemplo, preencha e envie. Sempre revise o resultado antes de continuar.",
         ],
-        searchTerms: ["importar", "organizze", "planilha", "csv", "xls", "modelo"],
+        searchTerms: ["importar", "organizze", "planilha", "modelo"],
         relatedModule: "Importação",
         route: "imports",
         contextualTopicId: "importacao-dados",

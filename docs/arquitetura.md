@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.3
+versao: 3.4
 atualizado: 2026-08-04
 relacionados:
   - "[[requisitos]]"
@@ -199,6 +199,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | Método | Rota |
 |---|---|
 | `GET` | `/api/cockpit?month=AAAA-MM` |
+| `GET` | `/api/cockpit/calendar` |
 | `GET` | `/api/reports/category-evolution?category_id={id}&subcategory_id={id}&period={periodo}` |
 
 #### Rotas — Tendências e IA → [[tendencias-saude-financeira]]
@@ -456,6 +457,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.4` — 2026-08-04 — Documentada rota `GET /api/cockpit/calendar` para a futura aba **Calendário** do Cockpit, com contas a receber/pagar atrasadas e vencimentos de renda fixa em 30 e 60 dias. Ver [[specs/cockpit-calendario]].
 - `3.3` — 2026-08-04 — Documentada rota pública `/api/latest-version`, módulo `financeiro/version_check.py` e fluxo de detecção de nova versão no Cockpit.
 - `3.2` — 2026-08-04 — Atualizada descrição de `instructions-view.js` para incluir botões contextuais `?` e responsividade em telas estreitas.
 - `3.1` — 2026-08-04 — Documentada view `instructions-view.js` da central de ajuda, integrada ao menu Usuário e ao orquestrador `web/app.js`.

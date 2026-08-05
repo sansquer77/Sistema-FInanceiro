@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 4.9
+versao: 5.1
 atualizado: 2026-08-04
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -50,7 +50,10 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[specs/sobre-app]] | ✅ implementado | Usuário |
 | [[specs/frontend-modularizacao]] | ✅ implementado | Frontend |
 | [[specs/tendencias-saude-financeira]] | ✅ implementado | Diagnóstico |
+| [[specs/score-saude-financeira]] | ✅ implementado | Diagnóstico |
 | [[specs/privacidade-valores]] | ✅ implementado | Privacidade |
+| [[specs/instrucoes-app]] | ✅ implementado | Usuário |
+| [[specs/landing-page]] | ✅ implementado | Institucional |
 | [[distribuição]] | ✅ implementado | Distribuição |
 
 ---
@@ -61,9 +64,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 
 | Spec | Status | Área |
 |---|---|---|
-| [[specs/instrucoes-app]] | 📝 rascunho | Usuário |
-| [[specs/landing-page]] | 🚧 em-implementacao | Institucional |
-| [[specs/score-saude-financeira]] | 🚧 em-implementacao | Diagnóstico |
+| [[specs/cockpit-calendario]] | 📝 rascunho | Cockpit |
 | [[specs/imposto-renda]] | ❌ depreciado — custo de manter regras fiscais atualizadas não compensa para uso familiar | Investimentos |
 | [[specs/exportacao-dados]] | ❌ depreciado — arquivo SQLite já acessível por leitor genérico ou agente de IA | Exportação |
 
@@ -120,6 +121,8 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `5.1` — 2026-08-04 — [[specs/instrucoes-app]], [[specs/landing-page]] e [[specs/score-saude-financeira]] movidas para a tabela de specs implementadas; status e frontmatter das specs atualizados para `implementado`.
+- `5.0` — 2026-08-04 — Adicionada [[specs/cockpit-calendario]] em rascunho para a nova aba **Calendário** do Cockpit; especificação não implementa código, apenas documenta a aba, regras, API e plano de implementação.
 - `4.9` — 2026-08-04 — [[specs/instrucoes-app]] atualizada com decisões sobre links internos, botões contextuais `?` e cobertura de todos os módulos operacionais.
 - `4.8` — 2026-08-04 — Adicionada [[specs/instrucoes-app]] em rascunho para orientar o futuro módulo **Instruções** no menu Usuário.
 - `4.7` — 2026-08-04 — [[specs/landing-page]] atualizada com orientação didática da seção “Como começar”, especialmente para o fluxo de Portfólio e ativos.

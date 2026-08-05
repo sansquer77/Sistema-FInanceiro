@@ -1,21 +1,21 @@
 ---
 tipo: spec
 area: landing-page
-status: em-implementacao
-versao: 1.7
+status: implementado
+versao: 1.8
 atualizado: 2026-08-04
 relacionados:
   - "[[sobre-app]]"
   - "[[../design/design-system|Design System]]"
   - "[[../adr/0007-landing-page-institucional-isolada|ADR-0007]]"
-tags: [spec, "area/landing-page", "status/em-implementacao"]
+tags: [spec, "area/landing-page", "status/implementado"]
 aliases: ["Landing Page do Produto", "Site Institucional de Apresentação"]
 ---
 
 # Landing Page do Produto e Showcase Visual
 
 > [!info] Status
-> **em-implementacao** · área: `landing-page` · atualizado em 2026-08-04 · relacionados: [[sobre-app]], [[../design/design-system|Design System]], [[../adr/0007-landing-page-institucional-isolada|ADR-0007]]
+> **implementado** · área: `landing-page` · atualizado em 2026-08-04 · relacionados: [[sobre-app]], [[../design/design-system|Design System]], [[../adr/0007-landing-page-institucional-isolada|ADR-0007]]
 
 ### Problema
 
@@ -145,6 +145,7 @@ Visitante ou usuário interessado que busca entender a proposta de valor, visual
 
 ### Changelog
 
+- `1.8` — 2026-08-04 — Spec marcada como `implementado` na documentação do repositório principal; a landing page vive em `sistemafinanceiropage` e este repositório mantém apenas a especificação/decisão do produto.
 - `1.7` — 2026-08-04 — Adicionado endpoint público `/api/latest-version` para que o app principal detecte novas versões sem scraping de HTML.
 - `1.6` — 2026-08-04 — Incluída orientação didática da seção “Como começar”, com destaque para o fluxo correto de cadastro de ativos, aportes e resgates.
 - `1.5` — 2026-08-04 — Removido o link textual separado “Ver notas da versão no GitHub” da seção de downloads, mantendo foco nos botões por plataforma.

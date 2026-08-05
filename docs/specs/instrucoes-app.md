@@ -2,7 +2,7 @@
 tipo: spec
 area: usuario
 status: implementado
-versao: 1.0
+versao: 1.3
 atualizado: 2026-08-04
 relacionados:
   - "[[sobre-app]]"
@@ -166,9 +166,9 @@ A lista abaixo é a **versão de referência** para o conteúdo estático do mó
 
 - **ID**: `investimentos-aportes`
   - **Título**: Lançar investimentos e aportes
-  - **Resumo**: Registre aportes em conta de investimento para acompanhar aplicações.
-  - **Conteúdo**: Use o tipo **Investimento/Aporte** quando enviar dinheiro para uma conta de investimento. Esse lançamento sai da conta-corrente e fica disponível para vincular a uma posição no Portfólio. Resgates e dividendos devem ser lançados de acordo com o tipo apropriado.
-  - **Termos de busca**: investimento, aporte, resgate, dividendo, aplicação
+  - **Resumo**: Registre compras, aportes e aplicações que aumentam uma posição existente ou criam uma nova no Portfólio.
+  - **Conteúdo**: No Extrato de Contas, use o tipo **Investimento/Aporte** quando comprar um ativo, fazer um aporte ou receber uma aplicação. Esse lançamento sai do saldo da conta-corrente e é contabilizado como uma operação do ativo. Se já houver uma posição com os mesmos dados (mesma carteira, tipo, ticker/nome, CNPJ, indexador e vencimento) no Portfólio, o aporte é somado a ela. Se não houver, o app cria uma nova posição automaticamente. **Não é o mesmo que Transferência**: uma transferência apenas move saldo entre contas e não cria operação de ativo. Preencha os campos do ativo: **Valor investido**, **Ativo** (ticker/código), **Nome do ativo**, **CNPJ** (para fundos), **Quantidade** e **Preço unitário** (quando aplicável), além de custos como corretagem, emolumentos, impostos e outros. Resgates e dividendos devem ser lançados com os tipos apropriados.
+  - **Termos de busca**: investimento, aporte, compra, aplicação, posição, ativo, transferência, conta investimento
   - **Módulo relacionado**: Extrato de Contas
   - **Rota do módulo**: `transactions`
   - **Tópico contextual**: `investimentos-aportes`
@@ -260,9 +260,9 @@ A lista abaixo é a **versão de referência** para o conteúdo estático do mó
 
 - **ID**: `posicao-movimentacao`
   - **Título**: Diferença entre posição e movimentação
-  - **Resumo**: A posição descreve o ativo; aportes e resgates são registrados pelos lançamentos da conta.
-  - **Conteúdo**: Quando você cadastra um ativo no Portfólio, está apenas descrevendo a posição (ex.: "CDB XYZ", quantidade, valor inicial). Aportes, resgates e dividendos devem ser registrados como lançamentos na conta-corrente ou de investimento. O Portfólio consolida essas movimentações para calcular o resultado. Não use o Portfólio como substituto do Extrato de Contas.
-  - **Termos de busca**: posição, movimentação, aporte, resgate, lançamento, ativo
+  - **Resumo**: O Portfólio registra a posição inicial; aportes, compras e resgates são registrados pelos lançamentos da conta.
+  - **Conteúdo**: Cadastre um ativo no Portfólio **apenas para registrar o que você já possui em carteira antes de começar a usar o app** (posição inicial). A partir daí, toda nova compra, aporte, resgate ou dividendo deve ser registrado como lançamento na conta-corrente ou de investimento, usando os tipos apropriados. O Portfólio consolida essas movimentações e calcula o resultado. Aportes criam novas posições se o ativo ainda não existir ou somam à posição existente. Não use o Portfólio como substituto do Extrato de Contas.
+  - **Termos de busca**: posição, movimentação, aporte, resgate, lançamento, ativo, posição inicial, carteira
   - **Módulo relacionado**: Portfólio
   - **Rota do módulo**: `portfolio`
   - **Tópico contextual**: `posicao-movimentacao`
@@ -287,12 +287,21 @@ A lista abaixo é a **versão de referência** para o conteúdo estático do mó
 
 - **ID**: `acoes-fundos`
   - **Título**: Ações, fundos, cripto e previdência
-  - **Resumo**: Cadastre outros tipos de ativos com identificador de mercado.
-  - **Conteúdo**: No Portfólio, escolha o tipo correspondente: Ações (ex.: PETR4), Fundos (ex.: XPML11), Cripto (ex.: BTC), Previdência Privada ou Poupança. Para renda variável e cripto, o app busca cotações de mercado. Para fundos, informe o valor da cota e a quantidade.
-  - **Termos de busca**: ações, fundos, cripto, previdência, poupança, cotação
+  - **Resumo**: Cadastre posições iniciais de renda variável, cripto, fundos e previdência que você já possui em carteira.
+  - **Conteúdo**: Use essa tela apenas para registrar ativos que você **já possui antes de começar a usar o app** (posição inicial). Aportes e compras futuras devem ser registrados pelo Extrato de Contas como lançamentos do tipo **Investimento/Aporte**. No formulário, preencha: **Carteira** (conta onde o ativo está custodiado), **Data de aquisição**, **Custo total** do lote, **Ativo** (ticker ou código, ex.: PETR4, BTC, XPML11) e **Nome do ativo**. Para fundos, informe também o **CNPJ do fundo**. Para previdência, escolha a subcategoria PGBL ou VGBL. Quando aplicável, preencha **Quantidade** e **Preço médio** para que o app acompanhe a evolução. Para ações, fundos e cripto, o app busca cotações de mercado automaticamente.
+  - **Termos de busca**: ações, fundos, cripto, previdência, cotação, posição inicial, ticker, quantidade, preço médio, CNPJ
   - **Módulo relacionado**: Portfólio
   - **Rota do módulo**: `portfolio`
   - **Tópico contextual**: `acoes-fundos`
+
+- **ID**: `cadastrar-poupanca`
+  - **Título**: Como cadastrar poupança
+  - **Resumo**: Registre posições de poupança com as datas de aniversário para cálculo automático de rendimento.
+  - **Conteúdo**: No Portfólio, clique em **Novo ativo** e escolha o tipo **Poupança**. Informe a conta, o nome do ativo e o valor investido. No campo **Aniversários da poupança**, cadastre cada data de aniversário seguida do valor aplicado naquele dia, usando o formato `AAAA-MM-DD; valor`. Por exemplo: `2026-01-05; 1.000,00`. Use uma linha para cada aniversário. O app usa essas datas para calcular o rendimento mês a mês com a regra da poupança (TR + 0,5% ou TR + 70% da Selic).
+  - **Termos de busca**: poupança, aniversário, rendimento, data, formato, AAAA-MM-DD
+  - **Módulo relacionado**: Portfólio
+  - **Rota do módulo**: `portfolio`
+  - **Tópico contextual**: `cadastrar-poupanca`
 
 - **ID**: `atualizar-valores`
   - **Título**: Como atualizar valores manualmente
@@ -382,8 +391,8 @@ A lista abaixo é a **versão de referência** para o conteúdo estático do mó
 - **ID**: `importacao-dados`
   - **Título**: Importação de dados
   - **Resumo**: Traga lançamentos de planilhas do Organizze ou do modelo do próprio sistema.
-  - **Conteúdo**: Em **Gestão > Importação**, escolha a origem, selecione o arquivo e a conta ou cartão de destino. Para o Organizze, use exportações `.xls` ou `.csv`. Para o modelo próprio, baixe o arquivo exemplo, preencha e envie. Sempre revise o resultado antes de continuar.
-  - **Termos de busca**: importar, organizze, planilha, csv, xls, modelo
+  - **Conteúdo**: Em **Gestão > Importação**, escolha a origem (Organizze ou modelo próprio), selecione o arquivo e a conta ou cartão de destino. Para o modelo próprio, baixe o arquivo exemplo, preencha e envie. Sempre revise o resultado antes de continuar.
+  - **Termos de busca**: importar, organizze, planilha, modelo
   - **Módulo relacionado**: Importação
   - **Rota do módulo**: `imports`
   - **Tópico contextual**: `importacao-dados`
@@ -532,6 +541,9 @@ Nenhuma pendência conhecida.
 
 ### Changelog
 
+- `1.3` — 2026-08-04 — Tópico `importacao-dados` ajustado: removida menção a formatos `.xls` e `.csv` do Organizze.
+- `1.2` — 2026-08-04 — Tópicos `acoes-fundos` e `investimentos-aportes` revisados: explicados campos de cadastro de ações, fundos, cripto e previdência, e diferenciado aporte de investimento de transferência entre contas. Tópico `posicao-movimentacao` reforça que o cadastro no Portfólio é para posição inicial já existente na carteira.
+- `1.1` — 2026-08-04 — Adicionado tópico `cadastrar-poupanca` ao grupo `portfolio`, explicando o cadastro de aniversários no formato `AAAA-MM-DD; valor` e o cálculo automático de rendimento.
 - `1.0` — 2026-08-04 — Spec implementada: módulo **Instruções** finalizado no menu Usuário, com central de ajuda local, busca, grupos colapsáveis, accordion, links internos, botões contextuais `?`, responsividade e aderência ao design system. Versão do produto elevada para `1.2.0`.
 - `0.9` — 2026-08-04 — Passo 5 do plano concluído: adicionado botão contextual `?` no header com mapeamento de tópicos por tela, ajustes de responsividade para telas estreitas, refinamento de estado vazio, atributos ARIA no accordion e estilos alinhados ao design system.
 - `0.8` — 2026-08-04 — Passo 4 do plano concluído: item **Instruções** confirmado no menu **Usuário** entre Preferências e Sobre, navegação interna conectada em `web/app.js` e proteção de autenticação herdada do fluxo normal do app.

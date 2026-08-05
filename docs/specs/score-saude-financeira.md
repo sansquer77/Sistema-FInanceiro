@@ -1,9 +1,9 @@
 ---
 tipo: spec
 area: score-saude-financeira
-status: em-implementacao
-versao: 3.1
-atualizado: 2026-08-02
+status: implementado
+versao: 3.2
+atualizado: 2026-08-04
 relacionados:
   - "[[relatorios]]"
   - "[[limites-gastos]]"
@@ -11,14 +11,14 @@ relacionados:
   - "[[cartoes]]"
   - "[[contas-correntes]]"
   - "[[arquitetura]]"
-tags: [spec, "area/score-saude-financeira", "status/em-implementacao"]
+tags: [spec, "area/score-saude-financeira", "status/implementado"]
 aliases: ["Score de Saúde Financeira", "Diagnóstico Financeiro", "Financial Health Score"]
 ---
 
 # Score de Saúde Financeira
 
 > [!info] Status
-> **em-implementacao** · área: `score-saude-financeira` · atualizado em 2026-08-02 · relacionados: [[relatorios]], [[limites-gastos]], [[investimentos-portfolio]], [[cartoes]], [[contas-correntes]]
+> **implementado** · área: `score-saude-financeira` · atualizado em 2026-08-04 · relacionados: [[relatorios]], [[limites-gastos]], [[investimentos-portfolio]], [[cartoes]], [[contas-correntes]]
 
 ## Problema
 
@@ -171,6 +171,7 @@ Nenhuma pendência conhecida.
 
 ## Changelog
 
+- `3.2` — 2026-08-04 — Spec marcada como `implementado` no vault de documentação do app principal.
 - `3.1` — 2026-08-02 — Gauge do Score passa a manter o centro livre de texto, movendo pontuação/status para o bloco lateral e removendo redundância visual com a escala.
 - `3.0` — 2026-08-02 — Diagnóstico visual passa a usar gauge de 0 a 1000 com quatro zonas (vermelho, laranja, amarelo, verde) e cards expansíveis para pilares e Paz Financeira.
 - `2.9` — 2026-07-31 — Indicador `i` da Taxa de Poupança passa a abrir caixa de ajuda visual em hover, foco de teclado ou clique/foco, em vez de depender apenas do tooltip nativo.

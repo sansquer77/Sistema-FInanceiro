@@ -1,4 +1,4 @@
-// spec: docs/specs/instrucoes-app.md v0.9 — view da central de ajuda
+// spec: docs/specs/instrucoes-app.md v1.3 — view da central de ajuda
 // View pura de apresentação: não realiza chamadas de API nem altera dados financeiros.
 
 import {
