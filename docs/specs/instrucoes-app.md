@@ -2,8 +2,8 @@
 tipo: spec
 area: usuario
 status: implementado
-versao: 1.3
-atualizado: 2026-08-04
+versao: 1.4
+atualizado: 2026-08-06
 relacionados:
   - "[[sobre-app]]"
   - "[[lancamentos]]"
@@ -17,7 +17,7 @@ aliases: ["Instruções do App", "Central de Ajuda Local"]
 # Instruções do App
 
 > [!info] Status
-> **implementado** · área: `usuario` · atualizado em 2026-08-04 · relacionados: [[sobre-app]], [[lancamentos]], [[cartoes]], [[investimentos-portfolio]], [[score-saude-financeira]]
+> **implementado** · área: `usuario` · atualizado em 2026-08-06 · relacionados: [[sobre-app]], [[lancamentos]], [[cartoes]], [[investimentos-portfolio]], [[score-saude-financeira]]
 
 ### Problema
 
@@ -541,6 +541,7 @@ Nenhuma pendência conhecida.
 
 ### Changelog
 
+- `1.4` — 2026-08-06 — Status e posição ajustados no Map of Content (`docs/README.md`): movida para a seção de specs implementadas, área `Usuário`.
 - `1.3` — 2026-08-04 — Tópico `importacao-dados` ajustado: removida menção a formatos `.xls` e `.csv` do Organizze.
 - `1.2` — 2026-08-04 — Tópicos `acoes-fundos` e `investimentos-aportes` revisados: explicados campos de cadastro de ações, fundos, cripto e previdência, e diferenciado aporte de investimento de transferência entre contas. Tópico `posicao-movimentacao` reforça que o cadastro no Portfólio é para posição inicial já existente na carteira.
 - `1.1` — 2026-08-04 — Adicionado tópico `cadastrar-poupanca` ao grupo `portfolio`, explicando o cadastro de aniversários no formato `AAAA-MM-DD; valor` e o cálculo automático de rendimento.

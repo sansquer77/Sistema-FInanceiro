@@ -2,7 +2,7 @@
 tipo: spec
 area: cockpit
 status: em-implementacao
-versao: 0.2
+versao: 0.3
 atualizado: 2026-08-06
 relacionados:
   - "[[relatorios]]"
@@ -201,6 +201,7 @@ A nova rota deve ser autenticada e validar `Host`/`Origin` conforme as regras de
 
 ## Changelog
 
+- `0.3` — 2026-08-06 — Status e posição ajustados no Map of Content (`docs/README.md`): permanece em `em-implementacao` na seção de specs em outros status enquanto a UI não é concluída.
 - `0.2` — 2026-08-06 — Implementados no backend a rota `GET /api/cockpit/calendar` e o módulo `financeiro/calendar.py`, com testes automatizados para atrasos e vencimentos. Status avançado para `em-implementacao`; UI ainda pendente (passos 3 e 4).
 - `0.1` — 2026-08-04 — Spec inicial em rascunho para a aba **Calendário** no Cockpit, com cards de contas a receber/pagar atrasadas e vencimentos de renda fixa em 30 e 60 dias.
 

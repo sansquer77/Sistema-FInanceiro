@@ -8,7 +8,7 @@ relacionados:
   - "[[landing-page]]"
   - "[[sobre-app]]"
   - "[[../adr/0007-landing-page-institucional-isolada|ADR-0007]]"
-tags: [spec, "area/alerta-nova-versao", "status/rascunho"]
+tags: [spec, "area/alerta-nova-versao", "status/implementado"]
 aliases: ["Alerta de Nova Versão no Cockpit"]
 ---
 

@@ -2,8 +2,8 @@
 tipo: spec
 area: score-saude-financeira
 status: implementado
-versao: 3.2
-atualizado: 2026-08-04
+versao: 3.3
+atualizado: 2026-08-06
 relacionados:
   - "[[relatorios]]"
   - "[[limites-gastos]]"
@@ -18,7 +18,7 @@ aliases: ["Score de Saúde Financeira", "Diagnóstico Financeiro", "Financial He
 # Score de Saúde Financeira
 
 > [!info] Status
-> **implementado** · área: `score-saude-financeira` · atualizado em 2026-08-04 · relacionados: [[relatorios]], [[limites-gastos]], [[investimentos-portfolio]], [[cartoes]], [[contas-correntes]]
+> **implementado** · área: `score-saude-financeira` · atualizado em 2026-08-06 · relacionados: [[relatorios]], [[limites-gastos]], [[investimentos-portfolio]], [[cartoes]], [[contas-correntes]]
 
 ## Problema
 
@@ -171,6 +171,7 @@ Nenhuma pendência conhecida.
 
 ## Changelog
 
+- `3.3` — 2026-08-06 — Status e posição ajustados no Map of Content (`docs/README.md`): movida para a seção de specs implementadas, área `Diagnóstico`.
 - `3.2` — 2026-08-04 — Spec marcada como `implementado` no vault de documentação do app principal.
 - `3.1` — 2026-08-02 — Gauge do Score passa a manter o centro livre de texto, movendo pontuação/status para o bloco lateral e removendo redundância visual com a escala.
 - `3.0` — 2026-08-02 — Diagnóstico visual passa a usar gauge de 0 a 1000 com quatro zonas (vermelho, laranja, amarelo, verde) e cards expansíveis para pilares e Paz Financeira.

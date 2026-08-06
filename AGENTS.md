@@ -1,6 +1,8 @@
 # AGENTS.md — Guia para agentes de IA neste repositório
 
 > Este arquivo é a fonte de regras para **qualquer ferramenta de IA** (assistentes de IDE, agentes de terminal, revisores automáticos de PR etc.) que leia, gere ou edite código neste repositório. Ele resume e aponta para a metodologia já definida em [`docs/sdd.md`](docs/sdd.md) e no restante de `docs/`. Em caso de conflito entre este arquivo e `docs/`, **`docs/` é a fonte canônica** — atualize este arquivo para refletir a mudança.
+>
+> **Use sempre `docs/README.md` como o ponto de entrada canônico do vault; não edite o `README.md` na raiz do repositório.**
 
 ## 0. Leia isto antes de tocar em qualquer arquivo
 

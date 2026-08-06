@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 5.2
+versao: 5.1
 atualizado: 2026-08-06
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -48,13 +48,13 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[specs/recuperacao-senha]] | ✅ implementado | Segurança |
 | [[specs/seguranca-autenticacao]] | ✅ implementado | Segurança |
 | [[specs/sobre-app]] | ✅ implementado | Usuário |
+| [[specs/instrucoes-app]] | ✅ implementado | Usuário |
 | [[specs/frontend-modularizacao]] | ✅ implementado | Frontend |
 | [[specs/tendencias-saude-financeira]] | ✅ implementado | Diagnóstico |
 | [[specs/score-saude-financeira]] | ✅ implementado | Diagnóstico |
 | [[specs/privacidade-valores]] | ✅ implementado | Privacidade |
-| [[specs/instrucoes-app]] | ✅ implementado | Usuário |
-| [[specs/landing-page]] | ✅ implementado | Institucional |
 | [[distribuição]] | ✅ implementado | Distribuição |
+| [[specs/landing-page]] | ✅ implementado | Institucional |
 
 ---
 
@@ -64,7 +64,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 
 | Spec | Status | Área |
 |---|---|---|
-| [[specs/cockpit-calendario]] | 🚧 em-implementação | Cockpit |
+| [[specs/cockpit-calendario]] | 🚧 em-implementacao | Cockpit |
 | [[specs/imposto-renda]] | ❌ depreciado — custo de manter regras fiscais atualizadas não compensa para uso familiar | Investimentos |
 | [[specs/exportacao-dados]] | ❌ depreciado — arquivo SQLite já acessível por leitor genérico ou agente de IA | Exportação |
 
@@ -102,6 +102,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 4. Se houver decisão técnica não trivial, registre um ADR em adr/
 5. Implemente a menor mudança que cumpre a spec
 6. Atualize status, versao, atualizado e Changelog da spec
+7. Mantenha o código simples e passivel de manutenção e entendimento humano
 ```
 
 ---
@@ -121,8 +122,7 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
-- `5.2` — 2026-08-06 — [[specs/cockpit-calendario]] avançou para `em-implementacao` com a rota `GET /api/cockpit/calendar` e o módulo `financeiro/calendar.py` implementados; UI da aba ainda pendente.
-- `5.1` — 2026-08-04 — [[specs/instrucoes-app]], [[specs/landing-page]] e [[specs/score-saude-financeira]] movidas para a tabela de specs implementadas; status e frontmatter das specs atualizados para `implementado`.
+- `5.1` — 2026-08-06 — Reorganização do Map of Content: [[specs/instrucoes-app]], [[specs/landing-page]] e [[specs/score-saude-financeira]] movidas para a seção de specs implementadas; [[specs/cockpit-calendario]] permanece em `em-implementacao` na seção de specs em outros status.
 - `5.0` — 2026-08-04 — Adicionada [[specs/cockpit-calendario]] em rascunho para a nova aba **Calendário** do Cockpit; especificação não implementa código, apenas documenta a aba, regras, API e plano de implementação.
 - `4.9` — 2026-08-04 — [[specs/instrucoes-app]] atualizada com decisões sobre links internos, botões contextuais `?` e cobertura de todos os módulos operacionais.
 - `4.8` — 2026-08-04 — Adicionada [[specs/instrucoes-app]] em rascunho para orientar o futuro módulo **Instruções** no menu Usuário.

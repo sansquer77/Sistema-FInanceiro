@@ -2,8 +2,8 @@
 tipo: spec
 area: landing-page
 status: implementado
-versao: 1.8
-atualizado: 2026-08-04
+versao: 1.9
+atualizado: 2026-08-06
 relacionados:
   - "[[sobre-app]]"
   - "[[../design/design-system|Design System]]"
@@ -15,7 +15,7 @@ aliases: ["Landing Page do Produto", "Site Institucional de Apresentação"]
 # Landing Page do Produto e Showcase Visual
 
 > [!info] Status
-> **implementado** · área: `landing-page` · atualizado em 2026-08-04 · relacionados: [[sobre-app]], [[../design/design-system|Design System]], [[../adr/0007-landing-page-institucional-isolada|ADR-0007]]
+> **implementado** · área: `landing-page` · atualizado em 2026-08-06 · relacionados: [[sobre-app]], [[../design/design-system|Design System]], [[../adr/0007-landing-page-institucional-isolada|ADR-0007]]
 
 ### Problema
 
@@ -145,6 +145,7 @@ Visitante ou usuário interessado que busca entender a proposta de valor, visual
 
 ### Changelog
 
+- `1.9` — 2026-08-06 — Status e posição ajustados no Map of Content (`docs/README.md`): movida para a seção de specs implementadas, área `Institucional`.
 - `1.8` — 2026-08-04 — Spec marcada como `implementado` na documentação do repositório principal; a landing page vive em `sistemafinanceiropage` e este repositório mantém apenas a especificação/decisão do produto.
 - `1.7` — 2026-08-04 — Adicionado endpoint público `/api/latest-version` para que o app principal detecte novas versões sem scraping de HTML.
 - `1.6` — 2026-08-04 — Incluída orientação didática da seção “Como começar”, com destaque para o fluxo correto de cadastro de ativos, aportes e resgates.
