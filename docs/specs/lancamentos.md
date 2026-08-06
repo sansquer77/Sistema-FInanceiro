@@ -2,8 +2,8 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 3.0
-atualizado: 2026-08-02
+versao: 3.1
+atualizado: 2026-08-06
 relacionados:
   - "[[contas-correntes]]"
   - "[[categorias-tags-gestao]]"
@@ -17,7 +17,7 @@ aliases: ["Lançamentos", "Transações"]
 # Lançamentos
 
 > [!info] Status
-> **implementado** · área: `lancamentos` · atualizado em 2026-08-02 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]]
+> **implementado** · área: `lancamentos` · atualizado em 2026-08-06 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]]
 
 ## Problema
 
@@ -74,8 +74,10 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 - **Exclusão em cascata** (`scope=future`): remove recursivamente todos os lançamentos futuros não conciliados da mesma série, revertendo os respectivos impactos nos saldos.
 - A escolha de edição/exclusão em cascata deve usar modal com ações explícitas, como `Apenas este lançamento`, `Este e os próximos`, `Excluir apenas este`, `Excluir este e os próximos` e `Voltar`.
 - Lançamentos parcelados exibem índice e total (`1/36`, `2/36`...) sem reiniciar a contagem em edições pontuais.
-- Em lançamentos parcelados, o valor informado é o total da compra/lançamento e deve ser dividido pela quantidade de parcelas. Ex.: R$ 500 em 5x gera 5 lançamentos de R$ 100.
-- Em lançamentos recorrentes, cada ocorrência futura deve manter exatamente o valor informado. Ex.: R$ 500 recorrente por 5 ocorrências gera 5 lançamentos de R$ 500.
+- Em lançamentos parcelados, o valor informado é o total da compra/lançamento e deve ser dividido pela quantidade total de parcelas. Ex.: R$ 500 em 5x gera 5 lançamentos de R$ 100.
+- Em lançamentos recorrentes, cada ocorrência futura deve manter exatamente o valor informado, a menos que o usuário ative a opção de calcular valores futuros pela média dos últimos 12 lançamentos com a mesma descrição normalizada, mesmo tipo e mesma categoria/subcategoria.
+- Quando a opção de média estiver ativa em um lançamento recorrente, o valor de cada ocorrência futura usa a média aritmética inteira (em centavos) dos valores dos últimos 12 lançamentos do usuário com a mesma descrição normalizada, mesmo tipo e mesma categoria/subcategoria; se houver menos de 12, usa todos os disponíveis; se não houver histórico, mantém o valor informado no formulário.
+- Lançamentos recorrentes não exibem o campo de quantidade de ocorrências no formulário; o sistema grava a série com 120 ocorrências automaticamente para manter compatibilidade com lançamentos antigos que usam o campo.
 - Ao final de cada grupo diário na tela de Lançamentos, `Saldo previsto` considera todos os lançamentos até a data e `Saldo conciliado` considera somente lançamentos com `reconciled_at`, ambos partindo do saldo inicial da conta selecionada.
 - Valores financeiros extensos no gráfico de histórico/projeção de saldos devem se adaptar ao espaço disponível reduzindo a tipografia, sem aumentar a área do gráfico nem truncar centavos.
 - Indicadores compactos distinguem visualmente valores previstos e conciliados sem introduzir novas cores semânticas.
@@ -156,9 +158,14 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dado o tipo Investimento com subcategoria de Poupança cadastrada com texto complementar antigo, quando o combo de subcategoria é exibido, então a opção aparece como `Poupança`, preservando o valor interno original.
 - Dado um aporte de Renda Fixa ou Poupança criado em Lançamentos de Contas, quando o usuário marca `Usar este aporte como reserva de emergência` e salva, então a operação de investimento fica marcada como reserva e a opção volta preenchida ao editar o lançamento.
 - Dado o tipo Investimento com subcategoria Poupança selecionada, quando o formulário é exibido, então apenas campos aplicáveis à Poupança permanecem visíveis, ocultando/desabilitando quantidade, preço unitário, renda fixa, CNPJ, corretagem, emolumentos, impostos e outros custos.
+- Dado um lançamento recorrente sem histórico de mesma descrição, categoria e subcategoria, quando a opção de média estiver ativada, então todas as ocorrências futuras mantêm o valor informado no formulário.
+- Dado um histórico de 3 lançamentos com a mesma descrição, categoria e subcategoria e valores R$ 100, R$ 200 e R$ 300, quando um lançamento recorrente mensal ativa a opção de média, então cada uma das 120 ocorrências futuras usa o valor de R$ 200.
+- Dado um lançamento recorrente sendo criado, quando o usuário seleciona o tipo "Recorrente", então o campo de quantidade de ocorrências permanece oculto e a série é gravada com 120 ocorrências.
+- Dado um lançamento recorrente existente sendo editado, quando o formulário é aberto, então o campo de quantidade de ocorrências continua oculto e a frequência permanece desabilitada.
 
 ## Changelog
 
+- `3.1` — 2026-08-06 — Lançamentos recorrentes permitem calcular valores futuros pela média dos últimos 12 lançamentos com mesma descrição e passam a usar 120 ocorrências automaticamente, sem exibir o campo de quantidade.
 - `3.0` — 2026-08-02 — Formulário de Renda Fixa em Lançamentos reduz ruído visual com modalidade em chips, microcopy dinâmica, atalhos e preview compacto.
 - `2.9` — 2026-08-02 — Lançamentos em moeda estrangeira sem cotação manual passam a consultar a última PTAX de venda disponível até a data do lançamento para normalizar valores em BRL.
 - `2.8` — 2026-08-02 — Gráfico de saldos em Lançamentos de Contas ganha ajustes responsivos para telas de 14 polegadas (e breakpoints intermediários), evitando quebra de linha em valores extensos sem truncar centavos.

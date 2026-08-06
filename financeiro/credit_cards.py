@@ -12,9 +12,11 @@ from financeiro.classification_suggestions import normalize_description
 from financeiro.database import begin_immediate, get_connection, row_to_dict
 from financeiro.operation_logs import create_operation_log_with_conn
 from financeiro.transactions import (
+    average_amount_for_recurring_description,
     convert_to_brl_cents,
     create_transaction_with_conn,
     micros_to_rate,
+    normalize_flag,
     normalize_optional_tags,
     resolve_exchange_rate_micros,
     split_cents,
@@ -235,6 +237,12 @@ def create_credit_card_transaction_with_conn(conn: sqlite3.Connection, user_id: 
     exchange_rate_micros = resolve_exchange_rate_micros(card["currency"], transaction["date"], transaction["exchange_rate"])
     category_id = get_or_create_category(conn, user_id, transaction["category"], transaction["type"])
     subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
+    if transaction.get("use_average") and transaction["series_kind"] == "recurring":
+        average_amount = average_amount_for_recurring_description(
+            conn, user_id, transaction["description"], transaction["type"], category_id, subcategory_id
+        )
+        if average_amount is not None:
+            transaction["average_amount_cents"] = average_amount
     tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
     occurrences = build_card_transaction_occurrences(transaction)
     series_id = str(uuid4()) if transaction["series_kind"] != "single" else None
@@ -767,6 +775,7 @@ def normalize_card_transaction_payload(data: dict) -> dict:
         raise CreditCardError("Informe um valor maior que zero.")
     series_kind = normalize_card_series_kind(data)
     installment_count = normalize_card_repeat_count(data.get("installment_count"), series_kind)
+    use_average = normalize_flag(data.get("use_average"))
     return {
         "credit_card_id": normalize_card_id(data.get("credit_card_id")),
         "type": transaction_type,
@@ -782,6 +791,7 @@ def normalize_card_transaction_payload(data: dict) -> dict:
         "series_kind": series_kind,
         "installment_count": installment_count,
         "recurrence_frequency": normalize_card_recurrence_frequency(data),
+        "use_average": use_average,
     }
 
 
@@ -798,15 +808,27 @@ def normalize_card_repeat_count(value: object, series_kind: str) -> int | None:
     raw = str(value or "").strip()
     if not raw and series_kind == "installment":
         return None
+    # spec: cartoes v2.4 — critérios 21 e 22
+    # (recorrentes usam 120 ocorrencias automaticamente quando o campo nao e enviado;
+    #  o campo nao e mais exibido no formulario, mas a API mantem compatibilidade)
+    if series_kind == "recurring":
+        if not raw:
+            return 120
+        try:
+            count = int(raw)
+        except ValueError as exc:
+            raise CreditCardError("Informe a quantidade de repeticoes.") from exc
+        if count < 2 or count > 240:
+            raise CreditCardError("Informe entre 2 e 240 repeticoes.")
+        return count
     if not raw:
         raise CreditCardError("Informe a quantidade de ocorrencias.")
     try:
         count = int(raw)
     except ValueError as exc:
         raise CreditCardError("Informe a quantidade de repeticoes.") from exc
-    maximum = 240 if series_kind == "recurring" else 120
-    if count < 2 or count > maximum:
-        raise CreditCardError(f"Informe entre 2 e {maximum} repeticoes.")
+    if count < 2 or count > 120:
+        raise CreditCardError("Informe entre 2 e 120 repeticoes.")
     return count
 
 
@@ -835,13 +857,16 @@ def should_apply_to_future_card(data: dict) -> bool:
 def build_card_transaction_occurrences(transaction: dict) -> list[dict]:
     start_date = date.fromisoformat(transaction["date"])
     if transaction["series_kind"] == "recurring":
-        count = transaction["installment_count"] or 12
+        count = transaction["installment_count"] or 120
+        amount_cents = transaction["amount_cents"]
+        if transaction.get("use_average") and transaction.get("average_amount_cents") is not None:
+            amount_cents = transaction["average_amount_cents"]
         return [
             {
                 "date": add_recurrence(start_date, transaction["recurrence_frequency"], index).isoformat(),
                 "invoice_month": add_recurrence(date.fromisoformat(f"{transaction['invoice_month']}-01"), transaction["recurrence_frequency"], index).strftime("%Y-%m"),
                 "description": transaction["description"],
-                "amount_cents": transaction["amount_cents"],
+                "amount_cents": amount_cents,
                 "installment_index": None,
                 "installment_count": count,
             }

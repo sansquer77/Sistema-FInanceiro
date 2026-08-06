@@ -140,7 +140,6 @@ def create_transaction_with_conn(conn: sqlite3.Connection, user_id: int, data: d
     source = get_active_account(conn, user_id, transaction["account_id"])
     if source["account_type"] == "wallet":
         force_single_transaction(transaction)
-    occurrences = build_transaction_occurrences(transaction)
     destination = None
     if transaction["type"] == "transfer":
         destination = get_active_account(conn, user_id, transaction["destination_account_id"])
@@ -152,6 +151,13 @@ def create_transaction_with_conn(conn: sqlite3.Connection, user_id: int, data: d
         transaction["exchange_rate"],
     )
     category_id, subcategory_id = resolve_transaction_category(conn, user_id, transaction, destination)
+    if transaction.get("use_average") and transaction["series_kind"] == "recurring":
+        average_amount = average_amount_for_recurring_description(
+            conn, user_id, transaction["description"], transaction["type"], category_id, subcategory_id
+        )
+        if average_amount is not None:
+            transaction["average_amount_cents"] = average_amount
+    occurrences = build_transaction_occurrences(transaction)
     tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
     first_transaction_id = None
     series_id = str(uuid4()) if transaction["series_kind"] != "single" else None
@@ -552,18 +558,24 @@ def normalize_series_payload(data: dict) -> dict:
     installment_count = None
     recurrence_frequency = None
     recurrence_count = None
+    use_average = normalize_flag(data.get("use_average"))
     if series_kind == "installment":
         installment_count = normalize_count(data.get("installment_count"), "Informe a quantidade de parcelas.", maximum=120)
     if series_kind == "recurring":
         recurrence_frequency = str(data.get("recurrence_frequency", "")).strip().lower()
         if recurrence_frequency not in RECURRENCE_FREQUENCIES:
             raise TransactionError("Informe a frequencia da recorrencia.")
-        recurrence_count = normalize_count(data.get("recurrence_count"), "Informe a quantidade de ocorrencias.", maximum=240)
+        # spec: lancamentos v3.1 — critérios 24 e 25
+        # (recorrentes usam 120 ocorrencias automaticamente quando o campo nao e enviado;
+        #  o campo nao e mais exibido no formulario, mas a API mantem compatibilidade)
+        raw_count = str(data.get("recurrence_count") or "").strip()
+        recurrence_count = normalize_count(raw_count, "Informe a quantidade de ocorrencias.", maximum=240) if raw_count else 120
     return {
         "series_kind": series_kind,
         "installment_count": installment_count,
         "recurrence_frequency": recurrence_frequency,
         "recurrence_count": recurrence_count,
+        "use_average": use_average,
     }
 
 
@@ -663,6 +675,11 @@ def normalize_optional_key(value: object) -> str | None:
     return raw or None
 
 
+def normalize_flag(value: object) -> bool:
+    raw = str(value or "").strip().lower()
+    return raw in {"1", "true", "yes", "sim", "on"}
+
+
 def decimal_to_micros(value: object) -> int:
     raw = str(value or "").strip()
     if not raw:
@@ -676,6 +693,57 @@ def decimal_to_micros(value: object) -> int:
     if decimal_value < 0:
         raise TransactionError("Informe valores positivos nos detalhes do investimento.")
     return int((decimal_value * EXCHANGE_RATE_SCALE).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
+def average_amount_for_recurring_description(
+    conn: sqlite3.Connection,
+    user_id: int,
+    description: str,
+    transaction_type: str,
+    category_id: int | None,
+    subcategory_id: int | None,
+) -> int | None:
+    # spec: lancamentos v3.1 — critérios 22 e 23
+    # (media dos ultimos 12 lancamentos do usuario com a mesma descricao normalizada,
+    #  mesmo tipo e mesma categoria/subcategoria, considerando tanto contas quanto
+    #  cartoes; retorna None quando nao ha historico)
+    normalized = normalize_description(description)
+    params: list[object] = [user_id, transaction_type, normalized]
+    category_filter = ""
+    if category_id is not None:
+        category_filter = "AND category_id = ?"
+        params.append(category_id)
+    subcategory_filter = ""
+    if subcategory_id is not None:
+        subcategory_filter = "AND subcategory_id = ?"
+        params.append(subcategory_id)
+    rows = conn.execute(
+        f"""
+        SELECT amount_cents
+        FROM (
+            SELECT amount_cents, date, id, category_id, subcategory_id
+            FROM transactions
+            WHERE user_id = ? AND type = ? AND archived_at IS NULL
+                AND normalized_description = ?
+                {category_filter}
+                {subcategory_filter}
+            UNION ALL
+            SELECT amount_cents, date, id, category_id, subcategory_id
+            FROM credit_card_transactions
+            WHERE user_id = ? AND type = ? AND archived_at IS NULL
+                AND normalized_description = ?
+                {category_filter}
+                {subcategory_filter}
+        )
+        ORDER BY date DESC, id DESC
+        LIMIT 12
+        """,
+        params + [user_id, transaction_type, normalized, *params[3:]],
+    ).fetchall()
+    if not rows:
+        return None
+    values = [int(row["amount_cents"]) for row in rows]
+    return int(sum(values) / len(values))
 
 
 def build_transaction_occurrences(transaction: dict) -> list[dict]:
@@ -698,12 +766,19 @@ def build_transaction_occurrences(transaction: dict) -> list[dict]:
             for index in range(transaction["installment_count"])
         ]
     if transaction["series_kind"] == "recurring":
+        amount_cents = transaction["amount_cents"]
+        if transaction.get("use_average") and transaction.get("average_amount_cents") is not None:
+            amount_cents = transaction["average_amount_cents"]
+        destination_amount_cents = transaction["destination_amount_cents"]
+        if destination_amount_cents and destination_amount_cents != transaction["amount_cents"]:
+            ratio = Decimal(destination_amount_cents) / Decimal(transaction["amount_cents"])
+            destination_amount_cents = int((Decimal(amount_cents) * ratio).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
         return [
             {
                 "date": add_recurrence(start_date, transaction["recurrence_frequency"], index).isoformat(),
                 "description": transaction["description"],
-                "amount_cents": transaction["amount_cents"],
-                "destination_amount_cents": transaction["destination_amount_cents"],
+                "amount_cents": amount_cents,
+                "destination_amount_cents": destination_amount_cents,
                 "installment_index": None,
                 "installment_count": transaction["recurrence_count"],
             }

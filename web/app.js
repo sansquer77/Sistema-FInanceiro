@@ -190,7 +190,8 @@ const cardInstallmentCount = document.querySelector("#cardInstallmentCount");
 const cardInstallmentCountLabel = document.querySelector("#cardInstallmentCountLabel");
 const cardRecurrenceFields = document.querySelector("#cardRecurrenceFields");
 const cardRecurrenceFrequency = document.querySelector("#cardRecurrenceFrequency");
-const cardRecurrenceCount = document.querySelector("#cardRecurrenceCount");
+const cardRecurrenceAverageFields = document.querySelector("#cardRecurrenceAverageFields");
+const cardUseAverage = document.querySelector("#cardUseAverage");
 const cardInvoiceList = document.querySelector("#cardInvoiceList");
 const cardInvoiceSearch = document.querySelector("#cardInvoiceSearch");
 const cardInvoiceStatusFilterButtons = document.querySelectorAll("[data-card-invoice-status-filter]");
@@ -368,7 +369,8 @@ const installmentCount = document.querySelector("#installmentCount");
 const installmentCountLabel = document.querySelector("#installmentCountLabel");
 const recurrenceFields = document.querySelector("#recurrenceFields");
 const recurrenceFrequency = document.querySelector("#recurrenceFrequency");
-const recurrenceCount = document.querySelector("#recurrenceCount");
+const recurrenceAverageFields = document.querySelector("#recurrenceAverageFields");
+const useAverage = document.querySelector("#useAverage");
 const exchangeRate = document.querySelector("#exchangeRate");
 const exchangeRateLabel = document.querySelector("#exchangeRateLabel");
 const userName = document.querySelector("#userName");
@@ -774,7 +776,8 @@ const cardsView = registerCardsView({
     cardInstallmentCountLabel,
     cardRecurrenceFields,
     cardRecurrenceFrequency,
-    cardRecurrenceCount,
+    cardRecurrenceAverageFields,
+    cardUseAverage,
     cardInvoiceList,
     cancelCardTransactionEditButton,
   },
@@ -854,7 +857,8 @@ const transactionsView = registerTransactionsView({
     installmentCountLabel,
     recurrenceFields,
     recurrenceFrequency,
-    recurrenceCount,
+    recurrenceAverageFields,
+    useAverage,
     exchangeRate,
     exchangeRateLabel,
     cancelTransactionEditButton,

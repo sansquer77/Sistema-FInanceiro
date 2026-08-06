@@ -67,7 +67,8 @@ export function registerCardsView({
     cardInstallmentCountLabel,
     cardRecurrenceFields,
     cardRecurrenceFrequency,
-    cardRecurrenceCount,
+    cardRecurrenceAverageFields,
+    cardUseAverage,
     cardInvoiceList,
     cancelCardTransactionEditButton,
   } = elements;
@@ -436,11 +437,12 @@ export function registerCardsView({
     cardSeriesKind.disabled = false;
     cardInstallmentCount.disabled = false;
     cardRecurrenceFrequency.disabled = false;
-    cardRecurrenceCount.disabled = false;
     cardSeriesKind.value = "single";
     cardInstallmentCount.value = "2";
     cardRecurrenceFrequency.value = "monthly";
-    cardRecurrenceCount.value = "12";
+    if (cardUseAverage) {
+      cardUseAverage.checked = false;
+    }
     cardTransactionFormTitle.textContent = "Novo lançamento no cartão";
     cancelCardTransactionEditButton.hidden = false;
     cardTransactionForm.querySelector('button[type="submit"]').textContent = "Salvar lançamento";
@@ -463,16 +465,16 @@ export function registerCardsView({
     cardSeriesKind.value = isInstallmentTransaction(transaction) ? "installment" : transaction.series_kind || "single";
     cardInstallmentCount.value = transaction.installment_count || "2";
     cardRecurrenceFrequency.value = transaction.recurrence_frequency || "monthly";
-    cardRecurrenceCount.value = transaction.installment_count || "12";
+    if (cardUseAverage) {
+      cardUseAverage.checked = false;
+    }
     cardSeriesKind.disabled = true;
     cardInstallmentCount.disabled = true;
     cardRecurrenceFrequency.disabled = true;
-    cardRecurrenceCount.disabled = true;
     updateCardSeriesState();
     cardSeriesKind.disabled = true;
     cardInstallmentCount.disabled = true;
     cardRecurrenceFrequency.disabled = true;
-    cardRecurrenceCount.disabled = true;
     renderCardTransactionCategories();
     if (transaction.category_name) {
       cardTransactionCategory.value = transaction.category_name;
@@ -495,9 +497,13 @@ export function registerCardsView({
     cardInstallmentCount.disabled = !isInstallment;
     cardRecurrenceFields.hidden = !isRecurring;
     cardRecurrenceFrequency.disabled = !isRecurring;
-    cardRecurrenceCount.disabled = !isRecurring;
+    if (cardRecurrenceAverageFields) {
+      cardRecurrenceAverageFields.hidden = !isRecurring;
+    }
+    if (cardUseAverage) {
+      cardUseAverage.disabled = !isRecurring;
+    }
     cardInstallmentCount.name = isRecurring ? "unused_installment_count" : "installment_count";
-    cardRecurrenceCount.name = isRecurring ? "installment_count" : "recurrence_count";
   }
 
   function renderCreditCards() {

@@ -2,8 +2,8 @@
 tipo: spec
 area: cartoes
 status: implementado
-versao: 2.3
-atualizado: 2026-08-02
+versao: 2.4
+atualizado: 2026-08-06
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -18,7 +18,7 @@ aliases: ["Cartões de Crédito", "Faturas"]
 # Cartões de Crédito
 
 > [!info] Status
-> **implementado** · área: `cartoes` · atualizado em 2026-08-02 · relacionados: [[contas-correntes]], [[lancamentos]], [[limites-gastos]], [[relatorios]]
+> **implementado** · área: `cartoes` · atualizado em 2026-08-06 · relacionados: [[contas-correntes]], [[lancamentos]], [[limites-gastos]], [[relatorios]]
 
 ## Problema
 
@@ -79,6 +79,9 @@ Qualquer usuário autenticado localmente que utilize cartões de crédito para d
 - A conta preferencial de pagamento, quando informada, deve ter a mesma moeda do cartão.
 - Lançamentos em cartão de moeda estrangeira persistem valor normalizado em BRL pela cotação informada manualmente; quando ela não for informada, o sistema consulta a última PTAX de venda disponível até a data do lançamento.
 - Lançamentos de cartão podem ser únicos, parcelados ou recorrentes.
+- Em lançamentos recorrentes de cartão, cada ocorrência futura deve manter exatamente o valor informado, a menos que o usuário ative a opção de calcular valores futuros pela média dos últimos 12 lançamentos com a mesma descrição normalizada, mesmo tipo e mesma categoria/subcategoria.
+- Quando a opção de média estiver ativa em um lançamento recorrente de cartão, o valor de cada ocorrência futura usa a média aritmética inteira (em centavos) dos valores dos últimos 12 lançamentos do usuário com a mesma descrição normalizada, mesmo tipo e mesma categoria/subcategoria; se houver menos de 12, usa todos os disponíveis; se não houver histórico, mantém o valor informado no formulário.
+- Lançamentos recorrentes de cartão não exibem o campo de quantidade de ocorrências no formulário; o sistema grava a série com 120 ocorrências automaticamente para manter compatibilidade com lançamentos antigos que usam o campo.
 - O formulário manual de lançamento no cartão deve oferecer o campo `Tag`, com as mesmas sugestões de tags usadas em lançamentos de contas e suporte a múltiplas tags separadas por vírgula.
 - Em novos lançamentos, descrições com histórico exato e confiança suficiente podem preencher categoria e subcategoria sem sobrescrever escolhas manuais. Ver [[classificacao-assistida]].
 - Em lançamentos parcelados de cartão, o valor informado é o total da compra e deve ser dividido pela quantidade de parcelas. Ex.: R$ 500 em 5x gera 5 lançamentos/faturas de R$ 100.
@@ -147,9 +150,14 @@ Tabelas: `credit_cards`, `credit_card_transactions`, `credit_card_payments`, `cr
 - Dado o usuário visualizando o seletor mensal da fatura, quando o mês é exibido, então o rótulo usa o formato `MM/AAAA`.
 - Dado qualquer tipo de lançamento no cartão, quando campos condicionais de parcela ou recorrência são exibidos ou ocultados, então os campos visíveis mantêm altura/alinhamento consistentes e linhas unitárias ocupam a largura completa.
 - Dado um novo lançamento de cartão em preenchimento, quando o usuário aciona `Cancelar`, então o formulário é limpo e volta ao estado inicial sem criar lançamento.
+- Dado um lançamento recorrente de cartão sem histórico de mesma descrição, categoria e subcategoria, quando a opção de média estiver ativada, então todas as ocorrências futuras mantêm o valor informado no formulário.
+- Dado um histórico de 3 lançamentos de cartão com a mesma descrição, categoria e subcategoria e valores R$ 100, R$ 200 e R$ 300, quando um lançamento recorrente mensal ativa a opção de média, então cada uma das 120 ocorrências futuras usa o valor de R$ 200.
+- Dado um lançamento recorrente de cartão sendo criado, quando o usuário seleciona o tipo "Recorrente", então o campo de quantidade de ocorrências permanece oculto e a série é gravada com 120 ocorrências.
+- Dado um lançamento recorrente de cartão existente sendo editado, quando o formulário é aberto, então o campo de quantidade de ocorrências continua oculto e a frequência permanece desabilitada.
 
 ## Changelog
 
+- `2.4` — 2026-08-06 — Lançamentos recorrentes de cartão permitem calcular valores futuros pela média dos últimos 12 lançamentos com mesma descrição e passam a usar 120 ocorrências automaticamente, sem exibir o campo de quantidade.
 - `2.3` — 2026-08-02 — Lançamentos de cartão em moeda estrangeira passam a gravar valor normalizado em BRL por cotação manual ou pela última PTAX de venda disponível.
 - `2.2` — 2026-08-02 — Gráfico de faturas e resumo de fatura ganham ajustes responsivos para telas de 14 polegadas (e breakpoints intermediários), evitando quebra de linha em valores extensos e melhorando a densidade dos cartões de resumo.
 - `2.1` — 2026-08-02 — Rótulo do seletor mensal da fatura passa a usar formato fixo `MM/AAAA`.

@@ -81,7 +81,8 @@ export function registerTransactionsView({
     installmentCountLabel,
     recurrenceFields,
     recurrenceFrequency,
-    recurrenceCount,
+    recurrenceAverageFields,
+    useAverage,
     exchangeRate,
     exchangeRateLabel,
     cancelTransactionEditButton,
@@ -415,7 +416,9 @@ export function registerTransactionsView({
     transactionForm.elements.date.value = todayLocalDateValue();
     installmentCount.value = "2";
     recurrenceFrequency.value = "monthly";
-    recurrenceCount.value = "12";
+    if (useAverage) {
+      useAverage.checked = false;
+    }
     destinationAmount.value = "";
     transferExchangeRate.value = "";
     investmentAmount.value = "";
@@ -457,14 +460,15 @@ export function registerTransactionsView({
     seriesKind.value = isInstallmentTransaction(transaction) ? "installment" : transaction.series_kind || "single";
     installmentCount.value = transaction.installment_count || "2";
     recurrenceFrequency.value = transaction.recurrence_frequency || "monthly";
-    recurrenceCount.value = transaction.recurrence_count || (transaction.series_kind === "recurring" ? transaction.installment_count : "12") || "12";
+    if (useAverage) {
+      useAverage.checked = false;
+    }
     updateSeriesState();
     updateTransactionTypeState();
     applyWalletAccountRestrictions();
     seriesKind.disabled = true;
     installmentCount.disabled = true;
     recurrenceFrequency.disabled = true;
-    recurrenceCount.disabled = true;
     if (transaction.destination_account_id) {
       destinationAccount.value = String(transaction.destination_account_id);
     }
@@ -1222,7 +1226,12 @@ export function registerTransactionsView({
     installmentCount.disabled = !isInstallment;
     recurrenceFields.hidden = !isRecurring;
     recurrenceFrequency.disabled = !isRecurring;
-    recurrenceCount.disabled = !isRecurring;
+    if (recurrenceAverageFields) {
+      recurrenceAverageFields.hidden = !isRecurring;
+    }
+    if (useAverage) {
+      useAverage.disabled = !isRecurring;
+    }
   }
 
   function shiftTransactionMonth(delta) {

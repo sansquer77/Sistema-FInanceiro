@@ -622,8 +622,10 @@
                       <option value="annual">Anual</option>
                     </select>
                   </label>
-                  <label>Ocorrências
-                    <input name="recurrence_count" id="cardRecurrenceCount" type="number" min="2" max="240" value="12">
+                </div>
+                <div class="field-row" id="cardRecurrenceAverageFields" hidden>
+                  <label class="checkbox-label compact-checkbox">Calcular valores futuros pela média dos últimos lançamentos
+                    <input name="use_average" id="cardUseAverage" type="checkbox" value="1">
                   </label>
                 </div>
                 <div class="field-row">
@@ -832,8 +834,10 @@
                       <option value="annual">Anual</option>
                     </select>
                   </label>
-                  <label>Ocorrências
-                    <input name="recurrence_count" id="recurrenceCount" type="number" min="2" max="240" value="12">
+                </div>
+                <div class="field-row" id="recurrenceAverageFields" hidden>
+                  <label class="checkbox-label compact-checkbox">Calcular valores futuros pela média dos últimos lançamentos
+                    <input name="use_average" id="useAverage" type="checkbox" value="1">
                   </label>
                 </div>
                 <label id="destinationAccountLabel" hidden>Conta de destino

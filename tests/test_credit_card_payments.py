@@ -309,6 +309,160 @@ class CreditCardPaymentAtomicityTest(unittest.TestCase):
 
         self.assertEqual(transaction["invoice_month"], "2026-08")
 
+    def test_recurring_card_transaction_uses_default_120_occurrences(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta principal",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "1000,00",
+        })
+        card = create_credit_card(user["id"], {
+            "name": "Cartao",
+            "issuer": "Banco",
+            "currency": "BRL",
+            "limit": "20000,00",
+            "closing_day": "28",
+            "due_day": "10",
+            "preferred_payment_account_id": str(account["id"]),
+        })
+
+        create_credit_card_transaction(user["id"], {
+            "credit_card_id": str(card["id"]),
+            "type": "expense",
+            "description": "Assinatura recorrente",
+            "amount": "500,00",
+            "date": "2026-06-10",
+            "invoice_month": "2026-06",
+            "category": "Servicos",
+            "series_kind": "recurring",
+            "recurrence_frequency": "monthly",
+        })
+
+        rows = list_credit_card_transactions(user["id"])
+
+        self.assertEqual(len(rows), 120)
+        self.assertTrue(all(row["amount"] == "500.00" for row in rows))
+
+    def test_recurring_card_transaction_with_average_uses_historical_average(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta principal",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "10000,00",
+        })
+        card = create_credit_card(user["id"], {
+            "name": "Cartao",
+            "issuer": "Banco",
+            "currency": "BRL",
+            "limit": "20000,00",
+            "closing_day": "28",
+            "due_day": "10",
+            "preferred_payment_account_id": str(account["id"]),
+        })
+
+        for amount, date_value in [("100,00", "2025-10-10"), ("200,00", "2025-11-10"), ("300,00", "2025-12-10")]:
+            create_credit_card_transaction(user["id"], {
+                "credit_card_id": str(card["id"]),
+                "type": "expense",
+                "description": "Conta de luz",
+                "amount": amount,
+                "date": date_value,
+                "invoice_month": date_value[:7],
+                "category": "Servicos",
+                "subcategory": "Energia",
+            })
+
+        create_credit_card_transaction(user["id"], {
+            "credit_card_id": str(card["id"]),
+            "type": "expense",
+            "description": "Conta de luz",
+            "amount": "999,00",
+            "date": "2026-06-10",
+            "invoice_month": "2026-06",
+            "category": "Servicos",
+            "subcategory": "Energia",
+            "series_kind": "recurring",
+            "recurrence_frequency": "monthly",
+            "use_average": "true",
+        })
+
+        rows = list_credit_card_transactions(user["id"])
+        recurring_rows = [row for row in rows if row["series_kind"] == "recurring"]
+
+        self.assertEqual(len(recurring_rows), 120)
+        self.assertTrue(all(row["amount"] == "200.00" for row in recurring_rows))
+
+    def test_recurring_card_transaction_average_ignores_different_category_or_subcategory(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta principal",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "10000,00",
+        })
+        card = create_credit_card(user["id"], {
+            "name": "Cartao",
+            "issuer": "Banco",
+            "currency": "BRL",
+            "limit": "20000,00",
+            "closing_day": "28",
+            "due_day": "10",
+            "preferred_payment_account_id": str(account["id"]),
+        })
+
+        create_credit_card_transaction(user["id"], {
+            "credit_card_id": str(card["id"]),
+            "type": "expense",
+            "description": "Conta de luz",
+            "amount": "300,00",
+            "date": "2025-12-10",
+            "invoice_month": "2025-12",
+            "category": "Servicos",
+            "subcategory": "Energia",
+        })
+        create_credit_card_transaction(user["id"], {
+            "credit_card_id": str(card["id"]),
+            "type": "expense",
+            "description": "Conta de luz",
+            "amount": "900,00",
+            "date": "2025-12-11",
+            "invoice_month": "2025-12",
+            "category": "Outros",
+            "subcategory": "Energia",
+        })
+        create_credit_card_transaction(user["id"], {
+            "credit_card_id": str(card["id"]),
+            "type": "expense",
+            "description": "Conta de luz",
+            "amount": "900,00",
+            "date": "2025-12-12",
+            "invoice_month": "2025-12",
+            "category": "Servicos",
+            "subcategory": "Outros",
+        })
+
+        create_credit_card_transaction(user["id"], {
+            "credit_card_id": str(card["id"]),
+            "type": "expense",
+            "description": "Conta de luz",
+            "amount": "999,00",
+            "date": "2026-06-10",
+            "invoice_month": "2026-06",
+            "category": "Servicos",
+            "subcategory": "Energia",
+            "series_kind": "recurring",
+            "recurrence_frequency": "monthly",
+            "use_average": "true",
+        })
+
+        rows = list_credit_card_transactions(user["id"])
+        recurring_rows = [row for row in rows if row["series_kind"] == "recurring"]
+
+        self.assertEqual(len(recurring_rows), 120)
+        self.assertTrue(all(row["amount"] == "300.00" for row in recurring_rows))
+
 
 if __name__ == "__main__":
     unittest.main()
