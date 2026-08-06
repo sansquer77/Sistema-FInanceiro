@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.4
-atualizado: 2026-08-04
+versao: 3.5
+atualizado: 2026-08-06
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -16,7 +16,7 @@ tags: [arquitetura, meta]
 # Arquitetura
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-08-04 · relacionados: [[requisitos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
+> **implementado** · área: `meta` · atualizado em 2026-08-06 · relacionados: [[requisitos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
 
 ## Visão geral
 
@@ -256,6 +256,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `emailer.py` | Envio SMTP do código de recuperação de senha. Ver [[recuperacao-senha]]. |
 | `secure_config.py` | Armazenamento criptografado da configuração SMTP local e de segredos de IA por usuário. Ver [[recuperacao-senha]], [[tendencias-saude-financeira]]. |
 | `version_check.py` | Consulta a landing page oficial por nova versão, compara com a versão local e mantém cache de 1h. Ver [[alerta-nova-versao]]. |
+| `calendar.py` | Cálculo da aba **Calendário** do Cockpit: contas a receber/pagar atrasadas e vencimentos de renda fixa em 30 e 60 dias. Ver [[specs/cockpit-calendario]]. |
 
 ---
 
@@ -404,14 +405,15 @@ Ver [[investimentos-portfolio]].
 ### Cockpit e Relatórios
 
 1. `GET /api/cockpit?month=AAAA-MM` consolida lançamentos de conta pelo mês selecionado e lançamentos de cartão pela fatura (`invoice_month`).
-2. O Cockpit usa um seletor mensal compartilhado pelas abas **Situação do mês** e **Saúde Financeira**.
-3. Planejamento do mês considera receitas/despesas/investimentos recorrentes, incluindo recorrências de cartão.
-4. Faturas de cartão continuam visíveis no Cockpit pelo mês de competência mesmo após pagamento; o pagamento agregado em conta-corrente permanece excluído das despesas analíticas.
-5. Relatórios no frontend agrupam por categoria, subcategoria, conta, tag e fluxo diário.
-6. Lançamentos de cartão entram em relatórios e limites pela competência da fatura.
-7. `GET /api/reports/category-evolution` retorna séries mensais por categoria/subcategoria para o drawer de evolução, com `periodo` igual a `3m`, `6m`, `12m`, `ytd` ou `all`.
+2. `GET /api/cockpit/calendar` retorna contas a receber/pagar atrasadas e vencimentos de renda fixa em 30 e 60 dias, calculados pela data atual do servidor, independentemente do mês selecionado. Ver [[specs/cockpit-calendario]].
+3. O Cockpit usa um seletor mensal compartilhado pelas abas **Situação do mês**, **Calendário**, **Tendências** e **Saúde Financeira**.
+4. Planejamento do mês considera receitas/despesas/investimentos recorrentes, incluindo recorrências de cartão.
+5. Faturas de cartão de crédito continuam visíveis no Cockpit pelo mês de competência mesmo após pagamento; o pagamento agregado em conta-corrente permanece excluído das despesas analíticas.
+6. Relatórios no frontend agrupam por categoria, subcategoria, conta, tag e fluxo diário.
+7. Lançamentos de cartão entram em relatórios e limites pela competência da fatura.
+8. `GET /api/reports/category-evolution` retorna séries mensais por categoria/subcategoria para o drawer de evolução, com `periodo` igual a `3m`, `6m`, `12m`, `ytd` ou `all`.
 
-Ver [[relatorios]], [[limites-gastos]].
+Ver [[relatorios]], [[limites-gastos]], [[specs/cockpit-calendario]].
 
 ### Importação de Arquivos
 
@@ -457,6 +459,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.5` — 2026-08-06 — Documentada implementação da rota `GET /api/cockpit/calendar` e do módulo `financeiro/calendar.py`, com autenticação e validação de `Host`/`Origin`. UI da aba **Calendário** ainda pendente. Ver [[specs/cockpit-calendario]].
 - `3.4` — 2026-08-04 — Documentada rota `GET /api/cockpit/calendar` para a futura aba **Calendário** do Cockpit, com contas a receber/pagar atrasadas e vencimentos de renda fixa em 30 e 60 dias. Ver [[specs/cockpit-calendario]].
 - `3.3` — 2026-08-04 — Documentada rota pública `/api/latest-version`, módulo `financeiro/version_check.py` e fluxo de detecção de nova versão no Cockpit.
 - `3.2` — 2026-08-04 — Atualizada descrição de `instructions-view.js` para incluir botões contextuais `?` e responsividade em telas estreitas.

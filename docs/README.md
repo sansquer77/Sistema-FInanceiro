@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 5.1
-atualizado: 2026-08-04
+versao: 5.2
+atualizado: 2026-08-06
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -64,7 +64,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 
 | Spec | Status | Área |
 |---|---|---|
-| [[specs/cockpit-calendario]] | 📝 rascunho | Cockpit |
+| [[specs/cockpit-calendario]] | 🚧 em-implementação | Cockpit |
 | [[specs/imposto-renda]] | ❌ depreciado — custo de manter regras fiscais atualizadas não compensa para uso familiar | Investimentos |
 | [[specs/exportacao-dados]] | ❌ depreciado — arquivo SQLite já acessível por leitor genérico ou agente de IA | Exportação |
 
@@ -121,6 +121,7 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `5.2` — 2026-08-06 — [[specs/cockpit-calendario]] avançou para `em-implementacao` com a rota `GET /api/cockpit/calendar` e o módulo `financeiro/calendar.py` implementados; UI da aba ainda pendente.
 - `5.1` — 2026-08-04 — [[specs/instrucoes-app]], [[specs/landing-page]] e [[specs/score-saude-financeira]] movidas para a tabela de specs implementadas; status e frontmatter das specs atualizados para `implementado`.
 - `5.0` — 2026-08-04 — Adicionada [[specs/cockpit-calendario]] em rascunho para a nova aba **Calendário** do Cockpit; especificação não implementa código, apenas documenta a aba, regras, API e plano de implementação.
 - `4.9` — 2026-08-04 — [[specs/instrucoes-app]] atualizada com decisões sobre links internos, botões contextuais `?` e cobertura de todos os módulos operacionais.

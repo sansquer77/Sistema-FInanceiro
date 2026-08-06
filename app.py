@@ -36,6 +36,7 @@ from financeiro.auth import (
     update_user_email,
     update_user_password,
 )
+from financeiro.calendar import get_cockpit_calendar
 from financeiro.categories import (
     create_category,
     create_subcategory,
@@ -282,6 +283,9 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/cockpit":
             self.handle_cockpit()
+            return
+        if path == "/api/cockpit/calendar":
+            self.handle_cockpit_calendar()
             return
         if path == "/api/financial-health-score":
             self.handle_financial_health_score()
@@ -615,6 +619,13 @@ class AppHandler(BaseHTTPRequestHandler):
         transactions = list_transactions(user["id"], month=month)
         card_transactions = list_credit_card_transactions(user["id"], invoice_month=month)
         self.send_json(cockpit_payload([*transactions, *card_transactions]))
+
+    def handle_cockpit_calendar(self) -> None:
+        # spec: cockpit-calendario v0.2 — critérios 17 e 18
+        if not self.validate_read_source():
+            return
+        user = self.require_user()
+        self.send_json(get_cockpit_calendar(user["id"]))
 
     def handle_financial_health_score(self) -> None:
         # spec: score-saude-financeira v2.5 — critério 15
