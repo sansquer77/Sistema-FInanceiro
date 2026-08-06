@@ -471,7 +471,25 @@ export function registerPortfolioView({
     renderPortfolioGroupList(portfolioCurrencyList, summary.by_currency);
     renderPortfolioGroupList(portfolioAccountList, summary.by_account);
     renderPortfolioPositions(portfolio.positions || []);
+    renderHighlightedPortfolioPosition();
     renderPortfolioHistory(portfolio.history || []);
+  }
+
+  function renderHighlightedPortfolioPosition() {
+    if (!state.portfolioHighlightId) {
+      return;
+    }
+    const row = portfolioPositions.querySelector(
+      `[data-portfolio-position-id="${CSS.escape(String(state.portfolioHighlightId))}"]`,
+    );
+    if (!row) {
+      state.portfolioHighlightId = "";
+      return;
+    }
+    row.scrollIntoView({ behavior: "smooth", block: "center" });
+    row.classList.add("portfolio-highlight-row");
+    window.setTimeout(() => row.classList.remove("portfolio-highlight-row"), 3200);
+    state.portfolioHighlightId = "";
   }
 
   function portfolioSummaryCurrencyRows(summary) {
@@ -951,8 +969,10 @@ export function registerPortfolioView({
     const redeemAction = portfolioIconButton("redeem", "Resgatar", `data-redeem-portfolio-payload="${escapeHtml(JSON.stringify(portfolioRedemptionPayload(position)))}"`);
     const valueAction = portfolioIconButton("edit-value", "Atualizar valor atual", `data-edit-portfolio-value-payload="${escapeHtml(JSON.stringify(portfolioValuePayload(position)))}"`);
     const closeAction = portfolioIconButton("close-position", "Encerrar posição", `data-close-portfolio-payload="${escapeHtml(JSON.stringify(portfolioClosePayload(position)))}"`);
+    const rowId = position.source_id || position.position_id || position.id;
+    const rowIdAttr = rowId ? `data-portfolio-position-id="${escapeHtml(String(rowId))}"` : "";
     return `
-      <tr class="${options.parent ? "portfolio-parent-row" : ""} ${options.child ? "portfolio-child-row" : ""} ${maturityAlert ? `portfolio-maturity-row ${maturityAlert.status}` : ""}">
+      <tr ${rowIdAttr} class="${options.parent ? "portfolio-parent-row" : ""} ${options.child ? "portfolio-child-row" : ""} ${maturityAlert ? `portfolio-maturity-row ${maturityAlert.status}` : ""}">
         <td>
           <div class="portfolio-asset-name">${toggle}<strong>${escapeHtml(rowLabel)}</strong>${maturityDetail}</div>
           <span class="portfolio-detail" title="${escapeHtml(assetDetail || "Sem detalhe adicional")}">${escapeHtml(assetDetail || "Sem detalhe adicional")}</span>

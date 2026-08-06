@@ -194,8 +194,8 @@ A nova rota deve ser autenticada e validar `Host`/`Origin` conforme as regras de
 
 - [x] Passo 1 — Criar rota `GET /api/cockpit/calendar` em `app.py`, autenticada e validada contra `Host`/`Origin`. Fecha: critérios 17 e 18.
 - [x] Passo 2 — Implementar função no núcleo (`financeiro/calendar.py` ou módulo equivalente) para calcular contas a receber/pagar atrasadas e vencimentos de renda fixa em 30 e 60 dias, usando centavos inteiros. Fecha: critérios 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 e 15.
-- [ ] Passo 3 — Adicionar a aba **Calendário** na UI do Cockpit (`web/index.html`, `web/modules/cockpit-view.js`) na ordem correta e com layout responsivo. Fecha: critérios 1, 2, 16 e 17.
-- [ ] Passo 4 — Implementar renderização dos cards na aba Calendário (`web/modules/calendar-view.js` ou dentro de `cockpit-view.js`) com estados vazios, totais por moeda e ações de navegação. Fecha: critérios 3, 4, 5, 6, 7, 8, 16 e 17.
+- [x] Passo 3 — Adicionar a aba **Calendário** na UI do Cockpit (`web/index.html`, `web/modules/cockpit-view.js`) na ordem correta e com layout responsivo. Fecha: critérios 1, 2, 16 e 17.
+- [x] Passo 4 — Implementar renderização dos cards na aba Calendário (`web/modules/calendar-view.js` ou dentro de `cockpit-view.js`) com estados vazios, totais por moeda e ações de navegação. Fecha: critérios 3, 4, 5, 6, 7, 8, 16 e 17.
 - [x] Passo 5 — Criar testes automatizados para os cálculos de atrasos e vencimentos, incluindo bordas de datas (30/31 dias), exclusão de tipos indevidos e ordenação. Fecha: critérios 3 a 15.
 - [x] Passo 6 — Atualizar `docs/arquitetura.md`, `docs/specs/relatorios.md` e `docs/README.md` para refletir a nova aba e rota. Fecha: critérios 1 e 2.
 

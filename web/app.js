@@ -95,6 +95,9 @@ const state = {
   transactions: [],
   accountTransactions: [],
   cockpit: null,
+  cockpitCalendar: null,
+  cockpitCalendarLoading: false,
+  cockpitCalendarError: "",
   cockpitTab: "summary",
   cockpitMonth: currentMonthValue(),
   financialHealth: null,
@@ -115,6 +118,7 @@ const state = {
   portfolioExpandedGroups: new Set(),
   portfolioCollapsedGroups: new Set(),
   portfolioAssetSaving: false,
+  portfolioHighlightId: "",
   view: "cockpit",
   cockpitRefreshRequestId: 0,
   transactionMonth: currentMonthValue(),
@@ -388,11 +392,16 @@ const todayCockpitMonthButton = document.querySelector("#todayCockpitMonthButton
 const nextCockpitMonthButton = document.querySelector("#nextCockpitMonthButton");
 const currencyList = document.querySelector("#currencyList");
 const cockpitPortfolioByType = document.querySelector("#cockpitPortfolioByType");
-  const cockpitLimitAlert = document.querySelector("#cockpitLimitAlert");
-  const cockpitPortfolioMaturityAlert = document.querySelector("#cockpitPortfolioMaturityAlert");
-  const cockpitVersionAlert = document.querySelector("#cockpitVersionAlert");
-  const cockpitVersionAlertVersion = document.querySelector("#cockpitVersionAlertVersion");
-  const cockpitVersionAlertDismiss = document.querySelector("#cockpitVersionAlertDismiss");
+const cockpitLimitAlert = document.querySelector("#cockpitLimitAlert");
+const cockpitPortfolioMaturityAlert = document.querySelector("#cockpitPortfolioMaturityAlert");
+const cockpitVersionAlert = document.querySelector("#cockpitVersionAlert");
+const cockpitVersionAlertVersion = document.querySelector("#cockpitVersionAlertVersion");
+const cockpitVersionAlertDismiss = document.querySelector("#cockpitVersionAlertDismiss");
+const cockpitCalendarPanel = document.querySelector("#cockpitCalendarPanel");
+const overdueReceivablesList = document.querySelector("#overdueReceivablesList");
+const overduePayablesList = document.querySelector("#overduePayablesList");
+const maturity30DaysList = document.querySelector("#maturity30DaysList");
+const maturity60DaysList = document.querySelector("#maturity60DaysList");
 const financialHealthPanel = document.querySelector("#financialHealthPanel");
 const financialHealthContent = document.querySelector("#financialHealthContent");
 const trendsPanel = document.querySelector("#trendsPanel");
@@ -654,6 +663,11 @@ const cockpitView = registerCockpitView({
     cockpitVersionAlert,
     cockpitVersionAlertVersion,
     cockpitVersionAlertDismiss,
+    cockpitCalendarPanel,
+    overdueReceivablesList,
+    overduePayablesList,
+    maturity30DaysList,
+    maturity60DaysList,
     financialHealthPanel,
     financialHealthContent,
     trendsPanel,
@@ -664,6 +678,7 @@ const cockpitView = registerCockpitView({
   currentMonthValue,
   formatMonthLabel,
   formatMonthShortLabel,
+  formatDate,
   shiftMonth,
   openMonthPicker,
   formatMoney,
@@ -681,6 +696,14 @@ const cockpitView = registerCockpitView({
   portfolioTotalsByCurrency,
   portfolioMaturityAlerts: () => portfolioView.portfolioMaturityAlerts(),
   goToPortfolio: () => showModule("portfolio"),
+  onNavigateToTransaction: (transactionId) => {
+    state.transactionHighlightId = String(transactionId);
+    showModule("transactions");
+  },
+  onNavigateToPortfolio: (positionId) => {
+    state.portfolioHighlightId = String(positionId);
+    showModule("portfolio");
+  },
 });
 
 const accountsView = registerAccountsView({
@@ -1292,6 +1315,7 @@ async function refreshCockpitData() {
     cardTransactionsResponse,
     cardPaymentsResponse,
     cockpitResponse,
+    cockpitCalendarResponse,
     spendingLimitsResponse,
   ] = await Promise.all([
     api("/api/checking-accounts"),
@@ -1299,6 +1323,7 @@ async function refreshCockpitData() {
     api("/api/credit-card-transactions"),
     api("/api/credit-card-payments"),
     api(`/api/cockpit?month=${encodeURIComponent(month)}`),
+    api(`/api/cockpit/calendar`),
     api(`/api/spending-limits?month=${encodeURIComponent(month)}`),
   ]);
   if (requestId !== state.cockpitRefreshRequestId) {
@@ -1310,6 +1335,7 @@ async function refreshCockpitData() {
   state.cardTransactions = cardTransactionsResponse.transactions || [];
   state.cardPayments = cardPaymentsResponse.payments || [];
   state.cockpit = cockpitResponse;
+  state.cockpitCalendar = cockpitCalendarResponse;
   state.currentSpendingLimits = spendingLimitsResponse.limits || [];
   invalidateFinancialHealth();
   renderBaseViews();

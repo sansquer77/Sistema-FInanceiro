@@ -206,6 +206,7 @@
           <div class="cockpit-toolbar">
             <div class="cockpit-tabs" role="tablist" aria-label="Visões do cockpit">
               <button class="cockpit-tab active" type="button" role="tab" aria-selected="true" aria-controls="cockpitSummaryPanel" data-cockpit-tab="summary">Situação</button>
+              <button class="cockpit-tab" type="button" role="tab" aria-selected="false" aria-controls="cockpitCalendarPanel" data-cockpit-tab="calendar">Calendário</button>
               <button class="cockpit-tab" type="button" role="tab" aria-selected="false" aria-controls="trendsPanel" data-cockpit-tab="trends">Tendências</button>
               <button class="cockpit-tab" type="button" role="tab" aria-selected="false" aria-controls="financialHealthPanel" data-cockpit-tab="health">Saúde</button>
             </div>
@@ -300,6 +301,57 @@
               </section>
             </div>
           </div>
+
+          <section class="panel cockpit-calendar-panel cockpit-tab-panel" id="cockpitCalendarPanel" role="tabpanel" hidden>
+            <div class="cockpit-calendar-header">
+              <div>
+                <h2>Calendário</h2>
+                <p class="muted-copy">Visão rápida de contas atrasadas e vencimentos de renda fixa nos próximos 60 dias.</p>
+              </div>
+              <div class="cockpit-calendar-meta">Dados do servidor</div>
+            </div>
+            <div class="cockpit-calendar-grid">
+              <section class="calendar-card">
+                <div class="calendar-card-heading">
+                  <div>
+                    <h3>Contas a receber atrasadas</h3>
+                    <small class="calendar-card-summary">Total por moeda.</small>
+                  </div>
+                </div>
+                <div class="calendar-card-list" id="overdueReceivablesList"></div>
+              </section>
+
+              <section class="calendar-card">
+                <div class="calendar-card-heading">
+                  <div>
+                    <h3>Contas a pagar atrasadas</h3>
+                    <small class="calendar-card-summary">Total por moeda.</small>
+                  </div>
+                </div>
+                <div class="calendar-card-list" id="overduePayablesList"></div>
+              </section>
+
+              <section class="calendar-card">
+                <div class="calendar-card-heading">
+                  <div>
+                    <h3>Vencimentos em 30 dias</h3>
+                    <small class="calendar-card-summary">Renda fixa aberta.</small>
+                  </div>
+                </div>
+                <div class="calendar-card-list" id="maturity30DaysList"></div>
+              </section>
+
+              <section class="calendar-card">
+                <div class="calendar-card-heading">
+                  <div>
+                    <h3>Vencimentos em 60 dias</h3>
+                    <small class="calendar-card-summary">Renda fixa aberta.</small>
+                  </div>
+                </div>
+                <div class="calendar-card-list" id="maturity60DaysList"></div>
+              </section>
+            </div>
+          </section>
 
           <section class="panel trends-panel cockpit-tab-panel" id="trendsPanel" role="tabpanel" hidden>
             <div class="trends-header">

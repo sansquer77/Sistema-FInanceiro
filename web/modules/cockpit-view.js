@@ -24,6 +24,8 @@ export function registerCockpitView({
   portfolioTotalsByCurrency,
   portfolioMaturityAlerts,
   goToPortfolio,
+  onNavigateToTransaction,
+  onNavigateToPortfolio,
 }) {
   const {
     monthIncome,
@@ -46,6 +48,11 @@ export function registerCockpitView({
     cockpitVersionAlert,
     cockpitVersionAlertVersion,
     cockpitVersionAlertDismiss,
+    cockpitCalendarPanel,
+    overdueReceivablesList,
+    overduePayablesList,
+    maturity30DaysList,
+    maturity60DaysList,
     financialHealthPanel,
     financialHealthContent,
     trendsPanel,
@@ -53,6 +60,7 @@ export function registerCockpitView({
     trendsMeta,
   } = elements;
   let financialHealthRequestId = 0;
+  let calendarRequestId = 0;
   let versionAlertDismissed = false;
   let activeChartBreakdownClose = null;
 
@@ -103,6 +111,9 @@ export function registerCockpitView({
     if (activeCockpitTab() === "trends") {
       trendsView.renderTrends(cockpitMonthValue());
     }
+    if (activeCockpitTab() === "calendar") {
+      renderCockpitCalendar();
+    }
   }
 
   function renderVersionAlert() {
@@ -121,13 +132,16 @@ export function registerCockpitView({
   }
 
   function setCockpitTab(tab) {
-    const allowedTabs = new Set(["summary", "trends", "health"]);
+    const allowedTabs = new Set(["summary", "calendar", "trends", "health"]);
     const nextTab = allowedTabs.has(tab) ? tab : "summary";
     if (state.cockpitTab === nextTab) {
       return;
     }
     state.cockpitTab = nextTab;
     renderCockpitTabs();
+    if (nextTab === "calendar") {
+      renderCockpitCalendar();
+    }
     if (nextTab === "health") {
       renderFinancialHealth();
     }
@@ -137,7 +151,7 @@ export function registerCockpitView({
   }
 
   function activeCockpitTab() {
-    const allowedTabs = new Set(["summary", "trends", "health"]);
+    const allowedTabs = new Set(["summary", "calendar", "trends", "health"]);
     return allowedTabs.has(state.cockpitTab) ? state.cockpitTab : "summary";
   }
 
@@ -151,6 +165,9 @@ export function registerCockpitView({
     });
     if (cockpitSummaryPanel) {
       cockpitSummaryPanel.hidden = activeTab !== "summary";
+    }
+    if (cockpitCalendarPanel) {
+      cockpitCalendarPanel.hidden = activeTab !== "calendar";
     }
     if (financialHealthPanel) {
       financialHealthPanel.hidden = activeTab !== "health";
@@ -805,8 +822,165 @@ export function registerCockpitView({
     return transactionMonth > currentMonth || !transaction.reconciled_at;
   }
 
-  function renderTopExpensesChart() {
-    if (state.cockpit?.top_expenses) {
+  function renderCockpitCalendar() {
+    if (!cockpitCalendarPanel) {
+      return;
+    }
+    if (!state.cockpitCalendar) {
+      if (state.cockpitCalendarError) {
+        const message = state.cockpitCalendarError || "Falha ao carregar dados do calendário.";
+        [overdueReceivablesList, overduePayablesList, maturity30DaysList, maturity60DaysList].forEach((container) => {
+          if (container) {
+            container.innerHTML = "";
+            container.append(emptyState(message, true));
+          }
+        });
+        return;
+      }
+      if (overdueReceivablesList) {
+        overdueReceivablesList.innerHTML = "";
+        overdueReceivablesList.append(emptyState("Carregando dados do calendário...", true));
+      }
+      if (overduePayablesList) {
+        overduePayablesList.innerHTML = "";
+        overduePayablesList.append(emptyState("Carregando dados do calendário...", true));
+      }
+      if (maturity30DaysList) {
+        maturity30DaysList.innerHTML = "";
+        maturity30DaysList.append(emptyState("Carregando dados do calendário...", true));
+      }
+      if (maturity60DaysList) {
+        maturity60DaysList.innerHTML = "";
+        maturity60DaysList.append(emptyState("Carregando dados do calendário...", true));
+      }
+      if (!state.cockpitCalendarLoading) {
+        loadCockpitCalendar().catch((error) => {
+          state.cockpitCalendarError = error.message;
+          renderCockpitCalendar();
+        });
+      }
+      return;
+    }
+    const payload = state.cockpitCalendar;
+    renderCalendarCard(
+      overdueReceivablesList,
+      payload.overdue_receivables || [],
+      "Nenhuma conta a receber atrasada.",
+      "overdue_receivables_cents",
+      (item) => renderOverdueItem(item, "receivable"),
+    );
+    renderCalendarCard(
+      overduePayablesList,
+      payload.overdue_payables || [],
+      "Nenhuma conta a pagar atrasada.",
+      "overdue_payables_cents",
+      (item) => renderOverdueItem(item, "payable"),
+    );
+    renderCalendarCard(
+      maturity30DaysList,
+      payload.maturity_30_days || [],
+      "Nenhum vencimento em 30 dias.",
+      "maturity_30_days_cents",
+      (item) => renderMaturityItem(item),
+    );
+    renderCalendarCard(
+      maturity60DaysList,
+      payload.maturity_60_days || [],
+      "Nenhum vencimento em 60 dias.",
+      "maturity_60_days_cents",
+      (item) => renderMaturityItem(item),
+    );
+  }
+
+  async function loadCockpitCalendar() {
+    calendarRequestId += 1;
+    const requestId = calendarRequestId;
+    state.cockpitCalendarLoading = true;
+    state.cockpitCalendarError = "";
+    try {
+      state.cockpitCalendar = await api("/api/cockpit/calendar");
+    } finally {
+      if (requestId !== calendarRequestId) {
+        return;
+      }
+      state.cockpitCalendarLoading = false;
+      renderCockpitCalendar();
+    }
+  }
+
+  function renderCalendarCard(container, items, emptyMessage, totalsKey, itemRenderer) {
+    if (!container) {
+      return;
+    }
+    const payload = state.cockpitCalendar || {};
+    const totals = buildTotalsByCurrency(payload, totalsKey);
+    if (!items.length) {
+      container.innerHTML = "";
+      container.append(emptyState(emptyMessage, true));
+      return;
+    }
+    container.innerHTML = `
+      ${totals.size ? `<div class="calendar-card-totals">${[...totals.entries()].map(([currency, amount]) => `<span>${escapeHtml(currency)}: <strong>${formatMoney(amount, currency)}</strong></span>`).join(" ")}</div>` : ""}
+      <div class="calendar-card-items">${items.map((item) => itemRenderer(item)).join("")}</div>
+    `;
+    container.querySelectorAll("[data-calendar-transaction-id]").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (typeof onNavigateToTransaction === "function") {
+          onNavigateToTransaction(button.dataset.calendarTransactionId);
+        }
+      });
+    });
+    container.querySelectorAll("[data-calendar-position-id]").forEach((button) => {
+      button.addEventListener("click", () => onNavigateToPortfolio(button.dataset.calendarPositionId));
+    });
+  }
+
+  function buildTotalsByCurrency(payload, totalsKey) {
+    const totalsByCurrency = new Map();
+    for (const item of payload.totals_by_currency || []) {
+      const amount = Number(item[totalsKey] || 0);
+      if (amount === 0) {
+        continue;
+      }
+      totalsByCurrency.set(item.currency || "BRL", amount / 100);
+    }
+    return totalsByCurrency;
+  }
+
+  function renderOverdueItem(item, kind) {
+    const label = kind === "receivable" ? "Receber" : "Pagar";
+    const description = item.description || "Sem descrição";
+    const detail = `${formatDate(item.date)} · ${escapeHtml(item.account_name || "Conta")} · ${escapeHtml(String(item.days_overdue))} dias de atraso`;
+    return `
+      <button class="calendar-item-row" type="button" data-calendar-transaction-id="${escapeHtml(String(item.id))}">
+        <div>
+          <strong>${escapeHtml(description)}</strong>
+          <small>${escapeHtml(detail)}</small>
+        </div>
+        <div>
+          <span>${escapeHtml(label)}</span>
+          <strong>${formatMoney(Number(item.amount_cents || 0) / 100, item.currency || "BRL")}</strong>
+        </div>
+      </button>
+    `;
+  }
+
+  function renderMaturityItem(item) {
+    const description = item.asset_name || item.asset_identifier || "Ativo sem identificação";
+    const detail = `${formatDate(item.maturity_date)} · ${escapeHtml(item.account_name || "Carteira")} · ${escapeHtml(String(item.days_to_maturity))} dias`;
+    return `
+      <button class="calendar-item-row" type="button" data-calendar-position-id="${escapeHtml(String(item.position_id))}">
+        <div>
+          <strong>${escapeHtml(description)}</strong>
+          <small>${escapeHtml(detail)}</small>
+        </div>
+        <div>
+          <span>Valor</span>
+          <strong>${formatMoney(Number(item.current_value_cents || 0) / 100, item.currency || "BRL")}</strong>
+        </div>
+      </button>
+    `;
+  }
       renderDonutListChart(topExpensesChart, state.cockpit.top_expenses, {
         empty: "Nenhuma despesa neste mês.",
         totalLabel: "Despesas",
