@@ -981,6 +981,9 @@ export function registerCockpitView({
       </button>
     `;
   }
+
+  function renderTopExpensesChart() {
+    if (state.cockpit?.top_expenses) {
       renderDonutListChart(topExpensesChart, state.cockpit.top_expenses, {
         empty: "Nenhuma despesa neste mês.",
         totalLabel: "Despesas",
