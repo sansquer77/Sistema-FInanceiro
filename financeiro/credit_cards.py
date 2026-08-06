@@ -255,8 +255,8 @@ def create_credit_card_transaction_with_conn(conn: sqlite3.Connection, user_id: 
                 user_id, credit_card_id, type, description, normalized_description, amount_cents,
                 exchange_rate_micros, amount_brl_cents, date,
                 invoice_month, series_id, series_kind, installment_index,
-                installment_count, recurrence_frequency, category_id, subcategory_id, notes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                installment_count, recurrence_frequency, use_average, category_id, subcategory_id, notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 user_id,
@@ -274,6 +274,7 @@ def create_credit_card_transaction_with_conn(conn: sqlite3.Connection, user_id: 
                 occurrence["installment_index"],
                 occurrence["installment_count"],
                 transaction["recurrence_frequency"],
+                1 if transaction.get("use_average") else 0,
                 category_id,
                 subcategory_id,
                 transaction["notes"],
@@ -339,8 +340,12 @@ def update_credit_card_transaction(user_id: int, transaction_id: str, data: dict
             ),
         )
         replace_credit_card_transaction_tags(conn, normalized_id, tag_ids)
-        if apply_to_future:
-            update_future_card_series(conn, user_id, existing, transaction, category_id, subcategory_id, tag_ids)
+        # spec: cartoes v2.5 — critérios 21 e 22
+        # (series recorrentes de cartao com use_average ativo aplicam edicao em cascata
+        #  automaticamente e recalculam valores futuros pela media)
+        force_apply_to_future = bool(existing["use_average"]) and existing["series_kind"] == "recurring"
+        if apply_to_future or force_apply_to_future:
+            update_future_card_series(conn, user_id, existing, transaction, category_id, subcategory_id, tag_ids, force_apply_to_future)
         row = fetch_card_transaction(conn, user_id, normalized_id)
     return format_card_transaction(row, card["currency"])
 
@@ -405,7 +410,11 @@ def update_future_card_series(
     category_id: int,
     subcategory_id: int | None,
     tag_ids: list[int],
+    force_apply_to_future: bool = False,
 ) -> None:
+    # spec: cartoes v2.5 — critérios 21 e 22
+    # (series recorrentes de cartao com use_average ativo propagam edicao automaticamente
+    #  e recalculam valores futuros pela media; demais series mantem apply_to_future)
     if not existing["series_id"]:
         return
     if not is_card_series(existing):
@@ -424,6 +433,14 @@ def update_future_card_series(
         """,
         (user_id, existing["series_id"], existing["id"], future_marker),
     ).fetchall()
+    # spec: cartoes v2.5 — criterio 22
+    # (quando use_average estiver ativo, recalcula o valor da serie pela media)
+    if force_apply_to_future and existing["series_kind"] == "recurring":
+        average_amount = average_amount_for_recurring_description(
+            conn, user_id, transaction["description"], transaction["type"], category_id, subcategory_id
+        )
+        if average_amount is not None:
+            transaction["amount_cents"] = average_amount
     for row in future_rows:
         ensure_invoice_is_open(conn, user_id, row["credit_card_id"], row["invoice_month"])
         shifted_date = (date.fromisoformat(row["date"]) + date_delta).isoformat()
@@ -1161,6 +1178,7 @@ def format_card_transaction(transaction: dict, currency: str) -> dict:
     transaction["exchange_rate_to_brl"] = micros_to_rate(transaction.pop("exchange_rate_micros", 1000000))
     transaction["amount_brl"] = cents_to_money(transaction.pop("amount_brl_cents", money_to_cents(transaction["amount"])))
     transaction["card_currency"] = transaction.pop("card_currency", currency) or currency
+    transaction["use_average"] = bool(transaction.pop("use_average", 0) or 0)
     raw_tags = transaction.pop("tag_names", "") or ""
     transaction["tags"] = [tag for tag in raw_tags.split("||") if tag]
     transaction["tag_name"] = ", ".join(transaction["tags"])

@@ -14,6 +14,7 @@ from financeiro.credit_cards import (
     create_credit_card_transaction,
     list_credit_card_transactions,
     pay_credit_card_invoice,
+    update_credit_card_transaction,
 )
 from financeiro.categories import get_category_evolution
 from financeiro.database import get_connection, initialize_database
@@ -462,6 +463,111 @@ class CreditCardPaymentAtomicityTest(unittest.TestCase):
 
         self.assertEqual(len(recurring_rows), 120)
         self.assertTrue(all(row["amount"] == "300.00" for row in recurring_rows))
+
+    def test_recurring_card_transaction_use_average_persists_to_all_occurrences(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta principal",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "10000,00",
+        })
+        card = create_credit_card(user["id"], {
+            "name": "Cartao",
+            "issuer": "Banco",
+            "currency": "BRL",
+            "limit": "20000,00",
+            "closing_day": "28",
+            "due_day": "10",
+            "preferred_payment_account_id": str(account["id"]),
+        })
+
+        create_credit_card_transaction(user["id"], {
+            "credit_card_id": str(card["id"]),
+            "type": "expense",
+            "description": "Conta de luz",
+            "amount": "999,00",
+            "date": "2026-06-10",
+            "invoice_month": "2026-06",
+            "category": "Servicos",
+            "subcategory": "Energia",
+            "series_kind": "recurring",
+            "recurrence_frequency": "monthly",
+            "use_average": "true",
+        })
+
+        rows = list_credit_card_transactions(user["id"])
+        recurring_rows = [row for row in rows if row["series_kind"] == "recurring"]
+
+        self.assertEqual(len(recurring_rows), 120)
+        self.assertTrue(all(row["use_average"] for row in recurring_rows))
+
+    def test_recurring_card_transaction_use_average_auto_recalculates_future_on_edit(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta principal",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "10000,00",
+        })
+        card = create_credit_card(user["id"], {
+            "name": "Cartao",
+            "issuer": "Banco",
+            "currency": "BRL",
+            "limit": "20000,00",
+            "closing_day": "28",
+            "due_day": "10",
+            "preferred_payment_account_id": str(account["id"]),
+        })
+
+        for amount, date_value in [("100,00", "2025-10-10"), ("200,00", "2025-11-10"), ("300,00", "2025-12-10")]:
+            create_credit_card_transaction(user["id"], {
+                "credit_card_id": str(card["id"]),
+                "type": "expense",
+                "description": "Conta de luz",
+                "amount": amount,
+                "date": date_value,
+                "invoice_month": date_value[:7],
+                "category": "Servicos",
+                "subcategory": "Energia",
+            })
+
+        first = create_credit_card_transaction(user["id"], {
+            "credit_card_id": str(card["id"]),
+            "type": "expense",
+            "description": "Conta de luz",
+            "amount": "999,00",
+            "date": "2026-06-10",
+            "invoice_month": "2026-06",
+            "category": "Servicos",
+            "subcategory": "Energia",
+            "series_kind": "recurring",
+            "recurrence_frequency": "monthly",
+            "use_average": "true",
+        })
+
+        update_credit_card_transaction(user["id"], str(first["id"]), {
+            "credit_card_id": str(card["id"]),
+            "type": "expense",
+            "description": "Conta de luz",
+            "amount": "999,00",
+            "date": "2026-06-15",
+            "invoice_month": "2026-06",
+            "category": "Servicos",
+            "subcategory": "Energia",
+        })
+
+        rows = sorted(
+            list_credit_card_transactions(user["id"]),
+            key=lambda row: row["date"],
+        )
+        recurring_rows = [row for row in rows if row["series_kind"] == "recurring"]
+
+        self.assertEqual(len(recurring_rows), 120)
+        self.assertEqual(recurring_rows[0]["amount"], "999.00")
+        self.assertEqual(recurring_rows[0]["date"], "2026-06-15")
+        self.assertTrue(all(row["amount"] == "200.00" for row in recurring_rows[1:]))
+        self.assertTrue(all(row["use_average"] for row in recurring_rows))
 
 
 if __name__ == "__main__":

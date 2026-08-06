@@ -208,6 +208,7 @@ def initialize_database() -> None:
                 installment_index INTEGER,
                 installment_count INTEGER,
                 recurrence_frequency TEXT,
+                use_average INTEGER NOT NULL DEFAULT 0 CHECK (use_average IN (0, 1)),
                 category_id INTEGER REFERENCES categories(id),
                 subcategory_id INTEGER REFERENCES subcategories(id),
                 reconciled_at TEXT,
@@ -278,6 +279,7 @@ def initialize_database() -> None:
                 installment_index INTEGER,
                 installment_count INTEGER,
                 recurrence_frequency TEXT,
+                use_average INTEGER NOT NULL DEFAULT 0 CHECK (use_average IN (0, 1)),
                 reconciled_at TEXT,
                 notes TEXT,
                 archived_at TEXT,
@@ -544,6 +546,8 @@ def initialize_database() -> None:
         ensure_column(conn, "credit_card_transactions", "installment_index", "INTEGER")
         ensure_column(conn, "credit_card_transactions", "installment_count", "INTEGER")
         ensure_column(conn, "credit_card_transactions", "recurrence_frequency", "TEXT")
+        ensure_column(conn, "credit_card_transactions", "use_average", "INTEGER NOT NULL DEFAULT 0")
+        ensure_column(conn, "transactions", "use_average", "INTEGER NOT NULL DEFAULT 0")
         ensure_column(conn, "credit_cards", "preferred_payment_account_id", "INTEGER REFERENCES checking_accounts(id)")
         ensure_column(conn, "investment_operations", "fixed_income_maturity_date", "TEXT")
         ensure_column(conn, "investment_operations", "emergency_reserve_eligible", "INTEGER NOT NULL DEFAULT 0")

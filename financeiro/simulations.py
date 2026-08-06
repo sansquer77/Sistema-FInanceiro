@@ -74,7 +74,10 @@ def normalize_simulation_payload(data: dict) -> dict:
         recurrence_frequency = str(data.get("recurrence_frequency") or "monthly").strip().lower()
         if recurrence_frequency not in RECURRENCE_FREQUENCIES:
             raise SimulationError("Informe a frequencia da recorrencia.")
-        recurrence_count = normalize_count(data.get("recurrence_count"), "Informe a quantidade de ocorrencias.")
+        # spec: efeito-borboleta v0.8 — critério 16
+        # (recorrentes usam 120 ocorrencias automaticamente quando o campo nao e enviado)
+        raw_count = str(data.get("recurrence_count") or "").strip()
+        recurrence_count = normalize_count(raw_count, "Informe a quantidade de ocorrencias.") if raw_count else 120
     return {
         "type": simulation_type,
         "amount_cents": amount_cents,

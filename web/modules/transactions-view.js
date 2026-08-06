@@ -289,11 +289,18 @@ export function registerTransactionsView({
       }
       const isEditing = Boolean(data.id);
       if (isEditing && shouldAskFutureReplication(data.id)) {
-        const scope = await chooseSeriesEditScope("conta");
-        if (!scope) {
-          return;
+        const transaction = findTransactionById(data.id);
+        if (transaction && transaction.use_average) {
+          // spec: lancamentos v3.2 — critério 27
+          // (series com use_average ativo nao exibem modal e aplicam em cascata)
+          data.apply_to_future = true;
+        } else {
+          const scope = await chooseSeriesEditScope("conta");
+          if (!scope) {
+            return;
+          }
+          data.apply_to_future = scope === "future";
         }
-        data.apply_to_future = scope === "future";
       }
       const response = await api(isEditing ? `/api/transactions/${data.id}` : "/api/transactions", {
         method: isEditing ? "PUT" : "POST",
@@ -461,7 +468,7 @@ export function registerTransactionsView({
     installmentCount.value = transaction.installment_count || "2";
     recurrenceFrequency.value = transaction.recurrence_frequency || "monthly";
     if (useAverage) {
-      useAverage.checked = false;
+      useAverage.checked = Boolean(transaction.use_average);
     }
     updateSeriesState();
     updateTransactionTypeState();

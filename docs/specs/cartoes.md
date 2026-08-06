@@ -2,7 +2,7 @@
 tipo: spec
 area: cartoes
 status: implementado
-versao: 2.4
+versao: 2.5
 atualizado: 2026-08-06
 relacionados:
   - "[[contas-correntes]]"
@@ -65,6 +65,7 @@ Qualquer usuário autenticado localmente que utilize cartões de crédito para d
 | `subcategoria_id` | FK | Opcional. |
 | `tags` | lista de FK | Opcional. N:M via `credit_card_transaction_tags`. |
 | `parcelas` | inteiro | Opcional. Exibe `1/12`, `2/12` etc. |
+| `use_average` | booleano | Opcional. Apenas para recorrentes. Persiste em todas as ocorrências da série. |
 | `reconciled_at` | timestamp | Opcional. Marcado na conciliação. |
 
 ## Regras
@@ -82,6 +83,9 @@ Qualquer usuário autenticado localmente que utilize cartões de crédito para d
 - Em lançamentos recorrentes de cartão, cada ocorrência futura deve manter exatamente o valor informado, a menos que o usuário ative a opção de calcular valores futuros pela média dos últimos 12 lançamentos com a mesma descrição normalizada, mesmo tipo e mesma categoria/subcategoria.
 - Quando a opção de média estiver ativa em um lançamento recorrente de cartão, o valor de cada ocorrência futura usa a média aritmética inteira (em centavos) dos valores dos últimos 12 lançamentos do usuário com a mesma descrição normalizada, mesmo tipo e mesma categoria/subcategoria; se houver menos de 12, usa todos os disponíveis; se não houver histórico, mantém o valor informado no formulário.
 - Lançamentos recorrentes de cartão não exibem o campo de quantidade de ocorrências no formulário; o sistema grava a série com 120 ocorrências automaticamente para manter compatibilidade com lançamentos antigos que usam o campo.
+- A marcação de média (`use_average`) em lançamentos recorrentes de cartão é persistida em todas as ocorrências geradas da série.
+- Ao editar uma ocorrência de uma série recorrente de cartão com `use_average` ativo, o sistema não exibe o modal de escopo; a alteração é aplicada automaticamente a todas as ocorrências futuras não conciliadas e seus valores são recalculados pela média dos últimos 12 lançamentos com a mesma descrição normalizada, mesmo tipo e mesma categoria/subcategoria.
+- Se `use_average` não estiver ativo, o comportamento atual de edição/exclusão em cascata se mantém.
 - O formulário manual de lançamento no cartão deve oferecer o campo `Tag`, com as mesmas sugestões de tags usadas em lançamentos de contas e suporte a múltiplas tags separadas por vírgula.
 - Em novos lançamentos, descrições com histórico exato e confiança suficiente podem preencher categoria e subcategoria sem sobrescrever escolhas manuais. Ver [[classificacao-assistida]].
 - Em lançamentos parcelados de cartão, o valor informado é o total da compra e deve ser dividido pela quantidade de parcelas. Ex.: R$ 500 em 5x gera 5 lançamentos/faturas de R$ 100.
@@ -154,9 +158,13 @@ Tabelas: `credit_cards`, `credit_card_transactions`, `credit_card_payments`, `cr
 - Dado um histórico de 3 lançamentos de cartão com a mesma descrição, categoria e subcategoria e valores R$ 100, R$ 200 e R$ 300, quando um lançamento recorrente mensal ativa a opção de média, então cada uma das 120 ocorrências futuras usa o valor de R$ 200.
 - Dado um lançamento recorrente de cartão sendo criado, quando o usuário seleciona o tipo "Recorrente", então o campo de quantidade de ocorrências permanece oculto e a série é gravada com 120 ocorrências.
 - Dado um lançamento recorrente de cartão existente sendo editado, quando o formulário é aberto, então o campo de quantidade de ocorrências continua oculto e a frequência permanece desabilitada.
+- Dado um lançamento recorrente de cartão criado com a opção `use_average`, quando as ocorrências são geradas, então todas persistem `use_average` ativo.
+- Dado uma série recorrente de cartão com `use_average` ativo, quando o usuário edita qualquer ocorrência, então o sistema não exibe o modal de escopo e aplica automaticamente a alteração a todas as ocorrências futuras não conciliadas, recalculando seus valores pela média.
+- Dado uma série recorrente de cartão sem `use_average`, quando o usuário edita uma ocorrência, então o sistema mantém o comportamento atual de perguntar se deseja alterar apenas o lançamento atual ou também os futuros.
 
 ## Changelog
 
+- `2.5` — 2026-08-06 — Lançamentos recorrentes de cartão com `use_average` persistem a marcação em todas as ocorrências e, ao editar qualquer ocorrência dessa série, recalculam automaticamente os valores futuros pela média sem exibir modal de escopo.
 - `2.4` — 2026-08-06 — Lançamentos recorrentes de cartão permitem calcular valores futuros pela média dos últimos 12 lançamentos com mesma descrição e passam a usar 120 ocorrências automaticamente, sem exibir o campo de quantidade.
 - `2.3` — 2026-08-02 — Lançamentos de cartão em moeda estrangeira passam a gravar valor normalizado em BRL por cotação manual ou pela última PTAX de venda disponível.
 - `2.2` — 2026-08-02 — Gráfico de faturas e resumo de fatura ganham ajustes responsivos para telas de 14 polegadas (e breakpoints intermediários), evitando quebra de linha em valores extensos e melhorando a densidade dos cartões de resumo.

@@ -49,6 +49,21 @@ is_available() {
   /usr/bin/curl -fsS --max-time 1 "$URL" >/dev/null 2>&1
 }
 
+kill_existing_server() {
+  PIDS=$(/usr/sbin/lsof -ti :"$APP_PORT" 2>/dev/null || true)
+  if [ -n "$PIDS" ]; then
+    echo "$PIDS" | xargs kill -TERM 2>/dev/null || true
+    sleep 1
+    PIDS=$(/usr/sbin/lsof -ti :"$APP_PORT" 2>/dev/null || true)
+    if [ -n "$PIDS" ]; then
+      echo "$PIDS" | xargs kill -KILL 2>/dev/null || true
+      sleep 0.5
+    fi
+  fi
+}
+
+kill_existing_server
+
 if ! is_available; then
   cd "$PROJECT_DIR" || exit 1
   APP_HOST="$APP_HOST" APP_PORT="$APP_PORT" APP_URL="$URL" \

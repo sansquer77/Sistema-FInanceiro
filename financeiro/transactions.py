@@ -182,8 +182,8 @@ def create_transaction_with_conn(conn: sqlite3.Connection, user_id: int, data: d
                 user_id, type, description, normalized_description, amount_cents, destination_amount_cents,
                 exchange_rate_micros, transfer_exchange_rate_micros, amount_brl_cents, date, account_id,
                 destination_account_id, category_id, subcategory_id, series_id, series_kind, installment_index,
-                installment_count, recurrence_frequency, notes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                installment_count, recurrence_frequency, use_average, notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 user_id,
@@ -205,6 +205,7 @@ def create_transaction_with_conn(conn: sqlite3.Connection, user_id: int, data: d
                 occurrence["installment_index"],
                 occurrence["installment_count"],
                 transaction["recurrence_frequency"],
+                1 if transaction.get("use_average") else 0,
                 transaction["notes"],
             ),
         )
@@ -252,6 +253,10 @@ def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
         apply_balance_delta(conn, source["id"], balance_delta(transaction["type"], transaction["amount_cents"], "source"))
         if destination:
             apply_balance_delta(conn, destination["id"], balance_delta(transaction["type"], destination_balance_amount(transaction), "destination"))
+        # spec: lancamentos v3.2 — critérios 26 e 27
+        # (series recorrentes com use_average ativo aplicam edicao em cascata
+        #  automaticamente e recalculam valores futuros pela media)
+        force_apply_to_future = bool(existing["use_average"]) and existing["series_kind"] == "recurring"
         conn.execute(
             """
             UPDATE transactions
@@ -282,13 +287,16 @@ def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
         )
         replace_transaction_tags(conn, normalized_id, tag_ids)
         upsert_investment_operation(conn, user_id, normalized_id, source["id"], transaction)
-        if apply_to_future:
-            update_future_series_transactions(conn, user_id, existing, transaction)
+        if apply_to_future or force_apply_to_future:
+            update_future_series_transactions(conn, user_id, existing, transaction, force_apply_to_future)
         row = fetch_transaction(conn, user_id, normalized_id)
     return format_transaction(row)
 
 
-def update_future_series_transactions(conn, user_id: int, existing, transaction: dict) -> None:
+def update_future_series_transactions(conn, user_id: int, existing, transaction: dict, force_apply_to_future: bool = False) -> None:
+    # spec: lancamentos v3.2 — criterio 27
+    # (series recorrentes com use_average ativo propagam edicao automaticamente
+    #  e recalculam valores futuros pela media; demais series mantem apply_to_future)
     # spec: lancamentos v2.9 — criterio 7 (apply_to_future)
     # (propaga apenas para ocorrencias futuras nao conciliadas da mesma serie;
     #  o delta de data e reaplicado, nao a data absoluta, para preservar o espacamento)
@@ -326,8 +334,17 @@ def update_future_series_transactions(conn, user_id: int, existing, transaction:
         transaction["date"],
         transaction["exchange_rate"],
     )
-    amount_brl_cents = convert_to_brl_cents(transaction["amount_cents"], exchange_rate_micros)
     category_id, subcategory_id = resolve_transaction_category(conn, user_id, transaction, destination)
+    # spec: lancamentos v3.2 — criterio 27
+    # (quando use_average estiver ativo, recalcula o valor da serie pela media)
+    if force_apply_to_future and existing["series_kind"] == "recurring":
+        average_amount = average_amount_for_recurring_description(
+            conn, user_id, transaction["description"], transaction["type"], category_id, subcategory_id
+        )
+        if average_amount is not None:
+            transaction["amount_cents"] = average_amount
+            normalize_transfer_amounts(transaction, source, destination)
+    amount_brl_cents = convert_to_brl_cents(transaction["amount_cents"], exchange_rate_micros)
     tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
     source_balance_delta = balance_delta(transaction["type"], transaction["amount_cents"], "source")
     destination_id = destination["id"] if destination else None
@@ -1170,6 +1187,7 @@ def format_transaction(transaction: dict) -> dict:
     transaction["exchange_rate_to_brl"] = micros_to_rate(transaction.pop("exchange_rate_micros"))
     transaction["transfer_exchange_rate"] = micros_to_rate(transaction.pop("transfer_exchange_rate_micros", 0) or 0)
     transaction["amount_brl"] = cents_to_money(transaction.pop("amount_brl_cents"))
+    transaction["use_average"] = bool(transaction.pop("use_average", 0) or 0)
     raw_tags = transaction.pop("tag_names", "") or ""
     transaction["tags"] = [tag for tag in raw_tags.split("||") if tag]
     transaction["tag_name"] = ", ".join(transaction["tags"])

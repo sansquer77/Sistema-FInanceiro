@@ -2,7 +2,7 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 3.1
+versao: 3.2
 atualizado: 2026-08-06
 relacionados:
   - "[[contas-correntes]]"
@@ -53,6 +53,7 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 | `observacoes` | texto | Opcional. |
 | `recorrente` | booleano + frequência | Opcional. |
 | `parcelas` | inteiro | Opcional. Gera série com índice `1/N`. |
+| `use_average` | booleano | Opcional. Apenas para recorrentes. Persiste em todas as ocorrências da série. |
 | `reconciled_at` | timestamp | Opcional. Marcado na conciliação bancária. |
 
 ## Regras de negócio
@@ -73,6 +74,9 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 - **Edição em cascata** (`apply_to_future`): ao editar um lançamento de uma série, o usuário pode aplicar as alterações ao lançamento atual ou a todos os futuros da série que ainda não foram conciliados (`reconciled_at IS NULL`).
 - **Exclusão em cascata** (`scope=future`): remove recursivamente todos os lançamentos futuros não conciliados da mesma série, revertendo os respectivos impactos nos saldos.
 - A escolha de edição/exclusão em cascata deve usar modal com ações explícitas, como `Apenas este lançamento`, `Este e os próximos`, `Excluir apenas este`, `Excluir este e os próximos` e `Voltar`.
+- A marcação de média (`use_average`) em lançamentos recorrentes é persistida em todas as ocorrências geradas da série.
+- Ao editar uma ocorrência de uma série recorrente com `use_average` ativo, o sistema não exibe o modal de escopo; a alteração é aplicada automaticamente a todas as ocorrências futuras não conciliadas e seus valores são recalculados pela média dos últimos 12 lançamentos com a mesma descrição normalizada, mesmo tipo e mesma categoria/subcategoria.
+- Se `use_average` não estiver ativo, o comportamento atual de edição/exclusão em cascata se mantém.
 - Lançamentos parcelados exibem índice e total (`1/36`, `2/36`...) sem reiniciar a contagem em edições pontuais.
 - Em lançamentos parcelados, o valor informado é o total da compra/lançamento e deve ser dividido pela quantidade total de parcelas. Ex.: R$ 500 em 5x gera 5 lançamentos de R$ 100.
 - Em lançamentos recorrentes, cada ocorrência futura deve manter exatamente o valor informado, a menos que o usuário ative a opção de calcular valores futuros pela média dos últimos 12 lançamentos com a mesma descrição normalizada, mesmo tipo e mesma categoria/subcategoria.
@@ -162,9 +166,13 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dado um histórico de 3 lançamentos com a mesma descrição, categoria e subcategoria e valores R$ 100, R$ 200 e R$ 300, quando um lançamento recorrente mensal ativa a opção de média, então cada uma das 120 ocorrências futuras usa o valor de R$ 200.
 - Dado um lançamento recorrente sendo criado, quando o usuário seleciona o tipo "Recorrente", então o campo de quantidade de ocorrências permanece oculto e a série é gravada com 120 ocorrências.
 - Dado um lançamento recorrente existente sendo editado, quando o formulário é aberto, então o campo de quantidade de ocorrências continua oculto e a frequência permanece desabilitada.
+- Dado um lançamento recorrente criado com a opção `use_average`, quando as ocorrências são geradas, então todas persistem `use_average` ativo.
+- Dado uma série recorrente com `use_average` ativo, quando o usuário edita qualquer ocorrência, então o sistema não exibe o modal de escopo e aplica automaticamente a alteração a todas as ocorrências futuras não conciliadas, recalculando seus valores pela média.
+- Dado uma série recorrente sem `use_average`, quando o usuário edita uma ocorrência, então o sistema mantém o comportamento atual de perguntar se deseja alterar apenas o lançamento atual ou também os futuros.
 
 ## Changelog
 
+- `3.2` — 2026-08-06 — Lançamentos recorrentes com `use_average` persistem a marcação em todas as ocorrências e, ao editar qualquer ocorrência dessa série, recalculam automaticamente os valores futuros pela média sem exibir modal de escopo.
 - `3.1` — 2026-08-06 — Lançamentos recorrentes permitem calcular valores futuros pela média dos últimos 12 lançamentos com mesma descrição e passam a usar 120 ocorrências automaticamente, sem exibir o campo de quantidade.
 - `3.0` — 2026-08-02 — Formulário de Renda Fixa em Lançamentos reduz ruído visual com modalidade em chips, microcopy dinâmica, atalhos e preview compacto.
 - `2.9` — 2026-08-02 — Lançamentos em moeda estrangeira sem cotação manual passam a consultar a última PTAX de venda disponível até a data do lançamento para normalizar valores em BRL.

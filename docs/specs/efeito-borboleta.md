@@ -2,8 +2,8 @@
 tipo: spec
 area: simulacoes
 status: rascunho
-versao: 0.7
-atualizado: 2026-07-24
+versao: 0.8
+atualizado: 2026-08-06
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -18,7 +18,7 @@ aliases: ["Efeito Borboleta", "Simulador Financeiro"]
 # Efeito Borboleta
 
 > [!info] Status
-> **rascunho** · área: `simulacoes` · atualizado em 2026-07-24 · relacionados: [[contas-correntes]], [[lancamentos]], [[cartoes]], [[limites-gastos]], [[relatorios]]
+> **rascunho** · área: `simulacoes` · atualizado em 2026-08-06 · relacionados: [[contas-correntes]], [[lancamentos]], [[cartoes]], [[limites-gastos]], [[relatorios]]
 
 ## Problema
 
@@ -48,7 +48,7 @@ Qualquer usuário autenticado localmente que queira testar cenários financeiros
 | `series_kind` | enum | Obrigatório. Valores: `single`, `installment` ou `recurring`. |
 | `installment_count` | inteiro | Obrigatório quando `series_kind = installment`. Deve ser maior que 1. |
 | `recurrence_frequency` | enum | Obrigatório quando `series_kind = recurring`. Valores iniciais: `monthly`. |
-| `recurrence_count` | inteiro | Obrigatório quando `series_kind = recurring`. Define a quantidade de ocorrências simuladas e deve ser maior que 1. |
+| `recurrence_count` | inteiro | Opcional quando `series_kind = recurring`. Define a quantidade de ocorrências simuladas e deve ser maior que 1. Quando não informado, o sistema assume 120 ocorrências automaticamente. |
 
 ## Regras
 
@@ -114,6 +114,7 @@ Resposta esperada:
 - Dado o app sem internet, quando o usuário abre o módulo, então a criação e visualização da simulação continuam disponíveis.
 - Dado uma despesa parcelada de R$ 1.200,00 em 12 vezes, quando simulada, então o sistema distribui R$ 100,00 por mês na projeção e mostra o impacto acumulado nos meses afetados.
 - Dado uma receita recorrente mensal de R$ 500,00 por 6 meses, quando simulada, então o sistema mostra seis ocorrências virtuais e atualiza o saldo projetado mês a mês.
+- Dado uma simulação recorrente sem informar a quantidade de ocorrências, quando enviada, então o sistema assume 120 ocorrências automaticamente e não exibe erro.
 - Dado uma simulação com payload legado categorizado, quando há limites cadastrados nos meses afetados, então cada ocorrência impacta apenas o limite do seu mês de competência.
 - Dado uma conta preferencial de pagamento com fatura de cartão conciliada e não paga, quando o usuário simula um cenário nessa conta, então o gráfico parte do saldo previsto da conta com a fatura abatida e adiciona somente os valores simulados.
 - Dado qualquer cenário válido, quando o resultado é exibido, então o saldo atual permanece igual ao saldo conciliado real da conta.
@@ -131,6 +132,7 @@ Resposta esperada:
 
 ## Changelog
 
+- `0.8` — 2026-08-06 — Simulações recorrentes passam a usar 120 ocorrências automaticamente quando a quantidade não é informada, evitando erro de campo obrigatório.
 - `0.7` — 2026-07-24 — Gráfico da simulação passa a adaptar valores financeiros extensos ao espaço disponível sem ampliar a área visual.
 - `0.6` — 2026-07-24 — Simulação passa a ser um cenário financeiro puro: formulário sem descrição, categoria ou subcategoria; classificação fica apenas como compatibilidade de payload legado.
 - `0.5` — 2026-07-06 — Resultado separa saldo atual real de saldo projetado; gráfico passa a comparar previsão da conta e cenário simulado em horizonte fixo de 5 meses.

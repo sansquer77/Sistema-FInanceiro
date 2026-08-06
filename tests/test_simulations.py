@@ -248,6 +248,29 @@ class ButterflyEffectSimulationTest(unittest.TestCase):
             [2074704, 2274704, 2474704, 2474704, 2474704],
         )
 
+    def test_recurring_simulation_uses_default_120_occurrences(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta principal",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "1000,00",
+        })
+
+        response = simulate_butterfly_effect(user["id"], {
+            "type": "income",
+            "amount": "100,00",
+            "date": "2026-01-15",
+            "description": "Receita recorrente",
+            "account_id": str(account["id"]),
+            "series_kind": "recurring",
+            "recurrence_frequency": "monthly",
+        })
+
+        self.assertEqual(response["scenario"]["recurrence_count"], 120)
+        self.assertEqual(len(response["virtual_items"]), 120)
+        self.assertTrue(all(item["impact_cents"] == 10000 for item in response["virtual_items"]))
+
     def test_rejects_non_monthly_recurrence_until_supported(self) -> None:
         user = create_user("Alice", "alice@example.com", "correct-password")
         account = create_checking_account(user["id"], {

@@ -275,12 +275,19 @@ export function registerCardsView({
     data.invoice_month = state.cardInvoiceMonth;
     const isEditing = Boolean(data.id);
     if (isEditing && shouldAskFutureCardReplication(data.id)) {
-      const scope = await chooseSeriesEditScope();
-      if (!scope) {
-        setFormBusy(cardTransactionForm, false);
-        return;
+      const transaction = state.cardTransactions.find((entry) => String(entry.id) === String(data.id));
+      if (transaction && transaction.use_average) {
+        // spec: cartoes v2.5 — critério 22
+        // (series com use_average ativo nao exibem modal e aplicam em cascata)
+        data.apply_to_future = true;
+      } else {
+        const scope = await chooseSeriesEditScope();
+        if (!scope) {
+          setFormBusy(cardTransactionForm, false);
+          return;
+        }
+        data.apply_to_future = scope === "future";
       }
-      data.apply_to_future = scope === "future";
     }
     try {
       await api(isEditing ? `/api/credit-card-transactions/${data.id}` : "/api/credit-card-transactions", {
@@ -466,7 +473,7 @@ export function registerCardsView({
     cardInstallmentCount.value = transaction.installment_count || "2";
     cardRecurrenceFrequency.value = transaction.recurrence_frequency || "monthly";
     if (cardUseAverage) {
-      cardUseAverage.checked = false;
+      cardUseAverage.checked = Boolean(transaction.use_average);
     }
     cardSeriesKind.disabled = true;
     cardInstallmentCount.disabled = true;
