@@ -367,6 +367,55 @@ class TransactionSeriesUpdateTest(unittest.TestCase):
         self.assertTrue(all(row["amount"] == "200.00" for row in recurring_rows[1:]))
         self.assertTrue(all(row["use_average"] for row in recurring_rows))
 
+    def test_recurring_transaction_use_average_ignores_future_occurrences_when_recalculating(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta principal",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "10000,00",
+        })
+
+        first = create_transaction(user["id"], {
+            "type": "expense",
+            "description": "Conta de luz",
+            "amount": "123,00",
+            "date": "2026-08-10",
+            "account_id": str(account["id"]),
+            "category": "Servicos",
+            "subcategory": "Energia",
+            "series_kind": "recurring",
+            "recurrence_frequency": "monthly",
+            "use_average": "true",
+        })
+
+        rows = sorted(
+            list_transactions(user["id"], account_id=account["id"]),
+            key=lambda row: row["date"],
+        )
+        september = next(row for row in rows if row["series_kind"] == "recurring" and row["date"] == "2026-09-10")
+
+        update_transaction(user["id"], str(september["id"]), {
+            "type": "expense",
+            "description": "Conta de luz",
+            "amount": "159,00",
+            "date": "2026-09-10",
+            "account_id": str(account["id"]),
+            "category": "Servicos",
+            "subcategory": "Energia",
+        })
+
+        rows = sorted(
+            list_transactions(user["id"], account_id=account["id"]),
+            key=lambda row: row["date"],
+        )
+        recurring_rows = [row for row in rows if row["series_kind"] == "recurring"]
+
+        self.assertEqual(len(recurring_rows), 120)
+        self.assertEqual(recurring_rows[0]["amount"], "123.00")
+        self.assertEqual(recurring_rows[1]["amount"], "159.00")
+        self.assertTrue(all(row["amount"] == "141.00" for row in recurring_rows[2:]))
+
 
 if __name__ == "__main__":
     unittest.main()

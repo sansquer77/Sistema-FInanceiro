@@ -239,7 +239,8 @@ def create_credit_card_transaction_with_conn(conn: sqlite3.Connection, user_id: 
     subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
     if transaction.get("use_average") and transaction["series_kind"] == "recurring":
         average_amount = average_amount_for_recurring_description(
-            conn, user_id, transaction["description"], transaction["type"], category_id, subcategory_id
+            conn, user_id, transaction["description"], transaction["type"], category_id, subcategory_id,
+            max_date=transaction["date"],
         )
         if average_amount is not None:
             transaction["average_amount_cents"] = average_amount
@@ -437,7 +438,8 @@ def update_future_card_series(
     # (quando use_average estiver ativo, recalcula o valor da serie pela media)
     if force_apply_to_future and existing["series_kind"] == "recurring":
         average_amount = average_amount_for_recurring_description(
-            conn, user_id, transaction["description"], transaction["type"], category_id, subcategory_id
+            conn, user_id, transaction["description"], transaction["type"], category_id, subcategory_id,
+            max_date=existing["date"],
         )
         if average_amount is not None:
             transaction["amount_cents"] = average_amount

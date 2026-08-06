@@ -153,7 +153,8 @@ def create_transaction_with_conn(conn: sqlite3.Connection, user_id: int, data: d
     category_id, subcategory_id = resolve_transaction_category(conn, user_id, transaction, destination)
     if transaction.get("use_average") and transaction["series_kind"] == "recurring":
         average_amount = average_amount_for_recurring_description(
-            conn, user_id, transaction["description"], transaction["type"], category_id, subcategory_id
+            conn, user_id, transaction["description"], transaction["type"], category_id, subcategory_id,
+            max_date=transaction["date"],
         )
         if average_amount is not None:
             transaction["average_amount_cents"] = average_amount
@@ -339,7 +340,8 @@ def update_future_series_transactions(conn, user_id: int, existing, transaction:
     # (quando use_average estiver ativo, recalcula o valor da serie pela media)
     if force_apply_to_future and existing["series_kind"] == "recurring":
         average_amount = average_amount_for_recurring_description(
-            conn, user_id, transaction["description"], transaction["type"], category_id, subcategory_id
+            conn, user_id, transaction["description"], transaction["type"], category_id, subcategory_id,
+            max_date=existing["date"],
         )
         if average_amount is not None:
             transaction["amount_cents"] = average_amount
@@ -719,11 +721,11 @@ def average_amount_for_recurring_description(
     transaction_type: str,
     category_id: int | None,
     subcategory_id: int | None,
+    max_date: str | None = None,
 ) -> int | None:
-    # spec: lancamentos v3.1 — critérios 22 e 23
-    # (media dos ultimos 12 lancamentos do usuario com a mesma descricao normalizada,
-    #  mesmo tipo e mesma categoria/subcategoria, considerando tanto contas quanto
-    #  cartoes; retorna None quando nao ha historico)
+    # spec: lancamentos v3.2 — critério 27
+    # (media dos ultimos 12 lancamentos anteriores ou na data de corte; ao recalcular
+    #  uma serie, os lancamentos futuros da propria serie nao devem influenciar a media)
     normalized = normalize_description(description)
     params: list[object] = [user_id, transaction_type, normalized]
     category_filter = ""
@@ -734,6 +736,10 @@ def average_amount_for_recurring_description(
     if subcategory_id is not None:
         subcategory_filter = "AND subcategory_id = ?"
         params.append(subcategory_id)
+    date_filter = ""
+    if max_date:
+        date_filter = "AND date <= ?"
+        params.append(max_date)
     rows = conn.execute(
         f"""
         SELECT amount_cents
@@ -744,6 +750,7 @@ def average_amount_for_recurring_description(
                 AND normalized_description = ?
                 {category_filter}
                 {subcategory_filter}
+                {date_filter}
             UNION ALL
             SELECT amount_cents, date, id, category_id, subcategory_id
             FROM credit_card_transactions
@@ -751,6 +758,7 @@ def average_amount_for_recurring_description(
                 AND normalized_description = ?
                 {category_filter}
                 {subcategory_filter}
+                {date_filter}
         )
         ORDER BY date DESC, id DESC
         LIMIT 12
