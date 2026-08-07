@@ -1436,5 +1436,6 @@ export function registerTransactionsView({
     launchActionButton,
     shiftTransactionMonth,
     setTransactionMonth,
+    highlightSavedTransaction,
   };
 }

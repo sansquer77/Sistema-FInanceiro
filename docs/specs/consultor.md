@@ -2,8 +2,8 @@
 tipo: spec
 area: consultor
 status: rascunho
-versao: 0.1
-atualizado: 2026-08-06
+versao: 0.2
+atualizado: 2026-08-07
 relacionados:
   - "[[instrucoes-app]]"
   - "[[investimentos-portfolio]]"
@@ -16,7 +16,7 @@ aliases: ["Consultor Virtual", "Assistente de Investimentos", "Especialista em F
 # Consultor Virtual de Investimentos e Planejamento Financeiro
 
 > [!info] Status
-> **rascunho** · área: `consultor` · atualizado em 2026-08-06 · relacionados: [[instrucoes-app]], [[investimentos-portfolio]], [[score-saude-financeira]], [[tendencias-saude-financeira]]
+> **rascunho** · área: `consultor` · atualizado em 2026-08-07 · relacionados: [[instrucoes-app]], [[investimentos-portfolio]], [[score-saude-financeira]], [[tendencias-saude-financeira]]
 
 ## Problema
 
@@ -29,11 +29,11 @@ Usuário autenticado que deseja esclarecer dúvidas sobre finanças, investiment
 ## Jornada
 
 1. O usuário acessa **Usuário > Preferências** e ativa a função de IA que irá usar o módulo **Consultor**.
-2. O usuário seleciona seu perfil de investidor: **Conservador**, **Moderado** ou **Arrojado** no menu de Preferências. 
-3. O usuário abre um campo de prompt do módulo **Consultor** no ícone de uma cartola que fica ao lado do ícone ocultar/mostrar valores.
+2. O usuário seleciona seu perfil de investidor: **Conservador**, **Moderado** ou **Arrojado** no menu de Preferências.
+3. O usuário acessa a aba **Consultor** do Cockpit, que é o único ponto de entrada do módulo. Quando a IA está habilitada, a aba passa a exibir o campo de prompt para o usuário digitar suas perguntas.
 4. O usuário digita uma pergunta sobre renda fixa, renda variável, criptoativos, planejamento financeiro ou análise de mercado.
 5. O sistema processa a pergunta usando a persona do especialista e os dados do usuário a partir da base de dados e retorna uma resposta estruturada no formato padrão, com disclaimer educacional no final.
-6. O usuário pode fazer perguntas de follow-up ou consultar o histórico da conversa.
+6. O usuário pode fazer perguntas de follow-up ou consultar o histórico da conversa na mesma aba.
 
 ## Dados
 
@@ -200,6 +200,14 @@ Toda resposta deve encerrar com o disclaimer:
 - A comunicação com provedores de IA externos, se houver, deve respeitar as regras de privacidade e nunca enviar senhas, tokens, chaves de criptografia ou dados sensíveis não anonimizados.
 - O histórico de conversas deve ser associado ao `user_id` autenticado.
 
+### Entrada e interface
+
+- A aba **Consultor** existente no Cockpit é o único ponto de entrada do módulo.
+- Não deve haver botão flutuante, atalho lateral, ícone de cartola ou qualquer outra forma de acionamento do prompt fora dessa aba.
+- Quando a IA está habilitada em Preferências, a aba **Consultor** passa a centralizar o campo de prompt, a conversa e o histórico.
+- Quando a IA está desabilitada, a aba **Consultor** não exibe o campo de prompt; o sistema informa que a função precisa ser ativada nas Preferências.
+- A aba **Consultor** do Cockpit permanece acessível mesmo com o módulo desabilitado, para exibir o aviso de ativação ou o prompt, conforme o estado da função.
+
 ## API e dados
 
 | Método | Rota | Descrição |
@@ -220,7 +228,9 @@ Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regr
 ## Critérios de aceite
 
 - Dado um usuário autenticado, quando acessa **Usuário > Preferências**, então encontra a opção de ativar/desativar o Consultor e selecionar o perfil de investidor.
-- Dado um usuário com o Consultor desativado, quando tenta acessar o módulo Consultor, então o sistema informa que a função precisa ser ativada nas Preferências.
+- Dado um usuário com o Consultor desativado, quando acessa a aba **Consultor** no Cockpit, então a aba exibe o aviso de que a função precisa ser ativada nas Preferências, sem campo de prompt.
+- Dado um usuário com o Consultor habilitado, quando acessa a aba **Consultor** do Cockpit, então encontra o campo de prompt centralizado na aba.
+- Dado um usuário com o Consultor habilitado, quando procura por um botão flutuante ou ícone de cartola para abrir o Consultor em outras telas, então não encontra nenhum ponto de acesso fora da aba **Consultor**.
 - Dado um usuário com perfil **Conservador** configurado, quando pergunta sobre alocação de carteira, então a resposta usa como referência a faixa de 70% a 90% em renda fixa.
 - Dado um usuário com perfil **Arrojado** configurado, quando pergunta sobre criptoativos, então a resposta usa como referência a faixa de 5% a 15%.
 - Dado um usuário fazendo uma pergunta, quando o Consultor responde, então a resposta segue o formato padrão (Resumo, Análise, Riscos, Adequação ao Perfil, Conclusão, Disclaimer).
@@ -243,7 +253,6 @@ Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regr
 - [ ] Definir limites de uso (mensagens por dia, tamanho máximo de pergunta/resposta, timeout).
 - [ ] Definir se haverá integração com cotações em tempo real e qual fonte será usada.
 - [ ] Definir se a ativação exige aceite explícito do disclaimer ou se basta a exibição ao final de cada resposta.
-- [ ] Definir se o Consultor será uma view independente ou integrado a outro módulo existente (ex.: dentro de Instruções ou Cockpit).
 
 ## Fora de escopo
 
@@ -260,12 +269,13 @@ Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regr
 - [ ] Passo 2 — Criar módulo Python `financeiro/consultor.py` com a persona, regras de resposta, limitações e formatador de saída. Fecha: critérios 3, 4, 5, 6, 7 e 8.
 - [ ] Passo 3 — Criar rotas `GET/POST /api/consultor/config`, `POST /api/consultor/ask`, `GET/DELETE /api/consultor/history` em `app.py`, autenticadas e validadas contra `Host`/`Origin`. Fecha: critérios 1, 2, 9, 10, 11 e 12.
 - [ ] Passo 4 — Criar tabela(s) SQLite de forma idempotente em `financeiro/database.py` para configuração e histórico do Consultor. Fecha: critérios 9 e 10.
-- [ ] Passo 5 — Criar view do Consultor em `web/modules/` seguindo o contrato de fábrica e integrar navegação em `web/app.js`. Fecha: critérios 1, 2 e 9.
+- [ ] Passo 5 — Integrar o campo de prompt e o histórico na aba **Consultor** existente do Cockpit (`web/modules/cockpit-view.js` / `consultor-view.js`) seguindo o contrato de fábrica, sem criar novo ponto de acesso. Fecha: critérios 1, 2, 3, 4 e 9.
 - [ ] Passo 6 — Criar testes automatizados para persona, perfis de investidor, limitações, formato de resposta e segurança das rotas. Fecha: critérios 3, 4, 5, 6, 7, 8, 11 e 12.
 - [ ] Passo 7 — Atualizar `docs/arquitetura.md`, `docs/requisitos.md` e `docs/README.md` para refletir o novo módulo, rotas e tabelas. Fecha: critérios 1 e 11.
 
 ## Changelog
 
+- `0.2` — 2026-08-07 — Decidido que a aba **Consultor** do Cockpit é o único ponto de entrada do módulo: removido o ícone de cartola flutuante da Jornada, adicionadas regras de entrada/interface, critérios de aceite sobre o prompt centralizado e a inexistência de atalhos em outras telas; pendência sobre view independente vs. integrada resolvida a favor da integração na aba existente.
 - `0.1` — 2026-08-06 — Spec inicial em rascunho para o módulo **Consultor Virtual**, documentando persona, especializações, perfis de investidor, diretrizes de resposta, limitações e API proposta.
 
 ## Relacionados

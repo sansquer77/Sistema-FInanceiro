@@ -706,10 +706,23 @@ const cockpitView = registerCockpitView({
   portfolioTotalsByCurrency,
   portfolioMaturityAlerts: () => portfolioView.portfolioMaturityAlerts(),
   goToPortfolio: () => showModule("portfolio"),
-  onNavigateToTransaction: (transactionId) => {
+  onNavigateToTransaction: (transactionId, accountId, date) => {
+    // spec: cockpit-calendario v0.4 — critério 17
     state.transactionHighlightId = String(transactionId);
+    if (accountId && state.accounts.some((account) => String(account.id) === String(accountId))) {
+      state.selectedAccountId = String(accountId);
+    }
+    if (date) {
+      const month = String(date).slice(0, 7);
+      if (isValidMonthValue(month)) {
+        state.transactionMonth = month;
+      }
+    }
+    state.transactionSearch = "";
+    state.transactionStatusFilter = "all";
     showModule("transactions");
   },
+
   onNavigateToPortfolio: (positionId) => {
     state.portfolioHighlightId = String(positionId);
     showModule("portfolio");
@@ -1463,7 +1476,10 @@ function showModule(view) {
     ensureSelectedAccount();
     renderTransactionAccounts();
     updateTransactionTypeState();
-    loadTransactionSlice().then(renderTransactions).catch((error) => setMessage(transactionMessage, error.message, "error"));
+    loadTransactionSlice().then(() => {
+      renderTransactions();
+      transactionsView.highlightSavedTransaction();
+    }).catch((error) => setMessage(transactionMessage, error.message, "error"));
   }
   if (view === "limits") {
     renderLimits();

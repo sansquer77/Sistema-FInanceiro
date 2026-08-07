@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 5.4
-atualizado: 2026-08-06
+versao: 5.5
+atualizado: 2026-08-07
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -124,6 +124,7 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `5.5` — 2026-08-07 — [[specs/consultor]] atualizada (v0.2): a aba **Consultor** do Cockpit passa a ser o único ponto de entrada — removido o ícone de cartola flutuante/pop-up acionável de qualquer tela — e, com a IA habilitada, a aba centraliza o campo de prompt. Permanece em rascunho.
 - `5.4` — 2026-08-06 — Adicionada [[specs/open-finance]] em rascunho para conexão de contas via Conector 200/Meu Pluggy (Pluggy), com credenciais opt-in por usuário, sincronização manual e vínculo sempre manual a contas correntes; spec ainda contraria o escopo atual de [[requisitos]] e depende de resolução das pendências antes de implementação.
 - `5.3` — 2026-08-06 — [[specs/consultor]] atualizada (v0.2): reutiliza configuração de IA existente (`user_ai_settings`), interface definida como pop-up acionável de qualquer tela e histórico persistido em arquivo criptografado no `DATA_DIR`.
 - `5.2` — 2026-08-06 — Adicionada [[specs/consultor]] em rascunho para o módulo **Consultor Virtual** de investimentos e planejamento financeiro.

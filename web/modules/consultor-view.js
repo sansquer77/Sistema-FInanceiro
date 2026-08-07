@@ -1,4 +1,4 @@
-// spec: cockpit-calendario v0.3 — critérios 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17 e 18
+// spec: cockpit-calendario v0.4 — critérios 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17 e 18
 export function registerConsultorView({
   elements,
   api,
@@ -133,7 +133,11 @@ export function registerConsultorView({
     container.querySelectorAll("[data-calendar-transaction-id]").forEach((button) => {
       button.addEventListener("click", () => {
         if (typeof onNavigateToTransaction === "function") {
-          onNavigateToTransaction(button.dataset.calendarTransactionId);
+          onNavigateToTransaction(
+            button.dataset.calendarTransactionId,
+            button.dataset.calendarAccountId,
+            button.dataset.calendarTransactionDate,
+          );
         }
       });
     });
@@ -159,7 +163,7 @@ export function registerConsultorView({
     const description = item.description || "Sem descrição";
     const detail = `${formatDate(item.date)} · ${escapeHtml(item.account_name || "Conta")} · ${escapeHtml(String(item.days_overdue))} dias de atraso`;
     return `
-      <button class="calendar-item-row" type="button" data-calendar-transaction-id="${escapeHtml(String(item.id))}">
+      <button class="calendar-item-row" type="button" data-calendar-transaction-id="${escapeHtml(String(item.id))}" data-calendar-account-id="${escapeHtml(String(item.account_id || ""))}" data-calendar-transaction-date="${escapeHtml(String(item.date || ""))}">
         <div>
           <strong>${escapeHtml(description)}</strong>
           <small>${escapeHtml(detail)}</small>
