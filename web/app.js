@@ -95,9 +95,6 @@ const state = {
   transactions: [],
   accountTransactions: [],
   cockpit: null,
-  cockpitCalendar: null,
-  cockpitCalendarLoading: false,
-  cockpitCalendarError: "",
   cockpitTab: "summary",
   cockpitMonth: currentMonthValue(),
   financialHealth: null,
@@ -1341,7 +1338,6 @@ async function refreshCockpitData() {
     cardTransactionsResponse,
     cardPaymentsResponse,
     cockpitResponse,
-    cockpitCalendarResponse,
     spendingLimitsResponse,
   ] = await Promise.all([
     api("/api/checking-accounts"),
@@ -1349,7 +1345,6 @@ async function refreshCockpitData() {
     api("/api/credit-card-transactions"),
     api("/api/credit-card-payments"),
     api(`/api/cockpit?month=${encodeURIComponent(month)}`),
-    api(`/api/cockpit/calendar`),
     api(`/api/spending-limits?month=${encodeURIComponent(month)}`),
   ]);
   if (requestId !== state.cockpitRefreshRequestId) {
@@ -1361,7 +1356,6 @@ async function refreshCockpitData() {
   state.cardTransactions = cardTransactionsResponse.transactions || [];
   state.cardPayments = cardPaymentsResponse.payments || [];
   state.cockpit = cockpitResponse;
-  state.cockpitCalendar = cockpitCalendarResponse;
   state.currentSpendingLimits = spendingLimitsResponse.limits || [];
   invalidateFinancialHealth();
   renderBaseViews();
