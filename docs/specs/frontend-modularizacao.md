@@ -2,8 +2,8 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 2.2
-atualizado: 2026-08-02
+versao: 2.3
+atualizado: 2026-08-07
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
   - "[[arquitetura]]"
@@ -57,6 +57,9 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `reports-view.js` | Filtros, abas, agrupamentos e tabelas. |
 | `imports-view.js` | Upload, download de modelo e resultado da importação. |
 | `cockpit-view.js` | Resumo, saldos, planejamento, dívidas, portfólio e alertas. |
+| `financial-health-view.js` | Aba Saúde Financeira do Cockpit: score/gauge, pilares, Paz Financeira e recomendações. |
+| `trends-view.js` | Aba Tendências do Cockpit: gráfico de evolução mensal, Budget x Realizado e achados. |
+| `consultor-view.js` | Aba Consultor/Calendário do Cockpit: vencimentos, atrasos e plano próximo. |
 | `accounts-view.js` | Contas: cadastro, edição, arquivamento e restauração. |
 | `cards-view.js` | Cartões: cadastro, faturas, busca/filtro da fatura, pagamento e conciliação. |
 | `portfolio-view.js` | Ativos: posições, consolidações com escala BRL, histórico, resgate e encerramento. |
@@ -126,6 +129,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Changelog
 
+- `2.3` — 2026-08-07 — Aba **Saúde Financeira** do Cockpit extraída para view dedicada `financial-health-view.js` (fábrica `registerFinancialHealthView`), desacoplando o estado de tela do `cockpit-view.js`.
 - `2.2` — 2026-08-02 — Registrado `privacy-utils.js` como utilitário local para Modo Privacidade via `data-privacy`, sem backend ou build step.
 - `2.1` — 2026-08-02 — Troca de módulos do dashboard passa a usar View Transitions API como melhoria progressiva, com fallback e respeito a redução de movimento.
 - `2.0` — 2026-08-02 — Navegação lateral passa a documentar rótulos desambiguados para Cadastro e Lançamentos, com títulos de página alinhados.

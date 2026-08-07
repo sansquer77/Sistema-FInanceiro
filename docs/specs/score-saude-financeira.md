@@ -2,8 +2,8 @@
 tipo: spec
 area: score-saude-financeira
 status: implementado
-versao: 3.3
-atualizado: 2026-08-06
+versao: 3.4
+atualizado: 2026-08-07
 relacionados:
   - "[[relatorios]]"
   - "[[limites-gastos]]"
@@ -167,10 +167,12 @@ Nenhuma pendência conhecida.
 - [x] Passo 3 — Adicionar as rotas `GET /api/financial-health-score` e `GET /api/financial-health-score/history` em `app.py` com validação de sessão e origem. Fecha: critérios 12, 13 e 14.
 - [x] Passo 4 — Criar os testes unitários automatizados em `tests/test_financial_health.py` validando os pilares, Paz Financeira e casos de borda. Fecha: critérios 1, 2, 3, 4, 5, 6, 7, 8, 9 e 10.
 - [x] Passo 5 — Implementar a aba dedicada de Saúde Financeira na view do Cockpit (`web/modules/cockpit-view.js` / sub-view dedicada), incluindo gráfico nativo de barras horizontais por pilar, fallback textual acessível e ajuda contextual da Taxa de Poupança. Fecha: critérios 15, 16, 17, 22 e 23.
+- [x] Passo 5.1 — Extrair a aba em módulo próprio `web/modules/financial-health-view.js` (fábrica `registerFinancialHealthView`), seguindo o padrão de `trends-view.js`/`consultor-view.js`, com estado de tela local e `invalidateFinancialHealth` delegado pelo `cockpit-view.js`.
 - [ ] Passo 6 — Atualizar `docs/arquitetura.md` e `docs/requisitos.md` com as novas rotas, módulo e metadado de reserva no Portfólio.
 
 ## Changelog
 
+- `3.4` — 2026-08-07 — Aba dedicada extraída para módulo próprio `web/modules/financial-health-view.js` (fábrica `registerFinancialHealthView`), seguindo o padrão de `trends-view.js`/`consultor-view.js`; estado de tela local migra para o módulo e `invalidateFinancialHealth` passa a ser delegado pelo `cockpit-view.js`.
 - `3.3` — 2026-08-06 — Status e posição ajustados no Map of Content (`docs/README.md`): movida para a seção de specs implementadas, área `Diagnóstico`.
 - `3.2` — 2026-08-04 — Spec marcada como `implementado` no vault de documentação do app principal.
 - `3.1` — 2026-08-02 — Gauge do Score passa a manter o centro livre de texto, movendo pontuação/status para o bloco lateral e removendo redundância visual com a escala.

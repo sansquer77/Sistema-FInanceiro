@@ -66,7 +66,10 @@ docs/               Requisitos, arquitetura, specs e referências
 | `limits-view.js` | Limites de gastos e índice de consumo. |
 | `reports-view.js` | Filtros, abas, agrupamentos e tabelas. |
 | `imports-view.js` | Upload, download de modelo e resultado da importação. |
-| `cockpit-view.js` | Resumo, saldos, planejamento, dívidas, portfólio e alertas. |
+| `cockpit-view.js` | Resumo, saldos, planejamento, dívidas, portfólio e alertas; registra sub-views de Calendário, Tendências e Saúde Financeira. |
+| `financial-health-view.js` | Aba **Saúde Financeira** do Cockpit: score/gauge, pilares, Paz Financeira e consolidado do diagnóstico. |
+| `trends-view.js` | Aba **Tendências** do Cockpit: gráfico mês a mês, Budget x Realizado e achados local. |
+| `consultor-view.js` | Aba **Calendário/Consultor** do Cockpit: vencimentos, atrasos e consultor. |
 | `accounts-view.js` | Contas: cadastro, edição, arquivamento, restauração. |
 | `cards-view.js` | Cartões: cadastro, faturas, pagamento, conciliação. |
 | `portfolio-view.js` | Ativos: posições, histórico, resgate, encerramento. |
@@ -460,6 +463,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.9` — 2026-08-07 — Aba **Saúde Financeira** extraída para módulo próprio `web/modules/financial-health-view.js` (fábrica `registerFinancialHealthView`), seguindo o padrão de `trends-view.js`/`consultor-view.js`; estado local de tela migra para o módulo e `invalidateFinancialHealth` passa a ser delegado pelo `cockpit-view.js`.
 - `3.8` — 2026-08-06 — Rota `GET /api/portfolio/returns`: série mensal por moeda (BRL/USD em %) com benchmarks CDI e IPCA; gráfico de linhas no drawer. Ver [[specs/rentabilidade-portfolio]].
 - `3.7` — 2026-08-06 — Ajustada rota `GET /api/portfolio/returns`: série mensal consolidada (carteira inteira em BRL) vs CDI do mês, últimos 12 meses ou todo o período disponível. Ver [[specs/rentabilidade-portfolio]].
 - `3.6` — 2026-08-06 — Documentada rota `GET /api/portfolio/returns` para rentabilidade da carteira por moeda com benchmark CDI. Ver [[specs/rentabilidade-portfolio]].

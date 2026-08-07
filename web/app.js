@@ -97,10 +97,6 @@ const state = {
   cockpit: null,
   cockpitTab: "summary",
   cockpitMonth: currentMonthValue(),
-  financialHealth: null,
-  financialHealthMonth: currentMonthValue(),
-  financialHealthLoading: false,
-  financialHealthError: "",
   categories: [],
   tags: [],
   spendingLimits: [],
@@ -1195,10 +1191,6 @@ function resetSessionState() {
   state.cockpit = null;
   state.cockpitTab = "summary";
   state.cockpitMonth = currentMonthValue();
-  state.financialHealth = null;
-  state.financialHealthMonth = state.cockpitMonth;
-  state.financialHealthLoading = false;
-  state.financialHealthError = "";
   state.categories = [];
   state.tags = [];
   state.spendingLimits = [];
@@ -1389,9 +1381,7 @@ function markPortfolioDirty() {
 }
 
 function invalidateFinancialHealth() {
-  state.financialHealthMonth = cockpitMonthValue();
-  state.financialHealth = null;
-  state.financialHealthError = "";
+  cockpitView.invalidateFinancialHealth();
 }
 
 function showPortfolioAssetForm() {
