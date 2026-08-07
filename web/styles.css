@@ -1185,47 +1185,50 @@ textarea:focus {
 
 .cockpit-calendar-meta {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  gap: 12px 18px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 800;
 }
 
 .cockpit-calendar-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(280px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
 }
 
 .calendar-card {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 20px;
+  gap: 10px;
+  padding: 14px 16px;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: var(--panel);
 }
 
 .calendar-card-heading {
-  display: grid;
-  gap: 6px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .calendar-card-heading h3 {
   margin: 0;
-  font-size: 1rem;
-}
-
-.calendar-card-heading small {
-  color: var(--muted);
-  line-height: 1.4;
+  font-size: 0.95rem;
 }
 
 .calendar-card-totals {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  justify-content: flex-end;
+  gap: 6px 14px;
   color: var(--ink);
-  font-size: 0.93rem;
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .calendar-card-totals span {
@@ -1234,18 +1237,24 @@ textarea:focus {
   align-items: baseline;
 }
 
+.calendar-card-list {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
 .calendar-card-items {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .calendar-item-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 14px;
+  gap: 12px;
   align-items: center;
   width: 100%;
-  padding: 14px 16px;
+  padding: 9px 12px;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--surface);
@@ -1262,23 +1271,34 @@ textarea:focus {
 
 .calendar-item-row div {
   min-width: 0;
+  line-height: 1.35;
 }
 
 .calendar-item-row strong {
   display: block;
-  font-size: 0.95rem;
+  font-size: 0.86rem;
 }
 
 .calendar-item-row small {
   display: block;
   color: var(--muted);
-  margin-top: 4px;
+  margin-top: 2px;
+  font-size: 0.78rem;
+  line-height: 1.35;
 }
 
 .calendar-item-row span {
   display: block;
   color: var(--muted);
-  font-size: 0.82rem;
+  font-size: 0.72rem;
+}
+
+.calendar-item-row > div:last-child {
+  text-align: right;
+}
+
+.calendar-item-row > div:last-child span {
+  margin-bottom: 2px;
 }
 
 @media (max-width: 800px) {

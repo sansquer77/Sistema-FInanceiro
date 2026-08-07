@@ -624,11 +624,13 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_json(cockpit_payload([*transactions, *card_transactions]))
 
     def handle_cockpit_calendar(self) -> None:
-        # spec: cockpit-calendario v0.2 — critérios 17 e 18
+        # spec: cockpit-calendario v0.6 — critérios 17 e 18
         if not self.validate_read_source():
             return
         user = self.require_user()
-        self.send_json(get_cockpit_calendar(user["id"]))
+        payload = get_cockpit_calendar(user["id"])
+        payload["ia_ativa"] = ai_summary_enabled(user["id"])
+        self.send_json(payload)
 
     def handle_financial_health_score(self) -> None:
         # spec: score-saude-financeira v2.5 — critério 15

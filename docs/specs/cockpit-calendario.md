@@ -2,7 +2,7 @@
 tipo: spec
 area: cockpit
 status: em-implementacao
-versao: 0.4
+versao: 0.6
 atualizado: 2026-08-07
 relacionados:
   - "[[relatorios]]"
@@ -50,6 +50,7 @@ Usuário autenticado que consulta o Cockpit e deseja uma visão rápida de conta
 | `total_overdue_receivables_cents` | inteiro | Soma total dos valores a receber atrasados, em centavos. |
 | `total_overdue_payables_cents` | inteiro | Soma total dos valores a pagar atrasados, em centavos. |
 | `totals_by_currency` | lista | Opcional. Totais atrasados e de vencimentos separados por moeda, para exibição multimoeda. |
+| `ia_ativa` | booleano | Indica se a preferência do usuário permite uso de IA para a aba Consultor (mesma regra da aba Tendências). |
 
 Campos de cada item de lançamento atrasado:
 
@@ -89,6 +90,8 @@ Campos de cada item de vencimento de investimento:
   - **Metade direita superior**: Contas a pagar atrasadas.
   - **Metade esquerda inferior**: Investimentos com vencimento em 30 dias.
   - **Metade direita inferior**: Investimentos com vencimento em 60 dias.
+- O total por moeda de cada card deve ser exibido no cabeçalho do card, alinhado à direita na mesma linha do título, com valores tabulares.
+- Os cards devem ser compactos: espaçamento interno reduzido e linhas de item enxutas, sem texto explicativo redundante no cabeçalho.
 - Em telas estreitas, os cards devem empilhar verticalmente, mantendo a ordem: receber, pagar, 30 dias, 60 dias.
 
 ### Contas a receber atrasadas
@@ -137,6 +140,12 @@ Campos de cada item de vencimento de investimento:
 - Cada item de receber/pagar deve oferecer ação para abrir o lançamento no Extrato de Contas.
 - Cada item de vencimento deve oferecer ação para abrir a posição no Portfólio.
 - A aba não deve permitir edição de dados; é apenas leitura.
+- Ao clicar em um item de receber/pagar, o app navega para o Extrato de Contas com o lançamento em destaque, **sem abrir automaticamente o formulário de edição** do lançamento.
+
+### Cabeçalho da aba
+
+- O cabeçalho da aba exibe o subtítulo **"Apoio no acompanhamento das suas contas"**.
+- Quando `ia_ativa` for verdadeiro, o cabeçalho exibe o mesmo indicador de IA usado na aba **Tendências**; caso contrário, nenhum indicador é exibido.
 
 ## API e dados
 
@@ -171,7 +180,9 @@ A nova rota deve ser autenticada e validar `Host`/`Origin` conforme as regras de
 - Dado uma transferência ou um investimento do tipo `investment`, quando acessa a aba **Calendário**, então ele não aparece nos cards de receber/pagar atrasadas.
 - Dado um lançamento parcelado de receita com a segunda parcela atrasada e não conciliada, quando acessa a aba **Calendário**, então apenas essa parcela aparece no card de receber atrasadas.
 - Dado um usuário em tela estreita, quando acessa a aba **Calendário**, então os cards empilham verticalmente mantendo a ordem: receber, pagar, 30 dias, 60 dias.
-- Dado um usuário clicando em um item de receber/pagar, quando a ação é acionada, então o app navega para o Extrato de Contas com o lançamento em destaque.
+- Dado um usuário clicando em um item de receber/pagar, quando a ação é acionada, então o app navega para o Extrato de Contas com o lançamento em destaque, sem abrir automaticamente o formulário de edição.
+- Dado um usuário com a IA habilitada, quando acessa a aba **Calendário**, então o cabeçalho exibe o mesmo indicador de IA usado na aba **Tendências**.
+- Dado um usuário com a IA desabilitada, quando acessa a aba **Calendário**, então o cabeçalho não exibe indicador de IA.
 - Dado um usuário clicando em um item de vencimento, quando a ação é acionada, então o app navega para o Portfólio com a posição em destaque.
 - Dado uma requisição sem sessão válida, quando tenta acessar `/api/cockpit/calendar`, então o sistema retorna erro de autenticação.
 - Dado uma requisição com `Host`/`Origin` inválidos, quando tenta acessar `/api/cockpit/calendar`, então o sistema retorna erro de segurança sem expor dados.
@@ -201,6 +212,8 @@ A nova rota deve ser autenticada e validar `Host`/`Origin` conforme as regras de
 
 ## Changelog
 
+- `0.6` — 2026-08-07 — Ajustado o cabeçalho da aba: novo subtítulo "Apoio no acompanhamento das suas contas" e, quando `ia_ativa` é verdadeiro, indicador de IA idêntico ao da aba **Tendências** (payload `ia_ativa` exposto pela rota). Explicitado que o clique em item navega ao lançamento com destaque sem abrir o formulário de edição.
+- `0.5` — 2026-08-07 — Ajustado o layout dos cards da aba: total por moeda movido para o cabeçalho do card (alinhado à direita, com valores tabulares), cards compactados (menos padding e linhas enxutas) e removida a etiqueta "Dados do servidor" do cabeçalho do painel.
 - `0.4` — 2026-08-07 — Corrigida a navegação do critério 17: ao clicar em item de receber/pagar, o app agora seleciona a conta e o mês do lançamento no Extrato de Contas, limpa busca/filtros e destaca o lançamento específico (scroll + destaque visual).
 - `0.3` — 2026-08-06 — Status e posição ajustados no Map of Content (`docs/README.md`): permanece em `em-implementacao` na seção de specs em outros status enquanto a UI não é concluída.
 - `0.2` — 2026-08-06 — Implementados no backend a rota `GET /api/cockpit/calendar` e o módulo `financeiro/calendar.py`, com testes automatizados para atrasos e vencimentos. Status avançado para `em-implementacao`; UI ainda pendente (passos 3 e 4).

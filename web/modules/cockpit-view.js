@@ -51,6 +51,7 @@ export function registerCockpitView({
     cockpitVersionAlertVersion,
     cockpitVersionAlertDismiss,
     cockpitCalendarPanel,
+    cockpitCalendarMeta,
     overdueReceivablesList,
     overduePayablesList,
     maturity30DaysList,
@@ -77,6 +78,7 @@ export function registerCockpitView({
   const consultorView = registerConsultorView({
     elements: {
       cockpitCalendarPanel,
+      cockpitCalendarMeta,
       overdueReceivablesList,
       overduePayablesList,
       maturity30DaysList,

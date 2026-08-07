@@ -408,6 +408,7 @@ const cockpitVersionAlert = document.querySelector("#cockpitVersionAlert");
 const cockpitVersionAlertVersion = document.querySelector("#cockpitVersionAlertVersion");
 const cockpitVersionAlertDismiss = document.querySelector("#cockpitVersionAlertDismiss");
 const cockpitCalendarPanel = document.querySelector("#cockpitCalendarPanel");
+const cockpitCalendarMeta = document.querySelector("#cockpitCalendarMeta");
 const overdueReceivablesList = document.querySelector("#overdueReceivablesList");
 const overduePayablesList = document.querySelector("#overduePayablesList");
 const maturity30DaysList = document.querySelector("#maturity30DaysList");
@@ -674,6 +675,7 @@ const cockpitView = registerCockpitView({
     cockpitVersionAlertVersion,
     cockpitVersionAlertDismiss,
     cockpitCalendarPanel,
+    cockpitCalendarMeta,
     overdueReceivablesList,
     overduePayablesList,
     maturity30DaysList,
@@ -707,7 +709,7 @@ const cockpitView = registerCockpitView({
   portfolioMaturityAlerts: () => portfolioView.portfolioMaturityAlerts(),
   goToPortfolio: () => showModule("portfolio"),
   onNavigateToTransaction: (transactionId, accountId, date) => {
-    // spec: cockpit-calendario v0.4 — critério 17
+    // spec: cockpit-calendario v0.6 — critério 17
     state.transactionHighlightId = String(transactionId);
     if (accountId && state.accounts.some((account) => String(account.id) === String(accountId))) {
       state.selectedAccountId = String(accountId);

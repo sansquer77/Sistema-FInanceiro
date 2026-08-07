@@ -1,4 +1,4 @@
-// spec: cockpit-calendario v0.4 — critérios 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17 e 18
+// spec: cockpit-calendario v0.6 — critérios 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17 e 18
 export function registerConsultorView({
   elements,
   api,
@@ -11,6 +11,7 @@ export function registerConsultorView({
 }) {
   const {
     cockpitCalendarPanel,
+    cockpitCalendarMeta,
     overdueReceivablesList,
     overduePayablesList,
     maturity30DaysList,
@@ -57,6 +58,7 @@ export function registerConsultorView({
     if (!cockpitCalendarPanel) {
       return;
     }
+    renderAIActiveBadge();
     if (!currentData) {
       if (error) {
         setAllContainers(emptyState(error, true));
@@ -102,9 +104,23 @@ export function registerConsultorView({
         if (card.container) {
           card.container.innerHTML = "";
           card.container.append(emptyState(card.empty, true));
+          const totalsEl = card.container.closest(".calendar-card")?.querySelector(".calendar-card-totals");
+          if (totalsEl) {
+            totalsEl.innerHTML = "";
+          }
         }
       }
     });
+  }
+
+  function renderAIActiveBadge() {
+    if (!cockpitCalendarMeta) {
+      return;
+    }
+    const active = currentData && currentData.ia_ativa === true;
+    cockpitCalendarMeta.innerHTML = active
+      ? '<span class="trends-ai-badge">IA ativa</span>'
+      : "";
   }
 
   function setAllContainers(element) {
@@ -112,6 +128,10 @@ export function registerConsultorView({
       if (container) {
         container.innerHTML = "";
         container.append(element.cloneNode(true));
+        const totalsEl = container.closest(".calendar-card")?.querySelector(".calendar-card-totals");
+        if (totalsEl) {
+          totalsEl.innerHTML = "";
+        }
       }
     });
   }
@@ -121,13 +141,18 @@ export function registerConsultorView({
       return;
     }
     const totals = buildTotalsByCurrency(currentData, totalsKey);
+    const totalsEl = container.closest(".calendar-card")?.querySelector(".calendar-card-totals");
+    if (totalsEl) {
+      totalsEl.innerHTML = totals.size
+        ? [...totals.entries()].map(([currency, amount]) => `<span>${escapeHtml(currency)}: <strong>${formatMoney(amount, currency)}</strong></span>`).join("")
+        : "";
+    }
     if (!items.length) {
       container.innerHTML = "";
       container.append(emptyState(empty, true));
       return;
     }
     container.innerHTML = `
-      ${totals.size ? `<div class="calendar-card-totals">${[...totals.entries()].map(([currency, amount]) => `<span>${escapeHtml(currency)}: <strong>${formatMoney(amount, currency)}</strong></span>`).join(" ")}</div>` : ""}
       <div class="calendar-card-items">${items.map((item) => renderItem(item)).join("")}</div>
     `;
     container.querySelectorAll("[data-calendar-transaction-id]").forEach((button) => {

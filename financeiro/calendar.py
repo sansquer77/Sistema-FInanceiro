@@ -16,7 +16,7 @@ class CalendarError(Exception):
 
 
 def get_cockpit_calendar(user_id: int, reference_date: date | None = None) -> dict:
-    # spec: cockpit-calendario v0.2 — critérios 3, 4, 7, 8, 9, 10, 11, 12, 13, 14 e 15
+    # spec: cockpit-calendario v0.6 — critérios 3, 4, 7, 8, 9, 10, 11, 12, 13, 14 e 15
     # (consolida contas a receber/pagar atrasadas e vencimentos de renda fixa
     #  em 30 e 60 dias a partir da data de referência do servidor)
     reference_date = reference_date or date.today()
@@ -39,7 +39,7 @@ def get_cockpit_calendar(user_id: int, reference_date: date | None = None) -> di
 
 
 def _fetch_overdue_transactions(user_id: int, reference_date: date, transaction_type: str) -> list[dict]:
-    # spec: cockpit-calendario v0.2 — critérios 3 e 4 (receitas/despesas atrasadas)
+    # spec: cockpit-calendario v0.6 — critérios 3 e 4 (receitas/despesas atrasadas)
     # (somente lançamentos de conta; data anterior à referência; não conciliados;
     #  transferências, investimentos e pagamentos de fatura excluídos)
     with get_connection() as conn:
@@ -98,7 +98,7 @@ def _format_overdue_transaction(row: dict, reference_date: date) -> dict:
 
 
 def _fetch_fixed_income_maturities(user_id: int, reference_date: date) -> tuple[list[dict], list[dict]]:
-    # spec: cockpit-calendario v0.2 — critérios 7, 8, 9, 10, 11, 12, 13, 14 e 15
+    # spec: cockpit-calendario v0.6 — critérios 7, 8, 9, 10, 11, 12, 13, 14 e 15
     # (somente posições abertas de renda fixa; exclui encerradas, poupança, ações,
     #  fundos, cripto, previdência e outros tipos; janelas de 30 e 60 dias sem sobreposição)
     positions = current_portfolio_positions(user_id)
@@ -145,7 +145,7 @@ def _build_totals_by_currency(
     maturity_30_days: list[dict],
     maturity_60_days: list[dict],
 ) -> list[dict]:
-    # spec: cockpit-calendario v0.2 — seção "Dados" (totals_by_currency opcional)
+    # spec: cockpit-calendario v0.6 — seção "Dados" (totals_by_currency opcional)
     totals: dict[str, dict[str, int]] = defaultdict(
         lambda: {
             "overdue_receivables_cents": 0,

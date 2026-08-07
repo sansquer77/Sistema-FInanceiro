@@ -393,6 +393,27 @@ class CalendarRouteTest(IsolatedDatabaseTest):
         self.assertIn("overdue_payables", payload)
         self.assertIn("maturity_30_days", payload)
         self.assertIn("maturity_60_days", payload)
+        self.assertIn("ia_ativa", payload)
+        self.assertIs(payload["ia_ativa"], False)
+
+    def test_route_exposes_ai_active_flag_when_enabled(self) -> None:
+        user = create_user("Alice", "alice@example.com", "strong-password")
+        handler = object.__new__(app.AppHandler)
+        handler.headers = {
+            "Host": "sistema-financeiro.localhost:8020",
+            "Origin": "http://sistema-financeiro.localhost:8020",
+        }
+        handler.path = "/api/cockpit/calendar"
+        handler.send_json = mock.Mock()
+        with (
+            mock.patch.object(app, "PORT", 8020),
+            mock.patch.object(app, "PUBLIC_URL", "http://sistema-financeiro.localhost:8020"),
+            mock.patch.object(app.AppHandler, "require_user", return_value=user),
+        ):
+            with mock.patch("app.ai_summary_enabled", return_value=True):
+                handler.handle_cockpit_calendar()
+        payload = handler.send_json.call_args.args[0]
+        self.assertIs(payload["ia_ativa"], True)
 
 
 if __name__ == "__main__":

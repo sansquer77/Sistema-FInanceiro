@@ -306,47 +306,39 @@
             <div class="cockpit-calendar-header">
               <div>
                 <h2>Consultor</h2>
-                <p class="muted-copy">Visão rápida de contas atrasadas e vencimentos de renda fixa nos próximos 60 dias.</p>
+                <p class="muted-copy">Apoio no acompanhamento das suas contas</p>
               </div>
-              <div class="cockpit-calendar-meta">Dados do servidor</div>
+              <div class="cockpit-calendar-meta" id="cockpitCalendarMeta"></div>
             </div>
             <div class="cockpit-calendar-grid">
               <section class="calendar-card">
                 <div class="calendar-card-heading">
-                  <div>
-                    <h3>Contas a receber atrasadas</h3>
-                    <small class="calendar-card-summary">Total por moeda.</small>
-                  </div>
+                  <h3>Contas a receber atrasadas</h3>
+                  <div class="calendar-card-totals"></div>
                 </div>
                 <div class="calendar-card-list" id="overdueReceivablesList"></div>
               </section>
 
               <section class="calendar-card">
                 <div class="calendar-card-heading">
-                  <div>
-                    <h3>Contas a pagar atrasadas</h3>
-                    <small class="calendar-card-summary">Total por moeda.</small>
-                  </div>
+                  <h3>Contas a pagar atrasadas</h3>
+                  <div class="calendar-card-totals"></div>
                 </div>
                 <div class="calendar-card-list" id="overduePayablesList"></div>
               </section>
 
               <section class="calendar-card">
                 <div class="calendar-card-heading">
-                  <div>
-                    <h3>Vencimentos em 30 dias</h3>
-                    <small class="calendar-card-summary">Renda fixa aberta.</small>
-                  </div>
+                  <h3>Vencimentos em 30 dias</h3>
+                  <div class="calendar-card-totals"></div>
                 </div>
                 <div class="calendar-card-list" id="maturity30DaysList"></div>
               </section>
 
               <section class="calendar-card">
                 <div class="calendar-card-heading">
-                  <div>
-                    <h3>Vencimentos em 60 dias</h3>
-                    <small class="calendar-card-summary">Renda fixa aberta.</small>
-                  </div>
+                  <h3>Vencimentos em 60 dias</h3>
+                  <div class="calendar-card-totals"></div>
                 </div>
                 <div class="calendar-card-list" id="maturity60DaysList"></div>
               </section>
