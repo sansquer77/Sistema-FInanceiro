@@ -216,8 +216,14 @@ export function registerReportsView({
   }
 
   function renderCashflowReport(items) {
+    const itemsByDate = new Map();
+    for (const item of items) {
+      const bucket = itemsByDate.get(item.date) || [];
+      bucket.push(item);
+      itemsByDate.set(item.date, bucket);
+    }
     const rows = monthDayRows(state.reportMonth).map((dateKey) => {
-      const dayItems = items.filter((item) => item.date === dateKey);
+      const dayItems = itemsByDate.get(dateKey) || [];
       const income = sumReportItems(dayItems, "income");
       const expense = sumReportItems(dayItems, "expense");
       const investment = sumReportItems(dayItems, "investment");
@@ -1070,6 +1076,23 @@ export function registerReportsView({
       ? [points[points.length - 1], ...forecastPoints].map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(" ")
       : "";
     
+    const pointMarkup = [
+      ...points.map((p, i) => {
+        const valueCents = data[i].total_cents;
+        return [
+          `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="1.5" fill="${color}" />`,
+          `<text x="${p.x.toFixed(2)}" y="${(p.y - 4).toFixed(2)}" class="evolution-value-label">${formatChartValue(valueCents)}</text>`,
+        ].join("");
+      }),
+      ...forecastPoints.map((p, i) => {
+        const valueCents = forecast[i].total_cents;
+        return [
+          `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="1.2" fill="var(--panel)" stroke="${color}" stroke-width="0.8" />`,
+          `<text x="${p.x.toFixed(2)}" y="${(p.y + 4).toFixed(2)}" class="evolution-value-label forecast">${formatChartValue(valueCents)}</text>`,
+        ].join("");
+      }),
+    ].join("");
+
     svgEl.innerHTML = `
       <defs>
         <linearGradient id="${gradientId}" x1="0" x2="0" y1="0" y2="1">
@@ -1080,18 +1103,8 @@ export function registerReportsView({
       <path d="${areaD}" fill="url(#${gradientId})" />
       <path d="${pathD}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
       ${forecastPath ? `<path d="${forecastPath}" class="evolution-sma-line" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />` : ""}
+      ${pointMarkup}
     `;
-    
-    points.forEach((p, i) => {
-      const valueCents = data[i].total_cents;
-      svgEl.innerHTML += `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="1.5" fill="${color}" />`;
-      svgEl.innerHTML += `<text x="${p.x.toFixed(2)}" y="${(p.y - 4).toFixed(2)}" class="evolution-value-label">${formatChartValue(valueCents)}</text>`;
-    });
-    forecastPoints.forEach((p, i) => {
-      const valueCents = forecast[i].total_cents;
-      svgEl.innerHTML += `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="1.2" fill="var(--panel)" stroke="${color}" stroke-width="0.8" />`;
-      svgEl.innerHTML += `<text x="${p.x.toFixed(2)}" y="${(p.y + 4).toFixed(2)}" class="evolution-value-label forecast">${formatChartValue(valueCents)}</text>`;
-    });
 
     if (data.length > 0) {
       const formatMonth = (m) => {

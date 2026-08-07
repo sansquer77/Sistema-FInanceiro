@@ -141,28 +141,30 @@ export function registerPortfolioView({
       setMessage(portfolioMessage, "Atualizando cotações...");
     }
     let portfolioErrorMessage = "";
-    try {
-      const endpoint = options.refreshMessage || options.force ? "/api/portfolio?refresh=1" : "/api/portfolio";
-      state.portfolio = await api(endpoint);
+    const portfolioEndpoint = options.refreshMessage || options.force ? "/api/portfolio?refresh=1" : "/api/portfolio";
+    const returnsEndpoint = options.refreshMessage || options.force ? "/api/portfolio/returns?refresh=1" : "/api/portfolio/returns";
+    const [portfolioResult, returnsResult] = await Promise.allSettled([
+      api(portfolioEndpoint),
+      api(returnsEndpoint),
+    ]);
+    if (portfolioResult.status === "fulfilled") {
+      state.portfolio = portfolioResult.value;
       state.portfolioDirty = false;
       if (options.refreshMessage) {
         setMessage(portfolioMessage, "Portfólio atualizado.", "success");
       }
-    } catch (error) {
+    } else {
       state.portfolio = null;
-      portfolioErrorMessage = error.message || "Erro ao carregar portfólio";
+      portfolioErrorMessage = portfolioResult.reason?.message || "Erro ao carregar portfólio";
       if (options.refreshMessage || state.view === "portfolio") {
         setMessage(portfolioMessage, portfolioErrorMessage, "error");
       }
     }
-
-    try {
-      const returnsEndpoint = options.refreshMessage || options.force ? "/api/portfolio/returns?refresh=1" : "/api/portfolio/returns";
-      state.portfolioReturns = await api(returnsEndpoint);
-      console.log("[portfolio-returns-debug] endpoint returned:", state.portfolioReturns);
-    } catch (error) {
+    if (returnsResult.status === "fulfilled") {
+      state.portfolioReturns = returnsResult.value;
+    } else {
       state.portfolioReturns = null;
-      console.error("Erro ao carregar rentabilidade:", error);
+      console.error("Erro ao carregar rentabilidade:", returnsResult.reason);
     }
 
     state.portfolioLoading = false;

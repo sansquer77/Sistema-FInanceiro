@@ -783,12 +783,34 @@ def current_portfolio_positions(user_id: int, force_refresh: bool = False) -> li
 def filter_closed_portfolio_rows(rows: list[dict], closed_positions: list[dict]) -> list[dict]:
     if not closed_positions:
         return rows
+    closed_by_key: dict[tuple, list[dict]] = {}
+    for closed in closed_positions:
+        key = _closed_position_key(closed)
+        closed_by_key.setdefault(key, []).append(closed)
     filtered = []
     for row in rows:
-        if any(row_matches_closed_position(row, closed) for closed in closed_positions):
+        base_key = (
+            int(row["account_id"]),
+            str(row["account_currency"] or "").upper(),
+            row["asset_type"] or "other",
+            normalize_asset_identifier(row["asset_identifier"], row["asset_type"] or "other"),
+        )
+        base_key, candidates = base_key, closed_by_key.get(base_key)
+        if candidates is None:
+            candidates = ()
+        if any(row_matches_closed_position(row, closed) for closed in candidates):
             continue
         filtered.append(row)
     return filtered
+
+
+def _closed_position_key(closed: dict) -> tuple:
+    return (
+        int(closed["account_id"]),
+        str(closed.get("currency") or "").upper(),
+        closed["asset_type"],
+        closed["asset_identifier"],
+    )
 
 
 def row_matches_closed_position(row: dict, closed: dict) -> bool:

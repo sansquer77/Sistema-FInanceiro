@@ -7,6 +7,7 @@ import re
 import sqlite3
 import sys
 from datetime import date
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -1480,7 +1481,7 @@ def audit_value(value: object) -> str:
 
 
 def cockpit_payload(transactions: list[dict]) -> dict:
-    totals = {"income": 0.0, "expense": 0.0, "investment": 0.0}
+    totals_cents = {"income": 0, "expense": 0, "investment": 0}
     category_rows = {"income": {}, "expense": {}, "investment": {}}
     planning = {
         "income": {},
@@ -1493,17 +1494,25 @@ def cockpit_payload(transactions: list[dict]) -> dict:
         report_type = cockpit_transaction_type(transaction)
         if not report_type:
             continue
-        amount = float(transaction.get("amount_brl") or transaction.get("amount") or 0)
-        totals[report_type] += amount
+        amount_cents = money_value_to_cents(transaction.get("amount_brl") or transaction.get("amount") or 0)
+        totals_cents[report_type] += amount_cents
         label = cockpit_category_label(transaction)
-        add_cockpit_group(category_rows[report_type], label, amount)
+        add_cockpit_group(category_rows[report_type], label, amount_cents)
         if transaction.get("series_kind") == "recurring" or (report_type == "investment" and transaction.get("series_kind") != "single"):
             currency = cockpit_transaction_currency(transaction)
-            original_amount = float(transaction.get("amount") or 0)
-            add_cockpit_group(planning[report_type], label, original_amount, currency)
-    savings_rate = totals["investment"] / totals["income"] if totals["income"] > 0 else 0
+            original_amount_cents = money_value_to_cents(transaction.get("amount") or 0)
+            add_cockpit_group(planning[report_type], label, original_amount_cents, currency)
+    income_cents = totals_cents["income"]
+    savings_rate = (
+        float(Decimal(totals_cents["investment"]) / Decimal(income_cents))
+        if income_cents > 0
+        else 0.0
+    )
     return {
-        "month_totals": {**totals, "savings_rate": savings_rate},
+        "month_totals": {
+            report_type: cents_to_value(cents)
+            for report_type, cents in totals_cents.items()
+        } | {"savings_rate": savings_rate},
         "top_income": ranked_cockpit_rows(category_rows["income"], 3),
         "top_expenses": ranked_cockpit_rows(category_rows["expense"], 5),
         "planning": {
@@ -1512,6 +1521,19 @@ def cockpit_payload(transactions: list[dict]) -> dict:
             "expense": ranked_cockpit_rows(planning["expense"]),
         },
     }
+
+
+def cents_to_value(cents: int) -> float:
+    return float(Decimal(cents) / Decimal(100))
+
+
+def money_value_to_cents(value: object) -> int:
+    raw = str(value or "0").strip()
+    try:
+        decimal = Decimal(raw).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    except InvalidOperation:
+        return 0
+    return int(decimal * Decimal(100))
 
 
 def is_credit_card_payment_transaction(transaction: dict) -> bool:
@@ -1545,35 +1567,46 @@ def cockpit_transaction_currency(transaction: dict) -> str:
     ).upper()
 
 
-def add_cockpit_group(groups: dict, label: str, amount: float, currency: str | None = None) -> None:
+def add_cockpit_group(groups: dict, label: str, amount_cents: int, currency: str | None = None) -> None:
     key = (currency, label) if currency else label
-    row = groups.setdefault(key, {"label": label, "total": 0.0, "count": 0})
+    row = groups.setdefault(key, {"label": label, "total_cents": 0, "count": 0})
     if currency:
         row["currency"] = currency
-    row["total"] += amount
+    row["total_cents"] += amount_cents
     row["count"] += 1
+
+
+def _cockpit_row_public(row: dict) -> dict:
+    public_row: dict = {
+        "label": row["label"],
+        "total": cents_to_value(row["total_cents"]),
+        "count": row["count"],
+    }
+    if "currency" in row:
+        public_row["currency"] = row["currency"]
+    return public_row
 
 
 def ranked_cockpit_rows(groups: dict, limit: int | None = None) -> list[dict]:
     rows = sorted(
         groups.values(),
-        key=lambda row: (row.get("currency", ""), -row["total"], row["label"]),
+        key=lambda row: (row.get("currency", ""), -row["total_cents"], row["label"]),
     )
     if limit and len(rows) > limit:
-        visible = rows[:limit]
+        visible = [_cockpit_row_public(row) for row in rows[:limit]]
         other_rows = rows[limit:]
-        other_total = sum(row["total"] for row in other_rows)
+        other_total_cents = sum(row["total_cents"] for row in other_rows)
         other_count = sum(row["count"] for row in other_rows)
-        if other_total > 0:
+        if other_total_cents > 0:
             # spec: relatorios/relatorios v2.6 — critério 28
             visible.append({
                 "label": "Outros",
-                "total": other_total,
+                "total": cents_to_value(other_total_cents),
                 "count": other_count,
-                "items": other_rows,
+                "items": [_cockpit_row_public(row) for row in other_rows],
             })
         return visible
-    return rows
+    return [_cockpit_row_public(row) for row in rows]
 
 
 def main() -> None:

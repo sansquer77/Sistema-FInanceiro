@@ -114,6 +114,38 @@ class CockpitPayloadTest(unittest.TestCase):
             ],
         )
 
+    def test_totals_accumulate_money_without_float_drift(self) -> None:
+        payload = cockpit_payload(
+            [
+                {
+                    "type": "expense",
+                    "amount": 0.01,
+                    "amount_brl": 0.01,
+                    "category_name": "Moradia",
+                    "subcategory_name": "Aluguel",
+                },
+                {
+                    "type": "expense",
+                    "amount": 0.02,
+                    "amount_brl": 0.02,
+                    "category_name": "Moradia",
+                    "subcategory_name": "Aluguel",
+                },
+                {
+                    "type": "expense",
+                    "amount": 999999.99,
+                    "amount_brl": 999999.99,
+                    "category_name": "Saude",
+                    "subcategory_name": "Plano",
+                },
+            ]
+        )
+
+        self.assertEqual(payload["month_totals"]["expense"], 1000000.02)
+        self.assertEqual(payload["top_expenses"][0]["label"], "Saude / Plano")
+        self.assertEqual(payload["top_expenses"][0]["total"], 999999.99)
+        self.assertEqual(payload["top_expenses"][1]["total"], 0.03)
+
     def test_planning_keeps_original_values_separated_by_currency(self) -> None:
         payload = cockpit_payload([
             {

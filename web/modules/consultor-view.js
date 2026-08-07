@@ -186,7 +186,7 @@ export function registerConsultorView({
   function renderOverdueItem(item, kind) {
     const label = kind === "receivable" ? "Receber" : "Pagar";
     const description = item.description || "Sem descrição";
-    const detail = `${formatDate(item.date)} · ${escapeHtml(item.account_name || "Conta")} · ${escapeHtml(String(item.days_overdue))} dias de atraso`;
+    const detail = `${formatDate(item.date)} · ${item.account_name || "Conta"} · ${item.days_overdue} dias de atraso`;
     return `
       <button class="calendar-item-row" type="button" data-calendar-transaction-id="${escapeHtml(String(item.id))}" data-calendar-account-id="${escapeHtml(String(item.account_id || ""))}" data-calendar-transaction-date="${escapeHtml(String(item.date || ""))}">
         <div>
@@ -203,7 +203,7 @@ export function registerConsultorView({
 
   function renderMaturityItem(item) {
     const description = item.asset_name || item.asset_identifier || "Ativo sem identificação";
-    const detail = `${formatDate(item.maturity_date)} · ${escapeHtml(item.account_name || "Carteira")} · ${escapeHtml(String(item.days_to_maturity))} dias`;
+    const detail = `${formatDate(item.maturity_date)} · ${item.account_name || "Carteira"} · ${item.days_to_maturity} dias`;
     return `
       <button class="calendar-item-row" type="button" data-calendar-position-id="${escapeHtml(String(item.position_id))}">
         <div>

@@ -36,6 +36,9 @@ export function applyPrivacyMode(mode = storedPrivacyMode()) {
 
 export function setPrivacyMode(mode) {
   const normalizedMode = applyPrivacyMode(mode);
+  if (normalizedMode === PRIVACY_ENABLED) {
+    markPrivacyMoneyValues();
+  }
   try {
     localStorage.setItem(PRIVACY_STORAGE_KEY, normalizedMode);
   } catch (error) {
@@ -70,7 +73,7 @@ export function updatePrivacyToggleButton(button, mode = document.documentElemen
 
 export function markPrivacyMoneyValues(root = document.body) {
   // spec: privacidade-valores v1.0 — critérios 1, 4 e 7
-  if (!root) {
+  if (!root || document.documentElement.dataset.privacy !== PRIVACY_ENABLED) {
     return;
   }
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
@@ -101,7 +104,7 @@ export function observePrivacyMoneyValues(root = document.body) {
   }
   let scheduled = false;
   const scheduleMarking = () => {
-    if (scheduled) {
+    if (scheduled || document.documentElement.dataset.privacy !== PRIVACY_ENABLED) {
       return;
     }
     scheduled = true;

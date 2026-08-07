@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 6.5
+versao: 6.6
 atualizado: 2026-08-07
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -124,6 +124,7 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `6.6` — 2026-08-07 — [[specs/score-saude-financeira]] atualizada (v3.5): lançamentos de cartão passam a entrar no Score via `amount_brl_cents` (BRL normalizado) em todas as somas (resumo mensal, contexto de dívida e aderência a limites), alinhando com [[specs/tendencias-saude-financeira]] e a regra de normalização de moedas para cartões estrangeiros; teste de regressão adicionado.
 - `6.5` — 2026-08-07 — Aba **Saúde Financeira** do Cockpit extraída para módulo próprio `web/modules/financial-health-view.js` (fábrica `registerFinancialHealthView`), seguindo o padrão de `trends-view.js`/`consultor-view.js`; estado de tela local migra para o módulo e `invalidateFinancialHealth` é delegado pelo `cockpit-view.js`. [[specs/score-saude-financeira]] em v3.4, [[specs/frontend-modularizacao]] em v2.3 e [[arquitetura]] atualizada.
 - `6.4` — 2026-08-07 — [[specs/consultor]] atualizada (v0.12): adicionada a **blindagem de prompt injection** — `system_prompt` imutável com prioridade absoluta, esteira de neutralização lexical (`financeiro/consultor_injection.py`) tratando o input como dados, sinalização `injection_triggered` e pós-processamento que bloqueia recomendações de compra/venda na saída. Permanece em rascunho.
 - `6.3` — 2026-08-07 — [[specs/consultor]] atualizada (v0.11): adicionada a camada **DLP (prevenção de vazamento de dados no prompt)** — esteira local de sanitização em `financeiro/consultor_dlp.py` com RegEx, dígitos verificadores de CPF, Luhn para cartões (evita falsos positivos), padrões de conta bancária e NER de nomes; ofuscação do payload com tags, retorno `dlp_triggered`, banner de alerta e reflexo no histórico (dado original nunca enviado, renderizado nem persistido). Permanece em rascunho.

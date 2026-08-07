@@ -154,13 +154,16 @@ export function registerTransactionsView({
   });
   nextMonthButton.addEventListener("click", () => shiftTransactionMonth(1));
   transactionSearch.value = state.transactionSearch || "";
+  let searchDebounceTimer = null;
   transactionSearch.addEventListener("input", () => {
     state.transactionSearch = transactionSearch.value;
-    renderTransactions();
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(renderTransactions, 200);
   });
   clearTransactionSearchButton.addEventListener("click", () => {
     state.transactionSearch = "";
     transactionSearch.value = "";
+    clearTimeout(searchDebounceTimer);
     renderTransactions();
     transactionSearch.focus();
   });
@@ -873,7 +876,7 @@ export function registerTransactionsView({
       content.hidden = !isExpanded;
       content.innerHTML = `<div class="transaction-rows">${rows}</div>`;
       group.append(heading, content);
-      if (!compact) {
+      if (!compact && isExpanded) {
         content.append(dailyBalance(dateKey, balanceTransactions));
       }
       container.append(group);

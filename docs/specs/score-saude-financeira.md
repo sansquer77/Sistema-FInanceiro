@@ -2,7 +2,7 @@
 tipo: spec
 area: score-saude-financeira
 status: implementado
-versao: 3.4
+versao: 3.5
 atualizado: 2026-08-07
 relacionados:
   - "[[relatorios]]"
@@ -172,6 +172,7 @@ Nenhuma pendência conhecida.
 
 ## Changelog
 
+- `3.5` — 2026-08-07 — Alinhamento com a regra de **Normalização de Moedas**: lançamentos de cartão (fatura) passam a entrar no cálculo do Score via `amount_brl_cents` (BRL normalizado) em todas as consultas de soma (resumo mensal, contexto de dívida e aderência a limites), garantindo consistência com [[tendencias-saude-financeira]] e com a regra vigente de \[\[relatorios\]\] para cartões em moeda estrangeira; teste de regressão adicionado.
 - `3.4` — 2026-08-07 — Aba dedicada extraída para módulo próprio `web/modules/financial-health-view.js` (fábrica `registerFinancialHealthView`), seguindo o padrão de `trends-view.js`/`consultor-view.js`; estado de tela local migra para o módulo e `invalidateFinancialHealth` passa a ser delegado pelo `cockpit-view.js`.
 - `3.3` — 2026-08-06 — Status e posição ajustados no Map of Content (`docs/README.md`): movida para a seção de specs implementadas, área `Diagnóstico`.
 - `3.2` — 2026-08-04 — Spec marcada como `implementado` no vault de documentação do app principal.
