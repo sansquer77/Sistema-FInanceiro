@@ -1327,18 +1327,42 @@ def apply_market_quote(position: dict, force_refresh: bool = False) -> None:
 
 
 def apply_fixed_income_value(position: dict, force_refresh: bool = False) -> None:
+    net_cents, gross_cents, iof_tax_cents, income_tax_cents, custody_fee_cents, rate_factor, source = fixed_income_value_as_of(
+        position, date.today(), force_refresh=force_refresh
+    )
+    mode = position["fixed_income_mode"] or "post"
+    indexer = position["fixed_income_indexer"] or "CDI"
+    annual_rate = Decimal(str(position["fixed_income_rate"] or "0"))
+    position["quote"] = fixed_income_quote_label(mode, indexer, annual_rate, rate_factor)
+    position["quote_source"] = source
+    position["quote_status"] = "ok"
+    position["quote_date"] = date.today().isoformat()
+    position["current_value_cents"] = net_cents
+    position["current_value_brl_cents"] = value_to_brl(position["current_value_cents"], position["currency"])
+    position["fixed_income_gross_value_cents"] = gross_cents
+    position["fixed_income_iof_tax_cents"] = iof_tax_cents
+    position["fixed_income_income_tax_cents"] = income_tax_cents
+    position["fixed_income_custody_fee_cents"] = custody_fee_cents
+    position["fixed_income_net_value_cents"] = net_cents
+    position["day_result_cents"] = 0
+    position["day_result_brl_cents"] = 0
+
+
+def fixed_income_value_as_of(
+    position: dict, as_of_date: date, force_refresh: bool = False
+) -> tuple[int, int, int, int, int, Decimal, str]:
     start_date = date.fromisoformat(position["first_operation_date"])
+    if as_of_date < start_date:
+        return 0, 0, 0, 0, 0, Decimal("0"), "Taxa cadastrada"
     maturity_date = parse_optional_iso_date(position.get("fixed_income_maturity_date"))
-    end_date = min(date.today(), maturity_date) if maturity_date else date.today()
+    end_date = min(as_of_date, maturity_date) if maturity_date else as_of_date
     days = max((end_date - start_date).days, 0)
     annual_rate = Decimal(str(position["fixed_income_rate"] or "0"))
     mode = position["fixed_income_mode"] or "post"
     indexer = position["fixed_income_indexer"] or "CDI"
     rate_factor = Decimal("0")
     gross_factor = Decimal("1")
-    status = "ok"
     source = "Taxa cadastrada"
-    fallback_source = ""
     try:
         if mode == "pre":
             rate_factor = annual_rate / Decimal("100")
@@ -1354,17 +1378,15 @@ def apply_fixed_income_value(position: dict, force_refresh: bool = False) -> Non
             else:
                 rate_factor = indexer_factor - Decimal("1")
                 gross_factor = indexer_factor
-    except PortfolioError as exc:
+    except PortfolioError:
         if mode == "pre":
-            status = exc.message
             rate_factor = annual_rate / Decimal("100")
             gross_factor = compound_annual_factor(rate_factor, days)
         else:
             fallback_indexer_rate = fallback_indexer_annual_rate(indexer)
             multiplier = annual_rate / Decimal("100") if annual_rate else Decimal("1")
             fallback_indexer_factor = compound_annual_factor(fallback_indexer_rate * multiplier, days)
-            fallback_source = f"Estimativa local ({indexer}); Banco Central indisponivel"
-            status = "ok"
+            source = f"Estimativa local ({indexer}); Banco Central indisponivel"
             if mode == "hybrid":
                 fallback_indexer_factor = compound_annual_factor(fallback_indexer_rate, days)
                 rate_factor = fallback_indexer_factor - Decimal("1") + annual_rate / Decimal("100")
@@ -1383,55 +1405,119 @@ def apply_fixed_income_value(position: dict, force_refresh: bool = False) -> Non
         iof_tax_cents = fixed_income_iof_tax_cents(gross_profit_cents, days)
         income_tax_cents = fixed_income_income_tax_cents(max(gross_profit_cents - iof_tax_cents, 0), days)
         net_cents = max(gross_cents - iof_tax_cents - income_tax_cents - custody_fee_cents, 0)
-    position["quote"] = fixed_income_quote_label(mode, indexer, annual_rate, rate_factor)
-    position["quote_source"] = fallback_source or source
-    position["quote_status"] = status
-    position["quote_date"] = date.today().isoformat()
-    position["current_value_cents"] = net_cents
-    position["current_value_brl_cents"] = value_to_brl(position["current_value_cents"], position["currency"])
-    position["fixed_income_gross_value_cents"] = gross_cents
-    position["fixed_income_iof_tax_cents"] = iof_tax_cents
-    position["fixed_income_income_tax_cents"] = income_tax_cents
-    position["fixed_income_custody_fee_cents"] = custody_fee_cents
-    position["fixed_income_net_value_cents"] = net_cents
-    position["day_result_cents"] = 0
-    position["day_result_brl_cents"] = 0
+    return net_cents, gross_cents, iof_tax_cents, income_tax_cents, custody_fee_cents, rate_factor, source
+
+
+def position_value_as_of(position: dict, as_of_date: date, force_refresh: bool = False) -> int:
+    if as_of_date < date.fromisoformat(position["first_operation_date"]):
+        return 0
+    if position["asset_type"] == "fixed_income":
+        return fixed_income_value_as_of(position, as_of_date, force_refresh=force_refresh)[0]
+    if position["asset_type"] == "savings":
+        return savings_value_as_of(position, as_of_date, force_refresh=force_refresh)
+    return int(position.get("current_value_cents") or 0)
+
+
+def get_portfolio_returns(user_id: int, force_refresh: bool = False) -> dict:
+    try:
+        portfolio = get_portfolio(user_id, force_refresh=force_refresh)
+        positions = portfolio.get("positions") or []
+        if not positions:
+            return {"series": [], "start_month": None, "end_month": None, "has_historical_approximation": False, "error": None}
+
+        today = date.today()
+        first_operation_date = min(date.fromisoformat(position["first_operation_date"]) for position in positions)
+        start_month = date(first_operation_date.year, first_operation_date.month, 1)
+        end_month = date(today.year, today.month, 1)
+
+        # Limita a série a 12 meses para evitar muitas chamadas de rede ao BCB
+        max_start_month = add_months(end_month, -11)
+        if start_month < max_start_month:
+            start_month = max_start_month
+
+        months = []
+        current = start_month
+        while current <= end_month:
+            months.append(current)
+            current = add_months(current, 1)
+
+        series: list[dict] = []
+        prev_month_end_value_by_currency: dict[str, int] = {}
+        prev_month_invested_by_currency: dict[str, int] = {}
+        has_approximation = any(position["asset_type"] not in {"fixed_income", "savings"} for position in positions)
+
+        for month_date in months:
+            month_key = month_date.strftime("%Y-%m")
+            last_day = add_months(month_date, 1) - timedelta(days=1)
+            as_of = min(last_day, today)
+
+            month_end_value_by_currency: dict[str, int] = defaultdict(int)
+            invested_by_currency: dict[str, int] = defaultdict(int)
+
+            for position in positions:
+                currency = position["currency"] or "BRL"
+                value_cents = position_value_as_of(position, as_of, force_refresh=force_refresh)
+                month_end_value_by_currency[currency] += value_cents
+                invested_by_currency[currency] += int(position.get("total_cost_cents") or 0)
+
+            month_cdi_factor = _cdi_factor_for_month(month_date, as_of, force_refresh=force_refresh)
+
+            for currency in sorted(month_end_value_by_currency.keys()):
+                end_value = month_end_value_by_currency[currency]
+                invested = invested_by_currency[currency]
+                prev_value = prev_month_end_value_by_currency.get(currency, invested)
+                prev_invested = prev_month_invested_by_currency.get(currency, invested)
+
+                portfolio_return = _monthly_return_pct(prev_value, end_value, invested - prev_invested)
+                cdi_return = (month_cdi_factor - Decimal("1")) * Decimal("100")
+
+                series.append({
+                    "month": month_key,
+                    "currency": currency,
+                    "portfolio_return_pct": float(_quantize(portfolio_return, "0.0001")),
+                    "cdi_return_pct": float(_quantize(cdi_return, "0.0001")),
+                    "portfolio_value_cents": end_value,
+                    "invested_cents": invested,
+                })
+
+            prev_month_end_value_by_currency = dict(month_end_value_by_currency)
+            prev_month_invested_by_currency = dict(invested_by_currency)
+
+        return {
+            "series": series,
+            "start_month": start_month.strftime("%Y-%m"),
+            "end_month": end_month.strftime("%Y-%m"),
+            "has_historical_approximation": has_approximation,
+            "error": None,
+        }
+    except Exception as exc:
+        print(f"[portfolio-returns-error] user={user_id}: {exc}")
+        return {"series": [], "start_month": None, "end_month": None, "has_historical_approximation": False, "error": str(exc)}
+
+
+def _cdi_factor_for_month(month_date: date, as_of: date, force_refresh: bool = False) -> Decimal:
+    if as_of < month_date:
+        return Decimal("1")
+    try:
+        return fetch_accumulated_indexer_factor("CDI", month_date, as_of, force_refresh=force_refresh)
+    except PortfolioError:
+        return Decimal("1")
+
+
+def _monthly_return_pct(prev_value: int, end_value: int, net_contribution: int) -> Decimal:
+    denominator = max(prev_value + max(net_contribution, 0), 1)
+    return (Decimal(end_value - prev_value - net_contribution) * Decimal("100")) / Decimal(denominator)
+
+
+def _quantize(value: Decimal, pattern: str = "0.0001") -> Decimal:
+    return value.quantize(Decimal(pattern), rounding=ROUND_HALF_UP)
 
 
 def apply_savings_value(position: dict, force_refresh: bool = False) -> None:
     today = date.today()
-    anniversaries = aggregate_savings_anniversaries(position.get("savings_anniversaries") or [])
-    if not anniversaries:
-        anniversaries = [{"date": position["first_operation_date"], "amount_cents": position["total_cost_cents"]}]
-    current_value = Decimal("0")
-    status = "ok"
-    source = "Banco Central SGS (TR/SELIC); aniversarios mensais"
-    try:
-        additional_monthly_rate = savings_additional_monthly_rate(force_refresh=force_refresh)
-        for anniversary in anniversaries:
-            start_date = parse_optional_iso_date(anniversary.get("date"))
-            amount_cents = int(anniversary.get("amount_cents") or 0)
-            if not start_date or amount_cents <= 0:
-                continue
-            current_value += Decimal(amount_cents) * savings_factor_for_anniversary(
-                start_date,
-                today,
-                additional_monthly_rate,
-                force_refresh=force_refresh,
-            )
-    except PortfolioError as exc:
-        status = exc.message
-        source = "Estimativa local; Banco Central indisponivel"
-        fallback_rate = fallback_indexer_annual_rate("SELIC")
-        additional_monthly_rate = savings_additional_monthly_rate_from_selic(fallback_rate)
-        for anniversary in anniversaries:
-            start_date = parse_optional_iso_date(anniversary.get("date"))
-            amount_cents = int(anniversary.get("amount_cents") or 0)
-            if not start_date or amount_cents <= 0:
-                continue
-            completed_months = completed_savings_anniversaries(start_date, today)
-            current_value += Decimal(amount_cents) * ((Decimal("1") + additional_monthly_rate) ** completed_months)
-    current_cents = int(current_value.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    current_cents, additional_monthly_rate, source, status = savings_value_as_of_with_meta(
+        position, today, force_refresh=force_refresh
+    )
     position["quote"] = savings_quote_label(additional_monthly_rate)
     position["quote_source"] = source
     position["quote_status"] = status
@@ -1445,6 +1531,48 @@ def apply_savings_value(position: dict, force_refresh: bool = False) -> None:
     position["fixed_income_net_value_cents"] = current_cents
     position["day_result_cents"] = 0
     position["day_result_brl_cents"] = 0
+
+
+def savings_value_as_of_with_meta(
+    position: dict, as_of_date: date, force_refresh: bool = False
+) -> tuple[int, Decimal, str, str]:
+    anniversaries = aggregate_savings_anniversaries(position.get("savings_anniversaries") or [])
+    if not anniversaries:
+        anniversaries = [{"date": position["first_operation_date"], "amount_cents": position["total_cost_cents"]}]
+    current_value = Decimal("0")
+    source = "Banco Central SGS (TR/SELIC); aniversarios mensais"
+    status = "ok"
+    additional_monthly_rate = Decimal("0")
+    try:
+        additional_monthly_rate = savings_additional_monthly_rate(force_refresh=force_refresh)
+        for anniversary in anniversaries:
+            start_date = parse_optional_iso_date(anniversary.get("date"))
+            amount_cents = int(anniversary.get("amount_cents") or 0)
+            if not start_date or amount_cents <= 0 or as_of_date < start_date:
+                continue
+            current_value += Decimal(amount_cents) * savings_factor_for_anniversary(
+                start_date,
+                as_of_date,
+                additional_monthly_rate,
+                force_refresh=force_refresh,
+            )
+    except PortfolioError as exc:
+        status = exc.message
+        source = "Estimativa local; Banco Central indisponivel"
+        fallback_rate = fallback_indexer_annual_rate("SELIC")
+        additional_monthly_rate = savings_additional_monthly_rate_from_selic(fallback_rate)
+        for anniversary in anniversaries:
+            start_date = parse_optional_iso_date(anniversary.get("date"))
+            amount_cents = int(anniversary.get("amount_cents") or 0)
+            if not start_date or amount_cents <= 0 or as_of_date < start_date:
+                continue
+            completed_months = completed_savings_anniversaries(start_date, as_of_date)
+            current_value += Decimal(amount_cents) * ((Decimal("1") + additional_monthly_rate) ** completed_months)
+    return int(current_value.quantize(Decimal("1"), rounding=ROUND_HALF_UP)), additional_monthly_rate, source, status
+
+
+def savings_value_as_of(position: dict, as_of_date: date, force_refresh: bool = False) -> int:
+    return savings_value_as_of_with_meta(position, as_of_date, force_refresh=force_refresh)[0]
 
 
 def savings_factor_for_anniversary(

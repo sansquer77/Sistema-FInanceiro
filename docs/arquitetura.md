@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.5
+versao: 3.6
 atualizado: 2026-08-06
 relacionados:
   - "[[requisitos]]"
@@ -187,6 +187,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | Método | Rota |
 |---|---|
 | `GET` | `/api/portfolio` |
+| `GET` | `/api/portfolio/returns` |
 | `POST` | `/api/portfolio/positions` |
 | `PUT` | `/api/portfolio/positions/{id}` |
 | `DELETE` | `/api/portfolio/positions/{id}` |
@@ -459,6 +460,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.6` — 2026-08-06 — Documentada rota `GET /api/portfolio/returns` para série mensal de rentabilidade da carteira por moeda com benchmark CDI. Ver [[specs/rentabilidade-portfolio]].
 - `3.5` — 2026-08-06 — Documentada implementação da rota `GET /api/cockpit/calendar` e do módulo `financeiro/calendar.py`, com autenticação e validação de `Host`/`Origin`. UI da aba **Calendário** ainda pendente. Ver [[specs/cockpit-calendario]].
 - `3.4` — 2026-08-04 — Documentada rota `GET /api/cockpit/calendar` para a futura aba **Calendário** do Cockpit, com contas a receber/pagar atrasadas e vencimentos de renda fixa em 30 e 60 dias. Ver [[specs/cockpit-calendario]].
 - `3.3` — 2026-08-04 — Documentada rota pública `/api/latest-version`, módulo `financeiro/version_check.py` e fluxo de detecção de nova versão no Cockpit.

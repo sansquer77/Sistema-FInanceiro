@@ -81,7 +81,7 @@ from financeiro.financial_health import (
 )
 from financeiro.imports import import_organizze_transactions, import_system_template, system_import_template
 from financeiro.operation_logs import create_operation_log, get_operation_log, list_operation_logs
-from financeiro.portfolio import close_position, create_opening_position, delete_opening_position, get_portfolio, redeem_position, update_opening_position, update_position_value_override
+from financeiro.portfolio import close_position, create_opening_position, delete_opening_position, get_portfolio, get_portfolio_returns, redeem_position, update_opening_position, update_position_value_override
 from financeiro.secure_config import (
     SecureConfigError,
     ai_settings_status,
@@ -301,6 +301,9 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/portfolio":
             self.handle_portfolio()
+            return
+        if path == "/api/portfolio/returns":
+            self.handle_portfolio_returns()
             return
         if path == "/api/reports/category-evolution":
             self.handle_category_evolution()
@@ -767,6 +770,12 @@ class AppHandler(BaseHTTPRequestHandler):
         query = parse_qs(urlsplit(self.path).query)
         force_refresh = (query.get("refresh") or [""])[0].lower() in {"1", "true", "yes", "sim"}
         self.send_json(get_portfolio(user["id"], force_refresh=force_refresh))
+
+    def handle_portfolio_returns(self) -> None:
+        user = self.require_user()
+        query = parse_qs(urlsplit(self.path).query)
+        force_refresh = (query.get("refresh") or [""])[0].lower() in {"1", "true", "yes", "sim"}
+        self.send_json(get_portfolio_returns(user["id"], force_refresh=force_refresh))
 
     def handle_create_portfolio_position(self) -> None:
         user = self.require_user()

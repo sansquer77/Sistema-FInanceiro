@@ -8,6 +8,8 @@ export function registerPortfolioView({
   formatMoney,
   formatPercent,
   formatDate,
+  formatMonthLabel,
+  formatMonthShortLabel,
   formatDecimal,
   moneyInputValue,
   portfolioQuoteText,
@@ -47,6 +49,15 @@ export function registerPortfolioView({
     portfolioResultSummary,
     portfolioReturnSummary,
     portfolioDayResultSummary,
+    portfolioReturnChartBtn,
+    portfolioReturnDrawer,
+    portfolioReturnDrawerOverlay,
+    portfolioReturnDrawerCloseBtn,
+    portfolioReturnDrawerTitle,
+    portfolioReturnChart,
+    portfolioReturnXLabels,
+    portfolioReturnLegend,
+    portfolioReturnNotice,
     portfolioPositionCount,
     portfolioMessage,
     portfolioTypeList,
@@ -87,6 +98,26 @@ export function registerPortfolioView({
     renderPortfolio();
   });
   portfolioPositions.addEventListener("click", handlePortfolioPositionsClick);
+  portfolioReturnChartBtn?.addEventListener("click", openPortfolioReturnDrawer);
+  portfolioReturnDrawerOverlay?.addEventListener("click", closePortfolioReturnDrawer);
+  portfolioReturnDrawerCloseBtn?.addEventListener("click", closePortfolioReturnDrawer);
+
+  function openPortfolioReturnDrawer() {
+    if (!portfolioReturnDrawer) {
+      return;
+    }
+    portfolioReturnDrawer.hidden = false;
+    portfolioReturnDrawer.setAttribute("aria-hidden", "false");
+    renderPortfolioReturns();
+  }
+
+  function closePortfolioReturnDrawer() {
+    if (!portfolioReturnDrawer) {
+      return;
+    }
+    portfolioReturnDrawer.hidden = true;
+    portfolioReturnDrawer.setAttribute("aria-hidden", "true");
+  }
 
   async function loadPortfolio(options = {}) {
     if (state.portfolio && !state.portfolioDirty && !options.force && !options.refreshMessage) {
@@ -102,6 +133,7 @@ export function registerPortfolioView({
     if (options.refreshMessage) {
       setMessage(portfolioMessage, "Atualizando cotações...");
     }
+    let portfolioErrorMessage = "";
     try {
       const endpoint = options.refreshMessage || options.force ? "/api/portfolio?refresh=1" : "/api/portfolio";
       state.portfolio = await api(endpoint);
@@ -111,13 +143,22 @@ export function registerPortfolioView({
       }
     } catch (error) {
       state.portfolio = null;
-      state.portfolioError = error.message;
+      portfolioErrorMessage = error.message || "Erro ao carregar portfólio";
       if (options.refreshMessage || state.view === "portfolio") {
-        setMessage(portfolioMessage, error.message, "error");
+        setMessage(portfolioMessage, portfolioErrorMessage, "error");
       }
-    } finally {
-      state.portfolioLoading = false;
     }
+
+    try {
+      const returnsEndpoint = options.refreshMessage || options.force ? "/api/portfolio/returns?refresh=1" : "/api/portfolio/returns";
+      state.portfolioReturns = await api(returnsEndpoint);
+      console.log("[portfolio-returns-debug] endpoint returned:", state.portfolioReturns);
+    } catch (error) {
+      state.portfolioReturns = null;
+      console.error("Erro ao carregar rentabilidade:", error);
+    }
+
+    state.portfolioLoading = false;
     renderPortfolio();
     onPortfolioChanged();
   }
@@ -466,6 +507,11 @@ export function registerPortfolioView({
     portfolioReturnSummary.innerHTML = portfolioSummaryMetric(currencyRows, (row) => formatPortfolioPercent(row.result_percent), true, (row) => Number(row.result_brl));
     portfolioDayResultSummary.innerHTML = portfolioSummaryMetric(currencyRows, (row) => `${formatMoney(row.day_result_brl, row.currency)} · ${formatPortfolioPercent(row.day_result_percent)}`, true, (row) => Number(row.day_result_brl));
     portfolioPositionCount.textContent = String(summary.position_count || 0);
+    if (portfolioReturnChartBtn) {
+      const hasReturns = state.portfolioReturns && state.portfolioReturns.series && state.portfolioReturns.series.length > 0;
+      console.log("[portfolio-returns-debug] returns:", state.portfolioReturns, "hasReturns:", hasReturns);
+      portfolioReturnChartBtn.hidden = !hasReturns;
+    }
     renderPortfolioGroupList(portfolioTypeList, summary.by_type);
     renderPortfolioGroupList(portfolioIndexerList, summary.by_indexer);
     renderPortfolioGroupList(portfolioCurrencyList, summary.by_currency);
@@ -490,6 +536,108 @@ export function registerPortfolioView({
     row.classList.add("portfolio-highlight-row");
     window.setTimeout(() => row.classList.remove("portfolio-highlight-row"), 3200);
     state.portfolioHighlightId = "";
+  }
+
+  function renderPortfolioReturns() {
+    const returns = state.portfolioReturns;
+    if (!returns) {
+      return;
+    }
+    if (returns.error) {
+      if (portfolioReturnChart) {
+        portfolioReturnChart.innerHTML = "";
+      }
+      if (portfolioReturnXLabels) {
+        portfolioReturnXLabels.innerHTML = "";
+      }
+      if (portfolioReturnLegend) {
+        portfolioReturnLegend.innerHTML = `<span class="error-text">Não foi possível carregar a rentabilidade.</span>`;
+      }
+      return;
+    }
+    if (!returns.series || returns.series.length === 0) {
+      return;
+    }
+    if (portfolioReturnDrawerTitle) {
+      const start = formatMonthLabel(returns.start_month);
+      const end = formatMonthLabel(returns.end_month);
+      portfolioReturnDrawerTitle.textContent = start === end ? start : `${start} a ${end}`;
+    }
+    if (portfolioReturnNotice) {
+      portfolioReturnNotice.hidden = !returns.has_historical_approximation;
+    }
+
+    const months = [...new Set(returns.series.map((entry) => entry.month))].sort();
+    const currencies = [...new Set(returns.series.map((entry) => entry.currency))].sort();
+    const cdiColor = "var(--muted)";
+    const barWidth = 7;
+    const step = months.length > 1 ? 100 / months.length : 100;
+    const centerOffset = (currencies.length * barWidth) / 2;
+
+    const maxAbs = Math.max(
+      0.01,
+      ...returns.series.map((entry) => Math.max(
+        Math.abs(entry.portfolio_return_pct || 0),
+        Math.abs(entry.cdi_return_pct || 0),
+      )),
+    );
+
+    const bars = [];
+    const labels = [];
+
+    months.forEach((month, monthIndex) => {
+      const xCenter = (monthIndex + 0.5) * step;
+      const monthData = returns.series.filter((entry) => entry.month === month);
+      const xStart = xCenter - centerOffset - barWidth / 2;
+
+      currencies.forEach((currency, currencyIndex) => {
+        const data = monthData.find((entry) => entry.currency === currency);
+        const value = data ? data.portfolio_return_pct : 0;
+        bars.push(renderReturnBar(xStart + currencyIndex * barWidth, value, maxAbs, chartColor(currencyIndex), currency, barWidth));
+      });
+
+      const cdiValue = monthData[0] ? monthData[0].cdi_return_pct : 0;
+      bars.push(renderReturnBar(xStart + currencies.length * barWidth, cdiValue, maxAbs, cdiColor, "CDI", barWidth));
+
+      labels.push(`<span style="left:${(xCenter).toFixed(2)}%">${formatReturnMonthLabel(month)}</span>`);
+    });
+
+    if (portfolioReturnChart) {
+      portfolioReturnChart.innerHTML = `
+        <line x1="0" y1="25" x2="100" y2="25" stroke="var(--line)" stroke-width="0.3" />
+        ${bars.join("")}
+      `;
+    }
+    if (portfolioReturnXLabels) {
+      portfolioReturnXLabels.innerHTML = labels.join("");
+    }
+    if (portfolioReturnLegend) {
+      const legendItems = currencies.map((currency, index) => `
+        <span><i style="background:${chartColor(index)}"></i>${escapeHtml(currency)}</span>
+      `).join("");
+      portfolioReturnLegend.innerHTML = `${legendItems}<span><i style="background:${cdiColor}"></i>CDI</span>`;
+    }
+  }
+
+  function formatReturnMonthLabel(month) {
+    const [year, monthNumber] = month.split("-").map(Number);
+    const date = new Date(year, monthNumber - 1, 1);
+    return date.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "").slice(0, 1).toUpperCase();
+  }
+
+  function renderReturnBar(x, value, maxAbs, color, label, barWidth) {
+    const zeroY = 25;
+    const height = (Math.abs(value) / maxAbs) * 22;
+    const y = value >= 0 ? zeroY - height : zeroY;
+    const displayValue = `${(value > 0 ? "+" : "")}${value.toFixed(2)}%`;
+    return `
+      <g class="portfolio-return-bar-group">
+        <rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${barWidth - 0.5}" height="${height.toFixed(2)}" fill="${color}" rx="0.5">
+          <title>${escapeHtml(label)}: ${escapeHtml(displayValue)}</title>
+        </rect>
+        <text x="${(x + barWidth / 2 - 0.25).toFixed(2)}" y="${value >= 0 ? (y - 1.5).toFixed(2) : (y + height + 2).toFixed(2)}" class="portfolio-return-label">${escapeHtml(displayValue)}</text>
+      </g>
+    `;
   }
 
   function portfolioSummaryCurrencyRows(summary) {

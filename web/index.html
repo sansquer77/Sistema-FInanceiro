@@ -935,8 +935,11 @@
                 <span>Resultado</span>
                 <strong id="portfolioResultSummary">R$ 0,00</strong>
               </div>
-              <div>
-                <span>Rentabilidade</span>
+              <div class="portfolio-summary-with-action">
+                <span class="portfolio-summary-label">Rentabilidade</span>
+                <button class="portfolio-return-chart-btn" type="button" id="portfolioReturnChartBtn" aria-label="Ver rentabilidade mês a mês" title="Rentabilidade mês a mês" hidden>
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
                 <strong id="portfolioReturnSummary">0,00%</strong>
               </div>
               <div>
@@ -950,6 +953,32 @@
             </div>
             <p class="message" id="portfolioMessage" role="alert"></p>
           </section>
+
+          <!-- Portfolio Return Drawer -->
+          <aside id="portfolioReturnDrawer" class="drawer" hidden aria-hidden="true">
+            <div class="drawer-overlay" id="portfolioReturnDrawerOverlay"></div>
+            <div class="drawer-content">
+              <header class="drawer-header">
+                <div>
+                  <p class="eyebrow">Rentabilidade</p>
+                  <h2 id="portfolioReturnDrawerTitle">Mês a mês</h2>
+                </div>
+                <button class="drawer-close-button" id="portfolioReturnDrawerCloseBtn" type="button" aria-label="Fechar gráfico" title="Fechar">
+                  <span aria-hidden="true">×</span>
+                </button>
+              </header>
+              <div class="drawer-body">
+                <div class="portfolio-return-chart-wrap">
+                  <svg id="portfolioReturnChart" class="portfolio-return-chart" viewBox="0 0 100 50" preserveAspectRatio="none"></svg>
+                  <div id="portfolioReturnXLabels" class="portfolio-return-x-labels"></div>
+                </div>
+                <div class="portfolio-return-legend" id="portfolioReturnLegend"></div>
+                <p class="portfolio-return-notice" id="portfolioReturnNotice" hidden>
+                  <small>Renda variável/cripto usam valor atual como aproximação para meses anteriores, pois cotações históricas ainda não são armazenadas.</small>
+                </p>
+              </div>
+            </div>
+          </aside>
 
           <section class="panel" id="portfolioAssetFormPanel" hidden>
             <div class="section-heading">

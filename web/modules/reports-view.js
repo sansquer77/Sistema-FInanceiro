@@ -1013,6 +1013,19 @@ export function registerReportsView({
     return Math.round(Number(value || 0) * 100);
   }
 
+  function formatChartValue(cents) {
+    const value = Number(cents || 0) / 100;
+    const abs = Math.abs(value);
+    const signal = value < 0 ? "-" : "";
+    if (abs >= 1000000) {
+      return `${signal}${(abs / 1000000).toFixed(1).replace(".", ",")}M`;
+    }
+    if (abs >= 1000) {
+      return `${signal}${(abs / 1000).toFixed(1).replace(".", ",")}k`;
+    }
+    return `${signal}${abs.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}`;
+  }
+
   function drawEvolutionChart(data, color) {
     currentEvolutionData = data;
     currentEvolutionColor = color;
@@ -1069,11 +1082,15 @@ export function registerReportsView({
       ${forecastPath ? `<path d="${forecastPath}" class="evolution-sma-line" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />` : ""}
     `;
     
-    points.forEach((p) => {
+    points.forEach((p, i) => {
+      const valueCents = data[i].total_cents;
       svgEl.innerHTML += `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="1.5" fill="${color}" />`;
+      svgEl.innerHTML += `<text x="${p.x.toFixed(2)}" y="${(p.y - 4).toFixed(2)}" class="evolution-value-label">${formatChartValue(valueCents)}</text>`;
     });
-    forecastPoints.forEach((p) => {
+    forecastPoints.forEach((p, i) => {
+      const valueCents = forecast[i].total_cents;
       svgEl.innerHTML += `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="1.2" fill="var(--panel)" stroke="${color}" stroke-width="0.8" />`;
+      svgEl.innerHTML += `<text x="${p.x.toFixed(2)}" y="${(p.y + 4).toFixed(2)}" class="evolution-value-label forecast">${formatChartValue(valueCents)}</text>`;
     });
 
     if (data.length > 0) {

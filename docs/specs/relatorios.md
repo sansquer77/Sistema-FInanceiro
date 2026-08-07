@@ -2,8 +2,8 @@
 tipo: spec
 area: relatorios
 status: implementado
-versao: 2.7
-atualizado: 2026-08-04
+versao: 2.8
+atualizado: 2026-08-06
 relacionados:
   - "[[lancamentos]]"
   - "[[cartoes]]"
@@ -167,9 +167,12 @@ O ponto crítico é cartão de crédito: a fatura pertence ao mês de competênc
 - Dado o usuário visualizando saldos no Cockpit com mês diferente do mês corrente, quando os saldos forem exibidos, então os rótulos indicam claramente o mês selecionado.
 - Dado o usuário visualizando o Cockpit ou Relatórios em telas de 14 polegadas ou menores, quando os painéis de KPIs, demonstrativos e gráficos são exibidos, então os grids de 4 ou 6 colunas se reorganizam em 2 ou 3 colunas e os gráficos do demonstrativo empilham verticalmente para evitar compressão e quebra de layout.
 - Dado o usuário visualizando **Maiores despesas do mês** com a linha `Outros`, quando clica nessa linha, então um pop-up mostra as categorias/subcategorias que compõem `Outros`, com valor de cada item e total agregado, sem alterar os totais do Cockpit.
+- Dado o usuário abrindo o gráfico de evolução de uma categoria/subcategoria, quando o drawer é exibido, então a área do gráfico é aproximadamente 20% maior que o tamanho anterior.
+- Dado o gráfico de evolução exibido, quando há pontos de dados históricos ou projeção SMA, então cada ponto exibe o respectivo valor formatado, mesmo quando a linha de tendência está ativada.
 
 ## Changelog
 
+- `2.8` — 2026-08-06 — Drawer de evolução de categoria ampliado em aproximadamente 20%; gráfico passa a exibir o valor formatado em cada ponto, inclusive nos pontos projetados pela linha de tendência SMA.
 - `2.7` — 2026-08-04 — Adicionada aba **Calendário** ao Cockpit na ordem **Situação**, **Calendário**, **Tendências** e **Saúde Financeira**. A nova aba é documentada na spec [[cockpit-calendario]].
 - `2.6` — 2026-08-04 — Linha `Outros` em Maiores despesas do mês passa a abrir detalhamento em pop-up com os itens agregados.
 - `2.5` — 2026-08-02 — Ordem das abas do Cockpit documentada como Situação, Tendências e Saúde Financeira, alinhando Relatórios/Cockpit à spec de Tendências.

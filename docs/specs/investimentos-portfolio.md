@@ -2,8 +2,8 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.8
-atualizado: 2026-08-02
+versao: 2.9
+atualizado: 2026-08-06
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -101,6 +101,7 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 | Método | Rota |
 |---|---|
 | `GET` | `/api/portfolio` |
+| `GET` | `/api/portfolio/returns` |
 | `POST` | `/api/portfolio/positions` |
 | `PUT` | `/api/portfolio/positions/{id}` |
 | `DELETE` | `/api/portfolio/positions/{id}` |
@@ -154,9 +155,14 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado o usuário cadastrando ou editando um aporte de Poupança em Lançamentos de Contas, quando o formulário é exibido, então os campos não aplicáveis à Poupança ficam ocultos/desabilitados e não competem com os campos essenciais.
 - Dado uma posição de Tesouro Prefixado, IPCA+ ou Selic padrão com cálculo na curva, quando o Portfólio calcula o valor líquido, então deduz a Taxa B3 estimada de 0,20% a.a. pro rata, aplicando isenção simplificada de R$ 10.000,00 apenas para Tesouro Selic.
 - Dado uma posição de Tesouro Direto exibida no Portfólio, quando o usuário lê a listagem, então há nota discreta informando que o cálculo é na curva e pode divergir da marcação a mercado do site do Tesouro.
+- Dado o usuário abrindo o Portfólio, quando a seção "Resumo da Carteira" é exibida, então o card "Rentabilidade" mantém o percentual total por moeda e exibe um botão para abrir o gráfico mês a mês.
+- Dado o usuário clicando no botão de gráfico do card "Rentabilidade", quando o drawer é aberto, então ele exibe barras comparando a carteira e o CDI.
+- Dado uma carteira com posições em BRL e USD, quando o gráfico de rentabilidade é exibido, então há séries separadas para cada moeda, mantendo o CDI como benchmark visível.
+- Dado o primeiro investimento cadastrado em Jun/2026, quando o usuário consulta rentabilidade em Ago/2026, então o gráfico mostra os meses disponíveis (Jun, Jul, Ago), usando 100% do período cadastrado.
 
 ## Changelog
 
+- `2.9` — 2026-08-06 — Adicionado card "Rentabilidade mês a mês" no Resumo da Carteira com gráfico de barras por moeda e benchmark CDI, via endpoint `GET /api/portfolio/returns`.
 - `2.8` — 2026-08-02 — Formulários de Renda Fixa no Portfólio e Lançamentos ganham redução de ruído visual com chips, microcopy dinâmica, presets e preview.
 - `2.7` — 2026-07-31 — Tesouro Direto mantém rentabilidade na curva pela taxa contratada, passa a deduzir Taxa B3 estimada em títulos padrão e exibe nota sobre diferenças frente à marcação a mercado oficial.
 - `2.6` — 2026-07-29 — Resgate e atualização manual de valor atual passam a ser documentados como modais internos consistentes com a identidade visual do app.

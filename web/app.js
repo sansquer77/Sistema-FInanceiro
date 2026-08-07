@@ -111,6 +111,7 @@ const state = {
   appInfo: null,
   latestVersion: null,
   portfolio: null,
+  portfolioReturns: null,
   portfolioDirty: true,
   portfolioLoading: false,
   portfolioError: "",
@@ -269,6 +270,15 @@ const portfolioCurrentSummary = document.querySelector("#portfolioCurrentSummary
 const portfolioResultSummary = document.querySelector("#portfolioResultSummary");
 const portfolioReturnSummary = document.querySelector("#portfolioReturnSummary");
 const portfolioDayResultSummary = document.querySelector("#portfolioDayResultSummary");
+const portfolioReturnChartBtn = document.querySelector("#portfolioReturnChartBtn");
+const portfolioReturnDrawer = document.querySelector("#portfolioReturnDrawer");
+const portfolioReturnDrawerOverlay = document.querySelector("#portfolioReturnDrawerOverlay");
+const portfolioReturnDrawerCloseBtn = document.querySelector("#portfolioReturnDrawerCloseBtn");
+const portfolioReturnDrawerTitle = document.querySelector("#portfolioReturnDrawerTitle");
+const portfolioReturnChart = document.querySelector("#portfolioReturnChart");
+const portfolioReturnXLabels = document.querySelector("#portfolioReturnXLabels");
+const portfolioReturnLegend = document.querySelector("#portfolioReturnLegend");
+const portfolioReturnNotice = document.querySelector("#portfolioReturnNotice");
 const portfolioPositionCount = document.querySelector("#portfolioPositionCount");
 const portfolioMessage = document.querySelector("#portfolioMessage");
 const portfolioTypeList = document.querySelector("#portfolioTypeList");
@@ -970,6 +980,15 @@ const portfolioView = registerPortfolioView({
     portfolioResultSummary,
     portfolioReturnSummary,
     portfolioDayResultSummary,
+    portfolioReturnChartBtn,
+    portfolioReturnDrawer,
+    portfolioReturnDrawerOverlay,
+    portfolioReturnDrawerCloseBtn,
+    portfolioReturnDrawerTitle,
+    portfolioReturnChart,
+    portfolioReturnXLabels,
+    portfolioReturnLegend,
+    portfolioReturnNotice,
     portfolioPositionCount,
     portfolioMessage,
     portfolioTypeList,
@@ -987,6 +1006,8 @@ const portfolioView = registerPortfolioView({
   formatMoney,
   formatPercent,
   formatDate,
+  formatMonthLabel,
+  formatMonthShortLabel,
   formatDecimal,
   moneyInputValue,
   portfolioQuoteText,
