@@ -2,8 +2,8 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 3.2
-atualizado: 2026-08-06
+versao: 3.3
+atualizado: 2026-08-07
 relacionados:
   - "[[contas-correntes]]"
   - "[[categorias-tags-gestao]]"
@@ -17,7 +17,7 @@ aliases: ["Lançamentos", "Transações"]
 # Lançamentos
 
 > [!info] Status
-> **implementado** · área: `lancamentos` · atualizado em 2026-08-06 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]]
+> **implementado** · área: `lancamentos` · atualizado em 2026-08-07 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]]
 
 ## Problema
 
@@ -109,6 +109,7 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 - No formulário de investimento, subcategorias de Poupança devem ser exibidas no combo apenas como `Poupança`, mesmo que o nome técnico/histórico da subcategoria contenha observações antigas; o valor interno deve ser preservado para não alterar históricos.
 - No formulário de investimento de Lançamentos de Contas, aportes de Renda Fixa ou Poupança devem exibir marcador compacto `Usar este aporte como reserva de emergência`, persistindo essa decisão na operação de investimento. A marcação não aparece nem é enviada para outros tipos de ativo.
 - O formulário de investimento deve se adaptar ao ativo selecionado para reduzir dúvidas: quando o aporte for Poupança, campos de quantidade, preço unitário, renda fixa, CNPJ, corretagem, emolumentos, impostos e outros custos ficam ocultos/desabilitados, pois não são aplicáveis.
+- A listagem completa de lançamentos (`GET /api/transactions`) é paginada por `limit` (padrão 2000, máximo 5000) e `offset`, respondendo `has_more`; o frontend percorre as páginas até receber uma página menor que `limit`.
 
 ## API e dados
 
@@ -169,8 +170,12 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dado um lançamento recorrente criado com a opção `use_average`, quando as ocorrências são geradas, então todas persistem `use_average` ativo.
 - Dado uma série recorrente com `use_average` ativo, quando o usuário edita qualquer ocorrência, então o sistema não exibe o modal de escopo e aplica automaticamente a alteração a todas as ocorrências futuras não conciliadas, recalculando seus valores pela média.
 - Dado uma série recorrente sem `use_average`, quando o usuário edita uma ocorrência, então o sistema mantém o comportamento atual de perguntar se deseja alterar apenas o lançamento atual ou também os futuros.
+- Dado `GET /api/transactions` com `limit` e `offset` válidos, quando os filtros de mês/conta também estão presentes, então retorna no máximo `limit` lançamentos da página solicitada com `has_more` indicando se há páginas seguintes.
+- Dado `GET /api/transactions` com `limit` acima de 5000, quando processado, então o servidor reduz o limite para 5000 sem erro.
 
 ## Changelog
+
+- `3.3` — 2026-08-07 — Listagens completas paginadas: `GET /api/transactions` aceita `limit`/`offset` (padrão 2000, máximo 5000) e responde `has_more`; o frontend itera as páginas automaticamente.
 
 - `3.2` — 2026-08-06 — Lançamentos recorrentes com `use_average` persistem a marcação em todas as ocorrências e, ao editar qualquer ocorrência dessa série, recalculam automaticamente os valores futuros pela média sem exibir modal de escopo.
 - `3.1` — 2026-08-06 — Lançamentos recorrentes permitem calcular valores futuros pela média dos últimos 12 lançamentos com mesma descrição e passam a usar 120 ocorrências automaticamente, sem exibir o campo de quantidade.

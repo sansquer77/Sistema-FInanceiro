@@ -7,6 +7,7 @@ export function registerPortfolioView({
   escapeHtml,
   formatMoney,
   formatPercent,
+  formatPercentValue,
   formatDate,
   formatMonthShortLabel,
   formatDecimal,
@@ -666,7 +667,7 @@ export function registerPortfolioView({
           return "0%";
         }
         const sign = tick > 0 ? "+" : "";
-        return `${sign}${formatPercentCompact(tick)}`;
+        return `${sign}${formatPercentValue(tick)}`;
       };
       portfolioReturnYAxis.innerHTML = yTicks.map((tick) => {
         const top = (yFor(tick) / 50) * 100;
@@ -702,11 +703,6 @@ export function registerPortfolioView({
       return 5 * power;
     }
     return 10 * power;
-  }
-
-  function formatPercentCompact(value) {
-    const formatted = Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
-    return `${formatted}%`;
   }
 
   function smoothPath(points) {

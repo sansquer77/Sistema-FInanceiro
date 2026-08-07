@@ -24,6 +24,15 @@ export function formatMonthShortLabel(value) {
   return month && year ? `${month}/${year}` : "";
 }
 
+export function formatShortMonthName(value) {
+  const [year, monthNumber] = String(value).split("-").map(Number);
+  if (!year || !monthNumber) {
+    return value;
+  }
+  const date = new Date(year, monthNumber - 1, 1);
+  return date.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
+}
+
 export function isValidMonthValue(value) {
   return /^\d{4}-\d{2}$/.test(String(value || ""));
 }

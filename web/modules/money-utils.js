@@ -1,6 +1,22 @@
 export function parseDecimalInput(value) {
-  const normalized = String(value || "").replace(/\./g, "").replace(",", ".");
-  const parsed = Number(normalized);
+  const normalized = String(value || "").trim().replace(/\s/g, "");
+  if (!normalized) {
+    return 0;
+  }
+  const lastComma = normalized.lastIndexOf(",");
+  const lastDot = normalized.lastIndexOf(".");
+  let parsed;
+  if (lastComma === -1) {
+    // Apenas ponto de decimal (formato internacional).
+    parsed = Number(normalized);
+  } else if (lastDot === -1) {
+    // Só uma barra de vírgula decimal (formato brasileiro).
+    parsed = Number(normalized.replace(/,/g, "."));
+  } else if (lastComma > lastDot) {
+    parsed = Number(normalized.replace(/\./g, "").replace(",", "."));
+  } else {
+    parsed = Number(normalized.replace(/,/g, ""));
+  }
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
@@ -44,6 +60,10 @@ export function formatPercent(value) {
     return "0,0%";
   }
   return parsed.toLocaleString("pt-BR", { style: "percent", maximumFractionDigits: 1 });
+}
+
+export function formatPercentValue(value) {
+  return `${Number(value || 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`;
 }
 
 export function portfolioQuoteText(position) {

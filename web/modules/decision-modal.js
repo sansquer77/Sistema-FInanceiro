@@ -32,102 +32,111 @@ export function createDecisionModal() {
 
   function openModal({ title, message, renderBody, actions, onSubmit }) {
     closeActiveModal();
-    return new Promise((resolve) => {
-      const previousFocus = document.activeElement;
-      const titleId = `decision-modal-title-${Date.now()}`;
-      const backdrop = document.createElement("div");
-      backdrop.className = "decision-modal-backdrop";
+    let resolveModal;
+    const pending = new Promise((resolve) => {
+      resolveModal = resolve;
+    });
+    const previousFocus = document.activeElement;
+    const titleId = `decision-modal-title-${Date.now()}`;
+    const backdrop = document.createElement("div");
+    backdrop.className = "decision-modal-backdrop";
 
-      const modal = document.createElement("form");
-      modal.className = "decision-modal";
-      modal.setAttribute("role", "dialog");
-      modal.setAttribute("aria-modal", "true");
-      modal.setAttribute("aria-labelledby", titleId);
-      modal.noValidate = false;
+    const modal = document.createElement("form");
+    modal.className = "decision-modal";
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+    modal.setAttribute("aria-labelledby", titleId);
+    modal.noValidate = false;
 
-      const header = document.createElement("div");
-      header.className = "decision-modal-header";
+    const header = document.createElement("div");
+    header.className = "decision-modal-header";
 
-      const heading = document.createElement("h3");
-      heading.id = titleId;
-      heading.textContent = title;
-      header.appendChild(heading);
+    const heading = document.createElement("h3");
+    heading.id = titleId;
+    heading.textContent = title;
+    header.appendChild(heading);
 
-      if (message) {
-        const description = document.createElement("p");
-        description.textContent = message;
-        header.appendChild(description);
+    if (message) {
+      const description = document.createElement("p");
+      description.textContent = message;
+      header.appendChild(description);
+    }
+
+    const body = document.createElement("div");
+    body.className = "decision-modal-body";
+    const firstField = renderBody(body);
+
+    const footer = document.createElement("div");
+    footer.className = "decision-modal-actions";
+    actions.forEach((action) => {
+      const button = document.createElement("button");
+      button.type = action.type || "button";
+      button.className = decisionButtonClass(action.variant);
+      button.textContent = action.label;
+      if (action.value !== "__submit__") {
+        button.addEventListener("click", () => finish(action.value));
       }
+      footer.appendChild(button);
+    });
 
-      const body = document.createElement("div");
-      body.className = "decision-modal-body";
-      const firstField = renderBody(body);
+    modal.append(header, body, footer);
+    backdrop.appendChild(modal);
+    document.body.appendChild(backdrop);
 
-      const footer = document.createElement("div");
-      footer.className = "decision-modal-actions";
-      actions.forEach((action) => {
-        const button = document.createElement("button");
-        button.type = action.type || "button";
-        button.className = decisionButtonClass(action.variant);
-        button.textContent = action.label;
-        if (action.value !== "__submit__") {
-          button.addEventListener("click", () => finish(action.value));
-        }
-        footer.appendChild(button);
-      });
-
-      modal.append(header, body, footer);
-      backdrop.appendChild(modal);
-      document.body.appendChild(backdrop);
-
-      activeModal = { backdrop, previousFocus };
-
-      backdrop.addEventListener("click", (event) => {
-        if (event.target === backdrop) {
-          finish(null);
-        }
-      });
-      modal.addEventListener("submit", (event) => {
+    function handleKeydown(event) {
+      if (event.key === "Escape") {
         event.preventDefault();
-        if (!onSubmit) {
-          return;
-        }
-        const values = onSubmit(modal);
-        if (values) {
-          finish(values);
-        }
-      });
-      document.addEventListener("keydown", handleKeydown);
-
-      requestAnimationFrame(() => {
-        const focusTarget = firstField || modal.querySelector("button");
-        focusTarget?.focus();
-      });
-
-      function handleKeydown(event) {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          finish(null);
-        }
+        finish(null);
       }
+    }
 
-      function finish(value) {
-        document.removeEventListener("keydown", handleKeydown);
-        closeActiveModal();
-        if (previousFocus && typeof previousFocus.focus === "function") {
-          previousFocus.focus();
-        }
-        resolve(value);
+    activeModal = { backdrop, previousFocus, resolveModal, handleKeydown };
+
+    function finish(value) {
+      if (!activeModal || activeModal.backdrop !== backdrop) {
+        return;
+      }
+      activeModal.value = value;
+      closeActiveModal();
+    }
+
+    backdrop.addEventListener("click", (event) => {
+      if (event.target === backdrop) {
+        finish(null);
       }
     });
+    modal.addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (!onSubmit) {
+        return;
+      }
+      const values = onSubmit(modal);
+      if (values) {
+        finish(values);
+      }
+    });
+    document.addEventListener("keydown", handleKeydown);
+
+    requestAnimationFrame(() => {
+      const focusTarget = firstField || modal.querySelector("button");
+      focusTarget?.focus();
+    });
+
+    return pending;
   }
 
   function closeActiveModal() {
     if (!activeModal) {
       return;
     }
-    activeModal.backdrop.remove();
+    const { backdrop, previousFocus, resolveModal, handleKeydown, value } = activeModal;
+    document.removeEventListener("keydown", handleKeydown);
+    backdrop.remove();
     activeModal = null;
+    resolveModal(value === undefined ? null : value);
+    if (previousFocus && typeof previousFocus.focus === "function") {
+      previousFocus.focus();
+    }
   }
 
   function renderFormFields(body, fields) {

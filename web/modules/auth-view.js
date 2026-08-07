@@ -100,11 +100,14 @@ export function registerAuthView(context) {
   }
 
   async function handleLogout() {
-    await api("/api/logout", { method: "POST" });
-    resetSessionState();
-    elements.loginForm.reset();
-    elements.registerForm.reset();
-    onShowAuth();
+    try {
+      await api("/api/logout", { method: "POST" });
+    } finally {
+      resetSessionState();
+      elements.loginForm.reset();
+      elements.registerForm.reset();
+      onShowAuth();
+    }
   }
 
   elements.loginTab.addEventListener("click", () => switchAuthMode("login"));

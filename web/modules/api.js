@@ -46,6 +46,24 @@ export async function upload(path, body) {
   return payload;
 }
 
+const PAGE_SIZE = 2000;
+
+export async function fetchAllListed(path, key, pageSize = PAGE_SIZE) {
+  const items = [];
+  let offset = 0;
+  for (;;) {
+    const separator = path.includes("?") ? "&" : "?";
+    const payload = await api(`${path}${separator}limit=${pageSize}&offset=${offset}`);
+    const batch = payload[key] || [];
+    items.push(...batch);
+    if (!payload.has_more || batch.length < pageSize) {
+      break;
+    }
+    offset += pageSize;
+  }
+  return items;
+}
+
 async function parseResponsePayload(response) {
   const text = await response.text().catch(() => "");
   if (!text) {

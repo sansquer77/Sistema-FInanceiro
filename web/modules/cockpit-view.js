@@ -13,6 +13,7 @@ export function registerCockpitView({
   openMonthPicker,
   formatMoney,
   formatPercent,
+  formatPercentValue,
   emptyState,
   escapeHtml,
   formatCategoryPath,
@@ -99,6 +100,7 @@ export function registerCockpitView({
     },
     api,
     formatMoney,
+    formatPercentValue,
     escapeHtml,
   });
 

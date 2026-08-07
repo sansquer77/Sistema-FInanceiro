@@ -2,6 +2,7 @@ export function registerCardsView({
   state,
   elements,
   api,
+  fetchAllListed,
   formData,
   setFormBusy,
   setMessage,
@@ -12,6 +13,7 @@ export function registerCardsView({
   formatDate,
   formatMonthLabel,
   formatMonthShortLabel,
+  formatShortMonthName,
   currentMonthValue,
   shiftMonth,
   todayLocalDateValue,
@@ -222,11 +224,11 @@ export function registerCardsView({
 
   async function loadCardTransactions() {
     const [transactionsResponse, paymentsResponse] = await Promise.all([
-      api("/api/credit-card-transactions"),
-      api("/api/credit-card-payments"),
+      fetchAllListed("/api/credit-card-transactions", "transactions"),
+      fetchAllListed("/api/credit-card-payments", "payments"),
     ]);
-    state.cardTransactions = transactionsResponse.transactions || [];
-    state.cardPayments = paymentsResponse.payments || [];
+    state.cardTransactions = transactionsResponse || [];
+    state.cardPayments = paymentsResponse || [];
   }
 
   function ensureSelectedCreditCard() {
@@ -852,7 +854,7 @@ export function registerCardsView({
       return {
         offset,
         month,
-        label: shortMonthLabel(month),
+        label: formatShortMonthName(month),
         amount: cardInvoiceMonthAmount(card.id, month),
         isCurrent: offset === 0,
       };
@@ -874,15 +876,6 @@ export function registerCardsView({
       const amount = Number(transaction.amount || 0);
       return total + (transaction.type === "expense" ? amount : -amount);
     }, 0);
-  }
-
-  function shortMonthLabel(month) {
-    const [year, monthNumber] = String(month).split("-").map(Number);
-    if (!year || !monthNumber) {
-      return month;
-    }
-    const date = new Date(year, monthNumber - 1, 1);
-    return date.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
   }
 
   function invoiceHistoryPath(rows, mode = "all") {

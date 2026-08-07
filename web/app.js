@@ -1,9 +1,10 @@
-import { api, configureApi, upload } from "./modules/api.js";
+import { api, configureApi, fetchAllListed, upload } from "./modules/api.js";
 import {
   currentMonthValue,
   formatDate,
   formatMonthLabel,
   formatMonthShortLabel,
+  formatShortMonthName,
   isValidMonthValue,
   monthEndDate,
   shiftMonth,
@@ -14,6 +15,7 @@ import {
   formatDecimal,
   formatMoney,
   formatPercent,
+  formatPercentValue,
   moneyInputValue,
   parseDecimalInput,
   portfolioQuoteText,
@@ -691,6 +693,7 @@ const cockpitView = registerCockpitView({
   openMonthPicker,
   formatMoney,
   formatPercent,
+  formatPercentValue,
   emptyState,
   escapeHtml,
   formatCategoryPath,
@@ -801,6 +804,7 @@ const cardsView = registerCardsView({
     cancelCardTransactionEditButton,
   },
   api,
+  fetchAllListed,
   formData,
   setFormBusy,
   setMessage,
@@ -811,6 +815,7 @@ const cardsView = registerCardsView({
   formatDate,
   formatMonthLabel,
   formatMonthShortLabel,
+  formatShortMonthName,
   currentMonthValue,
   shiftMonth,
   todayLocalDateValue,
@@ -895,6 +900,7 @@ const transactionsView = registerTransactionsView({
     transactionContextCount,
   },
   api,
+  fetchAllListed,
   formData,
   setFormBusy,
   setMessage,
@@ -906,6 +912,7 @@ const transactionsView = registerTransactionsView({
   formatDate,
   formatMonthLabel,
   formatMonthShortLabel,
+  formatShortMonthName,
   formatCategoryPath,
   moneyInputValue,
   parseDecimalInput,
@@ -1015,6 +1022,7 @@ const portfolioView = registerPortfolioView({
   escapeHtml,
   formatMoney,
   formatPercent,
+  formatPercentValue,
   formatDate,
   formatMonthShortLabel,
   formatDecimal,
@@ -1225,19 +1233,19 @@ async function loadAll() {
     const [accountsResponse, creditCardsResponse, transactionsResponse, cardTransactionsResponse, cardPaymentsResponse, cockpitResponse] = await Promise.all([
       api("/api/checking-accounts"),
       api("/api/credit-cards"),
-      api("/api/transactions"),
-      api("/api/credit-card-transactions"),
-      api("/api/credit-card-payments"),
+      fetchAllListed("/api/transactions", "transactions"),
+      fetchAllListed("/api/credit-card-transactions", "transactions"),
+      fetchAllListed("/api/credit-card-payments", "payments"),
       api(`/api/cockpit?month=${encodeURIComponent(cockpitMonthValue())}`),
     ]);
     state.accounts = accountsResponse.accounts;
     state.creditCards = creditCardsResponse.cards;
     ensureSelectedCreditCard();
     ensureSelectedAccount();
-    state.transactions = transactionsResponse.transactions;
+    state.transactions = transactionsResponse;
     state.accountTransactions = [];
-    state.cardTransactions = cardTransactionsResponse.transactions;
-    state.cardPayments = cardPaymentsResponse.payments || [];
+    state.cardTransactions = cardTransactionsResponse;
+    state.cardPayments = cardPaymentsResponse || [];
     state.cockpit = cockpitResponse;
     invalidateFinancialHealth();
     await loadArchivedAccounts();
@@ -1299,19 +1307,19 @@ async function loadTransactionsAndAccounts() {
   const [accountsResponse, creditCardsResponse, transactionsResponse, cardTransactionsResponse, cardPaymentsResponse, cockpitResponse] = await Promise.all([
     api("/api/checking-accounts"),
     api("/api/credit-cards"),
-    api("/api/transactions"),
-    api("/api/credit-card-transactions"),
-    api("/api/credit-card-payments"),
+    fetchAllListed("/api/transactions", "transactions"),
+    fetchAllListed("/api/credit-card-transactions", "transactions"),
+    fetchAllListed("/api/credit-card-payments", "payments"),
     api(`/api/cockpit?month=${encodeURIComponent(cockpitMonthValue())}`),
   ]);
   state.accounts = accountsResponse.accounts;
   state.creditCards = creditCardsResponse.cards;
   ensureSelectedCreditCard();
   ensureSelectedAccount();
-  state.transactions = transactionsResponse.transactions;
+  state.transactions = transactionsResponse;
   await loadTransactionSlice();
-  state.cardTransactions = cardTransactionsResponse.transactions;
-  state.cardPayments = cardPaymentsResponse.payments || [];
+  state.cardTransactions = cardTransactionsResponse;
+  state.cardPayments = cardPaymentsResponse || [];
   state.cockpit = cockpitResponse;
   invalidateFinancialHealth();
   await loadArchivedAccounts();
@@ -1348,9 +1356,9 @@ async function refreshCockpitData() {
     spendingLimitsResponse,
   ] = await Promise.all([
     api("/api/checking-accounts"),
-    api("/api/transactions"),
-    api("/api/credit-card-transactions"),
-    api("/api/credit-card-payments"),
+    fetchAllListed("/api/transactions", "transactions"),
+    fetchAllListed("/api/credit-card-transactions", "transactions"),
+    fetchAllListed("/api/credit-card-payments", "payments"),
     api(`/api/cockpit?month=${encodeURIComponent(month)}`),
     api(`/api/spending-limits?month=${encodeURIComponent(month)}`),
   ]);
@@ -1359,9 +1367,9 @@ async function refreshCockpitData() {
   }
   state.accounts = accountsResponse.accounts || [];
   ensureSelectedAccount();
-  state.transactions = transactionsResponse.transactions || [];
-  state.cardTransactions = cardTransactionsResponse.transactions || [];
-  state.cardPayments = cardPaymentsResponse.payments || [];
+  state.transactions = transactionsResponse || [];
+  state.cardTransactions = cardTransactionsResponse || [];
+  state.cardPayments = cardPaymentsResponse || [];
   state.cockpit = cockpitResponse;
   state.currentSpendingLimits = spendingLimitsResponse.limits || [];
   invalidateFinancialHealth();

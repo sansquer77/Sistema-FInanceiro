@@ -116,7 +116,12 @@ def list_credit_card_invoice(user_id: int, card_id: object, month: object) -> di
     }
 
 
-def list_credit_card_transactions(user_id: int, invoice_month: object | None = None) -> list[dict]:
+def list_credit_card_transactions(
+    user_id: int,
+    invoice_month: object | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+) -> list[dict]:
     normalized_invoice_month = normalize_month(invoice_month) if invoice_month else None
     filters = [
         "credit_card_transactions.user_id = ?",
@@ -127,6 +132,10 @@ def list_credit_card_transactions(user_id: int, invoice_month: object | None = N
         filters.append("credit_card_transactions.invoice_month = ?")
         params.append(normalized_invoice_month)
     where_clause = " AND ".join(filters)
+    pagination = ""
+    if limit is not None:
+        pagination = " LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
     with get_connection() as conn:
         rows = conn.execute(
             f"""
@@ -156,6 +165,7 @@ def list_credit_card_transactions(user_id: int, invoice_month: object | None = N
             WHERE {where_clause}
             GROUP BY credit_card_transactions.id
             ORDER BY credit_card_transactions.date DESC, credit_card_transactions.id DESC
+            {pagination}
             """,
             params,
         ).fetchall()
@@ -165,10 +175,15 @@ def list_credit_card_transactions(user_id: int, invoice_month: object | None = N
     ]
 
 
-def list_credit_card_payments(user_id: int) -> list[dict]:
+def list_credit_card_payments(user_id: int, limit: int | None = None, offset: int = 0) -> list[dict]:
+    pagination = ""
+    params: list[object] = [user_id]
+    if limit is not None:
+        pagination = " LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
     with get_connection() as conn:
         rows = conn.execute(
-            """
+            f"""
             SELECT
                 credit_card_payments.*,
                 credit_cards.currency AS card_currency,
@@ -182,8 +197,9 @@ def list_credit_card_payments(user_id: int) -> list[dict]:
                 AND checking_accounts.user_id = credit_card_payments.user_id
             WHERE credit_card_payments.user_id = ?
             ORDER BY credit_card_payments.payment_date DESC, credit_card_payments.id DESC
+            {pagination}
             """,
-            (user_id,),
+            params,
         ).fetchall()
     return [
         format_card_payment(row_to_dict(row), row["card_currency"])
@@ -341,7 +357,7 @@ def update_credit_card_transaction(user_id: int, transaction_id: str, data: dict
             ),
         )
         replace_credit_card_transaction_tags(conn, normalized_id, tag_ids)
-        # spec: cartoes v2.5 — critérios 21 e 22
+        # spec: cartoes v2.6 — critérios 21 e 22
         # (series recorrentes de cartao com use_average ativo aplicam edicao em cascata
         #  automaticamente e recalculam valores futuros pela media)
         force_apply_to_future = bool(existing["use_average"]) and existing["series_kind"] == "recurring"
@@ -413,7 +429,7 @@ def update_future_card_series(
     tag_ids: list[int],
     force_apply_to_future: bool = False,
 ) -> None:
-    # spec: cartoes v2.5 — critérios 21 e 22
+    # spec: cartoes v2.6 — critérios 21 e 22
     # (series recorrentes de cartao com use_average ativo propagam edicao automaticamente
     #  e recalculam valores futuros pela media; demais series mantem apply_to_future)
     if not existing["series_id"]:
@@ -434,7 +450,7 @@ def update_future_card_series(
         """,
         (user_id, existing["series_id"], existing["id"], future_marker),
     ).fetchall()
-    # spec: cartoes v2.5 — criterio 22
+    # spec: cartoes v2.6 — criterio 22
     # (quando use_average estiver ativo, recalcula o valor da serie pela media)
     if force_apply_to_future and existing["series_kind"] == "recurring":
         average_amount = average_amount_for_recurring_description(

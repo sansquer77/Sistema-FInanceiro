@@ -1,6 +1,7 @@
 import { api } from "./api.js";
 import { formatMoney } from "./money-utils.js";
 import { escapeHtml, formData, setMessage } from "./dom-utils.js";
+import { formatShortMonthName, todayLocalDateValue } from "./date-utils.js";
 
 export function registerSimulationsView({
   state,
@@ -54,7 +55,7 @@ export function registerSimulationsView({
     if (account) {
       clearSimulationResult();
     }
-    simulationDate.value = new Date().toISOString().slice(0, 10);
+    simulationDate.value = todayLocalDateValue();
   }
 
   function renderAccounts() {
@@ -80,7 +81,7 @@ export function registerSimulationsView({
 
   function resetForm() {
     simulationForm.reset();
-    simulationDate.value = new Date().toISOString().slice(0, 10);
+    simulationDate.value = todayLocalDateValue();
     simulationSeriesKind.value = "single";
     syncSeriesFields();
     clearSimulationResult();
@@ -219,7 +220,7 @@ export function registerSimulationsView({
     const rawRows = series.map((entry, index) => ({
       index,
       month: entry.month,
-      label: shortMonthLabel(entry.month),
+      label: formatShortMonthName(entry.month),
       forecastAmount: Number(entry.real_balance_cents || 0) / 100,
       simulatedAmount: Number(projectedBalanceCents(entry)) / 100,
       currency,
@@ -280,15 +281,6 @@ export function registerSimulationsView({
       const midX = (previous.x + point.x) / 2;
       return `${path} C ${midX} ${previous.y}, ${midX} ${point.y}, ${point.x} ${point.y}`;
     }, "");
-  }
-
-  function shortMonthLabel(month) {
-    const [year, monthNumber] = String(month).split("-").map(Number);
-    if (!year || !monthNumber) {
-      return month;
-    }
-    const date = new Date(year, monthNumber - 1, 1);
-    return date.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
   }
 
   return { loadSimulationFormData, resetForm, renderSimulation };

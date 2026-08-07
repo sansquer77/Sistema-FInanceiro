@@ -144,6 +144,40 @@ class PortfolioReturnsTest(unittest.TestCase):
         self.assertEqual(result["series"][0]["BRL_return_pct"], 0.0)
         self.assertTrue(len(result["series"]) >= 1)
 
+    def test_position_factors_are_cached_by_month_across_positions(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Carteira",
+            "bank_name": "Banco",
+            "account_type": "investment",
+            "currency": "BRL",
+            "initial_balance": "10000,00",
+        })
+
+        def cdi_segments() -> set[tuple]:
+            return {
+                (str(call.args[1]), str(call.args[2]))
+                for call in benchmark_mock.call_args_list
+                if str(call.args[0]) == "CDI"
+            }
+
+        # Linha de base: uma posicao.
+        with self._mock_benchmarks() as benchmark_mock:
+            self._create_fixed_position(user["id"], account["id"], "CDB-A", "1000,00")
+            result = get_portfolio_returns(user["id"])
+        segments_one = cdi_segments()
+        self.assertTrue(len(result["series"]) >= 1)
+
+        # Segunda posicao com a mesma data de aquisicao: o cache mensal
+        # compartilhado impede a duplicacao de fetches BCB por posicao.
+        with self._mock_benchmarks() as benchmark_mock:
+            self._create_fixed_position(user["id"], account["id"], "CDB-B", "500,00")
+            result = get_portfolio_returns(user["id"])
+        segments_two = cdi_segments()
+
+        self.assertTrue(len(result["series"]) >= 1)
+        self.assertEqual(segments_two, segments_one)
+
 
 if __name__ == "__main__":
     unittest.main()

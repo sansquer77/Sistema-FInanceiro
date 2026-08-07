@@ -1376,7 +1376,10 @@ def apply_fixed_income_value(position: dict, force_refresh: bool = False) -> Non
 
 
 def fixed_income_value_as_of(
-    position: dict, as_of_date: date, force_refresh: bool = False
+    position: dict,
+    as_of_date: date,
+    force_refresh: bool = False,
+    factor_cache: dict[str, Decimal] | None = None,
 ) -> tuple[int, int, int, int, int, Decimal, str]:
     start_date = date.fromisoformat(position["first_operation_date"])
     if as_of_date < start_date:
@@ -1396,12 +1399,22 @@ def fixed_income_value_as_of(
             gross_factor = compound_annual_factor(rate_factor, days)
         else:
             multiplier = annual_rate / Decimal("100") if annual_rate else Decimal("1")
-            indexer_factor = fetch_accumulated_indexer_factor(indexer, start_date, end_date, multiplier, force_refresh=force_refresh)
+            if factor_cache is not None:
+                indexer_factor = _accumulated_factor_by_month(
+                    indexer, start_date, end_date, multiplier, factor_cache, force_refresh=force_refresh
+                )
+            else:
+                indexer_factor = fetch_accumulated_indexer_factor(indexer, start_date, end_date, multiplier, force_refresh=force_refresh)
             source = f"Banco Central SGS ({indexer} acumulado)"
             if mode == "hybrid":
-                indexer_factor = fetch_accumulated_indexer_factor(indexer, start_date, end_date, force_refresh=force_refresh)
-                rate_factor = indexer_factor - Decimal("1") + annual_rate / Decimal("100")
-                gross_factor = indexer_factor * compound_annual_factor(annual_rate / Decimal("100"), days)
+                if factor_cache is not None:
+                    indexer_factor_plain = _accumulated_factor_by_month(
+                        indexer, start_date, end_date, Decimal("1"), factor_cache, force_refresh=force_refresh
+                    )
+                else:
+                    indexer_factor_plain = fetch_accumulated_indexer_factor(indexer, start_date, end_date, force_refresh=force_refresh)
+                rate_factor = indexer_factor_plain - Decimal("1") + annual_rate / Decimal("100")
+                gross_factor = indexer_factor_plain * compound_annual_factor(annual_rate / Decimal("100"), days)
             else:
                 rate_factor = indexer_factor - Decimal("1")
                 gross_factor = indexer_factor
@@ -1435,15 +1448,52 @@ def fixed_income_value_as_of(
     return net_cents, gross_cents, iof_tax_cents, income_tax_cents, custody_fee_cents, rate_factor, source
 
 
-def _position_value_native_as_of(position: dict, as_of_date: date, force_refresh: bool = False) -> int:
-    # spec: rentabilidade-portfolio v1.3 — critério 4
+def _position_value_native_as_of(
+    position: dict,
+    as_of_date: date,
+    force_refresh: bool = False,
+    factor_cache: dict[str, Decimal] | None = None,
+) -> int:
+    # spec: rentabilidade-portfolio v1.4 — critério 4
     if as_of_date < date.fromisoformat(position["first_operation_date"]):
         return 0
     if position["asset_type"] == "fixed_income":
-        return fixed_income_value_as_of(position, as_of_date, force_refresh=force_refresh)[0]
+        return fixed_income_value_as_of(position, as_of_date, force_refresh=force_refresh, factor_cache=factor_cache)[0]
     if position["asset_type"] == "savings":
-        return savings_value_as_of(position, as_of_date, force_refresh=force_refresh)
+        return savings_value_as_of(position, as_of_date, force_refresh=force_refresh, factor_cache=factor_cache)
     return int(position.get("current_value_cents") or 0)
+
+
+def _accumulated_factor_by_month(
+    indexer: str,
+    start_date: date,
+    end_date: date,
+    multiplier: Decimal,
+    month_cache: dict[str, Decimal],
+    force_refresh: bool = False,
+) -> Decimal:
+    # Decomposicao exata do fator acumulado em fatores mensais com cache
+    # compartilhado: evita N x 12 requisicoes BCB distintas no cache frio.
+    # Para indexadores diarios o produto por dia e associativo; para indexadores
+    # mensais (IPCA/IGP-M) o peso de overlap por mes se preserva na divisao
+    # em limites de mes. Fallback de payload vazio tambem e decomponivel
+    # (juros compostos somam expoentes), mantendo resultado identico.
+    if end_date < start_date:
+        return Decimal("1")
+    factor = Decimal("1")
+    month = date(start_date.year, start_date.month, 1)
+    last_month = date(end_date.year, end_date.month, 1)
+    while month <= last_month:
+        segment_start = max(month, start_date)
+        segment_end = min(add_months(month, 1) - timedelta(days=1), end_date)
+        cache_key = f"{indexer}:{multiplier}:{segment_start.isoformat()}:{segment_end.isoformat()}"
+        if cache_key not in month_cache:
+            month_cache[cache_key] = fetch_accumulated_indexer_factor(
+                indexer, segment_start, segment_end, multiplier, force_refresh=force_refresh
+            )
+        factor *= month_cache[cache_key]
+        month = add_months(month, 1)
+    return factor
 
 
 def _monthly_return_pct(prev_value: int, end_value: int, net_contribution: int) -> Decimal:
@@ -1452,7 +1502,7 @@ def _monthly_return_pct(prev_value: int, end_value: int, net_contribution: int) 
 
 
 def get_portfolio_returns(user_id: int, force_refresh: bool = False) -> dict:
-    # spec: rentabilidade-portfolio v1.3 — critérios 1 a 10
+    # spec: rentabilidade-portfolio v1.4 — critérios 1 a 10
     # Rentabilidade mensal (em percentual) por moeda consolidada (BRL e USD),
     # comparada ao CDI e ao IPCA do mês. Últimos 12 meses, ou todos os meses
     # disponíveis quando a base é menor. Cada moeda é calculada na própria
@@ -1490,6 +1540,7 @@ def get_portfolio_returns(user_id: int, force_refresh: bool = False) -> dict:
         prev_invested_by_currency: dict[str, int] = {}
         month_factor_cache: dict[str, Decimal] = {}
         ipca_month_cache: dict[str, float] = {}
+        position_factor_cache: dict[str, Decimal] = {}
 
         for month_date in months:
             month_start = month_date
@@ -1508,7 +1559,9 @@ def get_portfolio_returns(user_id: int, force_refresh: bool = False) -> dict:
                 if month_start <= first_operation <= month_end:
                     value = int(position.get("total_cost_cents") or 0)
                 else:
-                    value = _position_value_native_as_of(position, as_of, force_refresh=force_refresh)
+                    value = _position_value_native_as_of(
+                        position, as_of, force_refresh=force_refresh, factor_cache=position_factor_cache
+                    )
                 month_values[currency] = month_values.get(currency, 0) + value
                 month_invested[currency] = month_invested.get(currency, 0) + int(position.get("total_cost_cents") or 0)
 
@@ -1630,7 +1683,10 @@ def apply_savings_value(position: dict, force_refresh: bool = False) -> None:
 
 
 def savings_value_as_of_with_meta(
-    position: dict, as_of_date: date, force_refresh: bool = False
+    position: dict,
+    as_of_date: date,
+    force_refresh: bool = False,
+    factor_cache: dict[str, Decimal] | None = None,
 ) -> tuple[int, Decimal, str, str]:
     anniversaries = aggregate_savings_anniversaries(position.get("savings_anniversaries") or [])
     if not anniversaries:
@@ -1651,6 +1707,7 @@ def savings_value_as_of_with_meta(
                 as_of_date,
                 additional_monthly_rate,
                 force_refresh=force_refresh,
+                factor_cache=factor_cache,
             )
     except PortfolioError as exc:
         status = exc.message
@@ -1667,8 +1724,13 @@ def savings_value_as_of_with_meta(
     return int(current_value.quantize(Decimal("1"), rounding=ROUND_HALF_UP)), additional_monthly_rate, source, status
 
 
-def savings_value_as_of(position: dict, as_of_date: date, force_refresh: bool = False) -> int:
-    return savings_value_as_of_with_meta(position, as_of_date, force_refresh=force_refresh)[0]
+def savings_value_as_of(
+    position: dict,
+    as_of_date: date,
+    force_refresh: bool = False,
+    factor_cache: dict[str, Decimal] | None = None,
+) -> int:
+    return savings_value_as_of_with_meta(position, as_of_date, force_refresh=force_refresh, factor_cache=factor_cache)[0]
 
 
 def savings_factor_for_anniversary(
@@ -1676,13 +1738,19 @@ def savings_factor_for_anniversary(
     end_date: date,
     additional_monthly_rate: Decimal,
     force_refresh: bool = False,
+    factor_cache: dict[str, Decimal] | None = None,
 ) -> Decimal:
     factor = Decimal("1")
     completed_months = completed_savings_anniversaries(start_date, end_date)
     for month_index in range(1, completed_months + 1):
         period_start = add_months(start_date, month_index - 1)
         period_end = add_months(start_date, month_index)
-        tr_factor = fetch_accumulated_indexer_factor("TR", period_start, period_end, force_refresh=force_refresh)
+        if factor_cache is not None:
+            tr_factor = _accumulated_factor_by_month(
+                "TR", period_start, period_end, Decimal("1"), factor_cache, force_refresh=force_refresh
+            )
+        else:
+            tr_factor = fetch_accumulated_indexer_factor("TR", period_start, period_end, force_refresh=force_refresh)
         factor *= tr_factor * (Decimal("1") + additional_monthly_rate)
     return factor
 
@@ -2335,7 +2403,7 @@ def micros_to_decimal(micros: int) -> Decimal:
 
 
 def parse_rate_decimal(value: object) -> Decimal:
-    # spec: rentabilidade-portfolio v1.3 — critério 4
+    # spec: rentabilidade-portfolio v1.4 — critério 4
     # get_portfolio retorna a taxa ja formatada (ex.: "4,27"); aceita Decimal ou
     # string com ponto/virgula para nao quebrar o calculo de valor por data.
     if isinstance(value, Decimal):

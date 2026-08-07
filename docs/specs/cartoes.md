@@ -2,8 +2,8 @@
 tipo: spec
 area: cartoes
 status: implementado
-versao: 2.5
-atualizado: 2026-08-06
+versao: 2.6
+atualizado: 2026-08-07
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -18,7 +18,7 @@ aliases: ["Cartões de Crédito", "Faturas"]
 # Cartões de Crédito
 
 > [!info] Status
-> **implementado** · área: `cartoes` · atualizado em 2026-08-06 · relacionados: [[contas-correntes]], [[lancamentos]], [[limites-gastos]], [[relatorios]]
+> **implementado** · área: `cartoes` · atualizado em 2026-08-07 · relacionados: [[contas-correntes]], [[lancamentos]], [[limites-gastos]], [[relatorios]]
 
 ## Problema
 
@@ -104,6 +104,7 @@ Qualquer usuário autenticado localmente que utilize cartões de crédito para d
 - O rótulo do mês no seletor mensal da fatura deve usar o formato compacto `MM/AAAA`.
 - Campos do formulário de lançamento no cartão devem manter altura e alinhamento consistentes dentro da mesma linha; linhas com apenas um campo visível devem ocupar a largura completa para evitar lacunas visuais.
 - O formulário de Lançamentos de Cartões deve exibir ação `Cancelar` também durante novo cadastro, em variante discreta, permitindo limpar a entrada atual e retornar ao estado inicial sem depender de salvar ou navegar.
+- As listagens completas de lançamentos e pagamentos de cartão (`GET /api/credit-card-transactions` e `GET /api/credit-card-payments`) são paginadas por `limit` (padrão 2000, máximo 5000) e `offset`, respondendo `has_more`; o frontend percorre as páginas até receber uma página menor que `limit`.
 
 ## API e dados
 
@@ -161,8 +162,12 @@ Tabelas: `credit_cards`, `credit_card_transactions`, `credit_card_payments`, `cr
 - Dado um lançamento recorrente de cartão criado com a opção `use_average`, quando as ocorrências são geradas, então todas persistem `use_average` ativo.
 - Dado uma série recorrente de cartão com `use_average` ativo, quando o usuário edita qualquer ocorrência, então o sistema não exibe o modal de escopo e aplica automaticamente a alteração a todas as ocorrências futuras não conciliadas, recalculando seus valores pela média.
 - Dado uma série recorrente de cartão sem `use_average`, quando o usuário edita uma ocorrência, então o sistema mantém o comportamento atual de perguntar se deseja alterar apenas o lançamento atual ou também os futuros.
+- Dado `GET /api/credit-card-transactions` com `limit` e `offset` válidos, quando consultado, então retorna no máximo `limit` lançamentos da página solicitada com `has_more` adequado.
+- Dado `GET /api/credit-card-payments` com `limit` e `offset` válidos, quando consultado, então retorna no máximo `limit` pagamentos da página solicitada com `has_more` adequado.
 
 ## Changelog
+
+- `2.6` — 2026-08-07 — Listagens completas de cartão paginadas: `GET /api/credit-card-transactions` e `GET /api/credit-card-payments` aceitam `limit`/`offset` (padrão 2000, máximo 5000) e respondem `has_more`; o frontend itera as páginas automaticamente.
 
 - `2.5` — 2026-08-06 — Lançamentos recorrentes de cartão com `use_average` persistem a marcação em todas as ocorrências e, ao editar qualquer ocorrência dessa série, recalculam automaticamente os valores futuros pela média sem exibir modal de escopo.
 - `2.4` — 2026-08-06 — Lançamentos recorrentes de cartão permitem calcular valores futuros pela média dos últimos 12 lançamentos com mesma descrição e passam a usar 120 ocorrências automaticamente, sem exibir o campo de quantidade.

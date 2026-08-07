@@ -2,8 +2,8 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 1.3
-atualizado: 2026-08-06
+versao: 1.4
+atualizado: 2026-08-07
 relacionados:
   - "[[investimentos-portfolio]]"
   - "[[arquitetura]]"
@@ -14,7 +14,7 @@ aliases: ["Rentabilidade do Portfólio"]
 # Rentabilidade do Portfólio
 
 > [!info] Status
-> **implementado** · área: `investimentos` · atualizado em 2026-08-06 · relacionados: [[investimentos-portfolio]]
+> **implementado** · área: `investimentos` · atualizado em 2026-08-07 · relacionados: [[investimentos-portfolio]]
 
 ## Problema
 
@@ -55,8 +55,8 @@ Investidor que acompanha o Portfólio e quer uma leitura rápida de performance 
 - Mês cujo mês anterior tinha patrimônio zero (baseline vazio) não gera retorno sintético; vira o novo baseline.
 - Renda fixa e poupança têm valor mensal calculado pelos indexadores do Banco Central.
 - Renda variável, cripto, fundos, previdência e "outros" usam o valor atual conhecido como aproximação para todo o período histórico, pois o app não armazena cotações passadas; essa limitação é indicada no drawer.
-- O CDI é calculado como fator acumulado da série SGS 12 entre o primeiro e o último dia de cada mês (com cache por mês).
-- O IPCA é calculado como fator acumulado da série SGS 433 (indexador mensal) entre o primeiro e o último dia de cada mês (com cache por mês).
+- O CDI é calculado como fator acumulado da série SGS 12 entre o primeiro e o último dia de cada mês (com cache por mês, compartilhado entre as posições da mesma geração de série).
+- O IPCA é calculado como fator acumulado da série SGS 433 (indexador mensal) entre o primeiro e o último dia de cada mês (com cache por mês, compartilhado entre as posições da mesma geração de série).
 - Séries com todos os meses em 0% (moeda sem posições no período ou baseline) aparecem como linha plana; moedas sem posições abertas não geram linha própria.
 - O gráfico usa o estilo visual do gráfico de evolução de categoria (SVG puro, linhas e pontos, paleta do design system).
 
@@ -105,6 +105,7 @@ Tabelas: `investment_opening_positions`, `investment_operations`, `investment_re
 
 ## Changelog
 
+- `1.4` — 2026-08-07 — Desempenho: o fator acumulado de indexador (CDI/IPCA) por mês é decomposto por mês-calendário e compartilhado entre todas as posições e ativos de uma mesma geração de série (`_accumulated_factor_by_month`), reduzindo chamadas ao BCB; valores observáveis não mudam.
 - `1.3` — 2026-08-06 — Rework UX: gráfico de **barras → linhas** (R$, US$, CDI e IPCA em %), sem números fixos; valores em tooltip ao passar o mouse sobre os pontos; rentabilidade calculada **por moeda na própria moeda** (sem efeito de câmbio); adicionado benchmark **IPCA** (SGS 433 mensal). Ajuste visual posterior: **linhas suavizadas**, **eixos X/Y com grid e rótulos** e **área 15% maior**.
 - `1.2` — 2026-08-06 — Rentabilidade mensal consolidada da carteira inteira em BRL vs CDI do mês (substituída pela visão por moeda).
 - `1.1` — 2026-08-06 — Rentabilidade consolidada por moeda vs CDI acumulado do período (substituída pela visão mensal).

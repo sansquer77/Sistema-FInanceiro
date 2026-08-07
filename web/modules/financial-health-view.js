@@ -3,6 +3,7 @@ export function registerFinancialHealthView({
   elements,
   api,
   formatMoney,
+  formatPercentValue,
   escapeHtml,
 }) {
   const { financialHealthContent } = elements;
@@ -198,10 +199,10 @@ export function registerFinancialHealthView({
       return `Reserva marcada cobre <strong>${months} mês(es)</strong> de despesas médias. Valor elegível: <strong>${formatCents(data.reserva_elegivel_cents)}</strong>.`;
     }
     if (pillar.id === "endividamento") {
-      return `Parcelas do mês: <strong>${formatCents(data.dividas_parcelas_mes_cents)}</strong> · comprometimento: <strong>${formatDecimalPercent(data.comprometimento_divida_mes_pct)}</strong>.`;
+      return `Parcelas do mês: <strong>${formatCents(data.dividas_parcelas_mes_cents)}</strong> · comprometimento: <strong>${formatPercentValue(data.comprometimento_divida_mes_pct)}</strong>.`;
     }
     if (pillar.id === "concentracao_portfolio") {
-      return `Maior concentração: <strong>${formatDecimalPercent(data.maior_concentracao_portfolio_pct)}</strong> · Poupança: <strong>${formatDecimalPercent(data.concentracao_poupanca_pct)}</strong>.`;
+      return `Maior concentração: <strong>${formatPercentValue(data.maior_concentracao_portfolio_pct)}</strong> · Poupança: <strong>${formatPercentValue(data.concentracao_poupanca_pct)}</strong>.`;
     }
     if (pillar.id === "poupanca") {
       return `Receitas: <strong>${formatCents(data.receitas_cents)}</strong> · despesas de consumo: <strong>${formatCents(data.despesas_consumo_cents)}</strong>.`;
@@ -244,10 +245,6 @@ export function registerFinancialHealthView({
 
   function formatCents(cents) {
     return formatMoney(Number(cents || 0) / 100, "BRL");
-  }
-
-  function formatDecimalPercent(value) {
-    return `${Number(value || 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`;
   }
 
   function financialHealthLevelLabel(level) {

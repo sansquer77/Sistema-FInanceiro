@@ -598,11 +598,29 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def handle_list_credit_card_transactions(self) -> None:
         user = self.require_user()
-        self.send_json({"transactions": list_credit_card_transactions(user["id"])})
+        limit, offset = self.pagination_params()
+        transactions = list_credit_card_transactions(user["id"], limit=limit + 1, offset=offset)
+        self.send_json(
+            {
+                "transactions": transactions[:limit],
+                "limit": limit,
+                "offset": offset,
+                "has_more": len(transactions) > limit,
+            }
+        )
 
     def handle_list_credit_card_payments(self) -> None:
         user = self.require_user()
-        self.send_json({"payments": list_credit_card_payments(user["id"])})
+        limit, offset = self.pagination_params()
+        payments = list_credit_card_payments(user["id"], limit=limit + 1, offset=offset)
+        self.send_json(
+            {
+                "payments": payments[:limit],
+                "limit": limit,
+                "offset": offset,
+                "has_more": len(payments) > limit,
+            }
+        )
 
     def handle_list_transactions(self) -> None:
         user = self.require_user()
@@ -613,8 +631,22 @@ class AppHandler(BaseHTTPRequestHandler):
             normalized_account_id = int(account_id) if account_id else None
         except ValueError as exc:
             raise ApiError("Conta invalida.") from exc
-        transactions = list_transactions(user["id"], month=month, account_id=normalized_account_id)
-        self.send_json({"transactions": transactions})
+        limit, offset = self.pagination_params()
+        transactions = list_transactions(
+            user["id"],
+            month=month,
+            account_id=normalized_account_id,
+            limit=limit + 1,
+            offset=offset,
+        )
+        self.send_json(
+            {
+                "transactions": transactions[:limit],
+                "limit": limit,
+                "offset": offset,
+                "has_more": len(transactions) > limit,
+            }
+        )
 
     def handle_cockpit(self) -> None:
         user = self.require_user()
@@ -1262,6 +1294,15 @@ class AppHandler(BaseHTTPRequestHandler):
         if not user and not allow_anonymous:
             raise ApiError("Sessao expirada. Entre novamente.", HTTPStatus.UNAUTHORIZED)
         return user
+
+    def pagination_params(self) -> tuple[int, int]:
+        query = parse_qs(urlsplit(self.path).query)
+        try:
+            limit = int((query.get("limit") or ["2000"])[0])
+            offset = int((query.get("offset") or ["0"])[0])
+        except ValueError as exc:
+            raise ApiError("Parametros de paginacao invalidos.") from exc
+        return min(max(limit, 1), 5000), max(offset, 0)
 
     def read_json(self) -> dict:
         try:

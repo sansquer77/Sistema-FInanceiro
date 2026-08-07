@@ -35,21 +35,27 @@ class TransactionError(Exception):
         super().__init__(message)
 
 
-def list_transactions(user_id: int, month: str | None = None, account_id: int | None = None) -> list[dict]:
+def list_transactions(
+    user_id: int,
+    month: str | None = None,
+    account_id: int | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+) -> list[dict]:
     filters = ["transactions.user_id = ?", "transactions.archived_at IS NULL"]
     params: list[object] = [user_id]
     if month:
         normalized_month = normalize_month_filter(month)
-        if account_id:
-            filters.append("transactions.date <= ?")
-            params.append(month_end_date(normalized_month))
-        else:
-            filters.append("transactions.date >= ? AND transactions.date <= ?")
-            params.extend([f"{normalized_month}-01", month_end_date(normalized_month)])
+        filters.append("transactions.date >= ? AND transactions.date <= ?")
+        params.extend([f"{normalized_month}-01", month_end_date(normalized_month)])
     if account_id:
         filters.append("(transactions.account_id = ? OR transactions.destination_account_id = ?)")
         params.extend([account_id, account_id])
     where_clause = " AND ".join(filters)
+    pagination = ""
+    if limit is not None:
+        pagination = " LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
     with get_connection() as conn:
         rows = conn.execute(
             f"""
@@ -109,6 +115,7 @@ def list_transactions(user_id: int, month: str | None = None, account_id: int | 
             WHERE {where_clause}
             GROUP BY transactions.id
             ORDER BY transactions.date DESC, transactions.id DESC
+            {pagination}
             """,
             params,
         ).fetchall()
@@ -127,6 +134,24 @@ def normalize_month_filter(value: str) -> str:
 def month_end_date(month: str) -> str:
     year, month_number = map(int, month.split("-"))
     return date(year, month_number, days_in_month(year, month_number)).isoformat()
+
+
+MAX_LIST_LIMIT = 5000
+
+
+def normalize_limit(value: object | None) -> int:
+    try:
+        limit = int(value or 2000)
+    except (TypeError, ValueError) as exc:
+        raise TransactionError("Limite invalido.") from exc
+    return min(max(limit, 1), MAX_LIST_LIMIT)
+
+
+def normalize_offset(value: object | None) -> int:
+    try:
+        return max(int(value or 0), 0)
+    except (TypeError, ValueError) as exc:
+        raise TransactionError("Pagina invalida.") from exc
 
 
 def create_transaction(user_id: int, data: dict) -> dict:
@@ -236,7 +261,7 @@ def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
         category_id, subcategory_id = resolve_transaction_category(conn, user_id, transaction, destination)
         tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
 
-        # spec: lancamentos v3.2 — criterios 26 e 27
+        # spec: lancamentos v3.3 — criterios 26 e 27
         # (series recorrentes com use_average ativo aplicam edicao em cascata
         #  automaticamente e recalculam valores futuros pela media)
         force_apply_to_future = bool(existing["use_average"]) and existing["series_kind"] == "recurring"
@@ -283,7 +308,7 @@ def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
 
 
 def update_future_series_transactions(conn, user_id: int, existing, transaction: dict, force_apply_to_future: bool = False) -> None:
-    # spec: lancamentos v3.2 — criterio 27
+    # spec: lancamentos v3.3 — criterio 27
     # (series recorrentes com use_average ativo propagam edicao automaticamente
     #  e recalculam valores futuros pela media; demais series mantem apply_to_future)
     # spec: lancamentos v2.9 — criterio 7 (apply_to_future)
@@ -324,7 +349,7 @@ def update_future_series_transactions(conn, user_id: int, existing, transaction:
         transaction["exchange_rate"],
     )
     category_id, subcategory_id = resolve_transaction_category(conn, user_id, transaction, destination)
-    # spec: lancamentos v3.2 — criterio 27
+    # spec: lancamentos v3.3 — criterio 27
     # (quando use_average estiver ativo, recalcula o valor da serie pela media)
     if force_apply_to_future and existing["series_kind"] == "recurring":
         average_amount = average_amount_for_recurring_description(
@@ -694,7 +719,7 @@ def average_amount_for_recurring_description(
     subcategory_id: int | None,
     max_date: str | None = None,
 ) -> int | None:
-    # spec: lancamentos v3.2 — critério 27
+    # spec: lancamentos v3.3 — critério 27
     # (media dos ultimos 12 lancamentos anteriores ou na data de corte; ao recalcular
     #  uma serie, os lancamentos futuros da propria serie nao devem influenciar a media)
     normalized = normalize_description(description)

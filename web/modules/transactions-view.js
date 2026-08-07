@@ -2,6 +2,7 @@ export function registerTransactionsView({
   state,
   elements,
   api,
+  fetchAllListed,
   formData,
   setFormBusy,
   setMessage,
@@ -13,6 +14,7 @@ export function registerTransactionsView({
   formatDate,
   formatMonthLabel,
   formatMonthShortLabel,
+  formatShortMonthName,
   formatCategoryPath,
   moneyInputValue,
   parseDecimalInput,
@@ -253,7 +255,7 @@ export function registerTransactionsView({
       state.accountTransactions = [];
       return;
     }
-    const response = await api(`/api/transactions?month=${encodeURIComponent(month)}&account_id=${encodeURIComponent(accountId)}`);
+    const response = await fetchAllListed(`/api/transactions?month=${encodeURIComponent(month)}&account_id=${encodeURIComponent(accountId)}`, "transactions");
     if (
       requestId !== state.transactionSliceRequestId
       || month !== state.transactionMonth
@@ -261,7 +263,7 @@ export function registerTransactionsView({
     ) {
       return;
     }
-    state.accountTransactions = response.transactions || [];
+    state.accountTransactions = response;
   }
 
   async function handleTransactionSubmit(event) {
@@ -398,12 +400,12 @@ export function registerTransactionsView({
     const [, accountsResponse, transactionsResponse] = await Promise.all([
       loadTransactionSlice(),
       api("/api/checking-accounts"),
-      api("/api/transactions"),
+      fetchAllListed("/api/transactions", "transactions"),
       loadCockpit(),
     ]);
     state.accounts = accountsResponse.accounts || [];
     ensureSelectedAccount();
-    state.transactions = transactionsResponse.transactions || [];
+    state.transactions = transactionsResponse || [];
     markPortfolioDirty();
     renderBaseViews();
     renderFinanceViews();
@@ -739,7 +741,7 @@ export function registerTransactionsView({
       return {
         offset,
         month,
-        label: shortMonthLabel(month),
+        label: formatShortMonthName(month),
         description: offset < 0 ? "Conciliado" : "Previsto",
         amount,
         currency: account.currency,
@@ -798,15 +800,6 @@ export function registerTransactionsView({
       const midX = (previous.x + point.x) / 2;
       return `${path} C ${midX} ${previous.y}, ${midX} ${point.y}, ${point.x} ${point.y}`;
     }, "");
-  }
-
-  function shortMonthLabel(month) {
-    const [year, monthNumber] = String(month).split("-").map(Number);
-    if (!year || !monthNumber) {
-      return month;
-    }
-    const date = new Date(year, monthNumber - 1, 1);
-    return date.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
   }
 
   async function handleBalanceHistoryClick(event) {
