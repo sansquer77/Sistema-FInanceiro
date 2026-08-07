@@ -2,7 +2,7 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 3.3
+versao: 3.4
 atualizado: 2026-08-07
 relacionados:
   - "[[contas-correntes]]"
@@ -110,6 +110,7 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 - No formulário de investimento de Lançamentos de Contas, aportes de Renda Fixa ou Poupança devem exibir marcador compacto `Usar este aporte como reserva de emergência`, persistindo essa decisão na operação de investimento. A marcação não aparece nem é enviada para outros tipos de ativo.
 - O formulário de investimento deve se adaptar ao ativo selecionado para reduzir dúvidas: quando o aporte for Poupança, campos de quantidade, preço unitário, renda fixa, CNPJ, corretagem, emolumentos, impostos e outros custos ficam ocultos/desabilitados, pois não são aplicáveis.
 - A listagem completa de lançamentos (`GET /api/transactions`) é paginada por `limit` (padrão 2000, máximo 5000) e `offset`, respondendo `has_more`; o frontend percorre as páginas até receber uma página menor que `limit`.
+- Com `month` e `account_id` juntos, a listagem retorna todo o histórico da conta até o fim do mês informado (sem limite inferior de data) — o extrato usa essa fatia para calcular saldos previsto/conciliado a partir do saldo inicial da conta; o intervalo estrito do mês (`>= primeira data do mês`) aplica-se apenas à listagem sem conta.
 
 ## API e dados
 
@@ -175,6 +176,7 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 
 ## Changelog
 
+- `3.4` — 2026-08-07 — Corrigida uma regressão da v3.3: a fatia de `GET /api/transactions` com **mês + conta** voltou a retornar todo o histórico da conta até o fim do mês (`date <= fim do mês`, sem limite inferior), pois o extrato calcula saldos acumulados partindo do saldo inicial da conta somado aos lançamentos até a data (ver `getBalanceUntil` no frontend). O intervalo estrito do mês aplica-se apenas à listagem sem conta. Teste de regressão adicionado.
 - `3.3` — 2026-08-07 — Listagens completas paginadas: `GET /api/transactions` aceita `limit`/`offset` (padrão 2000, máximo 5000) e responde `has_more`; o frontend itera as páginas automaticamente.
 
 - `3.2` — 2026-08-06 — Lançamentos recorrentes com `use_average` persistem a marcação em todas as ocorrências e, ao editar qualquer ocorrência dessa série, recalculam automaticamente os valores futuros pela média sem exibir modal de escopo.

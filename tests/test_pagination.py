@@ -116,6 +116,30 @@ class ListPaginationTest(unittest.TestCase):
         self.assertEqual(len(payload["transactions"]), 3)
         self.assertTrue(payload["has_more"])
 
+    def test_month_account_slice_keeps_history_for_cumulative_balance(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = self._account(user["id"])
+        create_transaction(user["id"], {
+            "account_id": str(account["id"]),
+            "type": "income",
+            "description": "Salario de dezembro",
+            "amount": "4200,00",
+            "date": "2025-12-05",
+            "category": "Salario",
+        })
+        create_transaction(user["id"], {
+            "account_id": str(account["id"]),
+            "type": "expense",
+            "description": "Gasto de janeiro",
+            "amount": "200,00",
+            "date": "2026-01-10",
+            "category": "Mercado",
+        })
+
+        rows = list_transactions(user["id"], month="2026-01", account_id=account["id"])
+        self.assertEqual(len(rows), 2)
+        self.assertIn("2025-12-05", [row["date"] for row in rows])
+
     def test_transactions_endpoint_clamps_oversized_limit(self) -> None:
         user = create_user("Alice", "alice@example.com", "correct-password")
         account = self._account(user["id"])

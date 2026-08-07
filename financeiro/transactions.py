@@ -46,8 +46,15 @@ def list_transactions(
     params: list[object] = [user_id]
     if month:
         normalized_month = normalize_month_filter(month)
-        filters.append("transactions.date >= ? AND transactions.date <= ?")
-        params.extend([f"{normalized_month}-01", month_end_date(normalized_month)])
+        if account_id:
+            # spec: lancamentos v3.4 — a fatia de mes+conta mantem todo o historico
+            # ate o fim do mes (sem limite inferior) porque o extrato calcula saldos
+            # acumulados partindo do saldo inicial da conta (ver web/app.js getBalanceUntil)
+            filters.append("transactions.date <= ?")
+            params.append(month_end_date(normalized_month))
+        else:
+            filters.append("transactions.date >= ? AND transactions.date <= ?")
+            params.extend([f"{normalized_month}-01", month_end_date(normalized_month)])
     if account_id:
         filters.append("(transactions.account_id = ? OR transactions.destination_account_id = ?)")
         params.extend([account_id, account_id])
