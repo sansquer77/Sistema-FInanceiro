@@ -8,7 +8,6 @@ export function registerPortfolioView({
   formatMoney,
   formatPercent,
   formatDate,
-  formatMonthLabel,
   formatMonthShortLabel,
   formatDecimal,
   moneyInputValue,
@@ -56,6 +55,7 @@ export function registerPortfolioView({
     portfolioReturnDrawerTitle,
     portfolioReturnChart,
     portfolioReturnXLabels,
+    portfolioReturnYAxis,
     portfolioReturnLegend,
     portfolioReturnNotice,
     portfolioPositionCount,
@@ -102,12 +102,19 @@ export function registerPortfolioView({
   portfolioReturnDrawerOverlay?.addEventListener("click", closePortfolioReturnDrawer);
   portfolioReturnDrawerCloseBtn?.addEventListener("click", closePortfolioReturnDrawer);
 
-  function openPortfolioReturnDrawer() {
+  async function openPortfolioReturnDrawer() {
     if (!portfolioReturnDrawer) {
       return;
     }
     portfolioReturnDrawer.hidden = false;
     portfolioReturnDrawer.setAttribute("aria-hidden", "false");
+    if (!state.portfolioReturns || state.portfolioReturns.error) {
+      try {
+        state.portfolioReturns = await api("/api/portfolio/returns");
+      } catch (error) {
+        state.portfolioReturns = { error: error.message || "Erro ao carregar" };
+      }
+    }
     renderPortfolioReturns();
   }
 
@@ -508,9 +515,9 @@ export function registerPortfolioView({
     portfolioDayResultSummary.innerHTML = portfolioSummaryMetric(currencyRows, (row) => `${formatMoney(row.day_result_brl, row.currency)} · ${formatPortfolioPercent(row.day_result_percent)}`, true, (row) => Number(row.day_result_brl));
     portfolioPositionCount.textContent = String(summary.position_count || 0);
     if (portfolioReturnChartBtn) {
-      const hasReturns = state.portfolioReturns && state.portfolioReturns.series && state.portfolioReturns.series.length > 0;
-      console.log("[portfolio-returns-debug] returns:", state.portfolioReturns, "hasReturns:", hasReturns);
-      portfolioReturnChartBtn.hidden = !hasReturns;
+      const hasPositions = (summary.position_count || 0) > 0;
+      console.log("[portfolio-returns-debug] returns:", state.portfolioReturns, "hasPositions:", hasPositions);
+      portfolioReturnChartBtn.hidden = !hasPositions;
     }
     renderPortfolioGroupList(portfolioTypeList, summary.by_type);
     renderPortfolioGroupList(portfolioIndexerList, summary.by_indexer);
@@ -559,85 +566,180 @@ export function registerPortfolioView({
       return;
     }
     if (portfolioReturnDrawerTitle) {
-      const start = formatMonthLabel(returns.start_month);
-      const end = formatMonthLabel(returns.end_month);
+      const start = formatReturnMonthLabel(returns.start_month);
+      const end = formatReturnMonthLabel(returns.end_month);
       portfolioReturnDrawerTitle.textContent = start === end ? start : `${start} a ${end}`;
     }
     if (portfolioReturnNotice) {
       portfolioReturnNotice.hidden = !returns.has_historical_approximation;
     }
 
-    const months = [...new Set(returns.series.map((entry) => entry.month))].sort();
-    const currencies = [...new Set(returns.series.map((entry) => entry.currency))].sort();
-    const cdiColor = "var(--muted)";
-    const barWidth = 7;
-    const step = months.length > 1 ? 100 / months.length : 100;
-    const centerOffset = (currencies.length * barWidth) / 2;
+    const entries = returns.series;
+    const plotWidth = 100;
+    const plotTop = 2;
+    const plotBottom = 48;
+    const plotHeight = plotBottom - plotTop;
+    const marginX = 2;
+    const step = entries.length > 1 ? (plotWidth - marginX * 2) / (entries.length - 1) : 0;
+
+    const seriesConfig = [
+      { key: "BRL_return_pct", label: "R$", color: chartColor(0) },
+      { key: "USD_return_pct", label: "US$", color: chartColor(1) },
+      { key: "cdi_return_pct", label: "CDI", color: "var(--muted)" },
+      { key: "ipca_return_pct", label: "IPCA", color: "var(--accent)" },
+    ];
 
     const maxAbs = Math.max(
       0.01,
-      ...returns.series.map((entry) => Math.max(
-        Math.abs(entry.portfolio_return_pct || 0),
-        Math.abs(entry.cdi_return_pct || 0),
+      ...entries.map((entry) => Math.max(
+        Math.abs(Number(entry.BRL_return_pct || 0)),
+        Math.abs(Number(entry.USD_return_pct || 0)),
+        Math.abs(Number(entry.cdi_return_pct || 0)),
+        Math.abs(Number(entry.ipca_return_pct || 0)),
       )),
     );
 
-    const bars = [];
-    const labels = [];
+    const niceMax = niceCeil(maxAbs);
+    const halfMax = niceMax / 2;
+    const yTicks = [-niceMax, -halfMax, 0, halfMax, niceMax];
 
-    months.forEach((month, monthIndex) => {
-      const xCenter = (monthIndex + 0.5) * step;
-      const monthData = returns.series.filter((entry) => entry.month === month);
-      const xStart = xCenter - centerOffset - barWidth / 2;
+    const yFor = (value) => {
+      const zeroY = plotTop + plotHeight / 2;
+      const out = zeroY - (value / niceMax) * (plotHeight / 2);
+      return Math.max(plotTop, Math.min(plotBottom, out));
+    };
+    const xFor = (index) => (entries.length > 1 ? marginX + index * step : plotWidth / 2);
 
-      currencies.forEach((currency, currencyIndex) => {
-        const data = monthData.find((entry) => entry.currency === currency);
-        const value = data ? data.portfolio_return_pct : 0;
-        bars.push(renderReturnBar(xStart + currencyIndex * barWidth, value, maxAbs, chartColor(currencyIndex), currency, barWidth));
-      });
+    const yTicksGrid = yTicks.map((tick) => {
+      const y = yFor(tick);
+      if (Math.abs(tick) < 0.0001) {
+        return "";
+      }
+      return `<line x1="${marginX}" y1="${y.toFixed(2)}" x2="${plotWidth - marginX}" y2="${y.toFixed(2)}" stroke="var(--line)" stroke-width="0.2" stroke-dasharray="0.9 0.9" stroke-opacity="0.5" />`;
+    }).join("");
 
-      const cdiValue = monthData[0] ? monthData[0].cdi_return_pct : 0;
-      bars.push(renderReturnBar(xStart + currencies.length * barWidth, cdiValue, maxAbs, cdiColor, "CDI", barWidth));
+    const chart = seriesConfig.map((series) => {
+      const points = entries
+        .map((entry, index) => {
+          if (entry[series.key] === undefined || entry[series.key] === null) {
+            return null;
+          }
+          const value = Number(entry[series.key]);
+          return { x: xFor(index), y: yFor(value), value, index };
+        })
+        .filter((point) => point !== null);
 
-      labels.push(`<span style="left:${(xCenter).toFixed(2)}%">${formatReturnMonthLabel(month)}</span>`);
-    });
+      if (points.length === 0) {
+        return "";
+      }
+
+      const linePath = smoothPath(points);
+
+      const circles = points.map((point) => {
+        const monthLabel = formatReturnMonthLabel(entries[point.index].month);
+        const displayValue = `${(point.value > 0 ? "+" : "")}${point.value.toFixed(2)}%`;
+        return `<circle cx="${point.x.toFixed(2)}" cy="${point.y.toFixed(2)}" r="1.9" fill="${series.color}">
+          <title>${escapeHtml(series.label)} · ${escapeHtml(monthLabel)}: ${escapeHtml(displayValue)}</title>
+        </circle>`;
+      }).join("");
+
+      return `
+        <g class="portfolio-return-line-group">
+          <path d="${linePath}" fill="none" stroke="${series.color}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.88" />
+          ${circles}
+        </g>
+      `;
+    }).join("");
 
     if (portfolioReturnChart) {
       portfolioReturnChart.innerHTML = `
-        <line x1="0" y1="25" x2="100" y2="25" stroke="var(--line)" stroke-width="0.3" />
-        ${bars.join("")}
+        <line x1="${marginX}" y1="${yFor(0).toFixed(2)}" x2="${plotWidth - marginX}" y2="${yFor(0).toFixed(2)}" stroke="var(--ink)" stroke-width="0.4" />
+        ${yTicksGrid}
+        ${chart}
       `;
     }
+    if (portfolioReturnYAxis) {
+      const labelFor = (tick) => {
+        if (Math.abs(tick) < 0.0001) {
+          return "0%";
+        }
+        const sign = tick > 0 ? "+" : "";
+        return `${sign}${formatPercentCompact(tick)}`;
+      };
+      portfolioReturnYAxis.innerHTML = yTicks.map((tick) => {
+        const top = (yFor(tick) / 50) * 100;
+        return `<span style="top:${top.toFixed(1)}%">${labelFor(tick)}</span>`;
+      }).join("");
+    }
     if (portfolioReturnXLabels) {
-      portfolioReturnXLabels.innerHTML = labels.join("");
+      portfolioReturnXLabels.innerHTML = entries.map((entry, index) => {
+        const xCenter = xFor(index);
+        return `<span style="left:${(xCenter / plotWidth * 100).toFixed(2)}%">${formatReturnMonthShortLabel(entry.month)}</span>`;
+      }).join("");
     }
     if (portfolioReturnLegend) {
-      const legendItems = currencies.map((currency, index) => `
-        <span><i style="background:${chartColor(index)}"></i>${escapeHtml(currency)}</span>
-      `).join("");
-      portfolioReturnLegend.innerHTML = `${legendItems}<span><i style="background:${cdiColor}"></i>CDI</span>`;
+      portfolioReturnLegend.innerHTML = seriesConfig
+        .map((series) => `<span><i style="background:${series.color}"></i>${series.label}</span>`)
+        .join("");
     }
+  }
+
+  function niceCeil(value) {
+    if (value <= 0) {
+      return 1;
+    }
+    const power = Math.pow(10, Math.floor(Math.log10(value)));
+    const fraction = value / power;
+    if (fraction <= 1) {
+      return power;
+    }
+    if (fraction <= 2) {
+      return 2 * power;
+    }
+    if (fraction <= 5) {
+      return 5 * power;
+    }
+    return 10 * power;
+  }
+
+  function formatPercentCompact(value) {
+    const formatted = Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+    return `${formatted}%`;
+  }
+
+  function smoothPath(points) {
+    if (points.length === 0) {
+      return "";
+    }
+    if (points.length === 1) {
+      return `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
+    }
+    const start = points[0];
+    let d = `M ${start.x.toFixed(2)} ${start.y.toFixed(2)}`;
+    for (let i = 0; i < points.length - 1; i += 1) {
+      const p0 = points[Math.max(i - 1, 0)];
+      const p1 = points[i];
+      const p2 = points[i + 1];
+      const p3 = points[Math.min(i + 2, points.length - 1)];
+      const cp1x = p1.x + (p2.x - p0.x) / 6;
+      const cp1y = p1.y + (p2.y - p0.y) / 6;
+      const cp2x = p2.x - (p3.x - p1.x) / 6;
+      const cp2y = p2.y - (p3.y - p1.y) / 6;
+      d += ` C ${cp1x.toFixed(2)} ${cp1y.toFixed(2)}, ${cp2x.toFixed(2)} ${cp2y.toFixed(2)}, ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`;
+    }
+    return d;
   }
 
   function formatReturnMonthLabel(month) {
     const [year, monthNumber] = month.split("-").map(Number);
     const date = new Date(year, monthNumber - 1, 1);
-    return date.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "").slice(0, 1).toUpperCase();
+    return date.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
   }
 
-  function renderReturnBar(x, value, maxAbs, color, label, barWidth) {
-    const zeroY = 25;
-    const height = (Math.abs(value) / maxAbs) * 22;
-    const y = value >= 0 ? zeroY - height : zeroY;
-    const displayValue = `${(value > 0 ? "+" : "")}${value.toFixed(2)}%`;
-    return `
-      <g class="portfolio-return-bar-group">
-        <rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${barWidth - 0.5}" height="${height.toFixed(2)}" fill="${color}" rx="0.5">
-          <title>${escapeHtml(label)}: ${escapeHtml(displayValue)}</title>
-        </rect>
-        <text x="${(x + barWidth / 2 - 0.25).toFixed(2)}" y="${value >= 0 ? (y - 1.5).toFixed(2) : (y + height + 2).toFixed(2)}" class="portfolio-return-label">${escapeHtml(displayValue)}</text>
-      </g>
-    `;
+  function formatReturnMonthShortLabel(month) {
+    const [year, monthNumber] = month.split("-").map(Number);
+    const date = new Date(year, monthNumber - 1, 1);
+    return date.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "").slice(0, 1).toUpperCase();
   }
 
   function portfolioSummaryCurrencyRows(summary) {

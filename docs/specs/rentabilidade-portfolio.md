@@ -2,52 +2,63 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 1.0
+versao: 1.3
 atualizado: 2026-08-06
 relacionados:
   - "[[investimentos-portfolio]]"
   - "[[arquitetura]]"
-tags: [spec, "area/investimentos", "status/rascunho"]
+tags: [spec, "area/investimentos", "status/implementado"]
 aliases: ["Rentabilidade do Portfólio"]
 ---
 
 # Rentabilidade do Portfólio
 
 > [!info] Status
-> **rascunho** · área: `investimentos` · atualizado em 2026-08-06 · relacionados: [[investimentos-portfolio]]
+> **implementado** · área: `investimentos` · atualizado em 2026-08-06 · relacionados: [[investimentos-portfolio]]
 
 ## Problema
 
-O usuário precisa visualizar a evolução da rentabilidade da carteira de investimentos mês a mês, comparada com um benchmark simples (CDI), para entender se o patrimônio está rendendo acima ou abaixo da renda fixa básica.
+O usuário precisa visualizar a rentabilidade mensal da carteira em percentual, por moeda consolidada (R$ e US$), comparada com os benchmarks CDI e IPCA, para entender se o patrimônio rendeu acima da renda fixa básica e da inflação em cada mês disponível.
 
 ## Usuário
 
-Investidor que acompanha o Portfólio e quer uma leitura rápida de performance ao longo do tempo, em cada moeda da carteira.
+Investidor que acompanha o Portfólio e quer uma leitura rápida de performance mensal por moeda, nos últimos 12 meses (ou todo o período cadastrado, quando menor).
 
 ## Jornada
 
 1. O usuário abre o menu Portfólio.
-2. Na seção "Resumo da Carteira", visualiza o card "Rentabilidade" com o percentual total por moeda.
-3. Ao clicar no botão de gráfico dentro do card "Rentabilidade", um drawer exibe barras mês a mês comparando a rentabilidade da carteira e do CDI.
-4. O usuário identifica meses positivos/negativos e o acumulado do período disponível.
+2. Na seção "Resumo da Carteira", visualiza o card "Rentabilidade" com o percentual consolidado.
+3. Ao clicar no botão de gráfico dentro do card "Rentabilidade", um drawer exibe um **gráfico de linhas** mês a mês com as séries R$, US$, CDI e IPCA (todas em %).
+4. Ao passar o mouse sobre um ponto mensal, um tooltip mostra o valor percentual daquele mês para cada série.
+5. O usuário identifica meses acima/abaixo do CDI e da inflação e o maior/menor rendimento do período.
 
 ## Dados
 
 - `month`: mês no formato `AAAA-MM`.
-- `portfolio_return_pct`: rentabilidade percentual da carteira naquele mês (variação isolada do mês).
-- `cdi_return_pct`: rentabilidade percentual do CDI naquele mês (variação isolada do mês).
-- `currency`: moeda daquela série (ex.: `BRL`, `USD`).
+- `BRL_return_pct`: rentabilidade percentual mensal da carteira em reais (variação isolada do mês, calculada na própria moeda).
+- `USD_return_pct`: rentabilidade percentual mensal da carteira em dólares (variação isolada do mês, calculada na própria moeda).
+- `cdi_return_pct`: rentabilidade percentual mensal do CDI (variação isolada do mês).
+- `ipca_return_pct`: rentabilidade percentual mensal do IPCA (variação isolada do mês).
+- `start_month` / `end_month`: período da série (AAAA-MM).
 
 ## Regras
 
-- O gráfico deve usar o mesmo estilo visual do gráfico de evolução de categoria (SVG puro, barras, labels de valor, paleta do design system).
-- O período calculado começa no primeiro mês com posição ou aporte registrado e vai até o mês atual (quando o usuário pede YTD mas a base só tem dados parciais, usa-se 100% do período cadastrado).
-- Para cada mês, o cálculo considera o valor da carteira no último dia do mês.
+- O gráfico é **de linhas** (não barras), baseado em **percentuais**, sem valores numéricos fixos no desenho; os valores aparecem em tooltip ao passar o mouse sobre os pontos.
+- As linhas são **suavizadas** (interpolação por curvas Catmull-Rom) e o gráfico exibe **eixos X e Y** com gridlines e rótulos percentuais no eixo vertical.
+- A área de desenho é **15% maior** que a versão anterior para legibilidade.
+- A rentabilidade é **consolidada por moeda** (carteira inteira em R$ / carteira inteira em US$), nunca por produto individual.
+- Cada moeda é calculada **na própria moeda** (valores nativos em centavos da moeda), sem efeito de câmbio na série.
+- O gráfico mostra **12 meses** fixos, ou todos os meses disponíveis quando a base tem menos de 12 meses.
+- O período começa no primeiro mês com posição/operação cadastrada e vai até o mês atual.
+- Cada mês usa o valor do patrimônio no último dia do mês (limitado a hoje).
+- Posição que **entra no mês corrente** conta pelo custo (baseline), sem retorno sintético de entrada; a valorização começa nos meses seguintes.
+- Mês cujo mês anterior tinha patrimônio zero (baseline vazio) não gera retorno sintético; vira o novo baseline.
 - Renda fixa e poupança têm valor mensal calculado pelos indexadores do Banco Central.
-- Renda variável, cripto, fundos, previdência e "outros" usam o valor atual conhecido como aproximação para todo o período histórico, pois o app não armazena cotações passadas; essa limitação deve ser indicada visualmente.
-- O CDI é calculado como fator acumulado da série SGS 12 entre o primeiro dia do período e o último dia de cada mês.
-- A rentabilidade da carteira em cada mês é calculada sobre o patrimônio líquido (valor atual menos impostos estimados, quando aplicável).
-- Multi-moeda: cada moeda com posição aberta gera sua própria série de barras; o CDI é exibido como benchmark em cada moeda (o fator percentual é o mesmo, mas o contexto é por moeda).
+- Renda variável, cripto, fundos, previdência e "outros" usam o valor atual conhecido como aproximação para todo o período histórico, pois o app não armazena cotações passadas; essa limitação é indicada no drawer.
+- O CDI é calculado como fator acumulado da série SGS 12 entre o primeiro e o último dia de cada mês (com cache por mês).
+- O IPCA é calculado como fator acumulado da série SGS 433 (indexador mensal) entre o primeiro e o último dia de cada mês (com cache por mês).
+- Séries com todos os meses em 0% (moeda sem posições no período ou baseline) aparecem como linha plana; moedas sem posições abertas não geram linha própria.
+- O gráfico usa o estilo visual do gráfico de evolução de categoria (SVG puro, linhas e pontos, paleta do design system).
 
 ## API e dados
 
@@ -59,16 +70,17 @@ Tabelas: `investment_opening_positions`, `investment_operations`, `investment_re
 
 ## Critérios de aceite
 
-- Dado o usuário abrindo o Portfólio, quando a seção "Resumo da Carteira" é exibida, então o card "Rentabilidade" mantém o percentual total por moeda e exibe um botão para abrir o gráfico mês a mês.
-- Dado o usuário clicando no botão de gráfico do card "Rentabilidade", quando o drawer é aberto, então ele exibe barras comparando a carteira e o CDI.
-- Dado uma carteira com posições em BRL, quando o gráfico é exibido, então há uma série de barras para a rentabilidade da carteira em BRL e outra série para o CDI.
-- Dado uma carteira com posições em USD (ou outra moeda), quando o gráfico é exibido, então há uma série adicional para essa moeda, mantendo o CDI como benchmark visível.
-- Dado o primeiro investimento cadastrado em Jun/2026 e o mês atual Ago/2026, quando o usuário seleciona YTD, então o gráfico mostra os meses Jun, Jul e Ago (100% do período cadastrado), pois não há dados de Jan a Mai.
-- Dado uma posição de renda fixa CDI, quando o cálculo mensal é executado, então o valor da posição é projetado pelo fator acumulado do CDI até o último dia de cada mês.
-- Dado uma posição de ações/cripto sem cotação histórica, quando o cálculo mensal é executado, então o gráfico usa o valor atual como aproximação e exibe um aviso discreto sobre a limitação.
-- Dado o gráfico de rentabilidade exibido, quando há valores positivos e negativos, então as barras crescem para cima (positivo) ou para baixo (negativo) a partir do eixo zero.
-- Dado o gráfico exibido, quando o usuário passa o mouse ou foca uma barra, então o valor percentual daquele mês é legível (label ou tooltip).
+- Dado o usuário abrindo o Portfólio, quando a seção "Resumo da Carteira" é exibida, então o card "Rentabilidade" mantém o percentual consolidado e exibe um botão para abrir o gráfico mensal vs CDI/IPCA.
+- Dado o usuário clicando no botão de gráfico do card "Rentabilidade", quando o drawer é aberto, então ele exibe um gráfico de linhas com as séries R$, US$, CDI e IPCA (as que tiverem dados).
+- Dado o gráfico exibido, quando o usuário passa o mouse sobre um ponto mensal, então um tooltip mostra o valor percentual daquele mês e série.
+- Dado o gráfico exibido, quando há valores positivos e negativos, então as linhas atravessam o eixo zero sem truncamento.
+- Dado uma carteira com posições somente em BRL, quando o gráfico é exibido, então há linha R$ (e CDI/IPCA), sem linha US$ vazia.
+- Dado uma carteira com posições em BRL e USD, quando o gráfico é exibido, então há linhas R$, US$, CDI e IPCA.
+- Dado uma carteira com 12 meses ou mais de histórico, quando o gráfico é exibido, então são mostrados exatamente os últimos 12 meses.
+- Dado uma carteira com menos de 12 meses de histórico, quando o gráfico é exibido, então são mostrados todos os meses disponíveis desde a primeira posição.
 - Dado o usuário sem investimentos cadastrados, quando o card é exibido, então aparece estado vazio com mensagem amigável em vez de gráfico.
+- Dado um erro ao consultar o CDI/IPCA ou ao montar o resumo, quando o drawer é aberto, então o app exibe mensagem de erro sem travar o Portfólio.
+- Dado uma posição que entrou no mês atual, quando o gráfico calcula aquele mês, então o aporte não é tratado como retorno (marca baseline).
 
 ## Pendências
 
@@ -79,21 +91,25 @@ Tabelas: `investment_opening_positions`, `investment_operations`, `investment_re
 
 - Armazenamento de cotações históricas de renda variável/cripto.
 - Cálculo de rentabilidade TWR (Time-Weighted Return) ou MWR (Money-Weighted Return) complexos.
-- Benchmarks além do CDI nesta versão.
+- Rentabilidade por produto individual no gráfico.
+- Benchmarks além de CDI e IPCA nesta versão.
 
 ## Plano de implementação
 
-- [ ] Passo 1 — Adicionar função em `financeiro/portfolio.py` para calcular o valor de uma posição de renda fixa/poupança em uma data arbitrária (reutilizando lógica existente). Fecha: critério 5.
-- [ ] Passo 2 — Adicionar função em `financeiro/portfolio.py` para calcular CDI acumulado entre duas datas via SGS 12. Fecha: critérios 2, 3, 4.
-- [ ] Passo 3 — Criar endpoint `GET /api/portfolio/returns` que monta série mensal por moeda (patrimônio histórico + CDI). Fecha: critérios 1, 2, 3, 4.
-- [ ] Passo 4 — Adicionar card "Rentabilidade mês a mês" no HTML do Portfólio e renderizar gráfico de barras em `web/modules/portfolio-view.js`. Fecha: critérios 1, 6, 7, 8.
-- [ ] Passo 5 — Adicionar estilos do gráfico em `web/styles.css`. Fecha: critérios 1, 7.
-- [ ] Passo 6 — Escrever testes automatizados para o cálculo de série mensal e CDI acumulado. Fecha: critérios 2, 3, 4, 5.
+- [x] Passo 1 — Reescrever `get_portfolio_returns` em `financeiro/portfolio.py` para série mensal **por moeda** (BRL e USD em %) com CDI e IPCA por mês, com cache de fator por mês. Fecha: critérios 2, 6, 7, 8, 12.
+- [x] Passo 2 — Adicionar `_position_value_native_as_of`, `_cdi_factor_for_month` e `_ipca_factor_for_month` em `financeiro/portfolio.py`, limitando a série a 12 meses. Fecha: critérios 3, 4, 5, 7, 8.
+- [x] Passo 3 — Manter endpoint `GET /api/portfolio/returns` retornando `series` mensal por moeda + CDI + IPCA. Fecha: critérios 1, 2, 9, 10.
+- [x] Passo 4 — Renderizar no drawer linhas R$/US$/CDI/IPCA com pontos e tooltip em `web/modules/portfolio-view.js`. Fecha: critérios 3, 4, 5, 6.
+- [x] Passo 5 — Ajustar estilos do gráfico em `web/styles.css` (reuso das classes existentes). Fecha: critérios 3, 4.
+- [x] Passo 6 — Escrever testes automatizados para o cálculo mensal por moeda e CDI/IPCA por mês. Fecha: critérios 2, 3, 4, 5, 6, 7, 8, 12.
 
 ## Changelog
 
-- `1.0` — 2026-08-06 — Implementação do gráfico de rentabilidade mês a mês no Portfólio, com endpoint `/api/portfolio/returns`, cálculo de CDI acumulado e séries por moeda.
-- `0.1` — 2026-08-06 — Spec inicial do gráfico de rentabilidade mês a mês no Portfólio.
+- `1.3` — 2026-08-06 — Rework UX: gráfico de **barras → linhas** (R$, US$, CDI e IPCA em %), sem números fixos; valores em tooltip ao passar o mouse sobre os pontos; rentabilidade calculada **por moeda na própria moeda** (sem efeito de câmbio); adicionado benchmark **IPCA** (SGS 433 mensal). Ajuste visual posterior: **linhas suavizadas**, **eixos X/Y com grid e rótulos** e **área 15% maior**.
+- `1.2` — 2026-08-06 — Rentabilidade mensal consolidada da carteira inteira em BRL vs CDI do mês (substituída pela visão por moeda).
+- `1.1` — 2026-08-06 — Rentabilidade consolidada por moeda vs CDI acumulado do período (substituída pela visão mensal).
+- `1.0` — 2026-08-06 — Implementação inicial com série mês a mês por posição por moeda (depois substituída pela visão mensal consolidada).
+- `0.1` — 2026-08-06 — Spec inicial do gráfico de rentabilidade no Portfólio.
 
 ## Relacionados
 

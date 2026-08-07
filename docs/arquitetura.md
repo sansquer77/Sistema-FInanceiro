@@ -460,7 +460,9 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
-- `3.6` — 2026-08-06 — Documentada rota `GET /api/portfolio/returns` para série mensal de rentabilidade da carteira por moeda com benchmark CDI. Ver [[specs/rentabilidade-portfolio]].
+- `3.8` — 2026-08-06 — Rota `GET /api/portfolio/returns`: série mensal por moeda (BRL/USD em %) com benchmarks CDI e IPCA; gráfico de linhas no drawer. Ver [[specs/rentabilidade-portfolio]].
+- `3.7` — 2026-08-06 — Ajustada rota `GET /api/portfolio/returns`: série mensal consolidada (carteira inteira em BRL) vs CDI do mês, últimos 12 meses ou todo o período disponível. Ver [[specs/rentabilidade-portfolio]].
+- `3.6` — 2026-08-06 — Documentada rota `GET /api/portfolio/returns` para rentabilidade da carteira por moeda com benchmark CDI. Ver [[specs/rentabilidade-portfolio]].
 - `3.5` — 2026-08-06 — Documentada implementação da rota `GET /api/cockpit/calendar` e do módulo `financeiro/calendar.py`, com autenticação e validação de `Host`/`Origin`. UI da aba **Calendário** ainda pendente. Ver [[specs/cockpit-calendario]].
 - `3.4` — 2026-08-04 — Documentada rota `GET /api/cockpit/calendar` para a futura aba **Calendário** do Cockpit, com contas a receber/pagar atrasadas e vencimentos de renda fixa em 30 e 60 dias. Ver [[specs/cockpit-calendario]].
 - `3.3` — 2026-08-04 — Documentada rota pública `/api/latest-version`, módulo `financeiro/version_check.py` e fluxo de detecção de nova versão no Cockpit.

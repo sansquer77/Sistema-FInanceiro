@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 5.3
+versao: 5.4
 atualizado: 2026-08-06
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -66,6 +66,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 |---|---|---|
 | [[specs/cockpit-calendario]] | 🚧 em-implementacao | Cockpit |
 | [[specs/consultor]] | 📝 rascunho | Consultor |
+| [[specs/open-finance]] | 📝 rascunho | Open Finance |
 | [[specs/imposto-renda]] | ❌ depreciado — custo de manter regras fiscais atualizadas não compensa para uso familiar | Investimentos |
 | [[specs/exportacao-dados]] | ❌ depreciado — arquivo SQLite já acessível por leitor genérico ou agente de IA | Exportação |
 
@@ -123,6 +124,7 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `5.4` — 2026-08-06 — Adicionada [[specs/open-finance]] em rascunho para conexão de contas via Conector 200/Meu Pluggy (Pluggy), com credenciais opt-in por usuário, sincronização manual e vínculo sempre manual a contas correntes; spec ainda contraria o escopo atual de [[requisitos]] e depende de resolução das pendências antes de implementação.
 - `5.3` — 2026-08-06 — [[specs/consultor]] atualizada (v0.2): reutiliza configuração de IA existente (`user_ai_settings`), interface definida como pop-up acionável de qualquer tela e histórico persistido em arquivo criptografado no `DATA_DIR`.
 - `5.2` — 2026-08-06 — Adicionada [[specs/consultor]] em rascunho para o módulo **Consultor Virtual** de investimentos e planejamento financeiro.
 - `5.1` — 2026-08-06 — Reorganização do Map of Content: [[specs/instrucoes-app]], [[specs/landing-page]] e [[specs/score-saude-financeira]] movidas para a seção de specs implementadas; [[specs/cockpit-calendario]] permanece em `em-implementacao` na seção de specs em outros status.

@@ -277,6 +277,7 @@ const portfolioReturnDrawerCloseBtn = document.querySelector("#portfolioReturnDr
 const portfolioReturnDrawerTitle = document.querySelector("#portfolioReturnDrawerTitle");
 const portfolioReturnChart = document.querySelector("#portfolioReturnChart");
 const portfolioReturnXLabels = document.querySelector("#portfolioReturnXLabels");
+const portfolioReturnYAxis = document.querySelector("#portfolioReturnYAxis");
 const portfolioReturnLegend = document.querySelector("#portfolioReturnLegend");
 const portfolioReturnNotice = document.querySelector("#portfolioReturnNotice");
 const portfolioPositionCount = document.querySelector("#portfolioPositionCount");
@@ -987,6 +988,7 @@ const portfolioView = registerPortfolioView({
     portfolioReturnDrawerTitle,
     portfolioReturnChart,
     portfolioReturnXLabels,
+    portfolioReturnYAxis,
     portfolioReturnLegend,
     portfolioReturnNotice,
     portfolioPositionCount,
@@ -1006,7 +1008,6 @@ const portfolioView = registerPortfolioView({
   formatMoney,
   formatPercent,
   formatDate,
-  formatMonthLabel,
   formatMonthShortLabel,
   formatDecimal,
   moneyInputValue,

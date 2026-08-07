@@ -26,7 +26,7 @@
         }
       })();
     </script>
-    <link rel="stylesheet" href="/styles.css?v=127">
+    <link rel="stylesheet" href="/styles.css?v=131">
   </head>
   <body>
     <main class="app-shell">
@@ -937,7 +937,7 @@
               </div>
               <div class="portfolio-summary-with-action">
                 <span class="portfolio-summary-label">Rentabilidade</span>
-                <button class="portfolio-return-chart-btn" type="button" id="portfolioReturnChartBtn" aria-label="Ver rentabilidade mês a mês" title="Rentabilidade mês a mês" hidden>
+                <button class="portfolio-return-chart-btn" type="button" id="portfolioReturnChartBtn" aria-label="Ver rentabilidade mensal vs CDI" title="Rentabilidade mensal vs CDI" hidden>
                   <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </button>
                 <strong id="portfolioReturnSummary">0,00%</strong>
@@ -961,7 +961,7 @@
               <header class="drawer-header">
                 <div>
                   <p class="eyebrow">Rentabilidade</p>
-                  <h2 id="portfolioReturnDrawerTitle">Mês a mês</h2>
+                  <h2 id="portfolioReturnDrawerTitle">Rentabilidade</h2>
                 </div>
                 <button class="drawer-close-button" id="portfolioReturnDrawerCloseBtn" type="button" aria-label="Fechar gráfico" title="Fechar">
                   <span aria-hidden="true">×</span>
@@ -969,12 +969,15 @@
               </header>
               <div class="drawer-body">
                 <div class="portfolio-return-chart-wrap">
-                  <svg id="portfolioReturnChart" class="portfolio-return-chart" viewBox="0 0 100 50" preserveAspectRatio="none"></svg>
+                  <div class="portfolio-return-chart-row">
+                    <div class="portfolio-return-y-axis" id="portfolioReturnYAxis" aria-hidden="true"></div>
+                    <svg id="portfolioReturnChart" class="portfolio-return-chart" viewBox="0 0 100 50" preserveAspectRatio="none"></svg>
+                  </div>
                   <div id="portfolioReturnXLabels" class="portfolio-return-x-labels"></div>
                 </div>
                 <div class="portfolio-return-legend" id="portfolioReturnLegend"></div>
                 <p class="portfolio-return-notice" id="portfolioReturnNotice" hidden>
-                  <small>Renda variável/cripto usam valor atual como aproximação para meses anteriores, pois cotações históricas ainda não são armazenadas.</small>
+                  <small>Renda variável/cripto usam o valor atual como aproximação do período, pois cotações históricas ainda não são armazenadas.</small>
                 </p>
               </div>
             </div>
@@ -1895,6 +1898,6 @@
         </div>
       </aside>
     </main>
-    <script type="module" src="/app.js?v=127"></script>
+    <script type="module" src="/app.js?v=131"></script>
   </body>
 </html>

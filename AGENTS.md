@@ -2,7 +2,13 @@
 
 > Este arquivo é a fonte de regras para **qualquer ferramenta de IA** (assistentes de IDE, agentes de terminal, revisores automáticos de PR etc.) que leia, gere ou edite código neste repositório. Ele resume e aponta para a metodologia já definida em [`docs/sdd.md`](docs/sdd.md) e no restante de `docs/`. Em caso de conflito entre este arquivo e `docs/`, **`docs/` é a fonte canônica** — atualize este arquivo para refletir a mudança.
 >
-> **Use sempre `docs/README.md` como o ponto de entrada canônico do vault; não edite o `README.md` na raiz do repositório.**
+> **Use sempre `docs/README.md` como o ponto de entrada canônico do vault; não edite o `README.md` na raiz do repositório sem pedido explícito do usuário.**
+>
+> **Existem dois documentos chamados README, com propósitos diferentes — não confunda nem unifique os dois:**
+> - **`README.md` (raiz)** — vitrine pública do projeto no GitHub: o que é o app, como instalar e rodar, link para as Releases, link de entrada para `docs/README.md` e para a licença. Conteúdo estável, direcionado a quem chega pelo repositório, não a agentes de IA.
+> - **`docs/README.md`** — Map of Content (MoC) do vault Obsidian: índice de specs, ADRs, glossário, design system e do processo SDD. Usa wikilinks relativos que só resolvem dentro de `docs/`. É o ponto de entrada obrigatório para qualquer agente de IA antes de tocar em código (ver seção 0).
+>
+> Um agente de IA nunca deve mover, apagar ou mesclar um desses arquivos no outro. Atualizações de escopo funcional, specs e ADRs vão em `docs/README.md`; o `README.md` da raiz só muda quando a instalação, os requisitos de execução ou a descrição pública do projeto mudam — e mesmo assim só com pedido explícito do usuário.
 
 ## 0. Leia isto antes de tocar em qualquer arquivo
 
@@ -169,7 +175,8 @@ Consulte [`docs/design/design-system.md`](docs/design/design-system.md) para a p
 
 | Documento | Quando consultar |
 |---|---|
-| [`docs/README.md`](docs/README.md) | Ponto de entrada — sempre primeiro. |
+| [`docs/README.md`](docs/README.md) | Ponto de entrada da documentação técnica — sempre primeiro. |
+| [`README.md`](README.md) (raiz) | Vitrine pública do projeto; não é fonte de regras de desenvolvimento. |
 | [`docs/sdd.md`](docs/sdd.md) | Processo completo, frontmatter, ciclo de vida de status. |
 | [`docs/requisitos.md`](docs/requisitos.md) | Escopo funcional e requisitos não funcionais. |
 | [`docs/arquitetura.md`](docs/arquitetura.md) | Rotas, tabelas, módulos, fluxos principais. |

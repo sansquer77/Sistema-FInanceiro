@@ -1332,7 +1332,7 @@ def apply_fixed_income_value(position: dict, force_refresh: bool = False) -> Non
     )
     mode = position["fixed_income_mode"] or "post"
     indexer = position["fixed_income_indexer"] or "CDI"
-    annual_rate = Decimal(str(position["fixed_income_rate"] or "0"))
+    annual_rate = parse_rate_decimal(position.get("fixed_income_rate"))
     position["quote"] = fixed_income_quote_label(mode, indexer, annual_rate, rate_factor)
     position["quote_source"] = source
     position["quote_status"] = "ok"
@@ -1357,7 +1357,7 @@ def fixed_income_value_as_of(
     maturity_date = parse_optional_iso_date(position.get("fixed_income_maturity_date"))
     end_date = min(as_of_date, maturity_date) if maturity_date else as_of_date
     days = max((end_date - start_date).days, 0)
-    annual_rate = Decimal(str(position["fixed_income_rate"] or "0"))
+    annual_rate = parse_rate_decimal(position.get("fixed_income_rate"))
     mode = position["fixed_income_mode"] or "post"
     indexer = position["fixed_income_indexer"] or "CDI"
     rate_factor = Decimal("0")
@@ -1408,7 +1408,8 @@ def fixed_income_value_as_of(
     return net_cents, gross_cents, iof_tax_cents, income_tax_cents, custody_fee_cents, rate_factor, source
 
 
-def position_value_as_of(position: dict, as_of_date: date, force_refresh: bool = False) -> int:
+def _position_value_native_as_of(position: dict, as_of_date: date, force_refresh: bool = False) -> int:
+    # spec: rentabilidade-portfolio v1.3 — critério 4
     if as_of_date < date.fromisoformat(position["first_operation_date"]):
         return 0
     if position["asset_type"] == "fixed_income":
@@ -1418,7 +1419,17 @@ def position_value_as_of(position: dict, as_of_date: date, force_refresh: bool =
     return int(position.get("current_value_cents") or 0)
 
 
+def _monthly_return_pct(prev_value: int, end_value: int, net_contribution: int) -> Decimal:
+    denominator = max(prev_value + max(net_contribution, 0), 1)
+    return (Decimal(end_value - prev_value - net_contribution) * Decimal("100")) / Decimal(denominator)
+
+
 def get_portfolio_returns(user_id: int, force_refresh: bool = False) -> dict:
+    # spec: rentabilidade-portfolio v1.3 — critérios 1 a 10
+    # Rentabilidade mensal (em percentual) por moeda consolidada (BRL e USD),
+    # comparada ao CDI e ao IPCA do mês. Últimos 12 meses, ou todos os meses
+    # disponíveis quando a base é menor. Cada moeda é calculada na própria
+    # moeda (valores nativos), sem efeito de câmbio na série.
     try:
         portfolio = get_portfolio(user_id, force_refresh=force_refresh)
         positions = portfolio.get("positions") or []
@@ -1426,11 +1437,9 @@ def get_portfolio_returns(user_id: int, force_refresh: bool = False) -> dict:
             return {"series": [], "start_month": None, "end_month": None, "has_historical_approximation": False, "error": None}
 
         today = date.today()
+        end_month = date(today.year, today.month, 1)
         first_operation_date = min(date.fromisoformat(position["first_operation_date"]) for position in positions)
         start_month = date(first_operation_date.year, first_operation_date.month, 1)
-        end_month = date(today.year, today.month, 1)
-
-        # Limita a série a 12 meses para evitar muitas chamadas de rede ao BCB
         max_start_month = add_months(end_month, -11)
         if start_month < max_start_month:
             start_month = max_start_month
@@ -1441,47 +1450,71 @@ def get_portfolio_returns(user_id: int, force_refresh: bool = False) -> dict:
             months.append(current)
             current = add_months(current, 1)
 
+        currency_order = []
+        seen = set()
+        for position in positions:
+            currency = str(position.get("currency") or "BRL").upper()
+            if currency not in seen:
+                seen.add(currency)
+                currency_order.append(currency)
+
         series: list[dict] = []
-        prev_month_end_value_by_currency: dict[str, int] = {}
-        prev_month_invested_by_currency: dict[str, int] = {}
-        has_approximation = any(position["asset_type"] not in {"fixed_income", "savings"} for position in positions)
+        prev_by_currency: dict[str, int] = {}
+        prev_invested_by_currency: dict[str, int] = {}
+        month_factor_cache: dict[str, Decimal] = {}
+        ipca_month_cache: dict[str, float] = {}
 
         for month_date in months:
-            month_key = month_date.strftime("%Y-%m")
-            last_day = add_months(month_date, 1) - timedelta(days=1)
-            as_of = min(last_day, today)
+            month_start = month_date
+            month_end = add_months(month_date, 1) - timedelta(days=1)
+            as_of = min(month_end, today)
 
-            month_end_value_by_currency: dict[str, int] = defaultdict(int)
-            invested_by_currency: dict[str, int] = defaultdict(int)
-
+            month_values: dict[str, int] = {}
+            month_invested: dict[str, int] = {}
             for position in positions:
-                currency = position["currency"] or "BRL"
-                value_cents = position_value_as_of(position, as_of, force_refresh=force_refresh)
-                month_end_value_by_currency[currency] += value_cents
-                invested_by_currency[currency] += int(position.get("total_cost_cents") or 0)
+                currency = str(position.get("currency") or "BRL").upper()
+                first_operation = date.fromisoformat(position["first_operation_date"])
+                if as_of < first_operation:
+                    continue
+                # Posicao que entrou neste mês: conta pelo custo (baseline),
+                # sem retorno sintético de entrada; meses seguintes valorizam.
+                if month_start <= first_operation <= month_end:
+                    value = int(position.get("total_cost_cents") or 0)
+                else:
+                    value = _position_value_native_as_of(position, as_of, force_refresh=force_refresh)
+                month_values[currency] = month_values.get(currency, 0) + value
+                month_invested[currency] = month_invested.get(currency, 0) + int(position.get("total_cost_cents") or 0)
 
-            month_cdi_factor = _cdi_factor_for_month(month_date, as_of, force_refresh=force_refresh)
+            month_key = month_date.strftime("%Y-%m")
+            cdi_return = (Decimal(str(_cdi_factor_for_month(month_date, as_of, month_factor_cache, force_refresh=force_refresh))) - Decimal("1")) * Decimal("100")
+            ipca_factor = _ipca_factor_for_month(month_date, as_of, ipca_month_cache, force_refresh=force_refresh)
+            ipca_return = (Decimal(str(ipca_factor)) - Decimal("1")) * Decimal("100")
 
-            for currency in sorted(month_end_value_by_currency.keys()):
-                end_value = month_end_value_by_currency[currency]
-                invested = invested_by_currency[currency]
-                prev_value = prev_month_end_value_by_currency.get(currency, invested)
-                prev_invested = prev_month_invested_by_currency.get(currency, invested)
+            entry: dict[str, object] = {
+                "month": month_key,
+                "cdi_return_pct": float(cdi_return.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)),
+                "ipca_return_pct": float(ipca_return.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)),
+            }
 
-                portfolio_return = _monthly_return_pct(prev_value, end_value, invested - prev_invested)
-                cdi_return = (month_cdi_factor - Decimal("1")) * Decimal("100")
+            for currency in currency_order:
+                value = month_values.get(currency, 0)
+                invested = month_invested.get(currency, 0)
+                prev_value = prev_by_currency.get(currency)
+                if prev_value is not None:
+                    if prev_value <= 0:
+                        portfolio_return = Decimal("0")
+                    else:
+                        net_contribution = invested - prev_invested_by_currency.get(currency, 0)
+                        portfolio_return = _monthly_return_pct(prev_value, value, net_contribution)
+                else:
+                    portfolio_return = Decimal("0")
+                entry[f"{currency}_return_pct"] = float(portfolio_return.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP))
+                prev_by_currency[currency] = value
+                prev_invested_by_currency[currency] = invested
 
-                series.append({
-                    "month": month_key,
-                    "currency": currency,
-                    "portfolio_return_pct": float(_quantize(portfolio_return, "0.0001")),
-                    "cdi_return_pct": float(_quantize(cdi_return, "0.0001")),
-                    "portfolio_value_cents": end_value,
-                    "invested_cents": invested,
-                })
+            series.append(entry)
 
-            prev_month_end_value_by_currency = dict(month_end_value_by_currency)
-            prev_month_invested_by_currency = dict(invested_by_currency)
+        has_approximation = any(position["asset_type"] not in {"fixed_income", "savings"} for position in positions)
 
         return {
             "series": series,
@@ -1495,22 +1528,66 @@ def get_portfolio_returns(user_id: int, force_refresh: bool = False) -> dict:
         return {"series": [], "start_month": None, "end_month": None, "has_historical_approximation": False, "error": str(exc)}
 
 
-def _cdi_factor_for_month(month_date: date, as_of: date, force_refresh: bool = False) -> Decimal:
-    if as_of < month_date:
+def _cdi_factor_for_period(start_date: date, end_date: date, force_refresh: bool = False) -> Decimal:
+    if end_date < start_date:
         return Decimal("1")
     try:
-        return fetch_accumulated_indexer_factor("CDI", month_date, as_of, force_refresh=force_refresh)
+        return fetch_accumulated_indexer_factor("CDI", start_date, end_date, force_refresh=force_refresh)
     except PortfolioError:
+        try:
+            latest_rate = fetch_indexer_rate("CDI", force_refresh=force_refresh)
+            return compound_annual_factor(latest_rate, max((end_date - start_date).days, 0))
+        except PortfolioError:
+            return Decimal("1")
+
+
+def _cdi_factor_for_month(month_date: date, as_of: date, cache: dict[str, Decimal] | None = None, force_refresh: bool = False) -> Decimal:
+    month_end = min(add_months(month_date, 1) - timedelta(days=1), as_of)
+    if month_end < month_date:
         return Decimal("1")
+    cache_key = f"{month_date.isoformat()}:{month_end.isoformat()}"
+    if cache is not None and cache_key in cache:
+        return cache[cache_key]
+    try:
+        factor = fetch_accumulated_indexer_factor("CDI", month_date, month_end, force_refresh=force_refresh)
+    except PortfolioError:
+        try:
+            latest_rate = fetch_indexer_rate("CDI", force_refresh=force_refresh)
+            factor = compound_annual_factor(latest_rate, max((month_end - month_date).days, 0))
+        except PortfolioError:
+            factor = Decimal("1")
+    if cache is not None:
+        cache[cache_key] = factor
+    return factor
 
 
-def _monthly_return_pct(prev_value: int, end_value: int, net_contribution: int) -> Decimal:
-    denominator = max(prev_value + max(net_contribution, 0), 1)
-    return (Decimal(end_value - prev_value - net_contribution) * Decimal("100")) / Decimal(denominator)
+def _ipca_factor_for_month(month_date: date, as_of: date, cache: dict[str, float] | None = None, force_refresh: bool = False) -> float:
+    month_end = min(add_months(month_date, 1) - timedelta(days=1), as_of)
+    if month_end < month_date:
+        return 1.0
+    cache_key = f"{month_date.isoformat()}:{month_end.isoformat()}"
+    if cache is not None and cache_key in cache:
+        return cache[cache_key]
+    try:
+        factor = fetch_accumulated_indexer_factor("IPCA", month_date, month_end, force_refresh=force_refresh)
+    except PortfolioError:
+        try:
+            latest_rate = fetch_indexer_rate("IPCA", force_refresh=force_refresh)
+            factor = compound_annual_factor(latest_rate, max((month_end - month_date).days, 0))
+        except PortfolioError:
+            factor = Decimal("1")
+    value = float(factor)
+    if cache is not None:
+        cache[cache_key] = value
+    return value
 
 
-def _quantize(value: Decimal, pattern: str = "0.0001") -> Decimal:
-    return value.quantize(Decimal(pattern), rounding=ROUND_HALF_UP)
+def _consolidated_return_pct(invested_cents: int, current_cents: int) -> float:
+    if not invested_cents:
+        return 0.0
+    delta = Decimal(current_cents - invested_cents) * Decimal("100")
+    result = delta / Decimal(invested_cents)
+    return float(result.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP))
 
 
 def apply_savings_value(position: dict, force_refresh: bool = False) -> None:
@@ -2236,6 +2313,23 @@ def normalize_indexer(value: object) -> str:
 
 def micros_to_decimal(micros: int) -> Decimal:
     return Decimal(int(micros or 0)) / MICRO_SCALE
+
+
+def parse_rate_decimal(value: object) -> Decimal:
+    # spec: rentabilidade-portfolio v1.3 — critério 4
+    # get_portfolio retorna a taxa ja formatada (ex.: "4,27"); aceita Decimal ou
+    # string com ponto/virgula para nao quebrar o calculo de valor por data.
+    if isinstance(value, Decimal):
+        return value
+    raw = str(value or "").strip()
+    if not raw:
+        return Decimal("0")
+    if "," in raw:
+        raw = raw.replace(".", "").replace(",", ".")
+    try:
+        return Decimal(raw)
+    except InvalidOperation:
+        return Decimal("0")
 
 
 def decimal_to_micros(value: object) -> int:
