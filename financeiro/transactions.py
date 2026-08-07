@@ -10,7 +10,7 @@ from urllib.parse import quote
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from financeiro.accounts import cents_to_money, empty_to_none, money_to_cents
+from financeiro.accounts import cents_to_money, empty_to_none, money_to_cents, recompute_account_balance
 from financeiro.categories import ClassificationError, get_or_create_category, get_or_create_subcategory, get_or_create_tag, normalize_name
 from financeiro.classification_suggestions import normalize_description
 from financeiro.database import begin_immediate, get_connection, row_to_dict
@@ -166,17 +166,6 @@ def create_transaction_with_conn(conn: sqlite3.Connection, user_id: int, data: d
         occurrence_amount_cents = occurrence["amount_cents"]
         occurrence_destination_amount_cents = occurrence["destination_amount_cents"]
         occurrence_amount_brl_cents = convert_to_brl_cents(occurrence_amount_cents, exchange_rate_micros)
-        apply_balance_delta(
-            conn,
-            source["id"],
-            balance_delta(transaction["type"], occurrence_amount_cents, "source"),
-        )
-        if destination:
-            apply_balance_delta(
-                conn,
-                destination["id"],
-                balance_delta(transaction["type"], occurrence_destination_amount_cents, "destination"),
-            )
         cursor = conn.execute(
             """
             INSERT INTO transactions (
@@ -214,6 +203,9 @@ def create_transaction_with_conn(conn: sqlite3.Connection, user_id: int, data: d
             first_transaction_id = cursor.lastrowid
         replace_transaction_tags(conn, cursor.lastrowid, tag_ids)
         upsert_investment_operation(conn, user_id, cursor.lastrowid, source["id"], transaction)
+    recompute_account_balance(conn, user_id, source["id"])
+    if destination:
+        recompute_account_balance(conn, user_id, destination["id"])
     return format_transaction(fetch_transaction(conn, user_id, first_transaction_id))
 
 
@@ -244,17 +236,7 @@ def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
         category_id, subcategory_id = resolve_transaction_category(conn, user_id, transaction, destination)
         tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
 
-        apply_balance_delta(conn, existing["account_id"], -balance_delta(existing["type"], existing["amount_cents"], "source"))
-        if existing["destination_account_id"]:
-            apply_balance_delta(
-                conn,
-                existing["destination_account_id"],
-                -balance_delta(existing["type"], existing_destination_balance_amount(existing), "destination"),
-            )
-        apply_balance_delta(conn, source["id"], balance_delta(transaction["type"], transaction["amount_cents"], "source"))
-        if destination:
-            apply_balance_delta(conn, destination["id"], balance_delta(transaction["type"], destination_balance_amount(transaction), "destination"))
-        # spec: lancamentos v3.2 — critérios 26 e 27
+        # spec: lancamentos v3.2 — criterios 26 e 27
         # (series recorrentes com use_average ativo aplicam edicao em cascata
         #  automaticamente e recalculam valores futuros pela media)
         force_apply_to_future = bool(existing["use_average"]) and existing["series_kind"] == "recurring"
@@ -290,6 +272,12 @@ def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
         upsert_investment_operation(conn, user_id, normalized_id, source["id"], transaction)
         if apply_to_future or force_apply_to_future:
             update_future_series_transactions(conn, user_id, existing, transaction, force_apply_to_future)
+        recompute_account_balance(conn, user_id, existing["account_id"])
+        if existing["destination_account_id"]:
+            recompute_account_balance(conn, user_id, existing["destination_account_id"])
+        recompute_account_balance(conn, user_id, source["id"])
+        if destination:
+            recompute_account_balance(conn, user_id, destination["id"])
         row = fetch_transaction(conn, user_id, normalized_id)
     return format_transaction(row)
 
@@ -348,13 +336,7 @@ def update_future_series_transactions(conn, user_id: int, existing, transaction:
             normalize_transfer_amounts(transaction, source, destination)
     amount_brl_cents = convert_to_brl_cents(transaction["amount_cents"], exchange_rate_micros)
     tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
-    source_balance_delta = balance_delta(transaction["type"], transaction["amount_cents"], "source")
     destination_id = destination["id"] if destination else None
-    destination_balance_delta = (
-        balance_delta(transaction["type"], destination_balance_amount(transaction), "destination")
-        if destination
-        else 0
-    )
     conn.execute("SAVEPOINT future_series_update")
     try:
         apply_future_series_updates(
@@ -365,8 +347,6 @@ def update_future_series_transactions(conn, user_id: int, existing, transaction:
             date_delta,
             source,
             destination_id,
-            source_balance_delta,
-            destination_balance_delta,
             exchange_rate_micros,
             amount_brl_cents,
             category_id,
@@ -388,8 +368,6 @@ def apply_future_series_updates(
     date_delta: timedelta,
     source,
     destination_id: int | None,
-    source_balance_delta: int,
-    destination_balance_delta: int,
     exchange_rate_micros: int,
     amount_brl_cents: int,
     category_id: int | None,
@@ -399,16 +377,6 @@ def apply_future_series_updates(
     for row in future_rows:
         row_date = date.fromisoformat(row["date"])
         future_transaction = {**transaction, "date": (row_date + date_delta).isoformat()}
-        apply_balance_delta(conn, row["account_id"], -balance_delta(row["type"], row["amount_cents"], "source"))
-        if row["destination_account_id"]:
-            apply_balance_delta(
-                conn,
-                row["destination_account_id"],
-                -balance_delta(row["type"], existing_destination_balance_amount(row), "destination"),
-            )
-        apply_balance_delta(conn, source["id"], source_balance_delta)
-        if destination_id:
-            apply_balance_delta(conn, destination_id, destination_balance_delta)
         conn.execute(
             """
             UPDATE transactions
@@ -439,6 +407,13 @@ def apply_future_series_updates(
         )
         replace_transaction_tags(conn, row["id"], tag_ids)
         upsert_investment_operation(conn, user_id, row["id"], source["id"], future_transaction)
+    affected_account_ids = {row["account_id"] for row in future_rows}
+    affected_account_ids.update(row["destination_account_id"] for row in future_rows if row["destination_account_id"])
+    affected_account_ids.add(source["id"])
+    if destination_id:
+        affected_account_ids.add(destination_id)
+    for affected_account_id in affected_account_ids:
+        recompute_account_balance(conn, user_id, affected_account_id)
 
 
 def delete_transaction(user_id: int, transaction_id: str, apply_to_future: bool = False) -> None:
@@ -455,14 +430,6 @@ def delete_transaction(user_id: int, transaction_id: str, apply_to_future: bool 
         if not transaction:
             raise TransactionError("Lancamento nao encontrado.", HTTPStatus.NOT_FOUND)
         transactions = [transaction, *future_transactions_to_delete(conn, user_id, transaction, apply_to_future)]
-        for item in transactions:
-            apply_balance_delta(conn, item["account_id"], -balance_delta(item["type"], item["amount_cents"], "source"))
-            if item["destination_account_id"]:
-                apply_balance_delta(
-                    conn,
-                    item["destination_account_id"],
-                    -balance_delta(item["type"], existing_destination_balance_amount(item), "destination"),
-                )
         transaction_ids = [item["id"] for item in transactions]
         conn.execute(
             f"""
@@ -471,6 +438,10 @@ def delete_transaction(user_id: int, transaction_id: str, apply_to_future: bool 
             """,
             (user_id, *transaction_ids),
         )
+        affected_account_ids = {item["account_id"] for item in transactions}
+        affected_account_ids.update(item["destination_account_id"] for item in transactions if item["destination_account_id"])
+        for affected_account_id in affected_account_ids:
+            recompute_account_balance(conn, user_id, affected_account_id)
 
 
 def future_transactions_to_delete(conn, user_id: int, transaction, apply_to_future: bool):
@@ -676,7 +647,7 @@ def normalize_investment_asset_hint(category: str, subcategory: str, asset_ident
 
 
 def normalize_investment_emergency_reserve_eligible(data: dict, asset_type: str) -> int:
-    # spec: investimentos/investimentos-portfolio v2.7 — critérios 21 e 23
+    # spec: investimentos/investimentos-portfolio v2.10 — critérios 21 e 23
     if asset_type not in {"fixed_income", "savings"}:
         return 0
     return 1 if str(data.get("investment_emergency_reserve_eligible") or "").strip().lower() in {"1", "true", "on", "yes"} else 0
@@ -989,18 +960,6 @@ def normalize_transfer_amounts(transaction: dict, source, destination) -> None:
     transaction["transfer_exchange_rate_micros"] = rate_to_micros(rate)
 
 
-def destination_balance_amount(transaction: dict) -> int:
-    return transaction["destination_amount_cents"] or transaction["amount_cents"]
-
-
-def existing_destination_balance_amount(transaction) -> int:
-    try:
-        amount = int(transaction["destination_amount_cents"] or 0)
-    except (IndexError, KeyError):
-        amount = 0
-    return amount or int(transaction["amount_cents"])
-
-
 def resolve_transaction_category(conn, user_id: int, transaction: dict, destination) -> tuple[int | None, int | None]:
     if not transaction["category"]:
         return None, None
@@ -1026,30 +985,6 @@ def transaction_category_group(conn, user_id: int, transaction_type: str, destin
             if row:
                 return "investment"
     return "expense"
-
-
-def balance_delta(transaction_type: str, amount_cents: int, side: str) -> int:
-    # spec: lancamentos v2.9 — criterios 1-4
-    # (receita aumenta a conta de origem; despesa/investimento reduzem;
-    #  transferencia/cambio reduzem na origem e aumentam no destino)
-    if transaction_type == "income":
-        return amount_cents
-    if transaction_type in {"expense", "investment"}:
-        return -amount_cents
-    if side == "destination":
-        return amount_cents
-    return -amount_cents
-
-
-def apply_balance_delta(conn, account_id: int, delta_cents: int) -> None:
-    conn.execute(
-        """
-        UPDATE checking_accounts
-        SET current_balance_cents = current_balance_cents + ?, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-        """,
-        (delta_cents, account_id),
-    )
 
 
 def replace_transaction_tags(conn, transaction_id: int, tag_ids: list[int]) -> None:

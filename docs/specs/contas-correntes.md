@@ -2,8 +2,8 @@
 tipo: spec
 area: contas
 status: implementado
-versao: 1.2
-atualizado: 2026-07-05
+versao: 1.3
+atualizado: 2026-08-07
 relacionados:
   - "[[lancamentos]]"
   - "[[cartoes]]"
@@ -16,7 +16,7 @@ aliases: ["Contas-correntes", "Contas"]
 # Contas-correntes
 
 > [!info] Status
-> **implementado** · área: `contas` · atualizado em 2026-07-05 · relacionados: [[lancamentos]], [[cartoes]], [[investimentos-portfolio]]
+> **implementado** · área: `contas` · atualizado em 2026-08-07 · relacionados: [[lancamentos]], [[cartoes]], [[investimentos-portfolio]]
 
 ## Problema
 
@@ -55,11 +55,13 @@ Qualquer usuário autenticado localmente que mantenha contas em um ou mais banco
 - Contas arquivadas podem ser listadas (`?status=archived`) e restauradas.
 - A moeda de uma conta com lançamentos ativos não pode ser alterada.
 - Alterar o saldo inicial ajusta o saldo atual pela diferença.
-- O ajuste de saldo atual por mudança de saldo inicial deve ser aplicado como delta atômico para preservar lançamentos concorrentes.
+- O ajuste de saldo atual por mudança de saldo inicial é aplicado dentro de uma transação imediata curta (reconciliação via soma dos lançamentos) que protege a leitura prévia e preserva escritas concorrentes.
 - Contas do tipo `wallet` aceitam apenas receitas, despesas e transferências à vista; não exibem recorrência. Ver [[lancamentos]].
 - Contas do tipo `investment` alimentam o portfólio de investimentos. Ver [[investimentos-portfolio]].
 - O saldo previsto de uma conta usada como conta preferencial de pagamento de cartão deve abater despesas conciliadas de cartão em faturas não pagas, alocando o impacto no mês de vencimento da fatura.
 - Quando o saldo previsto incluir despesas conciliadas de cartão, a interface deve indicar `Saldo previsto (inclui despesas conciliadas de cartão)`.
+- O saldo atual é sempre calculado como `saldo inicial + soma dos deltas de lançamentos com data <= hoje`; lançamentos futuros não movem o saldo atual.
+- O `current_balance_cents` armazenado é reconciliado a cada escrita de lançamento (criar, editar, excluir, cascata de série e importação), permanecendo igual ao saldo efetivo exibido na listagem — nunca há divergência persistente entre o valor armazenado e o calculado.
 
 ## API e dados
 
@@ -82,9 +84,11 @@ Tabela: `checking_accounts`.
 - Dado uma conta restaurada, quando listada, ela volta para a lista principal com o saldo correto.
 - Dado uma conta com lançamentos ativos, quando o usuário tenta alterar a moeda, a operação é bloqueada.
 - Dado uma conta preferencial de pagamento com fatura conciliada e não paga, quando o saldo previsto ou gráfico de meses futuros é exibido, então o valor conciliado da fatura é abatido no mês de vencimento.
+- Dado uma conta com lançamentos futuros, quando listada, o saldo armazenado reflete apenas lançamentos com data até hoje e é igual ao saldo efetivo (criar/editar/excluir um lançamento futuro não altera o saldo na data de hoje).
 
 ## Changelog
 
+- `1.3` — 2026-08-07 — Saldo atual passa a ser sempre efetivo (lançamentos com data > hoje não movem o saldo); `current_balance_cents` armazenado é reconciliado após criar, editar, excluir, cascata de série, importação, resgate/encerramento de investimentos e ajuste de saldo inicial.
 - `1.2` — 2026-07-05 — Saldo previsto passa a considerar faturas conciliadas e não pagas de cartões vinculados como conta preferencial, pelo mês de vencimento.
 - `1.1` — 2026-07-03 — Regra de ajuste de saldo inicial explicita delta atômico para uso concorrente leve.
 - `1.0` — 2026-06-29 — Frontmatter e critérios formalizados.

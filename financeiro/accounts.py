@@ -79,6 +79,46 @@ def list_accounts_by_status(user_id: int, archived: bool) -> list[dict]:
     return [format_account(row_to_dict(row)) for row in rows]
 
 
+def recompute_account_balance(conn, user_id: int, account_id: int) -> None:
+    # spec: contas-correntes v1.2 — criterio 3
+    # (saldo atual = saldo inicial + deltas de lancamentos com data <= hoje;
+    #  lancamentos futuros nao movem o saldo armazenado, mantendo o cache
+    #  sempre igual ao saldo efetivo exibido pela listagem)
+    today = date.today().isoformat()
+    conn.execute(
+        """
+        UPDATE checking_accounts
+        SET current_balance_cents = (
+                SELECT initial_balance_cents + COALESCE(SUM(
+                    CASE
+                        WHEN transactions.account_id = checking_accounts.id
+                            AND transactions.type = 'income'
+                            THEN transactions.amount_cents
+                        WHEN transactions.account_id = checking_accounts.id
+                            AND transactions.type IN ('expense', 'investment', 'transfer')
+                            THEN -transactions.amount_cents
+                        WHEN transactions.destination_account_id = checking_accounts.id
+                            AND transactions.type = 'transfer'
+                            THEN COALESCE(NULLIF(transactions.destination_amount_cents, 0), transactions.amount_cents)
+                        ELSE 0
+                    END
+                ), 0)
+                FROM transactions
+                WHERE transactions.user_id = checking_accounts.user_id
+                    AND transactions.archived_at IS NULL
+                    AND transactions.date <= ?
+                    AND (
+                        transactions.account_id = checking_accounts.id
+                        OR transactions.destination_account_id = checking_accounts.id
+                    )
+            ),
+            updated_at = CURRENT_TIMESTAMP
+        WHERE checking_accounts.id = ? AND checking_accounts.user_id = ?
+        """,
+        (today, account_id, user_id),
+    )
+
+
 def create_checking_account(user_id: int, data: dict) -> dict:
     account = normalize_account_payload(data)
     with get_connection() as conn:
@@ -131,13 +171,11 @@ def update_checking_account(user_id: int, account_id: str, data: dict) -> dict:
         ).fetchone()["total"]
         if transaction_count and account["currency"] != existing["currency"]:
             raise AccountError("Nao altere a moeda de uma conta com lancamentos.")
-        balance_delta = account["initial_balance_cents"] - existing["initial_balance_cents"]
         conn.execute(
             """
             UPDATE checking_accounts
             SET name = ?, bank_name = ?, branch = ?, account_number = ?, account_type = ?, currency = ?,
                 initial_balance_cents = ?,
-                current_balance_cents = current_balance_cents + ?,
                 notes = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND user_id = ?
@@ -150,12 +188,12 @@ def update_checking_account(user_id: int, account_id: str, data: dict) -> dict:
                 account["account_type"],
                 account["currency"],
                 account["initial_balance_cents"],
-                balance_delta,
                 account["notes"],
                 account_id,
                 user_id,
             ),
         )
+        recompute_account_balance(conn, user_id, account_id)
         row = conn.execute("SELECT * FROM checking_accounts WHERE id = ?", (account_id,)).fetchone()
     return format_account(row_to_dict(row))
 
@@ -186,6 +224,7 @@ def restore_checking_account(user_id: int, account_id: str) -> dict:
         )
         if cursor.rowcount == 0:
             raise AccountError("Conta arquivada nao encontrada.", HTTPStatus.NOT_FOUND)
+        recompute_account_balance(conn, user_id, account_id)
         row = conn.execute(
             "SELECT * FROM checking_accounts WHERE id = ? AND user_id = ?",
             (account_id, user_id),

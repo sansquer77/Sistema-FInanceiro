@@ -1,13 +1,13 @@
-export const THEME_STORAGE_KEY = "sistemaFinanceiro.theme";
+const THEME_STORAGE_KEY = "sistemaFinanceiro.theme";
 
-export const THEMES = Object.freeze({
+const THEMES = Object.freeze({
   LIGHT: "light",
   DARK: "dark",
 });
 
 const THEME_VALUES = new Set(Object.values(THEMES));
 
-export function normalizeTheme(value) {
+function normalizeTheme(value) {
   return THEME_VALUES.has(value) ? value : THEMES.LIGHT;
 }
 

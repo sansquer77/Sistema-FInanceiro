@@ -1382,6 +1382,7 @@ function markPortfolioDirty() {
 
 function invalidateFinancialHealth() {
   cockpitView.invalidateFinancialHealth();
+  cockpitView.invalidateCalendar();
 }
 
 function showPortfolioAssetForm() {

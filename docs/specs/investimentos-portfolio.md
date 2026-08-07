@@ -2,8 +2,8 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.9
-atualizado: 2026-08-06
+versao: 2.10
+atualizado: 2026-08-07
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -162,6 +162,7 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 
 ## Changelog
 
+- `2.10` — 2026-08-07 — Resgate e encerramento de posições recalculam valor disponível e posições dentro da transação SQLite de escrita (via `begin_immediate`), eliminando janela TOCTOU entre a leitura das posições e os inserts. Cotação continua pré-cacheada fora do lock para não reter conexão durante chamadas externas.
 - `2.9` — 2026-08-06 — Adicionado card "Rentabilidade mês a mês" no Resumo da Carteira com gráfico de barras por moeda e benchmark CDI, via endpoint `GET /api/portfolio/returns`.
 - `2.8` — 2026-08-02 — Formulários de Renda Fixa no Portfólio e Lançamentos ganham redução de ruído visual com chips, microcopy dinâmica, presets e preview.
 - `2.7` — 2026-07-31 — Tesouro Direto mantém rentabilidade na curva pela taxa contratada, passa a deduzir Taxa B3 estimada em títulos padrão e exibe nota sobre diferenças frente à marcação a mercado oficial.

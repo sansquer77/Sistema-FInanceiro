@@ -1,4 +1,4 @@
-export const PRIVACY_STORAGE_KEY = "sistemaFinanceiro.privacyMode";
+const PRIVACY_STORAGE_KEY = "sistemaFinanceiro.privacyMode";
 
 const PRIVACY_ENABLED = "true";
 const PRIVACY_DISABLED = "false";
@@ -15,11 +15,11 @@ const SKIP_SELECTOR = [
   ".privacy-skip",
 ].join(",");
 
-export function normalizePrivacyMode(value) {
+function normalizePrivacyMode(value) {
   return value === PRIVACY_ENABLED ? PRIVACY_ENABLED : PRIVACY_DISABLED;
 }
 
-export function storedPrivacyMode() {
+function storedPrivacyMode() {
   try {
     return normalizePrivacyMode(localStorage.getItem(PRIVACY_STORAGE_KEY));
   } catch (error) {
@@ -34,7 +34,7 @@ export function applyPrivacyMode(mode = storedPrivacyMode()) {
   return normalizedMode;
 }
 
-export function setPrivacyMode(mode) {
+function setPrivacyMode(mode) {
   const normalizedMode = applyPrivacyMode(mode);
   if (normalizedMode === PRIVACY_ENABLED) {
     markPrivacyMoneyValues();
@@ -71,7 +71,7 @@ export function updatePrivacyToggleButton(button, mode = document.documentElemen
   button.textContent = enabled ? "🙈" : "👁️";
 }
 
-export function markPrivacyMoneyValues(root = document.body) {
+function markPrivacyMoneyValues(root = document.body) {
   // spec: privacidade-valores v1.0 — critérios 1, 4 e 7
   if (!root || document.documentElement.dataset.privacy !== PRIVACY_ENABLED) {
     return;

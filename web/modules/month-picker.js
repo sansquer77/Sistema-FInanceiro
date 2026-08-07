@@ -22,7 +22,7 @@ export function openMonthPicker(anchor, value, onSelect) {
   monthPickerPopover.monthSelect.focus();
 }
 
-export function closeMonthPicker() {
+function closeMonthPicker() {
   if (!monthPickerPopover) {
     return;
   }

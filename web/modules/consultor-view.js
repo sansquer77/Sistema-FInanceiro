@@ -218,7 +218,15 @@ export function registerConsultorView({
     `;
   }
 
+  function invalidateCalendar() {
+    requestId += 1;
+    currentData = null;
+    loading = false;
+    error = "";
+  }
+
   return {
     renderCalendar,
+    invalidateCalendar,
   };
 }

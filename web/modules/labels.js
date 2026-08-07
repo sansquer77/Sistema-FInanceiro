@@ -52,7 +52,7 @@ export function cardCategoryPath(transaction) {
   return `${transaction.category_name} › ${transaction.subcategory_name}`;
 }
 
-export function recurrenceFrequencyLabel(frequency) {
+function recurrenceFrequencyLabel(frequency) {
   return {
     weekly: "Semanal",
     monthly: "Mensal",

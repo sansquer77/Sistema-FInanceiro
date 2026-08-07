@@ -1,13 +1,16 @@
 export function setFormBusy(form, busy) {
   const button = form.querySelector('button[type="submit"]');
-  if (button && !button.dataset.label) {
-    button.dataset.label = button.textContent;
-  }
   for (const element of form.elements) {
     element.disabled = busy;
   }
   if (button) {
-    button.textContent = busy ? "Aguarde..." : button.dataset.label;
+    if (busy) {
+      button.dataset.label = button.textContent;
+      button.textContent = "Aguarde...";
+    } else {
+      button.textContent = button.dataset.label || "Aguarde...";
+      delete button.dataset.label;
+    }
   }
 }
 

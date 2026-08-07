@@ -552,10 +552,6 @@ def get_or_create_named_item(conn, table: str, user_id: int, name: str, required
     return cursor.lastrowid
 
 
-def format_classification(row) -> dict | None:
-    return row_to_dict(row)
-
-
 def normalize_name(name: object, required_message: str) -> str:
     normalized = " ".join(str(name or "").strip().split())
     if not normalized:

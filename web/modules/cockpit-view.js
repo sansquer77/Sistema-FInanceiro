@@ -225,12 +225,11 @@ export function registerCockpitView({
     }
     state.cockpitMonth = month;
     state.cockpit = null;
-    state.trendsData = null;
     state.trendsError = "";
-    renderCockpit();
+    renderCockpitTabs();
+    renderCockpitMonthLabel();
     if (typeof onCockpitMonthChanged === "function") {
-      onCockpitMonthChanged().catch((error) => {
-        financialHealthView.fail(error.message);
+      onCockpitMonthChanged().catch(() => {
         renderCockpit();
       });
     }
@@ -238,10 +237,8 @@ export function registerCockpitView({
 
   function renderPortfolioMaturityAlerts() {
     const alerts = portfolioMaturityAlerts();
-    if (alerts.length > 0) {
-      setPortfolioNavAlert(true);
-    }
     if (!cockpitPortfolioMaturityAlert) {
+      setPortfolioNavAlert(false);
       return;
     }
     if (!state.portfolio && state.portfolioDirty) {
@@ -792,5 +789,6 @@ export function registerCockpitView({
     renderPortfolioMaturityAlerts,
     renderCockpitPortfolioByType,
     invalidateFinancialHealth: () => financialHealthView.invalidateFinancialHealth(),
+    invalidateCalendar: () => consultorView.invalidateCalendar(),
   };
 }

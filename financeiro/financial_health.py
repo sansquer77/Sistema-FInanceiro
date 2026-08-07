@@ -379,10 +379,6 @@ def fetch_average_consumption_expenses(conn, user_id: int, month: str, months: i
     return int((Decimal(total) / Decimal(months)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
-def fetch_emergency_reserve_cents(user_id: int) -> int:
-    return emergency_reserve_cents_from_positions(current_portfolio_positions(user_id, force_refresh=False))
-
-
 def emergency_reserve_cents_from_positions(positions: list[dict]) -> int:
     total = 0
     for position in positions:

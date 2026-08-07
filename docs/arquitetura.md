@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.6
-atualizado: 2026-08-06
+versao: 3.10
+atualizado: 2026-08-07
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -16,7 +16,7 @@ tags: [arquitetura, meta]
 # Arquitetura
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-08-06 · relacionados: [[requisitos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
+> **implementado** · área: `meta` · atualizado em 2026-08-07 · relacionados: [[requisitos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
 
 ## Visão geral
 
@@ -463,6 +463,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.10` — 2026-08-07 — Saldo de conta-corrente passa a ser reconciliação curta (`current_balance_cents = saldo inicial + soma dos deltas de lançamentos com data <= hoje`) dentro da mesma transação imediata de escrita; `apply_balance_delta` deixa de existir; lançamentos futuros não movem o saldo. Ver [[specs/contas-correntes]].
 - `3.9` — 2026-08-07 — Aba **Saúde Financeira** extraída para módulo próprio `web/modules/financial-health-view.js` (fábrica `registerFinancialHealthView`), seguindo o padrão de `trends-view.js`/`consultor-view.js`; estado local de tela migra para o módulo e `invalidateFinancialHealth` passa a ser delegado pelo `cockpit-view.js`.
 - `3.8` — 2026-08-06 — Rota `GET /api/portfolio/returns`: série mensal por moeda (BRL/USD em %) com benchmarks CDI e IPCA; gráfico de linhas no drawer. Ver [[specs/rentabilidade-portfolio]].
 - `3.7` — 2026-08-06 — Ajustada rota `GET /api/portfolio/returns`: série mensal consolidada (carteira inteira em BRL) vs CDI do mês, últimos 12 meses ou todo o período disponível. Ver [[specs/rentabilidade-portfolio]].

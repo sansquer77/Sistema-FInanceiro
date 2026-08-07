@@ -99,7 +99,7 @@ class AccountBalanceListingTest(unittest.TestCase):
         accounts = list_checking_accounts(user["id"])
         listed_account = next(entry for entry in accounts if entry["id"] == account["id"])
 
-        self.assertEqual(listed_account["stored_current_balance"], "156.26")
+        self.assertEqual(listed_account["stored_current_balance"], "33.93")
         self.assertEqual(listed_account["current_balance"], "33.93")
 
     def test_foreign_currency_transaction_without_manual_rate_uses_latest_ptax(self) -> None:

@@ -11,7 +11,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
-from financeiro.accounts import cents_to_money, empty_to_none, money_to_cents
+from financeiro.accounts import cents_to_money, empty_to_none, money_to_cents, recompute_account_balance
 from financeiro.database import begin_immediate, get_connection, row_to_dict
 from financeiro.transactions import convert_to_brl_cents, get_exchange_rate_to_brl, parse_exchange_rate, rate_to_micros
 
@@ -410,7 +410,7 @@ def delete_opening_position(user_id: int, position_id: object) -> dict:
 
 
 def redeem_position(user_id: int, data: dict) -> dict:
-    # spec: investimentos-portfolio v1.5 — criterio 9
+    # spec: investimentos-portfolio v2.10 — criterio 9
     # (em posicao com multiplas origens, o consumo do resgate segue FIFO pela
     #  data da primeira operacao — candidates.sort abaixo garante essa ordem)
     selector = normalize_redemption_selector(data)
@@ -429,20 +429,26 @@ def redeem_position(user_id: int, data: dict) -> dict:
         ).fetchone()
         if not account:
             raise PortfolioError("Conta da carteira nao encontrada.", HTTPStatus.NOT_FOUND)
-    positions = current_portfolio_positions(user_id)
-    candidates = [
-        position for position in positions
-        if matches_redemption_selector(position, selector)
-        and position["source_type"] in {"operation", "opening"}
-        and int(position["current_value_cents"] or 0) > 0
-        and int(position["total_cost_cents"] or 0) > 0
-    ]
-    candidates.sort(key=lambda position: (position["first_operation_date"], 0 if position["source_type"] == "operation" else 1, position["source_id"] or 0))
-    available_cents = sum(int(position["current_value_cents"] or 0) for position in candidates)
-    if redemption_value_cents > available_cents:
-        raise PortfolioError("Valor de resgate maior que o valor disponivel para este ativo.")
+    # B5: warm the quote cache outside the write lock, so the recompute below only
+    # reads cache/database and never issues an external call with the transaction open.
+    current_portfolio_positions(user_id)
     with get_connection() as conn:
         begin_immediate(conn)
+        # B5: recompute positions and candidates inside the write transaction so
+        # validation and consumption use a snapshot consistent with the committed
+        # state (no TOCTOU between an out-of-lock read and the inserts below).
+        positions = current_portfolio_positions(user_id)
+        candidates = [
+            position for position in positions
+            if matches_redemption_selector(position, selector)
+            and position["source_type"] in {"operation", "opening"}
+            and int(position["current_value_cents"] or 0) > 0
+            and int(position["total_cost_cents"] or 0) > 0
+        ]
+        candidates.sort(key=lambda position: (position["first_operation_date"], 0 if position["source_type"] == "operation" else 1, position["source_id"] or 0))
+        available_cents = sum(int(position["current_value_cents"] or 0) for position in candidates)
+        if redemption_value_cents > available_cents:
+            raise PortfolioError("Valor de resgate maior que o valor disponivel para este ativo.")
         account = conn.execute(
             """
             SELECT id, currency
@@ -475,14 +481,7 @@ def redeem_position(user_id: int, data: dict) -> dict:
                 empty_to_none(data.get("notes")),
             ),
         )
-        conn.execute(
-            """
-            UPDATE checking_accounts
-            SET current_balance_cents = current_balance_cents + ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ? AND user_id = ?
-            """,
-            (redemption_value_cents, account["id"], user_id),
-        )
+        recompute_account_balance(conn, user_id, account["id"])
         remaining_cents = redemption_value_cents
         redemptions = []
         for position in candidates:
@@ -537,6 +536,8 @@ def close_position(user_id: int, data: dict) -> dict:
         ).fetchone()
         if not account:
             raise PortfolioError("Conta da carteira nao encontrada.", HTTPStatus.NOT_FOUND)
+    # B5: warm the quote cache outside the write lock, so the recompute below only
+    # reads cache/database and never issues an external call with the transaction open.
     positions = current_portfolio_positions(user_id)
     matches = [
         position for position in positions
@@ -545,20 +546,31 @@ def close_position(user_id: int, data: dict) -> dict:
     ]
     if not matches:
         raise PortfolioError("Posicao nao encontrada para encerramento.", HTTPStatus.NOT_FOUND)
-    position = aggregate_backend_positions(matches)
     exchange_rate_micros = rate_to_micros(Decimal("1"))
     closing_value_brl_cents = convert_to_brl_cents(closing_value_cents, exchange_rate_micros)
-    total_cost_brl_cents = int(position["total_cost_brl_cents"] or 0)
-    result_brl_cents = closing_value_brl_cents - total_cost_brl_cents
-    result_percent_micros = int((Decimal(result_brl_cents) * MICRO_SCALE / Decimal(total_cost_brl_cents)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)) if total_cost_brl_cents > 0 else 0
-    closed_indexer = common_value(matches, "fixed_income_indexer")
-    closed_maturity_date = common_value(matches, "fixed_income_maturity_date")
-    snapshot = format_quoted_position({**position})
-    snapshot["closed_at"] = closed_at
-    snapshot["closing_value"] = cents_to_money(closing_value_cents)
-    snapshot["closing_value_brl"] = cents_to_money(closing_value_brl_cents)
     with get_connection() as conn:
         begin_immediate(conn)
+        # B5: recompute positions and matches inside the write transaction so the
+        # aggregation/snapshot and the upsert below use a state consistent with
+        # the committed DB (no TOCTOU between the read and the insert).
+        positions = current_portfolio_positions(user_id)
+        matches = [
+            position for position in positions
+            if matches_redemption_selector(position, selector)
+            and position["first_operation_date"] <= closed_at
+        ]
+        if not matches:
+            raise PortfolioError("Posicao nao encontrada para encerramento.", HTTPStatus.NOT_FOUND)
+        position = aggregate_backend_positions(matches)
+        total_cost_brl_cents = int(position["total_cost_brl_cents"] or 0)
+        result_brl_cents = closing_value_brl_cents - total_cost_brl_cents
+        result_percent_micros = int((Decimal(result_brl_cents) * MICRO_SCALE / Decimal(total_cost_brl_cents)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)) if total_cost_brl_cents > 0 else 0
+        closed_indexer = common_value(matches, "fixed_income_indexer")
+        closed_maturity_date = common_value(matches, "fixed_income_maturity_date")
+        snapshot = format_quoted_position({**position})
+        snapshot["closed_at"] = closed_at
+        snapshot["closing_value"] = cents_to_money(closing_value_cents)
+        snapshot["closing_value_brl"] = cents_to_money(closing_value_brl_cents)
         account = conn.execute(
             """
             SELECT id, currency
@@ -660,7 +672,7 @@ def close_position(user_id: int, data: dict) -> dict:
 
 
 def should_register_closing_credit(data: dict) -> bool:
-    # spec: investimentos-portfolio v1.5 — criterios 10-11
+    # spec: investimentos-portfolio v2.10 — criterios 10-11
     # (a opcao de credito e opt-in explicito e vem desmarcada por padrao no
     #  formulario, justamente para evitar duplicidade com resgates ja lancados)
     return str(data.get("register_credit") or "").strip().lower() in {"1", "true", "on", "yes", "sim"}
@@ -696,14 +708,7 @@ def record_portfolio_closing_credit(
             empty_to_none(notes),
         ),
     )
-    conn.execute(
-        """
-        UPDATE checking_accounts
-        SET current_balance_cents = current_balance_cents + ?, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ? AND user_id = ?
-        """,
-        (amount_cents, account_id, user_id),
-    )
+    recompute_account_balance(conn, user_id, account_id)
 
 
 def current_portfolio_positions(user_id: int, force_refresh: bool = False) -> list[dict]:
@@ -973,7 +978,7 @@ def normalize_opening_position_payload(data: dict) -> dict:
 
 
 def normalize_emergency_reserve_eligible(data: dict, asset_type: str) -> int:
-    # spec: investimentos/investimentos-portfolio v2.7 — critérios 20 e 21
+    # spec: investimentos/investimentos-portfolio v2.10 — critérios 20 e 21
     if asset_type not in {"fixed_income", "savings"}:
         return 0
     return 1 if str(data.get("emergency_reserve_eligible") or "").strip().lower() in {"1", "true", "on", "yes"} else 0
@@ -1604,14 +1609,6 @@ def _ipca_factor_for_month(month_date: date, as_of: date, cache: dict[str, float
     return value
 
 
-def _consolidated_return_pct(invested_cents: int, current_cents: int) -> float:
-    if not invested_cents:
-        return 0.0
-    delta = Decimal(current_cents - invested_cents) * Decimal("100")
-    result = delta / Decimal(invested_cents)
-    return float(result.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP))
-
-
 def apply_savings_value(position: dict, force_refresh: bool = False) -> None:
     today = date.today()
     current_cents, additional_monthly_rate, source, status = savings_value_as_of_with_meta(
@@ -1719,7 +1716,7 @@ def savings_additional_monthly_rate(force_refresh: bool = False) -> Decimal:
 
 
 def savings_additional_monthly_rate_from_selic(selic_annual: Decimal) -> Decimal:
-    # spec: investimentos-portfolio v1.5 — secao "Regras > Poupanca"
+    # spec: investimentos-portfolio v2.10 — secao "Regras > Poupanca"
     # (TR + 0,5% a.m. quando Selic > 8,5% a.a.; TR + 70% da Selic equivalente
     #  mensal quando Selic <= 8,5% a.a. — limiar e formula nao sao obvios)
     if selic_annual > Decimal("0.085"):
@@ -1768,7 +1765,7 @@ def fallback_indexer_annual_rate(indexer: str) -> Decimal:
 
 
 def fixed_income_income_tax_cents(gross_profit_cents: int, days: int) -> int:
-    # spec: investimentos-portfolio v1.5 — criterio 3 (secao "Regras > Renda Fixa":
+    # spec: investimentos-portfolio v2.10 — criterio 3 (secao "Regras > Renda Fixa":
     # tabela regressiva de IR, 22,5% a 15% conforme dias corridos desde a aquisicao)
     if gross_profit_cents <= 0:
         return 0
@@ -1784,7 +1781,7 @@ def fixed_income_income_tax_cents(gross_profit_cents: int, days: int) -> int:
 
 
 def fixed_income_custody_fee_cents(position: dict, gross_cents: int, days: int) -> int:
-    # spec: investimentos/investimentos-portfolio v2.7 — critério 25
+    # spec: investimentos/investimentos-portfolio v2.10 — critério 25
     # Tesouro Direto tem taxa B3 de custodia provisionada diariamente. O app
     # estima a taxa na curva, sem tentar reproduzir marcacao a mercado oficial.
     if gross_cents <= 0 or days <= 0 or not is_treasury_direct_position(position):
@@ -1813,7 +1810,7 @@ def treasury_position_name(position: dict) -> str:
 
 
 def fixed_income_iof_tax_cents(gross_profit_cents: int, days: int) -> int:
-    # spec: investimentos-portfolio v1.5 — criterio 3 (secao "Regras > Renda Fixa":
+    # spec: investimentos-portfolio v2.10 — criterio 3 (secao "Regras > Renda Fixa":
     # IOF regressivo so incide ate 30 dias corridos desde a aquisicao)
     if gross_profit_cents <= 0 or days >= 30:
         return 0

@@ -792,16 +792,6 @@ export function registerReportsView({
     return [...groups.values()].sort((a, b) => b.sortTotal - a.sortTotal || a.label.localeCompare(b.label));
   }
 
-  function reportGroupLabel(item, key) {
-    if (key === "tag") {
-      return item.tag;
-    }
-    if (key === "subcategory") {
-      return `${item.category || "Sem categoria"} / ${item.subcategory || "Sem subcategoria"}`;
-    }
-    return item.category || "Sem categoria";
-  }
-
   function sumReportItems(items, type) {
     return items.reduce((total, item) => {
       if (item.reportType === type) {

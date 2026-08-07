@@ -6,8 +6,8 @@ export function todayLocalDateValue(date = new Date()) {
   ].join("-");
 }
 
-export function currentLocalMonthValue(date = new Date()) {
-  return todayLocalDateValue(date).slice(0, 7);
+function currentLocalMonthValue() {
+  return todayLocalDateValue().slice(0, 7);
 }
 
 export function currentMonthValue() {

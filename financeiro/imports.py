@@ -13,12 +13,11 @@ from uuid import uuid4
 from xml.etree import ElementTree
 from xml.sax.saxutils import escape as xml_escape
 
+from financeiro.accounts import recompute_account_balance
 from financeiro.categories import ClassificationError, get_or_create_category, get_or_create_subcategory, get_or_create_tag, normalize_name
 from financeiro.classification_suggestions import normalize_description
 from financeiro.credit_cards import create_credit_card_transaction_with_conn
 from financeiro.transactions import (
-    apply_balance_delta,
-    balance_delta,
     convert_to_brl_cents,
     create_transaction_with_conn,
     get_active_account,
@@ -694,11 +693,6 @@ def import_organizze_transactions(user_id: int, account_id: object, file_bytes: 
                 category_id = get_or_create_category(conn, user_id, transaction["category"], category_group)
                 subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
                 tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
-                apply_balance_delta(
-                    conn,
-                    normalized_account_id,
-                    balance_delta(transaction["type"], transaction["amount_cents"], "source"),
-                )
                 cursor = conn.execute(
                     """
                     INSERT INTO transactions (
@@ -722,6 +716,7 @@ def import_organizze_transactions(user_id: int, account_id: object, file_bytes: 
                     ),
                 )
                 replace_transaction_tags(conn, cursor.lastrowid, tag_ids)
+                recompute_account_balance(conn, user_id, normalized_account_id)
                 conn.execute("RELEASE SAVEPOINT import_row")
                 imported.append({"row": raw["row"], "id": cursor.lastrowid, "description": transaction["description"]})
             except Exception as exc:

@@ -626,7 +626,7 @@ export function registerTransactionsView({
     transactionSearch.value = state.transactionSearch || "";
     clearTransactionSearchButton.hidden = !state.transactionSearch;
     renderTransactionStatusFilters();
-    const monthTransactions = selectedAccountVisibleTransactions(accountTransactions)
+    const monthTransactions = selectedAccountTransactions(accountTransactions)
       .filter((transaction) => transaction.date.startsWith(state.transactionMonth));
     const searchedTransactions = monthTransactions.filter(matchesTransactionSearch);
     renderTransactionContextCount(searchedTransactions);
@@ -825,13 +825,6 @@ export function registerTransactionsView({
       String(transaction.account_id) === String(state.selectedAccountId)
       || String(transaction.destination_account_id || "") === String(state.selectedAccountId)
     ));
-  }
-
-  function selectedAccountVisibleTransactions(transactions = state.accountTransactions) {
-    if (!state.selectedAccountId) {
-      return [];
-    }
-    return selectedAccountTransactions(transactions);
   }
 
   function renderTransactionCollection(container, transactions, compact, balanceTransactions = transactions) {

@@ -20,6 +20,10 @@ export function registerFinancialHealthView({
       currentMonth = month;
       currentData = null;
       error = "";
+      if (loading) {
+        financialHealthRequestId += 1;
+        loading = false;
+      }
     }
     if (!currentData || currentData.month !== month) {
       if (!loading && !error) {
@@ -82,14 +86,6 @@ export function registerFinancialHealthView({
     currentData = null;
     loading = false;
     error = "";
-  }
-
-  function fail(message) {
-    financialHealthRequestId += 1;
-    loading = false;
-    error = message || "Não foi possível carregar o score de saúde financeira.";
-    currentData = null;
-    renderFinancialHealth(currentMonth);
   }
 
   function financialHealthGauge(data) {
@@ -325,6 +321,5 @@ export function registerFinancialHealthView({
   return {
     renderFinancialHealth,
     invalidateFinancialHealth,
-    fail,
   };
 }

@@ -6,6 +6,9 @@ export function parseDecimalInput(value) {
 
 export function formatMoney(value, currency) {
   const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return formatMoney(0, currency);
+  }
   const amount = Math.abs(parsed) < 0.005 ? 0 : parsed;
   return amount.toLocaleString("pt-BR", { style: "currency", currency });
 }
@@ -25,14 +28,22 @@ export function formatDecimal(value, maximumFractionDigits = 2) {
 }
 
 export function moneyInputValue(value) {
-  return Number(value).toLocaleString("pt-BR", {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return "0,00";
+  }
+  return parsed.toLocaleString("pt-BR", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
 }
 
 export function formatPercent(value) {
-  return Number(value).toLocaleString("pt-BR", { style: "percent", maximumFractionDigits: 1 });
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return "0,0%";
+  }
+  return parsed.toLocaleString("pt-BR", { style: "percent", maximumFractionDigits: 1 });
 }
 
 export function portfolioQuoteText(position) {
