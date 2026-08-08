@@ -1,4 +1,4 @@
-// spec: cockpit-calendario v0.6 — critérios 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17 e 18
+// spec: cockpit-calendario v0.7 — critérios 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17 e 18
 export function registerConsultorView({
   elements,
   api,
