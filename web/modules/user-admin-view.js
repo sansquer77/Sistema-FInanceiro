@@ -22,11 +22,12 @@ export function registerUserAdminView(context) {
       button.classList.toggle("active", active);
       button.setAttribute("aria-selected", String(active));
     });
-    const panels = document.querySelectorAll(".user-pref-panel");
-    panels.forEach((panel) => {
+    const tabButton = elements.userPrefTabs.querySelector(`[data-user-tab="${tabName}"]`);
+    const panelId = tabButton ? tabButton.getAttribute("aria-controls") : "";
+    document.querySelectorAll(".user-pref-panel").forEach((panel) => {
       panel.hidden = true;
     });
-    const panel = document.getElementById(`user${tabName[0].toUpperCase()}${tabName.slice(1)}Panel`);
+    const panel = document.getElementById(panelId);
     if (panel) {
       panel.hidden = false;
     }

@@ -53,12 +53,19 @@ kill_existing_server() {
   PIDS=$(/usr/sbin/lsof -ti :"$APP_PORT" 2>/dev/null || true)
   if [ -n "$PIDS" ]; then
     echo "$PIDS" | xargs kill -TERM 2>/dev/null || true
-    sleep 1
-    PIDS=$(/usr/sbin/lsof -ti :"$APP_PORT" 2>/dev/null || true)
-    if [ -n "$PIDS" ]; then
-      echo "$PIDS" | xargs kill -KILL 2>/dev/null || true
-      sleep 0.5
+  fi
+  i=0
+  while [ "$i" -lt 20 ]; do
+    if ! /usr/sbin/lsof -ti :"$APP_PORT" >/dev/null 2>&1; then
+      break
     fi
+    sleep 0.25
+    i=$((i + 1))
+  done
+  PIDS=$(/usr/sbin/lsof -ti :"$APP_PORT" 2>/dev/null || true)
+  if [ -n "$PIDS" ]; then
+    echo "$PIDS" | xargs kill -KILL 2>/dev/null || true
+    sleep 0.5
   fi
 }
 
