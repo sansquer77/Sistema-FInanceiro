@@ -728,7 +728,7 @@ class MaisRetornoConfigRouteTest(IsolatedDatabaseTest):
         return stack
 
     def test_status_unconfigured_returns_false_flags(self) -> None:
-        # spec: preferencias-abas v0.3 — critério 6
+        # spec: preferencias-abas v0.4 — critério 6
         user = create_user("MR1", "mr1@exemplo.com", "strong-password")
         handler = self._handler("/api/mais-retorno-config", user)
         with self._status_context(user):
@@ -739,7 +739,7 @@ class MaisRetornoConfigRouteTest(IsolatedDatabaseTest):
         self.assertFalse(status["has_api_key"])
 
     def test_status_requires_session_user(self) -> None:
-        # spec: preferencias-abas v0.3 — critério 6 (proteção de rota)
+        # spec: preferencias-abas v0.4 — critério 6 (proteção de rota)
         handler = self._handler("/api/mais-retorno-config", create_user("MR1B", "mr1b@exemplo.com", "strong-password"))
         with self._status_context():
             with self.assertRaises(app.ApiError) as error:
@@ -747,7 +747,7 @@ class MaisRetornoConfigRouteTest(IsolatedDatabaseTest):
         self.assertEqual(error.exception.status, HTTPStatus.UNAUTHORIZED)
 
     def test_save_enabled_without_key_is_rejected_and_state_unchanged(self) -> None:
-        # spec: preferencias-abas v0.3 — critério 7
+        # spec: preferencias-abas v0.4 — critério 7
         user = create_user("MR2", "mr2@exemplo.com", "strong-password")
         handler = self._handler("/api/mais-retorno-config", user, body={"enabled": True})
         with self._status_context(user):
@@ -762,7 +762,7 @@ class MaisRetornoConfigRouteTest(IsolatedDatabaseTest):
         self.assertFalse(status["enabled"])
 
     def test_save_with_key_never_exposes_secret(self) -> None:
-        # spec: preferencias-abas v0.3 — critérios 8
+        # spec: preferencias-abas v0.4 — critérios 8
         user = create_user("MR3", "mr3@exemplo.com", "strong-password")
         handler = self._handler("/api/mais-retorno-config", user, body={"enabled": True, "api_key": "mr-secreta-123"})
         with self._status_context(user):
@@ -777,7 +777,7 @@ class MaisRetornoConfigRouteTest(IsolatedDatabaseTest):
         self.assertNotIn(b"mr-secreta-123", enc_path.read_bytes())
 
     def test_disable_keeps_encrypted_key_for_reenable(self) -> None:
-        # spec: preferencias-abas v0.3 — critério 13
+        # spec: preferencias-abas v0.4 — critério 13
         user = create_user("MR4", "mr4@exemplo.com", "strong-password")
         from financeiro.secure_config import save_mais_retorno_settings
         save_mais_retorno_settings(user["id"], {"enabled": True, "api_key": "mr-secret-6789"})

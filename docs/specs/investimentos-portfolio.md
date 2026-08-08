@@ -2,8 +2,8 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.10
-atualizado: 2026-08-07
+versao: 2.13
+atualizado: 2026-08-08
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -88,11 +88,14 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 **Renda Variável / Criptos:**
 - Cotações via Yahoo Finance (ações/fundos) e CoinGecko/Yahoo (criptoativos).
 - Criptos usam pares de cotação na moeda do ativo/carteira (ex.: BTC/BRL ou BTC/USD).
+- A quantidade exibida em posições, origens e posições encerradas é normalizada com **até 2 casas decimais** (arredondamento `half-up`), independentemente da precisão cadastrada ou retornada pela cotação, para preservar o layout das tabelas.
 
 **Fundos (`fund`):**
 - Cotas dos fundos de investimento buscadas via **API Mais Retorno** quando a integração estiver ativada em Preferências (aba APIs — ver [[preferencias-abas]]), a posição tiver **CNPJ** preenchido e a carteira for em **BRL**.
-- Identificador da API: `{cnpj}:fi`; valor atual pela última cota do retorno e variação diária pela cota anterior.
-- Respostas cacheadas em `quote_cache` (TTL de 90 minutos) via `cached_json_url`; chamadas externas nunca ocorrem com transação de escrita aberta.
+- Identificador da API: `{cnpj}:fi`, com o CNPJ **somente dígitos** (sem pontos e sem barra — ex.: `46.422.299/0001-73` vira `46422299000173:fi`); valor atual pela última cota do retorno e variação diária pela cota anterior.
+- Requisição usa sempre `start_date` e `end_date` iguais à **data atual** (`GET /quotes/{identifier}?start_date=AAAA-MM-DD&end_date=AAAA-MM-DD`).
+- O preço da cota (`c`) chega como numeral JSON com separador decimal `.` (ex.: `1.601637`) e é convertido para centavos inteiros; o app nunca exibe o valor cru da API.
+- Respostas cacheadas em `quote_cache` (TTL até o **fim do dia corrente**, para não re-consumir a API ao entrar na tela várias vezes no mesmo dia) via `cached_json_url`; chamadas externas nunca ocorrem com transação de escrita aberta.
 - Sem integração ativada, sem CNPJ ou em moeda não-BRL, a posição mantém o valor de custo com status `Cotacao manual pendente` (comportamento anterior).
 - Falha da API (indisponível, chave inválida ou cota do plano esgotada) mantém o valor de custo com status amigável, sem bloquear o Portfólio.
 
@@ -169,10 +172,13 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado uma posição de fundo com CNPJ em carteira BRL e a integração Mais Retorno ativada nas Preferências, quando o Portfólio é carregado, então a posição usa a última cota da API como valor atual, com fonte e data da cota.
 - Dado uma posição de fundo sem integração ativada, sem CNPJ ou em carteira não-BRL, quando o Portfólio é carregado, então a posição mantém o valor de custo com status `Cotacao manual pendente` e nenhuma chamada à API Mais Retorno é feita.
 - Dado uma posição de fundo com a API Mais Retorno indisponível, quando o Portfólio é carregado, então a posição mantém o valor de custo com status amigável e o restante do portfólio segue funcionando.
+- Dado posições com quantidade de alta precisão (ex.: `94,65389`), quando o Portfólio é exibido, então a quantidade aparece com no máximo 2 casas decimais para preservar o layout das tabelas.
 
 ## Changelog
 
-- `2.11` — 2026-08-08 — Posições de fundos (`fund`) passam a cotar pela API Mais Retorno quando a integração está ativada em Preferências (aba APIs), a posição tem CNPJ e a carteira é BRL; cache de 90 min em `quote_cache` e fallback de custo sem bloquear o Portfólio. Ver [[preferencias-abas]] e ADR-0009.
+- `2.13` — 2026-08-08 — Integração Mais Retorno corrigida: identificador com CNPJ somente dígitos + `:fi`, requisição sempre com `start_date`/`end_date` = data atual, cache diário (até o fim do dia) em vez de 90 minutos e conversão explícita do separador decimal `.` para centavos.
+- `2.12` — 2026-08-08 — Quantidade exibida em posições, origens e posições encerradas normalizada para no máximo 2 casas decimais (arredondamento `half-up`), preservando o layout das tabelas.
+- `2.11` — 2026-08-08 — Posições de fundos (`fund`) passam a cotar pela API Mais Retorno quando a integração está ativada em Preferências (aba APIs), a posição tem CNPJ e a carteira é BRL; cache em `quote_cache` e fallback de custo sem bloquear o Portfólio. Ver [[preferencias-abas]] e ADR-0009.
 - `2.10` — 2026-08-07 — Resgate e encerramento de posições recalculam valor disponível e posições dentro da transação SQLite de escrita (via `begin_immediate`), eliminando janela TOCTOU entre a leitura das posições e os inserts. Cotação continua pré-cacheada fora do lock para não reter conexão durante chamadas externas.
 - `2.9` — 2026-08-06 — Adicionado card "Rentabilidade mês a mês" no Resumo da Carteira com gráfico de barras por moeda e benchmark CDI, via endpoint `GET /api/portfolio/returns`.
 - `2.8` — 2026-08-02 — Formulários de Renda Fixa no Portfólio e Lançamentos ganham redução de ruído visual com chips, microcopy dinâmica, presets e preview.

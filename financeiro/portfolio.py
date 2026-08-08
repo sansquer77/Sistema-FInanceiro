@@ -5,6 +5,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from http import HTTPStatus
 import json
+import re
 import ssl
 import sqlite3
 from urllib.error import HTTPError, URLError
@@ -20,12 +21,11 @@ MONEY_SCALE = Decimal("100")
 MICRO_SCALE = Decimal("1000000")
 YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=5d&interval=1d"
 COINGECKO_SIMPLE_PRICE_URL = "https://api.coingecko.com/api/v3/simple/price?ids={ids}&vs_currencies={currency}&include_24hr_change=true"
-MAIS_RETORNO_QUOTES_URL = "https://data.maisretorno.com/mr-data/v4/api/quotes/{symbol}"
+MAIS_RETORNO_QUOTES_URL = "https://data.maisretorno.com/mr-data/v4/api/quotes/{symbol}?start_date={start}&end_date={end}"
 BCB_SERIES_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{series}/dados/ultimos/1?formato=json"
 BCB_SERIES_RANGE_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{series}/dados?formato=json&dataInicial={start}&dataFinal={end}"
 MARKET_QUOTE_TTL_SECONDS = 6 * 60 * 60
 INDEXER_QUOTE_TTL_SECONDS = 24 * 60 * 60
-MAIS_RETORNO_QUOTE_TTL_SECONDS = 90 * 60
 QUOTE_MEMORY_CACHE: dict[str, tuple[datetime, dict | list]] = {}
 FX_MEMORY_CACHE: dict[tuple[str, str], int] = {}
 
@@ -1359,7 +1359,7 @@ def apply_market_quote(position: dict, force_refresh: bool = False) -> None:
 
 
 def apply_fund_quote(position: dict, user_id: int | None = None, force_refresh: bool = False) -> None:
-    # spec: investimentos/investimentos-portfolio v2.11 — criterios 27 e 28
+    # spec: investimentos/investimentos-portfolio v2.13 — criterios 27 e 28
     # (cotas de fundos via API Mais Retorno: opt-in configurado nas Preferencias,
     #  posicao com CNPJ e carteira em BRL; sem isso a posicao mantem valor de
     #  custo com status "Cotacao manual pendente")
@@ -1383,17 +1383,23 @@ def apply_fund_quote(position: dict, user_id: int | None = None, force_refresh: 
 
 
 def mais_retorno_fund_identifier(position: dict) -> str:
-    cnpj = str(position.get("cnpj") or "").strip()
+    # spec: investimentos/investimentos-portfolio v2.13 — criterio fundos-mais-retorno
+    # (API exige CNPJ somente com digitos, sem pontos/barra, mais sufixo ":fi")
+    cnpj = re.sub(r"\D", "", str(position.get("cnpj") or ""))
     return f"{cnpj}:fi" if cnpj else ""
 
 
 def fetch_mais_retorno_quote(identifier: str, api_key: str, force_refresh: bool = False) -> dict:
-    url = MAIS_RETORNO_QUOTES_URL.format(symbol=quote(identifier))
+    today = date.today().isoformat()
+    # spec: investimentos/investimentos-portfolio v2.13 — criterios 27 e 28:
+    # pergunta sempre pela data atual e cache vale ate o fim do dia para nao
+    # re-consumir a API ao entrar na tela varias vezes no mesmo dia
+    url = MAIS_RETORNO_QUOTES_URL.format(symbol=quote(identifier), start=today, end=today)
     payload = cached_json_url(
         url,
         "Nao foi possivel consultar a cotacao do fundo.",
         f"maisretorno:{identifier}",
-        MAIS_RETORNO_QUOTE_TTL_SECONDS,
+        seconds_until_end_of_day(),
         force_refresh=force_refresh,
         headers={"X-Api-Key": api_key},
     )
@@ -1404,8 +1410,11 @@ def fetch_mais_retorno_quote(identifier: str, api_key: str, force_refresh: bool 
         latest = max(quotes, key=lambda item: str(item["d"]))
         earlier = [item for item in quotes if str(item["d"]) < str(latest["d"])]
         previous = max(earlier, key=lambda item: str(item["d"])) if earlier else latest
-        price = Decimal(str(latest["c"]))
-        previous_price = Decimal(str(previous["c"]))
+        # spec: investimentos/investimentos-portfolio v2.13 — criterios 27 e 28:
+        # a API usa "." como separador decimal (JSON); normaliza virgula por
+        # seguranca antes de converter para Decimal
+        price = Decimal(str(latest["c"]).replace(",", "."))
+        previous_price = Decimal(str(previous["c"]).replace(",", "."))
         quote_date = str(latest["d"])
         if not parse_optional_iso_date(quote_date):
             quote_date = date.today().isoformat()
@@ -2161,6 +2170,14 @@ def bcb_range_ttl_seconds(end_date: date) -> int:
     return INDEXER_QUOTE_TTL_SECONDS
 
 
+def seconds_until_end_of_day() -> int:
+    # spec: investimentos/investimentos-portfolio v2.13 — criterios 27 e 28
+    # (cache de cotacao de fundos vale ate o fim do dia corrente)
+    now = datetime.now()
+    end = datetime(now.year, now.month, now.day) + timedelta(days=1)
+    return max(1, int((end - now).total_seconds()))
+
+
 def cached_json_url(
     url: str,
     message: str,
@@ -2511,9 +2528,12 @@ def cents_to_decimal(cents: int) -> Decimal:
 
 
 def decimal_to_string(value: Decimal) -> str:
+    # spec: investimentos/investimentos-portfolio v2.12 — critério normalização de quantidade
+    # com até 2 casas decimais (half-up) para não estourar o layout das tabelas.
     if not value:
         return "0"
-    return f"{value.normalize():f}"
+    rounded = value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return f"{rounded.normalize():f}"
 
 
 def format_decimal_percent(value: Decimal) -> str:

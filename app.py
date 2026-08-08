@@ -728,14 +728,14 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_json({"error": str(exc) or "Configuracao de IA invalida."}, HTTPStatus.BAD_REQUEST)
 
     def handle_mais_retorno_config_status(self) -> None:
-        # spec: preferencias-abas v0.3 — critérios 6 e 8
+        # spec: preferencias-abas v0.4 — critérios 6 e 8
         if not self.validate_read_source():
             return
         user = self.require_user()
         self.send_json(mais_retorno_config_status(user["id"]))
 
     def handle_save_mais_retorno_config(self) -> None:
-        # spec: preferencias-abas v0.3 — critérios 6, 7, 8 e 13
+        # spec: preferencias-abas v0.4 — critérios 6, 7, 8 e 13
         user = self.require_user()
         data = self.read_json()
         try:

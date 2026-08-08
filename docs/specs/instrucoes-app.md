@@ -2,8 +2,8 @@
 tipo: spec
 area: usuario
 status: implementado
-versao: 1.4
-atualizado: 2026-08-06
+versao: 1.5
+atualizado: 2026-08-08
 relacionados:
   - "[[sobre-app]]"
   - "[[lancamentos]]"
@@ -67,7 +67,7 @@ Também atende usuários novos que acabaram de instalar o app e precisam de uma 
 - Cada tela funcional deve poder exibir futuramente um botão contextual `?` pequeno e discreto ao lado do nome da tela, abrindo diretamente o tópico correspondente em **Instruções**.
 - A primeira versão deve cobrir todos os módulos operacionais atualmente implantados: Cockpit, Minhas Contas, Meus Cartões, Extrato de Contas, Fatura de Cartões, Portfólio, Limites, Simulação, Relatórios, Categorias, Importação, Histórico, Preferências, Privacidade e Instruções.
 - O módulo **Sobre** fica fora do conteúdo operacional, pois já é institucional e não exige instrução de uso.
-- O tópico de **Preferências** deve explicar a configuração SMTP usada para recuperação de senha e a configuração opcional de IA usada no módulo de Tendências.
+- O tópico de **Preferências** deve explicar as abas **Geral** (aparência, email, senha e recuperação SMTP), **APIs** (integrações opcionais de IA e Mais Retorno para cotas de fundos) e **Perigo** (apagar lançamentos e conta).
 - O tópico de **Portfólio e ativos** deve explicar claramente a diferença entre cadastro da posição e movimentação financeira: o ativo descreve a posição, enquanto aportes e resgates posteriores devem ser registrados pelos lançamentos da conta.
 - O tópico de **Portfólio e ativos** deve explicar também sobre a atualização manual dos valores e encerramento de posição (área histórico)
 - O tópico de **Renda fixa** deve diferenciar pré-fixada, pós-fixada e híbrida em linguagem prática.
@@ -541,7 +541,7 @@ Nenhuma pendência conhecida.
 
 ### Changelog
 
-- `1.4` — 2026-08-06 — Status e posição ajustados no Map of Content (`docs/README.md`): movida para a seção de specs implementadas, área `Usuário`.
+- `1.5` — 2026-08-08 — Tópico Preferências atualizado para refletir as abas **Geral**, **APIs** e **Perigo** e a integração opcional Mais Retorno ([[preferencias-abas]]).
 - `1.3` — 2026-08-04 — Tópico `importacao-dados` ajustado: removida menção a formatos `.xls` e `.csv` do Organizze.
 - `1.2` — 2026-08-04 — Tópicos `acoes-fundos` e `investimentos-aportes` revisados: explicados campos de cadastro de ações, fundos, cripto e previdência, e diferenciado aporte de investimento de transferência entre contas. Tópico `posicao-movimentacao` reforça que o cadastro no Portfólio é para posição inicial já existente na carteira.
 - `1.1` — 2026-08-04 — Adicionado tópico `cadastrar-poupanca` ao grupo `portfolio`, explicando o cadastro de aniversários no formato `AAAA-MM-DD; valor` e o cálculo automático de rendimento.

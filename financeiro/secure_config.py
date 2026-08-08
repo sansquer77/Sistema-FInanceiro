@@ -203,7 +203,7 @@ def mais_retorno_config_status(user_id: int) -> dict:
 
 
 def save_mais_retorno_settings(user_id: int, data: dict) -> dict:
-    # spec: preferencias-abas v0.3 — criterios 7, 8 e 13
+    # spec: preferencias-abas v0.4 — criterios 7, 8 e 13
     # (chave criptografada por usuario em data/mais_retorno_config_user_{id}.enc,
     #  nunca devolvida por rota; desligar mantem a chave para reativacao sem nova)
     enabled = bool(data.get("enabled", False))

@@ -1,8 +1,8 @@
 ---
 tipo: spec
 area: usuario
-status: em-implementacao
-versao: 0.3
+status: implementado
+versao: 0.5
 atualizado: 2026-08-08
 relacionados:
   - "[[investimentos-portfolio]]"
@@ -17,7 +17,7 @@ aliases: ["Preferências", "Abas de Preferências", "Mais Retorno"]
 # Preferências — abas Geral, APIs e Perigo
 
 > [!info] Status
-> **em-implementacao** · área: `usuario` · atualizado em 2026-08-08 · relacionados: [[investimentos-portfolio]], [[tendencias-saude-financeira]], [[recuperacao-senha]]
+> **implementado** · área: `usuario` · atualizado em 2026-08-08 · relacionados: [[investimentos-portfolio]], [[tendencias-saude-financeira]], [[recuperacao-senha]]
 
 ## Problema
 
@@ -52,8 +52,9 @@ Qualquer usuário autenticado que precise configurar perfil, integrações opcio
 **Mais Retorno (cotas de fundos):**
 - Apenas posições com `asset_type = fund` são afetadas; ações/ETFs/FIIs listados como `stock` continuam usando Yahoo Finance.
 - A cota é buscada apenas quando a integração está ativada, a posição tem **CNPJ** preenchido e a carteira é em **BRL**. Fora disso, a posição mantém o comportamento atual (`Cotacao manual pendente`).
-- O identificador usado na API é `{cnpj}:fi` (fundo da Mais Retorno), consultando o endpoint de cotações com a última cota disponível; a variação do dia usa a cota anterior do mesmo retorno.
-- Respostas da API são cacheadas em `quote_cache` (TTL de 90 minutos), reutilizando `cached_json_url` — chamadas externas nunca acontecem com transação de escrita aberta.
+- O identificador usado na API é `{cnpj}:fi`, com o CNPJ **somente dígitos** (sem pontos e sem barra — ex.: `46.422.299/0001-73` vira `46422299000173:fi`), consultando o endpoint de cotações sempre com `start_date`/`end_date` = **data atual**; a variação do dia usa a cota anterior do mesmo retorno.
+- Respostas da API são cacheadas em `quote_cache` (TTL até o **fim do dia corrente**, reutilizando `cached_json_url`) — o cache evita re-consumo da API ao entrar na tela várias vezes no mesmo dia, e chamadas externas nunca acontecem com transação de escrita aberta.
+- O preço da cota chega como numeral JSON com separador decimal `.` (ex.: `1.601637`) e é convertido para centavos inteiros no núcleo.
 - Falha da API (indisponível, chave inválida, cota do plano esgotada) exibe o status de cotação com mensagem amigável e mantém o valor de custo da posição — nunca bloqueia a abertura do Portfólio.
 
 ## API e dados
@@ -82,23 +83,26 @@ Qualquer usuário autenticado que precise configurar perfil, integrações opcio
 ## Pendências
 
 > [!question] Pendências
-> - **Passo 4 pendente** — integração das cotas de fundos no Portfólio via API Mais Retorno (`apply_fund_quote`, `fetch_mais_retorno_quote`, headers em `cached_json_url`/`read_json_url`, threading de `user_id` em `quote_positions`) não implementada. Critérios 9 a 12 ainda sem cobertura; implementar junto com os testes de `tests/test_portfolio_fund_quotes.py` (Passo 8 — parte 2).
+> Nenhuma pendência conhecida.
 
 ## Plano de implementação
 
 - [x] Passo 1 — Criar esta spec e atualizar [[investimentos-portfolio]] com a regra de cotas de fundos. Fecha: critérios 1 a 13 (ancoragem).
 - [x] Passo 2 — Registar ADR-0009 (integração opt-in com API paga). Fecha: ancoragem de decisão técnica.
 - [x] Passo 3 — `financeiro/secure_config.py`: status/save/load criptografado da Mais Retorno. Fecha: critérios 6, 7, 8 e 13.
-- [ ] Passo 4 — `financeiro/portfolio.py`: `apply_fund_quote`, `fetch_mais_retorno_quote`, headers em `cached_json_url`/`read_json_url`, threading de `user_id` em `quote_positions`. **Pendente** — só `headers` em `read_json_url` foi adicionado (sem uso ainda). Fecha: critérios 9, 10, 11 e 12.
+- [x] Passo 4 — `financeiro/portfolio.py`: `apply_fund_quote`, `fetch_mais_retorno_quote`, headers em `cached_json_url`/`read_json_url`, threading de `user_id` em `quote_positions`. Fecha: critérios 9, 10, 11 e 12.
 - [x] Passo 5 — `app.py`: rotas `GET/PUT /api/mais-retorno-config` com handlers espelhando ai-settings. Fecha: critérios 6, 7 e 8.
 - [x] Passo 6 — `web/index.html` + `web/styles.css`: abas Geral/APIs/Perigo e painel de configuração Mais Retorno. Fecha: critérios 1, 2, 3, 4 e 5.
 - [x] Passo 7 — `web/app.js` + `web/modules/user-admin-view.js`: troca de abas e formulário Mais Retorno. Fecha: critérios 2, 4 e 6 a 8 (lado cliente).
-- [ ] Passo 8 — Testes automatizados: **feita a parte** de `tests/test_security.py` (config criptografada e rotas, critérios 6, 7, 8 e 13); falta `tests/test_portfolio_fund_quotes.py` (cotação de fundos e fallbacks, critérios 9 a 12 — depende do Passo 4). Critérios 1 a 5 verificáveis manualmente.
-- [ ] Passo 9 — Documentação: [[arquitetura]] e [[instrucoes-app]] atualizados; falta revisar [[requisitos]] e o MoC quando o Passo 4 for concluído.
+- [x] Passo 8 — Testes automatizados: `tests/test_security.py` (config criptografada e rotas, critérios 6, 7, 8 e 13) e `tests/test_portfolio_fund_quotes.py` (cotação de fundos e fallbacks, critérios 9 a 12). Fecha: critérios 6 a 13. Critérios 1 a 5 verificáveis manualmente.
+- [x] Passo 9 — Documentação: [[arquitetura]], [[requisitos]], MoC, [[instrucoes-app]] e atualização de status/versão/changelog das specs. Fecha: consistência documental.
 
 ## Changelog
 
-- `0.3` — 2026-08-08 — Implementados os Passos 3, 5, 6 e 7: rotas `GET/PUT /api/mais-retorno-config`, arquivo `.enc` por usuário e abas Geral/APIs/Perigo no frontend com formulário de configuração; testes de `tests/test_security.py` (critérios 6, 7, 8 e 13). Resta o Passo 4 (cotas de fundos, critérios 9 a 12).
+- `0.5` — 2026-08-08 — Ajustes na integração Mais Retorno: CNPJ enviado somente com dígitos + `:fi`, requisição sempre com `start_date`/`end_date` = data atual, cache diário (até o fim do dia) no lugar do TTL de 90 minutos e conversão do separador decimal `.` para centavos.
+
+- `0.4` — 2026-08-08 — Passos 4, 8 parte 2 e 9 concluídos: testes de cotas de fundos validando os critérios 9 a 12 (headers `X-Api-Key`, cota mais recente, cache de 90 min, fallbacks de custo) e consolidação documental; spec promovida a **implementado**.
+- `0.3` — 2026-08-08 — Implementados os Passos 3, 5, 6 e 7: rotas `GET/PUT /api/mais-retorno-config`, arquivo `.enc` por usuário e abas Geral/APIs/Perigo no frontend com formulário de configuração; testes de `tests/test_security.py` (critérios 6, 7, 8 e 13).
 - `0.2` — 2026-08-08 — Adicionadas regras e critérios das cotas de fundos via Mais Retorno (posições `fund` com CNPJ em BRL, cache de 90 min, fallback de custo sem bloquear o Portfólio) e do armazenamento criptografado da chave por usuário.
 - `0.1` — 2026-08-08 — Spec inicial: reorganização de Preferências em abas **Geral**, **APIs** e **Perigo**, movendo IA para a aba APIs e ações destrutivas para a aba Perigo.
 

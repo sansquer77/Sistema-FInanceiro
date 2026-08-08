@@ -2,7 +2,7 @@
 tipo: adr
 area: investimentos
 status: implementado
-versao: 1.0
+versao: 1.1
 atualizado: 2026-08-08
 relacionados:
   - "[[../specs/preferencias-abas]]"
@@ -40,7 +40,7 @@ Adotar a **API Mais Retorno (mr-data v4)** como fonte **opcional** de cotas para
 
 - Identificador `{cnpj}:fi`, endpoint de cotações (`GET /quotes/{identifier}`), última cota do retorno como preço e a anterior como variação do dia.
 - Chave por usuário em `data/mais_retorno_config_user_{id}.enc`, criptografada pela mesma infraestrutura do SMTP/IA (`secure_config.py`), **nunca** devolvida por rota nem logada.
-- Integração desligada por padrão; chamadas externas apenas quando ativada, com cache de 90 minutos em `quote_cache` (reusando `cached_json_url`) e nunca com transação de escrita aberta.
+- Integração desligada por padrão; chamadas externas apenas quando ativada, com cache até o fim do dia corrente em `quote_cache` (reusando `cached_json_url`) e nunca com transação de escrita aberta.
 - Erros (401/403/429/indisponibilidade) viram status amigável na posição e o valor de custo é mantido.
 
 ### Motivos
@@ -90,6 +90,7 @@ Adotar a **API Mais Retorno (mr-data v4)** como fonte **opcional** de cotas para
 
 ## Changelog
 
+- `1.1` — 2026-08-08 — Cache passa de 90 minutos para até o fim do dia corrente; CNPJ só dígitos + `:fi` e `start_date`/`end_date` iguais à data atual na chamada à API.
 - `1.0` — 2026-08-08 — Decisão adotada: Mais Retorno opt-in com chave criptografada por usuário, cache de 90 min e fallback de custo sem bloqueio.
 
 ## Relacionados

@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 2.1
-atualizado: 2026-08-04
+versao: 2.2
+atualizado: 2026-08-08
 relacionados:
   - "[[arquitetura]]"
   - "[[visao-produto]]"
@@ -87,7 +87,7 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 - Ao trocar ou redefinir a senha, todas as sessões ativas do usuário são encerradas.
 - Toda mutação exige `Host` e `Origin` válidos como proteção contra CSRF.
 - A configuração SMTP fica criptografada por usuário em `data/email_config_user_{id}.enc`.
-- Segredos de integrações opcionais de IA ficam criptografados por usuário em `data/ai_config_user_{id}.enc` e nunca são retornados pela API.
+- Segredos de integrações opcionais de IA ficam criptografados por usuário em `data/ai_config_user_{id}.enc` e nunca são retornados pela API. O mesmo padrão vale para a chave da integração opcional Mais Retorno (`data/mais_retorno_config_user_{id}.enc`, [[preferencias-abas]]).
 - A chave local fica em `data/email_config.key` ou na variável `SISTEMA_FINANCEIRO_CONFIG_KEY`.
 - Pacotes distribuíveis não incluem credenciais SMTP; cada usuário configura seu próprio remetente localmente.
 - Arquivos de runtime em `data/` não devem ser versionados.
@@ -119,6 +119,7 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 
 ## Changelog
 
+- `2.2` — 2026-08-08 — Chave da integração opcional Mais Retorno também criptografada por usuário (mesma infraestructura de `secure_config.py`), conforme [[preferencias-abas]].
 - `2.1` — 2026-08-04 — Escopo atualizado para registrar distribuição gratuita como projeto open source sob Apache License 2.0, sem suporte formal.
 - `2.0` — 2026-08-02 — Lançamentos de conta ou cartão em moeda estrangeira sem cotação manual passam a usar a última PTAX de venda disponível até a data do lançamento para normalização em BRL.
 - `1.9` — 2026-08-02 — Regras de segurança atualizadas para prever armazenamento criptografado local de segredos de integrações opcionais de IA.
