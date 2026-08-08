@@ -2,7 +2,7 @@
 tipo: spec
 area: usuario
 status: implementado
-versao: 0.5
+versao: 0.6
 atualizado: 2026-08-08
 relacionados:
   - "[[investimentos-portfolio]]"
@@ -55,6 +55,7 @@ Qualquer usuário autenticado que precise configurar perfil, integrações opcio
 - O identificador usado na API é `{cnpj}:fi`, com o CNPJ **somente dígitos** (sem pontos e sem barra — ex.: `46.422.299/0001-73` vira `46422299000173:fi`), consultando o endpoint de cotações sempre com `start_date`/`end_date` = **data atual**; a variação do dia usa a cota anterior do mesmo retorno.
 - Respostas da API são cacheadas em `quote_cache` (TTL até o **fim do dia corrente**, reutilizando `cached_json_url`) — o cache evita re-consumo da API ao entrar na tela várias vezes no mesmo dia, e chamadas externas nunca acontecem com transação de escrita aberta.
 - O preço da cota chega como numeral JSON com separador decimal `.` (ex.: `1.601637`) e é convertido para centavos inteiros no núcleo.
+- Em dias sem cota publicada (fim de semana/feriado), a data atual retorna lista vazia e a consulta é refeita automaticamente com janela retroativa de 7 dias, usando a última cota publicada.
 - Falha da API (indisponível, chave inválida, cota do plano esgotada) exibe o status de cotação com mensagem amigável e mantém o valor de custo da posição — nunca bloqueia a abertura do Portfólio.
 
 ## API e dados
@@ -99,6 +100,7 @@ Qualquer usuário autenticado que precise configurar perfil, integrações opcio
 
 ## Changelog
 
+- `0.6` — 2026-08-08 — Cotas de fundos resilientes a fins de semana/feriados: data atual vazia dispara consulta retroativa de 7 dias usando a última cota publicada.
 - `0.5` — 2026-08-08 — Ajustes na integração Mais Retorno: CNPJ enviado somente com dígitos + `:fi`, requisição sempre com `start_date`/`end_date` = data atual, cache diário (até o fim do dia) no lugar do TTL de 90 minutos e conversão do separador decimal `.` para centavos.
 
 - `0.4` — 2026-08-08 — Passos 4, 8 parte 2 e 9 concluídos: testes de cotas de fundos validando os critérios 9 a 12 (headers `X-Api-Key`, cota mais recente, cache de 90 min, fallbacks de custo) e consolidação documental; spec promovida a **implementado**.

@@ -2,7 +2,7 @@
 tipo: spec
 area: usuario
 status: implementado
-versao: 1.5
+versao: 1.6
 atualizado: 2026-08-08
 relacionados:
   - "[[sobre-app]]"
@@ -69,7 +69,8 @@ Também atende usuários novos que acabaram de instalar o app e precisam de uma 
 - O módulo **Sobre** fica fora do conteúdo operacional, pois já é institucional e não exige instrução de uso.
 - O tópico de **Preferências** deve explicar as abas **Geral** (aparência, email, senha e recuperação SMTP), **APIs** (integrações opcionais de IA e Mais Retorno para cotas de fundos) e **Perigo** (apagar lançamentos e conta).
 - O tópico de **Portfólio e ativos** deve explicar claramente a diferença entre cadastro da posição e movimentação financeira: o ativo descreve a posição, enquanto aportes e resgates posteriores devem ser registrados pelos lançamentos da conta.
-- O tópico de **Portfólio e ativos** deve explicar também sobre a atualização manual dos valores e encerramento de posição (área histórico)
+- O tópico de **Portfólio e ativos** deve explicar também sobre a atualização manual dos valores e encerramento de posição (área histórico).
+- O tópico de **Portfólio e ativos** deve incluir instrução sobre cotações automáticas de fundos via **Mais Retorno**: acesso ao site, criação de conta, geração da chave de API na plataforma e configuração em **Preferências > APIs**, com a nota de que sem a chave a posição mantém `Cotação manual pendente` e com a integração ativa fundos com CNPJ em carteira em reais consultam a cota diária.
 - O tópico de **Renda fixa** deve diferenciar pré-fixada, pós-fixada e híbrida em linguagem prática.
 - O tópico de **Cartões** deve explicar diferença entre compra parcelada/recorrente, fatura, pagamento de fatura e antecipação de parcelas. Além disso, deixar claro que uma vez paga a fatura os dados não são alterados.
 - O tópico de **Lançamentos de contas** deve explicar diferença entre saldo previsto e saldo conciliado, além de entre compra parcelada/recorrente.
@@ -321,6 +322,15 @@ A lista abaixo é a **versão de referência** para o conteúdo estático do mó
   - **Rota do módulo**: `portfolio`
   - **Tópico contextual**: `resgatar-encerrar`
 
+- **ID**: `cota-fundos-mais-retorno`
+  - **Título**: Cotações de fundos (Mais Retorno)
+  - **Resumo**: Ative as cotações automáticas de fundos de investimento cadastrados com CNPJ.
+  - **Conteúdo**: Acesse o site da Mais Retorno (www.maisretorno.com) e crie sua conta gratuita, ou entre na sua conta existente. Na sua conta, gere uma chave de API na área de API/desenvolvedor da plataforma e copie a chave gerada. No app, abra **Usuário > Preferências**, aba **APIs**, seção **Mais Retorno**: cole a chave, marque a opção de ativação e salve. Com a integração ativa, posições de fundos com CNPJ preenchido em carteira em reais consultam a cota diária automaticamente. Sem a chave, a posição mantém o valor de custo com o status `Cotação manual pendente`.
+  - **Termos de busca**: mais retorno, fundo, cotação de fundos, chave de API, CNPJ, integração, API, cota
+  - **Módulo relacionado**: Preferências
+  - **Rota do módulo**: `user`
+  - **Tópico contextual**: `cota-fundos-mais-retorno`
+
 #### Grupo `cockpit`
 
 - **ID**: `entender-cockpit`
@@ -541,6 +551,7 @@ Nenhuma pendência conhecida.
 
 ### Changelog
 
+- `1.6` — 2026-08-08 — Novo tópico no grupo Portfólio: **Cotações de fundos (Mais Retorno)** — como criar conta na plataforma, gerar a chave de API e configurar em Preferências > APIs; regra correspondente adicionada.
 - `1.5` — 2026-08-08 — Tópico Preferências atualizado para refletir as abas **Geral**, **APIs** e **Perigo** e a integração opcional Mais Retorno ([[preferencias-abas]]).
 - `1.3` — 2026-08-04 — Tópico `importacao-dados` ajustado: removida menção a formatos `.xls` e `.csv` do Organizze.
 - `1.2` — 2026-08-04 — Tópicos `acoes-fundos` e `investimentos-aportes` revisados: explicados campos de cadastro de ações, fundos, cripto e previdência, e diferenciado aporte de investimento de transferência entre contas. Tópico `posicao-movimentacao` reforça que o cadastro no Portfólio é para posição inicial já existente na carteira.

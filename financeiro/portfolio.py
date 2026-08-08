@@ -1359,7 +1359,7 @@ def apply_market_quote(position: dict, force_refresh: bool = False) -> None:
 
 
 def apply_fund_quote(position: dict, user_id: int | None = None, force_refresh: bool = False) -> None:
-    # spec: investimentos/investimentos-portfolio v2.13 — criterios 27 e 28
+    # spec: investimentos/investimentos-portfolio v2.14 — criterios 27 e 28
     # (cotas de fundos via API Mais Retorno: opt-in configurado nas Preferencias,
     #  posicao com CNPJ e carteira em BRL; sem isso a posicao mantem valor de
     #  custo com status "Cotacao manual pendente")
@@ -1383,34 +1383,58 @@ def apply_fund_quote(position: dict, user_id: int | None = None, force_refresh: 
 
 
 def mais_retorno_fund_identifier(position: dict) -> str:
-    # spec: investimentos/investimentos-portfolio v2.13 — criterio fundos-mais-retorno
+    # spec: investimentos/investimentos-portfolio v2.14 — criterio fundos-mais-retorno
     # (API exige CNPJ somente com digitos, sem pontos/barra, mais sufixo ":fi")
     cnpj = re.sub(r"\D", "", str(position.get("cnpj") or ""))
     return f"{cnpj}:fi" if cnpj else ""
 
 
-def fetch_mais_retorno_quote(identifier: str, api_key: str, force_refresh: bool = False) -> dict:
-    today = date.today().isoformat()
-    # spec: investimentos/investimentos-portfolio v2.13 — criterios 27 e 28:
-    # pergunta sempre pela data atual e cache vale ate o fim do dia para nao
-    # re-consumir a API ao entrar na tela varias vezes no mesmo dia
-    url = MAIS_RETORNO_QUOTES_URL.format(symbol=quote(identifier), start=today, end=today)
+def mais_retorno_quotes_for_range(
+    start: str,
+    end: str,
+    identifier: str,
+    api_key: str,
+    force_refresh: bool = False,
+    cache_suffix: str = "",
+) -> list:
+    # spec: investimentos/investimentos-portfolio v2.14 — criterios 27 e 28:
+    # range de datas questionado junto com a data atual; cache diario (ate o
+    # fim do dia) para evitar re-consumo da API ao entrar na tela no mesmo dia
+    url = MAIS_RETORNO_QUOTES_URL.format(symbol=quote(identifier), start=start, end=end)
     payload = cached_json_url(
         url,
         "Nao foi possivel consultar a cotacao do fundo.",
-        f"maisretorno:{identifier}",
+        f"maisretorno:{identifier}{cache_suffix}",
         seconds_until_end_of_day(),
         force_refresh=force_refresh,
         headers={"X-Api-Key": api_key},
     )
     try:
         quotes = payload["quotes"]
+    except (KeyError, TypeError):
+        return []
+    return quotes if isinstance(quotes, list) else []
+
+
+def fetch_mais_retorno_quote(identifier: str, api_key: str, force_refresh: bool = False) -> dict:
+    today = date.today().isoformat()
+    # spec: investimentos/investimentos-portfolio v2.14 — criterios 27 e 28:
+    # 1a tentativa sempre com a data atual; em dias sem cota publicada (fim de
+    # semana/feriado) a API retorna lista vazia, entao re-consulta com janela
+    # retroativa de 7 dias e usa a ultima cota publicada
+    quotes = mais_retorno_quotes_for_range(today, today, identifier, api_key, force_refresh)
+    if not quotes:
+        start = (date.today() - timedelta(days=7)).isoformat()
+        quotes = mais_retorno_quotes_for_range(
+            start, today, identifier, api_key, force_refresh, cache_suffix=":7d"
+        )
+    try:
         if not quotes:
             raise KeyError
         latest = max(quotes, key=lambda item: str(item["d"]))
         earlier = [item for item in quotes if str(item["d"]) < str(latest["d"])]
         previous = max(earlier, key=lambda item: str(item["d"])) if earlier else latest
-        # spec: investimentos/investimentos-portfolio v2.13 — criterios 27 e 28:
+        # spec: investimentos/investimentos-portfolio v2.14 — criterios 27 e 28:
         # a API usa "." como separador decimal (JSON); normaliza virgula por
         # seguranca antes de converter para Decimal
         price = Decimal(str(latest["c"]).replace(",", "."))
@@ -2171,7 +2195,7 @@ def bcb_range_ttl_seconds(end_date: date) -> int:
 
 
 def seconds_until_end_of_day() -> int:
-    # spec: investimentos/investimentos-portfolio v2.13 — criterios 27 e 28
+    # spec: investimentos/investimentos-portfolio v2.14 — criterios 27 e 28
     # (cache de cotacao de fundos vale ate o fim do dia corrente)
     now = datetime.now()
     end = datetime(now.year, now.month, now.day) + timedelta(days=1)

@@ -367,6 +367,21 @@ export const INSTRUCTIONS_CONTENT = [
         route: "portfolio",
         contextualTopicId: "resgatar-encerrar",
       },
+      {
+        id: "cota-fundos-mais-retorno",
+        title: "Cotações de fundos (Mais Retorno)",
+        summary: "Ative as cotações automáticas de fundos de investimento cadastrados com CNPJ.",
+        content: [
+          "Acesse o site da Mais Retorno (www.maisretorno.com) e crie sua conta gratuita, ou entre na sua conta existente.",
+          "Na sua conta, gere uma chave de API na área de API/desenvolvedor da plataforma e copie a chave gerada.",
+          "No app, abra Usuário > Preferências, aba APIs, seção Mais Retorno: cole a chave, marque a opção de ativação e salve.",
+          "Com a integração ativa, posições de fundos com CNPJ preenchido em carteira em reais consultam a cota diária automaticamente. Sem a chave, a posição mantém o valor de custo com o status Cotação manual pendente.",
+        ],
+        searchTerms: ["mais retorno", "fundo", "cotação de fundos", "chave de API", "CNPJ", "integração", "API", "cota"],
+        relatedModule: "Preferências",
+        route: "user",
+        contextualTopicId: "cota-fundos-mais-retorno",
+      },
     ],
   },
   {

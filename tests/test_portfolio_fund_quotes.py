@@ -197,7 +197,7 @@ class FetchMaisRetornoQuoteTest(IsolatedDatabaseMixin):
         self.assertIn("Mais Retorno", quote["source"])
 
     def test_cnpj_formatted_is_normalized_to_digits_only(self) -> None:
-        # spec: investimentos/investimentos-portfolio v2.13 — critério fundos-mais-retorno
+        # spec: investimentos/investimentos-portfolio v2.14 — critério fundos-mais-retorno
         # (API exige CNPJ sem pontos/barra; ex.: 46.422.299/0001-73 -> 46422299000173)
         self.assertEqual(
             mais_retorno_fund_identifier(fund_position(cnpj="46.422.299/0001-73")),
@@ -210,7 +210,7 @@ class FetchMaisRetornoQuoteTest(IsolatedDatabaseMixin):
         self.assertEqual(mais_retorno_fund_identifier(fund_position(cnpj="")), "")
 
     def test_float_quote_with_dot_decimal_separator_is_converted_to_cents(self) -> None:
-        # spec: preferencias-abas v0.5 — critério 9 e investimentos-portfolio v2.13:
+        # spec: preferencias-abas v0.5 — critério 9 e investimentos-portfolio v2.14:
         # a API entrega o preco como numeral JSON (separador ".") — 1.601637 -> 160 centavos
         payload = {"quotes": [{"d": "2026-08-07", "c": 1.601637}]}
         with mock.patch("financeiro.portfolio.urlopen", return_value=self._response(payload)) as urlopen_mock:
@@ -219,7 +219,7 @@ class FetchMaisRetornoQuoteTest(IsolatedDatabaseMixin):
         self.assertEqual(quote["date"], "2026-08-07")
 
     def test_quote_with_comma_string_is_normalized(self) -> None:
-        # spec: investimentos/investimentos-portfolio v2.13 — critério fundos-mais-retorno
+        # spec: investimentos/investimentos-portfolio v2.14 — critério fundos-mais-retorno
         # (defesa caso a API retorne texto com virgula: "1,50" -> 150 centavos)
         payload = {"quotes": [{"d": "2026-08-07", "c": "1,50"}]}
         with mock.patch("financeiro.portfolio.urlopen", return_value=self._response(payload)):
@@ -232,6 +232,27 @@ class FetchMaisRetornoQuoteTest(IsolatedDatabaseMixin):
             with self.assertRaises(PortfolioError) as error:
                 fetch_mais_retorno_quote("12345678000199:fi", "mr-secret")
         self.assertEqual(error.exception.message, "Cotacao do fundo indisponivel")
+
+    def test_no_quote_today_falls_back_to_recent_window(self) -> None:
+        # spec: investimentos/investimentos-portfolio v2.14 — critério fundos-mais-retorno
+        # (fim de semana/feriado: a data atual vem vazia e a consulta retroage 7 dias)
+        today = datetime.now().strftime("%Y-%m-%d")
+        start7 = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+        last_quote_day = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+        empty = {"quotes": []}
+        previous_weekday = {"quotes": [{"d": last_quote_day, "c": 1.0100}]}
+        with mock.patch(
+            "financeiro.portfolio.urlopen",
+            side_effect=[self._response(empty), self._response(previous_weekday)],
+        ) as urlopen_mock:
+            quote = fetch_mais_retorno_quote("46422299000173:fi", "mr-secret")
+
+        urls = [call.args[0].full_url for call in urlopen_mock.call_args_list]
+        self.assertIn(f"start_date={today}", urls[0])
+        self.assertIn(f"start_date={start7}", urls[1])
+        self.assertIn(f"end_date={today}", urls[1])
+        self.assertEqual(quote["price_cents"], 101)
+        self.assertEqual(quote["date"], last_quote_day)
 
     def test_quote_is_cached_until_end_of_day(self) -> None:
         # spec: preferencias-abas v0.5 — regra de cache diario (ate o fim do dia corrente)

@@ -2,7 +2,7 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.13
+versao: 2.14
 atualizado: 2026-08-08
 relacionados:
   - "[[contas-correntes]]"
@@ -96,6 +96,7 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 - Requisição usa sempre `start_date` e `end_date` iguais à **data atual** (`GET /quotes/{identifier}?start_date=AAAA-MM-DD&end_date=AAAA-MM-DD`).
 - O preço da cota (`c`) chega como numeral JSON com separador decimal `.` (ex.: `1.601637`) e é convertido para centavos inteiros; o app nunca exibe o valor cru da API.
 - Respostas cacheadas em `quote_cache` (TTL até o **fim do dia corrente**, para não re-consumir a API ao entrar na tela várias vezes no mesmo dia) via `cached_json_url`; chamadas externas nunca ocorrem com transação de escrita aberta.
+- Em dias sem cota publicada (fins de semana e feriados), a consulta da data atual retorna lista vazia e o app refaz automaticamente a consulta com janela retroativa de **7 dias** (`start_date` = hoje − 7, `end_date` = hoje), usando a última cota publicada; somente se a janela inteira vier vazia a posição mantém o erro amigável.
 - Sem integração ativada, sem CNPJ ou em moeda não-BRL, a posição mantém o valor de custo com status `Cotacao manual pendente` (comportamento anterior).
 - Falha da API (indisponível, chave inválida ou cota do plano esgotada) mantém o valor de custo com status amigável, sem bloquear o Portfólio.
 
@@ -176,6 +177,7 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 
 ## Changelog
 
+- `2.14` — 2026-08-08 — Cotações Mais Retorno resilientes a dias sem cota publicada: quando a data atual retorna lista vazia (fim de semana/feriado), o app re-consulta com janela retroativa de 7 dias e usa a última cota disponível; cache diário preservado.
 - `2.13` — 2026-08-08 — Integração Mais Retorno corrigida: identificador com CNPJ somente dígitos + `:fi`, requisição sempre com `start_date`/`end_date` = data atual, cache diário (até o fim do dia) em vez de 90 minutos e conversão explícita do separador decimal `.` para centavos.
 - `2.12` — 2026-08-08 — Quantidade exibida em posições, origens e posições encerradas normalizada para no máximo 2 casas decimais (arredondamento `half-up`), preservando o layout das tabelas.
 - `2.11` — 2026-08-08 — Posições de fundos (`fund`) passam a cotar pela API Mais Retorno quando a integração está ativada em Preferências (aba APIs), a posição tem CNPJ e a carteira é BRL; cache em `quote_cache` e fallback de custo sem bloquear o Portfólio. Ver [[preferencias-abas]] e ADR-0009.
