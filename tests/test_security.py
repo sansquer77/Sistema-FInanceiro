@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 from io import BytesIO
 import sqlite3
 import tempfile
@@ -696,6 +697,96 @@ def transaction_payload(account_id: int) -> dict:
         "account_id": str(account_id),
         "category": "Mercado",
     }
+
+
+class MaisRetornoConfigRouteTest(IsolatedDatabaseTest):
+    def _handler(self, path: str, user: dict, body: dict | None = None) -> app.AppHandler:
+        handler = object.__new__(app.AppHandler)
+        handler.headers = {
+            "Host": "sistema-financeiro.localhost:8020",
+            "Origin": "http://sistema-financeiro.localhost:8020",
+        }
+        handler.path = path
+        handler.send_json = mock.Mock()
+        handler.read_json = mock.Mock(return_value=body or {})
+        return handler
+
+    def _status_patches(self):
+        return (
+            mock.patch.object(app, "PORT", 8020),
+            mock.patch.object(app, "PUBLIC_URL", "http://sistema-financeiro.localhost:8020"),
+        )
+
+    def _status_context(self, user: dict | None = None):
+        stack = contextlib.ExitStack()
+        for patch in self._status_patches():
+            stack.enter_context(patch)
+        if user is None:
+            stack.enter_context(mock.patch.object(app.AppHandler, "get_cookie", return_value=None))
+        else:
+            stack.enter_context(mock.patch.object(app.AppHandler, "require_user", return_value=user))
+        return stack
+
+    def test_status_unconfigured_returns_false_flags(self) -> None:
+        # spec: preferencias-abas v0.3 — critério 6
+        user = create_user("MR1", "mr1@exemplo.com", "strong-password")
+        handler = self._handler("/api/mais-retorno-config", user)
+        with self._status_context(user):
+            handler.handle_mais_retorno_config_status()
+        status = handler.send_json.call_args[0][0]
+        self.assertFalse(status["configured"])
+        self.assertFalse(status["enabled"])
+        self.assertFalse(status["has_api_key"])
+
+    def test_status_requires_session_user(self) -> None:
+        # spec: preferencias-abas v0.3 — critério 6 (proteção de rota)
+        handler = self._handler("/api/mais-retorno-config", create_user("MR1B", "mr1b@exemplo.com", "strong-password"))
+        with self._status_context():
+            with self.assertRaises(app.ApiError) as error:
+                handler.handle_mais_retorno_config_status()
+        self.assertEqual(error.exception.status, HTTPStatus.UNAUTHORIZED)
+
+    def test_save_enabled_without_key_is_rejected_and_state_unchanged(self) -> None:
+        # spec: preferencias-abas v0.3 — critério 7
+        user = create_user("MR2", "mr2@exemplo.com", "strong-password")
+        handler = self._handler("/api/mais-retorno-config", user, body={"enabled": True})
+        with self._status_context(user):
+            handler.handle_save_mais_retorno_config()
+        self.assertEqual(handler.send_json.call_args[0][1], HTTPStatus.BAD_REQUEST)
+        self.assertIn("chave", handler.send_json.call_args[0][0]["error"])
+        status_handler = self._handler("/api/mais-retorno-config", user)
+        with self._status_context(user):
+            status_handler.handle_mais_retorno_config_status()
+        status = status_handler.send_json.call_args[0][0]
+        self.assertFalse(status["configured"])
+        self.assertFalse(status["enabled"])
+
+    def test_save_with_key_never_exposes_secret(self) -> None:
+        # spec: preferencias-abas v0.3 — critérios 8
+        user = create_user("MR3", "mr3@exemplo.com", "strong-password")
+        handler = self._handler("/api/mais-retorno-config", user, body={"enabled": True, "api_key": "mr-secreta-123"})
+        with self._status_context(user):
+            handler.handle_save_mais_retorno_config()
+        status = handler.send_json.call_args[0][0]
+        self.assertTrue(status["configured"])
+        self.assertTrue(status["enabled"])
+        self.assertTrue(status["has_api_key"])
+        self.assertNotIn("api_key", status)
+        enc_path = database.DATA_DIR / f"mais_retorno_config_user_{user['id']}.enc"
+        self.assertTrue(enc_path.exists())
+        self.assertNotIn(b"mr-secreta-123", enc_path.read_bytes())
+
+    def test_disable_keeps_encrypted_key_for_reenable(self) -> None:
+        # spec: preferencias-abas v0.3 — critério 13
+        user = create_user("MR4", "mr4@exemplo.com", "strong-password")
+        from financeiro.secure_config import save_mais_retorno_settings
+        save_mais_retorno_settings(user["id"], {"enabled": True, "api_key": "mr-secret-6789"})
+        handler = self._handler("/api/mais-retorno-config", user, body={"enabled": False})
+        with mock.patch.object(app.AppHandler, "require_user", return_value=user):
+            handler.handle_save_mais_retorno_config()
+        status = handler.send_json.call_args[0][0]
+        self.assertFalse(status["enabled"])
+        self.assertTrue(status["has_api_key"])
 
 
 def json_handler(content_length: str, body: bytes):

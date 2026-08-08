@@ -13,16 +13,19 @@ from urllib.request import Request, urlopen
 
 from financeiro.accounts import cents_to_money, empty_to_none, money_to_cents, recompute_account_balance
 from financeiro.database import begin_immediate, get_connection, row_to_dict
+from financeiro.secure_config import load_mais_retorno_api_key
 from financeiro.transactions import convert_to_brl_cents, get_exchange_rate_to_brl, parse_exchange_rate, rate_to_micros
 
 MONEY_SCALE = Decimal("100")
 MICRO_SCALE = Decimal("1000000")
 YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=5d&interval=1d"
 COINGECKO_SIMPLE_PRICE_URL = "https://api.coingecko.com/api/v3/simple/price?ids={ids}&vs_currencies={currency}&include_24hr_change=true"
+MAIS_RETORNO_QUOTES_URL = "https://data.maisretorno.com/mr-data/v4/api/quotes/{symbol}"
 BCB_SERIES_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{series}/dados/ultimos/1?formato=json"
 BCB_SERIES_RANGE_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{series}/dados?formato=json&dataInicial={start}&dataFinal={end}"
 MARKET_QUOTE_TTL_SECONDS = 6 * 60 * 60
 INDEXER_QUOTE_TTL_SECONDS = 24 * 60 * 60
+MAIS_RETORNO_QUOTE_TTL_SECONDS = 90 * 60
 QUOTE_MEMORY_CACHE: dict[str, tuple[datetime, dict | list]] = {}
 FX_MEMORY_CACHE: dict[tuple[str, str], int] = {}
 
@@ -215,7 +218,7 @@ def get_portfolio(user_id: int, force_refresh: bool = False) -> dict:
     rows = filter_closed_portfolio_rows([*operation_rows, *opening_rows], closed_positions)
     rows = sorted(rows, key=lambda row: (row["date"], row["id"]))
     positions = build_positions(rows)
-    quote_positions(positions, force_refresh=force_refresh)
+    quote_positions(positions, user_id=user_id, force_refresh=force_refresh)
     apply_value_overrides(user_id, positions)
     summary = summarize_positions(positions)
     positions = [format_quoted_position(position) for position in positions]
@@ -780,7 +783,7 @@ def current_portfolio_positions(user_id: int, force_refresh: bool = False) -> li
     rows = [portfolio_row_with_redemptions(row_to_dict(row), redemption_totals) for row in [*operation_rows_raw, *opening_rows_raw]]
     rows = filter_closed_portfolio_rows(rows, closed_positions)
     positions = build_positions(sorted(rows, key=lambda row: (row["date"], row["id"])))
-    quote_positions(positions, force_refresh=force_refresh)
+    quote_positions(positions, user_id=user_id, force_refresh=force_refresh)
     apply_value_overrides(user_id, positions)
     return positions
 
@@ -1319,10 +1322,12 @@ def empty_position(row, asset_type: str, identifier: str) -> dict:
     }
 
 
-def quote_positions(positions: list[dict], force_refresh: bool = False) -> None:
+def quote_positions(positions: list[dict], user_id: int | None = None, force_refresh: bool = False) -> None:
     for position in positions:
         if position["asset_type"] in {"stock", "crypto"}:
             apply_market_quote(position, force_refresh=force_refresh)
+        elif position["asset_type"] == "fund":
+            apply_fund_quote(position, user_id=user_id, force_refresh=force_refresh)
         elif position["asset_type"] == "fixed_income":
             apply_fixed_income_value(position, force_refresh=force_refresh)
         elif position["asset_type"] == "savings":
@@ -1351,6 +1356,67 @@ def apply_market_quote(position: dict, force_refresh: bool = False) -> None:
         position["day_result_brl_cents"] = value_to_brl(position["day_result_cents"], position["currency"])
     except PortfolioError as exc:
         apply_cost_value(position, exc.message)
+
+
+def apply_fund_quote(position: dict, user_id: int | None = None, force_refresh: bool = False) -> None:
+    # spec: investimentos/investimentos-portfolio v2.11 — criterios 27 e 28
+    # (cotas de fundos via API Mais Retorno: opt-in configurado nas Preferencias,
+    #  posicao com CNPJ e carteira em BRL; sem isso a posicao mantem valor de
+    #  custo com status "Cotacao manual pendente")
+    identifier = mais_retorno_fund_identifier(position)
+    api_key = load_mais_retorno_api_key(user_id) if user_id is not None else ""
+    if not identifier or str(position["currency"] or "BRL").upper() != "BRL" or not api_key:
+        apply_cost_value(position, "Cotacao manual pendente")
+        return
+    try:
+        quote = fetch_mais_retorno_quote(identifier, api_key, force_refresh=force_refresh)
+        position["quote"] = cents_to_money(quote["price_cents"])
+        position["quote_source"] = quote.get("source") or f"Mais Retorno ({identifier})"
+        position["quote_status"] = "ok"
+        position["quote_date"] = quote["date"]
+        position["current_value_cents"] = decimal_to_cents(position["quantity"] * cents_to_decimal(quote["price_cents"]))
+        position["current_value_brl_cents"] = value_to_brl(position["current_value_cents"], position["currency"])
+        position["day_result_cents"] = decimal_to_cents(position["quantity"] * cents_to_decimal(quote["day_change_cents"]))
+        position["day_result_brl_cents"] = value_to_brl(position["day_result_cents"], position["currency"])
+    except PortfolioError as exc:
+        apply_cost_value(position, exc.message)
+
+
+def mais_retorno_fund_identifier(position: dict) -> str:
+    cnpj = str(position.get("cnpj") or "").strip()
+    return f"{cnpj}:fi" if cnpj else ""
+
+
+def fetch_mais_retorno_quote(identifier: str, api_key: str, force_refresh: bool = False) -> dict:
+    url = MAIS_RETORNO_QUOTES_URL.format(symbol=quote(identifier))
+    payload = cached_json_url(
+        url,
+        "Nao foi possivel consultar a cotacao do fundo.",
+        f"maisretorno:{identifier}",
+        MAIS_RETORNO_QUOTE_TTL_SECONDS,
+        force_refresh=force_refresh,
+        headers={"X-Api-Key": api_key},
+    )
+    try:
+        quotes = payload["quotes"]
+        if not quotes:
+            raise KeyError
+        latest = max(quotes, key=lambda item: str(item["d"]))
+        earlier = [item for item in quotes if str(item["d"]) < str(latest["d"])]
+        previous = max(earlier, key=lambda item: str(item["d"])) if earlier else latest
+        price = Decimal(str(latest["c"]))
+        previous_price = Decimal(str(previous["c"]))
+        quote_date = str(latest["d"])
+        if not parse_optional_iso_date(quote_date):
+            quote_date = date.today().isoformat()
+    except (KeyError, IndexError, TypeError, InvalidOperation) as exc:
+        raise PortfolioError("Cotacao do fundo indisponivel") from exc
+    return {
+        "price_cents": decimal_to_cents(price),
+        "day_change_cents": decimal_to_cents(price - previous_price),
+        "date": quote_date,
+        "source": f"Mais Retorno ({identifier})",
+    }
 
 
 def apply_fixed_income_value(position: dict, force_refresh: bool = False) -> None:
@@ -2101,6 +2167,7 @@ def cached_json_url(
     cache_key: str,
     ttl_seconds: int,
     force_refresh: bool = False,
+    headers: dict | None = None,
 ) -> dict | list:
     now = datetime.now()
     if not force_refresh:
@@ -2111,7 +2178,7 @@ def cached_json_url(
         if persistent_payload is not None:
             return persistent_payload
     try:
-        payload = read_json_url(url, message)
+        payload = read_json_url(url, message, headers=headers)
         store_cached_payload(cache_key, payload, now + timedelta(seconds=ttl_seconds))
         return payload
     except PortfolioError:
@@ -2173,8 +2240,9 @@ def store_cached_payload(cache_key: str, payload: dict | list, expires_at: datet
         return
 
 
-def read_json_url(url: str, message: str) -> dict | list:
-    request = Request(url, headers={"User-Agent": "SistemaFinanceiro/0.1"})
+def read_json_url(url: str, message: str, headers: dict | None = None) -> dict | list:
+    request_headers = {"User-Agent": "SistemaFinanceiro/0.1", **(headers or {})}
+    request = Request(url, headers=request_headers)
     try:
         with urlopen(request, timeout=6) as response:
             return json.loads(response.read().decode("utf-8"))

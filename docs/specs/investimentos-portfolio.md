@@ -89,6 +89,13 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 - Cotações via Yahoo Finance (ações/fundos) e CoinGecko/Yahoo (criptoativos).
 - Criptos usam pares de cotação na moeda do ativo/carteira (ex.: BTC/BRL ou BTC/USD).
 
+**Fundos (`fund`):**
+- Cotas dos fundos de investimento buscadas via **API Mais Retorno** quando a integração estiver ativada em Preferências (aba APIs — ver [[preferencias-abas]]), a posição tiver **CNPJ** preenchido e a carteira for em **BRL**.
+- Identificador da API: `{cnpj}:fi`; valor atual pela última cota do retorno e variação diária pela cota anterior.
+- Respostas cacheadas em `quote_cache` (TTL de 90 minutos) via `cached_json_url`; chamadas externas nunca ocorrem com transação de escrita aberta.
+- Sem integração ativada, sem CNPJ ou em moeda não-BRL, a posição mantém o valor de custo com status `Cotacao manual pendente` (comportamento anterior).
+- Falha da API (indisponível, chave inválida ou cota do plano esgotada) mantém o valor de custo com status amigável, sem bloquear o Portfólio.
+
 **Resgates e encerramentos:**
 - Resgates retornam valor para a conta da carteira. Em posições com múltiplas origens, consumo segue FIFO.
 - Resgates e atualização manual de valor atual devem usar modais internos do app, com campos rotulados, valor padrão preenchido e ação secundária de cancelamento, evitando prompts nativos do navegador.
@@ -109,7 +116,7 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 | `POST` | `/api/portfolio/close` |
 | `PUT` | `/api/portfolio/value` |
 
-Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emergency_reserve_eligible` para posições/aportes elegíveis), `investment_redemptions`, `investment_closed_positions`, `investment_value_overrides`, `transactions`, `checking_accounts`, `quote_cache`.
+Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emergency_reserve_eligible` para posições/aportes elegíveis), `investment_redemptions`, `investment_closed_positions`, `investment_value_overrides`, `transactions`, `checking_accounts`, `quote_cache`. A configuração da integração Mais Retorno vive em `data/mais_retorno_config_user_{id}.enc` (ver [[preferencias-abas]]).
 
 ## Plano de implementação
 
@@ -159,9 +166,13 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado o usuário clicando no botão de gráfico do card "Rentabilidade", quando o drawer é aberto, então ele exibe barras comparando a carteira e o CDI.
 - Dado uma carteira com posições em BRL e USD, quando o gráfico de rentabilidade é exibido, então há séries separadas para cada moeda, mantendo o CDI como benchmark visível.
 - Dado o primeiro investimento cadastrado em Jun/2026, quando o usuário consulta rentabilidade em Ago/2026, então o gráfico mostra os meses disponíveis (Jun, Jul, Ago), usando 100% do período cadastrado.
+- Dado uma posição de fundo com CNPJ em carteira BRL e a integração Mais Retorno ativada nas Preferências, quando o Portfólio é carregado, então a posição usa a última cota da API como valor atual, com fonte e data da cota.
+- Dado uma posição de fundo sem integração ativada, sem CNPJ ou em carteira não-BRL, quando o Portfólio é carregado, então a posição mantém o valor de custo com status `Cotacao manual pendente` e nenhuma chamada à API Mais Retorno é feita.
+- Dado uma posição de fundo com a API Mais Retorno indisponível, quando o Portfólio é carregado, então a posição mantém o valor de custo com status amigável e o restante do portfólio segue funcionando.
 
 ## Changelog
 
+- `2.11` — 2026-08-08 — Posições de fundos (`fund`) passam a cotar pela API Mais Retorno quando a integração está ativada em Preferências (aba APIs), a posição tem CNPJ e a carteira é BRL; cache de 90 min em `quote_cache` e fallback de custo sem bloquear o Portfólio. Ver [[preferencias-abas]] e ADR-0009.
 - `2.10` — 2026-08-07 — Resgate e encerramento de posições recalculam valor disponível e posições dentro da transação SQLite de escrita (via `begin_immediate`), eliminando janela TOCTOU entre a leitura das posições e os inserts. Cotação continua pré-cacheada fora do lock para não reter conexão durante chamadas externas.
 - `2.9` — 2026-08-06 — Adicionado card "Rentabilidade mês a mês" no Resumo da Carteira com gráfico de barras por moeda e benchmark CDI, via endpoint `GET /api/portfolio/returns`.
 - `2.8` — 2026-08-02 — Formulários de Renda Fixa no Portfólio e Lançamentos ganham redução de ruído visual com chips, microcopy dinâmica, presets e preview.

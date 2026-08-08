@@ -215,6 +215,13 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `PUT` | `/api/ai-settings` |
 | `POST` | `/api/financial-health-trends/ai-summary` |
 
+#### Rotas — Preferências e integrações opt-in → [[preferencias-abas]]
+
+| Método | Rota |
+|---|---|
+| `GET` | `/api/mais-retorno-config` |
+| `PUT` | `/api/mais-retorno-config` |
+
 #### Rotas — Score de Saúde Financeira → [[score-saude-financeira]]
 
 | Método | Rota |

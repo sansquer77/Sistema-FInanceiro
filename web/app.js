@@ -339,6 +339,11 @@ const aiConfigTimeout = document.querySelector("#aiConfigTimeout");
 const aiConfigTemperature = document.querySelector("#aiConfigTemperature");
 const aiConfigMaxTokens = document.querySelector("#aiConfigMaxTokens");
 const aiConfigMessage = document.querySelector("#aiConfigMessage");
+const userPrefTabs = document.querySelector(".user-pref-tabs");
+const maisRetornoConfigForm = document.querySelector("#maisRetornoConfigForm");
+const maisRetornoEnabled = document.querySelector("#maisRetornoEnabled");
+const maisRetornoApiKey = document.querySelector("#maisRetornoApiKey");
+const maisRetornoConfigMessage = document.querySelector("#maisRetornoConfigMessage");
 const clearLaunchesMessage = document.querySelector("#clearLaunchesMessage");
 const deleteUserMessage = document.querySelector("#deleteUserMessage");
 const monthlyPlanningList = document.querySelector("#monthlyPlanningList");
@@ -1115,6 +1120,11 @@ const userAdminViewController = registerUserAdminView({
     clearLaunchesForm,
     deleteUserForm,
     themePreference,
+    userPrefTabs,
+    maisRetornoConfigForm,
+    maisRetornoEnabled,
+    maisRetornoApiKey,
+    maisRetornoConfigMessage,
     emailMessage,
     passwordMessage,
     emailConfigMessage,
@@ -1512,6 +1522,7 @@ function showModule(view) {
     userAdminViewController.syncThemePreference();
     userAdminViewController.loadEmailConfigStatus();
     userAdminViewController.loadAIConfigStatus();
+    userAdminViewController.loadMaisRetornoConfigStatus();
   }
 }
 

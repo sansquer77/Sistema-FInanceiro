@@ -87,8 +87,10 @@ from financeiro.secure_config import (
     SecureConfigError,
     ai_settings_status,
     email_config_status,
+    mais_retorno_config_status,
     save_ai_settings,
     save_email_config,
+    save_mais_retorno_settings,
 )
 from financeiro.simulations import simulate_butterfly_effect
 from financeiro.trends import TrendsError, calculate_trends
@@ -300,6 +302,9 @@ class AppHandler(BaseHTTPRequestHandler):
         if path == "/api/ai-settings":
             self.handle_ai_settings_status()
             return
+        if path == "/api/mais-retorno-config":
+            self.handle_mais_retorno_config_status()
+            return
         if path == "/api/portfolio":
             self.handle_portfolio()
             return
@@ -449,6 +454,9 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/ai-settings":
             self.handle_save_ai_settings()
+            return
+        if path == "/api/mais-retorno-config":
+            self.handle_save_mais_retorno_config()
             return
         self.send_json({"error": "Rota nao encontrada."}, HTTPStatus.NOT_FOUND)
 
@@ -718,6 +726,22 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_json(save_ai_settings(user["id"], data))
         except SecureConfigError as exc:
             self.send_json({"error": str(exc) or "Configuracao de IA invalida."}, HTTPStatus.BAD_REQUEST)
+
+    def handle_mais_retorno_config_status(self) -> None:
+        # spec: preferencias-abas v0.3 — critérios 6 e 8
+        if not self.validate_read_source():
+            return
+        user = self.require_user()
+        self.send_json(mais_retorno_config_status(user["id"]))
+
+    def handle_save_mais_retorno_config(self) -> None:
+        # spec: preferencias-abas v0.3 — critérios 6, 7, 8 e 13
+        user = self.require_user()
+        data = self.read_json()
+        try:
+            self.send_json(save_mais_retorno_settings(user["id"], data))
+        except SecureConfigError as exc:
+            self.send_json({"error": str(exc) or "Configuracao da Mais Retorno invalida."}, HTTPStatus.BAD_REQUEST)
 
     def handle_ai_summary(self) -> None:
         # spec: tendencias-saude-financeira v2.13 — critérios 12, 13, 14, 16 e 17

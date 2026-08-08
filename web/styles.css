@@ -2563,6 +2563,37 @@ textarea:focus {
   margin-top: 18px;
 }
 
+.user-pref-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.user-pref-tab {
+  border: 1px solid var(--outline, var(--border));
+  background: var(--surface);
+  color: var(--muted);
+padding: 8px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.user-pref-tab:hover {
+  color: var(--ink);
+  border-color: var(--outline-strong, var(--accent));
+}
+
+.user-pref-tab.active {
+  background: var(--accent-container);
+  border-color: var(--accent);
+  color: var(--ink);
+  font-weight: 600;
+}
+
 .user-settings-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(280px, 1fr));

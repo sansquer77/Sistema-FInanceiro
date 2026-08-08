@@ -13,6 +13,33 @@ export function registerUserAdminView(context) {
   let emailConfigPresets = [];
   let aiConfigPresets = [];
 
+  function switchUserTab(tabName) {
+    if (!elements.userPrefTabs) {
+      return;
+    }
+    elements.userPrefTabs.querySelectorAll(".user-pref-tab").forEach((button) => {
+      const active = button.dataset.userTab === tabName;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-selected", String(active));
+    });
+    const panels = document.querySelectorAll(".user-pref-panel");
+    panels.forEach((panel) => {
+      panel.hidden = true;
+    });
+    const panel = document.getElementById(`user${tabName[0].toUpperCase()}${tabName.slice(1)}Panel`);
+    if (panel) {
+      panel.hidden = false;
+    }
+  }
+
+  function handleTabClick(event) {
+    const button = event.target.closest("[data-user-tab]");
+    if (!button) {
+      return;
+    }
+    switchUserTab(button.dataset.userTab);
+  }
+
   function syncThemePreference() {
     if (!elements.themePreference || !theme) {
       return;
@@ -247,6 +274,42 @@ export function registerUserAdminView(context) {
     }
   }
 
+  async function loadMaisRetornoConfigStatus() {
+    if (!elements.maisRetornoConfigForm) {
+      return;
+    }
+    try {
+      const status = await api("/api/mais-retorno-config");
+      elements.maisRetornoEnabled.checked = status.enabled === true;
+      elements.maisRetornoApiKey.value = "";
+      if (status.configured && status.enabled) {
+        setMessage(elements.maisRetornoConfigMessage, "API Mais Retorno ativada para cotas de fundos.", "success");
+      } else if (status.configured) {
+        setMessage(elements.maisRetornoConfigMessage, "Chave salva, mas busca desligada. Ative para usar.", "");
+      } else {
+        setMessage(elements.maisRetornoConfigMessage, "Mais Retorno não configurado.", "");
+      }
+    } catch (error) {
+      setMessage(elements.maisRetornoConfigMessage, error.message, "error");
+    }
+  }
+
+  async function handleMaisRetornoConfigSubmit(event) {
+    event.preventDefault();
+    setMessage(elements.maisRetornoConfigMessage, "");
+    const data = {
+      enabled: elements.maisRetornoEnabled ? elements.maisRetornoEnabled.checked : false,
+      api_key: elements.maisRetornoApiKey ? elements.maisRetornoApiKey.value : "",
+    };
+    try {
+      const status = await api("/api/mais-retorno-config", { method: "PUT", body: data });
+      elements.maisRetornoApiKey.value = "";
+      setMessage(elements.maisRetornoConfigMessage, status.enabled ? "API Mais Retorno ativada." : "API Mais Retorno desligada.", "success");
+    } catch (error) {
+      setMessage(elements.maisRetornoConfigMessage, error.message, "error");
+    }
+  }
+
   async function handleClearLaunchesSubmit(event) {
     event.preventDefault();
     setMessage(elements.clearLaunchesMessage, "");
@@ -310,12 +373,19 @@ export function registerUserAdminView(context) {
     elements.themePreference.addEventListener("click", handleThemePreferenceClick);
     syncThemePreference();
   }
+  if (elements.userPrefTabs) {
+    elements.userPrefTabs.addEventListener("click", handleTabClick);
+  }
+  if (elements.maisRetornoConfigForm) {
+    elements.maisRetornoConfigForm.addEventListener("submit", handleMaisRetornoConfigSubmit);
+  }
   elements.clearLaunchesForm.addEventListener("submit", handleClearLaunchesSubmit);
   elements.deleteUserForm.addEventListener("submit", handleDeleteUserSubmit);
 
   return {
     loadEmailConfigStatus,
     loadAIConfigStatus,
+    loadMaisRetornoConfigStatus,
     syncThemePreference,
   };
 }

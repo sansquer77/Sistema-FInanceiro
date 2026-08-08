@@ -71,6 +71,10 @@ def ai_secret_config_path(user_id: int) -> Path:
     return database.DATA_DIR / f"ai_config_user_{int(user_id)}.enc"
 
 
+def mais_retorno_config_path(user_id: int) -> Path:
+    return database.DATA_DIR / f"mais_retorno_config_user_{int(user_id)}.enc"
+
+
 def load_encrypted_config(path: Path, key_path: Path | None = None) -> dict:
     if key_path is None:
         key_path = email_config_key_path()
@@ -181,6 +185,56 @@ def save_email_config(user_id: int, data: dict) -> dict:
 
 def load_email_config(user_id: int) -> dict:
     return load_encrypted_config(email_config_path(user_id))
+
+
+def mais_retorno_config_status(user_id: int) -> dict:
+    path = mais_retorno_config_path(user_id)
+    if not path.exists():
+        return {"configured": False, "enabled": False, "has_api_key": False}
+    try:
+        config = load_encrypted_config(path)
+    except SecureConfigError:
+        return {"configured": False, "enabled": False, "has_api_key": False}
+    return {
+        "configured": True,
+        "enabled": bool(config.get("enabled")),
+        "has_api_key": bool(config.get("api_key")),
+    }
+
+
+def save_mais_retorno_settings(user_id: int, data: dict) -> dict:
+    # spec: preferencias-abas v0.3 — criterios 7, 8 e 13
+    # (chave criptografada por usuario em data/mais_retorno_config_user_{id}.enc,
+    #  nunca devolvida por rota; desligar mantem a chave para reativacao sem nova)
+    enabled = bool(data.get("enabled", False))
+    api_key = str(data.get("api_key") or "").strip()
+    path = mais_retorno_config_path(user_id)
+    existing_key = ""
+    if path.exists():
+        try:
+            existing_key = str(load_encrypted_config(path).get("api_key") or "")
+        except SecureConfigError:
+            existing_key = ""
+    effective_key = api_key or existing_key
+    if enabled and not effective_key:
+        raise SecureConfigError("Informe a chave de API da Mais Retorno para ativar as cotas de fundos.")
+    if effective_key:
+        save_encrypted_config({"enabled": enabled, "api_key": effective_key}, path)
+    elif path.exists():
+        path.unlink()
+    return mais_retorno_config_status(user_id)
+
+
+def load_mais_retorno_api_key(user_id: int) -> str:
+    status = mais_retorno_config_status(user_id)
+    if not status["enabled"]:
+        return ""
+    path = mais_retorno_config_path(user_id)
+    try:
+        config = load_encrypted_config(path)
+    except SecureConfigError:
+        return ""
+    return str(config.get("api_key") or "")
 
 
 def ai_provider_presets() -> list[dict]:
