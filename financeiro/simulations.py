@@ -74,7 +74,7 @@ def normalize_simulation_payload(data: dict) -> dict:
         recurrence_frequency = str(data.get("recurrence_frequency") or "monthly").strip().lower()
         if recurrence_frequency not in RECURRENCE_FREQUENCIES:
             raise SimulationError("Informe a frequencia da recorrencia.")
-        # spec: efeito-borboleta v0.8 — critério 16
+        # spec: efeito-borboleta v0.9 — critério 16
         # (recorrentes usam 120 ocorrencias automaticamente quando o campo nao e enviado)
         raw_count = str(data.get("recurrence_count") or "").strip()
         recurrence_count = normalize_count(raw_count, "Informe a quantidade de ocorrencias.") if raw_count else 120
@@ -217,12 +217,18 @@ def signed_impact_cents(simulation_type: str, amount_cents: int) -> int:
 def build_account_impact(conn, user_id: int, account: dict, payload: dict, virtual_items: list[dict]) -> dict:
     base_balance_cents = fetch_account_balance_until(conn, user_id, account["id"], payload["date"], reconciled_only=True)
     projected_base_cents = account_projected_balance_until(conn, user_id, account, month_end_date(payload["date"][:7]))
-    simulated_total_cents = sum(item["impact_cents"] for item in virtual_items)
-    projected_balance_cents = projected_base_cents + simulated_total_cents
+    # spec: efeito-borboleta v1.0 — critério 18
+    # (o card "Saldo projetado no mês" soma apenas o impacto virtual do mês da simulação,
+    # não as ocorrências de meses futuros da série)
+    month = payload["date"][:7]
+    simulated_month_total_cents = sum(item["impact_cents"] for item in virtual_items if item["month"] == month)
+    projected_balance_cents = projected_base_cents + simulated_month_total_cents
     return {
+        "month": month,
         "current_balance_cents": base_balance_cents,
         "projected_balance_cents": projected_balance_cents,
         "difference_cents": projected_balance_cents - base_balance_cents,
+        "simulated_month_total_cents": simulated_month_total_cents,
     }
 
 

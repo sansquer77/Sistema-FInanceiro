@@ -439,14 +439,12 @@ const simulationInstallmentCountLabel = document.querySelector("#simulationInsta
 const simulationInstallmentCount = document.querySelector("#simulationInstallmentCount");
 const simulationRecurrenceGroup = document.querySelector("#simulationRecurrenceGroup");
 const simulationRecurrenceFrequency = document.querySelector("#simulationRecurrenceFrequency");
-const simulationRecurrenceCount = document.querySelector("#simulationRecurrenceCount");
 const simulationMessage = document.querySelector("#simulationMessage");
 const simulationCurrentBalance = document.querySelector("#simulationCurrentBalance");
 const simulationProjectedBalance = document.querySelector("#simulationProjectedBalance");
 const simulationDifference = document.querySelector("#simulationDifference");
 const simulationChart = document.querySelector("#simulationChart");
-const simulationVirtualItems = document.querySelector("#simulationVirtualItems");
-const simulationWarnings = document.querySelector("#simulationWarnings");
+  const simulationWarnings = document.querySelector("#simulationWarnings");
 const resetSimulationButton = document.querySelector("#resetSimulationButton");
 const aboutAppVersion = document.querySelector("#aboutAppVersion");
 const navButtons = document.querySelectorAll("[data-view]");
@@ -952,13 +950,11 @@ const simulationsView = registerSimulationsView({
     simulationInstallmentCount,
     simulationRecurrenceGroup,
     simulationRecurrenceFrequency,
-    simulationRecurrenceCount,
     simulationMessage,
     simulationCurrentBalance,
     simulationProjectedBalance,
     simulationDifference,
     simulationChart,
-    simulationVirtualItems,
     simulationWarnings,
     resetSimulationButton,
   },

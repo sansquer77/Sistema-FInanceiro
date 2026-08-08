@@ -22,13 +22,11 @@ export function registerSimulationsView({
     simulationInstallmentCount,
     simulationRecurrenceGroup,
     simulationRecurrenceFrequency,
-    simulationRecurrenceCount,
     simulationMessage,
     simulationCurrentBalance,
     simulationProjectedBalance,
     simulationDifference,
     simulationChart,
-    simulationVirtualItems,
     simulationWarnings,
     resetSimulationButton,
   } = elements;
@@ -76,7 +74,6 @@ export function registerSimulationsView({
     simulationInstallmentCount.disabled = !isInstallment;
     simulationRecurrenceGroup.hidden = simulationSeriesKind.value !== "recurring";
     simulationRecurrenceFrequency.disabled = simulationSeriesKind.value !== "recurring";
-    simulationRecurrenceCount.disabled = simulationSeriesKind.value !== "recurring";
   }
 
   function resetForm() {
@@ -96,7 +93,6 @@ export function registerSimulationsView({
       simulationDifference.textContent = "-";
     }
     simulationChart.innerHTML = '<p class="muted-copy">Preencha o formulário e clique em Simular.</p>';
-    simulationVirtualItems.innerHTML = "";
     simulationWarnings.innerHTML = "";
   }
 
@@ -126,16 +122,6 @@ export function registerSimulationsView({
     }
 
     simulationChart.innerHTML = buildSimulationBalanceHistory(response.chart_series || [], currency);
-
-    simulationVirtualItems.innerHTML = (response.virtual_items || []).map((item) => `
-      <article class="simulation-item">
-        <div>
-          <strong>${escapeHtml(item.description || virtualItemLabel(response.scenario, item))}</strong>
-          <small>${escapeHtml(item.date)} · ${item.occurrence_index}/${item.occurrence_total}</small>
-        </div>
-        <strong>${item.impact_sign}${formatMoney(Math.abs((item.impact_cents || 0) / 100), currency)}</strong>
-      </article>
-    `).join("");
 
     simulationWarnings.innerHTML = (response.warnings || []).map((warning) => `
       <div class="simulation-warning">${escapeHtml(warning)}</div>
@@ -195,11 +181,6 @@ export function registerSimulationsView({
     element.classList.toggle("positive-text", amountCents > 0);
     element.closest(".summary-card")?.classList.toggle("danger", amountCents < 0);
     element.closest(".summary-card")?.classList.toggle("positive", amountCents > 0);
-  }
-
-  function virtualItemLabel(scenario = {}, item = {}) {
-    const base = scenario.type === "income" ? "Receita simulada" : "Despesa simulada";
-    return item.occurrence_total > 1 ? `${base} (${item.occurrence_index}/${item.occurrence_total})` : base;
   }
 
   function chartAmountSizeClass(text) {

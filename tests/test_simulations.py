@@ -145,7 +145,8 @@ class ButterflyEffectSimulationTest(unittest.TestCase):
         })
 
         self.assertEqual(response["account_impact"]["current_balance_cents"], 100000)
-        self.assertEqual(response["account_impact"]["projected_balance_cents"], 300000)
+        self.assertEqual(response["account_impact"]["projected_balance_cents"], 166667)
+        self.assertEqual(response["account_impact"]["simulated_month_total_cents"], 66667)
         self.assertEqual(
             [entry["projected_balance_cents"] for entry in response["chart_series"]],
             [166667, 233334, 300000, 300000, 300000],
@@ -241,7 +242,8 @@ class ButterflyEffectSimulationTest(unittest.TestCase):
         })
 
         self.assertEqual(response["account_impact"]["current_balance_cents"], 1874704)
-        self.assertEqual(response["account_impact"]["projected_balance_cents"], 2474704)
+        self.assertEqual(response["account_impact"]["projected_balance_cents"], 2074704)
+        self.assertEqual(response["account_impact"]["simulated_month_total_cents"], 200000)
         self.assertEqual([item["impact_cents"] for item in response["virtual_items"]], [200000, 200000, 200000])
         self.assertEqual(
             [entry["projected_balance_cents"] for entry in response["chart_series"]],
@@ -368,6 +370,30 @@ class ButterflyEffectSimulationTest(unittest.TestCase):
         self.assertEqual(response["virtual_items"][0]["impact_cents"], -10000)
         self.assertEqual(response["limit_impact"]["items"][0]["projected_spent_cents"], 20000)
         self.assertTrue(any("ultrapassado" in warning.lower() for warning in response["warnings"]))
+
+    def test_project_month_card_ignores_occurrences_of_later_months(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta principal",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "1000,00",
+        })
+
+        response = simulate_butterfly_effect(user["id"], {
+            "type": "income",
+            "amount": "100,00",
+            "date": "2026-01-15",
+            "description": "Receita recorrente",
+            "account_id": str(account["id"]),
+            "series_kind": "recurring",
+            "recurrence_frequency": "monthly",
+            "recurrence_count": 120,
+        })
+
+        self.assertEqual(response["account_impact"]["projected_balance_cents"], 110000)
+        self.assertEqual(response["account_impact"]["simulated_month_total_cents"], 10000)
+        self.assertEqual(response["chart_series"][1]["projected_balance_cents"], 120000)
 
 
 if __name__ == "__main__":

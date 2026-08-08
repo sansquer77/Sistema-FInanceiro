@@ -1045,35 +1045,11 @@ textarea:focus {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
-.simulation-list,
 .simulation-warnings {
   display: grid;
   gap: 8px;
 }
 
-.simulation-item {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 11px 12px;
-  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
-  border-radius: 10px;
-  background: linear-gradient(180deg, var(--panel) 0%, var(--surface-low) 100%);
-  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.simulation-item:hover {
-  transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--accent) 24%, var(--line));
-  box-shadow: var(--control-shadow);
-}
-
-.simulation-item strong {
-  font-size: 14px;
-  color: var(--ink);
-}
-
-.simulation-item small,
 .muted-copy {
   color: var(--muted);
 }
