@@ -649,9 +649,9 @@ export function registerCockpitView({
       if (Array.isArray(item.items) && item.items.length > 0) {
         const helpLabel = `Ver o detalhamento das despesas agregadas em ${item.label}.`;
         return `
-          <button class="chart-row chart-row-button chart-row-breakdown-item" type="button" data-chart-breakdown-index="${index}" aria-label="${escapeHtml(helpLabel)}" title="${escapeHtml(helpLabel)}">
-            ${content}
-            <span class="inline-help-icon" data-tooltip="${escapeHtml(helpLabel)}" aria-hidden="true">i</span>
+          <button class="chart-row chart-row-button" type="button" data-chart-breakdown-index="${index}" aria-label="${escapeHtml(helpLabel)}" title="${escapeHtml(helpLabel)}">
+            <span><i style="background:${chartColor(index)}"></i>${escapeHtml(item.label)}<span class="inline-help-icon" data-tooltip="${escapeHtml(helpLabel)}" aria-hidden="true">i</span></span>
+            <strong>${formatMoney(item.total, "BRL")} · ${formatPercent(percent)}</strong>
           </button>
         `;
       }
