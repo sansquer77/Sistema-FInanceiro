@@ -2,8 +2,8 @@
 tipo: spec
 area: relatorios
 status: implementado
-versao: 2.8
-atualizado: 2026-08-06
+versao: 2.10
+atualizado: 2026-08-07
 relacionados:
   - "[[lancamentos]]"
   - "[[cartoes]]"
@@ -56,6 +56,7 @@ Qualquer usuário autenticado localmente que queira analisar seus gastos e recei
 - O relatório de subcategorias agrupa por `Categoria / Subcategoria`.
 - O relatório de tags considera lançamentos de contas e cartões com tag, mesmo quando não houver subcategoria.
 - **Lançamentos de cartão entram nos relatórios pela competência da fatura (`invoice_month`), não pela data da compra.** Ver [[cartoes]].
+- O KPI **Aportes do mês** da aba Situação do mês exibe a soma dos lançamentos do tipo Investimento/Aporte do mês selecionado (compras, aplicações e aportes registrados em Lançamentos de Contas), com valores de contas em moeda estrangeira convertidos para BRL; posições iniciais cadastradas diretamente no Portfólio e transferências entre contas não entram no valor. O rótulo deve exibir o indicador `i` de ajuda explicando essa origem, no mesmo padrão do KPI Taxa de poupança.
 - Pagamentos de fatura gerados em conta-corrente reduzem o saldo da conta, mas não entram em análises de despesa, relatórios por categoria/subcategoria/tag, evolução de categoria nem totais do Cockpit, pois os lançamentos detalhados do cartão já representam o consumo.
 - Relatórios exibem totais por moeda quando houver movimentações multimoeda.
 - O planejamento do Cockpit separa receitas recorrentes, investimentos planejados e despesas recorrentes por moeda, exibindo os valores originais sem somar moedas distintas.
@@ -74,7 +75,7 @@ Qualquer usuário autenticado localmente que queira analisar seus gastos e recei
 - O status de pagamento da fatura afeta o saldo operacional da conta de pagamento na data do pagamento, mas não altera retroativamente o consumo analítico do mês da fatura.
 - Os rótulos do Cockpit devem deixar claro quando os valores representam o mês selecionado, usando textos como `Saldo previsto em Julho/2026`, `Saldo conciliado em Julho/2026` ou equivalente, para reduzir ambiguidade com o saldo atual.
 - Quando o usuário selecionar mês futuro, o Cockpit deve priorizar planejamento, recorrências, parcelas futuras e faturas previstas; dados realizados inexistentes devem aparecer como zero ou estado vazio, sem simular lançamentos não existentes fora das regras já cadastradas.
-- Quando o gráfico **Maiores despesas do mês** exibir a linha agregada `Outros`, essa linha deve permitir abrir um detalhamento com as categorias/subcategorias ocultas no agrupamento e seus respectivos valores.
+- Quando o gráfico **Maiores despesas do mês** exibir a linha agregada `Outros`, essa linha deve permitir abrir um detalhamento com as categorias/subcategorias ocultas no agrupamento e seus respectivos valores. A linha deve exibir, ao lado do rótulo, o indicador `i` discreto (mesmo padrão dos KPIs Taxa de poupança/Aportes do mês) sinalizando que a linha abre o detalhamento em pop-up.
 - Percentuais são calculados contra o total da seção.
 - Relatório **detalhado** mostra lançamentos individuais.
 - Relatório **sintético** mostra apenas agregados.
@@ -172,6 +173,8 @@ O ponto crítico é cartão de crédito: a fatura pertence ao mês de competênc
 
 ## Changelog
 
+- `2.10` — 2026-08-07 — A linha agregada `Outros` do gráfico **Maiores despesas do mês** ganha o indicador `i` ao lado do rótulo (mesmo padrão dos KPIs de Taxa de poupança/Aportes do mês), sinalizando que a linha abre o detalhamento em pop-up; o pop-up continua acessível por clique em toda a linha e por teclado.
+- `2.9` — 2026-08-07 — KPI **Aportes do mês** da aba Situação do mês ganha indicador `i` de ajuda (mesmo padrão do KPI Taxa de poupança) explicando a origem do valor: soma dos lançamentos do tipo Investimento/Aporte do mês selecionado, com conversão para BRL quando a conta é em outra moeda, excluindo posições iniciais cadastradas no Portfólio e transferências entre contas.
 - `2.8` — 2026-08-06 — Drawer de evolução de categoria ampliado em aproximadamente 20%; gráfico passa a exibir o valor formatado em cada ponto, inclusive nos pontos projetados pela linha de tendência SMA.
 - `2.7` — 2026-08-04 — Adicionada aba **Calendário** ao Cockpit na ordem **Situação**, **Calendário**, **Tendências** e **Saúde Financeira**. A nova aba é documentada na spec [[cockpit-calendario]].
 - `2.6` — 2026-08-04 — Linha `Outros` em Maiores despesas do mês passa a abrir detalhamento em pop-up com os itens agregados.

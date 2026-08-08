@@ -1632,6 +1632,17 @@ textarea:focus {
   background: var(--panel-subtle);
 }
 
+.chart-row-breakdown-item {
+  grid-template-columns: 1fr auto auto;
+}
+
+.chart-row-breakdown-item .inline-help-icon {
+  display: inline-grid;
+  flex: 0 0 auto;
+  align-self: center;
+  cursor: pointer;
+}
+
 .chart-row:last-child {
   border-bottom: none;
   padding-bottom: 0;
