@@ -68,7 +68,28 @@ export function registerPortfolioView({
     portfolioPositions,
     portfolioHistory,
     portfolioGroupFilter,
+    portfolioTabButtons,
   } = elements;
+  const portfolioTabPanels = {
+    position: document.querySelector("#portfolioPositionPanel"),
+    analysis: document.querySelector("#portfolioAnalysisPanel"),
+    history: document.querySelector("#portfolioHistoryPanel"),
+  };
+  const showPortfolioTab = (name) => {
+    const panel = portfolioTabPanels[name];
+    if (!panel) return;
+    portfolioTabButtons.forEach((button) => {
+      const active = button.dataset.portfolioTab === name;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    Object.entries(portfolioTabPanels).forEach(([key, currentPanel]) => {
+      currentPanel.hidden = key !== name;
+    });
+  };
+  portfolioTabButtons.forEach((button) => {
+    button.addEventListener("click", () => showPortfolioTab(button.dataset.portfolioTab));
+  });
   const portfolioEmergencyReserveFields = portfolioAssetForm.querySelector("#portfolioEmergencyReserveFields");
   const portfolioAssetName = portfolioAssetForm.elements.asset_name;
 

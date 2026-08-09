@@ -2,8 +2,8 @@
 tipo: spec
 area: usuario
 status: implementado
-versao: 1.6
-atualizado: 2026-07-31
+versao: 1.7
+atualizado: 2026-08-08
 relacionados:
   - "[[frontend-modularizacao]]"
   - "[[../arquitetura|Arquitetura]]"
@@ -48,7 +48,7 @@ Usuários finais e mantenedores que usam o Sistema Financeiro localmente, instal
 - A tela **Sobre** deve ficar no grupo **Usuário** do menu lateral.
 - A tela deve ser somente leitura e não deve criar tabelas, arquivos de dados ou chamadas externas.
 - O conteúdo deve mencionar o objetivo principal: controle financeiro local, privado e simples.
-- As funcionalidades devem cobrir contas, cartões, lançamentos, categorias/tags, limites, relatórios, cockpit, portfólio, importação, histórico e preferências/segurança.
+- As funcionalidades devem cobrir contas, cartões, lançamentos, categorias/tags, limites, relatórios, cockpit, planejamento, saúde financeira, portfólio (renda fixa, ações, fundos, cripto, poupança e previdência), importação, histórico/auditoria, instruções e preferências/segurança.
 - Os dados de desenvolvimento devem informar:
   - Desenvolvedor: Cristiano Gaspar.
   - Versão atual do sistema, a partir do endpoint de metadados do app.
@@ -65,6 +65,8 @@ Usuários finais e mantenedores que usam o Sistema Financeiro localmente, instal
 - A tela deve respeitar o design system existente, sem introduzir nova identidade visual.
 - O painel principal não deve repetir o rótulo **Sobre** acima de **Sistema Financeiro**, pois o módulo já informa esse contexto no cabeçalho da página.
 - O texto descritivo do painel principal deve aproveitar a largura disponível do card antes de quebrar linha, evitando sensação de coluna estreita em telas largas.
+- A seção **Contato** pode exibir o widget opcional do **Buy Me a Coffee** ao lado do e-mail. O widget carrega recurso externo da CDN quando há conexão; sem internet ou com bloqueio de terceiros, ele simplesmente não renderiza e o restante da tela permanece íntegro (conteúdo local).
+- O texto de **Tecnologias** deve refletir a stack vigente: Python 3 + servidor HTTP da biblioteca padrão, SQLite, HTML/CSS/JS com ES Modules sem build step, PyInstaller, criptografia local de segredos, SMTP local, fontes de cotações (Yahoo Finance, CoinGecko, Banco Central SGS, Mais Retorno) e IA externa opcional.
 
 ## API e dados
 
@@ -90,6 +92,7 @@ Usuários finais e mantenedores que usam o Sistema Financeiro localmente, instal
 
 ## Changelog
 
+- `1.7` — 2026-08-08 — Tela Sobre atualizada: novo texto de funcionalidades e tecnologias refletindo a stack vigente e widget opcional Buy Me a Coffee ao lado do contato (recurso externo, não bloqueia sem internet).
 - `1.6` — 2026-07-31 — Versão atual do app elevada para `1.0.52` após ajustes compatíveis de UX no Cockpit.
 - `1.5` — 2026-07-31 — Política de versionamento do produto formalizada com critérios para PATCH, MINOR, MAJOR e casos sem incremento de versão.
 - `1.4` — 2026-07-27 — Ajustado layout do texto descritivo no painel principal para usar melhor a largura disponível; versão do app elevada para `1.0.51`.

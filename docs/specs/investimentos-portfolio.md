@@ -2,7 +2,7 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.14
+versao: 2.15
 atualizado: 2026-08-08
 relacionados:
   - "[[contas-correntes]]"
@@ -107,6 +107,10 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 - No encerramento, o usuário informa data, valor final e pode optar por registrar o valor final como receita na conta da carteira em um modal único de decisão.
 - A opção de registrar crédito deve ficar desmarcada por padrão para evitar duplicidade com resgates ou créditos já lançados.
 
+**Estrutura em abas:**
+- A tela Portfólio é dividida em **três abas** (padrão de pílulas do design system): **Posição** (Resumo da carteira, formulário de ativo e posição atual), **Análise** (consolidações Por classe, Por indexador, Por moeda e Por carteira) e **Histórico** (posições encerradas).
+- Apenas o painel da aba ativa fica visível; a navegação preserva o estado das demais abas e não altera filtros nem dados.
+
 ## API e dados
 
 | Método | Rota |
@@ -174,9 +178,11 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado uma posição de fundo sem integração ativada, sem CNPJ ou em carteira não-BRL, quando o Portfólio é carregado, então a posição mantém o valor de custo com status `Cotacao manual pendente` e nenhuma chamada à API Mais Retorno é feita.
 - Dado uma posição de fundo com a API Mais Retorno indisponível, quando o Portfólio é carregado, então a posição mantém o valor de custo com status amigável e o restante do portfólio segue funcionando.
 - Dado posições com quantidade de alta precisão (ex.: `94,65389`), quando o Portfólio é exibido, então a quantidade aparece com no máximo 2 casas decimais para preservar o layout das tabelas.
+- Dado o módulo Portfólio aberto, quando o usuário navega entre as abas **Posição**, **Análise** e **Histórico**, então apenas o painel da aba ativa é exibido e os dados das demais abas permanecem preservados.
 
 ## Changelog
 
+- `2.15` — 2026-08-08 — Tela Portfólio dividida em três abas (Posição, Análise, Histórico) seguindo o padrão de pílulas do design system.
 - `2.14` — 2026-08-08 — Cotações Mais Retorno resilientes a dias sem cota publicada: quando a data atual retorna lista vazia (fim de semana/feriado), o app re-consulta com janela retroativa de 7 dias e usa a última cota disponível; cache diário preservado.
 - `2.13` — 2026-08-08 — Integração Mais Retorno corrigida: identificador com CNPJ somente dígitos + `:fi`, requisição sempre com `start_date`/`end_date` = data atual, cache diário (até o fim do dia) em vez de 90 minutos e conversão explícita do separador decimal `.` para centavos.
 - `2.12` — 2026-08-08 — Quantidade exibida em posições, origens e posições encerradas normalizada para no máximo 2 casas decimais (arredondamento `half-up`), preservando o layout das tabelas.

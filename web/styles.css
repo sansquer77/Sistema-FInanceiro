@@ -1,6 +1,6 @@
 :root {
   color-scheme: light;
-  --bg: #faf8ff;
+  --bg: #ffffff;
   --panel: #ffffff;
   --surface-low: #f2f3ff;
   --surface-container: #eaedff;
@@ -9,6 +9,9 @@
   --text: #131b2e;
   --muted: #434653;
   --line: #c3c6d6;
+  --outline: #9aa3b8;
+  --outline-strong: #00328a;
+  --accent-container: #dfe6ff;
   --accent: #00328a;
   --accent-dark: #00328a;
   --accent-strong: #0047bb;
@@ -91,6 +94,9 @@
   --text: #f4f6fb;
   --muted: #b8bfcb;
   --line: #3d4351;
+  --outline: #5b6478;
+  --outline-strong: #93c5fd;
+  --accent-container: #1e2a4d;
   --accent: #3b82f6;
   --accent-dark: #93c5fd;
   --accent-strong: #2563eb;
@@ -266,28 +272,35 @@ p {
 }
 
 .tabs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  padding: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 22px;
-  background: var(--surface-container);
-  border-radius: 8px;
 }
 
 .tab {
   min-height: 40px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
+  border: 1px solid var(--outline, var(--line));
+  background: var(--panel);
   color: var(--muted);
+  padding: 8px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
   font-weight: 700;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.tab:hover {
+  color: var(--ink);
+  border-color: var(--outline-strong, var(--accent));
 }
 
 .tab.active {
-  background: var(--panel);
+  background: var(--accent-container);
+  border-color: var(--accent);
   color: var(--ink);
-  box-shadow: var(--control-shadow);
 }
 
 .form {
@@ -1083,13 +1096,8 @@ textarea:focus {
 
 .cockpit-tabs {
   display: flex;
-  flex-wrap: nowrap;
-  gap: 4px;
-  padding: 4px;
-  border-radius: 8px;
-  background: var(--surface-container);
-  overflow-x: auto;
-  scrollbar-width: none;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .cockpit-tabs::-webkit-scrollbar {
@@ -1102,31 +1110,31 @@ textarea:focus {
 }
 
 .cockpit-tab {
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: 36px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
+  border: 1px solid var(--outline, var(--line));
+  background: var(--panel);
   color: var(--muted);
+  padding: 6px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  font: inherit;
   font-size: 0.84rem;
-  font-weight: 900;
-  line-height: 1.1;
-  padding: 0 10px;
+  font-weight: 700;
+  line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
 
 .cockpit-tab:hover {
-  background: var(--surface-low);
-  color: var(--text);
+  color: var(--ink);
+  border-color: var(--outline-strong, var(--accent));
 }
 
 .cockpit-tab.active {
-  background: var(--panel);
-  color: var(--accent-dark);
-  box-shadow: var(--control-shadow-sm);
+  background: var(--accent-container);
+  border-color: var(--accent);
+  color: var(--ink);
 }
 
 .cockpit-tab-panel[hidden] {
@@ -2719,6 +2727,24 @@ padding: 8px 16px;
   font-weight: 900;
 }
 
+.about-contact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.about-bmc-embed {
+  display: inline-flex;
+  align-items: center;
+}
+
+.about-bmc-embed img,
+.about-bmc-embed .bmc-btn {
+  width: auto;
+  height: 40px;
+}
+
 .about-infrastructure-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(240px, 1fr));
@@ -3539,31 +3565,36 @@ padding: 8px 16px;
 }
 
 .report-tabs {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 4px;
-  padding: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 16px;
-  border-radius: 8px;
-  background: var(--surface-container);
 }
 
 .report-tab {
-  min-height: 34px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
+  border: 1px solid var(--outline, var(--line));
+  background: var(--panel);
   color: var(--muted);
+  padding: 6px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  font: inherit;
   font-size: 0.82rem;
-  font-weight: 900;
-  line-height: 1.1;
-  padding: 0 6px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.report-tab:hover {
+  color: var(--ink);
+  border-color: var(--outline-strong, var(--accent));
 }
 
 .report-tab.active {
-  background: var(--panel);
-  color: var(--accent-dark);
-  box-shadow: var(--control-shadow-sm);
+  background: var(--accent-container);
+  border-color: var(--accent);
+  color: var(--ink);
 }
 
 .report-account-filter {
@@ -4212,6 +4243,41 @@ padding: 8px 16px;
 
 .portfolio-return-notice small {
   font-size: 0.7rem;
+}
+
+.portfolio-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.portfolio-tab {
+  border: 1px solid var(--outline, var(--line));
+  background: var(--panel);
+  color: var(--muted);
+  padding: 8px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.portfolio-tab:hover {
+  color: var(--ink);
+  border-color: var(--outline-strong, var(--accent));
+}
+
+.portfolio-tab.active {
+  background: var(--accent-container);
+  border-color: var(--accent);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.portfolio-tab-panel[hidden] {
+  display: none;
 }
 
 .portfolio-grid {
@@ -6302,10 +6368,6 @@ padding: 8px 16px;
   }
 
   .inline-form {
-    grid-template-columns: 1fr;
-  }
-
-  .report-tabs {
     grid-template-columns: 1fr;
   }
 

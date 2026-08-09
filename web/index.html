@@ -908,6 +908,13 @@
         </section>
 
         <section class="module-view" id="portfolioView" hidden>
+          <div class="portfolio-tabs" role="tablist" aria-label="Visão do Portfólio">
+            <button class="portfolio-tab active" type="button" role="tab" aria-selected="true" aria-controls="portfolioPositionPanel" data-portfolio-tab="position">Posição</button>
+            <button class="portfolio-tab" type="button" role="tab" aria-selected="false" aria-controls="portfolioAnalysisPanel" data-portfolio-tab="analysis">Análise</button>
+            <button class="portfolio-tab" type="button" role="tab" aria-selected="false" aria-controls="portfolioHistoryPanel" data-portfolio-tab="history">Histórico</button>
+          </div>
+
+          <section class="portfolio-tab-panel" id="portfolioPositionPanel" role="tabpanel" data-portfolio-panel="position">
           <section class="panel">
             <div class="section-heading">
               <h2>Resumo da carteira</h2>
@@ -1147,7 +1154,9 @@
             </div>
             <div id="portfolioPositions" class="portfolio-positions"></div>
           </section>
+          </section>
 
+          <section class="portfolio-tab-panel" id="portfolioAnalysisPanel" role="tabpanel" data-portfolio-panel="analysis" hidden>
           <div class="portfolio-grid">
             <section class="panel">
               <div class="section-heading">
@@ -1177,12 +1186,15 @@
               <div class="portfolio-group-list" id="portfolioAccountList"></div>
             </section>
           </div>
+          </section>
 
+          <section class="portfolio-tab-panel" id="portfolioHistoryPanel" role="tabpanel" data-portfolio-panel="history" hidden>
           <section class="panel report-content-panel">
             <div class="section-heading">
               <h2>Histórico</h2>
             </div>
             <div id="portfolioHistory" class="portfolio-positions"></div>
+          </section>
           </section>
         </section>
 
@@ -1774,16 +1786,17 @@
             <section class="panel">
               <h2>Funcionalidades principais</h2>
               <div class="about-feature-list">
-                <span>Contas, saldos e moedas</span>
-                <span>Lançamentos de contas e cartões</span>
-                <span>Recorrência, parcelamento e conciliação</span>
+                <span>Contas, saldos e múltiplas moedas</span>
+                <span>Lançamentos de contas e cartões com recorrência, parcelamento e conciliação</span>
                 <span>Categorias, subcategorias e tags</span>
-                <span>Limites de gastos e alertas</span>
-                <span>Cockpit e relatórios</span>
-                <span>Portfólio de investimentos</span>
+                <span>Limites de gastos com alertas</span>
+                <span>Cockpit, planejamento e saúde financeira</span>
+                <span>Relatórios e rentabilidade mês a mês</span>
+                <span>Portfólio: renda fixa, ações, fundos, cripto, poupança e previdência</span>
                 <span>Importação de planilhas</span>
-                <span>Histórico de operações</span>
-                <span>Preferências, segurança e recuperação por email</span>
+                <span>Histórico de operações e auditoria local</span>
+                <span>Instruções e central de ajuda integrada</span>
+                <span>Preferências, privacidade, integrações e recuperação de senha</span>
               </div>
             </section>
 
@@ -1800,11 +1813,14 @@
                 </div>
                 <div>
                   <dt>Tecnologias</dt>
-                  <dd>Python 3, servidor HTTP da biblioteca padrão, SQLite, HTML, CSS, JavaScript com ES Modules, PyInstaller, SMTP local para recuperação de senha, Yahoo Finance, CoinGecko e Banco Central SGS para cotações e índices.</dd>
+                  <dd>Python 3 e servidor HTTP da biblioteca padrão, SQLite, HTML, CSS e JavaScript com ES Modules (sem build step), PyInstaller, criptografia local para segredos, SMTP local para recuperação de senha, cotações e índices via Yahoo Finance, CoinGecko, Banco Central (SGS) e Mais Retorno, além de IA externa opcional para Tendências e Consultor.</dd>
                 </div>
                 <div>
                   <dt>Contato</dt>
-                  <dd><a href="mailto:cristiano_gaspar@outlook.com">cristiano_gaspar@outlook.com</a></dd>
+                  <dd class="about-contact">
+                    <a href="mailto:cristiano_gaspar@outlook.com">cristiano_gaspar@outlook.com</a>
+                    <span class="about-bmc-embed" id="bmc-btn-container"></span>
+                  </dd>
                 </div>
               </dl>
             </section>
@@ -1918,5 +1934,6 @@
       </aside>
     </main>
     <script type="module" src="/app.js?v=135"></script>
+    <script data-name="BMC-Widget" data-cfasync="false" src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js" data-id="sansquerh" data-description="Support me on Buy me a coffee!" data-message="Tks pelo café!" data-color="#5F7FFF" data-position="Right" data-x_margin="18" data-y_margin="18" data-container="bmc-btn-container"></script>
   </body>
 </html>

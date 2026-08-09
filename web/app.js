@@ -284,6 +284,7 @@ const portfolioAccountList = document.querySelector("#portfolioAccountList");
 const portfolioPositions = document.querySelector("#portfolioPositions");
 const portfolioHistory = document.querySelector("#portfolioHistory");
 const portfolioGroupFilter = document.querySelector("#portfolioGroupFilter");
+const portfolioTabButtons = document.querySelectorAll("[data-portfolio-tab]");
 const importForm = document.querySelector("#importForm");
 const importTarget = document.querySelector("#importTarget");
 const importAccount = document.querySelector("#importAccount");
@@ -1016,6 +1017,7 @@ const portfolioView = registerPortfolioView({
     portfolioPositions,
     portfolioHistory,
     portfolioGroupFilter,
+    portfolioTabButtons,
   },
   api,
   formData,

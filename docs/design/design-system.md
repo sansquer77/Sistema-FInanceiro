@@ -2,8 +2,8 @@
 tipo: design
 area: meta
 status: implementado
-versao: 2.6
-atualizado: 2026-08-02
+versao: 2.7
+atualizado: 2026-08-08
 relacionados:
   - "[[arquitetura]]"
   - "[[specs/frontend-modularizacao]]"
@@ -14,7 +14,7 @@ aliases: ["Design System", "Tokens Visuais", "Precisão Institucional"]
 # Design System — Precisão Institucional
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-08-02 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]]
+> **implementado** · área: `meta` · atualizado em 2026-08-08 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]]
 
 ## Personalidade da marca
 
@@ -38,12 +38,15 @@ Autoritária, sistemática e altamente técnica. A interface deve evocar confiab
 
 | Token | Valor | Uso |
 |---|---|---|
-| `--surface` | `#faf8ff` | Fundo geral da página. |
+| `--surface` | `#ffffff` | Fundo geral da página (branco no tema claro; `#101114` no escuro). |
 | `--surface-container-lowest` | `#ffffff` | Cartões e containers principais. |
 | `--surface-container-low` | `#f2f3ff` | Fundo de seções secundárias. |
 | `--surface-container` | `#eaedff` | Itens de lista em hover. |
 | `--surface-container-high` | `#e2e7ff` | Bordas internas de tabelas. |
 | `--surface-dim` | `#d2d9f4` | Fundos desabilitados / inativos. |
+
+> [!note] Fundo da página
+> No tema claro o fundo da tela é **branco** (`#ffffff`), no escuro é o tom base sólido (`#101114`). A separação entre as seções do layout é feita pelos **cards** (fundo de card + borda `1px` em `--outline-variant`), nunca por tonalidades diferentes no fundo da página. Evite reintroduzir fundos coloridos na página (ex.: lilás) para hierarquizar seções: a hierarquia deve vir dos cards, do espaçamento e do agrupamento.
 
 ### Textos e bordas
 
@@ -165,7 +168,7 @@ Grade de linha de base: **4px** (todos os valores são múltiplos de 4px).
 
 ## Elevação e sombras
 
-- **Superfícies**: hierarquia por camada tonal (tokens `--surface-*`), não por sombra.
+- **Superfícies**: separação de seções por cards com borda (`1px` em `--outline-variant`) sobre fundo neutro da página (branco no claro, escuro sólido no escuro), não por sombras nem por fundos coloridos.
 - **Bordas**: 1px sólida em `--outline-variant` para delimitar cards e tabelas.
 - **Sombras**: apenas em elementos transitórios (dropdowns, modais, tooltips).
   - Sombra padrão: `0 4px 20px rgba(15, 23, 42, 0.08)`.
@@ -195,6 +198,17 @@ Grade de linha de base: **4px** (todos os valores são múltiplos de 4px).
 |---|---|---|
 | Primário | `--primary` | `--on-primary` (`#ffffff`) |
 | Secundário | transparente | `--on-surface` com borda `--outline` |
+
+### Abas (tabs)
+
+Padrão único em toda a aplicação, conforme o modelo usado no menu **Preferências**:
+
+- **Estrutura**: contêiner `flex` com `gap: 8px` e `flex-wrap: wrap` — sem trilho/painel de fundo, sem bordas agrupadas nem contêiner escuro.
+- **Botão (`tab`)**: pílula — `border-radius: 999px`, borda `1px solid --outline`, fundo do card (`--surface-container-lowest`), texto `--on-surface-variant`, padding `6px 14px`/`8px 16px`.
+- **Hover**: texto `--on-surface` e borda `--outline-strong`.
+- **Ativo**: fundo `--accent-container`, borda `--accent`, texto `--on-surface` com `font-weight: 600`. Nunca usar `box-shadow` para marcar o estado ativo.
+- **Acessibilidade**: `role="tablist"` no contêiner, `role="tab"` + `aria-selected` nos botões e `aria-controls` apontando ao painel; painel com `role="tabpanel"`.
+- O mesmo padrão vale para o seletor de Acesso (login), as abas do Cockpit, as abas de Relatórios e quaisquer novas abas do produto.
 
 ### Modais de decisão
 
@@ -308,6 +322,7 @@ Grade de linha de base: **4px** (todos os valores são múltiplos de 4px).
 
 ## Changelog
 
+- `2.7` — 2026-08-08 — Fundo da página torna-se branco no tema claro (e escuro sólido no escuro) com separação de seções pelos cards (borda 1px); padronizado o componente de **Abas** como pílulas com borda `--outline`, ativo em `--accent-container` + `--accent` (modelo do menu Preferências), sem trilho nem sombras no estado ativo.
 - `2.6` — 2026-08-02 — Documentado padrão do Modo Privacidade com botão global, valores `.money-value`/`.privacy-mask`, Glass Blur e revelação em hover/foco.
 - `2.5` — 2026-08-02 — Documentado padrão de redução de ruído visual em formulários densos com helper sob demanda, microcopy dinâmica, segmented controls, presets e previews compactos.
 - `2.4` — 2026-08-02 — Documentado padrão premium para diagnóstico visual com gauge, zonas semânticas e cards expansíveis acessíveis.
