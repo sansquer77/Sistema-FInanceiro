@@ -11,6 +11,7 @@ from pathlib import Path
 from financeiro import database
 
 CONFIG_KEY_ENV = "SISTEMA_FINANCEIRO_CONFIG_KEY"
+CONFIG_KEY_PATH_ENV = "SISTEMA_FINANCEIRO_CONFIG_KEY_PATH"
 KDF_ITERATIONS = 310_000
 EMAIL_PROVIDER_PRESETS = {
     "gmail": {
@@ -67,6 +68,13 @@ def email_config_key_path() -> Path:
     return database.DATA_DIR / "email_config.key"
 
 
+def config_key_path() -> Path:
+    configured = str(os.environ.get(CONFIG_KEY_PATH_ENV) or "").strip()
+    if configured:
+        return Path(configured).expanduser()
+    return database.DATA_DIR.parent / "secure" / "config.key"
+
+
 def ai_secret_config_path(user_id: int) -> Path:
     return database.DATA_DIR / f"ai_config_user_{int(user_id)}.enc"
 
@@ -76,11 +84,13 @@ def mais_retorno_config_path(user_id: int) -> Path:
 
 
 def load_encrypted_config(path: Path, key_path: Path | None = None) -> dict:
-    if key_path is None:
-        key_path = email_config_key_path()
     if not path.exists():
         raise SecureConfigError("Configuracao de email criptografada nao encontrada.")
     payload = json.loads(path.read_text(encoding="utf-8"))
+    return decrypt_config_payload(payload, key_path)
+
+
+def decrypt_config_payload(payload: dict, key_path: Path | None = None) -> dict:
     key_material = load_key_material(key_path)
     salt = decode_field(payload, "salt")
     nonce = decode_field(payload, "nonce")
@@ -95,17 +105,14 @@ def load_encrypted_config(path: Path, key_path: Path | None = None) -> dict:
     return json.loads(plain.decode("utf-8"))
 
 
-def save_encrypted_config(config: dict, path: Path, key_path: Path | None = None) -> None:
-    if key_path is None:
-        key_path = email_config_key_path()
-    database.DATA_DIR.mkdir(exist_ok=True)
+def encrypt_config_payload(config: dict, key_path: Path | None = None) -> dict:
     key_material = load_or_create_key_material(key_path)
     salt = secrets.token_bytes(16)
     nonce = secrets.token_bytes(16)
     encryption_key, signing_key = derive_keys(key_material, salt, KDF_ITERATIONS)
     plain = json.dumps(config, ensure_ascii=True, sort_keys=True).encode("utf-8")
     ciphertext = xor_bytes(plain, key_stream(encryption_key, nonce, len(plain)))
-    payload = {
+    return {
         "version": 1,
         "kdf": "pbkdf2_hmac_sha256",
         "iterations": KDF_ITERATIONS,
@@ -114,13 +121,17 @@ def save_encrypted_config(config: dict, path: Path, key_path: Path | None = None
         "ciphertext": encode_bytes(ciphertext),
         "tag": encode_bytes(sign_payload(signing_key, nonce, ciphertext)),
     }
+
+
+def save_encrypted_config(config: dict, path: Path, key_path: Path | None = None) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = encrypt_config_payload(config, key_path)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
     os.chmod(path, 0o600)
 
 
 def email_config_status(user_id: int) -> dict:
-    path = email_config_path(user_id)
-    configured = path.exists()
+    configured = secure_config_exists(user_id, "email")
     status = {
         "configured": configured,
         "provider": "",
@@ -172,27 +183,26 @@ def save_email_config(user_id: int, data: dict) -> dict:
             raise SecureConfigError("Informe o servidor SMTP.")
     else:
         raise SecureConfigError("Provedor de email invalido.")
-    save_encrypted_config({
+    save_secure_config(user_id, "email", {
         "provider": provider,
         "sender": sender,
         "password": password,
         "smtp_server": smtp_server,
         "smtp_port": smtp_port,
         "use_tls": use_tls,
-    }, email_config_path(user_id))
+    })
     return email_config_status(user_id)
 
 
 def load_email_config(user_id: int) -> dict:
-    return load_encrypted_config(email_config_path(user_id))
+    return load_secure_config(user_id, "email")
 
 
 def mais_retorno_config_status(user_id: int) -> dict:
-    path = mais_retorno_config_path(user_id)
-    if not path.exists():
+    if not secure_config_exists(user_id, "mais_retorno"):
         return {"configured": False, "enabled": False, "has_api_key": False}
     try:
-        config = load_encrypted_config(path)
+        config = load_secure_config(user_id, "mais_retorno")
     except SecureConfigError:
         return {"configured": False, "enabled": False, "has_api_key": False}
     return {
@@ -203,25 +213,23 @@ def mais_retorno_config_status(user_id: int) -> dict:
 
 
 def save_mais_retorno_settings(user_id: int, data: dict) -> dict:
-    # spec: preferencias-abas v0.4 — criterios 7, 8 e 13
-    # (chave criptografada por usuario em data/mais_retorno_config_user_{id}.enc,
-    #  nunca devolvida por rota; desligar mantem a chave para reativacao sem nova)
+    # spec: preferencias-abas v0.8 — criterios 7, 8 e 13
+    # (chave criptografada por usuario no SQLite; desligar mantem a chave para reativacao sem nova)
     enabled = bool(data.get("enabled", False))
     api_key = str(data.get("api_key") or "").strip()
-    path = mais_retorno_config_path(user_id)
     existing_key = ""
-    if path.exists():
+    if secure_config_exists(user_id, "mais_retorno"):
         try:
-            existing_key = str(load_encrypted_config(path).get("api_key") or "")
+            existing_key = str(load_secure_config(user_id, "mais_retorno").get("api_key") or "")
         except SecureConfigError:
             existing_key = ""
     effective_key = api_key or existing_key
     if enabled and not effective_key:
         raise SecureConfigError("Informe a chave de API da Mais Retorno para ativar as cotas de fundos.")
     if effective_key:
-        save_encrypted_config({"enabled": enabled, "api_key": effective_key}, path)
-    elif path.exists():
-        path.unlink()
+        save_secure_config(user_id, "mais_retorno", {"enabled": enabled, "api_key": effective_key})
+    else:
+        delete_secure_config(user_id, "mais_retorno")
     return mais_retorno_config_status(user_id)
 
 
@@ -229,9 +237,8 @@ def load_mais_retorno_api_key(user_id: int) -> str:
     status = mais_retorno_config_status(user_id)
     if not status["enabled"]:
         return ""
-    path = mais_retorno_config_path(user_id)
     try:
-        config = load_encrypted_config(path)
+        config = load_secure_config(user_id, "mais_retorno")
     except SecureConfigError:
         return ""
     return str(config.get("api_key") or "")
@@ -262,15 +269,15 @@ def ai_settings_status(user_id: int) -> dict:
         ).fetchone()
     if row is None:
         return default_ai_settings_status()
-    secret_path = Path(str(row["secret_config_path"] or "")) if row["secret_config_path"] else ai_secret_config_path(user_id)
+    has_secret = secure_config_exists(user_id, "ai")
     return {
-        "configured": bool(row["model"]) and (str(row["auth_type"]) == "none" or secret_path.exists()),
+        "configured": bool(row["model"]) and (str(row["auth_type"]) == "none" or has_secret),
         "enabled": bool(row["enabled"]),
         "provider": str(row["provider"] or "custom"),
         "base_url": str(row["base_url"] or ""),
         "model": str(row["model"] or ""),
         "auth_type": str(row["auth_type"] or "bearer"),
-        "has_api_key": secret_path.exists(),
+        "has_api_key": has_secret,
         "timeout_seconds": int(row["timeout_seconds"] or 10),
         "temperature": micros_to_decimal(row["temperature_micros"], "0.2"),
         "max_tokens": int(row["max_tokens"] or 700),
@@ -316,20 +323,19 @@ def save_ai_settings(user_id: int, data: dict) -> dict:
     if enabled and not model:
         raise SecureConfigError("Informe o modelo de IA.")
 
-    secret_path = ai_secret_config_path(user_id)
     existing_key = ""
-    if secret_path.exists():
+    if secure_config_exists(user_id, "ai"):
         try:
-            existing_key = str(load_encrypted_config(secret_path).get("api_key") or "")
+            existing_key = str(load_secure_config(user_id, "ai").get("api_key") or "")
         except SecureConfigError:
             existing_key = ""
     effective_key = api_key or existing_key
     if enabled and auth_type == "bearer" and not effective_key:
         raise SecureConfigError("Informe a chave de API para ativar a IA.")
     if auth_type == "bearer" and effective_key:
-        save_encrypted_config({"api_key": effective_key}, secret_path)
-    elif auth_type == "none" and secret_path.exists():
-        secret_path.unlink()
+        save_secure_config(user_id, "ai", {"api_key": effective_key})
+    elif auth_type == "none":
+        delete_secure_config(user_id, "ai")
 
     # spec: tendencias-saude-financeira v2.13 — critérios 17, 21, 23, 27 e 28
     with database.get_connection() as conn:
@@ -362,7 +368,7 @@ def save_ai_settings(user_id: int, data: dict) -> dict:
                 timeout_seconds,
                 temperature_micros,
                 max_tokens,
-                str(secret_path),
+                "secure_configs:ai",
             ),
         )
     return ai_settings_status(user_id)
@@ -372,7 +378,7 @@ def load_ai_settings(user_id: int) -> dict:
     status = ai_settings_status(user_id)
     api_key = ""
     if status["has_api_key"]:
-        api_key = str(load_encrypted_config(ai_secret_config_path(user_id)).get("api_key") or "")
+        api_key = str(load_secure_config(user_id, "ai").get("api_key") or "")
     return {**status, "api_key": api_key}
 
 
@@ -424,21 +430,131 @@ def email_provider_presets() -> list[dict]:
     ]
 
 
-def load_key_material(key_path: Path) -> bytes:
+def secure_config_legacy_path(user_id: int, config_type: str) -> Path:
+    if config_type == "email":
+        return email_config_path(user_id)
+    if config_type == "ai":
+        return ai_secret_config_path(user_id)
+    if config_type == "mais_retorno":
+        return mais_retorno_config_path(user_id)
+    raise SecureConfigError("Tipo de configuracao segura invalido.")
+
+
+def secure_config_payload(user_id: int, config_type: str) -> str | None:
+    with database.get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT payload_enc
+            FROM secure_configs
+            WHERE user_id = ? AND config_type = ?
+            """,
+            (user_id, config_type),
+        ).fetchone()
+    if row is not None:
+        return str(row["payload_enc"] or "")
+
+    legacy_path = secure_config_legacy_path(user_id, config_type)
+    if config_type == "ai":
+        with database.get_connection() as conn:
+            settings_row = conn.execute(
+                "SELECT secret_config_path FROM user_ai_settings WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+        configured_path = str(settings_row["secret_config_path"] or "") if settings_row is not None else ""
+        if configured_path and not configured_path.startswith("secure_configs:"):
+            legacy_path = Path(configured_path)
+    if not legacy_path.exists():
+        return None
+    payload_text = legacy_path.read_text(encoding="utf-8")
+    with database.get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO secure_configs (user_id, config_type, payload_enc, source_path)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(user_id, config_type) DO UPDATE SET
+                payload_enc = excluded.payload_enc,
+                source_path = excluded.source_path,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (user_id, config_type, payload_text, str(legacy_path)),
+        )
+    return payload_text
+
+
+def secure_config_exists(user_id: int, config_type: str) -> bool:
+    return secure_config_payload(user_id, config_type) is not None
+
+
+def load_secure_config(user_id: int, config_type: str) -> dict:
+    payload_text = secure_config_payload(user_id, config_type)
+    if payload_text is None:
+        raise SecureConfigError("Configuracao criptografada nao encontrada.")
+    return decrypt_config_payload(json.loads(payload_text))
+
+
+def save_secure_config(user_id: int, config_type: str, config: dict) -> None:
+    payload_text = json.dumps(encrypt_config_payload(config), indent=2, sort_keys=True)
+    with database.get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO secure_configs (user_id, config_type, payload_enc, source_path)
+            VALUES (?, ?, ?, '')
+            ON CONFLICT(user_id, config_type) DO UPDATE SET
+                payload_enc = excluded.payload_enc,
+                source_path = '',
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (user_id, config_type, payload_text),
+        )
+
+
+def delete_secure_config(user_id: int, config_type: str) -> None:
+    with database.get_connection() as conn:
+        conn.execute(
+            "DELETE FROM secure_configs WHERE user_id = ? AND config_type = ?",
+            (user_id, config_type),
+        )
+    legacy_path = secure_config_legacy_path(user_id, config_type)
+    if legacy_path.exists():
+        legacy_path.unlink()
+
+
+def preferred_key_path(key_path: Path | None = None) -> Path:
+    return Path(key_path) if key_path is not None else config_key_path()
+
+
+def migrate_legacy_key_material() -> None:
+    preferred = config_key_path()
+    legacy = email_config_key_path()
+    if preferred.exists() or not legacy.exists() or preferred == legacy:
+        return
+    preferred.parent.mkdir(parents=True, exist_ok=True)
+    preferred.write_text(legacy.read_text(encoding="utf-8"), encoding="utf-8")
+    os.chmod(preferred, 0o600)
+
+
+def load_key_material(key_path: Path | None = None) -> bytes:
     env_value = os.environ.get(CONFIG_KEY_ENV)
     if env_value:
         return env_value.encode("utf-8")
+    if key_path is None:
+        migrate_legacy_key_material()
+    key_path = preferred_key_path(key_path)
     if not key_path.exists():
         raise SecureConfigError("Chave local da configuracao de email nao encontrada.")
     return base64.b64decode(key_path.read_text(encoding="utf-8").strip().encode("ascii"))
 
 
-def load_or_create_key_material(key_path: Path) -> bytes:
+def load_or_create_key_material(key_path: Path | None = None) -> bytes:
     env_value = os.environ.get(CONFIG_KEY_ENV)
     if env_value:
         return env_value.encode("utf-8")
+    if key_path is None:
+        migrate_legacy_key_material()
+    key_path = preferred_key_path(key_path)
     if key_path.exists():
         return load_key_material(key_path)
+    key_path.parent.mkdir(parents=True, exist_ok=True)
     key_material = secrets.token_bytes(32)
     key_path.write_text(base64.b64encode(key_material).decode("ascii"), encoding="utf-8")
     os.chmod(key_path, 0o600)

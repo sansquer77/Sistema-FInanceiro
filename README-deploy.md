@@ -51,6 +51,7 @@ Os exemplos abaixo usam como referência um servidor em `192.168.1.212`, acessad
 | `APP_ALLOWED_HOSTS` | Hosts aceitos no header `Host`, em CSV. Entradas sem porta também aceitam `APP_PORT`. |
 | `APP_ALLOWED_ORIGINS` | Origens aceitas para requisições que alteram dados, em CSV. |
 | `SISTEMA_FINANCEIRO_DATA_DIR` | Pasta dos dados locais. Opcional — só defina se quiser mudar o local padrão. |
+| `SISTEMA_FINANCEIRO_CONFIG_KEY_PATH` | Caminho persistente da chave mestra de segredos criptografados. No servidor, recomenda-se usar um diretório protegido fora do código, como `/etc/sistema-financeiro/config.key`. |
 
 URLs aceitas por padrão pelo backend (ajuste as variáveis acima para domínios, IPs ou portas diferentes destes):
 
@@ -80,6 +81,7 @@ Environment=APP_PORT=8010
 Environment=APP_URL=https://sistema-financeiro.net:8030
 Environment=APP_ALLOWED_HOSTS=sistema-financeiro.net,sistema-financeiro.net:8030,192.168.1.212,192.168.1.212:8030
 Environment=APP_ALLOWED_ORIGINS=https://sistema-financeiro.net:8030,http://sistema-financeiro.net:8030,https://192.168.1.212:8030,http://192.168.1.212:8030
+Environment=SISTEMA_FINANCEIRO_CONFIG_KEY_PATH=/etc/sistema-financeiro/config.key
 
 ExecStart=/usr/bin/python3 /opt/sistema-financeiro/app.py
 Restart=on-failure

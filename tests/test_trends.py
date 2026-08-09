@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import os
 import tempfile
 import unittest
 from urllib.error import URLError
@@ -29,9 +30,15 @@ class TrendsCalculationTest(unittest.TestCase):
         self.original_db_path = database.DB_PATH
         database.DATA_DIR = Path(self.tempdir.name)
         database.DB_PATH = database.DATA_DIR / "test-trends.db"
+        self.key_env_patch = mock.patch.dict(
+            os.environ,
+            {"SISTEMA_FINANCEIRO_CONFIG_KEY_PATH": f"{self.tempdir.name}-secure/config.key"},
+        )
+        self.key_env_patch.start()
         initialize_database()
 
     def tearDown(self) -> None:
+        self.key_env_patch.stop()
         database.DATA_DIR = self.original_data_dir
         database.DB_PATH = self.original_db_path
         self.tempdir.cleanup()

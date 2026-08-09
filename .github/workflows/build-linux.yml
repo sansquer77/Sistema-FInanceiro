@@ -173,6 +173,7 @@ jobs:
 
           find "$PACKAGE_ROOT" \( \
             -name data -o \
+            -name secure -o \
             -name tests -o \
             -name docs -o \
             -name __pycache__ -o \
@@ -197,7 +198,7 @@ jobs:
           ZIP_PATH="Sistema Financeiro - Distribuicao/Linux/${{ steps.app-version.outputs.asset_name }}"
           zip -T "$ZIP_PATH"
 
-          if unzip -Z1 "$ZIP_PATH" | grep -E '(^|/)(data|tests|docs|__pycache__|\.DS_Store|_CodeSignature|\._[^/]*)(/|$)| 2'; then
+          if unzip -Z1 "$ZIP_PATH" | grep -E '(^|/)(data|secure|tests|docs|__pycache__|\.DS_Store|_CodeSignature|\._[^/]*)(/|$)| 2'; then
             echo "O pacote contem arquivos, pastas proibidas ou duplicatas."
             exit 1
           fi

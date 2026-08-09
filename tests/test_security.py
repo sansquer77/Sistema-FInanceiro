@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 from io import BytesIO
+import os
 import sqlite3
 import tempfile
 import unittest
@@ -34,7 +35,17 @@ from financeiro.credit_cards import (
 )
 from financeiro.database import initialize_database
 from financeiro.portfolio import PortfolioError, create_opening_position, update_opening_position
-from financeiro.secure_config import ai_settings_status, load_ai_settings, email_config_status, save_ai_settings, save_email_config
+from financeiro.secure_config import (
+    ai_settings_status,
+    config_key_path,
+    email_config_key_path,
+    email_config_path,
+    email_config_status,
+    load_ai_settings,
+    save_ai_settings,
+    save_email_config,
+    save_encrypted_config,
+)
 from financeiro.spending_limits import SpendingLimitError, create_spending_limit, list_spending_limits, update_spending_limit
 from financeiro.transactions import TransactionError, create_transaction, update_transaction
 
@@ -46,12 +57,18 @@ class IsolatedDatabaseTest(unittest.TestCase):
         self.original_db_path = database.DB_PATH
         database.DATA_DIR = Path(self.tempdir.name)
         database.DB_PATH = database.DATA_DIR / "test-finance.db"
+        self.key_env_patch = mock.patch.dict(
+            os.environ,
+            {"SISTEMA_FINANCEIRO_CONFIG_KEY_PATH": f"{self.tempdir.name}-secure/config.key"},
+        )
+        self.key_env_patch.start()
         initialize_database()
         self.seed_patch = mock.patch("financeiro.categories.seed_default_categories", lambda conn, user_id: None)
         self.seed_patch.start()
 
     def tearDown(self) -> None:
         self.seed_patch.stop()
+        self.key_env_patch.stop()
         database.DATA_DIR = self.original_data_dir
         database.DB_PATH = self.original_db_path
         self.tempdir.cleanup()
@@ -369,12 +386,39 @@ class IdorProtectionTest(IsolatedDatabaseTest):
         self.assertTrue(status["enabled"])
         self.assertTrue(status["has_api_key"])
         self.assertNotIn("api_key", status)
-        encrypted = database.DATA_DIR / f"ai_config_user_{owner['id']}.enc"
-        self.assertTrue(encrypted.exists())
-        self.assertNotIn("sk-local-secret", encrypted.read_text(encoding="utf-8"))
+        with database.get_connection() as conn:
+            row = conn.execute(
+                "SELECT payload_enc FROM secure_configs WHERE user_id = ? AND config_type = 'ai'",
+                (owner["id"],),
+            ).fetchone()
+        self.assertIsNotNone(row)
+        self.assertNotIn("sk-local-secret", row["payload_enc"])
 
         loaded = load_ai_settings(owner["id"])
         self.assertEqual(loaded["api_key"], "sk-local-secret")
+
+    def test_secure_configs_migrate_legacy_files_and_copy_key_outside_data(self) -> None:
+        owner = create_user("Owner", "legacy@example.com", "strong-password")
+        legacy_key = email_config_key_path()
+        legacy_path = email_config_path(owner["id"])
+        save_encrypted_config(email_config_payload("legacy-smtp@example.com"), legacy_path, key_path=legacy_key)
+
+        self.assertTrue(legacy_key.exists())
+        self.assertFalse(config_key_path().exists())
+
+        status = email_config_status(owner["id"])
+
+        self.assertTrue(status["configured"])
+        self.assertEqual(status["sender"], "legacy-smtp@example.com")
+        self.assertTrue(config_key_path().exists())
+        self.assertNotEqual(config_key_path(), legacy_key)
+        with database.get_connection() as conn:
+            row = conn.execute(
+                "SELECT payload_enc, source_path FROM secure_configs WHERE user_id = ? AND config_type = 'email'",
+                (owner["id"],),
+            ).fetchone()
+        self.assertIsNotNone(row)
+        self.assertEqual(row["source_path"], str(legacy_path))
 
     def test_ai_settings_are_isolated_per_user(self) -> None:
         owner = create_user("Owner", "owner@example.com", "strong-password")
@@ -772,9 +816,13 @@ class MaisRetornoConfigRouteTest(IsolatedDatabaseTest):
         self.assertTrue(status["enabled"])
         self.assertTrue(status["has_api_key"])
         self.assertNotIn("api_key", status)
-        enc_path = database.DATA_DIR / f"mais_retorno_config_user_{user['id']}.enc"
-        self.assertTrue(enc_path.exists())
-        self.assertNotIn(b"mr-secreta-123", enc_path.read_bytes())
+        with database.get_connection() as conn:
+            row = conn.execute(
+                "SELECT payload_enc FROM secure_configs WHERE user_id = ? AND config_type = 'mais_retorno'",
+                (user["id"],),
+            ).fetchone()
+        self.assertIsNotNone(row)
+        self.assertNotIn("mr-secreta-123", row["payload_enc"])
 
     def test_disable_keeps_encrypted_key_for_reenable(self) -> None:
         # spec: preferencias-abas v0.4 — critério 13

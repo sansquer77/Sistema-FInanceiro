@@ -85,7 +85,7 @@ jobs:
           Copy-Item "$sourceRoot\Aplicativo\Abrir Sistema Financeiro na Rede.bat" "$appRoot\Abrir Sistema Financeiro na Rede.bat" -Force
           Copy-Item "dist\SistemaFinanceiro" $runtimeRoot -Recurse
 
-          $forbidden = @("data", "tests", "docs", "__pycache__")
+          $forbidden = @("data", "secure", "tests", "docs", "__pycache__")
           foreach ($name in $forbidden) {
             Get-ChildItem $packageRoot -Recurse -Force -Directory -Filter $name |
               Remove-Item -Recurse -Force
@@ -113,7 +113,7 @@ jobs:
           $zipPath = "artifact-output\${{ steps.app-version.outputs.asset_name }}"
           $items = tar -tf $zipPath
 
-          $blocked = $items | Select-String '(^|/)(data|tests|docs|__pycache__|\.DS_Store|_CodeSignature|__MACOSX|\._[^/]*)(/|$)|Windows/Aplicativo/app.py|Windows/Aplicativo/financeiro/|Windows/Aplicativo/web/| 2'
+          $blocked = $items | Select-String '(^|/)(data|secure|tests|docs|__pycache__|\.DS_Store|_CodeSignature|__MACOSX|\._[^/]*)(/|$)|Windows/Aplicativo/app.py|Windows/Aplicativo/financeiro/|Windows/Aplicativo/web/| 2'
           if ($blocked) {
             Write-Error "O pacote contem arquivos ou pastas proibidas: $blocked"
             exit 1

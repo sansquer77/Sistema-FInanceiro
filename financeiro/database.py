@@ -472,6 +472,17 @@ def initialize_database() -> None:
                 UNIQUE (user_id)
             );
 
+            CREATE TABLE IF NOT EXISTS secure_configs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                config_type TEXT NOT NULL CHECK (config_type IN ('email', 'ai', 'mais_retorno')),
+                payload_enc TEXT NOT NULL,
+                source_path TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (user_id, config_type)
+            );
+
             CREATE UNIQUE INDEX IF NOT EXISTS idx_spending_limits_category
             ON spending_limits (user_id, month, category_id)
             WHERE subcategory_id IS NULL;
@@ -560,6 +571,7 @@ def initialize_database() -> None:
         ensure_column(conn, "categories", "group_type", "TEXT NOT NULL DEFAULT 'expense'")
         ensure_operation_logs(conn)
         ensure_ai_settings(conn)
+        ensure_secure_configs(conn)
         migrate_category_unique_constraint(conn)
         migrate_transaction_type_constraint(conn)
         migrate_transaction_tags(conn)
@@ -641,6 +653,30 @@ def ensure_ai_settings(conn: sqlite3.Connection) -> None:
     ensure_column(conn, "user_ai_settings", "temperature_micros", "INTEGER NOT NULL DEFAULT 200000")
     ensure_column(conn, "user_ai_settings", "max_tokens", "INTEGER NOT NULL DEFAULT 700")
     ensure_column(conn, "user_ai_settings", "secret_config_path", "TEXT NOT NULL DEFAULT ''")
+
+
+def ensure_secure_configs(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS secure_configs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            config_type TEXT NOT NULL CHECK (config_type IN ('email', 'ai', 'mais_retorno')),
+            payload_enc TEXT NOT NULL,
+            source_path TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (user_id, config_type)
+        )
+        """
+    )
+    ensure_column(conn, "secure_configs", "source_path", "TEXT NOT NULL DEFAULT ''")
+    conn.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_secure_configs_user_type
+        ON secure_configs (user_id, config_type)
+        """
+    )
 
 
 def row_to_dict(row: sqlite3.Row | None) -> dict | None:

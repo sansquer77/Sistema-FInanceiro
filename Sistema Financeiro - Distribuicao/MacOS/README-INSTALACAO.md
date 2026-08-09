@@ -106,6 +106,7 @@ Este pacote nao inclui:
 
 - `data/finance.db`
 - `data/server.log`
+- `secure/config.key`
 - configuracoes SMTP criptografadas
 - usuarios, contas, cartoes, lancamentos, categorias, tags ou posicoes pessoais
 
@@ -137,4 +138,4 @@ Rodar o instalador novamente atualiza os arquivos do app em:
 
 `~/Documents/Sistema Financeiro`
 
-O instalador nao copia banco de dados do pacote. Se ja existir um banco local no Mac de destino, ele permanece na pasta `data/`.
+O instalador nao copia banco de dados nem chaves locais do pacote. Se ja existir um banco local no Mac de destino, ele permanece na pasta `data/`; se ja existir `secure/config.key`, ele tambem e preservado.

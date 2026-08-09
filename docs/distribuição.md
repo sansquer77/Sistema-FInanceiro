@@ -2,8 +2,8 @@
 tipo: spec
 area: distribuicao
 status: implementado
-versao: 2.2
-atualizado: 2026-08-04
+versao: 2.3
+atualizado: 2026-08-09
 relacionados:
   - "[[sdd]]"
   - "[[templates/spec-template|Template de spec]]"
@@ -16,7 +16,7 @@ aliases: ["Distribuicao", "Pacotes de Distribuicao", "Instalador macOS", "Instal
 # Distribuicao
 
 > [!info] Status
-> **implementado** · área: `distribuicao` · atualizado em 2026-08-04 · relacionados: [[sdd]], [[templates/spec-template|Template de spec]], [[arquitetura]], [[requisitos]]
+> **implementado** · área: `distribuicao` · atualizado em 2026-08-09 · relacionados: [[sdd]], [[templates/spec-template|Template de spec]], [[arquitetura]], [[requisitos]]
 
 ## Problema
 
@@ -68,12 +68,13 @@ Usuario final que vai instalar o Sistema Financeiro em outro computador e manten
 ## Regras
 
 - O pacote nao deve conter nenhum arquivo ou subdiretorio de `data/`.
+- O pacote nao deve conter nenhum arquivo ou subdiretorio de `secure/`.
 - O pacote nao deve conter nenhum arquivo ou subdiretorio de `tests/`.
 - O pacote final nao deve conter a pasta `docs/`; a documentacao tecnica fica apenas no repositorio de desenvolvimento.
 - O pacote final nao deve conter arquivos, assets, dependencias ou configuracoes da Landing Page institucional; ela vive em repositório separado (`/Users/sansquer/Documents/GitHub/sistemafinanceiropage`) e nao faz parte do app instalavel.
 - O pacote final nao deve conter zips antigos de distribuicao embutidos dentro da propria pasta da plataforma.
 - O pacote nao deve conter `__pycache__/`, `.DS_Store`, `_CodeSignature` ou arquivos AppleDouble `._*`.
-- O pacote nao deve conter banco SQLite, logs, configuracoes SMTP criptografadas, chaves locais, usuarios, contas, cartoes, lancamentos, categorias, tags ou posicoes pessoais.
+- O pacote nao deve conter banco SQLite, logs, configuracoes SMTP/IA/integrações criptografadas, chaves locais, usuarios, contas, cartoes, lancamentos, categorias, tags ou posicoes pessoais.
 - A pasta `Sistema Financeiro - Distribuicao/` deve permanecer no repositório apenas como template enxuto de empacotamento, não como armazenamento de pacotes gerados.
 - Runtimes PyInstaller (`Aplicativo/SistemaFinanceiro/`), zips finais e staging Linux sao saídas de build e não devem ser versionados.
 - A pasta Windows versionada não deve conter árvore fonte antiga (`app.py`, `financeiro/` ou `web/` completo); apenas launchers, instalador, README, script de hosts e o ícone `.ico` usado pelo workflow.
@@ -86,7 +87,7 @@ Usuario final que vai instalar o Sistema Financeiro em outro computador e manten
 - O bundle `Sistema Financeiro.app` dentro da distribuicao macOS deve usar launcher portatil baseado em `$HOME/Documents/Sistema Financeiro`, chamando `SistemaFinanceiro/SistemaFinanceiro` e nao caminhos absolutos da maquina de desenvolvimento.
 - O launcher do app e `MacOS/Instalar Sistema Financeiro.command` devem ter permissao de execucao.
 - Se o binario do launcher dentro do `.app` for substituido, assinaturas antigas em `Contents/_CodeSignature` devem ser removidas para evitar assinatura inconsistente.
-- O instalador macOS deve copiar a aplicacao para `~/Documents/Sistema Financeiro`, excluindo `data/`, `tests/`, `docs/`, `__pycache__/`, `.DS_Store`, `launcher_distribuicao.c` e `Sistema Financeiro.app/`.
+- O instalador macOS deve copiar a aplicacao para `~/Documents/Sistema Financeiro`, excluindo `data/`, `secure/`, `tests/`, `docs/`, `__pycache__/`, `.DS_Store`, `launcher_distribuicao.c` e `Sistema Financeiro.app/`.
 - O instalador macOS deve instalar `Sistema Financeiro.app` em `/Applications` e pedir permissao administrativa via macOS quando necessario.
 - O instalador Windows deve manter os dados locais fora do pacote e nao deve copiar dados de desenvolvimento.
 - Builds PyInstaller devem ser gerados no sistema operacional alvo; o build Windows deve ser feito em Windows, nao em macOS.
@@ -128,6 +129,7 @@ Arquivos e diretorios afetados:
 ## Critérios de aceite
 
 - Dado qualquer pacote gerado, quando o zip for inspecionado, entao nao existe nenhum caminho contendo `/data/` ou `/tests/`.
+- Dado qualquer pacote gerado, quando o zip for inspecionado, entao nao existe nenhum caminho contendo `/secure/`.
 - Dado qualquer pacote gerado, quando o zip for inspecionado, entao nao existe nenhum caminho contendo `/docs/`.
 - Dado qualquer pacote gerado, quando o zip for inspecionado, entao nao existem arquivos, assets, dependencias ou configuracoes da Landing Page institucional.
 - Dado qualquer pacote gerado, quando o zip for inspecionado, entao nao existe zip antigo de distribuicao embutido dentro da propria pasta compactada.
@@ -151,6 +153,7 @@ Arquivos e diretorios afetados:
 - Dado a pasta `Aplicativo/`, quando os arquivos Python forem compilados com `py_compile`, entao nao ha erro de sintaxe.
 - Dado um computador de destino sem dados anteriores, quando o usuario executar o instalador e abrir o app, entao um banco vazio e criado na pasta local de dados da plataforma.
 - Dado um computador de destino com banco anterior, quando o usuario reinstalar, entao o instalador atualiza arquivos do app sem copiar dados do pacote para `data/`.
+- Dado um computador de destino com segredos já configurados, quando o usuario reinstalar, entao o instalador preserva `data/` e `secure/`; no primeiro uso da nova versão, arquivos `.enc` legados podem ser migrados para `secure_configs` sem recadastro.
 
 ## Fora de escopo
 
@@ -164,6 +167,7 @@ Arquivos e diretorios afetados:
 
 ## Changelog
 
+- `2.3` — 2026-08-09 — Pacotes e instaladores passam a tratar `secure/` como runtime local sensível, fora dos zips, preservado em atualizações junto com `data/`; documentada migração compatível de segredos para `secure_configs`.
 - `2.2` — 2026-08-04 — Pasta `Sistema Financeiro - Distribuicao/` passa a ser tratada como template enxuto versionado, removendo runtimes PyInstaller, zips, staging Linux, `.DS_Store` e árvore fonte antiga dos pacotes.
 - `2.1` — 2026-08-04 — Workflows de pacotes passam a nomear zips e artifacts como `SO - versão do app` e publicar os assets em GitHub Releases para consumo pela Landing Page.
 - `2.0` — 2026-08-03 — Atualizada a regra de distribuição para refletir que a Landing Page foi movida para repositório próprio e o diretório legado `landing-page/` foi removido do app principal.

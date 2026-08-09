@@ -2,7 +2,7 @@
 tipo: spec
 area: usuario
 status: implementado
-versao: 0.7
+versao: 0.8
 atualizado: 2026-08-09
 relacionados:
   - "[[investimentos-portfolio]]"
@@ -10,6 +10,7 @@ relacionados:
   - "[[recuperacao-senha]]"
   - "[[seguranca-autenticacao]]"
   - "[[arquitetura]]"
+  - "[[../adr/0010-segredos-criptografados-sqlite]]"
 tags: [spec, "area/usuario", "status/implementado"]
 aliases: ["Preferências", "Abas de Preferências", "Mais Retorno"]
 ---
@@ -45,7 +46,9 @@ Qualquer usuário autenticado que precise configurar perfil, integrações opcio
 
 **Mais Retorno (configuração):**
 - A integração é **opt-in**: desligada por padrão, sem chave armazenada até o usuário salvar.
-- A chave de API é criptografada por usuário em `data/mais_retorno_config_user_{id}.enc`, usando a mesma infraestrutura de `secure_config.py` (mesma chave mestra do SMTP/IA). A chave **nunca** é devolvida por nenhuma rota nem logada.
+- A chave de API é criptografada por usuário em `secure_configs.payload_enc` no SQLite, usando a mesma infraestrutura de `secure_config.py` (mesma chave mestra do SMTP/IA). A chave **nunca** é devolvida por nenhuma rota nem logada.
+- Instalações existentes com `data/email_config_user_{id}.enc`, `data/ai_config_user_{id}.enc`, `data/mais_retorno_config_user_{id}.enc` ou `data/email_config.key` continuam compatíveis: no primeiro uso, o envelope criptografado é copiado para `secure_configs` e a chave mestra legada é copiada para `secure/config.key`, sem apagar os arquivos antigos automaticamente.
+- Novas gravações salvam SMTP, IA e Mais Retorno como blobs criptografados por usuário no SQLite; a chave mestra padrão fica fora de `data/`, em `secure/config.key`, ou no caminho definido por `SISTEMA_FINANCEIRO_CONFIG_KEY_PATH`.
 - Salvar com `enabled` ligado sem chave armazenada (ou sem chave nova informada) retorna erro amigável e não altera o estado anterior.
 - Desligar mantém a chave criptografada em disco (sem expô-la) para facilitar reativação; informar chave nova substitui a anterior.
 
@@ -62,8 +65,9 @@ Qualquer usuário autenticado que precise configurar perfil, integrações opcio
 
 - `GET /api/mais-retorno-config` — status da configuração (`configured`, `enabled`, `has_api_key`), sem segredos.
 - `PUT /api/mais-retorno-config` — salva `enabled` e `api_key`; valida origem (Host/Origin) como toda mutação.
-- Arquivo: `data/mais_retorno_config_user_{id}.enc` (payload `{"enabled": bool, "api_key": str}`).
-- Tabela nova: nenhuma — a configuração vive em arquivo criptografado, como SMTP.
+- Tabela `secure_configs`: guarda envelopes criptografados por usuário (`config_type = email | ai | mais_retorno`) em `payload_enc`; `source_path` registra a origem quando o payload veio de arquivo legado.
+- Arquivos legados compatíveis: `data/email_config_user_{id}.enc`, `data/ai_config_user_{id}.enc`, `data/mais_retorno_config_user_{id}.enc` e `data/email_config.key`.
+- Arquivo novo de chave mestra padrão: `secure/config.key`, fora de `data/`; servidores podem sobrepor com `SISTEMA_FINANCEIRO_CONFIG_KEY_PATH`.
 
 ## Critérios de aceite
 
@@ -74,12 +78,13 @@ Qualquer usuário autenticado que precise configurar perfil, integrações opcio
 5. Dado o usuário na aba **Perigo**, quando abre Preferências, então encontra apenas **Apagar lançamentos** e **Apagar conta**, com confirmação e senha atual obrigatórias.
 6. Dado um usuário sem integração configurada, quando consulta `GET /api/mais-retorno-config`, então recebe `configured = false`, `enabled = false` e `has_api_key = false`.
 7. Dado um usuário salvando a integração com `enabled = true` e sem chave (nova ou armazenada), então recebe erro amigável e o estado anterior permanece inalterado.
-8. Dado um usuário salvando a integração com chave nova, quando consulta o status, então a chave nunca aparece na resposta e o conteúdo do arquivo `.enc` não contém a chave em texto puro.
+8. Dado um usuário salvando a integração com chave nova, quando consulta o status, então a chave nunca aparece na resposta e o conteúdo de `secure_configs.payload_enc` não contém a chave em texto puro.
 9. Dado um usuário com a integração ativada e uma posição de fundo com CNPJ em BRL, quando o Portfólio é carregado, então a posição exibe valor atual calculado pela última cota da API, com fonte e data da cota.
 10. Dado um usuário com a integração desativada (ou posição de fundo sem CNPJ), quando o Portfólio é carregado, então a posição de fundo mantém valor de custo com status `Cotacao manual pendente`, sem nenhuma chamada à API Mais Retorno.
 11. Dado um usuário com a integração ativada e a API indisponível, quando o Portfólio é carregado, então a posição de fundo mantém valor de custo com status amigável de falha e o restante do portfólio continua funcionando.
 12. Dado um usuário com a integração ativada, quando uma posição de fundo é em carteira não-BRL ou é de outro tipo de ativo, então a integração não é usada e o comportamento anterior é preservado.
 13. Dado um usuário desabilitando a integração que já tinha chave salva, quando salva, então `enabled = false` mas a chave permanece armazenada criptografada (reativação não exige nova chave).
+14. Dado uma instalação anterior com arquivos `.enc` e `data/email_config.key`, quando o usuário consulta ou salva SMTP, IA ou Mais Retorno após atualizar o app, então a configuração continua legível, o payload é copiado para `secure_configs` e a chave mestra é copiada para `secure/config.key`.
 
 ## Pendências
 
@@ -97,9 +102,11 @@ Qualquer usuário autenticado que precise configurar perfil, integrações opcio
 - [x] Passo 7 — `web/app.js` + `web/modules/user-admin-view.js`: troca de abas e formulário Mais Retorno. Fecha: critérios 2, 4 e 6 a 8 (lado cliente).
 - [x] Passo 8 — Testes automatizados: `tests/test_security.py` (config criptografada e rotas, critérios 6, 7, 8 e 13) e `tests/test_portfolio_fund_quotes.py` (cotação de fundos e fallbacks, critérios 9 a 12). Fecha: critérios 6 a 13. Critérios 1 a 5 verificáveis manualmente.
 - [x] Passo 9 — Documentação: [[arquitetura]], [[requisitos]], MoC, [[instrucoes-app]] e atualização de status/versão/changelog das specs. Fecha: consistência documental.
+- [x] Passo 10 — Migrar segredos de SMTP/IA/Mais Retorno para `secure_configs`, mantendo compatibilidade com arquivos `.enc` legados e chave mestra copiada para `secure/config.key`. Fecha: critérios 8, 13 e 14.
 
 ## Changelog
 
+- `0.8` — 2026-08-09 — Segredos de SMTP, IA e Mais Retorno passam a ser persistidos como envelopes criptografados em `secure_configs`; arquivos `.enc` e `data/email_config.key` continuam compatíveis e são copiados/migrados no primeiro uso.
 - `0.7` — 2026-08-09 — Tag de status sincronizada com o frontmatter, callout e MoC.
 - `0.6` — 2026-08-08 — Cotas de fundos resilientes a fins de semana/feriados: data atual vazia dispara consulta retroativa de 7 dias usando a última cota publicada.
 - `0.5` — 2026-08-08 — Ajustes na integração Mais Retorno: CNPJ enviado somente com dígitos + `:fi`, requisição sempre com `start_date`/`end_date` = data atual, cache diário (até o fim do dia) no lugar do TTL de 90 minutos e conversão do separador decimal `.` para centavos.
@@ -116,3 +123,4 @@ Qualquer usuário autenticado que precise configurar perfil, integrações opcio
 - [[recuperacao-senha]]
 - [[seguranca-autenticacao]]
 - [[arquitetura]]
+- [[../adr/0010-segredos-criptografados-sqlite]]

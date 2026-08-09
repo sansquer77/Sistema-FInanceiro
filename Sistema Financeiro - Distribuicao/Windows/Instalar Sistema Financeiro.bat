@@ -24,7 +24,7 @@ echo Copiando arquivos do sistema para:
 echo %DEST_DIR%
 echo.
 
-robocopy "%SOURCE_DIR%" "%DEST_DIR%" /E /XD data tests docs __pycache__ ".git" "Sistema Financeiro.app" /XF ".DS_Store" "._*" "*.pyc" "server.log" >nul
+robocopy "%SOURCE_DIR%" "%DEST_DIR%" /E /XD data secure tests docs __pycache__ ".git" "Sistema Financeiro.app" /XF ".DS_Store" "._*" "*.pyc" "server.log" >nul
 if %errorlevel% GEQ 8 (
   echo Erro ao copiar os arquivos do sistema.
   echo.

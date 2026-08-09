@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 7.1
+versao: 7.2
 atualizado: 2026-08-09
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -90,6 +90,8 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[adr/0006-classificacao-assistida-local]] | Proposta de classificação assistida por hábitos locais, com IA externa apenas como fallback opcional. |
 | [[adr/0007-landing-page-institucional-isolada]] | Landing Page institucional em repositório separado, deployável pela Vercel fora da distribuição do app. |
 | [[adr/0008-licenca-apache-2-0]] | App principal disponibilizado gratuitamente como projeto open source sob Apache License 2.0. |
+| [[adr/0009-mais-retorno-cotas-opt-in]] | Cotas de fundos via API Mais Retorno em integração opt-in. |
+| [[adr/0010-segredos-criptografados-sqlite]] | Segredos de SMTP, IA e integrações em SQLite criptografado, com chave fora de `data/`. |
 
 ---
 
@@ -130,6 +132,7 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `7.2` — 2026-08-09 — Adicionado [[adr/0010-segredos-criptografados-sqlite]] e atualizada [[specs/preferencias-abas]] para v0.8 com segredos criptografados em `secure_configs` e migração compatível de arquivos legados.
 - `7.1` — 2026-08-09 — [[specs/consultor]] atualizada para v0.18, ainda em rascunho, com ajustes pré-implementação sobre disponibilidade IA/Consultor/consentimento, 4 categorias e Perfil Complementar criptografado em SQLite por usuário.
 - `7.0` — 2026-08-09 — [[specs/rentabilidade-portfolio]] atualizada para v1.5 com refinamento visual do gráfico de rentabilidade: linhas mais finas e pontos discretos.
 - `6.9` — 2026-08-09 — [[specs/cockpit-calendario]] promovida para specs implementadas no MoC, alinhada à spec v0.8.

@@ -22,6 +22,7 @@ echo "$DEST_DIR"
 
 /usr/bin/rsync -a \
   --exclude 'data/' \
+  --exclude 'secure/' \
   --exclude 'tests/' \
   --exclude 'docs/' \
   --exclude '__pycache__/' \
