@@ -4189,6 +4189,12 @@ padding: 8px 16px;
 
 .portfolio-return-line-group circle {
   cursor: pointer;
+  transition: r 0.16s ease, fill-opacity 0.16s ease;
+}
+
+.portfolio-return-line-group circle:hover {
+  r: 2.1;
+  fill-opacity: 1;
 }
 
 .portfolio-return-x-labels {

@@ -2,8 +2,8 @@
 tipo: spec
 area: alerta-nova-versao
 status: implementado
-versao: 1.0
-atualizado: 2026-08-04
+versao: 1.1
+atualizado: 2026-08-09
 relacionados:
   - "[[landing-page]]"
   - "[[sobre-app]]"
@@ -15,7 +15,7 @@ aliases: ["Alerta de Nova Versão no Cockpit"]
 # Alerta de Nova Versão no Cockpit
 
 > [!info] Status
-> **rascunho** · área: `alerta-nova-versao` · atualizado em 2026-08-04 · relacionados: [[landing-page]], [[sobre-app]], [[../adr/0007-landing-page-institucional-isolada|ADR-0007]]
+> **implementado** · área: `alerta-nova-versao` · atualizado em 2026-08-09 · relacionados: [[landing-page]], [[sobre-app]], [[../adr/0007-landing-page-institucional-isolada|ADR-0007]]
 
 ### Problema
 
@@ -96,6 +96,7 @@ Usuário do app local que quer ser notificado dentro da própria interface quand
 
 ### Changelog
 
+- `1.1` — 2026-08-09 — Status visual da nota sincronizado com o frontmatter e com o MoC.
 - `1.0` — 2026-08-04 — Spec implementada: endpoint `/api/latest-version` na landing page, módulo `financeiro/version_check.py`, rota no `app.py` e alerta no Cockpit com testes automatizados.
 
 ### Relacionados

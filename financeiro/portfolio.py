@@ -1553,7 +1553,7 @@ def _position_value_native_as_of(
     force_refresh: bool = False,
     factor_cache: dict[str, Decimal] | None = None,
 ) -> int:
-    # spec: rentabilidade-portfolio v1.4 — critério 4
+    # spec: rentabilidade-portfolio v1.5 — critério 4
     if as_of_date < date.fromisoformat(position["first_operation_date"]):
         return 0
     if position["asset_type"] == "fixed_income":
@@ -1601,7 +1601,7 @@ def _monthly_return_pct(prev_value: int, end_value: int, net_contribution: int) 
 
 
 def get_portfolio_returns(user_id: int, force_refresh: bool = False) -> dict:
-    # spec: rentabilidade-portfolio v1.4 — critérios 1 a 10
+    # spec: rentabilidade-portfolio v1.5 — critérios 1 a 10
     # Rentabilidade mensal (em percentual) por moeda consolidada (BRL e USD),
     # comparada ao CDI e ao IPCA do mês. Últimos 12 meses, ou todos os meses
     # disponíveis quando a base é menor. Cada moeda é calculada na própria
@@ -2512,7 +2512,7 @@ def micros_to_decimal(micros: int) -> Decimal:
 
 
 def parse_rate_decimal(value: object) -> Decimal:
-    # spec: rentabilidade-portfolio v1.4 — critério 4
+    # spec: rentabilidade-portfolio v1.5 — critério 4
     # get_portfolio retorna a taxa ja formatada (ex.: "4,27"); aceita Decimal ou
     # string com ponto/virgula para nao quebrar o calculo de valor por data.
     if isinstance(value, Decimal):

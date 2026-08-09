@@ -662,14 +662,14 @@ export function registerPortfolioView({
       const circles = points.map((point) => {
         const monthLabel = formatReturnMonthLabel(entries[point.index].month);
         const displayValue = `${(point.value > 0 ? "+" : "")}${point.value.toFixed(2)}%`;
-        return `<circle cx="${point.x.toFixed(2)}" cy="${point.y.toFixed(2)}" r="1.9" fill="${series.color}">
+        return `<circle cx="${point.x.toFixed(2)}" cy="${point.y.toFixed(2)}" r="1.35" fill="${series.color}" fill-opacity="0.82">
           <title>${escapeHtml(series.label)} · ${escapeHtml(monthLabel)}: ${escapeHtml(displayValue)}</title>
         </circle>`;
       }).join("");
 
       return `
         <g class="portfolio-return-line-group">
-          <path d="${linePath}" fill="none" stroke="${series.color}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.88" />
+          <path d="${linePath}" fill="none" stroke="${series.color}" stroke-width="0.82" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.78" vector-effect="non-scaling-stroke" />
           ${circles}
         </g>
       `;

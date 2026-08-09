@@ -2,8 +2,8 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 1.4
-atualizado: 2026-08-07
+versao: 1.5
+atualizado: 2026-08-09
 relacionados:
   - "[[investimentos-portfolio]]"
   - "[[arquitetura]]"
@@ -14,7 +14,7 @@ aliases: ["Rentabilidade do Portfólio"]
 # Rentabilidade do Portfólio
 
 > [!info] Status
-> **implementado** · área: `investimentos` · atualizado em 2026-08-07 · relacionados: [[investimentos-portfolio]]
+> **implementado** · área: `investimentos` · atualizado em 2026-08-09 · relacionados: [[investimentos-portfolio]]
 
 ## Problema
 
@@ -45,6 +45,7 @@ Investidor que acompanha o Portfólio e quer uma leitura rápida de performance 
 
 - O gráfico é **de linhas** (não barras), baseado em **percentuais**, sem valores numéricos fixos no desenho; os valores aparecem em tooltip ao passar o mouse sobre os pontos.
 - As linhas são **suavizadas** (interpolação por curvas Catmull-Rom) e o gráfico exibe **eixos X e Y** com gridlines e rótulos percentuais no eixo vertical.
+- As linhas do gráfico devem ser finas e discretas, com pontos menores e destaque apenas no hover, para evitar aparência pesada no card de rentabilidade.
 - A área de desenho é **15% maior** que a versão anterior para legibilidade.
 - A rentabilidade é **consolidada por moeda** (carteira inteira em R$ / carteira inteira em US$), nunca por produto individual.
 - Cada moeda é calculada **na própria moeda** (valores nativos em centavos da moeda), sem efeito de câmbio na série.
@@ -105,6 +106,7 @@ Tabelas: `investment_opening_positions`, `investment_operations`, `investment_re
 
 ## Changelog
 
+- `1.5` — 2026-08-09 — Refinamento visual do gráfico de rentabilidade: linhas mais finas/discretas e pontos menores com destaque apenas no hover.
 - `1.4` — 2026-08-07 — Desempenho: o fator acumulado de indexador (CDI/IPCA) por mês é decomposto por mês-calendário e compartilhado entre todas as posições e ativos de uma mesma geração de série (`_accumulated_factor_by_month`), reduzindo chamadas ao BCB; valores observáveis não mudam.
 - `1.3` — 2026-08-06 — Rework UX: gráfico de **barras → linhas** (R$, US$, CDI e IPCA em %), sem números fixos; valores em tooltip ao passar o mouse sobre os pontos; rentabilidade calculada **por moeda na própria moeda** (sem efeito de câmbio); adicionado benchmark **IPCA** (SGS 433 mensal). Ajuste visual posterior: **linhas suavizadas**, **eixos X/Y com grid e rótulos** e **área 15% maior**.
 - `1.2` — 2026-08-06 — Rentabilidade mensal consolidada da carteira inteira em BRL vs CDI do mês (substituída pela visão por moeda).

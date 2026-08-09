@@ -1,23 +1,23 @@
 ---
 tipo: spec
 area: cockpit
-status: em-implementacao
-versao: 0.7
-atualizado: 2026-08-07
+status: implementado
+versao: 0.8
+atualizado: 2026-08-09
 relacionados:
   - "[[relatorios]]"
   - "[[lancamentos]]"
   - "[[investimentos-portfolio]]"
   - "[[cartoes]]"
   - "[[arquitetura]]"
-tags: [spec, "area/cockpit", "status/em-implementacao"]
+tags: [spec, "area/cockpit", "status/implementado"]
 aliases: ["Calendário do Cockpit", "Aba Calendário"]
 ---
 
 # Calendário do Cockpit
 
 > [!info] Status
-> **em-implementacao** · área: `cockpit` · atualizado em 2026-08-07 · relacionados: [[relatorios]], [[lancamentos]], [[investimentos-portfolio]], [[cartoes]]
+> **implementado** · área: `cockpit` · atualizado em 2026-08-09 · relacionados: [[relatorios]], [[lancamentos]], [[investimentos-portfolio]], [[cartoes]]
 
 ## Problema
 
@@ -212,6 +212,7 @@ A nova rota deve ser autenticada e validar `Host`/`Origin` conforme as regras de
 
 ## Changelog
 
+- `0.8` — 2026-08-09 — Spec promovida para **implementado** na documentação do app.
 - `0.7` — 2026-08-07 — Títulos dos cards inferiores alinhados ao rótulo das regras de layout: passam de "Vencimentos em 30/60 dias" para **"Investimentos com vencimento em 30/60 dias"**, deixando explícito que os cards tratam de investimentos de renda fixa (e não de contas a pagar). Também explicita que títulos do Tesouro Direto entram nos cards por serem classificados como renda fixa com vencimento cadastrado.
 - `0.6` — 2026-08-07 — Ajustado o cabeçalho da aba: novo subtítulo "Apoio no acompanhamento das suas contas" e, quando `ia_ativa` é verdadeiro, indicador de IA idêntico ao da aba **Tendências** (payload `ia_ativa` exposto pela rota). Explicitado que o clique em item navega ao lançamento com destaque sem abrir o formulário de edição.
 - `0.5` — 2026-08-07 — Ajustado o layout dos cards da aba: total por moeda movido para o cabeçalho do card (alinhado à direita, com valores tabulares), cards compactados (menos padding e linhas enxutas) e removida a etiqueta "Dados do servidor" do cabeçalho do painel.

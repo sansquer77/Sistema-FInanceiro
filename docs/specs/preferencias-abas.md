@@ -2,22 +2,22 @@
 tipo: spec
 area: usuario
 status: implementado
-versao: 0.6
-atualizado: 2026-08-08
+versao: 0.7
+atualizado: 2026-08-09
 relacionados:
   - "[[investimentos-portfolio]]"
   - "[[tendencias-saude-financeira]]"
   - "[[recuperacao-senha]]"
   - "[[seguranca-autenticacao]]"
   - "[[arquitetura]]"
-tags: [spec, "area/usuario", "status/em-implementacao"]
+tags: [spec, "area/usuario", "status/implementado"]
 aliases: ["Preferências", "Abas de Preferências", "Mais Retorno"]
 ---
 
 # Preferências — abas Geral, APIs e Perigo
 
 > [!info] Status
-> **implementado** · área: `usuario` · atualizado em 2026-08-08 · relacionados: [[investimentos-portfolio]], [[tendencias-saude-financeira]], [[recuperacao-senha]]
+> **implementado** · área: `usuario` · atualizado em 2026-08-09 · relacionados: [[investimentos-portfolio]], [[tendencias-saude-financeira]], [[recuperacao-senha]]
 
 ## Problema
 
@@ -100,6 +100,7 @@ Qualquer usuário autenticado que precise configurar perfil, integrações opcio
 
 ## Changelog
 
+- `0.7` — 2026-08-09 — Tag de status sincronizada com o frontmatter, callout e MoC.
 - `0.6` — 2026-08-08 — Cotas de fundos resilientes a fins de semana/feriados: data atual vazia dispara consulta retroativa de 7 dias usando a última cota publicada.
 - `0.5` — 2026-08-08 — Ajustes na integração Mais Retorno: CNPJ enviado somente com dígitos + `:fi`, requisição sempre com `start_date`/`end_date` = data atual, cache diário (até o fim do dia) no lugar do TTL de 90 minutos e conversão do separador decimal `.` para centavos.
 

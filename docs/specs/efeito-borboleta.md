@@ -1,9 +1,9 @@
 ---
 tipo: spec
 area: simulacoes
-status: rascunho
-versao: 1.1
-atualizado: 2026-08-07
+status: implementado
+versao: 1.2
+atualizado: 2026-08-09
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -11,14 +11,14 @@ relacionados:
   - "[[limites-gastos]]"
   - "[[relatorios]]"
   - "[[arquitetura]]"
-tags: [spec, "area/simulacoes", "status/rascunho"]
+tags: [spec, "area/simulacoes", "status/implementado"]
 aliases: ["Efeito Borboleta", "Simulador Financeiro"]
 ---
 
 # Efeito Borboleta
 
 > [!info] Status
-> **rascunho** · área: `simulacoes` · atualizado em 2026-08-07 · relacionados: [[contas-correntes]], [[lancamentos]], [[cartoes]], [[limites-gastos]], [[relatorios]]
+> **implementado** · área: `simulacoes` · atualizado em 2026-08-09 · relacionados: [[contas-correntes]], [[lancamentos]], [[cartoes]], [[limites-gastos]], [[relatorios]]
 
 ## Problema
 
@@ -134,6 +134,7 @@ Resposta esperada:
 
 ## Changelog
 
+- `1.2` — 2026-08-09 — Spec promovida para **implementado** na documentação do app.
 - `1.1` — 2026-08-07 — Tópico **Saúde Financeira** (comparativo nota atual vs projetada dos 5 pilares) retirado da interface e do backend por decisão de validação; permanece apenas o card **Saldo projetado no mês** com impacto do mês da simulação.
 - `1.0` — 2026-08-07 — Resultado da simulação passa a ser um comparativo de cenário: o card **Saldo projetado no mês** passa a considerar apenas o impacto virtual do mês da simulação (séries de 120 ocorrências não mais inflam o card); a lista de itens virtuais é removida da interface (campo permanece no contrato da API); novo bloco **Saúde Financeira** compara a nota atual e a nota projetada dos 5 pilares no mês do cenário, recalculando com os valores simulados apenas os pilares sensíveis a receitas/despesas mensais.
 - `0.9` — 2026-08-07 — Formulário de simulação: campo de ocorrências removido do modo **Recorrente** (série sempre assume 120 ocorrências, sem campo visível); a contagem de repetições fica exclusiva do modo **Parcelada** (campo *Parcelas*). O backend continua aceitando `recurrence_count` legado com default 120.

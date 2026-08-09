@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 6.6
-atualizado: 2026-08-07
+versao: 7.0
+atualizado: 2026-08-09
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -45,14 +45,21 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[specs/investimentos-portfolio]] | ✅ implementado | Investimentos |
 | [[specs/relatorios]] | ✅ implementado | Relatórios |
 | [[specs/importacao-organizze]] | ✅ implementado | Importação |
+| [[specs/historico-operacoes]] | ✅ implementado | Auditoria |
 | [[specs/recuperacao-senha]] | ✅ implementado | Segurança |
 | [[specs/seguranca-autenticacao]] | ✅ implementado | Segurança |
 | [[specs/sobre-app]] | ✅ implementado | Usuário |
 | [[specs/instrucoes-app]] | ✅ implementado | Usuário |
+| [[specs/preferencias-abas]] | ✅ implementado | Usuário |
 | [[specs/frontend-modularizacao]] | ✅ implementado | Frontend |
 | [[specs/tendencias-saude-financeira]] | ✅ implementado | Diagnóstico |
 | [[specs/score-saude-financeira]] | ✅ implementado | Diagnóstico |
 | [[specs/privacidade-valores]] | ✅ implementado | Privacidade |
+| [[specs/alerta-nova-versao]] | ✅ implementado | Atualização |
+| [[specs/rentabilidade-portfolio]] | ✅ implementado | Investimentos |
+| [[specs/efeito-borboleta]] | ✅ implementado | Simulações |
+| [[specs/cockpit-calendario]] | ✅ implementado | Cockpit |
+| [[specs/Update Server]] | ✅ implementado | Distribuição |
 | [[distribuição]] | ✅ implementado | Distribuição |
 | [[specs/landing-page]] | ✅ implementado | Institucional |
 
@@ -64,7 +71,6 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 
 | Spec | Status | Área |
 |---|---|---|
-| [[specs/cockpit-calendario]] | 🚧 em-implementacao | Cockpit |
 | [[specs/consultor]] | 📝 rascunho | Consultor |
 | [[specs/open-finance]] | 📝 rascunho | Open Finance |
 | [[specs/imposto-renda]] | ❌ depreciado — custo de manter regras fiscais atualizadas não compensa para uso familiar | Investimentos |
@@ -124,6 +130,10 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `7.0` — 2026-08-09 — [[specs/rentabilidade-portfolio]] atualizada para v1.5 com refinamento visual do gráfico de rentabilidade: linhas mais finas e pontos discretos.
+- `6.9` — 2026-08-09 — [[specs/cockpit-calendario]] promovida para specs implementadas no MoC, alinhada à spec v0.8.
+- `6.8` — 2026-08-09 — [[specs/efeito-borboleta]] promovida para specs implementadas no MoC, alinhada à spec v1.2.
+- `6.7` — 2026-08-09 — MoC sincronizado com os arquivos de specs atuais: adicionadas as specs implementadas de Histórico de Operações, Preferências, Alerta de Nova Versão, Rentabilidade do Portfólio e Update Server; adicionada [[specs/efeito-borboleta]] em rascunho; [[specs/open-finance]] alinhada ao diretório `docs/specs/`.
 - `6.6` — 2026-08-07 — [[specs/score-saude-financeira]] atualizada (v3.5): lançamentos de cartão passam a entrar no Score via `amount_brl_cents` (BRL normalizado) em todas as somas (resumo mensal, contexto de dívida e aderência a limites), alinhando com [[specs/tendencias-saude-financeira]] e a regra de normalização de moedas para cartões estrangeiros; teste de regressão adicionado.
 - `6.5` — 2026-08-07 — Aba **Saúde Financeira** do Cockpit extraída para módulo próprio `web/modules/financial-health-view.js` (fábrica `registerFinancialHealthView`), seguindo o padrão de `trends-view.js`/`consultor-view.js`; estado de tela local migra para o módulo e `invalidateFinancialHealth` é delegado pelo `cockpit-view.js`. [[specs/score-saude-financeira]] em v3.4, [[specs/frontend-modularizacao]] em v2.3 e [[arquitetura]] atualizada.
 - `6.4` — 2026-08-07 — [[specs/consultor]] atualizada (v0.12): adicionada a **blindagem de prompt injection** — `system_prompt` imutável com prioridade absoluta, esteira de neutralização lexical (`financeiro/consultor_injection.py`) tratando o input como dados, sinalização `injection_triggered` e pós-processamento que bloqueia recomendações de compra/venda na saída. Permanece em rascunho.
