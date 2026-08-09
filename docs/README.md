@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 7.0
+versao: 7.1
 atualizado: 2026-08-09
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -130,6 +130,7 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `7.1` — 2026-08-09 — [[specs/consultor]] atualizada para v0.18, ainda em rascunho, com ajustes pré-implementação sobre disponibilidade IA/Consultor/consentimento, 4 categorias e Perfil Complementar criptografado em SQLite por usuário.
 - `7.0` — 2026-08-09 — [[specs/rentabilidade-portfolio]] atualizada para v1.5 com refinamento visual do gráfico de rentabilidade: linhas mais finas e pontos discretos.
 - `6.9` — 2026-08-09 — [[specs/cockpit-calendario]] promovida para specs implementadas no MoC, alinhada à spec v0.8.
 - `6.8` — 2026-08-09 — [[specs/efeito-borboleta]] promovida para specs implementadas no MoC, alinhada à spec v1.2.

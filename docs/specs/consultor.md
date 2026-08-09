@@ -2,8 +2,8 @@
 tipo: spec
 area: consultor
 status: rascunho
-versao: 0.17
-atualizado: 2026-08-07
+versao: 0.18
+atualizado: 2026-08-09
 relacionados:
   - "[[instrucoes-app]]"
   - "[[investimentos-portfolio]]"
@@ -17,7 +17,7 @@ aliases: ["Consultor Virtual", "Assistente de Investimentos", "Especialista em F
 # Consultor Virtual de Investimentos e Planejamento Financeiro
 
 > [!info] Status
-> **rascunho** · área: `consultor` · atualizado em 2026-08-07 · relacionados: [[instrucoes-app]], [[investimentos-portfolio]], [[score-saude-financeira]], [[tendencias-saude-financeira]], [[cockpit-calendario]]
+> **rascunho** · área: `consultor` · atualizado em 2026-08-09 · relacionados: [[instrucoes-app]], [[investimentos-portfolio]], [[score-saude-financeira]], [[tendencias-saude-financeira]], [[cockpit-calendario]]
 
 > [!warning] Pivô arquitetural (v0.13, refinado em v0.14/v0.15)
 > A partir desta versão, o Consultor **não possui campo de prompt livre**. O usuário interage exclusivamente através de um **catálogo de análises pré-formatadas** (cards). Essa mudança é uma decisão de **Security by Design**: eliminar a superfície de entrada de texto livre remove pela raiz os vetores de vazamento acidental de dados sensíveis (PII) e de *prompt injection* via chat. As seções "Prevenção de vazamento de dados no prompt (DLP)" e "Blindagem de prompt injection" da v0.12 são **removidas** desta spec — ver "Segurança by Design" e "Nota de segurança residual" abaixo para o que substitui essas salvaguardas.
@@ -32,19 +32,21 @@ Usuário autenticado que já possui os dados no sistema (lançamentos, portfóli
 
 ## Jornada
 
-1. O usuário acessa **Usuário > Preferências** e ativa a função de IA que irá usar o módulo **Consultor**. Ao habilitar, um pop-up de consentimento informa que a IA terá acesso aos dados financeiros já registrados no app (carteira, lançamentos, contas, score) para gerar as análises; se o usuário recusar, o Consultor permanece **desabilitado**.
-2. O usuário seleciona seu perfil de investidor: **Conservador**, **Moderado** ou **Arrojado** no menu de Preferências.
-3. Na primeira ativação, o sistema exibe o formulário opcional **Perfil Complementar** (idade, imóvel próprio, dependentes, objetivo financeiro principal, horizonte de investimento, renda aproximada, tolerância a perdas). O usuário pode responder total ou parcialmente, ou pular todas as perguntas sem impedir a ativação do módulo. As respostas ficam disponíveis para edição ou remoção a qualquer momento em Preferências.
-4. O usuário acessa a aba **Consultor** do Cockpit, único ponto de entrada do módulo. Em vez de um campo de texto, o sistema exibe o **Catálogo de Análises**: uma grade de cards clicáveis, agrupados por categoria (Orçamento e Tendências, Portfólio e Risco, Saúde Financeira).
-5. O usuário clica no card da análise desejada (ex.: "Termômetro de Assinaturas e Recorrências"). No card "Detecção de Anomalias e 'Ralos' Financeiros", antes de acionar a análise, o usuário escolhe o período de comparação em um seletor de opções fechadas (**3, 6, 12 meses ou YTD**) — nunca um campo de texto ou data livre.
-6. O sistema monta o payload minimizado com os dados relevantes daquele domínio (ex.: lançamentos recorrentes da categoria "Assinaturas e Serviços"), aplica o `analysis_id` a um prompt estrito e imutável já blindado no backend, envia à IA e renderiza o relatório estruturado na tela, com o disclaimer educacional ao final.
-7. O usuário pode consultar o histórico de análises já geradas na mesma aba, revisitando relatórios anteriores. Se desabilitar a IA nas Preferências (revogando o consentimento), todo o histórico é **expurgado automaticamente**.
+1. O usuário acessa **Usuário > Preferências** e ativa a IA geral do app, quando ainda não estiver ativa.
+2. Em Preferências, o usuário ativa especificamente o módulo **Consultor**. Ao habilitar, um pop-up de consentimento informa que o Consultor usará a IA configurada e terá acesso aos dados financeiros já registrados no app (carteira, lançamentos, contas, score) para gerar as análises; se o usuário recusar, o Consultor permanece **desabilitado**.
+3. O usuário seleciona seu perfil de investidor: **Conservador**, **Moderado** ou **Arrojado** no menu de Preferências.
+4. Na primeira ativação, o sistema exibe o formulário opcional **Perfil Complementar** (idade, imóvel próprio, dependentes, objetivo financeiro principal, horizonte de investimento, renda aproximada, tolerância a perdas). O usuário pode responder total ou parcialmente, ou pular todas as perguntas sem impedir a ativação do módulo. As respostas ficam disponíveis para edição ou remoção a qualquer momento em Preferências.
+5. O usuário acessa a aba **Consultor** do Cockpit, único ponto de entrada do módulo. Em vez de um campo de texto, o sistema exibe o **Catálogo de Análises**: uma grade de cards clicáveis, agrupados por categoria (Orçamento e Tendências, Portfólio e Risco, Saúde Financeira, Decisões e Planejamento).
+6. O usuário clica no card da análise desejada (ex.: "Termômetro de Assinaturas e Recorrências"). No card "Detecção de Anomalias e 'Ralos' Financeiros", antes de acionar a análise, o usuário escolhe o período de comparação em um seletor de opções fechadas (**3, 6, 12 meses ou YTD**) — nunca um campo de texto ou data livre.
+7. O sistema monta o payload minimizado com os dados relevantes daquele domínio (ex.: lançamentos recorrentes da categoria "Assinaturas e Serviços"), aplica o `analysis_id` a um prompt estrito e imutável já blindado no backend, envia à IA e renderiza o relatório estruturado na tela, com o disclaimer educacional ao final.
+8. O usuário pode consultar o histórico de análises já geradas na mesma aba, revisitando relatórios anteriores. Se desabilitar a IA geral ou desabilitar o Consultor nas Preferências (revogando o consentimento), todo o histórico é **expurgado automaticamente**.
 
 ## Dados
 
 | Campo | Tipo | Descrição |
 |---|---|---|
 | `investor_profile` | texto | Perfil de investidor selecionado: `conservador`, `moderado` ou `arrojado`. Padrão: `moderado`. |
+| `consultor_enabled` | booleano | Indica se o módulo Consultor está habilitado para o usuário. Fica em tabela própria do Consultor, separada da configuração geral de IA. |
 | `data_access_consent` | booleano | Indica se o usuário aceitou, via pop-up nas Preferências, que a IA acesse os dados financeiros do app. Se `false`/recusado, o Consultor permanece desabilitado. |
 | `analysis_id` | texto (enum) | Identificador do card de análise acionado (ver "Catálogo de Análises"). |
 | `period_window` | texto (enum), opcional | Período de comparação selecionado pelo usuário: `3m`, `6m`, `12m` ou `ytd`. Padrão: `3m`. Aplicável apenas ao card `ralos_financeiros`; `null`/ausente para os demais cards. |
@@ -60,6 +62,7 @@ Usuário autenticado que já possui os dados no sistema (lançamentos, portfóli
 | `horizonte_investimento_principal` | texto (enum), opcional | Um entre: `curto_prazo`, `medio_prazo`, `longo_prazo`. Armazenado criptografado. |
 | `renda_mensal_aproximada` | texto (enum), opcional | Faixa de renda mensal aproximada: `ate_3k`, `de_3k_a_8k`, `de_8k_a_15k`, `acima_de_15k`. Armazenado criptografado. |
 | `tolerancia_perdas` | texto (enum), opcional | Um entre: `baixa`, `moderada`, `alta`. Armazenado criptografado. |
+| `perfil_complementar_payload_enc` | texto JSON criptografado | Envelope criptografado em repouso com os campos opcionais do Perfil Complementar, pertencente a um único `user_id`. |
 | `perfil_complementar_atualizado_em` | ISO datetime | Data/hora do último preenchimento ou edição do Perfil Complementar. |
 
 ## Regras
@@ -104,13 +107,15 @@ Regras específicas:
 - Todos os campos são opcionais, campo a campo; o usuário pode pular tudo sem impedir a ativação do Consultor.
 - **Versionamento aditivo**: novos campos futuros são adicionados apenas por **append**, nunca renomeados ou removidos retroativamente.
 - As análises são sempre geradas a partir do **cenário atual cadastrado**; ao editar/excluir o Perfil Complementar, apenas novas execuções refletem a mudança — o histórico já gerado permanece como está, sem regeneração retroativa.
-- Os campos ficam isolados em tabela própria (`consultor_perfil_complementar`), separada de `users`, armazenados **criptografados em repouso**, reaproveitando a implementação já existente em `financeiro/secure_config.py`.
+- Os campos ficam isolados em tabela própria (`consultor_perfil_complementar`), separada de `users`, com `user_id` único e `ON DELETE CASCADE`.
+- O Perfil Complementar é armazenado como **um único payload JSON criptografado** em campo texto/blob no SQLite (`payload_enc`), usando o mesmo material de chave local de `financeiro/secure_config.py` (`SISTEMA_FINANCEIRO_CONFIG_KEY` ou `data/email_config.key`). Isso é viável porque a implementação atual já serializa segredos em envelope JSON com `salt`, `nonce`, `ciphertext` e `tag`; a implementação deve fatorar helpers para criptografar/decriptografar esse envelope em memória, sem depender de arquivo `.enc` por perfil.
+- O payload descriptografado nunca deve ser retornado para outro usuário, logado, exportado para pacotes de distribuição ou enviado integralmente à IA quando o `analysis_id` não precisar desses campos.
 - O Perfil Complementar apenas contextualiza a linguagem e os exemplos da análise (ex.: mencionar horizonte de longo prazo ou existência de dependentes); nunca é usado para gerar recomendação de compra/venda de ativo específico.
 - Quando não preenchido, as análises são geradas normalmente usando apenas `investor_profile`.
 
 ### Catálogo de Análises (Cards)
 
-A aba **Consultor** exibe uma grade de cards agrupados em três categorias. Cada card aciona um prompt estrito, fixo e **imutável pelo usuário**, blindado no backend — o usuário nunca edita o texto da instrução, apenas escolhe qual análise executar.
+A aba **Consultor** exibe uma grade de cards agrupados em quatro categorias. Cada card aciona um prompt estrito, fixo e **imutável pelo usuário**, blindado no backend — o usuário nunca edita o texto da instrução, apenas escolhe qual análise executar.
 
 #### Categoria 1 — Orçamento e Tendências
 
@@ -204,8 +209,10 @@ Toda análise deve encerrar com o disclaimer:
 ### Ativação e privacidade
 
 - O Consultor só fica disponível quando explicitamente ativado em Preferências, **reutilizando a mesma configuração de IA já existente no app** (provedor, chave e endpoints) — não há configuração de IA própria do Consultor.
-- Ao habilitar a IA, um **pop-up de consentimento** informa que a IA terá acesso aos dados financeiros do usuário registrados no app. O `data_access_consent` é registrado: se recusado, o Consultor permanece **desabilitado**.
-- **Expurgo automático do histórico**: se o usuário desabilitar a IA nas Preferências, **todo o histórico de análises** (`consultor_analyses`) é **expurgado automaticamente**. Ao reabilitar, o Consultor reinicia com histórico vazio.
+- A disponibilidade do Consultor exige três condições simultâneas: IA geral configurada e habilitada em `user_ai_settings`, `consultor_enabled = true` e `data_access_consent = true`.
+- Ao habilitar o Consultor, um **pop-up de consentimento específico** informa que a IA terá acesso aos dados financeiros do usuário registrados no app. O `data_access_consent` é registrado por usuário: se recusado, o Consultor permanece **desabilitado**, mesmo que a IA geral continue ativa para Tendências.
+- Desabilitar apenas a IA geral torna o Consultor indisponível, sem apagar automaticamente `consultor_enabled`; ao reabilitar a IA, o Consultor só volta a executar se o consentimento específico ainda estiver válido.
+- **Expurgo automático do histórico**: se o usuário desabilitar o Consultor ou revogar o consentimento de dados nas Preferências, **todo o histórico de análises** (`consultor_analyses`) é **expurgado automaticamente**. Se a IA geral for desligada, o histórico também deve ser expurgado como medida de privacidade, pois o usuário está removendo a autorização de uso externo.
 - O perfil de investidor pode ser alterado a qualquer momento em Preferências.
 - O histórico de análises é **persistido no SQLite**, uma linha por execução em `consultor_analyses`, associado ao `user_id` autenticado.
 - A comunicação com provedores de IA externos deve respeitar as regras de privacidade e nunca enviar senhas, tokens ou chaves de criptografia.
@@ -214,8 +221,8 @@ Toda análise deve encerrar com o disclaimer:
 
 - A aba **Consultor** existente no Cockpit é o único ponto de entrada do módulo.
 - Não deve haver botão flutuante, atalho lateral, ícone de cartola ou qualquer outra forma de acionamento fora dessa aba.
-- Quando a IA está habilitada, a aba **Consultor** exibe o Catálogo de Análises (grade de cards) e o histórico de execuções.
-- Quando a IA está desabilitada, a aba **Consultor** não exibe os cards; o sistema informa que a função precisa ser ativada nas Preferências.
+- Quando IA geral, Consultor e consentimento estão habilitados, a aba **Consultor** exibe o Catálogo de Análises (grade de cards) e o histórico de execuções.
+- Quando qualquer uma dessas três condições não está atendida, a aba **Consultor** não exibe os cards; o sistema informa, de forma específica, se falta configurar a IA, habilitar o Consultor ou aceitar o consentimento de dados nas Preferências.
 - **Não existe campo de texto livre em nenhum momento do fluxo do Consultor.**
 
 ### Limites de uso
@@ -262,15 +269,17 @@ A substituição do campo de prompt livre por um catálogo fechado de análises 
 
 Tabelas potencialmente envolvidas:
 
-- `users` — configurações do Consultor e perfil de investidor.
+- `consultor_settings` — configuração do Consultor por usuário (`user_id`, `consultor_enabled`, `investor_profile`, `data_access_consent`, `created_at`, `updated_at`), separada de `users` e de `user_ai_settings`.
 - `consultor_analyses` — histórico de execuções (`user_id`, `analysis_id`, `analysis_output`, `created_at`).
-- `consultor_perfil_complementar` — campos opcionais criptografados (`user_id`, `idade`, `possui_imovel_proprio`, `possui_dependentes`, `numero_dependentes`, `objetivo_financeiro_principal`, `horizonte_investimento_principal`, `renda_mensal_aproximada`, `tolerancia_perdas`, `atualizado_em`).
+- `consultor_perfil_complementar` — perfil complementar por usuário (`user_id`, `payload_enc`, `schema_version`, `atualizado_em`), com o JSON descriptografado contendo `idade`, `possui_imovel_proprio`, `possui_dependentes`, `numero_dependentes`, `objetivo_financeiro_principal`, `horizonte_investimento_principal`, `renda_mensal_aproximada` e `tolerancia_perdas`.
 
 Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regras de segurança do app. `POST /api/consultor/analyze` deve validar `analysis_id` contra o enum fechado de cards existentes, rejeitando qualquer valor fora da lista.
 
 ## Critérios de aceite
 
 - Dado um usuário autenticado, quando acessa **Usuário > Preferências**, então encontra a opção de ativar/desativar o Consultor e selecionar o perfil de investidor.
+- Dado um usuário sem IA geral configurada e habilitada, quando tenta habilitar o Consultor, então o sistema informa que a configuração de IA precisa ser concluída antes de ativar o módulo.
+- Dado um usuário com IA geral ativa, Consultor habilitado e consentimento aceito, quando acessa a aba **Consultor**, então os cards ficam disponíveis; se qualquer uma dessas três condições faltar, os cards não são exibidos.
 - Dado um usuário com o Consultor desativado, quando acessa a aba **Consultor** no Cockpit, então a aba exibe o aviso de que a função precisa ser ativada nas Preferências, sem exibir os cards.
 - Dado um usuário com o Consultor habilitado, quando acessa a aba **Consultor** do Cockpit, então encontra um painel com os 8 cards de análise, agrupados nas 4 categorias, **sem nenhum campo de digitação de texto livre**.
 - Dado um usuário com o Consultor habilitado, quando procura por um botão flutuante ou ícone de cartola em outras telas, então não encontra nenhum ponto de acesso fora da aba **Consultor**.
@@ -291,6 +300,7 @@ Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regr
 - Dado uma requisição com `Host`/`Origin` inválidos, quando tenta acessar qualquer rota do Consultor, então o sistema retorna erro de segurança sem expor dados.
 - Dado um usuário ativando o Consultor pela primeira vez, quando o formulário de Perfil Complementar é exibido, então todos os campos são opcionais e o usuário consegue ativar o módulo sem preencher nenhum deles.
 - Dado um usuário que preencheu o Perfil Complementar, quando os dados são persistidos, então ficam armazenados criptografados e são exibidos decriptografados apenas para o próprio usuário autenticado.
+- Dado um usuário que preencheu o Perfil Complementar, quando o banco SQLite é inspecionado diretamente, então a tabela `consultor_perfil_complementar` contém apenas o envelope criptografado em `payload_enc`, sem campos sensíveis em texto puro.
 - Dado um usuário com Perfil Complementar preenchido, quando acessa Preferências, então consegue editar ou excluir os dados a qualquer momento, com efeito imediato nas próximas execuções.
 - Dado um usuário ativando a IA nas Preferências, quando o pop-up de consentimento de acesso a dados é apresentado e recusado, então o Consultor permanece **desabilitado**.
 - Dado um usuário com a IA habilitada, quando uma análise cita cotações de mercado, então os valores usam as mesmas fontes do módulo de **Portfólio** (Yahoo Finance, CoinGecko e PTAX, via `quote_cache`) e não divergem dos valores exibidos no app.
@@ -315,12 +325,12 @@ Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regr
 
 ## Plano de implementação
 
-- [ ] Passo 1 — Adicionar configurações do Consultor em Preferências (`investor_profile`, `consultor_enabled`), reutilizando a configuração de IA já existente do app, com pop-up de consentimento de acesso a dados ao habilitar (`data_access_consent`). Fecha: critérios de ativação/consentimento e de perfil de investidor.
+- [ ] Passo 1 — Adicionar configurações do Consultor em Preferências (`consultor_enabled`, `investor_profile`, `data_access_consent`) em tabela própria `consultor_settings`, reutilizando a configuração de IA já existente do app e exigindo IA geral habilitada antes da ativação do Consultor. Fecha: critérios de ativação/consentimento e de perfil de investidor.
 - [ ] Passo 2 — Criar módulo Python `financeiro/consultor.py` com a persona, o mapeamento fechado `analysis_id → prompt estrito` para os 8 cards, o formatador de saída padrão e o pós-processamento que valida a resposta contra as "Limitações obrigatórias". Fecha: critérios do catálogo, do formato padrão e da validação de saída.
 - [ ] Passo 2a — Implementar acesso às cotações pelas mesmas fontes do Portfólio (Yahoo Finance, CoinGecko, PTAX, via `quote_cache`) para os cards que citam valores de mercado. Fecha: critério de cotações.
 - [ ] Passo 2b — Implantar o tratamento de indisponibilidade: captura de timeout, erro HTTP, rede e resposta inválida; mensagem padronizada; não persistência e não desconto de quota em falha; cooldown de 30s. Fecha: critérios de indisponibilidade.
 - [ ] Passo 3 — Criar rotas `GET/POST /api/consultor/config`, `GET/POST/DELETE /api/consultor/perfil-complementar`, `POST /api/consultor/analyze` (com validação do `analysis_id` contra o enum fechado), `GET/DELETE /api/consultor/history` em `app.py`, autenticadas e validadas contra `Host`/`Origin`. Fecha: critérios de API e segurança de rotas.
-- [ ] Passo 4 — Criar tabela(s) SQLite de forma idempotente em `financeiro/database.py` para configuração, histórico (`consultor_analyses`) e Perfil Complementar (criptografado com `financeiro/secure_config.py`). Fecha: critérios de persistência e criptografia.
+- [ ] Passo 4 — Criar tabela(s) SQLite de forma idempotente em `financeiro/database.py` para configuração (`consultor_settings`), histórico (`consultor_analyses`) e Perfil Complementar (`consultor_perfil_complementar.payload_enc` como envelope JSON criptografado por usuário, reaproveitando helpers fatorados de `financeiro/secure_config.py`). Fecha: critérios de persistência e criptografia.
 - [ ] Passo 5 — Substituir o campo de prompt e o histórico de mensagens da aba **Consultor** existente (`web/modules/cockpit-view.js` / `consultor-view.js`) pela grade de cards do Catálogo de Análises e pela listagem de histórico de execuções, seguindo o contrato de fábrica, sem criar novo ponto de acesso. Fecha: critérios de interface, ausência de campo livre e histórico.
 - [ ] Passo 6 — Criar testes automatizados para persona, perfis de investidor, Perfil Complementar, mapeamento `analysis_id → prompt`, validação de `analysis_id` inválido, formato de resposta, pós-processamento de recomendações vedadas, limites de uso, indisponibilidade e segurança das rotas. Fecha: critérios de teste do catálogo, limites e resiliência.
 - [ ] Passo 7 — Atualizar `docs/arquitetura.md`, `docs/requisitos.md` e `docs/README.md` para refletir o novo módulo, rotas, tabelas e a remoção do chat livre.
@@ -334,6 +344,7 @@ _Nenhuma pendência em aberto._
 
 ## Changelog
 
+- `0.18` — 2026-08-09 — Ajustes pré-implementação: catálogo corrigido para 4 categorias, disponibilidade separa IA geral/Consultor/consentimento, configuração do Consultor movida para `consultor_settings`, Perfil Complementar definido como payload JSON criptografado em SQLite por usuário (`payload_enc`) e critérios/plano atualizados.
 - `0.17` — 2026-08-07 — Confirmada a dependência de dados do card `destino_vencimentos`: o Portfólio já expõe data de vencimento por ativo de renda fixa, mesmo campo já consumido por [[cockpit-calendario]]. Card escopado explicitamente para ativos de renda fixa (ações, ETFs e cripto não têm vencimento e ficam fora). Removida a verificação de schema do Passo 1 do plano de implementação, já que a dependência está resolvida.
 - `0.16` — 2026-08-07 — Adicionado o 8º card, em nova **Categoria 4 — Decisões e Planejamento**: `destino_vencimentos` ("Melhor Destino para Investimentos a Vencer"), cruzando ativos com vencimento em até 60 dias, projeção de fluxo de caixa de 3 meses e os pilares Reserva/Endividamento do Score, mantendo a regra de nunca recomendar produto ou ativo específico — a resposta fica no nível de destino (reserva, dívida, liquidez ou reinvestir mantendo o perfil). Marcada dependência a confirmar: o Portfólio precisa expor data de vencimento por ativo (tipicamente só renda fixa) — verificação movida para o Passo 1 do plano de implementação. Atualizadas as contagens de 7 para 8 cards e de 3 para 4 categorias nos critérios de aceite e no plano.
 - `0.15` — 2026-08-07 — Reforçado o propósito central do módulo em "Problema", "Usuário" e "Persona do consultor": o Consultor **interpreta** os dados que o usuário já possui e já vê nos relatórios do app — nunca introduz dado novo — devolvendo leitura cruzada e insights acionáveis para apoiar a evolução financeira. Sem mudança de escopo técnico; ajuste de framing/propósito.
