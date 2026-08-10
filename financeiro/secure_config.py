@@ -85,7 +85,7 @@ def mais_retorno_config_path(user_id: int) -> Path:
 
 def load_encrypted_config(path: Path, key_path: Path | None = None) -> dict:
     if not path.exists():
-        raise SecureConfigError("Configuracao de email criptografada nao encontrada.")
+        raise SecureConfigError("Configuracao criptografada nao encontrada.")
     payload = json.loads(path.read_text(encoding="utf-8"))
     return decrypt_config_payload(payload, key_path)
 
@@ -100,7 +100,7 @@ def decrypt_config_payload(payload: dict, key_path: Path | None = None) -> dict:
     encryption_key, signing_key = derive_keys(key_material, salt, iterations)
     actual_tag = sign_payload(signing_key, nonce, ciphertext)
     if not hmac.compare_digest(actual_tag, expected_tag):
-        raise SecureConfigError("Configuracao de email invalida ou chave incorreta.")
+        raise SecureConfigError("Configuracao criptografada invalida ou chave incorreta.")
     plain = xor_bytes(ciphertext, key_stream(encryption_key, nonce, len(ciphertext)))
     return json.loads(plain.decode("utf-8"))
 
@@ -128,6 +128,22 @@ def save_encrypted_config(config: dict, path: Path, key_path: Path | None = None
     payload = encrypt_config_payload(config, key_path)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
     os.chmod(path, 0o600)
+
+
+def encrypt_json_for_storage(config: dict, key_path: Path | None = None) -> str:
+    # spec: consultor/consultor v0.22 — critério 23
+    return json.dumps(encrypt_config_payload(config, key_path), indent=2, sort_keys=True)
+
+
+def decrypt_json_from_storage(payload_text: str, key_path: Path | None = None) -> dict:
+    # spec: consultor/consultor v0.22 — critério 23
+    if not str(payload_text or "").strip():
+        raise SecureConfigError("Configuracao criptografada nao encontrada.")
+    try:
+        payload = json.loads(payload_text)
+    except json.JSONDecodeError as exc:
+        raise SecureConfigError("Configuracao criptografada invalida.") from exc
+    return decrypt_config_payload(payload, key_path)
 
 
 def email_config_status(user_id: int) -> dict:
@@ -489,11 +505,11 @@ def load_secure_config(user_id: int, config_type: str) -> dict:
     payload_text = secure_config_payload(user_id, config_type)
     if payload_text is None:
         raise SecureConfigError("Configuracao criptografada nao encontrada.")
-    return decrypt_config_payload(json.loads(payload_text))
+    return decrypt_json_from_storage(payload_text)
 
 
 def save_secure_config(user_id: int, config_type: str, config: dict) -> None:
-    payload_text = json.dumps(encrypt_config_payload(config), indent=2, sort_keys=True)
+    payload_text = encrypt_json_for_storage(config)
     with database.get_connection() as conn:
         conn.execute(
             """
@@ -541,7 +557,7 @@ def load_key_material(key_path: Path | None = None) -> bytes:
         migrate_legacy_key_material()
     key_path = preferred_key_path(key_path)
     if not key_path.exists():
-        raise SecureConfigError("Chave local da configuracao de email nao encontrada.")
+        raise SecureConfigError("Chave local da configuracao criptografada nao encontrada.")
     return base64.b64decode(key_path.read_text(encoding="utf-8").strip().encode("ascii"))
 
 
@@ -592,4 +608,4 @@ def decode_field(payload: dict, field: str) -> bytes:
     try:
         return base64.b64decode(str(payload[field]).encode("ascii"))
     except Exception as exc:
-        raise SecureConfigError("Configuracao de email criptografada invalida.") from exc
+        raise SecureConfigError("Configuracao criptografada invalida.") from exc

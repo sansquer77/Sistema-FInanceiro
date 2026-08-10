@@ -96,6 +96,18 @@ PERFORMANCE_INDEXES = (
         "CREATE INDEX IF NOT EXISTS idx_operation_logs_user_batch "
         "ON operation_logs (user_id, operation_batch_id)"
     ),
+    (
+        "CREATE INDEX IF NOT EXISTS idx_consultor_analyses_user_created "
+        "ON consultor_analyses (user_id, created_at DESC, id DESC)"
+    ),
+    (
+        "CREATE INDEX IF NOT EXISTS idx_consultor_analyses_user_day "
+        "ON consultor_analyses (user_id, created_date)"
+    ),
+    (
+        "CREATE INDEX IF NOT EXISTS idx_consultor_analyses_user_analysis_created "
+        "ON consultor_analyses (user_id, analysis_id, created_at DESC)"
+    ),
 )
 
 
@@ -487,6 +499,39 @@ def initialize_database() -> None:
                 UNIQUE (user_id, config_type)
             );
 
+            CREATE TABLE IF NOT EXISTS consultor_settings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                consultor_enabled INTEGER NOT NULL DEFAULT 0 CHECK (consultor_enabled IN (0, 1)),
+                investor_profile TEXT NOT NULL DEFAULT 'moderado' CHECK (investor_profile IN ('conservador', 'moderado', 'arrojado')),
+                data_access_consent INTEGER NOT NULL DEFAULT 0 CHECK (data_access_consent IN (0, 1)),
+                consented_at TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (user_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS consultor_analyses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                analysis_id TEXT NOT NULL,
+                period_window TEXT CHECK (period_window IS NULL OR period_window IN ('3m', '6m', '12m', 'ytd')),
+                analysis_output TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                created_date TEXT NOT NULL DEFAULT (date('now'))
+            );
+
+            CREATE TABLE IF NOT EXISTS consultor_perfil_complementar (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                payload_enc TEXT NOT NULL,
+                schema_version INTEGER NOT NULL DEFAULT 1 CHECK (schema_version >= 1),
+                atualizado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (user_id)
+            );
+
             CREATE UNIQUE INDEX IF NOT EXISTS idx_spending_limits_category
             ON spending_limits (user_id, month, category_id)
             WHERE subcategory_id IS NULL;
@@ -527,6 +572,15 @@ def initialize_database() -> None:
 
             CREATE INDEX IF NOT EXISTS idx_quote_cache_expires_at
             ON quote_cache (expires_at);
+
+            CREATE INDEX IF NOT EXISTS idx_consultor_analyses_user_created
+            ON consultor_analyses (user_id, created_at DESC, id DESC);
+
+            CREATE INDEX IF NOT EXISTS idx_consultor_analyses_user_day
+            ON consultor_analyses (user_id, created_date);
+
+            CREATE INDEX IF NOT EXISTS idx_consultor_analyses_user_analysis_created
+            ON consultor_analyses (user_id, analysis_id, created_at DESC);
             """
         )
         ensure_column(conn, "transactions", "category_id", "INTEGER REFERENCES categories(id)")
@@ -576,6 +630,7 @@ def initialize_database() -> None:
         ensure_operation_logs(conn)
         ensure_ai_settings(conn)
         ensure_secure_configs(conn)
+        ensure_consultor_schema(conn)
         migrate_category_unique_constraint(conn)
         migrate_transaction_type_constraint(conn)
         migrate_transaction_tags(conn)
@@ -679,6 +734,107 @@ def ensure_secure_configs(conn: sqlite3.Connection) -> None:
         """
         CREATE UNIQUE INDEX IF NOT EXISTS idx_secure_configs_user_type
         ON secure_configs (user_id, config_type)
+        """
+    )
+
+
+def ensure_consultor_schema(conn: sqlite3.Connection) -> None:
+    # spec: consultor/consultor v0.22 — critério 23
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS consultor_settings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            consultor_enabled INTEGER NOT NULL DEFAULT 0 CHECK (consultor_enabled IN (0, 1)),
+            investor_profile TEXT NOT NULL DEFAULT 'moderado' CHECK (investor_profile IN ('conservador', 'moderado', 'arrojado')),
+            data_access_consent INTEGER NOT NULL DEFAULT 0 CHECK (data_access_consent IN (0, 1)),
+            consented_at TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (user_id)
+        )
+        """
+    )
+    ensure_column(conn, "consultor_settings", "consultor_enabled", "INTEGER NOT NULL DEFAULT 0")
+    ensure_column(conn, "consultor_settings", "investor_profile", "TEXT NOT NULL DEFAULT 'moderado'")
+    ensure_column(conn, "consultor_settings", "data_access_consent", "INTEGER NOT NULL DEFAULT 0")
+    ensure_column(conn, "consultor_settings", "consented_at", "TEXT")
+    ensure_column(conn, "consultor_settings", "created_at", "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP")
+    ensure_column(conn, "consultor_settings", "updated_at", "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP")
+    conn.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_consultor_settings_user
+        ON consultor_settings (user_id)
+        """
+    )
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS consultor_analyses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            analysis_id TEXT NOT NULL,
+            period_window TEXT CHECK (period_window IS NULL OR period_window IN ('3m', '6m', '12m', 'ytd')),
+            analysis_output TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            created_date TEXT NOT NULL DEFAULT (date('now'))
+        )
+        """
+    )
+    ensure_column(conn, "consultor_analyses", "analysis_id", "TEXT NOT NULL DEFAULT ''")
+    ensure_column(conn, "consultor_analyses", "period_window", "TEXT")
+    ensure_column(conn, "consultor_analyses", "analysis_output", "TEXT NOT NULL DEFAULT ''")
+    ensure_column(conn, "consultor_analyses", "created_at", "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP")
+    ensure_column(conn, "consultor_analyses", "created_date", "TEXT NOT NULL DEFAULT ''")
+    conn.execute(
+        """
+        UPDATE consultor_analyses
+        SET created_date = substr(created_at, 1, 10)
+        WHERE created_date = ''
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_consultor_analyses_user_created
+        ON consultor_analyses (user_id, created_at DESC, id DESC)
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_consultor_analyses_user_day
+        ON consultor_analyses (user_id, created_date)
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_consultor_analyses_user_analysis_created
+        ON consultor_analyses (user_id, analysis_id, created_at DESC)
+        """
+    )
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS consultor_perfil_complementar (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            payload_enc TEXT NOT NULL,
+            schema_version INTEGER NOT NULL DEFAULT 1 CHECK (schema_version >= 1),
+            atualizado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (user_id)
+        )
+        """
+    )
+    ensure_column(conn, "consultor_perfil_complementar", "payload_enc", "TEXT NOT NULL DEFAULT ''")
+    ensure_column(conn, "consultor_perfil_complementar", "schema_version", "INTEGER NOT NULL DEFAULT 1")
+    ensure_column(conn, "consultor_perfil_complementar", "atualizado_em", "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP")
+    ensure_column(conn, "consultor_perfil_complementar", "created_at", "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP")
+    ensure_column(conn, "consultor_perfil_complementar", "updated_at", "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP")
+    conn.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_consultor_perfil_complementar_user
+        ON consultor_perfil_complementar (user_id)
         """
     )
 

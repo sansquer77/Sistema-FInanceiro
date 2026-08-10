@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 2.2
-atualizado: 2026-08-08
+versao: 2.3
+atualizado: 2026-08-10
 relacionados:
   - "[[arquitetura]]"
   - "[[visao-produto]]"
@@ -14,7 +14,7 @@ tags: [produto, meta]
 # Requisitos
 
 > [!info] Status
-> **implementado** (escopo vivo) · área: `meta` · atualizado em 2026-08-02 · relacionados: [[arquitetura]], [[visao-produto]]
+> **implementado** (escopo vivo) · área: `meta` · atualizado em 2026-08-10 · relacionados: [[arquitetura]], [[visao-produto]]
 
 ## Objetivo
 
@@ -86,9 +86,9 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 - Sessões expiram definitivamente 30 dias após a criação.
 - Ao trocar ou redefinir a senha, todas as sessões ativas do usuário são encerradas.
 - Toda mutação exige `Host` e `Origin` válidos como proteção contra CSRF.
-- A configuração SMTP fica criptografada por usuário em `data/email_config_user_{id}.enc`.
-- Segredos de integrações opcionais de IA ficam criptografados por usuário em `data/ai_config_user_{id}.enc` e nunca são retornados pela API. O mesmo padrão vale para a chave da integração opcional Mais Retorno (`data/mais_retorno_config_user_{id}.enc`, [[preferencias-abas]]).
-- A chave local fica em `data/email_config.key` ou na variável `SISTEMA_FINANCEIRO_CONFIG_KEY`.
+- A configuração SMTP fica criptografada por usuário em `secure_configs.payload_enc`, mantendo compatibilidade de leitura com arquivos legados `data/email_config_user_{id}.enc`.
+- Segredos de integrações opcionais de IA e Mais Retorno ficam criptografados por usuário em `secure_configs.payload_enc` e nunca são retornados pela API; arquivos legados `data/ai_config_user_{id}.enc` e `data/mais_retorno_config_user_{id}.enc` continuam compatíveis para migração transparente. Ver [[preferencias-abas]] e [[adr/0010-segredos-criptografados-sqlite]].
+- A chave local padrão fica em `secure/config.key`, com compatibilidade para `data/email_config.key`; instalações administradas podem usar `SISTEMA_FINANCEIRO_CONFIG_KEY_PATH` ou `SISTEMA_FINANCEIRO_CONFIG_KEY`.
 - Pacotes distribuíveis não incluem credenciais SMTP; cada usuário configura seu próprio remetente localmente.
 - Arquivos de runtime em `data/` não devem ser versionados.
 - Upload de importação é limitado a 5 MB.
@@ -119,6 +119,7 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 
 ## Changelog
 
+- `2.3` — 2026-08-10 — Regras de segurança alinhadas ao [[adr/0010-segredos-criptografados-sqlite]]: segredos de SMTP, IA e Mais Retorno ficam em `secure_configs.payload_enc`, chave padrão em `secure/config.key` e arquivos `.enc` legados permanecem apenas como compatibilidade de migração.
 - `2.2` — 2026-08-08 — Chave da integração opcional Mais Retorno também criptografada por usuário (mesma infraestructura de `secure_config.py`), conforme [[preferencias-abas]].
 - `2.1` — 2026-08-04 — Escopo atualizado para registrar distribuição gratuita como projeto open source sob Apache License 2.0, sem suporte formal.
 - `2.0` — 2026-08-02 — Lançamentos de conta ou cartão em moeda estrangeira sem cotação manual passam a usar a última PTAX de venda disponível até a data do lançamento para normalização em BRL.

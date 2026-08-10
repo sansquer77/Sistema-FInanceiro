@@ -39,9 +39,11 @@ from financeiro.portfolio import PortfolioError, create_opening_position, update
 from financeiro.secure_config import (
     ai_settings_status,
     config_key_path,
+    decrypt_json_from_storage,
     email_config_key_path,
     email_config_path,
     email_config_status,
+    encrypt_json_for_storage,
     load_ai_settings,
     save_ai_settings,
     save_email_config,
@@ -466,6 +468,32 @@ class IdorProtectionTest(IsolatedDatabaseTest):
             ).fetchone()
         self.assertIsNotNone(row)
         self.assertEqual(row["source_path"], str(legacy_path))
+
+    def test_json_storage_helpers_round_trip_without_profile_files(self) -> None:
+        payload_text = encrypt_json_for_storage({
+            "idade": 42,
+            "objetivo_financeiro_principal": "aposentadoria",
+            "possui_dependentes": True,
+        })
+
+        loaded = decrypt_json_from_storage(payload_text)
+
+        self.assertEqual(loaded["idade"], 42)
+        self.assertEqual(loaded["objetivo_financeiro_principal"], "aposentadoria")
+        self.assertTrue(loaded["possui_dependentes"])
+        self.assertTrue(config_key_path().exists())
+        self.assertEqual(list(database.DATA_DIR.glob("consultor*.enc")), [])
+        self.assertNotIn("aposentadoria", payload_text)
+
+    def test_json_storage_helpers_can_read_payload_encrypted_with_legacy_key(self) -> None:
+        legacy_key = email_config_key_path()
+        payload_text = encrypt_json_for_storage({"perfil": "moderado"}, key_path=legacy_key)
+
+        loaded = decrypt_json_from_storage(payload_text)
+
+        self.assertEqual(loaded["perfil"], "moderado")
+        self.assertTrue(config_key_path().exists())
+        self.assertNotEqual(config_key_path(), legacy_key)
 
     def test_ai_settings_are_isolated_per_user(self) -> None:
         owner = create_user("Owner", "owner@example.com", "strong-password")

@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 8.4
+versao: 8.8
 atualizado: 2026-08-10
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -132,6 +132,10 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `8.8` — 2026-08-10 — [[specs/consultor]] atualizada para v0.22 com Passo 3 concluído: helpers reutilizáveis de envelope JSON criptografado em memória para o Perfil Complementar.
+- `8.7` — 2026-08-10 — [[specs/consultor]] atualizada para v0.21 com Passo 2 concluído; [[arquitetura]] v3.15 documenta as tabelas futuras do Consultor.
+- `8.6` — 2026-08-10 — [[specs/consultor]] atualizada para v0.20 com Passo 1 concluído; [[requisitos]] v2.3 alinha regras de segurança ao [[adr/0010-segredos-criptografados-sqlite]].
+- `8.5` — 2026-08-10 — [[specs/consultor]] atualizada para v0.19, ainda em rascunho, com plano de implementação transformado em passos executáveis antes do início do código.
 - `8.4` — 2026-08-10 — [[specs/tendencias-saude-financeira]] v2.20 documenta indicador de fonte no card **Despesas** da aba Tendências.
 - `8.3` — 2026-08-10 — [[specs/investimentos-portfolio]] v2.21 documenta resgates de Poupança consumindo aniversários por FIFO e resgate total removendo a posição aberta.
 - `8.2` — 2026-08-10 — [[specs/lancamentos]] v3.6 e [[specs/investimentos-portfolio]] v2.20 ampliam o uso de CNPJ/Mais Retorno para Previdência Privada.

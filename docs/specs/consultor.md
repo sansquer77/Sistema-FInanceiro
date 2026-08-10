@@ -2,8 +2,8 @@
 tipo: spec
 area: consultor
 status: rascunho
-versao: 0.18
-atualizado: 2026-08-09
+versao: 0.22
+atualizado: 2026-08-10
 relacionados:
   - "[[instrucoes-app]]"
   - "[[investimentos-portfolio]]"
@@ -17,7 +17,7 @@ aliases: ["Consultor Virtual", "Assistente de Investimentos", "Especialista em F
 # Consultor Virtual de Investimentos e Planejamento Financeiro
 
 > [!info] Status
-> **rascunho** · área: `consultor` · atualizado em 2026-08-09 · relacionados: [[instrucoes-app]], [[investimentos-portfolio]], [[score-saude-financeira]], [[tendencias-saude-financeira]], [[cockpit-calendario]]
+> **rascunho** · área: `consultor` · atualizado em 2026-08-10 · relacionados: [[instrucoes-app]], [[investimentos-portfolio]], [[score-saude-financeira]], [[tendencias-saude-financeira]], [[cockpit-calendario]]
 
 > [!warning] Pivô arquitetural (v0.13, refinado em v0.14/v0.15)
 > A partir desta versão, o Consultor **não possui campo de prompt livre**. O usuário interage exclusivamente através de um **catálogo de análises pré-formatadas** (cards). Essa mudança é uma decisão de **Security by Design**: eliminar a superfície de entrada de texto livre remove pela raiz os vetores de vazamento acidental de dados sensíveis (PII) e de *prompt injection* via chat. As seções "Prevenção de vazamento de dados no prompt (DLP)" e "Blindagem de prompt injection" da v0.12 são **removidas** desta spec — ver "Segurança by Design" e "Nota de segurança residual" abaixo para o que substitui essas salvaguardas.
@@ -173,6 +173,7 @@ Quando uma análise citar valores de mercado em tempo real (preço de ativo, câ
 - **Yahoo Finance** para ações, ETFs, FIIs e ativos tradicionais.
 - **CoinGecko** para criptoativos.
 - **PTAX do Banco Central** para câmbio.
+- **Mais Retorno** para fundos de investimento, quando a integração opcional estiver configurada.
 
 As cotações passam pelo mesmo cache (`quote_cache`) usado pelo Portfólio. Valores fora dessa base são apresentados como estimativa genérica, com aviso de indisponibilidade de cotação em tempo real.
 
@@ -325,15 +326,44 @@ Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regr
 
 ## Plano de implementação
 
-- [ ] Passo 1 — Adicionar configurações do Consultor em Preferências (`consultor_enabled`, `investor_profile`, `data_access_consent`) em tabela própria `consultor_settings`, reutilizando a configuração de IA já existente do app e exigindo IA geral habilitada antes da ativação do Consultor. Fecha: critérios de ativação/consentimento e de perfil de investidor.
-- [ ] Passo 2 — Criar módulo Python `financeiro/consultor.py` com a persona, o mapeamento fechado `analysis_id → prompt estrito` para os 8 cards, o formatador de saída padrão e o pós-processamento que valida a resposta contra as "Limitações obrigatórias". Fecha: critérios do catálogo, do formato padrão e da validação de saída.
-- [ ] Passo 2a — Implementar acesso às cotações pelas mesmas fontes do Portfólio (Yahoo Finance, CoinGecko, PTAX, via `quote_cache`) para os cards que citam valores de mercado. Fecha: critério de cotações.
-- [ ] Passo 2b — Implantar o tratamento de indisponibilidade: captura de timeout, erro HTTP, rede e resposta inválida; mensagem padronizada; não persistência e não desconto de quota em falha; cooldown de 30s. Fecha: critérios de indisponibilidade.
-- [ ] Passo 3 — Criar rotas `GET/POST /api/consultor/config`, `GET/POST/DELETE /api/consultor/perfil-complementar`, `POST /api/consultor/analyze` (com validação do `analysis_id` contra o enum fechado), `GET/DELETE /api/consultor/history` em `app.py`, autenticadas e validadas contra `Host`/`Origin`. Fecha: critérios de API e segurança de rotas.
-- [ ] Passo 4 — Criar tabela(s) SQLite de forma idempotente em `financeiro/database.py` para configuração (`consultor_settings`), histórico (`consultor_analyses`) e Perfil Complementar (`consultor_perfil_complementar.payload_enc` como envelope JSON criptografado por usuário, reaproveitando helpers fatorados de `financeiro/secure_config.py`). Fecha: critérios de persistência e criptografia.
-- [ ] Passo 5 — Substituir o campo de prompt e o histórico de mensagens da aba **Consultor** existente (`web/modules/cockpit-view.js` / `consultor-view.js`) pela grade de cards do Catálogo de Análises e pela listagem de histórico de execuções, seguindo o contrato de fábrica, sem criar novo ponto de acesso. Fecha: critérios de interface, ausência de campo livre e histórico.
-- [ ] Passo 6 — Criar testes automatizados para persona, perfis de investidor, Perfil Complementar, mapeamento `analysis_id → prompt`, validação de `analysis_id` inválido, formato de resposta, pós-processamento de recomendações vedadas, limites de uso, indisponibilidade e segurança das rotas. Fecha: critérios de teste do catálogo, limites e resiliência.
-- [ ] Passo 7 — Atualizar `docs/arquitetura.md`, `docs/requisitos.md` e `docs/README.md` para refletir o novo módulo, rotas, tabelas e a remoção do chat livre.
+> [!info] Execução
+> Esta spec permanece em **rascunho**. Antes de tocar no código, o plano abaixo deve ser usado como checklist de execução atômica. Cada passo deve ser implementado, testado e marcado na própria spec quando concluído.
+
+- [x] Passo 1 — Preparar a implantação documental: revisar esta spec contra [[requisitos]], [[arquitetura]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]], [[adr/0003-sqlite-fonte-de-verdade]] e [[adr/0010-segredos-criptografados-sqlite]]; confirmar que não há decisão técnica pendente nem necessidade de novo ADR antes do código. Entregável: checklist documental validado e, se necessário, ADR criado antes da implementação.
+- [x] Passo 2 — Criar migrações idempotentes em `financeiro/database.py` para `consultor_settings`, `consultor_analyses` e `consultor_perfil_complementar`, com `user_id` isolado por usuário, `ON DELETE CASCADE` quando aplicável, índices para histórico/quota diária e `payload_enc` como único campo sensível do Perfil Complementar. Fecha: critérios de persistência, isolamento por usuário, quota diária e inspeção direta do SQLite sem dados sensíveis em texto puro.
+- [x] Passo 3 — Fatorar em `financeiro/secure_config.py` helpers reutilizáveis para criptografar/decriptografar envelopes JSON em memória, mantendo compatibilidade com o material de chave atual (`SISTEMA_FINANCEIRO_CONFIG_KEY`, `SISTEMA_FINANCEIRO_CONFIG_KEY_PATH` ou chave local legada). Entregável: Perfil Complementar criptografado em SQLite sem criar arquivos `.enc` por usuário. Fecha: critérios de Perfil Complementar criptografado e compatibilidade operacional.
+- [ ] Passo 4 — Implementar em `financeiro/consultor.py` o domínio base do módulo: enums de `investor_profile`, `analysis_id` e `period_window`; catálogo fechado dos 8 cards; prompts estritos; persona; disclaimer obrigatório; mensagens de erro amigáveis; funções puras de validação. Fecha: critérios de catálogo fechado, ausência de prompt livre, perfil de investidor e rejeição de `analysis_id`/`period_window` inválidos.
+- [ ] Passo 5 — Implementar a camada de configuração do Consultor em `financeiro/consultor.py`: ler/gravar `consultor_settings`, validar que IA geral está configurada e habilitada antes de permitir `consultor_enabled`, registrar/recusar `data_access_consent`, alterar `investor_profile` e expurgar histórico ao desabilitar Consultor, revogar consentimento ou desligar IA geral. Fecha: critérios de ativação, consentimento, disponibilidade e expurgo automático.
+- [ ] Passo 6 — Implementar o Perfil Complementar por usuário: criar, atualizar parcialmente, ler e excluir o payload criptografado; validar enums/faixas; tratar campos ausentes como opcionais; preservar versionamento aditivo por `schema_version`. Fecha: critérios de formulário opcional, edição/exclusão, leitura apenas pelo próprio usuário e compatibilidade de versões futuras.
+- [ ] Passo 7 — Implementar os construtores de contexto minimizado por `analysis_id`, reutilizando agregados já existentes dos módulos de Tendências, Score, Portfólio, Limites e Cockpit Calendário, sem enviar transações cruas quando o card não precisa delas e sem carregar carteira completa para `destino_vencimentos`. Fecha: critérios de payload mínimo, Score sem transações cruas e vencimentos de renda fixa até 60 dias.
+- [ ] Passo 8 — Integrar as cotações de mercado usando as mesmas fontes e caches do Portfólio (Yahoo Finance, CoinGecko, PTAX e `quote_cache`) apenas nos cards que precisarem citar valores de mercado. Entregável: nenhuma fonte nova de cotação e nenhuma divergência deliberada entre Consultor e Portfólio. Fecha: critério de cotações.
+- [ ] Passo 9 — Implementar o executor de IA reutilizando exclusivamente a configuração já existente em Preferências (`user_ai_settings`), aplicando `max_tokens = min(configurado, 900)`, timeout configurado e prompt de sistema que trata qualquer texto vindo dos dados do usuário como dado, nunca como instrução. Fecha: critérios de reuso de configuração de IA, limite de tokens e defesa residual contra instruções embutidas em descrições.
+- [ ] Passo 10 — Implementar pós-processamento de saída: exigir a estrutura Resumo, Análise de Dados, Pontos de Atenção, Plano de Ação e Disclaimer; validar menções vedadas de recomendação direta de compra/venda de ativo específico; substituir respostas violadoras pela recusa padrão antes de renderizar ou persistir. Fecha: critérios de formato padrão, classificação de risco e limitações obrigatórias.
+- [ ] Passo 11 — Implementar quota e resiliência: contar no máximo 20 execuções bem-sucedidas por usuário/dia; não descontar quota nem persistir histórico em timeout, erro HTTP, erro de rede ou resposta inválida; aplicar cooldown de 30s por usuário/card após falha. Fecha: critérios de limite diário, indisponibilidade, cooldown e histórico preservado.
+- [ ] Passo 12 — Expor as rotas em `app.py`: `GET/POST /api/consultor/config`, `GET/POST/DELETE /api/consultor/perfil-complementar`, `POST /api/consultor/analyze`, `GET/DELETE /api/consultor/history`, todas autenticadas, com validação de `Host`/`Origin`, mensagens sem vazamento técnico e serialização sem expor `payload_enc`. Fecha: critérios de API, autenticação e segurança de rotas.
+- [ ] Passo 13 — Implementar a UI em Preferências: opção de habilitar/desabilitar Consultor, seleção de perfil, pop-up de consentimento, formulário opcional de Perfil Complementar com edição/exclusão e mensagens específicas quando IA geral não estiver pronta. Fecha: critérios de Preferências, ativação, recusa de consentimento e Perfil Complementar.
+- [ ] Passo 14 — Implementar a UI da aba **Consultor** no Cockpit seguindo o contrato de fábrica do frontend: grade de cards agrupados nas 4 categorias, seletor fechado de período apenas em `ralos_financeiros`, execução sob demanda, histórico de análises e estados vazios/bloqueados específicos; remover qualquer campo de texto livre e não criar ponto de acesso fora da aba. Fecha: critérios de interface, 8 cards, histórico, seletor de período e ausência de botão externo.
+- [ ] Passo 15 — Criar testes automatizados de domínio e persistência: migrações idempotentes, criptografia do Perfil Complementar, isolamento por `user_id`, validação de enums, prompts fechados, payload mínimo por card, expurgo de histórico, quota diária, cooldown e falhas que não persistem nem consomem quota.
+- [ ] Passo 16 — Criar testes automatizados de API: autenticação obrigatória, `Host`/`Origin` inválidos, `analysis_id` e `period_window` inválidos sem chamada à IA, serialização segura da configuração/perfil/histórico e recusa por IA geral ausente. Fecha: critérios de segurança de rotas e validação de entrada.
+- [ ] Passo 17 — Criar testes automatizados ou mocks do executor de IA: uso da configuração das Preferências, teto de 900 tokens, indisponibilidade padronizada, pós-processamento de recomendação vedada, estrutura obrigatória de resposta e tratamento de texto de lançamento com aparência de instrução como dado. Fecha: critérios de IA, limitações obrigatórias e segurança residual.
+- [ ] Passo 18 — Atualizar documentação após a implementação: [[arquitetura]] com rotas/tabelas/fluxos, [[requisitos]] se o escopo geral mudar, [[instrucoes-app]] com uso do Consultor, esta spec com passos marcados e status adequado, e [[README]] do vault. Entregável: documentação sincronizada com código e testes.
+- [ ] Passo 19 — Validar em homologação manual: IA geral ausente, IA configurada, consentimento recusado/aceito, Perfil Complementar vazio/parcial/completo, cada card do catálogo, período de `ralos_financeiros`, histórico, exclusão de histórico, desligamento de IA/Consultor e mensagens de indisponibilidade. Entregável: evidências ou checklist de homologação atualizado.
+- [ ] Passo 20 — Avaliar versionamento de produto e distribuição: se o módulo for implementado, recomendar incremento **MINOR**, atualizar `financeiro/app_metadata.py` somente se solicitado/aprovado e revisar pacotes/instruções de atualização para usuários existentes. Entregável: recomendação de versão e impactos operacionais claros.
+
+### Checklist documental do Passo 1
+
+Revisão concluída em 2026-08-10, antes de qualquer código do Consultor.
+
+| Documento | Resultado |
+|---|---|
+| [[requisitos]] | Compatível após alinhamento da seção "Regras de segurança" ao [[adr/0010-segredos-criptografados-sqlite]]. O Consultor ainda não entra no escopo implementado; quando o módulo sair de rascunho, [[requisitos]] deve receber o novo escopo funcional. |
+| [[arquitetura]] | Compatível para implantação futura: servidor HTTP puro em `app.py`, domínio em `financeiro/`, frontend em ES Modules e SQLite como persistência. As rotas, tabelas e o módulo `financeiro/consultor.py` devem ser adicionados somente nos passos de implementação correspondentes. |
+| [[adr/0001-stack-local-sem-framework]] | Compatível: o Consultor deve expor rotas no servidor HTTP existente, sem Flask, FastAPI, Django ou middleware externo. |
+| [[adr/0002-modularizacao-frontend]] | Compatível: a UI deve ficar em view ES Module nativa, seguindo a fábrica `createXxxView({ state, elements, services, formatters, actions })`, sem build step. |
+| [[adr/0003-sqlite-fonte-de-verdade]] | Compatível: configurações, histórico e Perfil Complementar usam SQLite com migrações idempotentes, índices e transações curtas; chamadas externas de IA/cotação não devem manter conexão aberta. |
+| [[adr/0010-segredos-criptografados-sqlite]] | Compatível: o Perfil Complementar criptografado em `consultor_perfil_complementar.payload_enc` reutiliza o mesmo padrão de envelope e chave local fora de `data/`; não há necessidade de novo ADR para esta extensão. |
+
+Decisão do Passo 1: **não há decisão técnica pendente nem necessidade de novo ADR antes do código**. O único ajuste documental necessário foi atualizar [[requisitos]] para refletir o modelo atual de segredos criptografados em SQLite com chave fora de `data/`.
 
 ## Pendências
 
@@ -344,6 +374,10 @@ _Nenhuma pendência em aberto._
 
 ## Changelog
 
+- `0.22` — 2026-08-10 — Passo 3 do plano concluído: `secure_config.py` passa a expor helpers reutilizáveis para criptografar/decriptografar envelopes JSON em memória, compatíveis com a chave atual e com chave legada, permitindo gravar o Perfil Complementar no SQLite sem criar arquivos `.enc` por usuário.
+- `0.21` — 2026-08-10 — Passo 2 do plano concluído: migrações idempotentes adicionam `consultor_settings`, `consultor_analyses` e `consultor_perfil_complementar`, com isolamento por usuário, cascata, índices para histórico/quota e `payload_enc` como único campo sensível do Perfil Complementar; testes de schema incluídos.
+- `0.20` — 2026-08-10 — Passo 1 do plano concluído: checklist documental validado contra requisitos, arquitetura e ADRs 0001/0002/0003/0010; confirmada ausência de novo ADR necessário e registrado ajuste correlato em [[requisitos]].
+- `0.19` — 2026-08-10 — Plano de implementação reestruturado em passos executáveis e atômicos antes de tocar no código, cobrindo preparação documental, migrações, criptografia do Perfil Complementar, domínio, APIs, UI, testes, homologação, versionamento e distribuição; status permanece `rascunho`.
 - `0.18` — 2026-08-09 — Ajustes pré-implementação: catálogo corrigido para 4 categorias, disponibilidade separa IA geral/Consultor/consentimento, configuração do Consultor movida para `consultor_settings`, Perfil Complementar definido como payload JSON criptografado em SQLite por usuário (`payload_enc`) e critérios/plano atualizados.
 - `0.17` — 2026-08-07 — Confirmada a dependência de dados do card `destino_vencimentos`: o Portfólio já expõe data de vencimento por ativo de renda fixa, mesmo campo já consumido por [[cockpit-calendario]]. Card escopado explicitamente para ativos de renda fixa (ações, ETFs e cripto não têm vencimento e ficam fora). Removida a verificação de schema do Passo 1 do plano de implementação, já que a dependência está resolvida.
 - `0.16` — 2026-08-07 — Adicionado o 8º card, em nova **Categoria 4 — Decisões e Planejamento**: `destino_vencimentos` ("Melhor Destino para Investimentos a Vencer"), cruzando ativos com vencimento em até 60 dias, projeção de fluxo de caixa de 3 meses e os pilares Reserva/Endividamento do Score, mantendo a regra de nunca recomendar produto ou ativo específico — a resposta fica no nível de destino (reserva, dívida, liquidez ou reinvestir mantendo o perfil). Marcada dependência a confirmar: o Portfólio precisa expor data de vencimento por ativo (tipicamente só renda fixa) — verificação movida para o Passo 1 do plano de implementação. Atualizadas as contagens de 7 para 8 cards e de 3 para 4 categorias nos critérios de aceite e no plano.

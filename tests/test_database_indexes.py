@@ -39,6 +39,136 @@ class DatabaseIndexTest(unittest.TestCase):
         self.assertIn("idx_credit_card_payments_user_card_invoice", card_payment_indexes)
         self.assertIn("idx_credit_card_payments_user_date", card_payment_indexes)
 
+    def test_initialize_database_creates_consultor_schema(self) -> None:
+        initialize_database()
+        initialize_database()
+
+        with get_connection() as conn:
+            settings_columns = column_names(conn, "consultor_settings")
+            analyses_columns = column_names(conn, "consultor_analyses")
+            perfil_columns = column_names(conn, "consultor_perfil_complementar")
+            analyses_indexes = index_names(conn, "consultor_analyses")
+            settings_indexes = index_names(conn, "consultor_settings")
+            perfil_indexes = index_names(conn, "consultor_perfil_complementar")
+
+        self.assertEqual(
+            {
+                "id",
+                "user_id",
+                "consultor_enabled",
+                "investor_profile",
+                "data_access_consent",
+                "consented_at",
+                "created_at",
+                "updated_at",
+            },
+            settings_columns,
+        )
+        self.assertEqual(
+            {
+                "id",
+                "user_id",
+                "analysis_id",
+                "period_window",
+                "analysis_output",
+                "created_at",
+                "created_date",
+            },
+            analyses_columns,
+        )
+        self.assertEqual(
+            {
+                "id",
+                "user_id",
+                "payload_enc",
+                "schema_version",
+                "atualizado_em",
+                "created_at",
+                "updated_at",
+            },
+            perfil_columns,
+        )
+        self.assertIn("idx_consultor_settings_user", settings_indexes)
+        self.assertIn("idx_consultor_analyses_user_created", analyses_indexes)
+        self.assertIn("idx_consultor_analyses_user_day", analyses_indexes)
+        self.assertIn("idx_consultor_analyses_user_analysis_created", analyses_indexes)
+        self.assertIn("idx_consultor_perfil_complementar_user", perfil_indexes)
+
+    def test_consultor_schema_enforces_user_isolation_enums_and_cascade(self) -> None:
+        initialize_database()
+
+        with get_connection() as conn:
+            user_id = conn.execute(
+                """
+                INSERT INTO users (name, email, password_hash)
+                VALUES ('Ana', 'ana@example.com', 'hash')
+                RETURNING id
+                """
+            ).fetchone()["id"]
+            conn.execute(
+                """
+                INSERT INTO consultor_settings (
+                    user_id, consultor_enabled, investor_profile, data_access_consent
+                )
+                VALUES (?, 1, 'moderado', 1)
+                """,
+                (user_id,),
+            )
+            conn.execute(
+                """
+                INSERT INTO consultor_analyses (
+                    user_id, analysis_id, period_window, analysis_output, created_at, created_date
+                )
+                VALUES (?, 'ralos_financeiros', '3m', 'Resumo', '2026-08-10 10:00:00', '2026-08-10')
+                """,
+                (user_id,),
+            )
+            conn.execute(
+                """
+                INSERT INTO consultor_perfil_complementar (user_id, payload_enc)
+                VALUES (?, '{"ciphertext":"x"}')
+                """,
+                (user_id,),
+            )
+
+            with self.assertRaises(sqlite3.IntegrityError):
+                other_user_id = conn.execute(
+                    """
+                    INSERT INTO users (name, email, password_hash)
+                    VALUES ('Bia', 'bia@example.com', 'hash')
+                    RETURNING id
+                    """
+                ).fetchone()["id"]
+                conn.execute(
+                    """
+                    INSERT INTO consultor_settings (
+                        user_id, consultor_enabled, investor_profile, data_access_consent
+                    )
+                    VALUES (?, 1, 'agressivo', 1)
+                    """,
+                    (other_user_id,),
+                )
+
+            with self.assertRaises(sqlite3.IntegrityError):
+                conn.execute(
+                    """
+                    INSERT INTO consultor_analyses (
+                        user_id, analysis_id, period_window, analysis_output
+                    )
+                    VALUES (?, 'ralos_financeiros', '24m', 'Resumo')
+                    """,
+                    (user_id,),
+                )
+
+            conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            settings_count = conn.execute("SELECT COUNT(*) FROM consultor_settings").fetchone()[0]
+            analyses_count = conn.execute("SELECT COUNT(*) FROM consultor_analyses").fetchone()[0]
+            perfil_count = conn.execute("SELECT COUNT(*) FROM consultor_perfil_complementar").fetchone()[0]
+
+        self.assertEqual(settings_count, 0)
+        self.assertEqual(analyses_count, 0)
+        self.assertEqual(perfil_count, 0)
+
     def test_get_connection_closes_after_context_exit(self) -> None:
         initialize_database()
 
@@ -61,6 +191,10 @@ class DatabaseIndexTest(unittest.TestCase):
 
 def index_names(conn, table_name: str) -> set[str]:
     return {row["name"] for row in conn.execute(f"PRAGMA index_list({table_name})")}
+
+
+def column_names(conn, table_name: str) -> set[str]:
+    return {row["name"] for row in conn.execute(f"PRAGMA table_info({table_name})")}
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.14
+versao: 3.15
 atualizado: 2026-08-10
 relacionados:
   - "[[requisitos]]"
@@ -308,6 +308,9 @@ Conexões SQLite são abertas com `journal_mode=WAL`, `busy_timeout` curto e `fo
 | `quote_cache` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
 | `user_ai_settings` | `secure_config.py` — metadados não secretos de configuração opcional de IA por usuário; segredo fica em `secure_configs`. Ver [[tendencias-saude-financeira]]. |
 | `secure_configs` | `secure_config.py` — envelopes criptografados por usuário para SMTP, IA e Mais Retorno; `source_path` indica arquivo legado migrado quando aplicável. Ver [[specs/preferencias-abas]], [[adr/0010-segredos-criptografados-sqlite]]. |
+| `consultor_settings` | `database.py` — configuração futura do Consultor por usuário (`consultor_enabled`, `investor_profile`, `data_access_consent`). Ver [[specs/consultor]]. |
+| `consultor_analyses` | `database.py` — histórico futuro de execuções do Consultor, indexado por usuário, data e `analysis_id` para leitura e quota diária. Ver [[specs/consultor]]. |
+| `consultor_perfil_complementar` | `database.py` — payload criptografado futuro do Perfil Complementar por usuário (`payload_enc`, `schema_version`). Ver [[specs/consultor]]. |
 
 `transactions` e `credit_card_transactions` persistem `normalized_description` para a classificação assistida. Ambas também mantêm valor normalizado em BRL (`amount_brl_cents`); em moedas estrangeiras sem cotação manual, a normalização usa a última PTAX de venda disponível até a data do lançamento. Bancos existentes são retroalimentados de forma idempotente durante a inicialização.
 
@@ -479,6 +482,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.15` — 2026-08-10 — Documentadas as tabelas futuras do Consultor (`consultor_settings`, `consultor_analyses`, `consultor_perfil_complementar`) criadas por migrações idempotentes. Ver [[specs/consultor]] v0.21.
 - `3.14` — 2026-08-10 — Documentada rota `GET /api/portfolio/fund-quote?cnpj={cnpj}` para busca assistida de cota de fundos via Mais Retorno no formulário de Lançamentos.
 - `3.13` — 2026-08-09 — Ajustes finais de performance: índice `idx_investment_closed_positions_user_closed`, filtro por intervalo de datas nas Tendências, widget terceiro assíncrono e modo privacidade sem `filter: blur()` em massa.
 - `3.12` — 2026-08-09 — Documentadas revalidação HTTP com `ETag`/`Last-Modified`, gzip para JSON grande, cache em memória limitado para cotações/câmbio e lazy rendering das abas do Portfólio.
