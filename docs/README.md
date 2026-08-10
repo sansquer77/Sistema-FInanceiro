@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 8.8
+versao: 9.2
 atualizado: 2026-08-10
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -132,6 +132,10 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `9.2` — 2026-08-10 — [[specs/consultor]] atualizada para v0.26 com Passo 7 concluído; [[arquitetura]] v3.19 documenta contexto minimizado por card.
+- `9.1` — 2026-08-10 — [[specs/consultor]] atualizada para v0.25 com Passo 6 concluído; [[arquitetura]] v3.18 documenta Perfil Complementar criptografado por usuário.
+- `9.0` — 2026-08-10 — [[specs/consultor]] atualizada para v0.24 com Passo 5 concluído; [[arquitetura]] v3.17 documenta configuração por usuário e expurgo de histórico no domínio do Consultor.
+- `8.9` — 2026-08-10 — [[specs/consultor]] atualizada para v0.23 com Passo 4 concluído; [[arquitetura]] v3.16 documenta `financeiro/consultor.py`.
 - `8.8` — 2026-08-10 — [[specs/consultor]] atualizada para v0.22 com Passo 3 concluído: helpers reutilizáveis de envelope JSON criptografado em memória para o Perfil Complementar.
 - `8.7` — 2026-08-10 — [[specs/consultor]] atualizada para v0.21 com Passo 2 concluído; [[arquitetura]] v3.15 documenta as tabelas futuras do Consultor.
 - `8.6` — 2026-08-10 — [[specs/consultor]] atualizada para v0.20 com Passo 1 concluído; [[requisitos]] v2.3 alinha regras de segurança ao [[adr/0010-segredos-criptografados-sqlite]].

@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.15
+versao: 3.19
 atualizado: 2026-08-10
 relacionados:
   - "[[requisitos]]"
@@ -266,6 +266,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `financial_health.py` | Núcleo analítico do Score de Saúde Financeira: cálculo atômico dos pilares, lista `pilares`, Paz Financeira e função de histórico com validação de `months` (1-36). Ver [[score-saude-financeira]]. |
 | `trends.py` | Núcleo local de Tendências e Achados: série mensal, Budget x Realizado, achados estruturados, eventos pontuais, assinaturas/serviços recorrentes, confiança e resumo determinístico. Ver [[tendencias-saude-financeira]]. |
 | `ai_summary.py` | Reescrita opcional do resumo por IA com payload minimizado, timeout curto e fallback para resumo local. Ver [[tendencias-saude-financeira]]. |
+| `consultor.py` | Domínio futuro do Consultor: catálogo fechado de análises, validações de enums, prompts estritos, persona, disclaimer, configuração por usuário, Perfil Complementar criptografado, contexto minimizado por card e expurgo de histórico por privacidade. Ver [[specs/consultor]]. |
 | `imports.py` | Leitura de exportações Organizze e planilhas modelo. Ver [[importacao-organizze]]. |
 | `operation_logs.py` | Auditoria funcional das operações do usuário. Ver [[historico-operacoes]]. |
 | `emailer.py` | Envio SMTP do código de recuperação de senha. Ver [[recuperacao-senha]]. |
@@ -482,6 +483,10 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.19` — 2026-08-10 — `financeiro/consultor.py` documentado com construtores de contexto minimizado por `analysis_id`, reaproveitando agregados existentes sem transações cruas. Ver [[specs/consultor]] v0.26.
+- `3.18` — 2026-08-10 — `financeiro/consultor.py` documentado com Perfil Complementar criptografado por usuário em `consultor_perfil_complementar.payload_enc`. Ver [[specs/consultor]] v0.25.
+- `3.17` — 2026-08-10 — `financeiro/consultor.py` documentado com configuração por usuário e expurgo de histórico quando Consultor/consentimento/IA geral são desabilitados. Ver [[specs/consultor]] v0.24.
+- `3.16` — 2026-08-10 — Documentado `financeiro/consultor.py` como domínio base futuro do Consultor, ainda sem rotas ou execução de IA. Ver [[specs/consultor]] v0.23.
 - `3.15` — 2026-08-10 — Documentadas as tabelas futuras do Consultor (`consultor_settings`, `consultor_analyses`, `consultor_perfil_complementar`) criadas por migrações idempotentes. Ver [[specs/consultor]] v0.21.
 - `3.14` — 2026-08-10 — Documentada rota `GET /api/portfolio/fund-quote?cnpj={cnpj}` para busca assistida de cota de fundos via Mais Retorno no formulário de Lançamentos.
 - `3.13` — 2026-08-09 — Ajustes finais de performance: índice `idx_investment_closed_positions_user_closed`, filtro por intervalo de datas nas Tendências, widget terceiro assíncrono e modo privacidade sem `filter: blur()` em massa.
