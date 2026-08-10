@@ -19,15 +19,19 @@ DEFAULT_TEMPERATURE = 0.2
 SUMMARY_TIMEOUT_SECONDS = 15
 
 SYSTEM_PROMPT = (
-    "Você é um assistente conciso. Reescreva o resumo financeiro abaixo de forma natural, "
-    "mantendo os valores e fatos. Não altere números, não invente dados, não dê recomendações "
-    "personalizadas de investimento ou crédito. Use tom explicativo e não prescritivo."
+    "Você escreve a síntese executiva integrada do módulo Tendências de um app financeiro pessoal. "
+    "Produza 2 a 4 frases curtas, naturais e úteis, como uma leitura do mês feita pelo próprio sistema. "
+    "Mantenha valores e fatos, não altere números, não invente dados e não dê recomendações personalizadas "
+    "de investimento, crédito ou consumo. Destaque a causa provável apenas quando houver evidência local no "
+    "payload; se a confiança for baixa, deixe claro que a leitura ainda é cautelosa. Não liste limites de "
+    "orçamento, eventos pontuais ou antecipações de parcelas em detalhe; esses itens aparecem em cards "
+    "separados abaixo do resumo."
 )
 
 
 def generate_ai_summary(user_id: int, trends_payload: dict) -> str | None:
     """
-    spec: tendencias-saude-financeira v2.13 — critérios 12, 13, 14, 16 e 17
+    spec: tendencias-saude-financeira v2.19 — critérios 12, 13, 14, 16 e 17
     Reescreve o resumo local com IA, usando payload minimizado, timeout curto e
     fallback imediato para None quando a IA estiver indisponível ou retornar conteúdo inválido.
     """
@@ -37,7 +41,7 @@ def generate_ai_summary(user_id: int, trends_payload: dict) -> str | None:
 
     api_key = ""
     if settings["has_api_key"]:
-        # spec: tendencias-saude-financeira v2.13 — critério 28
+        # spec: tendencias-saude-financeira v2.19 — critério 28
         # O segredo nunca deve transitar na API; aqui é usado apenas para a requisição externa.
         full = load_ai_settings(user_id)
         api_key = str(full.get("api_key") or "").strip()
@@ -57,7 +61,7 @@ def generate_ai_summary(user_id: int, trends_payload: dict) -> str | None:
         method="POST",
     )
 
-    # spec: tendencias-saude-financeira v2.13 — critério 16
+    # spec: tendencias-saude-financeira v2.19 — critério 16
     # Nenhuma chamada de IA pode manter conexão SQLite aberta durante a requisição externa.
     # (a conexão já foi fechada antes de chamar esta função)
     timeout = int(settings.get("timeout_seconds") or SUMMARY_TIMEOUT_SECONDS)
@@ -85,7 +89,7 @@ def build_ai_request(settings: dict, api_key: str, minimized_payload: dict) -> d
     temperature = float(settings.get("temperature") or DEFAULT_TEMPERATURE)
     max_tokens = int(settings.get("max_tokens") or MAX_SUMMARY_TOKENS)
     if provider == "google":
-        # spec: tendencias-saude-financeira v2.13 — critérios 12, 24 e 32
+        # spec: tendencias-saude-financeira v2.19 — critérios 12, 24 e 32
         # Google/Gemini não usa o contrato OpenAI-compatible; usa generateContent.
         gemini_model = model.removeprefix("models/")
         headers = {"Content-Type": "application/json"}
@@ -109,7 +113,7 @@ def build_ai_request(settings: dict, api_key: str, minimized_payload: dict) -> d
             },
         }
     if provider == "anthropic":
-        # spec: tendencias-saude-financeira v2.13 — critérios 12, 24 e 32
+        # spec: tendencias-saude-financeira v2.19 — critérios 12, 24 e 32
         # Anthropic/Claude usa a Messages API nativa, não Chat Completions.
         headers = {
             "Content-Type": "application/json",
@@ -151,17 +155,19 @@ def build_ai_request(settings: dict, api_key: str, minimized_payload: dict) -> d
 
 def minimize_trends_payload(trends_payload: dict) -> dict:
     """
-    Minimiza os dados enviados à IA: apenas resumo local, achados principais e
-    assinaturas/eventos pontuais, sem valores brutos completos, histórico ou segredos.
+    Minimiza os dados enviados à IA: apenas resumo local, achados narrativos e
+    contadores operacionais, sem valores brutos completos, histórico ou segredos.
     """
     findings = trends_payload.get("achados") or []
+    narrative_finding_types = {"confianca", "receita", "despesa", "assinatura_servico"}
     minimized_findings = [
         {
             "tipo": f.get("tipo"),
             "titulo": f.get("titulo"),
             "descricao": f.get("descricao"),
         }
-        for f in findings[:8]
+        for f in findings
+        if f.get("tipo") in narrative_finding_types
     ]
     subscriptions = trends_payload.get("assinaturas_e_servicos") or []
     minimized_subscriptions = [
@@ -171,15 +177,7 @@ def minimize_trends_payload(trends_payload: dict) -> dict:
         }
         for s in subscriptions
     ]
-    point_events = trends_payload.get("eventos_pontuais") or []
-    minimized_events = [
-        {
-            "tipo": e.get("tipo"),
-            "descricao": e.get("descricao"),
-            "valor_cents": e.get("valor_cents"),
-        }
-        for e in point_events[:5]
-    ]
+    operational_context = summarize_operational_context(trends_payload)
     return {
         "month": trends_payload.get("month"),
         "confianca": trends_payload.get("confianca"),
@@ -187,10 +185,33 @@ def minimize_trends_payload(trends_payload: dict) -> dict:
         "receitas_mes_cents": trends_payload.get("receitas_mes_cents"),
         "despesas_mes_cents": trends_payload.get("despesas_mes_cents"),
         "saldo_mes_cents": trends_payload.get("saldo_mes_cents"),
-        "achados": minimized_findings,
+        "achados": minimized_findings[:8],
         "assinaturas_e_servicos": minimized_subscriptions,
-        "eventos_pontuais": minimized_events,
+        "contexto_operacional": operational_context,
     }
+
+
+def summarize_operational_context(trends_payload: dict) -> dict:
+    findings = trends_payload.get("achados") or []
+    counts = {
+        "limites_em_cards": 0,
+        "eventos_pontuais_em_cards": 0,
+        "antecipacoes_em_cards": 0,
+    }
+    for finding in findings:
+        finding_type = finding.get("tipo")
+        if finding_type == "limite":
+            counts["limites_em_cards"] += 1
+        elif finding_type == "evento_pontual":
+            counts["eventos_pontuais_em_cards"] += 1
+        elif finding_type == "antecipacao_parcela":
+            counts["antecipacoes_em_cards"] += 1
+    counts["total_antecipado_cents"] = sum(
+        int(item.get("valor_cents") or 0)
+        for item in trends_payload.get("antecipacao_parcelas") or []
+    )
+    counts["quantidade_antecipacoes"] = len(trends_payload.get("antecipacao_parcelas") or [])
+    return counts
 
 
 def extract_summary_text(payload: dict, provider: str = "custom") -> str | None:

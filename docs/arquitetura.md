@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.13
-atualizado: 2026-08-09
+versao: 3.14
+atualizado: 2026-08-10
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -16,7 +16,7 @@ tags: [arquitetura, meta]
 # Arquitetura
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-08-09 · relacionados: [[requisitos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
+> **implementado** · área: `meta` · atualizado em 2026-08-10 · relacionados: [[requisitos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
 
 ## Visão geral
 
@@ -194,6 +194,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 |---|---|
 | `GET` | `/api/portfolio` |
 | `GET` | `/api/portfolio/returns` |
+| `GET` | `/api/portfolio/fund-quote?cnpj={cnpj}` |
 | `POST` | `/api/portfolio/positions` |
 | `PUT` | `/api/portfolio/positions/{id}` |
 | `DELETE` | `/api/portfolio/positions/{id}` |
@@ -478,6 +479,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.14` — 2026-08-10 — Documentada rota `GET /api/portfolio/fund-quote?cnpj={cnpj}` para busca assistida de cota de fundos via Mais Retorno no formulário de Lançamentos.
 - `3.13` — 2026-08-09 — Ajustes finais de performance: índice `idx_investment_closed_positions_user_closed`, filtro por intervalo de datas nas Tendências, widget terceiro assíncrono e modo privacidade sem `filter: blur()` em massa.
 - `3.12` — 2026-08-09 — Documentadas revalidação HTTP com `ETag`/`Last-Modified`, gzip para JSON grande, cache em memória limitado para cotações/câmbio e lazy rendering das abas do Portfólio.
 - `3.11` — 2026-08-09 — Documentada a tabela `secure_configs`, a migração compatível de arquivos `.enc` legados e a chave mestra padrão em `secure/config.key` fora de `data/`.

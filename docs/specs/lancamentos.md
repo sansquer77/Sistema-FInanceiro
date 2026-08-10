@@ -2,8 +2,8 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 3.4
-atualizado: 2026-08-07
+versao: 3.6
+atualizado: 2026-08-10
 relacionados:
   - "[[contas-correntes]]"
   - "[[categorias-tags-gestao]]"
@@ -17,7 +17,7 @@ aliases: ["Lançamentos", "Transações"]
 # Lançamentos
 
 > [!info] Status
-> **implementado** · área: `lancamentos` · atualizado em 2026-08-07 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]]
+> **implementado** · área: `lancamentos` · atualizado em 2026-08-10 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]]
 
 ## Problema
 
@@ -109,6 +109,7 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 - No formulário de investimento, subcategorias de Poupança devem ser exibidas no combo apenas como `Poupança`, mesmo que o nome técnico/histórico da subcategoria contenha observações antigas; o valor interno deve ser preservado para não alterar históricos.
 - No formulário de investimento de Lançamentos de Contas, aportes de Renda Fixa ou Poupança devem exibir marcador compacto `Usar este aporte como reserva de emergência`, persistindo essa decisão na operação de investimento. A marcação não aparece nem é enviada para outros tipos de ativo.
 - O formulário de investimento deve se adaptar ao ativo selecionado para reduzir dúvidas: quando o aporte for Poupança, campos de quantidade, preço unitário, renda fixa, CNPJ, corretagem, emolumentos, impostos e outros custos ficam ocultos/desabilitados, pois não são aplicáveis.
+- No formulário de investimento em **Fundos de Investimentos** ou **Previdência Privada**, o usuário pode informar CNPJ opcionalmente e buscar a cota pela **Mais Retorno**; a busca preenche **Preço unitário** como assistência editável e não salva dados automaticamente.
 - A listagem completa de lançamentos (`GET /api/transactions`) é paginada por `limit` (padrão 2000, máximo 5000) e `offset`, respondendo `has_more`; o frontend percorre as páginas até receber uma página menor que `limit`.
 - Com `month` e `account_id` juntos, a listagem retorna todo o histórico da conta até o fim do mês informado (sem limite inferior de data) — o extrato usa essa fatia para calcular saldos previsto/conciliado a partir do saldo inicial da conta; o intervalo estrito do mês (`>= primeira data do mês`) aplica-se apenas à listagem sem conta.
 
@@ -123,6 +124,7 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 | `PUT` | `/api/transactions/{id}/reconciliation` |
 | `GET` | `/api/exchange-rate` |
 | `GET` | `/api/classification-suggestion` |
+| `GET` | `/api/portfolio/fund-quote?cnpj={cnpj}` |
 
 Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, `subcategories`, `tags`.
 
@@ -153,6 +155,7 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dado o gráfico de histórico/projeção de saldos com valores extensos, quando exibido em qualquer tamanho de tela, então os valores cabem nos cartões mensais por ajuste responsivo de tipografia e de largura mínima dos cartões, mantendo o tamanho atual da área e sem truncar centavos.
 - Dado o usuário visualizando o seletor mensal de Lançamentos de Contas, quando os botões de navegação aparecem, então usam ícones compactos com rótulo acessível em vez de palavras longas.
 - Dado o usuário visualizando o seletor mensal de Lançamentos de Contas, quando o mês é exibido, então o rótulo usa o formato `MM/AAAA`.
+- Dado um lançamento de investimento classificado como **Fundos de Investimentos** ou **Previdência Privada** com CNPJ preenchido e Mais Retorno configurada, quando o usuário aciona `Buscar cota`, então o sistema preenche **Preço unitário** com a última cota disponível e mantém o campo editável.
 - Dado o tipo Investimento selecionado no formulário de Lançamentos, quando campos condicionais de renda fixa são exibidos, então inputs e selects da mesma linha mantêm alturas e alinhamentos consistentes, com dicas exibidas sem deslocar campos vizinhos.
 - Dado qualquer tipo de lançamento de conta, quando uma linha condicional exibe apenas um campo, então esse campo ocupa a linha inteira e o formulário não apresenta coluna vazia.
 - Dado o tipo Investimento com categoria Renda Fixa selecionado, quando o usuário aciona o ícone de ajuda, então vê orientação contextual para pré-fixada, pós-fixada e híbrida sem alterar o alinhamento dos campos.
@@ -176,6 +179,8 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 
 ## Changelog
 
+- `3.6` — 2026-08-10 — Campo CNPJ e busca assistida de cota pela Mais Retorno passam a aparecer também para lançamentos de Previdência Privada, mantendo CNPJ opcional.
+- `3.5` — 2026-08-10 — Formulário de investimento em Fundos passa a oferecer busca assistida de cota pela Mais Retorno a partir do CNPJ, preenchendo **Preço unitário** como sugestão editável.
 - `3.4` — 2026-08-07 — Corrigida uma regressão da v3.3: a fatia de `GET /api/transactions` com **mês + conta** voltou a retornar todo o histórico da conta até o fim do mês (`date <= fim do mês`, sem limite inferior), pois o extrato calcula saldos acumulados partindo do saldo inicial da conta somado aos lançamentos até a data (ver `getBalanceUntil` no frontend). O intervalo estrito do mês aplica-se apenas à listagem sem conta. Teste de regressão adicionado.
 - `3.3` — 2026-08-07 — Listagens completas paginadas: `GET /api/transactions` aceita `limit`/`offset` (padrão 2000, máximo 5000) e responde `has_more`; o frontend itera as páginas automaticamente.
 

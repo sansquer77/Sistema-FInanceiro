@@ -717,10 +717,14 @@
                     </label>
                   </div>
                   <div class="field-row investment-fund-fields" id="investmentFundFields" hidden>
-                    <label>CNPJ do fundo
+                    <label>CNPJ do fundo/plano
                       <input name="investment_cnpj" id="investmentCnpj" type="text" placeholder="00.000.000/0000-00 ou alfanumérico">
                     </label>
+                    <label class="field-action-label">Cota
+                      <button class="ghost small-button" type="button" id="fetchInvestmentFundQuoteButton">Buscar cota</button>
+                    </label>
                   </div>
+                  <p class="field-hint" id="investmentFundQuoteHint" aria-live="polite"></p>
                   <div class="investment-fixed-fields" id="investmentFixedFields" hidden>
                     <div class="field-row fixed-income-mode-row">
                       <label class="fixed-income-mode-field">Modalidade

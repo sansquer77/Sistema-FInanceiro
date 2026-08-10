@@ -63,6 +63,8 @@ export function registerTransactionsView({
     investmentOperationFields,
     investmentAmount,
     investmentFundFields,
+    fetchInvestmentFundQuoteButton,
+    investmentFundQuoteHint,
     investmentFixedFields,
     investmentPricingFields,
     investmentEmergencyReserveFields,
@@ -114,6 +116,7 @@ export function registerTransactionsView({
   });
   transactionAccount.addEventListener("change", handleTransactionAccountChange);
   destinationAccount.addEventListener("change", updateTransferExchangeRateState);
+  fetchInvestmentFundQuoteButton?.addEventListener("click", fetchInvestmentFundQuote);
   investmentAmount.addEventListener("input", () => {
     if (transactionType.value === "investment") {
       transactionAmount.value = investmentAmount.value;
@@ -1142,8 +1145,16 @@ export function registerTransactionsView({
     const isInvestment = transactionType.value === "investment";
     const cat = transactionCategory.value;
     const isSavings = isInvestmentSavingsSelection();
+    const usesFundQuote = cat === "Fundos de Investimentos" || cat === "Previdência Privada";
     const canBeEmergencyReserve = isInvestment && (cat === "Renda Fixa" || isSavings);
-    investmentFundFields.hidden = !isInvestment || cat !== "Fundos de Investimentos";
+    investmentFundFields.hidden = !isInvestment || !usesFundQuote;
+    if (fetchInvestmentFundQuoteButton) {
+      fetchInvestmentFundQuoteButton.disabled = investmentFundFields.hidden;
+    }
+    if (investmentFundQuoteHint && investmentFundFields.hidden) {
+      investmentFundQuoteHint.textContent = "";
+      investmentFundQuoteHint.className = "field-hint";
+    }
     investmentFixedFields.hidden = !isInvestment || cat !== "Renda Fixa" || isSavings;
     investmentPricingFields.hidden = isInvestment && (cat === "Renda Fixa" || isSavings);
     if (investmentTradingCostFields) {
@@ -1195,6 +1206,59 @@ export function registerTransactionsView({
       transactionForm.elements.investment_asset_identifier.value = "";
     }
     investmentAmount.required = isInvestment;
+  }
+
+  async function fetchInvestmentFundQuote() {
+    const cnpjField = transactionForm.elements.investment_cnpj;
+    const unitPriceField = transactionForm.elements.investment_unit_price;
+    const cnpj = String(cnpjField?.value || "").trim();
+    if (!cnpj) {
+      setFundQuoteHint("Informe o CNPJ do fundo antes de buscar a cota.", "error");
+      cnpjField?.focus();
+      return;
+    }
+    if (unitPriceField?.value.trim()) {
+      const overwrite = await decisionModal.choose({
+        title: "Substituir preço unitário?",
+        message: "O campo Preço unitário já tem valor. Deseja substituir pela cota retornada pela Mais Retorno?",
+        actions: [
+          { value: "replace", label: "Substituir", variant: "primary" },
+          { value: null, label: "Manter atual", variant: "ghost" },
+        ],
+      });
+      if (!overwrite) {
+        return;
+      }
+    }
+    const previousLabel = fetchInvestmentFundQuoteButton?.textContent || "Buscar cota";
+    if (fetchInvestmentFundQuoteButton) {
+      fetchInvestmentFundQuoteButton.disabled = true;
+      fetchInvestmentFundQuoteButton.textContent = "Buscando...";
+    }
+    setFundQuoteHint("Consultando a Mais Retorno...");
+    try {
+      const quote = await api(`/api/portfolio/fund-quote?cnpj=${encodeURIComponent(cnpj)}`);
+      unitPriceField.value = moneyInputValue(quote.unit_price);
+      setFundQuoteHint(
+        `Cota de ${formatDate(quote.quote_date)} preenchida. Confira com o comprovante antes de salvar.`,
+        "success",
+      );
+    } catch (error) {
+      setFundQuoteHint(error.message || "Nao foi possivel buscar a cota do fundo.", "error");
+    } finally {
+      if (fetchInvestmentFundQuoteButton) {
+        fetchInvestmentFundQuoteButton.disabled = investmentFundFields.hidden;
+        fetchInvestmentFundQuoteButton.textContent = previousLabel;
+      }
+    }
+  }
+
+  function setFundQuoteHint(text, tone = "") {
+    if (!investmentFundQuoteHint) {
+      return;
+    }
+    investmentFundQuoteHint.textContent = text;
+    investmentFundQuoteHint.className = `field-hint ${tone}`.trim();
   }
 
   function isInvestmentSavingsSelection() {

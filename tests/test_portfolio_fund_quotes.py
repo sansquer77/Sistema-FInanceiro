@@ -15,6 +15,7 @@ from financeiro.portfolio import (
     QUOTE_MEMORY_CACHE,
     PortfolioError,
     apply_fund_quote,
+    fetch_fund_quote_for_user,
     fetch_mais_retorno_quote,
     mais_retorno_fund_identifier,
     quote_positions,
@@ -87,6 +88,25 @@ class FundQuoteApplicationTest(IsolatedDatabaseMixin):
         self.assertEqual(position["current_value_brl_cents"], 150_000)
         self.assertEqual(position["day_result_cents"], 500)
         self.assertEqual(position["day_result_brl_cents"], 500)
+
+    def test_private_pension_with_cnpj_uses_mais_retorno_quote(self) -> None:
+        # spec: investimentos/investimentos-portfolio v2.20 — criterio previdencia-mais-retorno
+        position = {**fund_position(quantity="8", cnpj="46.422.299/0001-73"), "asset_type": "private_pension"}
+        with (
+            mock.patch("financeiro.portfolio.load_mais_retorno_api_key", return_value="mr-secret"),
+            mock.patch("financeiro.portfolio.fetch_mais_retorno_quote", return_value=fake_quote(
+                price_cents=12_345,
+                day_change_cents=12,
+                source="Mais Retorno (46422299000173:fi)",
+            )) as fetch,
+        ):
+            quote_positions([position], user_id=7)
+
+        fetch.assert_called_once_with("46422299000173:fi", "mr-secret", force_refresh=False)
+        self.assertEqual(position["quote"], "123.45")
+        self.assertEqual(position["quote_status"], "ok")
+        self.assertEqual(position["current_value_cents"], 98_760)
+        self.assertEqual(position["day_result_cents"], 96)
 
     def test_fund_without_key_keeps_cost_and_pending_status(self) -> None:
         # spec: preferencias-abas v0.5 — critério 10
@@ -208,6 +228,36 @@ class FetchMaisRetornoQuoteTest(IsolatedDatabaseMixin):
             "46422299000173:fi",
         )
         self.assertEqual(mais_retorno_fund_identifier(fund_position(cnpj="")), "")
+
+    def test_fetch_fund_quote_for_launch_form_returns_editable_unit_price_data(self) -> None:
+        # spec: lancamentos v3.5 — criterio cota-fundo-lancamento
+        with (
+            mock.patch("financeiro.portfolio.load_mais_retorno_api_key", return_value="mr-secret"),
+            mock.patch("financeiro.portfolio.fetch_mais_retorno_quote", return_value=fake_quote(
+                price_cents=123_456,
+                date="2026-08-10",
+                source="Mais Retorno (46422299000173:fi)",
+            )) as fetch,
+        ):
+            quote = fetch_fund_quote_for_user(7, "46.422.299/0001-73")
+
+        fetch.assert_called_once_with("46422299000173:fi", "mr-secret", force_refresh=False)
+        self.assertEqual(quote["cnpj"], "46422299000173")
+        self.assertEqual(quote["identifier"], "46422299000173:fi")
+        self.assertEqual(quote["unit_price"], "1234.56")
+        self.assertEqual(quote["quote_date"], "2026-08-10")
+        self.assertEqual(quote["quote_source"], "Mais Retorno (46422299000173:fi)")
+
+    def test_fetch_fund_quote_for_launch_form_requires_mais_retorno_key(self) -> None:
+        # spec: lancamentos v3.5 — criterio cota-fundo-lancamento
+        with (
+            mock.patch("financeiro.portfolio.load_mais_retorno_api_key", return_value=""),
+            mock.patch("financeiro.portfolio.fetch_mais_retorno_quote", side_effect=AssertionError("nao deve chamar")),
+        ):
+            with self.assertRaises(PortfolioError) as error:
+                fetch_fund_quote_for_user(7, "46.422.299/0001-73")
+
+        self.assertIn("Mais Retorno", error.exception.message)
 
     def test_float_quote_with_dot_decimal_separator_is_converted_to_cents(self) -> None:
         # spec: preferencias-abas v0.5 — critério 9 e investimentos-portfolio v2.14:

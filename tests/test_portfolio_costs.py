@@ -1,11 +1,64 @@
 from __future__ import annotations
 
+import json
 import unittest
 
 from financeiro.portfolio import build_positions, fixed_income_custody_fee_cents, format_position, group_positions
 
 
 class PortfolioCostTest(unittest.TestCase):
+    def savings_row(self, redeemed_cost_cents: int = 0) -> dict:
+        return {
+            "id": 1,
+            "source_type": "operation",
+            "source_id": 1,
+            "transaction_id": 10,
+            "account_id": 1,
+            "account_name": "Carteira",
+            "account_currency": "BRL",
+            "asset_type": "savings",
+            "asset_identifier": "POUPANCA",
+            "asset_name": "Poupança",
+            "cnpj": None,
+            "quantity_micros": 0,
+            "unit_price_cents": 0,
+            "invested_amount_cents": 30_000,
+            "brokerage_fee_cents": 0,
+            "exchange_fee_cents": 0,
+            "tax_cents": 0,
+            "other_costs_cents": 0,
+            "fixed_income_mode": None,
+            "fixed_income_indexer": None,
+            "fixed_income_rate_micros": 0,
+            "fixed_income_maturity_date": None,
+            "apply_tax_estimate": 0,
+            "emergency_reserve_eligible": 0,
+            "savings_anniversaries_json": json.dumps([
+                {"date": "2026-01-05", "amount_cents": 10_000},
+                {"date": "2026-02-05", "amount_cents": 20_000},
+            ]),
+            "date": "2026-01-05",
+            "description": "Aporte Poupança",
+            "amount_cents": 30_000,
+            "exchange_rate_micros": 1_000_000,
+            "redeemed_cost_cents": redeemed_cost_cents,
+            "redeemed_quantity_micros": 0,
+        }
+
+    def test_savings_redemption_consumes_anniversaries_fifo(self) -> None:
+        positions = build_positions([self.savings_row(redeemed_cost_cents=15_000)])
+
+        self.assertEqual(len(positions), 1)
+        self.assertEqual(positions[0]["total_cost_cents"], 15_000)
+        self.assertEqual(positions[0]["savings_anniversaries"], [
+            {"date": "2026-02-05", "amount_cents": 15_000},
+        ])
+
+    def test_savings_full_redemption_removes_open_position(self) -> None:
+        positions = build_positions([self.savings_row(redeemed_cost_cents=30_000)])
+
+        self.assertEqual(positions, [])
+
     def test_treasury_direct_custody_fee_is_estimated_with_selic_exemption(self) -> None:
         # spec: investimentos/investimentos-portfolio v2.7 — critério 25
         prefixado = {

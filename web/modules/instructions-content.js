@@ -1,4 +1,4 @@
-// spec: docs/specs/instrucoes-app.md v1.3 — conteúdo estático da central de ajuda
+// spec: docs/specs/instrucoes-app.md v1.7 — conteúdo estático da central de ajuda
 // Este módulo é puro e sem estado: o conteúdo é versionado no frontend e
 // disponível offline, sem dependência de backend ou internet.
 
@@ -135,11 +135,14 @@ export const INSTRUCTIONS_CONTENT = [
         title: "Lançar investimentos e aportes",
         summary: "Registre compras, aportes e aplicações que aumentam uma posição existente ou criam uma nova no Portfólio.",
         content: [
-          "No Extrato de Contas, use o tipo Investimento/Aporte quando comprar um ativo, fazer um aporte ou receber uma aplicação. Esse lançamento sai do saldo da conta-corrente e é contabilizado como uma operação do ativo.",
-          "Se já houver uma posição com os mesmos dados (mesma carteira, tipo, ticker/nome, CNPJ, indexador e vencimento) no Portfólio, o aporte é somado a ela. Se não houver, o app cria uma nova posição automaticamente.",
-          "Não é o mesmo que Transferência: uma transferência apenas move saldo entre contas e não cria operação de ativo. Preencha Valor investido, Ativo (ticker/código), Nome do ativo, CNPJ (para fundos), Quantidade e Preço unitário (quando aplicável), além de custos como corretagem, emolumentos, impostos e outros. Resgates e dividendos devem ser lançados com os tipos apropriados.",
+          "No Extrato de Contas, use o tipo Investimento/Aporte quando comprar um ativo, aplicar em um fundo, reforçar uma previdência ou fazer novo aporte em uma posição já existente. O lançamento reduz o saldo da conta escolhida e cria uma operação de investimento para o Portfólio.",
+          "Comece pelo valor financeiro da operação: informe o valor total que saiu da conta, a data, a carteira/conta de custódia e os custos da operação, como corretagem, emolumentos, impostos ou outras taxas. O valor investido representa o dinheiro movimentado; os custos ajudam o app a calcular o custo total da posição.",
+          "Depois preencha a identificação do ativo. Para ações, ETFs, FIIs e cripto, use o ticker ou código mais reconhecível. Para fundos de investimento e previdência privada, informe o nome e, se tiver, o CNPJ. Para renda fixa, informe também indexador, taxa e vencimento quando fizer sentido.",
+          "Quantidade e Preço unitário trabalham juntos: em fundos, a Quantidade é a quantidade de cotas compradas e o Preço unitário é o valor de cada cota na data da aplicação. Exemplo: se você aplicou R$ 1.000,00 em um fundo cuja cota era R$ 2,50, a quantidade será 400 cotas. Se informar quantidade e preço unitário, o app consegue calcular o custo do lote; se informar apenas o valor total, a posição ainda é registrada, mas a análise por cota fica menos precisa.",
+          "Se já houver uma posição com os mesmos dados principais (mesma carteira, tipo, ticker/nome, CNPJ, indexador e vencimento), o aporte é somado a ela. Se não houver, o app cria uma nova posição automaticamente. Não use Transferência para isso: transferência apenas move saldo entre contas e não cria operação de ativo.",
+          "Resgates, vendas, dividendos, juros sobre capital próprio e rendimentos devem ser lançados com os tipos apropriados. Assim o Extrato mostra o fluxo financeiro e o Portfólio mostra a posição consolidada.",
         ],
-        searchTerms: ["investimento", "aporte", "compra", "aplicação", "posição", "ativo", "transferência", "conta investimento"],
+        searchTerms: ["investimento", "aporte", "compra", "aplicação", "posição", "ativo", "transferência", "conta investimento", "fundo", "cotas", "preço unitário", "CNPJ"],
         relatedModule: "Extrato de Contas",
         route: "transactions",
         contextualTopicId: "investimentos-aportes",
@@ -319,13 +322,30 @@ export const INSTRUCTIONS_CONTENT = [
         summary: "Cadastre posições iniciais de renda variável, cripto, fundos e previdência que você já possui em carteira.",
         content: [
           "Use essa tela apenas para registrar ativos que você já possui antes de começar a usar o app (posição inicial). Aportes e compras futuras devem ser registrados pelo Extrato de Contas como lançamentos do tipo Investimento/Aporte.",
-          "Preencha Carteira (conta onde o ativo está custodiado), Data de aquisição, Custo total do lote, Ativo (ticker ou código, ex.: PETR4, BTC, XPML11) e Nome do ativo. Para fundos, informe também o CNPJ do fundo. Para previdência, escolha a subcategoria PGBL ou VGBL.",
-          "Quando aplicável, preencha Quantidade e Preço médio para que o app acompanhe a evolução. Para ações, fundos e cripto, o app busca cotações de mercado automaticamente.",
+          "Preencha Carteira (conta onde o ativo está custodiado), Data de aquisição, Custo total do lote, Ativo (ticker ou código, ex.: PETR4, BTC, XPML11) e Nome do ativo. Para fundos e previdência privada, informe também o CNPJ quando disponível. Para previdência, escolha a subcategoria PGBL ou VGBL.",
+          "Quando aplicável, preencha Quantidade e Preço médio para que o app acompanhe a evolução. Em fundos de investimento, Quantidade é a quantidade de cotas e Preço médio é o valor médio pago por cota na posição inicial.",
+          "Para ativos com fonte de mercado disponível, o app atualiza o valor atual automaticamente: ações e FIIs via Yahoo, cripto via CoinGecko, indicadores e renda fixa via BACEN, e fundos/previdência com CNPJ via Mais Retorno quando a integração estiver configurada. O custo histórico informado por você permanece como base da posição.",
         ],
         searchTerms: ["ações", "fundos", "cripto", "previdência", "cotação", "posição inicial", "ticker", "quantidade", "preço médio", "CNPJ"],
         relatedModule: "Portfólio",
         route: "portfolio",
         contextualTopicId: "acoes-fundos",
+      },
+      {
+        id: "fundos-cotas-preco-unitario",
+        title: "Fundos: cotas e preço unitário",
+        summary: "Entenda como preencher quantidade de cotas, valor da cota e CNPJ ao lançar fundos de investimento.",
+        content: [
+          "Fundos de investimento são registrados por cotas. A Quantidade é o número de cotas que você comprou ou já possui; o Preço unitário é o valor de uma cota na data da aplicação ou da posição inicial.",
+          "Use o informe da corretora ou do administrador do fundo para conferir esses dados. Normalmente ele mostra valor aplicado, quantidade de cotas e valor da cota. Se o documento mostrar apenas valor aplicado e valor da cota, divida o valor aplicado pelo valor da cota para chegar à quantidade.",
+          "O CNPJ identifica o fundo. Preenchê-lo é importante porque evita misturar fundos com nomes parecidos e permite que a integração da Mais Retorno consulte a cota diária no Portfólio, desde que a API esteja configurada em Preferências > APIs.",
+          "A cotação automática da Mais Retorno atualiza o valor atual da posição no Portfólio. O preço unitário informado no lançamento ou na posição inicial continua editável, porque ele representa o seu preço de compra/custo histórico, não necessariamente a cota mais recente.",
+          "Se a API da Mais Retorno estiver configurada e o CNPJ estiver correto, use a cota consultada como referência para conferir o preenchimento. Se houver divergência com o comprovante da corretora, mantenha o valor do comprovante no lançamento.",
+        ],
+        searchTerms: ["fundos", "fundo de investimento", "cotas", "preço unitário", "preço médio", "valor da cota", "CNPJ", "Mais Retorno"],
+        relatedModule: "Portfólio",
+        route: "portfolio",
+        contextualTopicId: "fundos-cotas-preco-unitario",
       },
       {
         id: "cadastrar-poupanca",

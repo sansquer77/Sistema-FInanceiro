@@ -2,8 +2,8 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.18
-atualizado: 2026-08-09
+versao: 2.21
+atualizado: 2026-08-10
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -16,7 +16,7 @@ aliases: ["Investimentos", "Portfólio"]
 # Investimentos e Portfólio
 
 > [!info] Status
-> **implementado** · área: `investimentos` · atualizado em 2026-08-09 · relacionados: [[contas-correntes]], [[lancamentos]], [[relatorios]]
+> **implementado** · área: `investimentos` · atualizado em 2026-08-10 · relacionados: [[contas-correntes]], [[lancamentos]], [[relatorios]]
 
 ## Problema
 
@@ -76,6 +76,7 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 - Posições iniciais podem informar lista de aniversários (data/valor).
 - Lançamentos classificados como Poupança geram automaticamente um aniversário na data do lançamento.
 - Cálculo: TR + 0,5% a.m. quando Selic > 8,5% a.a.; TR + 70% da Selic equivalente mensal quando Selic ≤ 8,5% a.a.
+- Resgates de Poupança consomem os aniversários por FIFO, dos aniversários mais antigos para os mais recentes; resgate total zera os aniversários remanescentes e remove a posição da carteira aberta.
 - Não há cálculo de IOF/IR para Poupança.
 - Posições e aportes de Poupança podem ser marcados explicitamente como reserva de emergência, mas a marcação deve ser decisão do usuário.
 - A marcação de reserva de emergência deve ser visualmente discreta no formulário, com peso menor que campos financeiros principais.
@@ -83,7 +84,7 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 
 **Previdência Privada (`private_pension`):**
 - Lançamentos classificados como `Previdência Privada`, `PGBL` ou `VGBL` geram operações do tipo `private_pension`.
-- Valor atual pode ser ajustado manualmente quando não houver indexador/cotação confiável.
+- Quando houver CNPJ preenchido, carteira em BRL e Mais Retorno configurada, o valor atual pode usar a última cota disponível pela mesma integração de fundos; sem isso, permanece ajustável manualmente.
 
 **Renda Variável / Criptos:**
 - Cotações via Yahoo Finance (ações/fundos) e CoinGecko/Yahoo (criptoativos).
@@ -92,6 +93,7 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 
 **Fundos (`fund`):**
 - Cotas dos fundos de investimento buscadas via **API Mais Retorno** quando a integração estiver ativada em Preferências (aba APIs — ver [[preferencias-abas]]), a posição tiver **CNPJ** preenchido e a carteira for em **BRL**.
+- A mesma integração pode ser usada pelo formulário de Lançamentos de Contas para buscar a última cota disponível por CNPJ e preencher **Preço unitário** como sugestão editável no aporte de fundo ou previdência; essa busca não cria nem altera posição sozinha.
 - Identificador da API: `{cnpj}:fi`, com o CNPJ **somente dígitos** (sem pontos e sem barra — ex.: `46.422.299/0001-73` vira `46422299000173:fi`); valor atual pela última cota do retorno e variação diária pela cota anterior.
 - Requisição usa sempre `start_date` e `end_date` iguais à **data atual** (`GET /quotes/{identifier}?start_date=AAAA-MM-DD&end_date=AAAA-MM-DD`).
 - O preço da cota (`c`) chega como numeral JSON com separador decimal `.` (ex.: `1.601637`) e é convertido para centavos inteiros; o app nunca exibe o valor cru da API.
@@ -120,6 +122,7 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 |---|---|
 | `GET` | `/api/portfolio` |
 | `GET` | `/api/portfolio/returns` |
+| `GET` | `/api/portfolio/fund-quote?cnpj={cnpj}` |
 | `POST` | `/api/portfolio/positions` |
 | `PUT` | `/api/portfolio/positions/{id}` |
 | `DELETE` | `/api/portfolio/positions/{id}` |
@@ -171,6 +174,8 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado o formulário de posição inicial com opção de reserva visível, quando exibido, então a marcação aparece como controle compacto/discreto e não compete visualmente com os campos principais.
 - Dado o usuário cadastrando ou editando um aporte de Poupança ou Renda Fixa em Lançamentos de Contas, quando marca `Usar este aporte como reserva de emergência`, então a operação é persistida com `emergency_reserve_eligible = 1`, aparece marcada ao editar o lançamento e passa a compor a reserva elegível do Portfólio/Score.
 - Dado o usuário cadastrando ou editando um aporte de Poupança em Lançamentos de Contas, quando o formulário é exibido, então os campos não aplicáveis à Poupança ficam ocultos/desabilitados e não competem com os campos essenciais.
+- Dado uma posição de Poupança com múltiplos aniversários, quando ocorre resgate parcial, então o valor resgatado consome primeiro o saldo dos aniversários mais antigos.
+- Dado uma posição de Poupança com resgate total, quando o Portfólio é recalculado, então a posição deixa de aparecer como aberta.
 - Dado uma posição de Tesouro Prefixado, IPCA+ ou Selic padrão com cálculo na curva, quando o Portfólio calcula o valor líquido, então deduz a Taxa B3 estimada de 0,20% a.a. pro rata, aplicando isenção simplificada de R$ 10.000,00 apenas para Tesouro Selic.
 - Dado uma posição de Tesouro Direto exibida no Portfólio, quando o usuário lê a listagem, então há nota discreta informando que o cálculo é na curva e pode divergir da marcação a mercado do site do Tesouro.
 - Dado o usuário abrindo o Portfólio, quando a seção "Resumo da Carteira" é exibida, então o card "Rentabilidade" mantém o percentual total por moeda e exibe um botão para abrir o gráfico mês a mês.
@@ -178,6 +183,8 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado uma carteira com posições em BRL e USD, quando o gráfico de rentabilidade é exibido, então há séries separadas para cada moeda, mantendo o CDI como benchmark visível.
 - Dado o primeiro investimento cadastrado em Jun/2026, quando o usuário consulta rentabilidade em Ago/2026, então o gráfico mostra os meses disponíveis (Jun, Jul, Ago), usando 100% do período cadastrado.
 - Dado uma posição de fundo com CNPJ em carteira BRL e a integração Mais Retorno ativada nas Preferências, quando o Portfólio é carregado, então a posição usa a última cota da API como valor atual, com fonte e data da cota.
+- Dado um CNPJ de fundo ou previdência e Mais Retorno configurada, quando o formulário de Lançamentos consulta `/api/portfolio/fund-quote`, então recebe a última cota disponível, data e fonte sem persistir alterações.
+- Dado uma posição de Previdência Privada com CNPJ em carteira BRL e a integração Mais Retorno ativada, quando o Portfólio é carregado, então a posição usa a última cota da API como valor atual, com fonte e data da cota.
 - Dado uma posição de fundo sem integração ativada, sem CNPJ ou em carteira não-BRL, quando o Portfólio é carregado, então a posição mantém o valor de custo com status `Cotacao manual pendente` e nenhuma chamada à API Mais Retorno é feita.
 - Dado uma posição de fundo com a API Mais Retorno indisponível, quando o Portfólio é carregado, então a posição mantém o valor de custo com status amigável e o restante do portfólio segue funcionando.
 - Dado posições com quantidade de alta precisão (ex.: `94,65389`), quando o Portfólio é exibido, então a quantidade aparece com no máximo 2 casas decimais para preservar o layout das tabelas.
@@ -185,6 +192,9 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 
 ## Changelog
 
+- `2.21` — 2026-08-10 — Resgates de Poupança passam a consumir saldos de aniversários por FIFO; resgate total remove a posição aberta automaticamente.
+- `2.20` — 2026-08-10 — Previdência Privada com CNPJ passa a usar Mais Retorno para cotação no Portfólio e no preenchimento assistido de lançamentos.
+- `2.19` — 2026-08-10 — Integração Mais Retorno exposta também como busca assistida de cota por CNPJ para o formulário de Lançamentos de Contas, sem persistência automática.
 - `2.18` — 2026-08-09 — Consulta principal do Portfólio remove ordenação SQL redundante antes da consolidação em memória; histórico de posições encerradas passa a ter índice compatível com a ordenação por usuário/data/id.
 - `2.17` — 2026-08-09 — Cache em memória de cotações/câmbio passa a ter limite de entradas e limpeza de expirados; referência da configuração Mais Retorno atualizada para `secure_configs`.
 - `2.16` — 2026-08-09 — Cotações de posições independentes passam a ser aplicadas em paralelo com limite de workers, reduzindo bloqueio de Portfólio quando vários ativos precisam consultar APIs externas sem cache.

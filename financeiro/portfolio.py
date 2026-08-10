@@ -1070,6 +1070,26 @@ def parse_savings_anniversaries(value: object, fallback_date: object, fallback_a
     return entries
 
 
+def consume_savings_anniversaries_fifo(entries: list[dict], redeemed_cost_cents: int) -> list[dict]:
+    # spec: investimentos-portfolio v2.21 — criterio poupanca-resgate-fifo
+    # (resgates de poupanca consomem primeiro os aniversarios mais antigos para
+    # manter a base de rentabilidade alinhada ao saldo remanescente por lote)
+    remaining_redeemed = max(int(redeemed_cost_cents or 0), 0)
+    adjusted = []
+    for entry in sorted(entries, key=lambda item: str(item.get("date") or "")):
+        amount_cents = int(entry.get("amount_cents") or 0)
+        if amount_cents <= 0:
+            continue
+        if remaining_redeemed >= amount_cents:
+            remaining_redeemed -= amount_cents
+            continue
+        if remaining_redeemed > 0:
+            amount_cents -= remaining_redeemed
+            remaining_redeemed = 0
+        adjusted.append({"date": str(entry.get("date") or ""), "amount_cents": amount_cents})
+    return adjusted
+
+
 def normalize_position_value_override_payload(data: dict) -> dict:
     asset_type = str(data.get("asset_type") or "other").strip().lower()
     if asset_type not in ASSET_TYPE_LABELS:
@@ -1185,7 +1205,6 @@ def build_positions(rows) -> list[dict]:
         asset_type = row["asset_type"] or "other"
         identifier = normalize_asset_identifier(row["asset_identifier"], asset_type)
         key = portfolio_position_key(row, asset_type, identifier)
-        position = grouped.setdefault(key, empty_position(row, asset_type, identifier))
         original_quantity_micros = int(row["quantity_micros"] or 0)
         redeemed_quantity_micros = min(int(row.get("redeemed_quantity_micros") or 0), original_quantity_micros)
         quantity = micros_to_decimal(max(original_quantity_micros - redeemed_quantity_micros, 0))
@@ -1204,11 +1223,17 @@ def build_positions(rows) -> list[dict]:
             costs_cents = int((Decimal(costs_cents) * Decimal(total_cost_cents) / Decimal(original_total_cost_cents)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
         if total_cost_cents <= 0 and quantity <= 0:
             continue
+        position = grouped.setdefault(key, empty_position(row, asset_type, identifier))
         source_savings_anniversaries = parse_savings_anniversaries(
             row.get("savings_anniversaries_json"),
             row["date"],
-            total_cost_cents,
+            original_total_cost_cents,
         ) if asset_type == "savings" else []
+        if asset_type == "savings" and redeemed_cost_cents > 0:
+            source_savings_anniversaries = consume_savings_anniversaries_fifo(
+                source_savings_anniversaries,
+                redeemed_cost_cents,
+            )
         position["quantity"] += quantity
         position["invested_cents"] += invested_cents
         position["costs_cents"] += costs_cents
@@ -1339,7 +1364,7 @@ def quote_positions(positions: list[dict], user_id: int | None = None, force_ref
 def quote_position(position: dict, user_id: int | None = None, force_refresh: bool = False) -> None:
     if position["asset_type"] in {"stock", "crypto"}:
         apply_market_quote(position, force_refresh=force_refresh)
-    elif position["asset_type"] == "fund":
+    elif position["asset_type"] in {"fund", "private_pension"}:
         apply_fund_quote(position, user_id=user_id, force_refresh=force_refresh)
     elif position["asset_type"] == "fixed_income":
         apply_fixed_income_value(position, force_refresh=force_refresh)
@@ -1395,10 +1420,33 @@ def apply_fund_quote(position: dict, user_id: int | None = None, force_refresh: 
         apply_cost_value(position, exc.message)
 
 
+def fetch_fund_quote_for_user(user_id: int, cnpj: str, force_refresh: bool = False) -> dict:
+    # spec: lancamentos v3.5 — criterio cota-fundo-lancamento
+    # (busca assistida de cota de fundo no formulario de aporte; o preco segue editavel)
+    identifier = mais_retorno_identifier_from_cnpj(cnpj)
+    if not identifier:
+        raise PortfolioError("Informe o CNPJ do fundo.")
+    api_key = load_mais_retorno_api_key(user_id)
+    if not api_key:
+        raise PortfolioError("Configure a API da Mais Retorno em Preferencias > APIs.")
+    quote = fetch_mais_retorno_quote(identifier, api_key, force_refresh=force_refresh)
+    return {
+        "cnpj": re.sub(r"\D", "", str(cnpj or "")),
+        "identifier": identifier,
+        "unit_price": cents_to_money(quote["price_cents"]),
+        "quote_date": quote["date"],
+        "quote_source": quote.get("source") or f"Mais Retorno ({identifier})",
+    }
+
+
 def mais_retorno_fund_identifier(position: dict) -> str:
     # spec: investimentos/investimentos-portfolio v2.14 — criterio fundos-mais-retorno
     # (API exige CNPJ somente com digitos, sem pontos/barra, mais sufixo ":fi")
-    cnpj = re.sub(r"\D", "", str(position.get("cnpj") or ""))
+    return mais_retorno_identifier_from_cnpj(position.get("cnpj"))
+
+
+def mais_retorno_identifier_from_cnpj(cnpj_value: object) -> str:
+    cnpj = re.sub(r"\D", "", str(cnpj_value or ""))
     return f"{cnpj}:fi" if cnpj else ""
 
 

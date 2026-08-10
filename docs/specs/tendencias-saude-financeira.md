@@ -2,7 +2,7 @@
 tipo: spec
 area: tendencias-saude-financeira
 status: implementado
-versao: 2.17
+versao: 2.19
 atualizado: 2026-08-09
 relacionados:
   - "[[score-saude-financeira]]"
@@ -81,6 +81,8 @@ Usuário autenticado que consulta o Cockpit e deseja entender, em linguagem simp
 - Cada mês do gráfico deve oferecer tooltip/descrição no hover com mês, receitas, despesas, saldo líquido e percentual de saldo sobre receita quando houver receita positiva.
 - Abaixo do gráfico deve haver uma microfrase automática, calculada localmente sobre a série exibida, resumindo o principal achado do período, como melhor saldo, perda de força ou déficit no mês mais recente.
 - A seção **Tendências e achados** deve evitar duplicidade entre resumo textual e cards. Achados de variação de receitas, variação de despesas e assinaturas/serviços recorrentes devem aparecer apenas no texto narrativo. Cards devem ficar reservados para limites, eventos pontuais, antecipações e outros itens que precisem de detalhe operacional.
+- Quando a reescrita por IA estiver ativa, a IA deve atuar como síntese executiva integrada do resumo local, com 2 a 4 frases curtas, e não deve repetir em lista textual os limites estourados/próximos, eventos pontuais ou antecipações de parcelas que já serão exibidos como cards.
+- A IA pode receber contexto operacional agregado sobre quantidade de cards de limites, eventos pontuais e antecipações, mas não deve receber os detalhes desses cards, para permitir leitura de causa provável sem duplicar a interface.
 - A tabela **Budget x Realizado** deve reaproveitar os limites de gastos vigentes do mês consultado, sem criar um novo cadastro de orçamento paralelo.
 - A tabela **Budget x Realizado** deve mostrar, no mínimo, categoria/subcategoria, limite mensal vigente, valor realizado, diferença, percentual usado e estado textual como `Dentro do limite`, `Atenção` ou `Acima do limite`.
 - A coluna de estado da tabela **Budget x Realizado** deve manter alinhamento e largura consistentes entre `Dentro do limite`, `Atenção` e `Acima do limite`, sem molduras, fundos, bordas ou quebras visuais diferentes por tamanho do texto; a atenção deve ser comunicada apenas por cor/texto.
@@ -212,7 +214,7 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 - Dado o gráfico com valores elevados e saldo negativo pequeno, quando o eixo Y é exibido, então os rótulos ficam compactos e não se sobrepõem próximos ao zero.
 - Dado o usuário visualizando o gráfico de Tendências, quando a série filtrada é exibida, então uma microfrase abaixo do gráfico resume automaticamente o melhor saldo, pior saldo ou déficit mais recente.
 - Dado a seção **Tendências e achados**, quando o resumo textual já citar receitas, despesas ou assinaturas recorrentes, então esses achados não aparecem novamente como cards.
-- Dado existam limites próximos/estourados, eventos pontuais ou antecipações de parcelas, quando a seção é renderizada, então esses itens podem aparecer como cards por conterem detalhe operacional complementar ao resumo.
+- Dado existam limites próximos/estourados, eventos pontuais ou antecipações de parcelas, quando a seção é renderizada, então esses itens aparecem como cards por conterem detalhe operacional complementar ao resumo, sem serem repetidos em lista no texto narrativo.
 - Dado um usuário com limites cadastrados, quando consulta a aba **Tendências**, então visualiza uma tabela **Budget x Realizado** reaproveitando os limites vigentes e o consumo real por categoria/subcategoria.
 - Dado uma linha acima do limite na tabela **Budget x Realizado**, quando o estado exibido for `Acima do limite`, então o texto fica alinhado com os demais estados e não cria moldura, fundo ou borda visual diferente.
 - Dado um usuário sem limites cadastrados, quando consulta a aba **Tendências**, então visualiza estado vazio explicativo para Budget x Realizado sem bloquear o gráfico e os achados.
@@ -223,11 +225,11 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 - Dado um usuário com despesa em `Viagens, Passagens e Hospedagens (Férias)`, quando a análise de tendências é calculada, então essa despesa é candidata a evento pontual de férias/viagem.
 - Dado um usuário com despesa em `Imprevistos e Emergências Domésticas` ou `Habitação › Manutenção, Reparos e Reformas`, quando a análise de tendências é calculada, então essa despesa é candidata a evento pontual de manutenção, reparo ou emergência doméstica.
 - Dado um usuário com receitas recorrentes mensais, quando a análise compara receitas, então a leitura diferencia receitas recorrentes de receitas pontuais.
-- Dado um usuário com antecipações de parcelas em cartão registradas no histórico como movimento para fatura anterior, quando o mês consultado concentra esses lançamentos, então o resumo informa que o aumento de despesa pode estar ligado a antecipação e pode reduzir faturas futuras.
+- Dado um usuário com antecipações de parcelas em cartão registradas no histórico como movimento para fatura anterior, quando o mês consultado concentra esses lançamentos, então o card **Antecipação de parcelas** informa que o aumento de despesa pode estar ligado a antecipação e pode reduzir faturas futuras.
 - Dado um usuário com lançamentos movidos para fatura posterior, quando consulta o mês de destino, então esses lançamentos não aparecem como antecipação de parcelas.
 - Dado um usuário com parcelas futuras concentradas em uma fatura sem histórico operacional disponível, quando consulta o mês dessa fatura, então o card **Antecipação de parcelas** aparece obrigatoriamente.
 - Dado um usuário com antecipações de parcelas no mês, quando visualiza o card **Antecipação de parcelas**, então o card mostra o total antecipado e a quantidade de lançamentos antecipados.
-- Dado um usuário com compras parceladas antecipadas identificáveis, quando visualiza **Tendências e achados**, então o texto explicativo cita as compras antecipadas de forma resumida, limitando a lista para preservar a leitura.
+- Dado um usuário com compras parceladas antecipadas identificáveis, quando visualiza o card **Antecipação de parcelas**, então o texto explicativo cita as compras antecipadas de forma resumida, limitando a lista para preservar a leitura.
 - Dado um usuário com pagamentos de fatura em conta-corrente, quando as despesas do mês são agregadas, então esses pagamentos não são somados como despesa analítica.
 - Dado um usuário com lançamentos de cartão, quando a tendência mensal é calculada, então os valores entram pela competência da fatura (`invoice_month`).
 - Dado um usuário em cenário multi-moeda, quando houver dados em mais de uma moeda, então o sistema não mistura moedas sem indicar a base usada.
@@ -283,6 +285,8 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 
 ## Changelog
 
+- `2.19` — 2026-08-09 — Prompt da IA de Tendências refinado para síntese executiva integrada em 2 a 4 frases e payload enriquecido apenas com contexto operacional agregado, sem detalhes de cards.
+- `2.18` — 2026-08-09 — Ajustada a fronteira entre resumo e cards: IA e resumo local passam a evitar repetição de limites, eventos pontuais e antecipações já detalhados nos cards.
 - `2.17` — 2026-08-09 — Consulta base da série mensal passa a filtrar lançamentos por intervalo de datas em vez de `substr(date, 1, 7)` no `WHERE`, preservando uso de índice em bases maiores.
 - `2.16` — 2026-08-02 — Antecipação de parcelas passa a ser detectada também por evidência estrutural de parcelas futuras concentradas na fatura do mês, cobrindo bases sem histórico operacional.
 - `2.15` — 2026-08-02 — Antecipação de parcelas passa a considerar apenas movimentos para fatura anterior, ignorando postergações/remanejamentos para faturas futuras.

@@ -3224,6 +3224,14 @@ padding: 8px 16px;
   font-size: 0.8rem;
 }
 
+.field-action-label {
+  justify-content: end;
+}
+
+.field-action-label .small-button {
+  min-height: 42px;
+}
+
 .segmented-control {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

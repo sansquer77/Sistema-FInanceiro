@@ -85,7 +85,8 @@ from financeiro.financial_health import (
 )
 from financeiro.imports import import_organizze_transactions, import_system_template, system_import_template
 from financeiro.operation_logs import create_operation_log, get_operation_log, list_operation_logs
-from financeiro.portfolio import close_position, create_opening_position, delete_opening_position, get_portfolio, get_portfolio_returns, redeem_position, update_opening_position, update_position_value_override
+from financeiro.portfolio import close_position, create_opening_position, delete_opening_position, fetch_fund_quote_for_user, get_portfolio, get_portfolio_returns, redeem_position, update_opening_position, update_position_value_override
+from financeiro.portfolio import PortfolioError
 from financeiro.secure_config import (
     SecureConfigError,
     ai_settings_status,
@@ -314,6 +315,9 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/portfolio/returns":
             self.handle_portfolio_returns()
+            return
+        if path == "/api/portfolio/fund-quote":
+            self.handle_portfolio_fund_quote()
             return
         if path == "/api/reports/category-evolution":
             self.handle_category_evolution()
@@ -839,6 +843,19 @@ class AppHandler(BaseHTTPRequestHandler):
         query = parse_qs(urlsplit(self.path).query)
         force_refresh = (query.get("refresh") or [""])[0].lower() in {"1", "true", "yes", "sim"}
         self.send_json(get_portfolio_returns(user["id"], force_refresh=force_refresh))
+
+    def handle_portfolio_fund_quote(self) -> None:
+        # spec: lancamentos v3.5 — criterio cota-fundo-lancamento
+        if not self.validate_read_source():
+            return
+        user = self.require_user()
+        query = parse_qs(urlsplit(self.path).query)
+        cnpj = (query.get("cnpj") or [""])[0]
+        force_refresh = (query.get("refresh") or [""])[0].lower() in {"1", "true", "yes", "sim"}
+        try:
+            self.send_json(fetch_fund_quote_for_user(user["id"], cnpj, force_refresh=force_refresh))
+        except PortfolioError as exc:
+            self.send_json({"error": exc.message}, HTTPStatus.BAD_REQUEST)
 
     def handle_create_portfolio_position(self) -> None:
         user = self.require_user()

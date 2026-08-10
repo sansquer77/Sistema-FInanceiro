@@ -2,8 +2,8 @@
 tipo: spec
 area: usuario
 status: implementado
-versao: 1.6
-atualizado: 2026-08-08
+versao: 1.7
+atualizado: 2026-08-10
 relacionados:
   - "[[sobre-app]]"
   - "[[lancamentos]]"
@@ -17,7 +17,7 @@ aliases: ["Instruções do App", "Central de Ajuda Local"]
 # Instruções do App
 
 > [!info] Status
-> **implementado** · área: `usuario` · atualizado em 2026-08-06 · relacionados: [[sobre-app]], [[lancamentos]], [[cartoes]], [[investimentos-portfolio]], [[score-saude-financeira]]
+> **implementado** · área: `usuario` · atualizado em 2026-08-10 · relacionados: [[sobre-app]], [[lancamentos]], [[cartoes]], [[investimentos-portfolio]], [[score-saude-financeira]]
 
 ### Problema
 
@@ -70,6 +70,7 @@ Também atende usuários novos que acabaram de instalar o app e precisam de uma 
 - O tópico de **Preferências** deve explicar as abas **Geral** (aparência, email, senha e recuperação SMTP), **APIs** (integrações opcionais de IA e Mais Retorno para cotas de fundos) e **Perigo** (apagar lançamentos e conta).
 - O tópico de **Portfólio e ativos** deve explicar claramente a diferença entre cadastro da posição e movimentação financeira: o ativo descreve a posição, enquanto aportes e resgates posteriores devem ser registrados pelos lançamentos da conta.
 - O tópico de **Portfólio e ativos** deve explicar também sobre a atualização manual dos valores e encerramento de posição (área histórico).
+- O tópico de **Portfólio e ativos** deve detalhar fluxos complexos em formato tutorial, incluindo fundos de investimento: **Quantidade** representa cotas e **Preço unitário/Preço médio** representa o valor da cota usado como custo histórico, permanecendo editável mesmo quando houver cotação automática.
 - O tópico de **Portfólio e ativos** deve incluir instrução sobre cotações automáticas de fundos via **Mais Retorno**: acesso ao site, criação de conta, geração da chave de API na plataforma e configuração em **Preferências > APIs**, com a nota de que sem a chave a posição mantém `Cotação manual pendente` e com a integração ativa fundos com CNPJ em carteira em reais consultam a cota diária.
 - O tópico de **Renda fixa** deve diferenciar pré-fixada, pós-fixada e híbrida em linguagem prática.
 - O tópico de **Cartões** deve explicar diferença entre compra parcelada/recorrente, fatura, pagamento de fatura e antecipação de parcelas. Além disso, deixar claro que uma vez paga a fatura os dados não são alterados.
@@ -168,8 +169,8 @@ A lista abaixo é a **versão de referência** para o conteúdo estático do mó
 - **ID**: `investimentos-aportes`
   - **Título**: Lançar investimentos e aportes
   - **Resumo**: Registre compras, aportes e aplicações que aumentam uma posição existente ou criam uma nova no Portfólio.
-  - **Conteúdo**: No Extrato de Contas, use o tipo **Investimento/Aporte** quando comprar um ativo, fazer um aporte ou receber uma aplicação. Esse lançamento sai do saldo da conta-corrente e é contabilizado como uma operação do ativo. Se já houver uma posição com os mesmos dados (mesma carteira, tipo, ticker/nome, CNPJ, indexador e vencimento) no Portfólio, o aporte é somado a ela. Se não houver, o app cria uma nova posição automaticamente. **Não é o mesmo que Transferência**: uma transferência apenas move saldo entre contas e não cria operação de ativo. Preencha os campos do ativo: **Valor investido**, **Ativo** (ticker/código), **Nome do ativo**, **CNPJ** (para fundos), **Quantidade** e **Preço unitário** (quando aplicável), além de custos como corretagem, emolumentos, impostos e outros. Resgates e dividendos devem ser lançados com os tipos apropriados.
-  - **Termos de busca**: investimento, aporte, compra, aplicação, posição, ativo, transferência, conta investimento
+  - **Conteúdo**: No Extrato de Contas, use o tipo **Investimento/Aporte** quando comprar um ativo, aplicar em um fundo, reforçar uma previdência ou fazer novo aporte em uma posição já existente. Esse lançamento reduz o saldo da conta escolhida e cria uma operação de investimento para o Portfólio. Comece pelo valor financeiro da operação: informe o valor total que saiu da conta, a data, a carteira/conta de custódia e os custos da operação, como corretagem, emolumentos, impostos ou outras taxas. Depois preencha a identificação do ativo. Para ações, ETFs, FIIs e cripto, use o ticker ou código mais reconhecível. Para fundos de investimento, informe o nome do fundo e o CNPJ. Quantidade e Preço unitário trabalham juntos: em fundos, a **Quantidade** é a quantidade de cotas compradas e o **Preço unitário** é o valor de cada cota na data da aplicação. Exemplo: se você aplicou R$ 1.000,00 em um fundo cuja cota era R$ 2,50, a quantidade será 400 cotas. Se já houver uma posição com os mesmos dados principais (mesma carteira, tipo, ticker/nome, CNPJ, indexador e vencimento), o aporte é somado a ela. Se não houver, o app cria uma nova posição automaticamente. **Não use Transferência para isso**: transferência apenas move saldo entre contas e não cria operação de ativo. Resgates, vendas, dividendos, juros sobre capital próprio e rendimentos devem ser lançados com os tipos apropriados.
+  - **Termos de busca**: investimento, aporte, compra, aplicação, posição, ativo, transferência, conta investimento, fundo, cotas, preço unitário, CNPJ
   - **Módulo relacionado**: Extrato de Contas
   - **Rota do módulo**: `transactions`
   - **Tópico contextual**: `investimentos-aportes`
@@ -289,11 +290,20 @@ A lista abaixo é a **versão de referência** para o conteúdo estático do mó
 - **ID**: `acoes-fundos`
   - **Título**: Ações, fundos, cripto e previdência
   - **Resumo**: Cadastre posições iniciais de renda variável, cripto, fundos e previdência que você já possui em carteira.
-  - **Conteúdo**: Use essa tela apenas para registrar ativos que você **já possui antes de começar a usar o app** (posição inicial). Aportes e compras futuras devem ser registrados pelo Extrato de Contas como lançamentos do tipo **Investimento/Aporte**. No formulário, preencha: **Carteira** (conta onde o ativo está custodiado), **Data de aquisição**, **Custo total** do lote, **Ativo** (ticker ou código, ex.: PETR4, BTC, XPML11) e **Nome do ativo**. Para fundos, informe também o **CNPJ do fundo**. Para previdência, escolha a subcategoria PGBL ou VGBL. Quando aplicável, preencha **Quantidade** e **Preço médio** para que o app acompanhe a evolução. Para ações, fundos e cripto, o app busca cotações de mercado automaticamente.
+  - **Conteúdo**: Use essa tela apenas para registrar ativos que você **já possui antes de começar a usar o app** (posição inicial). Aportes e compras futuras devem ser registrados pelo Extrato de Contas como lançamentos do tipo **Investimento/Aporte**. No formulário, preencha: **Carteira** (conta onde o ativo está custodiado), **Data de aquisição**, **Custo total** do lote, **Ativo** (ticker ou código, ex.: PETR4, BTC, XPML11) e **Nome do ativo**. Para fundos, informe também o **CNPJ do fundo**. Para previdência, escolha a subcategoria PGBL ou VGBL. Quando aplicável, preencha **Quantidade** e **Preço médio** para que o app acompanhe a evolução. Em fundos de investimento, Quantidade é a quantidade de cotas e Preço médio é o valor médio pago por cota na posição inicial. Para ativos com fonte de mercado disponível, o app atualiza o valor atual automaticamente: ações e FIIs via Yahoo, cripto via CoinGecko, indicadores e renda fixa via BACEN, e fundos via Mais Retorno quando a integração estiver configurada. O custo histórico informado por você permanece como base da posição.
   - **Termos de busca**: ações, fundos, cripto, previdência, cotação, posição inicial, ticker, quantidade, preço médio, CNPJ
   - **Módulo relacionado**: Portfólio
   - **Rota do módulo**: `portfolio`
   - **Tópico contextual**: `acoes-fundos`
+
+- **ID**: `fundos-cotas-preco-unitario`
+  - **Título**: Fundos: cotas e preço unitário
+  - **Resumo**: Entenda como preencher quantidade de cotas, valor da cota e CNPJ ao lançar fundos de investimento.
+  - **Conteúdo**: Fundos de investimento são registrados por cotas. A **Quantidade** é o número de cotas que você comprou ou já possui; o **Preço unitário** é o valor de uma cota na data da aplicação ou da posição inicial. Use o informe da corretora ou do administrador do fundo para conferir valor aplicado, quantidade de cotas e valor da cota. Se o documento mostrar apenas valor aplicado e valor da cota, divida o valor aplicado pelo valor da cota para chegar à quantidade. O **CNPJ** identifica o fundo, evita misturar fundos com nomes parecidos e permite que a integração da Mais Retorno consulte a cota diária no Portfólio, desde que a API esteja configurada em **Preferências > APIs**. A cotação automática da Mais Retorno atualiza o valor atual da posição no Portfólio. O preço unitário informado no lançamento ou na posição inicial continua editável, porque representa o seu preço de compra/custo histórico, não necessariamente a cota mais recente. Se houver divergência com o comprovante da corretora, mantenha o valor do comprovante no lançamento.
+  - **Termos de busca**: fundos, fundo de investimento, cotas, preço unitário, preço médio, valor da cota, CNPJ, Mais Retorno
+  - **Módulo relacionado**: Portfólio
+  - **Rota do módulo**: `portfolio`
+  - **Tópico contextual**: `fundos-cotas-preco-unitario`
 
 - **ID**: `cadastrar-poupanca`
   - **Título**: Como cadastrar poupança
@@ -514,6 +524,7 @@ A lista abaixo é a **versão de referência** para o conteúdo estático do mó
 - Dado um usuário na tela de instruções, quando digita um termo de busca inexistente, então a página exibe estado vazio amigável.
 - Dado um usuário lendo um grupo com muitos tópicos, quando abre um tópico, então apenas o conteúdo detalhado daquele tópico fica visível em formato expansível.
 - Dado um usuário lendo o tópico de Portfólio e ativos, quando chega à explicação de aportes e resgates, então entende que movimentações posteriores devem ser feitas pelos lançamentos da conta.
+- Dado um usuário lendo instruções de fundos de investimento, quando consulta Quantidade e Preço unitário, então entende que Quantidade representa cotas e Preço unitário representa o valor da cota/custo histórico editável.
 - Dado um usuário lendo o tópico de Renda fixa, quando compara modalidades, então entende a diferença entre pré-fixada, pós-fixada e híbrida.
 - Dado um usuário lendo o tópico de Cartões, quando compara fatura e pagamento de fatura, então entende que o pagamento da fatura não substitui o histórico detalhado das compras.
 - Dado um usuário lendo o tópico de Lançamentos de contas, quando compara saldos diários, então entende a diferença entre previsto e conciliado.
@@ -551,6 +562,7 @@ Nenhuma pendência conhecida.
 
 ### Changelog
 
+- `1.7` — 2026-08-10 — Textos de Portfólio e Investimento/Aporte expandidos em formato mais didático; novo tópico **Fundos: cotas e preço unitário** explica cotas, valor da cota, CNPJ, custo histórico editável e relação com a Mais Retorno.
 - `1.6` — 2026-08-08 — Novo tópico no grupo Portfólio: **Cotações de fundos (Mais Retorno)** — como criar conta na plataforma, gerar a chave de API e configurar em Preferências > APIs; regra correspondente adicionada.
 - `1.5` — 2026-08-08 — Tópico Preferências atualizado para refletir as abas **Geral**, **APIs** e **Perigo** e a integração opcional Mais Retorno ([[preferencias-abas]]).
 - `1.3` — 2026-08-04 — Tópico `importacao-dados` ajustado: removida menção a formatos `.xls` e `.csv` do Organizze.

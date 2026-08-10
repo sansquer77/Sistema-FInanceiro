@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 7.7
-atualizado: 2026-08-09
+versao: 8.3
+atualizado: 2026-08-10
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -132,6 +132,12 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `8.3` — 2026-08-10 — [[specs/investimentos-portfolio]] v2.21 documenta resgates de Poupança consumindo aniversários por FIFO e resgate total removendo a posição aberta.
+- `8.2` — 2026-08-10 — [[specs/lancamentos]] v3.6 e [[specs/investimentos-portfolio]] v2.20 ampliam o uso de CNPJ/Mais Retorno para Previdência Privada.
+- `8.1` — 2026-08-10 — [[specs/lancamentos]] v3.5, [[specs/investimentos-portfolio]] v2.19 e [[arquitetura]] v3.14 documentam busca assistida de cota de fundos por CNPJ via Mais Retorno no formulário de Lançamentos.
+- `8.0` — 2026-08-10 — [[specs/instrucoes-app]] atualizada para v1.7: instruções de Investimento/Aporte e Portfólio passam a detalhar fundos, cotas, preço unitário/preço médio, CNPJ e Mais Retorno.
+- `7.9` — 2026-08-09 — [[specs/tendencias-saude-financeira]] atualizada para v2.19: IA passa a gerar síntese executiva integrada em 2 a 4 frases com contexto operacional agregado.
+- `7.8` — 2026-08-09 — [[specs/tendencias-saude-financeira]] atualizada para v2.18: resumo local/IA deixa de repetir limites, eventos pontuais e antecipações que já aparecem como cards.
 - `7.7` — 2026-08-09 — [[specs/landing-page]] atualizada para v2.1 com destaque público do Portfólio conectado a Yahoo Finance, CoinGecko, BACEN/SGS e Mais Retorno opcional.
 - `7.6` — 2026-08-09 — [[specs/landing-page]] atualizada para v2.0 com nova vitrine de screenshots demonstrativos: APIs, Consultor, Tendências, Análise do Portfólio e Demonstrativos.
 - `7.5` — 2026-08-09 — Fechamento dos ajustes leves de performance: removido log de debug no Portfólio, Tendências filtra por intervalo indexável, histórico do Portfólio ganha índice compatível, BMC carrega assíncrono, dashboard não anima grid estrutural e Modo Privacidade troca blur massivo por máscara textual leve.
