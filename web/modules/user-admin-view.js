@@ -6,6 +6,7 @@ export function registerUserAdminView(context) {
     loadAll,
     resetSessionState,
     setMessage,
+    decisionModal,
     theme,
     state,
     onShowAuth,
@@ -243,12 +244,13 @@ export function registerUserAdminView(context) {
     try {
       const status = await api("/api/consultor/config");
       consultorSettings = status;
+      const aiReady = status.ai_configured && status.ai_enabled;
       elements.consultorEnabled.checked = status.consultor_enabled === true;
       elements.consultorInvestorProfile.value = status.investor_profile || "moderado";
-      elements.consultorEnabled.disabled = !(status.ai_configured && status.ai_enabled) && !status.consultor_enabled;
+      setConsultorConfigEnabled(aiReady);
       if (status.available) {
         setMessage(elements.consultorConfigMessage, "Consultor ativado.", "success");
-      } else if (!status.ai_configured || !status.ai_enabled) {
+      } else if (!aiReady) {
         setMessage(elements.consultorConfigMessage, "Configure e ative a IA antes de habilitar o Consultor.", "");
       } else if (!status.consultor_enabled) {
         setMessage(elements.consultorConfigMessage, "Consultor desligado.", "");
@@ -262,20 +264,59 @@ export function registerUserAdminView(context) {
     }
   }
 
-  function consultorConsentAccepted() {
+  function setConsultorConfigEnabled(enabled) {
+    if (elements.consultorEnabled) {
+      elements.consultorEnabled.disabled = !enabled;
+    }
+    if (elements.consultorInvestorProfile) {
+      elements.consultorInvestorProfile.disabled = !enabled;
+    }
+    const submitButton = elements.consultorConfigForm?.querySelector('button[type="submit"]');
+    if (submitButton) {
+      submitButton.disabled = !enabled;
+    }
+  }
+
+  async function consultorConsentAccepted() {
     if (consultorSettings?.data_access_consent) {
       return true;
     }
-    return window.confirm(
-      "O Consultor usará a IA configurada e dados financeiros agregados já registrados no app para gerar análises. Deseja habilitar este acesso?"
-    );
+    if (!decisionModal?.choose) {
+      return false;
+    }
+    const choice = await decisionModal.choose({
+      title: "Habilitar Consultor",
+      message: (
+        "O Consultor enviará para a IA configurada apenas dados financeiros agregados e minimizados do app, "
+        + "como carteira, score, tendências, vencimentos e limites relevantes ao card escolhido. "
+        + "Senhas, chaves de API e o Perfil Complementar criptografado em repouso não são enviados integralmente. "
+        + "As respostas têm caráter educacional e não executam alterações nos seus dados."
+      ),
+      actions: [
+        { value: true, label: "Aceitar e habilitar", variant: "primary" },
+        { value: false, label: "Cancelar", variant: "ghost" },
+      ],
+    });
+    return choice === true;
   }
 
   async function handleConsultorConfigSubmit(event) {
     event.preventDefault();
     setMessage(elements.consultorConfigMessage, "");
+    if (!(consultorSettings?.ai_configured && consultorSettings?.ai_enabled)) {
+      setMessage(elements.consultorConfigMessage, "Configure e ative a IA antes de habilitar o Consultor.", "error");
+      return;
+    }
     const wantsEnabled = elements.consultorEnabled ? elements.consultorEnabled.checked : false;
-    const consent = wantsEnabled ? consultorConsentAccepted() : false;
+    if (!wantsEnabled && consultorSettings?.consultor_enabled) {
+      const confirmed = await confirmConsultorDisable();
+      if (!confirmed) {
+        elements.consultorEnabled.checked = true;
+        setMessage(elements.consultorConfigMessage, "Consultor mantido ativo.", "");
+        return;
+      }
+    }
+    const consent = wantsEnabled ? await consultorConsentAccepted() : false;
     if (wantsEnabled && !consent) {
       elements.consultorEnabled.checked = false;
       setMessage(elements.consultorConfigMessage, "Consultor não habilitado sem consentimento.", "error");
@@ -292,10 +333,29 @@ export function registerUserAdminView(context) {
       });
       consultorSettings = status;
       await loadConsultorConfigStatus();
+      window.dispatchEvent(new CustomEvent("consultor:settings-changed"));
       setMessage(elements.consultorConfigMessage, status.available ? "Consultor ativado." : "Consultor salvo.", "success");
     } catch (error) {
       setMessage(elements.consultorConfigMessage, error.message, "error");
     }
+  }
+
+  async function confirmConsultorDisable() {
+    if (!decisionModal?.choose) {
+      return true;
+    }
+    const choice = await decisionModal.choose({
+      title: "Desativar Consultor",
+      message: (
+        "Ao desativar o Consultor, o histórico de análises geradas será apagado deste usuário. "
+        + "As configurações de IA permanecem salvas para Tendências e outros recursos."
+      ),
+      actions: [
+        { value: false, label: "Manter ativo", variant: "ghost" },
+        { value: true, label: "Desativar e apagar histórico", variant: "danger" },
+      ],
+    });
+    return choice === true;
   }
 
   async function loadConsultorProfile() {

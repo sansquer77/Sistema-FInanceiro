@@ -313,18 +313,6 @@
               </div>
               <div class="cockpit-calendar-meta" id="cockpitCalendarMeta"></div>
             </div>
-            <div class="consultor-workspace">
-              <div class="consultor-status" id="consultorStatus"></div>
-              <div class="consultor-card-grid" id="consultorCardGrid"></div>
-              <section class="consultor-output" id="consultorOutput" hidden></section>
-              <section class="consultor-history">
-                <div class="calendar-card-heading">
-                  <h3>Histórico de análises</h3>
-                  <button class="ghost" id="consultorHistoryRefreshButton" type="button">Atualizar</button>
-                </div>
-                <div class="consultor-history-list" id="consultorHistoryList"></div>
-              </section>
-            </div>
             <div class="cockpit-calendar-grid">
               <section class="calendar-card">
                 <div class="calendar-card-heading">
@@ -356,6 +344,27 @@
                   <div class="calendar-card-totals"></div>
                 </div>
                 <div class="calendar-card-list" id="maturity60DaysList"></div>
+              </section>
+            </div>
+            <div class="consultor-workspace">
+              <div class="consultor-subtabs" role="tablist" aria-label="Consultor">
+                <button class="consultor-subtab active" type="button" role="tab" aria-selected="true" aria-controls="consultorAnalysesPanel" data-consultor-tab="analyses">Análises</button>
+                <button class="consultor-subtab" type="button" role="tab" aria-selected="false" aria-controls="consultorHistoryPanel" data-consultor-tab="history">Histórico</button>
+              </div>
+              <section class="consultor-tab-panel" id="consultorAnalysesPanel" role="tabpanel">
+                <div class="consultor-status" id="consultorStatus"></div>
+                <div class="consultor-card-grid" id="consultorCardGrid"></div>
+                <section class="consultor-output" id="consultorOutput" hidden></section>
+              </section>
+              <section class="consultor-history consultor-tab-panel" id="consultorHistoryPanel" role="tabpanel" hidden>
+                <div class="calendar-card-heading">
+                  <h3>Histórico de análises</h3>
+                  <button class="ghost" id="consultorHistoryRefreshButton" type="button">Atualizar</button>
+                </div>
+                <label class="consultor-history-filter">Filtrar por análise
+                  <input id="consultorHistoryFilter" type="search" placeholder="Ex.: ralos, score, assinatura">
+                </label>
+                <div class="consultor-history-list" id="consultorHistoryList"></div>
               </section>
             </div>
           </section>
@@ -1671,7 +1680,7 @@
             <div class="user-settings-grid">
               <section class="panel">
                 <h2>Inteligência artificial (opcional)</h2>
-                <p class="form-help">A IA só reescreve o resumo local de Tendências de forma mais natural. Todos os cálculos e achados continuam feitos localmente.</p>
+                <p class="form-help">A IA só reescreve o resumo local de Tendências de forma mais natural e habilita o uso do Consultor. Todos os cálculos e achados continuam feitos localmente.</p>
                 <form id="aiConfigForm" class="form">
                   <label class="checkbox-field">
                     <input name="enabled" id="aiConfigEnabled" type="checkbox" value="1">
@@ -1719,7 +1728,7 @@
 
               <section class="panel">
                 <h2>Consultor</h2>
-                <p class="form-help">Ative o Consultor para gerar análises pré-formatadas com a IA configurada acima.</p>
+                <p class="form-help">Ative o Consultor para gerar análises pré-formatadas com uso da IA configurada.</p>
                 <form id="consultorConfigForm" class="form">
                   <label class="checkbox-field">
                     <input name="consultor_enabled" id="consultorEnabled" type="checkbox" value="1">

@@ -1,8 +1,8 @@
 ---
 tipo: spec
 area: consultor
-status: rascunho
-versao: 0.33
+status: implementado
+versao: 1.0
 atualizado: 2026-08-10
 relacionados:
   - "[[instrucoes-app]]"
@@ -10,14 +10,14 @@ relacionados:
   - "[[score-saude-financeira]]"
   - "[[tendencias-saude-financeira]]"
   - "[[cockpit-calendario]]"
-tags: [spec, "area/consultor", "status/rascunho"]
+tags: [spec, "area/consultor", "status/implementado"]
 aliases: ["Consultor Virtual", "Assistente de Investimentos", "Especialista em Finanças"]
 ---
 
 # Consultor Virtual de Investimentos e Planejamento Financeiro
 
 > [!info] Status
-> **rascunho** · área: `consultor` · atualizado em 2026-08-10 · relacionados: [[instrucoes-app]], [[investimentos-portfolio]], [[score-saude-financeira]], [[tendencias-saude-financeira]], [[cockpit-calendario]]
+> **implementado** · área: `consultor` · atualizado em 2026-08-10 · relacionados: [[instrucoes-app]], [[investimentos-portfolio]], [[score-saude-financeira]], [[tendencias-saude-financeira]], [[cockpit-calendario]]
 
 > [!warning] Pivô arquitetural (v0.13, refinado em v0.14/v0.15)
 > A partir desta versão, o Consultor **não possui campo de prompt livre**. O usuário interage exclusivamente através de um **catálogo de análises pré-formatadas** (cards). Essa mudança é uma decisão de **Security by Design**: eliminar a superfície de entrada de texto livre remove pela raiz os vetores de vazamento acidental de dados sensíveis (PII) e de *prompt injection* via chat. As seções "Prevenção de vazamento de dados no prompt (DLP)" e "Blindagem de prompt injection" da v0.12 são **removidas** desta spec — ver "Segurança by Design" e "Nota de segurança residual" abaixo para o que substitui essas salvaguardas.
@@ -135,7 +135,6 @@ A aba **Consultor** exibe uma grade de cards agrupados em quatro categorias. Cad
 
 | `analysis_id` | Card | Prompt estrito (backend) | Dados de entrada |
 |---|---|---|---|
-| `reserva_emergencia` | **Teste de Estresse da Reserva de Emergência** | "Cruze a soma dos ativos marcados como 'reserva elegível' no Portfólio com a média mensal de despesas de consumo calculada no Score. Informe quantos meses de despesas a reserva atual cobre e se há risco de liquidez." | Ativos com tag de reserva elegível, média de despesas do Score. |
 | `score_saude_financeira` | **Diagnóstico do Score de Saúde Financeira** | "Analise os 5 pilares do Score de Saúde Financeira do usuário (Poupança, Reserva, Endividamento, Limites, Concentração) e indique qual pilar está mais fraco, propondo foco de melhoria." | Score e seus 5 pilares. |
 | `sustentabilidade_padrao_vida` | **Sustentabilidade do Padrão de Vida (Paz Financeira)** | "Usando a base de receitas recorrentes do usuário, compare o padrão de vida atual (gastos e composição do orçamento) com referências ideais de gastos e independência financeira." | Receitas recorrentes, indicadores de Paz Financeira. |
 
@@ -214,6 +213,7 @@ Toda análise deve encerrar com o disclaimer:
 - Ao habilitar o Consultor, um **pop-up de consentimento específico** informa que a IA terá acesso aos dados financeiros do usuário registrados no app. O `data_access_consent` é registrado por usuário: se recusado, o Consultor permanece **desabilitado**, mesmo que a IA geral continue ativa para Tendências.
 - Desabilitar apenas a IA geral torna o Consultor indisponível, sem apagar automaticamente `consultor_enabled`; ao reabilitar a IA, o Consultor só volta a executar se o consentimento específico ainda estiver válido.
 - **Expurgo automático do histórico**: se o usuário desabilitar o Consultor ou revogar o consentimento de dados nas Preferências, **todo o histórico de análises** (`consultor_analyses`) é **expurgado automaticamente**. Se a IA geral for desligada, o histórico também deve ser expurgado como medida de privacidade, pois o usuário está removendo a autorização de uso externo.
+- Ao desabilitar o Consultor nas Preferências, antes de salvar a alteração, o app deve exibir confirmação interna avisando que o histórico de análises daquele usuário será apagado; após salvar, a aba Consultor deve refletir imediatamente o estado desabilitado e o histórico vazio.
 - O perfil de investidor pode ser alterado a qualquer momento em Preferências.
 - O histórico de análises é **persistido no SQLite**, uma linha por execução em `consultor_analyses`, associado ao `user_id` autenticado.
 - A comunicação com provedores de IA externos deve respeitar as regras de privacidade e nunca enviar senhas, tokens ou chaves de criptografia.
@@ -224,6 +224,16 @@ Toda análise deve encerrar com o disclaimer:
 - Não deve haver botão flutuante, atalho lateral, ícone de cartola ou qualquer outra forma de acionamento fora dessa aba.
 - Quando IA geral, Consultor e consentimento estão habilitados, a aba **Consultor** exibe o Catálogo de Análises (grade de cards) e o histórico de execuções.
 - Quando qualquer uma dessas três condições não está atendida, a aba **Consultor** não exibe os cards; o sistema informa, de forma específica, se falta configurar a IA, habilitar o Consultor ou aceitar o consentimento de dados nas Preferências.
+- Em **Preferências > APIs**, a opção de habilitar o Consultor deve permanecer indisponível enquanto a IA geral não estiver configurada e ligada; não deve ser possível ligar o Consultor antes da IA.
+- Na aba **Consultor** do Cockpit, o estado "Consultor ativo" deve ter espaçamento claro em relação aos cards de calendário acima e os botões dos cards de análise devem seguir escala compacta, sem parecerem maiores que os demais controles da tela.
+- A aba **Consultor** deve separar o catálogo de análises e o histórico em subtabs próprias; o histórico deve ter filtro textual por tipo de análise, período, data ou conteúdo da resposta para continuar utilizável com crescimento do volume de execuções.
+- Em telas largas, a subtab **Análises** deve usar layout em duas colunas: catálogo compacto alinhado à esquerda e painel de resposta à direita, reduzindo rolagem para leitura após gerar uma análise; em telas estreitas, o layout volta para coluna única.
+- Nos cards de Portfólio e Risco, o payload enviado à IA deve explicitar que campos `_cents` estão em centavos e também incluir valores em reais já convertidos/formatados, reduzindo risco de a IA interpretar centavos como reais.
+- O card **Termômetro de Assinaturas e Recorrências** deve consumir o formato atual do módulo Tendências para `assinaturas_e_servicos`, que é uma lista de itens por subcategoria com `valor_cents`, mantendo compatibilidade com o formato legado em objeto.
+- O card **Detecção de Anomalias e "Ralos" Financeiros** deve consumir o formato atual de `antecipacao_parcelas` em lista, somando `valor_cents` e contando os itens sem depender do formato legado agregado.
+- O prompt do Consultor deve orientar a IA a iniciar a seção **Pontos de Atenção (Riscos)** com `Risco Baixo`, `Risco Medio` ou `Risco Alto`, mas o pós-processamento não deve inserir avisos artificiais de risco quando a IA não trouxer a classificação explicitamente.
+- O pós-processamento pode completar o disclaimer obrigatório quando a IA retorna todas as seções analíticas válidas mas omite ou altera apenas o texto final do disclaimer; demais seções obrigatórias ausentes continuam bloqueando a resposta.
+- O catálogo não deve incluir o card **Teste de Estresse da Reserva de Emergência**, pois a cobertura da reserva em meses já é exibida no pilar Reserva da aba **Saúde Financeira**.
 - **Não existe campo de texto livre em nenhum momento do fluxo do Consultor.**
 
 ### Limites de uso
@@ -231,6 +241,7 @@ Toda análise deve encerrar com o disclaimer:
 | Limite | Valor | Comportamento |
 |---|---|---|
 | Resposta | cap de `max_tokens` das Preferências, limitado a **900** | O teto de tokens de saída por análise jamais excede 900. |
+| Timeout | valor das Preferências, com piso operacional de **20s** | Evita falhas prematuras em cards que exigem mais tempo de resposta, mantendo o timeout configurado quando ele for maior que o piso. |
 | Contexto de dados | minimizado (padrão `minimize_trends_payload`) | Apenas agregados de carteira/lançamentos/score relevantes ao `analysis_id`, sem transações cruas desnecessárias. |
 | Quota diária | **20 execuções/usuário/dia** | Contadas em `consultor_analyses` por `created_at`; ao atingir o limite, aviso amigável e bloqueio até o dia seguinte. |
 
@@ -282,7 +293,7 @@ Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regr
 - Dado um usuário sem IA geral configurada e habilitada, quando tenta habilitar o Consultor, então o sistema informa que a configuração de IA precisa ser concluída antes de ativar o módulo.
 - Dado um usuário com IA geral ativa, Consultor habilitado e consentimento aceito, quando acessa a aba **Consultor**, então os cards ficam disponíveis; se qualquer uma dessas três condições faltar, os cards não são exibidos.
 - Dado um usuário com o Consultor desativado, quando acessa a aba **Consultor** no Cockpit, então a aba exibe o aviso de que a função precisa ser ativada nas Preferências, sem exibir os cards.
-- Dado um usuário com o Consultor habilitado, quando acessa a aba **Consultor** do Cockpit, então encontra um painel com os 8 cards de análise, agrupados nas 4 categorias, **sem nenhum campo de digitação de texto livre**.
+- Dado um usuário com o Consultor habilitado, quando acessa a aba **Consultor** do Cockpit, então encontra um painel com os 7 cards de análise, agrupados nas 4 categorias, **sem nenhum campo de digitação de texto livre**.
 - Dado um usuário com o Consultor habilitado, quando procura por um botão flutuante ou ícone de cartola em outras telas, então não encontra nenhum ponto de acesso fora da aba **Consultor**.
 - Dado um usuário que clica no card "Diagnóstico do Score de Saúde Financeira", quando o sistema processa a requisição, então o endpoint `POST /api/consultor/analyze` é acionado com `analysis_id: "score_saude_financeira"` e o payload enviado à IA contém apenas os agregados do Score, sem transações cruas.
 - Dado um usuário com perfil **Conservador** configurado, quando aciona o card "Avaliação de Alocação vs. Perfil", então a análise usa como referência a faixa de 70% a 90% em renda fixa.
@@ -327,12 +338,12 @@ Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regr
 ## Plano de implementação
 
 > [!info] Execução
-> Esta spec permanece em **rascunho**. Antes de tocar no código, o plano abaixo deve ser usado como checklist de execução atômica. Cada passo deve ser implementado, testado e marcado na própria spec quando concluído.
+> Esta spec está **implementada**. O código, as rotas, a UI, os testes automatizados, a validação em homologação e o versionamento do produto foram concluídos.
 
 - [x] Passo 1 — Preparar a implantação documental: revisar esta spec contra [[requisitos]], [[arquitetura]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]], [[adr/0003-sqlite-fonte-de-verdade]] e [[adr/0010-segredos-criptografados-sqlite]]; confirmar que não há decisão técnica pendente nem necessidade de novo ADR antes do código. Entregável: checklist documental validado e, se necessário, ADR criado antes da implementação.
 - [x] Passo 2 — Criar migrações idempotentes em `financeiro/database.py` para `consultor_settings`, `consultor_analyses` e `consultor_perfil_complementar`, com `user_id` isolado por usuário, `ON DELETE CASCADE` quando aplicável, índices para histórico/quota diária e `payload_enc` como único campo sensível do Perfil Complementar. Fecha: critérios de persistência, isolamento por usuário, quota diária e inspeção direta do SQLite sem dados sensíveis em texto puro.
 - [x] Passo 3 — Fatorar em `financeiro/secure_config.py` helpers reutilizáveis para criptografar/decriptografar envelopes JSON em memória, mantendo compatibilidade com o material de chave atual (`SISTEMA_FINANCEIRO_CONFIG_KEY`, `SISTEMA_FINANCEIRO_CONFIG_KEY_PATH` ou chave local legada). Entregável: Perfil Complementar criptografado em SQLite sem criar arquivos `.enc` por usuário. Fecha: critérios de Perfil Complementar criptografado e compatibilidade operacional.
-- [x] Passo 4 — Implementar em `financeiro/consultor.py` o domínio base do módulo: enums de `investor_profile`, `analysis_id` e `period_window`; catálogo fechado dos 8 cards; prompts estritos; persona; disclaimer obrigatório; mensagens de erro amigáveis; funções puras de validação. Fecha: critérios de catálogo fechado, ausência de prompt livre, perfil de investidor e rejeição de `analysis_id`/`period_window` inválidos.
+- [x] Passo 4 — Implementar em `financeiro/consultor.py` o domínio base do módulo: enums de `investor_profile`, `analysis_id` e `period_window`; catálogo fechado dos 7 cards; prompts estritos; persona; disclaimer obrigatório; mensagens de erro amigáveis; funções puras de validação. Fecha: critérios de catálogo fechado, ausência de prompt livre, perfil de investidor e rejeição de `analysis_id`/`period_window` inválidos.
 - [x] Passo 5 — Implementar a camada de configuração do Consultor em `financeiro/consultor.py`: ler/gravar `consultor_settings`, validar que IA geral está configurada e habilitada antes de permitir `consultor_enabled`, registrar/recusar `data_access_consent`, alterar `investor_profile` e expurgar histórico ao desabilitar Consultor, revogar consentimento ou desligar IA geral. Fecha: critérios de ativação, consentimento, disponibilidade e expurgo automático.
 - [x] Passo 6 — Implementar o Perfil Complementar por usuário: criar, atualizar parcialmente, ler e excluir o payload criptografado; validar enums/faixas; tratar campos ausentes como opcionais; preservar versionamento aditivo por `schema_version`. Fecha: critérios de formulário opcional, edição/exclusão, leitura apenas pelo próprio usuário e compatibilidade de versões futuras.
 - [x] Passo 7 — Implementar os construtores de contexto minimizado por `analysis_id`, reutilizando agregados já existentes dos módulos de Tendências, Score, Portfólio, Limites e Cockpit Calendário, sem enviar transações cruas quando o card não precisa delas e sem carregar carteira completa para `destino_vencimentos`. Fecha: critérios de payload mínimo, Score sem transações cruas e vencimentos de renda fixa até 60 dias.
@@ -342,13 +353,37 @@ Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regr
 - [x] Passo 11 — Implementar quota e resiliência: contar no máximo 20 execuções bem-sucedidas por usuário/dia; não descontar quota nem persistir histórico em timeout, erro HTTP, erro de rede ou resposta inválida; aplicar cooldown de 30s por usuário/card após falha. Fecha: critérios de limite diário, indisponibilidade, cooldown e histórico preservado.
 - [x] Passo 12 — Expor as rotas em `app.py`: `GET/POST /api/consultor/config`, `GET/POST/DELETE /api/consultor/perfil-complementar`, `POST /api/consultor/analyze`, `GET/DELETE /api/consultor/history`, todas autenticadas, com validação de `Host`/`Origin`, mensagens sem vazamento técnico e serialização sem expor `payload_enc`. Fecha: critérios de API, autenticação e segurança de rotas.
 - [x] Passo 13 — Implementar a UI em Preferências: opção de habilitar/desabilitar Consultor, seleção de perfil, pop-up de consentimento, formulário opcional de Perfil Complementar com edição/exclusão e mensagens específicas quando IA geral não estiver pronta. Fecha: critérios de Preferências, ativação, recusa de consentimento e Perfil Complementar.
-- [x] Passo 14 — Implementar a UI da aba **Consultor** no Cockpit seguindo o contrato de fábrica do frontend: grade de cards agrupados nas 4 categorias, seletor fechado de período apenas em `ralos_financeiros`, execução sob demanda, histórico de análises e estados vazios/bloqueados específicos; remover qualquer campo de texto livre e não criar ponto de acesso fora da aba. Fecha: critérios de interface, 8 cards, histórico, seletor de período e ausência de botão externo.
-- [ ] Passo 15 — Criar testes automatizados de domínio e persistência: migrações idempotentes, criptografia do Perfil Complementar, isolamento por `user_id`, validação de enums, prompts fechados, payload mínimo por card, expurgo de histórico, quota diária, cooldown e falhas que não persistem nem consomem quota.
-- [ ] Passo 16 — Criar testes automatizados de API: autenticação obrigatória, `Host`/`Origin` inválidos, `analysis_id` e `period_window` inválidos sem chamada à IA, serialização segura da configuração/perfil/histórico e recusa por IA geral ausente. Fecha: critérios de segurança de rotas e validação de entrada.
-- [ ] Passo 17 — Criar testes automatizados ou mocks do executor de IA: uso da configuração das Preferências, teto de 900 tokens, indisponibilidade padronizada, pós-processamento de recomendação vedada, estrutura obrigatória de resposta e tratamento de texto de lançamento com aparência de instrução como dado. Fecha: critérios de IA, limitações obrigatórias e segurança residual.
-- [ ] Passo 18 — Atualizar documentação após a implementação: [[arquitetura]] com rotas/tabelas/fluxos, [[requisitos]] se o escopo geral mudar, [[instrucoes-app]] com uso do Consultor, esta spec com passos marcados e status adequado, e [[README]] do vault. Entregável: documentação sincronizada com código e testes.
-- [ ] Passo 19 — Validar em homologação manual: IA geral ausente, IA configurada, consentimento recusado/aceito, Perfil Complementar vazio/parcial/completo, cada card do catálogo, período de `ralos_financeiros`, histórico, exclusão de histórico, desligamento de IA/Consultor e mensagens de indisponibilidade. Entregável: evidências ou checklist de homologação atualizado.
-- [ ] Passo 20 — Avaliar versionamento de produto e distribuição: se o módulo for implementado, recomendar incremento **MINOR**, atualizar `financeiro/app_metadata.py` somente se solicitado/aprovado e revisar pacotes/instruções de atualização para usuários existentes. Entregável: recomendação de versão e impactos operacionais claros.
+- [x] Passo 14 — Implementar a UI da aba **Consultor** no Cockpit seguindo o contrato de fábrica do frontend: grade de cards agrupados nas 4 categorias, seletor fechado de período apenas em `ralos_financeiros`, execução sob demanda, histórico de análises em subtab própria com filtro textual e estados vazios/bloqueados específicos; remover qualquer campo de texto livre e não criar ponto de acesso fora da aba. Fecha: critérios de interface, 7 cards, histórico, seletor de período e ausência de botão externo.
+- [x] Passo 15 — Criar testes automatizados de domínio e persistência: migrações idempotentes, criptografia do Perfil Complementar, isolamento por `user_id`, validação de enums, prompts fechados, payload mínimo por card, expurgo de histórico, quota diária, cooldown e falhas que não persistem nem consomem quota.
+- [x] Passo 16 — Criar testes automatizados de API: autenticação obrigatória, `Host`/`Origin` inválidos, `analysis_id` e `period_window` inválidos sem chamada à IA, serialização segura da configuração/perfil/histórico e recusa por IA geral ausente. Fecha: critérios de segurança de rotas e validação de entrada.
+- [x] Passo 17 — Criar testes automatizados ou mocks do executor de IA: uso da configuração das Preferências, teto de 900 tokens, indisponibilidade padronizada, pós-processamento de recomendação vedada, estrutura obrigatória de resposta e tratamento de texto de lançamento com aparência de instrução como dado. Fecha: critérios de IA, limitações obrigatórias e segurança residual.
+- [x] Passo 18 — Atualizar documentação após a implementação: [[arquitetura]] com rotas/tabelas/fluxos, [[requisitos]] se o escopo geral mudar, [[instrucoes-app]] com uso do Consultor, esta spec com passos marcados e status adequado, e [[README]] do vault. Entregável: documentação sincronizada com código e testes.
+- [x] Passo 19 — Validar em homologação manual: IA geral ausente, IA configurada, consentimento recusado/aceito, Perfil Complementar vazio/parcial/completo, cada card do catálogo, período de `ralos_financeiros`, histórico, exclusão de histórico, desligamento de IA/Consultor e mensagens de indisponibilidade. Entregável: evidências ou checklist de homologação atualizado.
+- [x] Passo 20 — Avaliar versionamento de produto e distribuição: se o módulo for implementado, recomendar incremento **MINOR**, atualizar `financeiro/app_metadata.py` somente se solicitado/aprovado e revisar pacotes/instruções de atualização para usuários existentes. Entregável: recomendação de versão e impactos operacionais claros.
+
+### Checklist de homologação do Passo 19
+
+Validação realizada em 2026-08-10 na homologação oficial `http://sistema-financeiro.localhost:8010`, autenticada com o usuário de homologação.
+
+| Item | Resultado |
+|---|---|
+| IA geral ausente/desligada | Coberto por testes automatizados de API/domínio: controles do Consultor ficam indisponíveis quando IA geral não está configurada e ligada. |
+| IA configurada | Validado manualmente em **Preferências > APIs**: IA ativa, provedor Google/Gemini selecionado, campo API key exibido e mensagem "IA ativada para reescrita de resumo". |
+| Consultor desabilitado | Validado manualmente no Cockpit: aba Consultor exibe aviso "Ative o Consultor em Preferências > APIs para liberar as análises" e não mostra botões de geração. |
+| Consentimento aceito | Validado manualmente: ao ativar o Consultor, o app exibiu modal interno com aviso de envio de dados agregados/minimizados para a IA; após "Aceitar e habilitar", exibiu "Consultor ativado". |
+| Consentimento recusado | Coberto por testes automatizados de configuração: recusa mantém `consultor_enabled = false` e não libera cards. |
+| Perfil Complementar vazio/parcial/completo | Validado manualmente que o formulário é opcional e editável; cenário de homologação carregou perfil preenchido parcialmente/completo. Persistência criptografada coberta por testes automatizados. |
+| Cards do catálogo | Validado manualmente: 7 botões "Gerar análise" e todos os cards esperados aparecem quando Consultor está ativo. |
+| Período de `ralos_financeiros` | Validado manualmente: opções fechadas 3 meses, 6 meses, 12 meses e YTD aparecem apenas no card de ralos. |
+| Histórico | Validado manualmente: subaba **Histórico** existe, possui filtro textual e exibiu estado vazio "Nenhuma análise gerada ainda". |
+| Exclusão/desligamento | Validado manualmente: ao desativar, modal interno avisou que o histórico seria apagado; após confirmar, os cards voltaram a ficar bloqueados e o histórico permaneceu vazio. |
+| Indisponibilidade da IA | Coberto por testes automatizados/mocks: falhas retornam "O Consultor está indisponível no momento.", não persistem execução e não descontam quota. |
+
+### Versionamento e distribuição do Passo 20
+
+- Incremento aplicado: **MINOR**, de `1.3.0` para `1.4.0`, por introduzir nova capacidade relevante ao usuário.
+- Metadado atualizado em `financeiro/app_metadata.py`; `/api/app-info`, workflows de pacote e nomes de Release passam a herdar `APP_VERSION = "1.4.0"`.
+- Impacto operacional: usuários existentes não precisam migrar dados manualmente; as novas tabelas do Consultor são criadas por migrações idempotentes, e segredos/Perfil Complementar seguem o padrão criptografado local existente.
 
 ### Checklist documental do Passo 1
 
@@ -356,8 +391,8 @@ Revisão concluída em 2026-08-10, antes de qualquer código do Consultor.
 
 | Documento | Resultado |
 |---|---|
-| [[requisitos]] | Compatível após alinhamento da seção "Regras de segurança" ao [[adr/0010-segredos-criptografados-sqlite]]. O Consultor ainda não entra no escopo implementado; quando o módulo sair de rascunho, [[requisitos]] deve receber o novo escopo funcional. |
-| [[arquitetura]] | Compatível para implantação futura: servidor HTTP puro em `app.py`, domínio em `financeiro/`, frontend em ES Modules e SQLite como persistência. As rotas, tabelas e o módulo `financeiro/consultor.py` devem ser adicionados somente nos passos de implementação correspondentes. |
+| [[requisitos]] | Compatível: o Consultor foi incluído no escopo implementado com ativação opt-in, IA configurada, consentimento explícito, Perfil Complementar criptografado e expurgo de histórico ao remover autorização. |
+| [[arquitetura]] | Compatível: servidor HTTP puro em `app.py`, domínio em `financeiro/`, frontend em ES Modules e SQLite como persistência. Rotas, tabelas e o módulo `financeiro/consultor.py` foram documentados na arquitetura durante a implementação. |
 | [[adr/0001-stack-local-sem-framework]] | Compatível: o Consultor deve expor rotas no servidor HTTP existente, sem Flask, FastAPI, Django ou middleware externo. |
 | [[adr/0002-modularizacao-frontend]] | Compatível: a UI deve ficar em view ES Module nativa, seguindo a fábrica `createXxxView({ state, elements, services, formatters, actions })`, sem build step. |
 | [[adr/0003-sqlite-fonte-de-verdade]] | Compatível: configurações, histórico e Perfil Complementar usam SQLite com migrações idempotentes, índices e transações curtas; chamadas externas de IA/cotação não devem manter conexão aberta. |
@@ -374,6 +409,24 @@ _Nenhuma pendência em aberto._
 
 ## Changelog
 
+- `1.0` — 2026-08-10 — Passos 19 e 20 concluídos: homologação manual registrada, versionamento MINOR aplicado em `financeiro/app_metadata.py` elevando o app para `1.4.0`, spec marcada como `implementado` e checklist final documentado.
+- `0.50` — 2026-08-10 — Passo 18 concluído: documentação sincronizada após a implementação, com [[arquitetura]], [[requisitos]], [[instrucoes-app]] e [[README]] atualizados; status da spec ajustado para `em-implementacao` enquanto ficam pendentes homologação formal e versionamento/distribuição.
+- `0.49` — 2026-08-10 — Passo 17 concluído com mocks do executor de IA cobrindo configuração das Preferências, limite de tokens, timeout mínimo, indisponibilidade padronizada, respostas vazias, recomendações vedadas, estrutura obrigatória e texto com aparência de instrução tratado como dado.
+- `0.48` — 2026-08-10 — Passo 16 concluído com testes automatizados de API cobrindo autenticação obrigatória, `Host`/`Origin` inválidos, validação de `analysis_id`/`period_window` sem chamada à IA, serialização segura e recusa por IA geral ausente.
+- `0.47` — 2026-08-10 — Passo 15 concluído com cobertura automatizada de domínio e persistência, incluindo migrações idempotentes, contrato de tabelas/índices do Consultor e regressões já existentes de criptografia, isolamento, payload mínimo, expurgo, quota e cooldown.
+- `0.46` — 2026-08-10 — Preferências passa a confirmar a desativação do Consultor com aviso de perda do histórico e a aba Consultor atualiza imediatamente cards/histórico após mudança de configuração.
+- `0.45` — 2026-08-10 — Layout da subtab Análises do Consultor passa a usar catálogo compacto à esquerda e painel de resposta à direita em telas largas.
+- `0.44` — 2026-08-10 — Executor do Consultor passa a aplicar timeout mínimo operacional de 20s, evitando indisponibilidade prematura em cards mais lentos como Sustentabilidade do Padrão de Vida.
+- `0.43` — 2026-08-10 — Removida a inserção automática de "Risco Medio: nivel de risco normalizado pelo app"; o prompt foi endurecido para pedir a classificação explicitamente sem acrescentar aviso artificial na resposta.
+- `0.42` — 2026-08-10 — Payload do Consultor para Portfólio passa a incluir nota de unidade monetária e valores em reais formatados, evitando interpretação de centavos como reais pela IA.
+- `0.41` — 2026-08-10 — Histórico de análises passa para subtab própria dentro do Consultor, com filtro textual por análise/período/data/conteúdo.
+- `0.40` — 2026-08-10 — Removido o card "Teste de Estresse da Reserva de Emergência" do catálogo do Consultor, pois a cobertura da reserva em meses já é apresentada no pilar Reserva da aba Saúde Financeira.
+- `0.39` — 2026-08-10 — Prompt do Consultor passa a pedir respostas mais concisas e o pós-processamento completa o disclaimer obrigatório quando só essa seção final vier ausente/alterada.
+- `0.38` — 2026-08-10 — Pós-processamento do Consultor passa a aceitar títulos com bullets e normalizar nível de risco ausente ou descrito em linguagem natural, evitando bloqueio indevido de respostas válidas da IA.
+- `0.37` — 2026-08-10 — Corrigida compatibilidade do card de Ralos Financeiros com o formato atual de `antecipacao_parcelas` em Tendências.
+- `0.36` — 2026-08-10 — Corrigida compatibilidade do card de Assinaturas e Recorrências com o formato atual de `assinaturas_e_servicos` retornado por Tendências, evitando erro inesperado ao gerar a análise.
+- `0.35` — 2026-08-10 — Ajuste fino de UX na aba Consultor: maior respiro entre calendário/status/catálogo e botões de cards em escala compacta.
+- `0.34` — 2026-08-10 — Ajuste de Preferências: texto da IA passa a mencionar o Consultor e os controles do Consultor ficam indisponíveis enquanto a IA geral não estiver configurada e ligada.
 - `0.33` — 2026-08-10 — Passo 14 do plano concluído: aba Consultor no Cockpit exibe cards agrupados por categoria, seletor fechado de período em `ralos_financeiros`, execução sob demanda, resultado e histórico, sem campo de texto livre nem ponto de acesso externo.
 - `0.32` — 2026-08-10 — Passo 13 do plano concluído: Preferências passa a exibir ativação do Consultor, seleção de perfil, confirmação de consentimento e formulário opcional de Perfil Complementar com edição/exclusão.
 - `0.31` — 2026-08-10 — Passo 12 do plano concluído: rotas autenticadas do Consultor expostas em `app.py` para configuração, Perfil Complementar, análise e histórico, com validação de origem nas mutações, mensagens amigáveis e serialização sem `payload_enc`.

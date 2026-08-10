@@ -805,7 +805,7 @@ class AppHandler(BaseHTTPRequestHandler):
         })
 
     def handle_consultor_config(self) -> None:
-        # spec: consultor/consultor v0.33 - criterios 1, 2, 3, 25, 26 e 32
+        # spec: consultor/consultor v1.0 - criterios 1, 2, 3, 25, 26 e 32
         if not self.validate_read_source():
             return
         user = self.require_user()
@@ -814,7 +814,7 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_json(payload)
 
     def handle_save_consultor_config(self) -> None:
-        # spec: consultor/consultor v0.33 - criterios 1, 2, 3, 25, 26 e 32
+        # spec: consultor/consultor v1.0 - criterios 1, 2, 3, 25, 26 e 32
         user = self.require_user()
         try:
             self.send_json(save_consultor_settings(user["id"], self.read_json()))
@@ -822,14 +822,14 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_consultor_error(exc)
 
     def handle_consultor_complementary_profile(self) -> None:
-        # spec: consultor/consultor v0.33 - criterios 22, 23, 24, 25 e 33
+        # spec: consultor/consultor v1.0 - criterios 22, 23, 24, 25 e 33
         if not self.validate_read_source():
             return
         user = self.require_user()
         self.send_json(get_complementary_profile(user["id"]))
 
     def handle_save_consultor_complementary_profile(self) -> None:
-        # spec: consultor/consultor v0.33 - criterios 22, 23, 24, 25 e 33
+        # spec: consultor/consultor v1.0 - criterios 22, 23, 24, 25 e 33
         user = self.require_user()
         try:
             self.send_json(save_complementary_profile(user["id"], self.read_json()))
@@ -837,12 +837,12 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_consultor_error(exc)
 
     def handle_delete_consultor_complementary_profile(self) -> None:
-        # spec: consultor/consultor v0.33 - criterios 22, 23, 24, 25 e 33
+        # spec: consultor/consultor v1.0 - criterios 22, 23, 24, 25 e 33
         user = self.require_user()
         self.send_json({"deleted": delete_complementary_profile(user["id"])})
 
     def handle_consultor_analyze(self) -> None:
-        # spec: consultor/consultor v0.33 - criterios 7, 10, 13, 27, 29, 30, 31 e 34
+        # spec: consultor/consultor v1.0 - criterios 7, 10, 13, 27, 29, 30, 31 e 34
         user = self.require_user()
         data = self.read_json()
         try:
@@ -856,7 +856,7 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_consultor_error(exc)
 
     def handle_consultor_history(self) -> None:
-        # spec: consultor/consultor v0.33 - criterios 16, 17 e 30
+        # spec: consultor/consultor v1.0 - criterios 16, 17 e 30
         if not self.validate_read_source():
             return
         user = self.require_user()
@@ -868,7 +868,7 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_json({"history": list_consultor_history(user["id"], limit=limit)})
 
     def handle_delete_consultor_history(self) -> None:
-        # spec: consultor/consultor v0.33 - criterios 16, 17 e 30
+        # spec: consultor/consultor v1.0 - criterios 16, 17 e 30
         user = self.require_user()
         self.send_json({"deleted": delete_consultor_history(user["id"])})
 

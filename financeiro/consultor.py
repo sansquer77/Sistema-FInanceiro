@@ -82,6 +82,7 @@ PERIOD_WINDOWS = {
     "ytd": "YTD (ano corrente)",
 }
 CONSULTOR_MAX_TOKENS = 900
+CONSULTOR_MIN_TIMEOUT_SECONDS = 20
 CONSULTOR_DAILY_QUOTA = 20
 CONSULTOR_FAILURE_COOLDOWN_SECONDS = 30
 DEFAULT_TEMPERATURE = 0.2
@@ -198,18 +199,6 @@ ANALYSIS_CATALOG: tuple[AnalysisCard, ...] = (
         input_scope="Portfolio segmentado por moeda e geografia.",
     ),
     AnalysisCard(
-        analysis_id="reserva_emergencia",
-        title="Teste de Estresse da Reserva de Emergencia",
-        short_description="Calcule quantos meses de despesas a reserva cobre.",
-        category="Saude Financeira",
-        strict_prompt=(
-            "Cruze a soma dos ativos marcados como 'reserva elegivel' no Portfolio com a media mensal "
-            "de despesas de consumo calculada no Score. Informe quantos meses de despesas a reserva "
-            "atual cobre e se ha risco de liquidez."
-        ),
-        input_scope="Ativos com tag de reserva elegivel e media de despesas do Score.",
-    ),
-    AnalysisCard(
         analysis_id="score_saude_financeira",
         title="Diagnostico do Score de Saude Financeira",
         short_description="Encontre o pilar mais fraco do Score e o foco de melhoria.",
@@ -305,7 +294,7 @@ def build_system_prompt(
     investor_profile: object = "moderado",
     period_window: object = None,
 ) -> str:
-    # spec: consultor/consultor v0.33 - criterios 8, 9, 12, 14 e 34
+    # spec: consultor/consultor v1.0 - criterios 8, 9, 12, 14 e 34
     normalized_analysis_id = validate_analysis_id(analysis_id)
     profile = validate_investor_profile(investor_profile)
     period = validate_period_window(period_window, analysis_id=normalized_analysis_id)
@@ -321,6 +310,8 @@ def build_system_prompt(
         "e planejamento financeiro, com funcao estritamente educacional e informativa.\n\n"
         "Regras obrigatorias:\n"
         "- Interprete apenas os dados fornecidos pelo app; nao invente dados, cotacoes ou indicadores.\n"
+        "- Campos monetarios com sufixo `_cents` estao em centavos; ao citar valores, converta para reais "
+        "dividindo por 100 ou use os campos `_brl`/`_display` ja formatados.\n"
         "- Diferencie fatos de opinioes e explique conceitos tecnicos em linguagem acessivel.\n"
         "- Nunca garanta retornos, nunca diga que um investimento e sem risco e nunca recomende compra "
         "ou venda de ativo, produto, ticker ou fundo especifico.\n"
@@ -332,6 +323,9 @@ def build_system_prompt(
         f"Prompt estrito: {prompt}\n\n"
         "A resposta deve seguir exatamente estas secoes:\n"
         f"{sections}\n\n"
+        "Seja conciso: use no maximo 2 frases no Resumo e ate 3 bullets curtos nas demais secoes.\n"
+        "Na secao Pontos de Atencao (Riscos), a primeira linha deve ser exatamente "
+        "`Risco Baixo: ...`, `Risco Medio: ...` ou `Risco Alto: ...`, com justificativa curta.\n"
         f"Disclaimer obrigatorio ao final: {DISCLAIMER}"
     )
 
@@ -350,7 +344,7 @@ def execute_consultor_analysis(
     ai_client=None,
     now: datetime | None = None,
 ) -> dict:
-    # spec: consultor/consultor v0.33 - criterios 7, 8, 10, 13 e 34
+    # spec: consultor/consultor v1.0 - criterios 7, 8, 10, 13 e 34
     normalized_user_id = int(user_id)
     normalized_analysis_id = validate_analysis_id(analysis_id)
     current_time = now or datetime.now()
@@ -362,7 +356,7 @@ def execute_consultor_analysis(
 
     ai_settings = load_ai_settings(normalized_user_id)
     max_tokens = normalize_consultor_max_tokens(ai_settings.get("max_tokens"))
-    timeout_seconds = int(ai_settings.get("timeout_seconds") or 10)
+    timeout_seconds = normalize_consultor_timeout(ai_settings.get("timeout_seconds"))
     normalized_period = validate_period_window(period_window, analysis_id=normalized_analysis_id)
     context = build_analysis_context(
         normalized_user_id,
@@ -510,7 +504,7 @@ def failure_cooldown_remaining(user_id: int, analysis_id: str, current_time: dat
 
 
 def postprocess_consultor_output(output: object) -> str:
-    # spec: consultor/consultor v0.33 - criterios 11, 12, 14 e 15
+    # spec: consultor/consultor v1.0 - criterios 11, 12, 14 e 15
     text = str(output or "").strip()
     if not text:
         raise ConsultorError("O Consultor esta indisponivel no momento.")
@@ -518,18 +512,21 @@ def postprocess_consultor_output(output: object) -> str:
     if contains_forbidden_recommendation(normalized):
         return refusal_response()
     missing_sections = [section for section in RESPONSE_SECTIONS if not has_section(text, section)]
-    if missing_sections:
+    missing_without_disclaimer = [section for section in missing_sections if section != "Disclaimer"]
+    if missing_without_disclaimer:
         raise ConsultorError("O Consultor esta indisponivel no momento.")
-    if normalize_text(DISCLAIMER) not in normalized:
-        raise ConsultorError("O Consultor esta indisponivel no momento.")
-    if not has_risk_level(normalized):
-        raise ConsultorError("O Consultor esta indisponivel no momento.")
+    if "Disclaimer" in missing_sections or normalize_text(DISCLAIMER) not in normalized:
+        text = append_consultor_disclaimer(text)
     return text
 
 
 def has_section(text: str, section: str) -> bool:
     escaped = re.escape(section)
-    return bool(re.search(rf"(^|\n)\s*(#{1,6}\s*)?(\*\*)?{escaped}(\*\*)?\s*:?", text, flags=re.IGNORECASE))
+    return bool(re.search(
+        rf"(^|\n)\s*(?:[-*]\s+)?(?:#{1,6}\s*)?(\*\*)?{escaped}(\*\*)?\s*:?",
+        text,
+        flags=re.IGNORECASE,
+    ))
 
 
 def contains_forbidden_recommendation(normalized_text: str) -> bool:
@@ -538,6 +535,10 @@ def contains_forbidden_recommendation(normalized_text: str) -> bool:
 
 def has_risk_level(normalized_text: str) -> bool:
     return bool(re.search(r"\brisco\s+(baixo|medio|alto)\b", normalized_text))
+
+
+def append_consultor_disclaimer(text: str) -> str:
+    return f"{text.rstrip()}\n\nDisclaimer\n{DISCLAIMER}"
 
 
 def refusal_response() -> str:
@@ -565,6 +566,14 @@ def normalize_consultor_max_tokens(value: object) -> int:
     except (TypeError, ValueError):
         configured = 700
     return max(1, min(configured, CONSULTOR_MAX_TOKENS))
+
+
+def normalize_consultor_timeout(value: object) -> int:
+    try:
+        configured = int(value if value not in (None, "") else CONSULTOR_MIN_TIMEOUT_SECONDS)
+    except (TypeError, ValueError):
+        configured = CONSULTOR_MIN_TIMEOUT_SECONDS
+    return max(CONSULTOR_MIN_TIMEOUT_SECONDS, configured)
 
 
 def build_ai_messages(system_prompt: str, context: dict) -> list[dict]:
@@ -670,7 +679,7 @@ def build_analysis_context(
     period_window: object | None = None,
     reference_date: date | None = None,
 ) -> dict:
-    # spec: consultor/consultor v0.33 - criterios 7, 10, 27 e 34
+    # spec: consultor/consultor v1.0 - criterios 7, 10, 27 e 34
     normalized_analysis_id = validate_analysis_id(analysis_id)
     normalized_period = validate_period_window(period_window, analysis_id=normalized_analysis_id)
     if normalized_analysis_id == "ralos_financeiros":
@@ -681,8 +690,6 @@ def build_analysis_context(
         return build_allocation_context(user_id)
     if normalized_analysis_id == "exposicao_cambial":
         return build_currency_exposure_context(user_id)
-    if normalized_analysis_id == "reserva_emergencia":
-        return build_emergency_reserve_context(user_id, month=month)
     if normalized_analysis_id == "score_saude_financeira":
         return build_score_context(user_id, month=month)
     if normalized_analysis_id == "sustentabilidade_padrao_vida":
@@ -716,15 +723,14 @@ def build_subscriptions_context(user_id: int, *, month: object | None) -> dict:
     from financeiro.trends import calculate_trends
 
     trends = calculate_trends(user_id, month)
-    subscriptions = trends.get("assinaturas_e_servicos") or {}
-    items = subscriptions.get("items") or subscriptions.get("itens") or []
+    subscriptions = normalize_subscriptions_payload(trends.get("assinaturas_e_servicos"))
     return {
         "analysis_id": "assinaturas_recorrencias",
         "month": trends["month"],
         "confidence": trends["confianca"],
-        "total_cents": int(subscriptions.get("total_cents") or 0),
-        "annualized_cents": int(subscriptions.get("total_cents") or 0) * 12,
-        "items": compact_named_amounts(items),
+        "total_cents": subscriptions["total_cents"],
+        "annualized_cents": subscriptions["total_cents"] * 12,
+        "items": compact_named_amounts(subscriptions["items"]),
     }
 
 
@@ -746,27 +752,6 @@ def build_currency_exposure_context(user_id: int) -> dict:
             "by_currency": group_positions_by(positions, "currency"),
             "by_market": group_positions_by(positions, "market_label"),
         },
-        "market_data": market_data_context(positions),
-    }
-
-
-def build_emergency_reserve_context(user_id: int, *, month: object | None) -> dict:
-    from financeiro.financial_health import calculate_financial_health_score
-
-    positions = portfolio_positions(user_id)
-    score = calculate_financial_health_score(user_id, month, portfolio_positions=positions)
-    return {
-        "analysis_id": "reserva_emergencia",
-        "month": score["month"],
-        "reserve": {
-            "eligible_reserve_cents": int(score.get("reserva_elegivel_cents") or 0),
-            "average_expenses_cents": int(score.get("despesas_consumo_cents") or 0),
-            "reserve_months": score.get("meses_reserva"),
-            "pillar_score": int(score.get("pilar_reserva") or 0),
-        },
-        "eligible_assets": compact_positions([
-            position for position in positions if bool(position.get("emergency_reserve_eligible"))
-        ]),
         "market_data": market_data_context(positions),
     }
 
@@ -847,8 +832,12 @@ def money_context(trends: dict) -> dict:
 
 
 def summarize_portfolio(positions: list[dict]) -> dict:
+    total_brl_cents = sum(int(position.get("current_value_brl_cents") or 0) for position in positions)
     return {
-        "total_brl_cents": sum(int(position.get("current_value_brl_cents") or 0) for position in positions),
+        "currency_unit_note": "Valores com sufixo _cents estao em centavos de BRL; valores _brl ja estao em reais.",
+        "total_brl_cents": total_brl_cents,
+        "total_brl": cents_to_reais(total_brl_cents),
+        "total_display": format_brl_cents(total_brl_cents),
         "position_count": len(positions),
         "by_asset_type": group_positions_by(positions, "asset_type_label"),
         "positions": compact_positions(positions),
@@ -859,8 +848,16 @@ def group_positions_by(positions: list[dict], key: str) -> list[dict]:
     totals: dict[str, dict] = {}
     for position in positions:
         label = str(position.get(key) or "Nao informado")
-        row = totals.setdefault(label, {"label": label, "current_value_brl_cents": 0, "position_count": 0})
+        row = totals.setdefault(label, {
+            "label": label,
+            "current_value_brl_cents": 0,
+            "current_value_brl": 0.0,
+            "current_value_display": "",
+            "position_count": 0,
+        })
         row["current_value_brl_cents"] += int(position.get("current_value_brl_cents") or 0)
+        row["current_value_brl"] = cents_to_reais(row["current_value_brl_cents"])
+        row["current_value_display"] = format_brl_cents(row["current_value_brl_cents"])
         row["position_count"] += 1
     return sorted(totals.values(), key=lambda row: row["current_value_brl_cents"], reverse=True)
 
@@ -877,7 +874,11 @@ def compact_positions(positions: list[dict], *, limit: int = 12) -> list[dict]:
             "asset_type_label": position.get("asset_type_label"),
             "currency": position.get("currency"),
             "current_value_brl_cents": int(position.get("current_value_brl_cents") or 0),
+            "current_value_brl": cents_to_reais(position.get("current_value_brl_cents")),
+            "current_value_display": format_brl_cents(position.get("current_value_brl_cents")),
             "total_cost_brl_cents": int(position.get("total_cost_brl_cents") or 0),
+            "total_cost_brl": cents_to_reais(position.get("total_cost_brl_cents")),
+            "total_cost_display": format_brl_cents(position.get("total_cost_brl_cents")),
             "quote_source": safe_quote_source(position.get("quote_source")),
             "quote_status": position.get("quote_status") or "",
             "quote_date": position.get("quote_date") or "",
@@ -899,6 +900,16 @@ def market_data_context(rows: list[dict]) -> dict:
         "allowed_sources": list(MARKET_DATA_SOURCES),
         "observed_sources": sources,
     }
+
+
+def cents_to_reais(value: object) -> float:
+    return round(int(value or 0) / 100, 2)
+
+
+def format_brl_cents(value: object) -> str:
+    amount = cents_to_reais(value)
+    formatted = f"{amount:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return f"R$ {formatted}"
 
 
 def safe_quote_source(value: object) -> str:
@@ -936,18 +947,43 @@ def compact_point_events(rows: list[dict], *, limit: int = 8) -> list[dict]:
     ]
 
 
-def compact_acceleration(payload: dict) -> dict:
+def compact_acceleration(payload: object) -> dict:
+    if isinstance(payload, list):
+        return {
+            "total_cents": sum(amount_from_row(item) for item in payload),
+            "count": len(payload),
+        }
+    if not isinstance(payload, dict):
+        return {"total_cents": 0, "count": 0}
     return {
         "total_cents": int(payload.get("total_cents") or 0),
         "count": int(payload.get("count") or payload.get("parcel_count") or 0),
     }
 
 
+def normalize_subscriptions_payload(payload: object) -> dict:
+    if isinstance(payload, list):
+        items = payload
+        total_cents = sum(amount_from_row(item) for item in items)
+        return {"total_cents": total_cents, "items": items}
+    if isinstance(payload, dict):
+        items = payload.get("items") or payload.get("itens") or []
+        total_cents = int(payload.get("total_cents") or 0)
+        if total_cents <= 0:
+            total_cents = sum(amount_from_row(item) for item in items)
+        return {"total_cents": total_cents, "items": items}
+    return {"total_cents": 0, "items": []}
+
+
+def amount_from_row(row: dict) -> int:
+    return int(row.get("amount_cents") or row.get("total_cents") or row.get("valor_cents") or 0)
+
+
 def compact_named_amounts(rows: list[dict], *, limit: int = 12) -> list[dict]:
     return [
         {
             "name": row.get("name") or row.get("label") or row.get("subcategory_name") or row.get("description") or "",
-            "amount_cents": int(row.get("amount_cents") or row.get("total_cents") or 0),
+            "amount_cents": amount_from_row(row),
             "count": int(row.get("count") or row.get("transaction_count") or 0),
         }
         for row in rows[:limit]
@@ -1019,7 +1055,7 @@ def consultor_blocked_reason(settings: dict) -> str:
 
 
 def save_consultor_settings(user_id: int, data: dict) -> dict:
-    # spec: consultor/consultor v0.33 - criterios 1, 2, 3, 25, 26 e 32
+    # spec: consultor/consultor v1.0 - criterios 1, 2, 3, 25, 26 e 32
     normalized_user_id = int(user_id)
     current = get_consultor_settings(normalized_user_id)
     consultor_enabled = bool(data.get("consultor_enabled", current["consultor_enabled"]))
@@ -1117,7 +1153,7 @@ def get_complementary_profile(user_id: int) -> dict:
 
 
 def save_complementary_profile(user_id: int, data: dict) -> dict:
-    # spec: consultor/consultor v0.33 - criterios 22, 23, 24, 25 e 33
+    # spec: consultor/consultor v1.0 - criterios 22, 23, 24, 25 e 33
     current = get_complementary_profile(int(user_id))["profile"]
     normalized_patch = normalize_complementary_profile(data, partial=True)
     merged = {**current, **normalized_patch}

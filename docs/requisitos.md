@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 2.3
+versao: 2.4
 atualizado: 2026-08-10
 relacionados:
   - "[[arquitetura]]"
@@ -46,6 +46,7 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
   - Importação de lançamentos por meio de planilhas de modelo do sistema (`.xlsx`) para contas e cartões.
   - Ver [[importacao-organizze]].
 - **Histórico de Operações**: auditoria funcional somente leitura com filtros, busca, agrupamentos e rastreio de lotes por `operation_batch_id`. Ver [[historico-operacoes]].
+- **Consultor**: análises pré-formatadas por IA na aba Consultor do Cockpit, mediante IA geral configurada, ativação explícita e consentimento de acesso aos dados financeiros do usuário. Usa catálogo fechado de cards, contexto minimizado, Perfil Complementar criptografado em SQLite, histórico por usuário e expurgo automático quando IA/Consultor/consentimento são desabilitados. Ver [[specs/consultor]].
 - **Sobre o app**: tela informativa no grupo Usuário com objetivo, funcionalidades, tecnologias, contato e infraestrutura mínima. Ver [[sobre-app]].
 - **Interface web estática**: painéis locais em `web/`, sem dependências externas de frontend. Ver [[arquitetura]] e [[adr/0001-stack-local-sem-framework]].
 - **Distribuição desktop**: pacotes macOS e Windows com instaladores, modo local e launchers opcionais para rede local confiável. Ver [[distribuição]].
@@ -88,6 +89,7 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 - Toda mutação exige `Host` e `Origin` válidos como proteção contra CSRF.
 - A configuração SMTP fica criptografada por usuário em `secure_configs.payload_enc`, mantendo compatibilidade de leitura com arquivos legados `data/email_config_user_{id}.enc`.
 - Segredos de integrações opcionais de IA e Mais Retorno ficam criptografados por usuário em `secure_configs.payload_enc` e nunca são retornados pela API; arquivos legados `data/ai_config_user_{id}.enc` e `data/mais_retorno_config_user_{id}.enc` continuam compatíveis para migração transparente. Ver [[preferencias-abas]] e [[adr/0010-segredos-criptografados-sqlite]].
+- O Perfil Complementar do Consultor fica criptografado por usuário em `consultor_perfil_complementar.payload_enc`; o histórico do Consultor é apagado ao desligar a IA geral, desabilitar o Consultor ou revogar o consentimento de acesso aos dados.
 - A chave local padrão fica em `secure/config.key`, com compatibilidade para `data/email_config.key`; instalações administradas podem usar `SISTEMA_FINANCEIRO_CONFIG_KEY_PATH` ou `SISTEMA_FINANCEIRO_CONFIG_KEY`.
 - Pacotes distribuíveis não incluem credenciais SMTP; cada usuário configura seu próprio remetente localmente.
 - Arquivos de runtime em `data/` não devem ser versionados.
@@ -119,6 +121,7 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 
 ## Changelog
 
+- `2.4` — 2026-08-10 — Consultor incluído no escopo implementado com ativação opt-in, catálogo fechado de análises por IA, Perfil Complementar criptografado e expurgo de histórico ao remover autorização.
 - `2.3` — 2026-08-10 — Regras de segurança alinhadas ao [[adr/0010-segredos-criptografados-sqlite]]: segredos de SMTP, IA e Mais Retorno ficam em `secure_configs.payload_enc`, chave padrão em `secure/config.key` e arquivos `.enc` legados permanecem apenas como compatibilidade de migração.
 - `2.2` — 2026-08-08 — Chave da integração opcional Mais Retorno também criptografada por usuário (mesma infraestructura de `secure_config.py`), conforme [[preferencias-abas]].
 - `2.1` — 2026-08-04 — Escopo atualizado para registrar distribuição gratuita como projeto open source sob Apache License 2.0, sem suporte formal.

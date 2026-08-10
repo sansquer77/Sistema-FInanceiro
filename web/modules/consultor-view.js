@@ -12,10 +12,14 @@ export function registerConsultorView({
   const {
     cockpitCalendarPanel,
     cockpitCalendarMeta,
+    consultorTabs,
+    consultorAnalysesPanel,
+    consultorHistoryPanel,
     consultorStatus,
     consultorCardGrid,
     consultorOutput,
     consultorHistoryList,
+    consultorHistoryFilter,
     consultorHistoryRefreshButton,
     overdueReceivablesList,
     overduePayablesList,
@@ -28,6 +32,8 @@ export function registerConsultorView({
   let consultorHistory = [];
   let consultorLoading = false;
   let runningAnalysisId = "";
+  let activeConsultorTab = "analyses";
+  let historyFilter = "";
   let loading = false;
   let error = "";
 
@@ -184,6 +190,25 @@ export function registerConsultorView({
     renderConsultorHistory();
   }
 
+  function setConsultorTab(tab) {
+    activeConsultorTab = tab === "history" ? "history" : "analyses";
+    renderConsultorTabs();
+  }
+
+  function renderConsultorTabs() {
+    consultorTabs?.forEach((button) => {
+      const isActive = button.dataset.consultorTab === activeConsultorTab;
+      button.classList.toggle("active", isActive);
+      button.setAttribute("aria-selected", String(isActive));
+    });
+    if (consultorAnalysesPanel) {
+      consultorAnalysesPanel.hidden = activeConsultorTab !== "analyses";
+    }
+    if (consultorHistoryPanel) {
+      consultorHistoryPanel.hidden = activeConsultorTab !== "history";
+    }
+  }
+
   function renderConsultorStatus(config) {
     if (config.available) {
       return '<div class="consultor-status-ready">Consultor ativo. Escolha uma análise abaixo.</div>';
@@ -280,11 +305,16 @@ export function registerConsultorView({
     if (!consultorHistoryList) {
       return;
     }
+    const filteredHistory = filteredConsultorHistory();
     if (!consultorHistory.length) {
       consultorHistoryList.innerHTML = '<div class="empty-state compact">Nenhuma análise gerada ainda.</div>';
       return;
     }
-    consultorHistoryList.innerHTML = consultorHistory.map((item) => `
+    if (!filteredHistory.length) {
+      consultorHistoryList.innerHTML = '<div class="empty-state compact">Nenhuma análise encontrada para o filtro.</div>';
+      return;
+    }
+    consultorHistoryList.innerHTML = filteredHistory.map((item) => `
       <button class="consultor-history-item" type="button" data-consultor-history-id="${escapeHtml(String(item.analysis_execution_id))}">
         <strong>${escapeHtml(analysisTitle(item.analysis_id))}</strong>
         <small>${escapeHtml(item.created_at || "")}</small>
@@ -299,9 +329,35 @@ export function registerConsultorView({
             output: item.analysis_output,
             created_at: item.created_at,
           });
+          setConsultorTab("analyses");
         }
       });
     });
+  }
+
+  function filteredConsultorHistory() {
+    const query = normalizeSearch(historyFilter);
+    if (!query) {
+      return consultorHistory;
+    }
+    return consultorHistory.filter((item) => {
+      const haystack = normalizeSearch([
+        analysisTitle(item.analysis_id),
+        item.analysis_id,
+        item.period_window,
+        item.created_at,
+        item.analysis_output,
+      ].join(" "));
+      return haystack.includes(query);
+    });
+  }
+
+  function normalizeSearch(value) {
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
   }
 
   function analysisTitle(analysisId) {
@@ -437,6 +493,18 @@ export function registerConsultorView({
   if (consultorHistoryRefreshButton) {
     consultorHistoryRefreshButton.addEventListener("click", loadConsultor);
   }
+  consultorTabs?.forEach((button) => {
+    button.addEventListener("click", () => setConsultorTab(button.dataset.consultorTab));
+  });
+  consultorHistoryFilter?.addEventListener("input", () => {
+    historyFilter = consultorHistoryFilter.value || "";
+    renderConsultorHistory();
+  });
+  window.addEventListener("consultor:settings-changed", () => {
+    invalidateCalendar();
+    loadConsultor();
+  });
+  renderConsultorTabs();
 
   return {
     renderCalendar,

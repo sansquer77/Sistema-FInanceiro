@@ -1185,17 +1185,70 @@ textarea:focus {
 
 .consultor-workspace {
   display: grid;
-  gap: 16px;
+  gap: 18px;
+  margin-top: 20px;
   margin-bottom: 20px;
 }
 
 .consultor-status-ready {
-  padding: 10px 12px;
+  padding: 8px 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
   color: var(--ink);
   background: var(--surface);
+  font-size: 0.84rem;
   font-weight: 800;
+}
+
+.consultor-subtabs {
+  display: inline-flex;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  justify-self: start;
+}
+
+.consultor-subtab {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.consultor-subtab.active {
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: var(--control-shadow-sm);
+}
+
+.consultor-tab-panel {
+  min-width: 0;
+}
+
+#consultorAnalysesPanel {
+  display: grid;
+  grid-template-columns: minmax(280px, 400px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+#consultorAnalysesPanel .consultor-status,
+#consultorAnalysesPanel .consultor-card-grid {
+  grid-column: 1;
+}
+
+#consultorAnalysesPanel .consultor-output {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  position: sticky;
+  top: 14px;
+  max-height: calc(100vh - 120px);
+  overflow: auto;
 }
 
 .consultor-card-grid,
@@ -1206,31 +1259,56 @@ textarea:focus {
 
 .consultor-card-group h3 {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: 0.88rem;
 }
 
 .consultor-analysis-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: 1fr;
+  gap: 8px;
 }
 
 .consultor-analysis-card,
 .consultor-output,
 .consultor-history {
   display: grid;
-  gap: 12px;
-  padding: 14px;
+  gap: 10px;
+  padding: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
+}
+
+.consultor-analysis-card {
+  align-content: start;
+}
+
+.consultor-analysis-card strong {
+  font-size: 0.86rem;
+  line-height: 1.25;
+}
+
+.consultor-analysis-card .primary {
+  justify-self: start;
+  min-height: 30px;
+  padding: 0 9px;
+  font-size: 0.78rem;
 }
 
 .consultor-analysis-card p,
 .consultor-response p {
   margin: 0;
   color: var(--muted);
-  line-height: 1.55;
+  line-height: 1.45;
+}
+
+.consultor-analysis-card p {
+  font-size: 0.8rem;
+}
+
+.consultor-period-select,
+.consultor-response {
+  font-size: 0.86rem;
 }
 
 .consultor-period-select {
@@ -1247,6 +1325,12 @@ textarea:focus {
 .consultor-history-list {
   display: grid;
   gap: 8px;
+}
+
+.consultor-history-filter {
+  display: grid;
+  gap: 6px;
+  max-width: 360px;
 }
 
 .consultor-history-item {
@@ -1369,9 +1453,22 @@ textarea:focus {
 }
 
 @media (max-width: 800px) {
+  #consultorAnalysesPanel,
   .cockpit-calendar-grid,
   .consultor-analysis-grid {
     grid-template-columns: 1fr;
+  }
+
+  #consultorAnalysesPanel .consultor-status,
+  #consultorAnalysesPanel .consultor-card-grid,
+  #consultorAnalysesPanel .consultor-output {
+    grid-column: 1;
+  }
+
+  #consultorAnalysesPanel .consultor-output {
+    grid-row: auto;
+    position: static;
+    max-height: none;
   }
 }
 

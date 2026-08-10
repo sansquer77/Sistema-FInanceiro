@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 9.9
+versao: 11.7
 atualizado: 2026-08-10
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -54,6 +54,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[specs/frontend-modularizacao]] | ✅ implementado | Frontend |
 | [[specs/tendencias-saude-financeira]] | ✅ implementado | Diagnóstico |
 | [[specs/score-saude-financeira]] | ✅ implementado | Diagnóstico |
+| [[specs/consultor]] | ✅ implementado | Consultor |
 | [[specs/privacidade-valores]] | ✅ implementado | Privacidade |
 | [[specs/alerta-nova-versao]] | ✅ implementado | Atualização |
 | [[specs/rentabilidade-portfolio]] | ✅ implementado | Investimentos |
@@ -71,7 +72,6 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 
 | Spec | Status | Área |
 |---|---|---|
-| [[specs/consultor]] | 📝 rascunho | Consultor |
 | [[specs/open-finance]] | 📝 rascunho | Open Finance |
 | [[specs/imposto-renda]] | ❌ depreciado — custo de manter regras fiscais atualizadas não compensa para uso familiar | Investimentos |
 | [[specs/exportacao-dados]] | ❌ depreciado — arquivo SQLite já acessível por leitor genérico ou agente de IA | Exportação |
@@ -132,6 +132,24 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `11.7` — 2026-08-10 — [[specs/consultor]] atualizada para v1.0 e movida para implementado; Passos 19 e 20 concluídos com homologação registrada e versão do app elevada para `1.4.0`.
+- `11.6` — 2026-08-10 — [[specs/consultor]] atualizada para v0.50 com Passo 18 concluído: documentação pós-implementação sincronizada em [[arquitetura]], [[requisitos]], [[instrucoes-app]] e no MoC do vault.
+- `11.5` — 2026-08-10 — [[specs/consultor]] atualizada para v0.49 com Passo 17 concluído: mocks e testes automatizados do executor de IA do Consultor.
+- `11.4` — 2026-08-10 — [[specs/consultor]] atualizada para v0.48 com Passo 16 concluído: testes automatizados de API do Consultor.
+- `11.3` — 2026-08-10 — [[specs/consultor]] atualizada para v0.47 com Passo 15 concluído: testes automatizados de domínio e persistência do Consultor.
+- `11.2` — 2026-08-10 — [[specs/consultor]] atualizada para v0.46: desativação do Consultor confirma perda de histórico e sincroniza imediatamente a aba Consultor.
+- `11.1` — 2026-08-10 — [[specs/consultor]] atualizada para v0.45: subtab Análises usa catálogo compacto à esquerda, resposta à direita e tipografia mais enxuta em telas largas.
+- `11.0` — 2026-08-10 — [[specs/consultor]] atualizada para v0.44: timeout mínimo operacional de 20s no executor para reduzir indisponibilidade prematura em cards mais lentos.
+- `10.9` — 2026-08-10 — [[specs/consultor]] atualizada para v0.43: removida a inserção automática de risco normalizado e endurecido o prompt para a IA classificar risco explicitamente.
+- `10.8` — 2026-08-10 — [[specs/consultor]] atualizada para v0.42: payload de Portfólio do Consultor explicita centavos e inclui valores em reais formatados para reduzir erro de interpretação pela IA.
+- `10.7` — 2026-08-10 — [[specs/consultor]] atualizada para v0.41: histórico de análises em subtab própria do Consultor, com filtro textual.
+- `10.6` — 2026-08-10 — [[specs/consultor]] atualizada para v0.40 removendo o card "Teste de Estresse da Reserva de Emergência", já coberto pela aba Saúde Financeira.
+- `10.5` — 2026-08-10 — [[specs/consultor]] atualizada para v0.39: prompt mais conciso e pós-processamento completa o disclaimer obrigatório quando só a seção final vier ausente/alterada.
+- `10.4` — 2026-08-10 — [[specs/consultor]] atualizada para v0.38: pós-processamento aceita títulos com bullets e normaliza nível de risco descrito em linguagem natural.
+- `10.3` — 2026-08-10 — [[specs/consultor]] atualizada para v0.37 corrigindo também a compatibilidade do card de Ralos Financeiros com o formato atual de `antecipacao_parcelas` em Tendências.
+- `10.2` — 2026-08-10 — [[specs/consultor]] atualizada para v0.36 corrigindo a compatibilidade do card de Assinaturas e Recorrências com o formato atual de `assinaturas_e_servicos` em Tendências.
+- `10.1` — 2026-08-10 — [[specs/consultor]] atualizada para v0.35 com ajuste fino de UX na aba Consultor: espaçamento entre calendário/status/catálogo e botões de cards em escala compacta.
+- `10.0` — 2026-08-10 — [[specs/consultor]] atualizada para v0.34: Preferências deixa claro que a IA habilita o Consultor e bloqueia os controles do Consultor quando a IA geral está desligada.
 - `9.9` — 2026-08-10 — [[specs/consultor]] atualizada para v0.33 com Passo 14 concluído; [[arquitetura]] v3.26 documenta a UI da aba Consultor no Cockpit.
 - `9.8` — 2026-08-10 — [[specs/consultor]] atualizada para v0.32 com Passo 13 concluído; [[arquitetura]] v3.25 documenta Preferências do Consultor.
 - `9.7` — 2026-08-10 — [[specs/consultor]] atualizada para v0.31 com Passo 12 concluído; [[arquitetura]] v3.24 documenta as rotas autenticadas do Consultor.

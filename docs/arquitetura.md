@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.26
+versao: 3.27
 atualizado: 2026-08-10
 relacionados:
   - "[[requisitos]]"
@@ -32,6 +32,8 @@ docs/               Requisitos, arquitetura, specs e referências
 ```
 
 O servidor HTTP revalida arquivos estáticos com `ETag` e `Last-Modified`; arquivos não versionados usam `Cache-Control: no-cache` para permitir `304 Not Modified` sem cache agressivo. Respostas JSON acima de 1 KB podem ser comprimidas com gzip quando o cliente envia `Accept-Encoding: gzip`.
+
+O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Cockpit > Consultor**. Em Preferências, o usuário configura a IA geral, ativa o Consultor, aceita o consentimento de acesso aos dados e pode preencher/remover o Perfil Complementar criptografado. No Cockpit, a aba Consultor exibe os indicadores de atrasos/vencimentos, a subaba **Análises** com catálogo fechado de cards e a subaba **Histórico** com filtro textual. O módulo não possui prompt livre: cada execução envia apenas o contexto minimizado do card escolhido e persiste somente respostas bem-sucedidas.
 
 ---
 
@@ -279,7 +281,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `financial_health.py` | Núcleo analítico do Score de Saúde Financeira: cálculo atômico dos pilares, lista `pilares`, Paz Financeira e função de histórico com validação de `months` (1-36). Ver [[score-saude-financeira]]. |
 | `trends.py` | Núcleo local de Tendências e Achados: série mensal, Budget x Realizado, achados estruturados, eventos pontuais, assinaturas/serviços recorrentes, confiança e resumo determinístico. Ver [[tendencias-saude-financeira]]. |
 | `ai_summary.py` | Reescrita opcional do resumo por IA com payload minimizado, timeout curto e fallback para resumo local. Ver [[tendencias-saude-financeira]]. |
-| `consultor.py` | Domínio futuro do Consultor: catálogo fechado de análises, validações de enums, prompts estritos, persona, disclaimer, configuração por usuário, Perfil Complementar criptografado, contexto minimizado por card, metadados de cotações herdados do Portfólio, executor de IA via `user_ai_settings`, pós-processamento de respostas, quota/cooldown de resiliência e expurgo de histórico por privacidade. Ver [[specs/consultor]]. |
+| `consultor.py` | Domínio do Consultor: catálogo fechado de 7 análises, validações de enums, prompts estritos, persona, disclaimer, configuração por usuário, Perfil Complementar criptografado, contexto minimizado por card, metadados de cotações herdados do Portfólio, executor de IA via `user_ai_settings`, pós-processamento de respostas, quota/cooldown de resiliência e expurgo de histórico por privacidade. Ver [[specs/consultor]]. |
 | `imports.py` | Leitura de exportações Organizze e planilhas modelo. Ver [[importacao-organizze]]. |
 | `operation_logs.py` | Auditoria funcional das operações do usuário. Ver [[historico-operacoes]]. |
 | `emailer.py` | Envio SMTP do código de recuperação de senha. Ver [[recuperacao-senha]]. |
@@ -322,9 +324,9 @@ Conexões SQLite são abertas com `journal_mode=WAL`, `busy_timeout` curto e `fo
 | `quote_cache` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
 | `user_ai_settings` | `secure_config.py` — metadados não secretos de configuração opcional de IA por usuário; segredo fica em `secure_configs`. Ver [[tendencias-saude-financeira]]. |
 | `secure_configs` | `secure_config.py` — envelopes criptografados por usuário para SMTP, IA e Mais Retorno; `source_path` indica arquivo legado migrado quando aplicável. Ver [[specs/preferencias-abas]], [[adr/0010-segredos-criptografados-sqlite]]. |
-| `consultor_settings` | `database.py` — configuração futura do Consultor por usuário (`consultor_enabled`, `investor_profile`, `data_access_consent`). Ver [[specs/consultor]]. |
-| `consultor_analyses` | `database.py` — histórico futuro de execuções do Consultor, indexado por usuário, data e `analysis_id` para leitura e quota diária. Ver [[specs/consultor]]. |
-| `consultor_perfil_complementar` | `database.py` — payload criptografado futuro do Perfil Complementar por usuário (`payload_enc`, `schema_version`). Ver [[specs/consultor]]. |
+| `consultor_settings` | `database.py` — configuração do Consultor por usuário (`consultor_enabled`, `investor_profile`, `data_access_consent`). Ver [[specs/consultor]]. |
+| `consultor_analyses` | `database.py` — histórico de execuções bem-sucedidas do Consultor, indexado por usuário, data e `analysis_id` para leitura e quota diária. Ver [[specs/consultor]]. |
+| `consultor_perfil_complementar` | `database.py` — payload criptografado do Perfil Complementar por usuário (`payload_enc`, `schema_version`). Ver [[specs/consultor]]. |
 
 `transactions` e `credit_card_transactions` persistem `normalized_description` para a classificação assistida. Ambas também mantêm valor normalizado em BRL (`amount_brl_cents`); em moedas estrangeiras sem cotação manual, a normalização usa a última PTAX de venda disponível até a data do lançamento. Bancos existentes são retroalimentados de forma idempotente durante a inicialização.
 
@@ -496,6 +498,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.27` — 2026-08-10 — Arquitetura sincronizada após implementação do Consultor: removidas marcações de "futuro", documentado fluxo Preferências/Cockpit, catálogo fechado de 7 análises, histórico em subaba própria e persistência criptografada do Perfil Complementar.
 - `3.26` — 2026-08-10 — `consultor-view.js` documentado com grade de cards, execução sob demanda e histórico da aba Consultor no Cockpit. Ver [[specs/consultor]] v0.33.
 - `3.25` — 2026-08-10 — Preferências documentadas com ativação do Consultor, seleção de perfil e Perfil Complementar opcional. Ver [[specs/consultor]] v0.32.
 - `3.24` — 2026-08-10 — Documentadas as rotas autenticadas do Consultor (`/api/consultor/config`, `/api/consultor/perfil-complementar`, `/api/consultor/analyze` e `/api/consultor/history`). Ver [[specs/consultor]] v0.31.

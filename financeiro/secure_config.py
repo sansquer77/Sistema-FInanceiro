@@ -131,12 +131,12 @@ def save_encrypted_config(config: dict, path: Path, key_path: Path | None = None
 
 
 def encrypt_json_for_storage(config: dict, key_path: Path | None = None) -> str:
-    # spec: consultor/consultor v0.33 - criterio 23
+    # spec: consultor/consultor v1.0 - criterio 23
     return json.dumps(encrypt_config_payload(config, key_path), indent=2, sort_keys=True)
 
 
 def decrypt_json_from_storage(payload_text: str, key_path: Path | None = None) -> dict:
-    # spec: consultor/consultor v0.33 - criterio 23
+    # spec: consultor/consultor v1.0 - criterio 23
     if not str(payload_text or "").strip():
         raise SecureConfigError("Configuracao criptografada nao encontrada.")
     try:

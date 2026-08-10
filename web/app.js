@@ -433,10 +433,14 @@ const cockpitVersionAlertVersion = document.querySelector("#cockpitVersionAlertV
 const cockpitVersionAlertDismiss = document.querySelector("#cockpitVersionAlertDismiss");
 const cockpitCalendarPanel = document.querySelector("#cockpitCalendarPanel");
 const cockpitCalendarMeta = document.querySelector("#cockpitCalendarMeta");
+const consultorTabs = document.querySelectorAll("[data-consultor-tab]");
+const consultorAnalysesPanel = document.querySelector("#consultorAnalysesPanel");
+const consultorHistoryPanel = document.querySelector("#consultorHistoryPanel");
 const consultorStatus = document.querySelector("#consultorStatus");
 const consultorCardGrid = document.querySelector("#consultorCardGrid");
 const consultorOutput = document.querySelector("#consultorOutput");
 const consultorHistoryList = document.querySelector("#consultorHistoryList");
+const consultorHistoryFilter = document.querySelector("#consultorHistoryFilter");
 const consultorHistoryRefreshButton = document.querySelector("#consultorHistoryRefreshButton");
 const overdueReceivablesList = document.querySelector("#overdueReceivablesList");
 const overduePayablesList = document.querySelector("#overduePayablesList");
@@ -703,10 +707,14 @@ const cockpitView = registerCockpitView({
     cockpitVersionAlertDismiss,
     cockpitCalendarPanel,
     cockpitCalendarMeta,
+    consultorTabs,
+    consultorAnalysesPanel,
+    consultorHistoryPanel,
     consultorStatus,
     consultorCardGrid,
     consultorOutput,
     consultorHistoryList,
+    consultorHistoryFilter,
     consultorHistoryRefreshButton,
     overdueReceivablesList,
     overduePayablesList,
@@ -1187,6 +1195,7 @@ const userAdminViewController = registerUserAdminView({
   loadAll,
   resetSessionState,
   setMessage,
+  decisionModal,
   theme: {
     setTheme,
     storedTheme,

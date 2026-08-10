@@ -2,7 +2,7 @@
 tipo: spec
 area: usuario
 status: implementado
-versao: 1.7
+versao: 1.8
 atualizado: 2026-08-10
 relacionados:
   - "[[sobre-app]]"
@@ -10,6 +10,7 @@ relacionados:
   - "[[cartoes]]"
   - "[[investimentos-portfolio]]"
   - "[[score-saude-financeira]]"
+  - "[[specs/consultor]]"
 tags: [spec, "area/usuario", "status/implementado"]
 aliases: ["Instruções do App", "Central de Ajuda Local"]
 ---
@@ -17,7 +18,7 @@ aliases: ["Instruções do App", "Central de Ajuda Local"]
 # Instruções do App
 
 > [!info] Status
-> **implementado** · área: `usuario` · atualizado em 2026-08-10 · relacionados: [[sobre-app]], [[lancamentos]], [[cartoes]], [[investimentos-portfolio]], [[score-saude-financeira]]
+> **implementado** · área: `usuario` · atualizado em 2026-08-10 · relacionados: [[sobre-app]], [[lancamentos]], [[cartoes]], [[investimentos-portfolio]], [[score-saude-financeira]], [[specs/consultor]]
 
 ### Problema
 
@@ -68,6 +69,8 @@ Também atende usuários novos que acabaram de instalar o app e precisam de uma 
 - A primeira versão deve cobrir todos os módulos operacionais atualmente implantados: Cockpit, Minhas Contas, Meus Cartões, Extrato de Contas, Fatura de Cartões, Portfólio, Limites, Simulação, Relatórios, Categorias, Importação, Histórico, Preferências, Privacidade e Instruções.
 - O módulo **Sobre** fica fora do conteúdo operacional, pois já é institucional e não exige instrução de uso.
 - O tópico de **Preferências** deve explicar as abas **Geral** (aparência, email, senha e recuperação SMTP), **APIs** (integrações opcionais de IA e Mais Retorno para cotas de fundos) e **Perigo** (apagar lançamentos e conta).
+- O tópico de **Preferências** deve explicar que a IA opcional também habilita o **Consultor**, desde que o usuário ative o módulo, aceite o consentimento de acesso aos dados e escolha o perfil de investidor.
+- O tópico de **Cockpit** deve explicar o uso da aba **Consultor**: cards de análise pré-formatados, ausência de prompt livre, seletor de período em "Ralos Financeiros", histórico em subaba própria e expurgo do histórico quando IA/Consultor/consentimento forem desligados.
 - O tópico de **Portfólio e ativos** deve explicar claramente a diferença entre cadastro da posição e movimentação financeira: o ativo descreve a posição, enquanto aportes e resgates posteriores devem ser registrados pelos lançamentos da conta.
 - O tópico de **Portfólio e ativos** deve explicar também sobre a atualização manual dos valores e encerramento de posição (área histórico).
 - O tópico de **Portfólio e ativos** deve detalhar fluxos complexos em formato tutorial, incluindo fundos de investimento: **Quantidade** representa cotas e **Preço unitário/Preço médio** representa o valor da cota usado como custo histórico, permanecendo editável mesmo quando houver cotação automática.
@@ -534,6 +537,7 @@ A lista abaixo é a **versão de referência** para o conteúdo estático do mó
 - Dado um usuário lendo um tópico de módulo operacional, quando clica em “Ir para o módulo”, então o app navega internamente para o módulo relacionado sem executar alterações de dados.
 - Dado um usuário em uma tela funcional com tópico de ajuda associado, quando clica no botão contextual `?` ao lado do nome da tela, então o app abre o tópico correspondente em **Instruções**.
 - Dado um usuário lendo o tópico de Preferências, quando consulta SMTP e IA, então entende que SMTP apoia recuperação de senha e IA é opcional para Tendências.
+- Dado um usuário lendo o tópico de Consultor, quando acessa Preferências e Cockpit, então entende como ativar o módulo, consentir o uso de dados, escolher um card, consultar histórico e desligar sabendo que o histórico será apagado.
 
 ### Pendências
 
@@ -562,6 +566,7 @@ Nenhuma pendência conhecida.
 
 ### Changelog
 
+- `1.8` — 2026-08-10 — Conteúdo de ajuda atualizado para cobrir o uso do Consultor: ativação via Preferências > APIs, consentimento, perfil de investidor, cards pré-formatados no Cockpit, histórico e expurgo por privacidade.
 - `1.7` — 2026-08-10 — Textos de Portfólio e Investimento/Aporte expandidos em formato mais didático; novo tópico **Fundos: cotas e preço unitário** explica cotas, valor da cota, CNPJ, custo histórico editável e relação com a Mais Retorno.
 - `1.6` — 2026-08-08 — Novo tópico no grupo Portfólio: **Cotações de fundos (Mais Retorno)** — como criar conta na plataforma, gerar a chave de API e configurar em Preferências > APIs; regra correspondente adicionada.
 - `1.5` — 2026-08-08 — Tópico Preferências atualizado para refletir as abas **Geral**, **APIs** e **Perigo** e a integração opcional Mais Retorno ([[preferencias-abas]]).
@@ -586,3 +591,4 @@ Nenhuma pendência conhecida.
 - [[cartoes]]
 - [[investimentos-portfolio]]
 - [[score-saude-financeira]]
+- [[specs/consultor]]
