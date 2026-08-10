@@ -4,7 +4,7 @@ import json
 import re
 import unicodedata
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, timedelta
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
@@ -82,7 +82,10 @@ PERIOD_WINDOWS = {
     "ytd": "YTD (ano corrente)",
 }
 CONSULTOR_MAX_TOKENS = 900
+CONSULTOR_DAILY_QUOTA = 20
+CONSULTOR_FAILURE_COOLDOWN_SECONDS = 30
 DEFAULT_TEMPERATURE = 0.2
+_FAILURE_COOLDOWNS: dict[tuple[int, str], datetime] = {}
 MARKET_DATA_SOURCES = (
     "Yahoo Finance",
     "CoinGecko",
@@ -302,7 +305,7 @@ def build_system_prompt(
     investor_profile: object = "moderado",
     period_window: object = None,
 ) -> str:
-    # spec: consultor/consultor v0.29 - criterios 8, 9, 12, 14 e 34
+    # spec: consultor/consultor v0.33 - criterios 8, 9, 12, 14 e 34
     normalized_analysis_id = validate_analysis_id(analysis_id)
     profile = validate_investor_profile(investor_profile)
     period = validate_period_window(period_window, analysis_id=normalized_analysis_id)
@@ -345,13 +348,17 @@ def execute_consultor_analysis(
     period_window: object | None = None,
     reference_date: date | None = None,
     ai_client=None,
+    now: datetime | None = None,
 ) -> dict:
-    # spec: consultor/consultor v0.29 - criterios 7, 8, 10, 13 e 34
+    # spec: consultor/consultor v0.33 - criterios 7, 8, 10, 13 e 34
     normalized_user_id = int(user_id)
     normalized_analysis_id = validate_analysis_id(analysis_id)
+    current_time = now or datetime.now()
     consultor_settings = get_consultor_settings(normalized_user_id)
     if not consultor_settings["available"]:
         raise ConsultorError("O Consultor nao esta disponivel. Verifique as Preferencias.")
+    assert_not_in_failure_cooldown(normalized_user_id, normalized_analysis_id, current_time)
+    assert_daily_quota_available(normalized_user_id, current_time.date())
 
     ai_settings = load_ai_settings(normalized_user_id)
     max_tokens = normalize_consultor_max_tokens(ai_settings.get("max_tokens"))
@@ -371,20 +378,34 @@ def execute_consultor_analysis(
     )
     messages = build_ai_messages(system_prompt, context)
     client = ai_client or call_consultor_ai_provider
-    output = client(
-        ai_settings,
-        messages,
-        max_tokens=max_tokens,
-        timeout_seconds=timeout_seconds,
+    try:
+        output = client(
+            ai_settings,
+            messages,
+            max_tokens=max_tokens,
+            timeout_seconds=timeout_seconds,
+        )
+        text = str(output or "").strip()
+        if not text:
+            raise ConsultorError("O Consultor esta indisponivel no momento.")
+        text = postprocess_consultor_output(text)
+    except ConsultorError as exc:
+        register_failure_cooldown(normalized_user_id, normalized_analysis_id, current_time)
+        raise ConsultorError("O Consultor esta indisponivel no momento.") from exc
+    execution = persist_consultor_analysis(
+        normalized_user_id,
+        normalized_analysis_id,
+        normalized_period,
+        text,
+        current_time,
     )
-    text = str(output or "").strip()
-    if not text:
-        raise ConsultorError("O Consultor esta indisponivel no momento.")
-    text = postprocess_consultor_output(text)
+    clear_failure_cooldown(normalized_user_id, normalized_analysis_id)
     return {
+        "analysis_execution_id": execution["id"],
         "analysis_id": normalized_analysis_id,
         "period_window": normalized_period,
         "output": text,
+        "created_at": execution["created_at"],
         "context": context,
         "provider": ai_settings.get("provider") or "custom",
         "model": ai_settings.get("model") or "",
@@ -393,8 +414,103 @@ def execute_consultor_analysis(
     }
 
 
+def assert_daily_quota_available(user_id: int, current_date: date) -> None:
+    if consultor_daily_usage(user_id, current_date) >= CONSULTOR_DAILY_QUOTA:
+        raise ConsultorError("Limite diario do Consultor atingido. Tente novamente amanha.")
+
+
+def consultor_daily_usage(user_id: int, current_date: date) -> int:
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT COUNT(*) AS total
+            FROM consultor_analyses
+            WHERE user_id = ? AND created_date = ?
+            """,
+            (int(user_id), current_date.isoformat()),
+        ).fetchone()
+    return int(row["total"] if row else 0)
+
+
+def persist_consultor_analysis(
+    user_id: int,
+    analysis_id: str,
+    period_window: str | None,
+    output: str,
+    current_time: datetime,
+) -> dict:
+    created_at = current_time.strftime("%Y-%m-%d %H:%M:%S")
+    created_date = current_time.date().isoformat()
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO consultor_analyses (
+                user_id, analysis_id, period_window, analysis_output, created_at, created_date
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (int(user_id), analysis_id, period_window, output, created_at, created_date),
+        )
+        execution_id = int(cursor.lastrowid)
+    return {"id": execution_id, "created_at": created_at}
+
+
+def list_consultor_history(user_id: int, *, limit: int = 50) -> list[dict]:
+    bounded_limit = min(max(int(limit), 1), 100)
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, analysis_id, period_window, analysis_output, created_at
+            FROM consultor_analyses
+            WHERE user_id = ?
+            ORDER BY created_at DESC, id DESC
+            LIMIT ?
+            """,
+            (int(user_id), bounded_limit),
+        ).fetchall()
+    return [
+        {
+            "analysis_execution_id": int(row["id"]),
+            "analysis_id": row["analysis_id"],
+            "period_window": row["period_window"] or None,
+            "analysis_output": row["analysis_output"],
+            "created_at": row["created_at"],
+        }
+        for row in rows
+    ]
+
+
+def assert_not_in_failure_cooldown(user_id: int, analysis_id: str, current_time: datetime) -> None:
+    remaining = failure_cooldown_remaining(user_id, analysis_id, current_time)
+    if remaining > 0:
+        raise ConsultorError(
+            f"O Consultor esta indisponivel no momento. Tente novamente em {remaining} segundos."
+        )
+
+
+def register_failure_cooldown(user_id: int, analysis_id: str, current_time: datetime) -> None:
+    _FAILURE_COOLDOWNS[(int(user_id), analysis_id)] = current_time + timedelta(
+        seconds=CONSULTOR_FAILURE_COOLDOWN_SECONDS
+    )
+
+
+def clear_failure_cooldown(user_id: int, analysis_id: str) -> None:
+    _FAILURE_COOLDOWNS.pop((int(user_id), analysis_id), None)
+
+
+def failure_cooldown_remaining(user_id: int, analysis_id: str, current_time: datetime) -> int:
+    expires_at = _FAILURE_COOLDOWNS.get((int(user_id), analysis_id))
+    if expires_at is None:
+        return 0
+    remaining = int((expires_at - current_time).total_seconds())
+    if remaining <= 0:
+        clear_failure_cooldown(user_id, analysis_id)
+        return 0
+    return remaining
+
+
 def postprocess_consultor_output(output: object) -> str:
-    # spec: consultor/consultor v0.29 - criterios 11, 12, 14 e 15
+    # spec: consultor/consultor v0.33 - criterios 11, 12, 14 e 15
     text = str(output or "").strip()
     if not text:
         raise ConsultorError("O Consultor esta indisponivel no momento.")
@@ -554,7 +670,7 @@ def build_analysis_context(
     period_window: object | None = None,
     reference_date: date | None = None,
 ) -> dict:
-    # spec: consultor/consultor v0.29 - criterios 7, 10, 27 e 34
+    # spec: consultor/consultor v0.33 - criterios 7, 10, 27 e 34
     normalized_analysis_id = validate_analysis_id(analysis_id)
     normalized_period = validate_period_window(period_window, analysis_id=normalized_analysis_id)
     if normalized_analysis_id == "ralos_financeiros":
@@ -903,7 +1019,7 @@ def consultor_blocked_reason(settings: dict) -> str:
 
 
 def save_consultor_settings(user_id: int, data: dict) -> dict:
-    # spec: consultor/consultor v0.29 - criterios 1, 2, 3, 25, 26 e 32
+    # spec: consultor/consultor v0.33 - criterios 1, 2, 3, 25, 26 e 32
     normalized_user_id = int(user_id)
     current = get_consultor_settings(normalized_user_id)
     consultor_enabled = bool(data.get("consultor_enabled", current["consultor_enabled"]))
@@ -1001,7 +1117,7 @@ def get_complementary_profile(user_id: int) -> dict:
 
 
 def save_complementary_profile(user_id: int, data: dict) -> dict:
-    # spec: consultor/consultor v0.29 - criterios 22, 23, 24, 25 e 33
+    # spec: consultor/consultor v0.33 - criterios 22, 23, 24, 25 e 33
     current = get_complementary_profile(int(user_id))["profile"]
     normalized_patch = normalize_complementary_profile(data, partial=True)
     merged = {**current, **normalized_patch}

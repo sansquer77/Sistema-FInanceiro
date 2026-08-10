@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 9.5
+versao: 9.9
 atualizado: 2026-08-10
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -132,6 +132,10 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `9.9` — 2026-08-10 — [[specs/consultor]] atualizada para v0.33 com Passo 14 concluído; [[arquitetura]] v3.26 documenta a UI da aba Consultor no Cockpit.
+- `9.8` — 2026-08-10 — [[specs/consultor]] atualizada para v0.32 com Passo 13 concluído; [[arquitetura]] v3.25 documenta Preferências do Consultor.
+- `9.7` — 2026-08-10 — [[specs/consultor]] atualizada para v0.31 com Passo 12 concluído; [[arquitetura]] v3.24 documenta as rotas autenticadas do Consultor.
+- `9.6` — 2026-08-10 — [[specs/consultor]] atualizada para v0.30 com Passo 11 concluído; [[arquitetura]] v3.23 documenta quota diária, cooldown e persistência apenas de execuções bem-sucedidas.
 - `9.5` — 2026-08-10 — [[specs/consultor]] atualizada para v0.29 com Passo 10 concluído; [[arquitetura]] v3.22 documenta o pós-processamento de respostas do Consultor.
 - `9.4` — 2026-08-10 — [[specs/consultor]] atualizada para v0.28 com Passo 9 concluído; [[arquitetura]] v3.21 documenta o executor de IA reutilizando `user_ai_settings`.
 - `9.3` — 2026-08-10 — [[specs/consultor]] atualizada para v0.27 com Passo 8 concluído; [[arquitetura]] v3.20 documenta metadados de cotações herdados do Portfólio.

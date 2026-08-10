@@ -56,6 +56,18 @@ from financeiro.categories import (
     get_category_evolution,
 )
 from financeiro.classification_suggestions import get_classification_suggestion
+from financeiro.consultor import (
+    ConsultorError,
+    delete_complementary_profile,
+    delete_consultor_history,
+    execute_consultor_analysis,
+    get_complementary_profile,
+    get_consultor_settings,
+    list_analysis_cards,
+    list_consultor_history,
+    save_complementary_profile,
+    save_consultor_settings,
+)
 from financeiro.credit_cards import (
     archive_credit_card,
     create_credit_card,
@@ -310,6 +322,15 @@ class AppHandler(BaseHTTPRequestHandler):
         if path == "/api/mais-retorno-config":
             self.handle_mais_retorno_config_status()
             return
+        if path == "/api/consultor/config":
+            self.handle_consultor_config()
+            return
+        if path == "/api/consultor/perfil-complementar":
+            self.handle_consultor_complementary_profile()
+            return
+        if path == "/api/consultor/history":
+            self.handle_consultor_history()
+            return
         if path == "/api/portfolio":
             self.handle_portfolio()
             return
@@ -415,6 +436,15 @@ class AppHandler(BaseHTTPRequestHandler):
         if path == "/api/financial-health-trends/ai-summary":
             self.handle_ai_summary()
             return
+        if path == "/api/consultor/config":
+            self.handle_save_consultor_config()
+            return
+        if path == "/api/consultor/perfil-complementar":
+            self.handle_save_consultor_complementary_profile()
+            return
+        if path == "/api/consultor/analyze":
+            self.handle_consultor_analyze()
+            return
         self.send_json({"error": "Rota nao encontrada."}, HTTPStatus.NOT_FOUND)
 
     def do_PUT(self) -> None:
@@ -501,6 +531,12 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path.startswith("/api/transactions/"):
             self.handle_delete_transaction()
+            return
+        if path == "/api/consultor/perfil-complementar":
+            self.handle_delete_consultor_complementary_profile()
+            return
+        if path == "/api/consultor/history":
+            self.handle_delete_consultor_history()
             return
         self.send_json({"error": "Rota nao encontrada."}, HTTPStatus.NOT_FOUND)
 
@@ -767,6 +803,83 @@ class AppHandler(BaseHTTPRequestHandler):
             "resumo_local": trends["resumo_local"],
             "ia_usada": summary is not None,
         })
+
+    def handle_consultor_config(self) -> None:
+        # spec: consultor/consultor v0.33 - criterios 1, 2, 3, 25, 26 e 32
+        if not self.validate_read_source():
+            return
+        user = self.require_user()
+        payload = get_consultor_settings(user["id"])
+        payload["cards"] = list_analysis_cards()
+        self.send_json(payload)
+
+    def handle_save_consultor_config(self) -> None:
+        # spec: consultor/consultor v0.33 - criterios 1, 2, 3, 25, 26 e 32
+        user = self.require_user()
+        try:
+            self.send_json(save_consultor_settings(user["id"], self.read_json()))
+        except ConsultorError as exc:
+            self.send_consultor_error(exc)
+
+    def handle_consultor_complementary_profile(self) -> None:
+        # spec: consultor/consultor v0.33 - criterios 22, 23, 24, 25 e 33
+        if not self.validate_read_source():
+            return
+        user = self.require_user()
+        self.send_json(get_complementary_profile(user["id"]))
+
+    def handle_save_consultor_complementary_profile(self) -> None:
+        # spec: consultor/consultor v0.33 - criterios 22, 23, 24, 25 e 33
+        user = self.require_user()
+        try:
+            self.send_json(save_complementary_profile(user["id"], self.read_json()))
+        except ConsultorError as exc:
+            self.send_consultor_error(exc)
+
+    def handle_delete_consultor_complementary_profile(self) -> None:
+        # spec: consultor/consultor v0.33 - criterios 22, 23, 24, 25 e 33
+        user = self.require_user()
+        self.send_json({"deleted": delete_complementary_profile(user["id"])})
+
+    def handle_consultor_analyze(self) -> None:
+        # spec: consultor/consultor v0.33 - criterios 7, 10, 13, 27, 29, 30, 31 e 34
+        user = self.require_user()
+        data = self.read_json()
+        try:
+            self.send_json(execute_consultor_analysis(
+                user["id"],
+                data.get("analysis_id"),
+                month=data.get("month"),
+                period_window=data.get("period_window"),
+            ), status=HTTPStatus.CREATED)
+        except ConsultorError as exc:
+            self.send_consultor_error(exc)
+
+    def handle_consultor_history(self) -> None:
+        # spec: consultor/consultor v0.33 - criterios 16, 17 e 30
+        if not self.validate_read_source():
+            return
+        user = self.require_user()
+        query = parse_qs(urlsplit(self.path).query)
+        try:
+            limit = int((query.get("limit") or ["50"])[0])
+        except ValueError:
+            limit = 50
+        self.send_json({"history": list_consultor_history(user["id"], limit=limit)})
+
+    def handle_delete_consultor_history(self) -> None:
+        # spec: consultor/consultor v0.33 - criterios 16, 17 e 30
+        user = self.require_user()
+        self.send_json({"deleted": delete_consultor_history(user["id"])})
+
+    def send_consultor_error(self, exc: ConsultorError) -> None:
+        message = str(exc) or "O Consultor esta indisponivel no momento."
+        status = HTTPStatus.BAD_REQUEST
+        if "Limite diario" in message or "Tente novamente" in message:
+            status = HTTPStatus.TOO_MANY_REQUESTS
+        elif "indisponivel" in message:
+            status = HTTPStatus.SERVICE_UNAVAILABLE
+        self.send_json({"error": message}, status)
 
     def handle_exchange_rate(self) -> None:
         self.require_user()

@@ -313,6 +313,18 @@
               </div>
               <div class="cockpit-calendar-meta" id="cockpitCalendarMeta"></div>
             </div>
+            <div class="consultor-workspace">
+              <div class="consultor-status" id="consultorStatus"></div>
+              <div class="consultor-card-grid" id="consultorCardGrid"></div>
+              <section class="consultor-output" id="consultorOutput" hidden></section>
+              <section class="consultor-history">
+                <div class="calendar-card-heading">
+                  <h3>Histórico de análises</h3>
+                  <button class="ghost" id="consultorHistoryRefreshButton" type="button">Atualizar</button>
+                </div>
+                <div class="consultor-history-list" id="consultorHistoryList"></div>
+              </section>
+            </div>
             <div class="cockpit-calendar-grid">
               <section class="calendar-card">
                 <div class="calendar-card-heading">
@@ -1703,6 +1715,100 @@
                   <button class="primary" type="submit">Salvar configuração de IA</button>
                 </form>
                 <p class="message" id="aiConfigMessage" role="alert"></p>
+              </section>
+
+              <section class="panel">
+                <h2>Consultor</h2>
+                <p class="form-help">Ative o Consultor para gerar análises pré-formatadas com a IA configurada acima.</p>
+                <form id="consultorConfigForm" class="form">
+                  <label class="checkbox-field">
+                    <input name="consultor_enabled" id="consultorEnabled" type="checkbox" value="1">
+                    <span>Ativar Consultor</span>
+                  </label>
+                  <label>Perfil de investidor
+                    <select name="investor_profile" id="consultorInvestorProfile">
+                      <option value="conservador">Conservador</option>
+                      <option value="moderado">Moderado</option>
+                      <option value="arrojado">Arrojado</option>
+                    </select>
+                  </label>
+                  <button class="primary" type="submit">Salvar Consultor</button>
+                </form>
+                <p class="message" id="consultorConfigMessage" role="alert"></p>
+              </section>
+
+              <section class="panel">
+                <h2>Perfil complementar</h2>
+                <p class="form-help">Opcional, criptografado por usuário, usado apenas para contextualizar novas análises.</p>
+                <form id="consultorProfileForm" class="form">
+                  <div class="field-row">
+                    <label>Idade
+                      <input name="idade" id="consultorProfileAge" type="number" min="1" max="120" placeholder="Opcional">
+                    </label>
+                    <label>Imóvel próprio
+                      <select name="possui_imovel_proprio" id="consultorProfileHome">
+                        <option value="">Não informar</option>
+                        <option value="true">Sim</option>
+                        <option value="false">Não</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div class="field-row">
+                    <label>Dependentes
+                      <select name="possui_dependentes" id="consultorProfileDependents">
+                        <option value="">Não informar</option>
+                        <option value="true">Sim</option>
+                        <option value="false">Não</option>
+                      </select>
+                    </label>
+                    <label id="consultorProfileDependentsCountField">Quantidade
+                      <input name="numero_dependentes" id="consultorProfileDependentsCount" type="number" min="0" max="20" placeholder="Opcional">
+                    </label>
+                  </div>
+                  <label>Objetivo financeiro principal
+                    <select name="objetivo_financeiro_principal" id="consultorProfileGoal">
+                      <option value="">Não informar</option>
+                      <option value="aposentadoria">Aposentadoria</option>
+                      <option value="compra_de_imovel">Compra de imóvel</option>
+                      <option value="reserva_de_emergencia">Reserva de emergência</option>
+                      <option value="educacao_dos_filhos">Educação dos filhos</option>
+                      <option value="independencia_financeira">Independência financeira</option>
+                      <option value="outro">Outro</option>
+                    </select>
+                  </label>
+                  <div class="field-row">
+                    <label>Horizonte
+                      <select name="horizonte_investimento_principal" id="consultorProfileHorizon">
+                        <option value="">Não informar</option>
+                        <option value="curto_prazo">Curto prazo</option>
+                        <option value="medio_prazo">Médio prazo</option>
+                        <option value="longo_prazo">Longo prazo</option>
+                      </select>
+                    </label>
+                    <label>Tolerância a perdas
+                      <select name="tolerancia_perdas" id="consultorProfileLossTolerance">
+                        <option value="">Não informar</option>
+                        <option value="baixa">Baixa</option>
+                        <option value="moderada">Moderada</option>
+                        <option value="alta">Alta</option>
+                      </select>
+                    </label>
+                  </div>
+                  <label>Renda mensal aproximada
+                    <select name="renda_mensal_aproximada" id="consultorProfileIncome">
+                      <option value="">Não informar</option>
+                      <option value="ate_3k">Até R$ 3 mil</option>
+                      <option value="de_3k_a_8k">R$ 3 mil a R$ 8 mil</option>
+                      <option value="de_8k_a_15k">R$ 8 mil a R$ 15 mil</option>
+                      <option value="acima_de_15k">Acima de R$ 15 mil</option>
+                    </select>
+                  </label>
+                  <div class="form-actions">
+                    <button class="primary" type="submit">Salvar perfil</button>
+                    <button class="ghost" id="consultorProfileDeleteButton" type="button">Excluir perfil</button>
+                  </div>
+                </form>
+                <p class="message" id="consultorProfileMessage" role="alert"></p>
               </section>
 
               <section class="panel">

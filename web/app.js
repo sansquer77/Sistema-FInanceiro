@@ -343,6 +343,22 @@ const aiConfigTemperature = document.querySelector("#aiConfigTemperature");
 const aiConfigMaxTokens = document.querySelector("#aiConfigMaxTokens");
 const aiConfigMessage = document.querySelector("#aiConfigMessage");
 const userPrefTabs = document.querySelector(".user-pref-tabs");
+const consultorConfigForm = document.querySelector("#consultorConfigForm");
+const consultorEnabled = document.querySelector("#consultorEnabled");
+const consultorInvestorProfile = document.querySelector("#consultorInvestorProfile");
+const consultorConfigMessage = document.querySelector("#consultorConfigMessage");
+const consultorProfileForm = document.querySelector("#consultorProfileForm");
+const consultorProfileAge = document.querySelector("#consultorProfileAge");
+const consultorProfileHome = document.querySelector("#consultorProfileHome");
+const consultorProfileDependents = document.querySelector("#consultorProfileDependents");
+const consultorProfileDependentsCountField = document.querySelector("#consultorProfileDependentsCountField");
+const consultorProfileDependentsCount = document.querySelector("#consultorProfileDependentsCount");
+const consultorProfileGoal = document.querySelector("#consultorProfileGoal");
+const consultorProfileHorizon = document.querySelector("#consultorProfileHorizon");
+const consultorProfileLossTolerance = document.querySelector("#consultorProfileLossTolerance");
+const consultorProfileIncome = document.querySelector("#consultorProfileIncome");
+const consultorProfileDeleteButton = document.querySelector("#consultorProfileDeleteButton");
+const consultorProfileMessage = document.querySelector("#consultorProfileMessage");
 const maisRetornoConfigForm = document.querySelector("#maisRetornoConfigForm");
 const maisRetornoEnabled = document.querySelector("#maisRetornoEnabled");
 const maisRetornoApiKey = document.querySelector("#maisRetornoApiKey");
@@ -417,6 +433,11 @@ const cockpitVersionAlertVersion = document.querySelector("#cockpitVersionAlertV
 const cockpitVersionAlertDismiss = document.querySelector("#cockpitVersionAlertDismiss");
 const cockpitCalendarPanel = document.querySelector("#cockpitCalendarPanel");
 const cockpitCalendarMeta = document.querySelector("#cockpitCalendarMeta");
+const consultorStatus = document.querySelector("#consultorStatus");
+const consultorCardGrid = document.querySelector("#consultorCardGrid");
+const consultorOutput = document.querySelector("#consultorOutput");
+const consultorHistoryList = document.querySelector("#consultorHistoryList");
+const consultorHistoryRefreshButton = document.querySelector("#consultorHistoryRefreshButton");
 const overdueReceivablesList = document.querySelector("#overdueReceivablesList");
 const overduePayablesList = document.querySelector("#overduePayablesList");
 const maturity30DaysList = document.querySelector("#maturity30DaysList");
@@ -682,6 +703,11 @@ const cockpitView = registerCockpitView({
     cockpitVersionAlertDismiss,
     cockpitCalendarPanel,
     cockpitCalendarMeta,
+    consultorStatus,
+    consultorCardGrid,
+    consultorOutput,
+    consultorHistoryList,
+    consultorHistoryRefreshButton,
     overdueReceivablesList,
     overduePayablesList,
     maturity30DaysList,
@@ -1125,6 +1151,22 @@ const userAdminViewController = registerUserAdminView({
     aiConfigTimeout,
     aiConfigTemperature,
     aiConfigMaxTokens,
+    consultorConfigForm,
+    consultorEnabled,
+    consultorInvestorProfile,
+    consultorConfigMessage,
+    consultorProfileForm,
+    consultorProfileAge,
+    consultorProfileHome,
+    consultorProfileDependents,
+    consultorProfileDependentsCountField,
+    consultorProfileDependentsCount,
+    consultorProfileGoal,
+    consultorProfileHorizon,
+    consultorProfileLossTolerance,
+    consultorProfileIncome,
+    consultorProfileDeleteButton,
+    consultorProfileMessage,
     clearLaunchesForm,
     deleteUserForm,
     themePreference,
@@ -1539,6 +1581,8 @@ function showModule(view) {
     userAdminViewController.syncThemePreference();
     userAdminViewController.loadEmailConfigStatus();
     userAdminViewController.loadAIConfigStatus();
+    userAdminViewController.loadConsultorConfigStatus();
+    userAdminViewController.loadConsultorProfile();
     userAdminViewController.loadMaisRetornoConfigStatus();
   }
 }

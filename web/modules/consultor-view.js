@@ -12,6 +12,11 @@ export function registerConsultorView({
   const {
     cockpitCalendarPanel,
     cockpitCalendarMeta,
+    consultorStatus,
+    consultorCardGrid,
+    consultorOutput,
+    consultorHistoryList,
+    consultorHistoryRefreshButton,
     overdueReceivablesList,
     overduePayablesList,
     maturity30DaysList,
@@ -19,6 +24,10 @@ export function registerConsultorView({
   } = elements;
   let requestId = 0;
   let currentData = null;
+  let consultorConfig = null;
+  let consultorHistory = [];
+  let consultorLoading = false;
+  let runningAnalysisId = "";
   let loading = false;
   let error = "";
 
@@ -29,7 +38,32 @@ export function registerConsultorView({
     if (!currentData || force) {
       loadCalendar();
     }
+    if (!consultorConfig || force) {
+      loadConsultor();
+    }
     render();
+  }
+
+  async function loadConsultor() {
+    consultorLoading = true;
+    renderConsultor();
+    try {
+      const [config, history] = await Promise.all([
+        api("/api/consultor/config"),
+        api("/api/consultor/history?limit=20"),
+      ]);
+      consultorConfig = config;
+      consultorHistory = history.history || [];
+    } catch (err) {
+      consultorConfig = { available: false, blocked_reason: "load_error", cards: [] };
+      consultorHistory = [];
+      if (consultorStatus) {
+        consultorStatus.innerHTML = `<div class="empty-state compact">${escapeHtml(err.message || "Falha ao carregar Consultor.")}</div>`;
+      }
+    } finally {
+      consultorLoading = false;
+      renderConsultor();
+    }
   }
 
   async function loadCalendar() {
@@ -59,6 +93,7 @@ export function registerConsultorView({
       return;
     }
     renderAIActiveBadge();
+    renderConsultor();
     if (!currentData) {
       if (error) {
         setAllContainers(emptyState(error, true));
@@ -111,6 +146,177 @@ export function registerConsultorView({
         }
       }
     });
+  }
+
+  function renderConsultor() {
+    if (!consultorCardGrid || !consultorStatus) {
+      return;
+    }
+    if (consultorLoading && !consultorConfig) {
+      consultorStatus.innerHTML = '<div class="empty-state compact">Carregando Consultor...</div>';
+      consultorCardGrid.innerHTML = "";
+      renderConsultorHistory();
+      return;
+    }
+    const config = consultorConfig || {};
+    consultorStatus.innerHTML = renderConsultorStatus(config);
+    if (!config.available) {
+      consultorCardGrid.innerHTML = "";
+      if (consultorOutput) {
+        consultorOutput.hidden = true;
+        consultorOutput.innerHTML = "";
+      }
+      renderConsultorHistory();
+      return;
+    }
+    const groups = groupCards(config.cards || []);
+    consultorCardGrid.innerHTML = [...groups.entries()].map(([category, cards]) => `
+      <section class="consultor-card-group">
+        <h3>${escapeHtml(category)}</h3>
+        <div class="consultor-analysis-grid">
+          ${cards.map((card) => renderAnalysisCard(card)).join("")}
+        </div>
+      </section>
+    `).join("");
+    consultorCardGrid.querySelectorAll("[data-consultor-run]").forEach((button) => {
+      button.addEventListener("click", () => runAnalysis(button.dataset.consultorRun));
+    });
+    renderConsultorHistory();
+  }
+
+  function renderConsultorStatus(config) {
+    if (config.available) {
+      return '<div class="consultor-status-ready">Consultor ativo. Escolha uma análise abaixo.</div>';
+    }
+    const messages = {
+      ai_not_configured: "Configure e ative a IA em Preferências > APIs para usar o Consultor.",
+      consultor_disabled: "Ative o Consultor em Preferências > APIs para liberar as análises.",
+      consent_required: "Aceite o consentimento de dados em Preferências > APIs para usar o Consultor.",
+      load_error: "Não foi possível carregar o Consultor agora.",
+    };
+    return `<div class="empty-state compact">${escapeHtml(messages[config.blocked_reason] || "Consultor indisponível.")}</div>`;
+  }
+
+  function groupCards(cards) {
+    const groups = new Map();
+    for (const card of cards) {
+      const category = card.category || "Análises";
+      if (!groups.has(category)) {
+        groups.set(category, []);
+      }
+      groups.get(category).push(card);
+    }
+    return groups;
+  }
+
+  function renderAnalysisCard(card) {
+    const isRunning = runningAnalysisId === card.analysis_id;
+    const period = card.requires_period_window
+      ? `<label class="consultor-period-select">Período
+          <select data-consultor-period="${escapeHtml(card.analysis_id)}">
+            <option value="3m">3 meses</option>
+            <option value="6m">6 meses</option>
+            <option value="12m">12 meses</option>
+            <option value="ytd">YTD</option>
+          </select>
+        </label>`
+      : "";
+    return `
+      <article class="consultor-analysis-card">
+        <div>
+          <strong>${escapeHtml(card.title || "Análise")}</strong>
+          <p>${escapeHtml(card.short_description || "")}</p>
+        </div>
+        ${period}
+        <button class="primary" type="button" data-consultor-run="${escapeHtml(card.analysis_id)}" ${isRunning ? "disabled" : ""}>
+          ${isRunning ? "Gerando..." : "Gerar análise"}
+        </button>
+      </article>
+    `;
+  }
+
+  async function runAnalysis(analysisId) {
+    if (!analysisId || runningAnalysisId) {
+      return;
+    }
+    runningAnalysisId = analysisId;
+    renderConsultor();
+    const periodSelect = [...(consultorCardGrid?.querySelectorAll("[data-consultor-period]") || [])]
+      .find((select) => select.dataset.consultorPeriod === analysisId);
+    const body = { analysis_id: analysisId };
+    if (periodSelect) {
+      body.period_window = periodSelect.value || "3m";
+    }
+    try {
+      const result = await api("/api/consultor/analyze", { method: "POST", body });
+      renderAnalysisOutput(result);
+      await loadConsultor();
+    } catch (err) {
+      if (consultorOutput) {
+        consultorOutput.hidden = false;
+        consultorOutput.innerHTML = `<div class="empty-state compact">${escapeHtml(err.message || "O Consultor está indisponível no momento.")}</div>`;
+      }
+    } finally {
+      runningAnalysisId = "";
+      renderConsultor();
+    }
+  }
+
+  function renderAnalysisOutput(result) {
+    if (!consultorOutput) {
+      return;
+    }
+    consultorOutput.hidden = false;
+    consultorOutput.innerHTML = `
+      <div class="calendar-card-heading">
+        <h3>${escapeHtml(analysisTitle(result.analysis_id))}</h3>
+        <span>${escapeHtml(result.created_at || "")}</span>
+      </div>
+      <div class="consultor-response">${formatConsultorText(result.output || "")}</div>
+    `;
+  }
+
+  function renderConsultorHistory() {
+    if (!consultorHistoryList) {
+      return;
+    }
+    if (!consultorHistory.length) {
+      consultorHistoryList.innerHTML = '<div class="empty-state compact">Nenhuma análise gerada ainda.</div>';
+      return;
+    }
+    consultorHistoryList.innerHTML = consultorHistory.map((item) => `
+      <button class="consultor-history-item" type="button" data-consultor-history-id="${escapeHtml(String(item.analysis_execution_id))}">
+        <strong>${escapeHtml(analysisTitle(item.analysis_id))}</strong>
+        <small>${escapeHtml(item.created_at || "")}</small>
+      </button>
+    `).join("");
+    consultorHistoryList.querySelectorAll("[data-consultor-history-id]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const item = consultorHistory.find((entry) => String(entry.analysis_execution_id) === button.dataset.consultorHistoryId);
+        if (item) {
+          renderAnalysisOutput({
+            analysis_id: item.analysis_id,
+            output: item.analysis_output,
+            created_at: item.created_at,
+          });
+        }
+      });
+    });
+  }
+
+  function analysisTitle(analysisId) {
+    const card = (consultorConfig?.cards || []).find((item) => item.analysis_id === analysisId);
+    return card?.title || analysisId || "Análise";
+  }
+
+  function formatConsultorText(text) {
+    const escaped = escapeHtml(String(text || ""));
+    return escaped
+      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\n{2,}/g, "</p><p>")
+      .replace(/\n/g, "<br>")
+      .replace(/^/, "<p>")
+      .replace(/$/, "</p>");
   }
 
   function renderAIActiveBadge() {
@@ -223,6 +429,13 @@ export function registerConsultorView({
     currentData = null;
     loading = false;
     error = "";
+    consultorConfig = null;
+    consultorHistory = [];
+    runningAnalysisId = "";
+  }
+
+  if (consultorHistoryRefreshButton) {
+    consultorHistoryRefreshButton.addEventListener("click", loadConsultor);
   }
 
   return {

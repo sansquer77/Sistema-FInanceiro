@@ -1183,6 +1183,88 @@ textarea:focus {
   gap: 16px;
 }
 
+.consultor-workspace {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.consultor-status-ready {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: var(--surface);
+  font-weight: 800;
+}
+
+.consultor-card-grid,
+.consultor-card-group {
+  display: grid;
+  gap: 12px;
+}
+
+.consultor-card-group h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.consultor-analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.consultor-analysis-card,
+.consultor-output,
+.consultor-history {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.consultor-analysis-card p,
+.consultor-response p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.consultor-period-select {
+  display: grid;
+  gap: 6px;
+  max-width: 180px;
+}
+
+.consultor-response {
+  display: grid;
+  gap: 10px;
+}
+
+.consultor-history-list {
+  display: grid;
+  gap: 8px;
+}
+
+.consultor-history-item {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  text-align: left;
+}
+
+.consultor-history-item small {
+  color: var(--muted);
+}
+
 .calendar-card {
   display: flex;
   flex-direction: column;
@@ -1287,7 +1369,8 @@ textarea:focus {
 }
 
 @media (max-width: 800px) {
-  .cockpit-calendar-grid {
+  .cockpit-calendar-grid,
+  .consultor-analysis-grid {
     grid-template-columns: 1fr;
   }
 }

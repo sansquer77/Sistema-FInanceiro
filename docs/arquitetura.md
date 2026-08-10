@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.22
+versao: 3.26
 atualizado: 2026-08-10
 relacionados:
   - "[[requisitos]]"
@@ -64,7 +64,7 @@ O servidor HTTP revalida arquivos estáticos com `ETag` e `Last-Modified`; arqui
 | Módulo | Responsabilidade |
 |---|---|
 | `auth-view.js` | Login, cadastro, logout e recuperação de senha. |
-| `user-admin-view.js` | Troca de email/senha, config. SMTP, limpeza e exclusão. |
+| `user-admin-view.js` | Preferências de usuário, tema, SMTP, IA, Mais Retorno, ativação/perfil do Consultor, limpeza e exclusão. |
 | `classifications-view.js` | Categorias, subcategorias e tags. |
 | `limits-view.js` | Limites de gastos e índice de consumo. |
 | `reports-view.js` | Filtros, abas, agrupamentos e tabelas. |
@@ -72,7 +72,7 @@ O servidor HTTP revalida arquivos estáticos com `ETag` e `Last-Modified`; arqui
 | `cockpit-view.js` | Resumo, saldos, planejamento, dívidas, portfólio e alertas; registra sub-views de Calendário, Tendências e Saúde Financeira. |
 | `financial-health-view.js` | Aba **Saúde Financeira** do Cockpit: score/gauge, pilares, Paz Financeira e consolidado do diagnóstico. |
 | `trends-view.js` | Aba **Tendências** do Cockpit: gráfico mês a mês, Budget x Realizado e achados local. |
-| `consultor-view.js` | Aba **Calendário/Consultor** do Cockpit: vencimentos, atrasos e consultor. |
+| `consultor-view.js` | Aba **Consultor** do Cockpit: cards de análise, execução sob demanda, histórico, vencimentos e atrasos. |
 | `accounts-view.js` | Contas: cadastro, edição, arquivamento, restauração. |
 | `cards-view.js` | Cartões: cadastro, faturas, pagamento, conciliação. |
 | `portfolio-view.js` | Ativos: posições, histórico, resgate, encerramento. |
@@ -219,6 +219,19 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `PUT` | `/api/ai-settings` |
 | `POST` | `/api/financial-health-trends/ai-summary` |
 
+#### Rotas — Consultor → [[specs/consultor]]
+
+| Método | Rota |
+|---|---|
+| `GET` | `/api/consultor/config` |
+| `POST` | `/api/consultor/config` |
+| `GET` | `/api/consultor/perfil-complementar` |
+| `POST` | `/api/consultor/perfil-complementar` |
+| `DELETE` | `/api/consultor/perfil-complementar` |
+| `POST` | `/api/consultor/analyze` |
+| `GET` | `/api/consultor/history` |
+| `DELETE` | `/api/consultor/history` |
+
 #### Rotas — Preferências e integrações opt-in → [[preferencias-abas]]
 
 | Método | Rota |
@@ -266,7 +279,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `financial_health.py` | Núcleo analítico do Score de Saúde Financeira: cálculo atômico dos pilares, lista `pilares`, Paz Financeira e função de histórico com validação de `months` (1-36). Ver [[score-saude-financeira]]. |
 | `trends.py` | Núcleo local de Tendências e Achados: série mensal, Budget x Realizado, achados estruturados, eventos pontuais, assinaturas/serviços recorrentes, confiança e resumo determinístico. Ver [[tendencias-saude-financeira]]. |
 | `ai_summary.py` | Reescrita opcional do resumo por IA com payload minimizado, timeout curto e fallback para resumo local. Ver [[tendencias-saude-financeira]]. |
-| `consultor.py` | Domínio futuro do Consultor: catálogo fechado de análises, validações de enums, prompts estritos, persona, disclaimer, configuração por usuário, Perfil Complementar criptografado, contexto minimizado por card, metadados de cotações herdados do Portfólio, executor de IA via `user_ai_settings`, pós-processamento de respostas e expurgo de histórico por privacidade. Ver [[specs/consultor]]. |
+| `consultor.py` | Domínio futuro do Consultor: catálogo fechado de análises, validações de enums, prompts estritos, persona, disclaimer, configuração por usuário, Perfil Complementar criptografado, contexto minimizado por card, metadados de cotações herdados do Portfólio, executor de IA via `user_ai_settings`, pós-processamento de respostas, quota/cooldown de resiliência e expurgo de histórico por privacidade. Ver [[specs/consultor]]. |
 | `imports.py` | Leitura de exportações Organizze e planilhas modelo. Ver [[importacao-organizze]]. |
 | `operation_logs.py` | Auditoria funcional das operações do usuário. Ver [[historico-operacoes]]. |
 | `emailer.py` | Envio SMTP do código de recuperação de senha. Ver [[recuperacao-senha]]. |
@@ -483,6 +496,10 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.26` — 2026-08-10 — `consultor-view.js` documentado com grade de cards, execução sob demanda e histórico da aba Consultor no Cockpit. Ver [[specs/consultor]] v0.33.
+- `3.25` — 2026-08-10 — Preferências documentadas com ativação do Consultor, seleção de perfil e Perfil Complementar opcional. Ver [[specs/consultor]] v0.32.
+- `3.24` — 2026-08-10 — Documentadas as rotas autenticadas do Consultor (`/api/consultor/config`, `/api/consultor/perfil-complementar`, `/api/consultor/analyze` e `/api/consultor/history`). Ver [[specs/consultor]] v0.31.
+- `3.23` — 2026-08-10 — `financeiro/consultor.py` documentado com persistência somente de execuções bem-sucedidas, quota diária e cooldown por falha de card. Ver [[specs/consultor]] v0.30.
 - `3.22` — 2026-08-10 — `financeiro/consultor.py` documentado com pós-processamento de respostas para estrutura obrigatória, disclaimer, risco e bloqueio de recomendações vedadas. Ver [[specs/consultor]] v0.29.
 - `3.21` — 2026-08-10 — `financeiro/consultor.py` documentado com executor de IA que reutiliza `user_ai_settings`, respeita timeout configurado e limita tokens de resposta a 900. Ver [[specs/consultor]] v0.28.
 - `3.20` — 2026-08-10 — `financeiro/consultor.py` documentado com metadados de cotações herdados do Portfólio (`market_data`), sem novas fontes de mercado no Consultor. Ver [[specs/consultor]] v0.27.

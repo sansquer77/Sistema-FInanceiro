@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import unittest
 import tempfile
+import contextlib
+from datetime import datetime, timedelta
+from http import HTTPStatus
 from pathlib import Path
 from unittest import mock
 
+import app
 from financeiro import database
 from financeiro.auth import create_user
 from financeiro.consultor import (
@@ -464,9 +468,17 @@ class ConsultorAIExecutorTest(unittest.TestCase):
             return valid_consultor_response()
 
         with mock.patch("financeiro.consultor.build_analysis_context", return_value={"analysis_id": "alocacao_perfil"}):
-            result = execute_consultor_analysis(user["id"], "alocacao_perfil", ai_client=fake_client)
+            result = execute_consultor_analysis(
+                user["id"],
+                "alocacao_perfil",
+                ai_client=fake_client,
+                now=datetime(2026, 8, 10, 9, 0, 0),
+            )
 
         self.assertEqual(result["output"], valid_consultor_response())
+        self.assertGreater(result["analysis_execution_id"], 0)
+        self.assertEqual(result["created_at"], "2026-08-10 09:00:00")
+        self.assertEqual(history_count(user["id"]), 1)
         self.assertEqual(result["max_tokens"], 900)
         self.assertEqual(captured["max_tokens"], 900)
         self.assertEqual(captured["timeout_seconds"], 22)
@@ -493,6 +505,7 @@ class ConsultorAIExecutorTest(unittest.TestCase):
                 user["id"],
                 "score_saude_financeira",
                 ai_client=lambda settings, messages, *, max_tokens, timeout_seconds: valid_consultor_response(),
+                now=datetime(2026, 8, 10, 9, 0, 0),
             )
 
         self.assertEqual(result["max_tokens"], 450)
@@ -545,6 +558,58 @@ class ConsultorAIExecutorTest(unittest.TestCase):
         self.assertEqual(anthropic_request["body"]["max_tokens"], 800)
         self.assertEqual(anthropic_request["headers"]["x-api-key"], "claude-key")
 
+    def test_execute_blocks_when_daily_quota_is_reached(self) -> None:
+        user = create_user("Tania", "tania@example.com", "strong-password")
+        save_ready_ai_and_consultor(user["id"])
+        for _ in range(20):
+            insert_history(user["id"], created_at="2026-08-10 08:00:00")
+
+        with self.assertRaisesRegex(ConsultorError, "Limite diario"):
+            execute_consultor_analysis(
+                user["id"],
+                "score_saude_financeira",
+                ai_client=lambda settings, messages, *, max_tokens, timeout_seconds: valid_consultor_response(),
+                now=datetime(2026, 8, 10, 9, 0, 0),
+            )
+
+        self.assertEqual(history_count(user["id"]), 20)
+
+    def test_failed_execution_does_not_persist_and_starts_card_cooldown(self) -> None:
+        user = create_user("Ulisses", "ulisses@example.com", "strong-password")
+        save_ready_ai_and_consultor(user["id"])
+        now = datetime(2026, 8, 10, 9, 0, 0)
+
+        with self.assertRaisesRegex(ConsultorError, "indisponivel"):
+            execute_consultor_analysis(
+                user["id"],
+                "score_saude_financeira",
+                ai_client=lambda settings, messages, *, max_tokens, timeout_seconds: (_ for _ in ()).throw(
+                    ConsultorError("timeout")
+                ),
+                now=now,
+            )
+
+        self.assertEqual(history_count(user["id"]), 0)
+        with self.assertRaisesRegex(ConsultorError, "Tente novamente"):
+            execute_consultor_analysis(
+                user["id"],
+                "score_saude_financeira",
+                ai_client=lambda settings, messages, *, max_tokens, timeout_seconds: valid_consultor_response(),
+                now=now + timedelta(seconds=10),
+            )
+        self.assertEqual(history_count(user["id"]), 0)
+
+        with mock.patch("financeiro.consultor.build_analysis_context", return_value={"analysis_id": "score_saude_financeira"}):
+            result = execute_consultor_analysis(
+                user["id"],
+                "score_saude_financeira",
+                ai_client=lambda settings, messages, *, max_tokens, timeout_seconds: valid_consultor_response(),
+                now=now + timedelta(seconds=31),
+            )
+
+        self.assertGreater(result["analysis_execution_id"], 0)
+        self.assertEqual(history_count(user["id"]), 1)
+
     def test_postprocess_accepts_structured_response_with_disclaimer_and_risk(self) -> None:
         text = valid_consultor_response()
 
@@ -577,6 +642,88 @@ class ConsultorAIExecutorTest(unittest.TestCase):
         self.assertIn("Nao posso apresentar recomendacao direta", processed)
         self.assertIn("Risco Alto", processed)
         self.assertIn(DISCLAIMER, processed)
+
+    def test_api_config_routes_do_not_expose_sensitive_profile_payload(self) -> None:
+        user = create_user("Vera", "vera@example.com", "strong-password")
+        save_ready_ai_and_consultor(user["id"])
+        save_complementary_profile(user["id"], {"idade": 39, "tolerancia_perdas": "moderada"})
+
+        config_handler = self.handler("/api/consultor/config", user=user)
+        profile_handler = self.handler("/api/consultor/perfil-complementar", user=user)
+        with self.route_context(user):
+            config_handler.handle_consultor_config()
+            profile_handler.handle_consultor_complementary_profile()
+
+        self.assertTrue(config_handler.send_json.call_args[0][0]["available"])
+        profile_payload = profile_handler.send_json.call_args[0][0]
+        self.assertEqual(profile_payload["profile"]["idade"], 39)
+        self.assertNotIn("payload_enc", json_dump(profile_payload))
+
+    def test_api_analyze_validates_enum_before_calling_ai(self) -> None:
+        user = create_user("Wagner", "wagner@example.com", "strong-password")
+        handler = self.handler("/api/consultor/analyze", user=user, body={"analysis_id": "chat_livre"})
+
+        with self.route_context(user):
+            handler.handle_consultor_analyze()
+
+        payload, status = handler.send_json.call_args[0]
+        self.assertEqual(status, HTTPStatus.BAD_REQUEST)
+        self.assertIn("Analise", payload["error"])
+
+    def test_api_analyze_serializes_success_and_history(self) -> None:
+        user = create_user("Xenia", "xenia@example.com", "strong-password")
+        handler = self.handler("/api/consultor/analyze", user=user, body={"analysis_id": "score_saude_financeira"})
+        expected = {
+            "analysis_execution_id": 12,
+            "analysis_id": "score_saude_financeira",
+            "period_window": None,
+            "output": valid_consultor_response(),
+            "created_at": "2026-08-10 09:00:00",
+        }
+
+        with self.route_context(user):
+            with mock.patch.object(app, "execute_consultor_analysis", return_value=expected) as execute_mock:
+                handler.handle_consultor_analyze()
+
+        execute_mock.assert_called_once()
+        self.assertEqual(handler.send_json.call_args[0][0]["analysis_execution_id"], 12)
+        self.assertEqual(handler.send_json.call_args[1]["status"], HTTPStatus.CREATED)
+
+    def test_api_history_and_delete_are_user_scoped(self) -> None:
+        owner = create_user("Yara", "yara@example.com", "strong-password")
+        other = create_user("Zeca", "zeca@example.com", "strong-password")
+        insert_history(owner["id"])
+        insert_history(other["id"])
+
+        history_handler = self.handler("/api/consultor/history", user=owner)
+        delete_handler = self.handler("/api/consultor/history", user=owner)
+        with self.route_context(owner):
+            history_handler.handle_consultor_history()
+            delete_handler.handle_delete_consultor_history()
+
+        history = history_handler.send_json.call_args[0][0]["history"]
+        self.assertEqual(len(history), 1)
+        self.assertEqual(delete_handler.send_json.call_args[0][0]["deleted"], 1)
+        self.assertEqual(history_count(owner["id"]), 0)
+        self.assertEqual(history_count(other["id"]), 1)
+
+    def handler(self, path: str, *, user: dict, body: dict | None = None) -> app.AppHandler:
+        handler = object.__new__(app.AppHandler)
+        handler.headers = {
+            "Host": "sistema-financeiro.localhost:8020",
+            "Origin": "http://sistema-financeiro.localhost:8020",
+        }
+        handler.path = path
+        handler.send_json = mock.Mock()
+        handler.read_json = mock.Mock(return_value=body or {})
+        return handler
+
+    def route_context(self, user: dict):
+        stack = contextlib.ExitStack()
+        stack.enter_context(mock.patch.object(app, "PORT", 8020))
+        stack.enter_context(mock.patch.object(app, "PUBLIC_URL", "http://sistema-financeiro.localhost:8020"))
+        stack.enter_context(mock.patch.object(app.AppHandler, "require_user", return_value=user))
+        return stack
 
 
 def trends_payload() -> dict:
@@ -620,6 +767,12 @@ def valid_consultor_response() -> str:
         "Disclaimer\n"
         f"{DISCLAIMER}"
     )
+
+
+def json_dump(payload: dict) -> str:
+    import json
+
+    return json.dumps(payload, ensure_ascii=False)
 
 
 def score_payload() -> dict:
@@ -706,16 +859,30 @@ def calendar_payload() -> dict:
     }
 
 
-def insert_history(user_id: int) -> None:
+def save_ready_ai_and_consultor(user_id: int) -> None:
+    save_ai_settings(user_id, {
+        "enabled": True,
+        "provider": "openai",
+        "model": "gpt-test",
+        "api_key": "sk-test",
+    })
+    save_consultor_settings(user_id, {
+        "consultor_enabled": True,
+        "data_access_consent": True,
+    })
+
+
+def insert_history(user_id: int, *, created_at: str = "2026-08-10 10:00:00") -> None:
+    created_date = created_at[:10]
     with database.get_connection() as conn:
         conn.execute(
             """
             INSERT INTO consultor_analyses (
                 user_id, analysis_id, analysis_output, created_at, created_date
             )
-            VALUES (?, 'score_saude_financeira', 'Resumo', '2026-08-10 10:00:00', '2026-08-10')
+            VALUES (?, 'score_saude_financeira', 'Resumo', ?, ?)
             """,
-            (int(user_id),),
+            (int(user_id), created_at, created_date),
         )
 
 

@@ -12,6 +12,7 @@ export function registerUserAdminView(context) {
   } = context;
   let emailConfigPresets = [];
   let aiConfigPresets = [];
+  let consultorSettings = null;
 
   function switchUserTab(tabName) {
     if (!elements.userPrefTabs) {
@@ -198,6 +199,7 @@ export function registerUserAdminView(context) {
       } else {
         setMessage(elements.aiConfigMessage, "IA não configurada.", "");
       }
+      await loadConsultorConfigStatus();
     } catch (error) {
       setMessage(elements.aiConfigMessage, error.message, "error");
     }
@@ -227,9 +229,163 @@ export function registerUserAdminView(context) {
       elements.aiConfigApiKey.value = "";
       aiConfigPresets = status.presets || aiConfigPresets;
       await loadAIConfigStatus();
+      await loadConsultorConfigStatus();
       setMessage(elements.aiConfigMessage, "Configuração de IA salva.", "success");
     } catch (error) {
       setMessage(elements.aiConfigMessage, error.message, "error");
+    }
+  }
+
+  async function loadConsultorConfigStatus() {
+    if (!elements.consultorConfigForm) {
+      return;
+    }
+    try {
+      const status = await api("/api/consultor/config");
+      consultorSettings = status;
+      elements.consultorEnabled.checked = status.consultor_enabled === true;
+      elements.consultorInvestorProfile.value = status.investor_profile || "moderado";
+      elements.consultorEnabled.disabled = !(status.ai_configured && status.ai_enabled) && !status.consultor_enabled;
+      if (status.available) {
+        setMessage(elements.consultorConfigMessage, "Consultor ativado.", "success");
+      } else if (!status.ai_configured || !status.ai_enabled) {
+        setMessage(elements.consultorConfigMessage, "Configure e ative a IA antes de habilitar o Consultor.", "");
+      } else if (!status.consultor_enabled) {
+        setMessage(elements.consultorConfigMessage, "Consultor desligado.", "");
+      } else if (!status.data_access_consent) {
+        setMessage(elements.consultorConfigMessage, "Consentimento de dados pendente.", "");
+      } else {
+        setMessage(elements.consultorConfigMessage, "Consultor indisponível.", "");
+      }
+    } catch (error) {
+      setMessage(elements.consultorConfigMessage, error.message, "error");
+    }
+  }
+
+  function consultorConsentAccepted() {
+    if (consultorSettings?.data_access_consent) {
+      return true;
+    }
+    return window.confirm(
+      "O Consultor usará a IA configurada e dados financeiros agregados já registrados no app para gerar análises. Deseja habilitar este acesso?"
+    );
+  }
+
+  async function handleConsultorConfigSubmit(event) {
+    event.preventDefault();
+    setMessage(elements.consultorConfigMessage, "");
+    const wantsEnabled = elements.consultorEnabled ? elements.consultorEnabled.checked : false;
+    const consent = wantsEnabled ? consultorConsentAccepted() : false;
+    if (wantsEnabled && !consent) {
+      elements.consultorEnabled.checked = false;
+      setMessage(elements.consultorConfigMessage, "Consultor não habilitado sem consentimento.", "error");
+      return;
+    }
+    try {
+      const status = await api("/api/consultor/config", {
+        method: "POST",
+        body: {
+          consultor_enabled: wantsEnabled,
+          investor_profile: elements.consultorInvestorProfile ? elements.consultorInvestorProfile.value : "moderado",
+          data_access_consent: consent,
+        },
+      });
+      consultorSettings = status;
+      await loadConsultorConfigStatus();
+      setMessage(elements.consultorConfigMessage, status.available ? "Consultor ativado." : "Consultor salvo.", "success");
+    } catch (error) {
+      setMessage(elements.consultorConfigMessage, error.message, "error");
+    }
+  }
+
+  async function loadConsultorProfile() {
+    if (!elements.consultorProfileForm) {
+      return;
+    }
+    try {
+      const status = await api("/api/consultor/perfil-complementar");
+      const profile = status.profile || {};
+      elements.consultorProfileAge.value = profile.idade || "";
+      elements.consultorProfileHome.value = profileValue(profile.possui_imovel_proprio);
+      elements.consultorProfileDependents.value = profileValue(profile.possui_dependentes);
+      elements.consultorProfileDependentsCount.value = profile.numero_dependentes || "";
+      elements.consultorProfileGoal.value = profile.objetivo_financeiro_principal || "";
+      elements.consultorProfileHorizon.value = profile.horizonte_investimento_principal || "";
+      elements.consultorProfileLossTolerance.value = profile.tolerancia_perdas || "";
+      elements.consultorProfileIncome.value = profile.renda_mensal_aproximada || "";
+      renderConsultorProfileFields();
+      setMessage(
+        elements.consultorProfileMessage,
+        status.configured ? "Perfil complementar salvo." : "Perfil complementar ainda não preenchido.",
+        status.configured ? "success" : "",
+      );
+    } catch (error) {
+      setMessage(elements.consultorProfileMessage, error.message, "error");
+    }
+  }
+
+  function profileValue(value) {
+    if (value === true) {
+      return "true";
+    }
+    if (value === false) {
+      return "false";
+    }
+    return "";
+  }
+
+  function optionalBoolean(value) {
+    if (value === "true") {
+      return true;
+    }
+    if (value === "false") {
+      return false;
+    }
+    return "";
+  }
+
+  function renderConsultorProfileFields() {
+    if (!elements.consultorProfileDependentsCountField) {
+      return;
+    }
+    const hasDependents = elements.consultorProfileDependents?.value === "true";
+    elements.consultorProfileDependentsCountField.hidden = !hasDependents;
+    if (!hasDependents && elements.consultorProfileDependentsCount) {
+      elements.consultorProfileDependentsCount.value = "";
+    }
+  }
+
+  async function handleConsultorProfileSubmit(event) {
+    event.preventDefault();
+    setMessage(elements.consultorProfileMessage, "");
+    const data = {
+      idade: elements.consultorProfileAge?.value || "",
+      possui_imovel_proprio: optionalBoolean(elements.consultorProfileHome?.value || ""),
+      possui_dependentes: optionalBoolean(elements.consultorProfileDependents?.value || ""),
+      numero_dependentes: elements.consultorProfileDependentsCount?.value || "",
+      objetivo_financeiro_principal: elements.consultorProfileGoal?.value || "",
+      horizonte_investimento_principal: elements.consultorProfileHorizon?.value || "",
+      tolerancia_perdas: elements.consultorProfileLossTolerance?.value || "",
+      renda_mensal_aproximada: elements.consultorProfileIncome?.value || "",
+    };
+    try {
+      await api("/api/consultor/perfil-complementar", { method: "POST", body: data });
+      await loadConsultorProfile();
+      setMessage(elements.consultorProfileMessage, "Perfil complementar salvo.", "success");
+    } catch (error) {
+      setMessage(elements.consultorProfileMessage, error.message, "error");
+    }
+  }
+
+  async function handleConsultorProfileDelete() {
+    setMessage(elements.consultorProfileMessage, "");
+    try {
+      await api("/api/consultor/perfil-complementar", { method: "DELETE" });
+      elements.consultorProfileForm.reset();
+      renderConsultorProfileFields();
+      setMessage(elements.consultorProfileMessage, "Perfil complementar excluído.", "success");
+    } catch (error) {
+      setMessage(elements.consultorProfileMessage, error.message, "error");
     }
   }
 
@@ -370,6 +526,14 @@ export function registerUserAdminView(context) {
       elements.aiConfigAuthType.addEventListener("change", renderAIConfigFields);
     }
   }
+  if (elements.consultorConfigForm) {
+    elements.consultorConfigForm.addEventListener("submit", handleConsultorConfigSubmit);
+  }
+  if (elements.consultorProfileForm) {
+    elements.consultorProfileForm.addEventListener("submit", handleConsultorProfileSubmit);
+    elements.consultorProfileDependents?.addEventListener("change", renderConsultorProfileFields);
+    elements.consultorProfileDeleteButton?.addEventListener("click", handleConsultorProfileDelete);
+  }
   if (elements.themePreference) {
     elements.themePreference.addEventListener("click", handleThemePreferenceClick);
     syncThemePreference();
@@ -386,6 +550,8 @@ export function registerUserAdminView(context) {
   return {
     loadEmailConfigStatus,
     loadAIConfigStatus,
+    loadConsultorConfigStatus,
+    loadConsultorProfile,
     loadMaisRetornoConfigStatus,
     syncThemePreference,
   };
