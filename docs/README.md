@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 8.3
+versao: 8.4
 atualizado: 2026-08-10
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -132,6 +132,7 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `8.4` — 2026-08-10 — [[specs/tendencias-saude-financeira]] v2.20 documenta indicador de fonte no card **Despesas** da aba Tendências.
 - `8.3` — 2026-08-10 — [[specs/investimentos-portfolio]] v2.21 documenta resgates de Poupança consumindo aniversários por FIFO e resgate total removendo a posição aberta.
 - `8.2` — 2026-08-10 — [[specs/lancamentos]] v3.6 e [[specs/investimentos-portfolio]] v2.20 ampliam o uso de CNPJ/Mais Retorno para Previdência Privada.
 - `8.1` — 2026-08-10 — [[specs/lancamentos]] v3.5, [[specs/investimentos-portfolio]] v2.19 e [[arquitetura]] v3.14 documentam busca assistida de cota de fundos por CNPJ via Mais Retorno no formulário de Lançamentos.

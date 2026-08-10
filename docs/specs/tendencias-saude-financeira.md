@@ -2,8 +2,8 @@
 tipo: spec
 area: tendencias-saude-financeira
 status: implementado
-versao: 2.19
-atualizado: 2026-08-09
+versao: 2.20
+atualizado: 2026-08-10
 relacionados:
   - "[[score-saude-financeira]]"
   - "[[relatorios]]"
@@ -20,7 +20,7 @@ aliases: ["Tendências de Saúde Financeira", "Achados Financeiros", "Insights F
 # Tendências e Achados de Saúde Financeira
 
 > [!info] Status
-> **implementado** · área: `tendencias-saude-financeira` · atualizado em 2026-08-09 · relacionados: [[score-saude-financeira]], [[relatorios]], [[lancamentos]], [[cartoes]]
+> **implementado** · área: `tendencias-saude-financeira` · atualizado em 2026-08-10 · relacionados: [[score-saude-financeira]], [[relatorios]], [[lancamentos]], [[cartoes]]
 
 ## Problema
 
@@ -134,6 +134,7 @@ Usuário autenticado que consulta o Cockpit e deseja entender, em linguagem simp
 - Quando as compras antecipadas forem identificáveis, o texto explicativo deve citar até 5 descrições; acima disso, deve agrupar o restante para preservar densidade e evitar transformar o resumo em extrato.
 - Pagamentos de fatura em conta-corrente continuam excluídos das despesas analíticas para evitar duplicidade, conforme [[relatorios]].
 - Lançamentos de cartão devem entrar pela competência da fatura (`invoice_month`) nas análises mensais, conforme [[relatorios]].
+- O card de **Despesas** no topo da aba deve oferecer indicação discreta de fonte, explicando que o valor soma despesas de contas pela data e lançamentos de cartão pela competência da fatura, com pagamentos de fatura excluídos para evitar duplicidade.
 - Sugestões devem ser explicativas e não prescritivas, evitando tom de aconselhamento financeiro personalizado.
 - Em moeda estrangeira ou cenário multi-moeda, a primeira versão deve evitar misturar moedas sem explicação; quando necessário, gerar achados por moeda ou usar os valores normalizados já definidos pelo Score.
 - O aviso de cenário multi-moeda deve aparecer apenas no bloco **Tendências e achados**, preferencialmente como último ponto do resumo textual, evitando repetição na linha de metadados da aba.
@@ -232,6 +233,7 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 - Dado um usuário com compras parceladas antecipadas identificáveis, quando visualiza o card **Antecipação de parcelas**, então o texto explicativo cita as compras antecipadas de forma resumida, limitando a lista para preservar a leitura.
 - Dado um usuário com pagamentos de fatura em conta-corrente, quando as despesas do mês são agregadas, então esses pagamentos não são somados como despesa analítica.
 - Dado um usuário com lançamentos de cartão, quando a tendência mensal é calculada, então os valores entram pela competência da fatura (`invoice_month`).
+- Dado um usuário visualizando o card **Despesas** no topo da aba Tendências, quando consulta a indicação de fonte, então entende que o valor vem das despesas analíticas do mês em BRL, somando contas por data e cartões por competência da fatura, com pagamentos de fatura excluídos.
 - Dado um usuário em cenário multi-moeda, quando houver dados em mais de uma moeda, então o sistema não mistura moedas sem indicar a base usada.
 - Dado um usuário em cenário multi-moeda, quando visualiza a aba **Tendências**, então o aviso de moeda aparece uma única vez no bloco **Tendências e achados**.
 - Dado um usuário com despesas recorrentes mensais na categoria `Assinaturas e Serviços`, quando consulta a aba **Tendências**, então o sistema exibe o custo mensal agregado por subcategoria como achado estruturado em centavos, sem recomendar cancelamento.
@@ -285,6 +287,7 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 
 ## Changelog
 
+- `2.20` — 2026-08-10 — Card **Despesas** da aba Tendências ganha indicador discreto de fonte, explicando contas por data, cartões por competência e exclusão de pagamentos de fatura.
 - `2.19` — 2026-08-09 — Prompt da IA de Tendências refinado para síntese executiva integrada em 2 a 4 frases e payload enriquecido apenas com contexto operacional agregado, sem detalhes de cards.
 - `2.18` — 2026-08-09 — Ajustada a fronteira entre resumo e cards: IA e resumo local passam a evitar repetição de limites, eventos pontuais e antecipações já detalhados nos cards.
 - `2.17` — 2026-08-09 — Consulta base da série mensal passa a filtrar lançamentos por intervalo de datas em vez de `substr(date, 1, 7)` no `WHERE`, preservando uso de índice em bases maiores.

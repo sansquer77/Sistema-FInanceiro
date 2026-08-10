@@ -6554,6 +6554,34 @@ padding: 8px 16px;
   letter-spacing: 0.06em;
 }
 
+.trends-summary-label-with-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.trends-info-button {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: help;
+}
+
+.trends-info-button:hover,
+.trends-info-button:focus-visible {
+  color: var(--ink);
+  border-color: var(--accent);
+  box-shadow: var(--control-shadow-sm);
+}
+
 .trends-summary-item strong {
   font-size: 22px;
   font-weight: 950;

@@ -157,7 +157,15 @@ export function registerTrendsView({
           <small>${baseIncome > 0 ? `base: ${formatMoney(baseIncome / 100, "BRL")}` : "&nbsp;"}</small>
         </article>
         <article class="trends-summary-item expense">
-          <span>Despesas</span>
+          <span class="trends-summary-label-with-info">
+            Despesas
+            <button
+              class="trends-info-button"
+              type="button"
+              aria-label="Fonte do valor de despesas"
+              title="Despesas analíticas do mês em BRL: despesas de contas pela data do lançamento + lançamentos de cartão pela competência da fatura. Pagamentos de fatura são excluídos para evitar duplicidade."
+            >i</button>
+          </span>
           <strong>${formatMoney(expense / 100, "BRL")}</strong>
           <small>${baseExpense > 0 ? `base: ${formatMoney(baseExpense / 100, "BRL")}` : "&nbsp;"}</small>
         </article>
