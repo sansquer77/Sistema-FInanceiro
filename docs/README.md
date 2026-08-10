@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 9.2
+versao: 9.5
 atualizado: 2026-08-10
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -132,6 +132,9 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `9.5` — 2026-08-10 — [[specs/consultor]] atualizada para v0.29 com Passo 10 concluído; [[arquitetura]] v3.22 documenta o pós-processamento de respostas do Consultor.
+- `9.4` — 2026-08-10 — [[specs/consultor]] atualizada para v0.28 com Passo 9 concluído; [[arquitetura]] v3.21 documenta o executor de IA reutilizando `user_ai_settings`.
+- `9.3` — 2026-08-10 — [[specs/consultor]] atualizada para v0.27 com Passo 8 concluído; [[arquitetura]] v3.20 documenta metadados de cotações herdados do Portfólio.
 - `9.2` — 2026-08-10 — [[specs/consultor]] atualizada para v0.26 com Passo 7 concluído; [[arquitetura]] v3.19 documenta contexto minimizado por card.
 - `9.1` — 2026-08-10 — [[specs/consultor]] atualizada para v0.25 com Passo 6 concluído; [[arquitetura]] v3.18 documenta Perfil Complementar criptografado por usuário.
 - `9.0` — 2026-08-10 — [[specs/consultor]] atualizada para v0.24 com Passo 5 concluído; [[arquitetura]] v3.17 documenta configuração por usuário e expurgo de histórico no domínio do Consultor.

@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.19
+versao: 3.22
 atualizado: 2026-08-10
 relacionados:
   - "[[requisitos]]"
@@ -266,7 +266,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `financial_health.py` | Núcleo analítico do Score de Saúde Financeira: cálculo atômico dos pilares, lista `pilares`, Paz Financeira e função de histórico com validação de `months` (1-36). Ver [[score-saude-financeira]]. |
 | `trends.py` | Núcleo local de Tendências e Achados: série mensal, Budget x Realizado, achados estruturados, eventos pontuais, assinaturas/serviços recorrentes, confiança e resumo determinístico. Ver [[tendencias-saude-financeira]]. |
 | `ai_summary.py` | Reescrita opcional do resumo por IA com payload minimizado, timeout curto e fallback para resumo local. Ver [[tendencias-saude-financeira]]. |
-| `consultor.py` | Domínio futuro do Consultor: catálogo fechado de análises, validações de enums, prompts estritos, persona, disclaimer, configuração por usuário, Perfil Complementar criptografado, contexto minimizado por card e expurgo de histórico por privacidade. Ver [[specs/consultor]]. |
+| `consultor.py` | Domínio futuro do Consultor: catálogo fechado de análises, validações de enums, prompts estritos, persona, disclaimer, configuração por usuário, Perfil Complementar criptografado, contexto minimizado por card, metadados de cotações herdados do Portfólio, executor de IA via `user_ai_settings`, pós-processamento de respostas e expurgo de histórico por privacidade. Ver [[specs/consultor]]. |
 | `imports.py` | Leitura de exportações Organizze e planilhas modelo. Ver [[importacao-organizze]]. |
 | `operation_logs.py` | Auditoria funcional das operações do usuário. Ver [[historico-operacoes]]. |
 | `emailer.py` | Envio SMTP do código de recuperação de senha. Ver [[recuperacao-senha]]. |
@@ -483,6 +483,9 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.22` — 2026-08-10 — `financeiro/consultor.py` documentado com pós-processamento de respostas para estrutura obrigatória, disclaimer, risco e bloqueio de recomendações vedadas. Ver [[specs/consultor]] v0.29.
+- `3.21` — 2026-08-10 — `financeiro/consultor.py` documentado com executor de IA que reutiliza `user_ai_settings`, respeita timeout configurado e limita tokens de resposta a 900. Ver [[specs/consultor]] v0.28.
+- `3.20` — 2026-08-10 — `financeiro/consultor.py` documentado com metadados de cotações herdados do Portfólio (`market_data`), sem novas fontes de mercado no Consultor. Ver [[specs/consultor]] v0.27.
 - `3.19` — 2026-08-10 — `financeiro/consultor.py` documentado com construtores de contexto minimizado por `analysis_id`, reaproveitando agregados existentes sem transações cruas. Ver [[specs/consultor]] v0.26.
 - `3.18` — 2026-08-10 — `financeiro/consultor.py` documentado com Perfil Complementar criptografado por usuário em `consultor_perfil_complementar.payload_enc`. Ver [[specs/consultor]] v0.25.
 - `3.17` — 2026-08-10 — `financeiro/consultor.py` documentado com configuração por usuário e expurgo de histórico quando Consultor/consentimento/IA geral são desabilitados. Ver [[specs/consultor]] v0.24.

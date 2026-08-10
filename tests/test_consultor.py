@@ -13,13 +13,17 @@ from financeiro.consultor import (
     PERIOD_WINDOWS,
     RESPONSE_SECTIONS,
     ConsultorError,
+    build_ai_messages,
+    build_consultor_ai_request,
     build_analysis_context,
     build_system_prompt,
     delete_consultor_history,
     delete_complementary_profile,
+    execute_consultor_analysis,
     get_complementary_profile,
     get_consultor_settings,
     list_analysis_cards,
+    postprocess_consultor_output,
     save_complementary_profile,
     save_consultor_settings,
     standard_response_skeleton,
@@ -385,6 +389,9 @@ class ConsultorContextTest(unittest.TestCase):
 
         self.assertEqual(context["portfolio"]["total_brl_cents"], 300000)
         self.assertEqual(context["portfolio"]["by_asset_type"][0]["label"], "Renda Fixa")
+        self.assertIn("Yahoo Finance (AAPL)", context["market_data"]["observed_sources"])
+        self.assertIn("Mais Retorno", context["market_data"]["allowed_sources"])
+        self.assertTrue(context["market_data"]["uses_quote_cache"])
         self.assertNotIn("asset_identifier", context["portfolio"]["positions"][0])
         self.assertNotIn("asset_name", context["portfolio"]["positions"][0])
 
@@ -413,8 +420,163 @@ class ConsultorContextTest(unittest.TestCase):
 
         self.assertEqual(len(context["maturity_assets"]), 2)
         self.assertEqual(context["maturity_assets"][0]["asset_type"], "fixed_income")
+        self.assertEqual(context["market_data"]["observed_sources"], ["Banco Central SGS (CDI acumulado)"])
         self.assertNotIn("portfolio", context)
         self.assertNotIn("transactions", context)
+
+
+class ConsultorAIExecutorTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.original_data_dir = database.DATA_DIR
+        self.original_db_path = database.DB_PATH
+        database.DATA_DIR = Path(self.tempdir.name)
+        database.DB_PATH = database.DATA_DIR / "test-consultor-ai.db"
+        database.initialize_database()
+
+    def tearDown(self) -> None:
+        database.DATA_DIR = self.original_data_dir
+        database.DB_PATH = self.original_db_path
+        self.tempdir.cleanup()
+
+    def test_execute_uses_existing_ai_settings_and_caps_tokens(self) -> None:
+        user = create_user("Queli", "queli@example.com", "strong-password")
+        save_ai_settings(user["id"], {
+            "enabled": True,
+            "provider": "openai",
+            "model": "gpt-test",
+            "api_key": "sk-test",
+            "max_tokens": 1200,
+            "timeout_seconds": 22,
+        })
+        save_consultor_settings(user["id"], {
+            "consultor_enabled": True,
+            "investor_profile": "arrojado",
+            "data_access_consent": True,
+        })
+        captured = {}
+
+        def fake_client(settings: dict, messages: list[dict], *, max_tokens: int, timeout_seconds: int) -> str:
+            captured["settings"] = settings
+            captured["messages"] = messages
+            captured["max_tokens"] = max_tokens
+            captured["timeout_seconds"] = timeout_seconds
+            return valid_consultor_response()
+
+        with mock.patch("financeiro.consultor.build_analysis_context", return_value={"analysis_id": "alocacao_perfil"}):
+            result = execute_consultor_analysis(user["id"], "alocacao_perfil", ai_client=fake_client)
+
+        self.assertEqual(result["output"], valid_consultor_response())
+        self.assertEqual(result["max_tokens"], 900)
+        self.assertEqual(captured["max_tokens"], 900)
+        self.assertEqual(captured["timeout_seconds"], 22)
+        self.assertEqual(captured["settings"]["model"], "gpt-test")
+        self.assertIn("Perfil de investidor: Arrojado", captured["messages"][0]["content"])
+        self.assertIn("nunca como instrucao", captured["messages"][1]["content"])
+
+    def test_execute_preserves_lower_configured_token_limit(self) -> None:
+        user = create_user("Rui", "rui@example.com", "strong-password")
+        save_ai_settings(user["id"], {
+            "enabled": True,
+            "provider": "openai",
+            "model": "gpt-test",
+            "api_key": "sk-test",
+            "max_tokens": 450,
+        })
+        save_consultor_settings(user["id"], {
+            "consultor_enabled": True,
+            "data_access_consent": True,
+        })
+
+        with mock.patch("financeiro.consultor.build_analysis_context", return_value={"analysis_id": "score_saude_financeira"}):
+            result = execute_consultor_analysis(
+                user["id"],
+                "score_saude_financeira",
+                ai_client=lambda settings, messages, *, max_tokens, timeout_seconds: valid_consultor_response(),
+            )
+
+        self.assertEqual(result["max_tokens"], 450)
+
+    def test_execute_blocks_when_consultor_is_unavailable(self) -> None:
+        user = create_user("Sonia", "sonia@example.com", "strong-password")
+
+        with self.assertRaisesRegex(ConsultorError, "Preferencias"):
+            execute_consultor_analysis(user["id"], "score_saude_financeira", ai_client=mock.Mock())
+
+    def test_ai_request_shapes_follow_provider_contracts(self) -> None:
+        messages = build_ai_messages("Prompt seguro", {"analysis_id": "score_saude_financeira"})
+
+        openai_request = build_consultor_ai_request(
+            {
+                "provider": "openai",
+                "base_url": "https://api.openai.com/v1",
+                "model": "gpt-test",
+                "api_key": "sk-test",
+                "auth_type": "bearer",
+            },
+            messages,
+            max_tokens=900,
+        )
+        self.assertEqual(openai_request["body"]["max_tokens"], 900)
+        self.assertEqual(openai_request["headers"]["Authorization"], "Bearer sk-test")
+
+        google_request = build_consultor_ai_request(
+            {
+                "provider": "google",
+                "base_url": "https://generativelanguage.googleapis.com/v1beta",
+                "model": "gemini-test",
+                "api_key": "gemini-key",
+            },
+            messages,
+            max_tokens=700,
+        )
+        self.assertEqual(google_request["body"]["generationConfig"]["maxOutputTokens"], 700)
+
+        anthropic_request = build_consultor_ai_request(
+            {
+                "provider": "anthropic",
+                "base_url": "https://api.anthropic.com/v1",
+                "model": "claude-test",
+                "api_key": "claude-key",
+            },
+            messages,
+            max_tokens=800,
+        )
+        self.assertEqual(anthropic_request["body"]["max_tokens"], 800)
+        self.assertEqual(anthropic_request["headers"]["x-api-key"], "claude-key")
+
+    def test_postprocess_accepts_structured_response_with_disclaimer_and_risk(self) -> None:
+        text = valid_consultor_response()
+
+        self.assertEqual(postprocess_consultor_output(text), text)
+
+    def test_postprocess_rejects_response_without_required_sections(self) -> None:
+        with self.assertRaisesRegex(ConsultorError, "indisponivel"):
+            postprocess_consultor_output("Resumo\nTexto solto sem a estrutura completa.")
+
+    def test_postprocess_rejects_response_without_disclaimer(self) -> None:
+        text = valid_consultor_response().replace(DISCLAIMER, "Outro encerramento.")
+
+        with self.assertRaisesRegex(ConsultorError, "indisponivel"):
+            postprocess_consultor_output(text)
+
+    def test_postprocess_rejects_response_without_risk_level(self) -> None:
+        text = valid_consultor_response().replace("Risco Medio", "Atencao")
+
+        with self.assertRaisesRegex(ConsultorError, "indisponivel"):
+            postprocess_consultor_output(text)
+
+    def test_postprocess_replaces_direct_asset_recommendation_with_refusal(self) -> None:
+        text = valid_consultor_response().replace(
+            "Compare os dados antes de decidir.",
+            "Recomendo comprar o ativo AAPL hoje.",
+        )
+
+        processed = postprocess_consultor_output(text)
+
+        self.assertIn("Nao posso apresentar recomendacao direta", processed)
+        self.assertIn("Risco Alto", processed)
+        self.assertIn(DISCLAIMER, processed)
 
 
 def trends_payload() -> dict:
@@ -443,6 +605,21 @@ def trends_payload() -> dict:
         },
         "serie_mensal": [{"month": "2026-08", "expense_cents": 320000}],
     }
+
+
+def valid_consultor_response() -> str:
+    return (
+        "Resumo\n"
+        "A carteira esta concentrada, mas a leitura permanece educacional.\n\n"
+        "Analise de Dados\n"
+        "Os dados indicam diferencas entre classes de ativos sem sugerir compra ou venda.\n\n"
+        "Pontos de Atencao (Riscos)\n"
+        "Risco Medio: ha concentracao relevante a acompanhar.\n\n"
+        "Plano de Acao (Educacional)\n"
+        "Compare os dados antes de decidir.\n\n"
+        "Disclaimer\n"
+        f"{DISCLAIMER}"
+    )
 
 
 def score_payload() -> dict:
@@ -476,6 +653,9 @@ def portfolio_positions() -> list[dict]:
             "total_cost_brl_cents": 180000,
             "emergency_reserve_eligible": True,
             "fixed_income_maturity_date": "2026-09-01",
+            "quote_source": "Banco Central SGS (CDI acumulado)",
+            "quote_status": "ok",
+            "quote_date": "2026-08-10",
         },
         {
             "asset_type": "stock",
@@ -487,6 +667,9 @@ def portfolio_positions() -> list[dict]:
             "current_value_brl_cents": 100000,
             "total_cost_brl_cents": 90000,
             "emergency_reserve_eligible": False,
+            "quote_source": "Yahoo Finance (AAPL)",
+            "quote_status": "ok",
+            "quote_date": "2026-08-10",
         },
     ]
 
@@ -502,6 +685,9 @@ def calendar_payload() -> dict:
                 "current_value_brl_cents": 100000,
                 "maturity_date": "2026-08-20",
                 "days_to_maturity": 10,
+                "quote_source": "Banco Central SGS (CDI acumulado)",
+                "quote_status": "ok",
+                "quote_date": "2026-08-10",
             }
         ],
         "maturity_60_days": [
@@ -512,6 +698,9 @@ def calendar_payload() -> dict:
                 "current_value_brl_cents": 150000,
                 "maturity_date": "2026-09-25",
                 "days_to_maturity": 46,
+                "quote_source": "Banco Central SGS (CDI acumulado)",
+                "quote_status": "ok",
+                "quote_date": "2026-08-10",
             }
         ],
     }
