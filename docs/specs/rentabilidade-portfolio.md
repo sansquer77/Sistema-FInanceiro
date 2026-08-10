@@ -2,7 +2,7 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 1.5
+versao: 1.6
 atualizado: 2026-08-09
 relacionados:
   - "[[investimentos-portfolio]]"
@@ -60,6 +60,8 @@ Investidor que acompanha o Portfólio e quer uma leitura rápida de performance 
 - O IPCA é calculado como fator acumulado da série SGS 433 (indexador mensal) entre o primeiro e o último dia de cada mês (com cache por mês, compartilhado entre as posições da mesma geração de série).
 - Séries com todos os meses em 0% (moeda sem posições no período ou baseline) aparecem como linha plana; moedas sem posições abertas não geram linha própria.
 - O gráfico usa o estilo visual do gráfico de evolução de categoria (SVG puro, linhas e pontos, paleta do design system).
+- A série de rentabilidade deve ser carregada sob demanda quando o usuário abrir o drawer/gráfico, não junto com o carregamento inicial da aba **Posição**.
+- Quando um chamador backend já tiver posições do Portfólio calculadas no mesmo fluxo, `get_portfolio_returns` pode receber essa lista e evitar recalcular/cotar o Portfólio inteiro.
 
 ## API e dados
 
@@ -106,6 +108,7 @@ Tabelas: `investment_opening_positions`, `investment_operations`, `investment_re
 
 ## Changelog
 
+- `1.6` — 2026-08-09 — Rentabilidade passa a ser carregada sob demanda no drawer e `get_portfolio_returns` aceita posições já calculadas para evitar segunda consolidação do Portfólio quando houver contexto disponível.
 - `1.5` — 2026-08-09 — Refinamento visual do gráfico de rentabilidade: linhas mais finas/discretas e pontos menores com destaque apenas no hover.
 - `1.4` — 2026-08-07 — Desempenho: o fator acumulado de indexador (CDI/IPCA) por mês é decomposto por mês-calendário e compartilhado entre todas as posições e ativos de uma mesma geração de série (`_accumulated_factor_by_month`), reduzindo chamadas ao BCB; valores observáveis não mudam.
 - `1.3` — 2026-08-06 — Rework UX: gráfico de **barras → linhas** (R$, US$, CDI e IPCA em %), sem números fixos; valores em tooltip ao passar o mouse sobre os pontos; rentabilidade calculada **por moeda na própria moeda** (sem efeito de câmbio); adicionado benchmark **IPCA** (SGS 433 mensal). Ajuste visual posterior: **linhas suavizadas**, **eixos X/Y com grid e rótulos** e **área 15% maior**.

@@ -2,8 +2,8 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 2.3
-atualizado: 2026-08-07
+versao: 2.6
+atualizado: 2026-08-09
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
   - "[[arquitetura]]"
@@ -14,7 +14,7 @@ aliases: ["Modularização Frontend", "ES Modules"]
 # Modularização do Frontend
 
 > [!info] Status
-> **implementado** · área: `frontend` · atualizado em 2026-08-02 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]]
+> **implementado** · área: `frontend` · atualizado em 2026-08-09 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]]
 
 ## Problema
 
@@ -118,6 +118,12 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Dado o usuário visualizando o menu lateral, quando compara os grupos Cadastro e Lançamentos, então os itens não repetem apenas `Contas` e `Cartões`; eles aparecem como **Minhas Contas**, **Meus Cartões**, **Extrato de Contas** e **Fatura de Cartões**.
 - Dado o usuário acessando um desses itens, quando a tela abre, então o título da página usa o mesmo nome desambiguado do menu.
 - Dado um navegador com suporte a View Transitions API, quando o usuário alterna módulos pelo menu lateral, então a troca visual acontece com transição curta e sem bloquear os carregamentos da tela.
+- Dado o dashboard carregado com dados do Cockpit para o mês atual, quando o usuário navega para Cockpit novamente sem alterar mês ou dados, então a UI reaproveita o snapshot em memória e não dispara nova busca completa dos endpoints pesados.
+- Dado o usuário abrindo o Portfólio, quando a tela carrega, então a aba **Posição** renderiza primeiro; **Análise**, **Histórico** e rentabilidade detalhada são renderizados/carregados sob demanda no primeiro acesso.
+- Dado o usuário alterando o agrupamento ou colapsando/expandindo grupos no Portfólio, quando a tela já tem dados carregados, então apenas a lista de posições é renderizada novamente.
+- Dado a interface carregando scripts de terceiros não essenciais, quando o HTML é parseado, então esses scripts não bloqueiam a inicialização do app (`async`/`defer` quando aplicável).
+- Dado uma área estrutural de layout como o dashboard principal, quando o menu lateral alterna estado, então a UI não anima propriedades caras como `grid-template-columns`.
+- Dado uma função de renderização frequente, quando executada, então não deve emitir logs de debug no console em operação normal.
 - Dado o usuário autenticado, quando alterna o modo privacidade, então `privacy-utils.js` aplica `data-privacy` no documento sem alterar endpoints, banco ou regras financeiras.
 - Dado um navegador sem suporte à API ou com redução de movimento ativa, quando o usuário alterna módulos, então a navegação continua funcionando de forma instantânea.
 
@@ -129,6 +135,9 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Changelog
 
+- `2.6` — 2026-08-09 — Ajustes finais de performance frontend: widget externo BMC passa a carregar com `async/defer`, transição de `grid-template-columns` removida do dashboard e logs de debug removidos de renderizações frequentes.
+- `2.5` — 2026-08-09 — Portfólio passa a renderizar abas sob demanda: Posição no carregamento inicial, Análise/Histórico no primeiro acesso e rentabilidade detalhada apenas ao abrir o drawer; agrupamento/colapso atualiza só a lista de posições.
+- `2.4` — 2026-08-09 — Navegação para Cockpit passa a reaproveitar o snapshot em memória do mês já carregado, evitando a segunda busca pesada no load inicial e re-buscas completas ao clicar novamente no módulo.
 - `2.3` — 2026-08-07 — Aba **Saúde Financeira** do Cockpit extraída para view dedicada `financial-health-view.js` (fábrica `registerFinancialHealthView`), desacoplando o estado de tela do `cockpit-view.js`.
 - `2.2` — 2026-08-02 — Registrado `privacy-utils.js` como utilitário local para Modo Privacidade via `data-privacy`, sem backend ou build step.
 - `2.1` — 2026-08-02 — Troca de módulos do dashboard passa a usar View Transitions API como melhoria progressiva, com fallback e respeito a redução de movimento.

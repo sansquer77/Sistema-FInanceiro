@@ -2,8 +2,8 @@
 tipo: design
 area: meta
 status: implementado
-versao: 2.7
-atualizado: 2026-08-08
+versao: 2.8
+atualizado: 2026-08-09
 relacionados:
   - "[[arquitetura]]"
   - "[[specs/frontend-modularizacao]]"
@@ -14,7 +14,7 @@ aliases: ["Design System", "Tokens Visuais", "Precisão Institucional"]
 # Design System — Precisão Institucional
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-08-08 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]]
+> **implementado** · área: `meta` · atualizado em 2026-08-09 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]]
 
 ## Personalidade da marca
 
@@ -290,9 +290,9 @@ Padrão único em toda a aplicação, conforme o modelo usado no menu **Preferê
 
 - O botão global de privacidade deve ficar no cabeçalho superior como ação circular discreta, com estado e rótulo acessível.
 - Valores monetários mascaráveis usam `.money-value` ou `.privacy-mask`.
-- Em `:root[data-privacy="true"]`, valores monetários usam desfoque suave (`filter: blur(7px)`), transição curta (`0.2s`) e `user-select: none`.
-- No hover/foco do valor individual, o desfoque pode reduzir para `blur(0)` para permitir consulta rápida sem desligar o modo global.
-- O blur não deve alterar largura, alinhamento ou densidade dos cards/tabelas; a estrutura visual deve permanecer estável.
+- Em `:root[data-privacy="true"]`, valores monetários usam máscara textual leve (`color: transparent` + `text-shadow`), transição curta e `user-select: none`.
+- No hover/foco do valor individual, a cor volta a `inherit` e a sombra é removida para permitir consulta rápida sem desligar o modo global.
+- A máscara não deve alterar largura, alinhamento ou densidade dos cards/tabelas; a estrutura visual deve permanecer estável.
 
 ### Formulários de lançamento
 
@@ -322,6 +322,7 @@ Padrão único em toda a aplicação, conforme o modelo usado no menu **Preferê
 
 ## Changelog
 
+- `2.8` — 2026-08-09 — Modo Privacidade passa a usar máscara textual leve no lugar de `filter: blur()` em massa, mantendo revelação em hover/foco e preservando alinhamento.
 - `2.7` — 2026-08-08 — Fundo da página torna-se branco no tema claro (e escuro sólido no escuro) com separação de seções pelos cards (borda 1px); padronizado o componente de **Abas** como pílulas com borda `--outline`, ativo em `--accent-container` + `--accent` (modelo do menu Preferências), sem trilho nem sombras no estado ativo.
 - `2.6` — 2026-08-02 — Documentado padrão do Modo Privacidade com botão global, valores `.money-value`/`.privacy-mask`, Glass Blur e revelação em hover/foco.
 - `2.5` — 2026-08-02 — Documentado padrão de redução de ruído visual em formulários densos com helper sob demanda, microcopy dinâmica, segmented controls, presets e previews compactos.

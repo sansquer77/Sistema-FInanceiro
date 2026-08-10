@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.11
+versao: 3.13
 atualizado: 2026-08-09
 relacionados:
   - "[[requisitos]]"
@@ -27,8 +27,11 @@ app.py              Servidor HTTP, roteamento da API e arquivos estáticos
 financeiro/         Regras de domínio, persistência e integrações locais
 web/                Interface do usuário em HTML, CSS e JavaScript
 data/               Arquivos de runtime criados localmente (não versionados)
+secure/             Chave mestra local de segredos criptografados (não versionada)
 docs/               Requisitos, arquitetura, specs e referências
 ```
+
+O servidor HTTP revalida arquivos estáticos com `ETag` e `Last-Modified`; arquivos não versionados usam `Cache-Control: no-cache` para permitir `304 Not Modified` sem cache agressivo. Respostas JSON acima de 1 KB podem ser comprimidas com gzip quando o cliente envia `Accept-Encoding: gzip`.
 
 ---
 
@@ -330,6 +333,7 @@ A chave mestra padrão de `secure_config.py` fica fora de `data/`, em `secure/co
 - `idx_investment_redemptions_source`
 - `idx_investment_value_overrides_user`
 - `idx_investment_closed_positions_user`
+- `idx_investment_closed_positions_user_closed`
 - `idx_credit_card_transactions_card_month`
 - `idx_credit_card_transactions_user_card_invoice_date`
 - `idx_credit_card_transactions_user_invoice_date`
@@ -406,13 +410,14 @@ Ver [[cartoes]].
 ### Portfólio de Investimentos
 
 1. Carteira consolidada unindo posições iniciais e operações em contas de investimento.
-2. Cotações de Renda Variável e Cripto buscadas de APIs externas (Yahoo Finance / CoinGecko) e cacheadas em `quote_cache`.
+2. Cotações de Renda Variável e Cripto buscadas de APIs externas (Yahoo Finance / CoinGecko) e cacheadas em `quote_cache`, com cache em memória limitado e limpeza de expirados.
 3. Rendimentos de Renda Fixa pós-fixados/híbridos indexados via SGS/BCB, com fallback local.
 4. Valor líquido projetado aplicando tributação regressiva de IOF e IR baseada no tempo de aquisição.
 5. Poupança tratada como ativo próprio com aniversários; Previdência Privada como `private_pension`.
 6. Resgates usam FIFO; encerramentos movem posições para histórico.
 7. Ativos em moeda estrangeira exibidos na moeda da carteira; conversão via lançamentos de câmbio.
 8. Consolidações do Portfólio mantêm valores exibidos na moeda original, mas expõem valor atual normalizado em BRL para a escala das barras visuais, usando cotação do fechamento anterior quando a moeda não é BRL.
+9. A UI do Portfólio carrega a aba **Posição** primeiro; Análise, Histórico e rentabilidade detalhada são renderizados/carregados sob demanda.
 
 Ver [[investimentos-portfolio]].
 
@@ -473,6 +478,8 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.13` — 2026-08-09 — Ajustes finais de performance: índice `idx_investment_closed_positions_user_closed`, filtro por intervalo de datas nas Tendências, widget terceiro assíncrono e modo privacidade sem `filter: blur()` em massa.
+- `3.12` — 2026-08-09 — Documentadas revalidação HTTP com `ETag`/`Last-Modified`, gzip para JSON grande, cache em memória limitado para cotações/câmbio e lazy rendering das abas do Portfólio.
 - `3.11` — 2026-08-09 — Documentada a tabela `secure_configs`, a migração compatível de arquivos `.enc` legados e a chave mestra padrão em `secure/config.key` fora de `data/`.
 - `3.10` — 2026-08-07 — Saldo de conta-corrente passa a ser reconciliação curta (`current_balance_cents = saldo inicial + soma dos deltas de lançamentos com data <= hoje`) dentro da mesma transação imediata de escrita; `apply_balance_delta` deixa de existir; lançamentos futuros não movem o saldo. Ver [[specs/contas-correntes]].
 - `3.9` — 2026-08-07 — Aba **Saúde Financeira** extraída para módulo próprio `web/modules/financial-health-view.js` (fábrica `registerFinancialHealthView`), seguindo o padrão de `trends-view.js`/`consultor-view.js`; estado local de tela migra para o módulo e `invalidateFinancialHealth` passa a ser delegado pelo `cockpit-view.js`.

@@ -2,8 +2,8 @@
 tipo: spec
 area: tendencias-saude-financeira
 status: implementado
-versao: 2.16
-atualizado: 2026-08-02
+versao: 2.17
+atualizado: 2026-08-09
 relacionados:
   - "[[score-saude-financeira]]"
   - "[[relatorios]]"
@@ -20,7 +20,7 @@ aliases: ["Tendências de Saúde Financeira", "Achados Financeiros", "Insights F
 # Tendências e Achados de Saúde Financeira
 
 > [!info] Status
-> **implementado** · área: `tendencias-saude-financeira` · atualizado em 2026-08-02 · relacionados: [[score-saude-financeira]], [[relatorios]], [[lancamentos]], [[cartoes]]
+> **implementado** · área: `tendencias-saude-financeira` · atualizado em 2026-08-09 · relacionados: [[score-saude-financeira]], [[relatorios]], [[lancamentos]], [[cartoes]]
 
 ## Problema
 
@@ -75,6 +75,7 @@ Usuário autenticado que consulta o Cockpit e deseja entender, em linguagem simp
 - O gráfico não deve forçar escala simétrica se apenas o saldo líquido ficar negativo; despesas e receitas devem ser tratadas como valores positivos em barras, e o campo negativo deve refletir apenas a menor perda/saldo negativo relevante.
 - O eixo Y do gráfico deve usar escala visual confortável, evitando rótulos colados próximos ao zero e usando rótulos compactos quando valores altos prejudicarem a leitura.
 - O gráfico deve evitar espaço morto por meses zerados no início da série; o filtro padrão deve exibir **Apenas meses com movimento**, mantendo atalhos para **3 meses**, **6 meses** e **12 meses**.
+- A consulta base da série mensal deve filtrar lançamentos de conta por intervalo de datas (`date >= início` e `date <= fim`) para preservar o uso de índices; a extração `AAAA-MM` pode ficar apenas no agrupamento.
 - O saldo líquido deve ser destacado como linha com pontos sobre as barras, e receitas/despesas devem ser barras lado a lado para reduzir cruzamento visual de linhas.
 - O fundo de cada mês pode usar shading discreto para superávit/déficit: verde translúcido quando receitas superam despesas e vermelho translúcido quando despesas superam receitas.
 - Cada mês do gráfico deve oferecer tooltip/descrição no hover com mês, receitas, despesas, saldo líquido e percentual de saldo sobre receita quando houver receita positiva.
@@ -282,6 +283,7 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 
 ## Changelog
 
+- `2.17` — 2026-08-09 — Consulta base da série mensal passa a filtrar lançamentos por intervalo de datas em vez de `substr(date, 1, 7)` no `WHERE`, preservando uso de índice em bases maiores.
 - `2.16` — 2026-08-02 — Antecipação de parcelas passa a ser detectada também por evidência estrutural de parcelas futuras concentradas na fatura do mês, cobrindo bases sem histórico operacional.
 - `2.15` — 2026-08-02 — Antecipação de parcelas passa a considerar apenas movimentos para fatura anterior, ignorando postergações/remanejamentos para faturas futuras.
 - `2.14` — 2026-08-02 — Card e resumo de antecipação de parcelas passam a exibir total antecipado e compras parceladas identificadas.

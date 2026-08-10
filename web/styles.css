@@ -560,7 +560,6 @@ textarea:focus {
   margin: 0;
   padding: 24px 24px 48px;
   align-items: start;
-  transition: grid-template-columns 0.18s ease;
 }
 
 .dashboard.sidebar-collapsed {
@@ -728,16 +727,18 @@ textarea:focus {
 
 :root[data-privacy="true"] .money-value,
 :root[data-privacy="true"] .privacy-mask {
-  filter: blur(7px);
+  color: transparent;
+  text-shadow: 0 0 9px var(--text-muted);
   user-select: none;
-  transition: filter 0.2s ease;
+  transition: color 0.12s ease, text-shadow 0.12s ease;
 }
 
 :root[data-privacy="true"] .money-value:hover,
 :root[data-privacy="true"] .money-value:focus,
 :root[data-privacy="true"] .privacy-mask:hover,
 :root[data-privacy="true"] .privacy-mask:focus {
-  filter: blur(0);
+  color: inherit;
+  text-shadow: none;
 }
 
 .user-area {

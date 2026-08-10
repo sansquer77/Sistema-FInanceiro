@@ -67,6 +67,10 @@ PERFORMANCE_INDEXES = (
         "CREATE INDEX IF NOT EXISTS idx_investment_closed_positions_user "
         "ON investment_closed_positions (user_id, account_id, asset_type, closed_at)"
     ),
+    (
+        "CREATE INDEX IF NOT EXISTS idx_investment_closed_positions_user_closed "
+        "ON investment_closed_positions (user_id, closed_at DESC, id DESC)"
+    ),
     "CREATE INDEX IF NOT EXISTS idx_quote_cache_expires_at ON quote_cache (expires_at)",
     (
         "CREATE INDEX IF NOT EXISTS idx_operation_logs_user_created "

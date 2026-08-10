@@ -282,6 +282,18 @@ class FinancialHealthDatabaseIntegrationTest(unittest.TestCase):
         self.assertEqual(len(payload["pilares"]), 5)
         json.dumps(payload, ensure_ascii=False)
 
+    def test_score_history_reuses_single_portfolio_snapshot(self) -> None:
+        # spec: score-saude-financeira v3.6 — critério 18
+        user = create_user("History", "history@example.com", "strong-password")
+        positions = [
+            {"asset_type": "fixed_income", "asset_name": "CDB", "current_value_brl_cents": 1_000_000, "emergency_reserve_eligible": True},
+        ]
+        with mock.patch("financeiro.financial_health.current_portfolio_positions", return_value=positions) as portfolio_mock:
+            history = calculate_financial_health_score_history(user["id"], 12)
+
+        self.assertEqual(len(history), 12)
+        portfolio_mock.assert_called_once_with(user["id"], force_refresh=False)
+
     def test_foreign_currency_card_totals_use_brl_normalized_amounts(self) -> None:
         # spec: score-saude-financeira v3.5 — critérios 1, 5 e 6
         user = create_user("Diogo", "diogo@example.com", "strong-password")

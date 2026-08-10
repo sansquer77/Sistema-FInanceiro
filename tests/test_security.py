@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import gzip
 from io import BytesIO
 import os
 import sqlite3
@@ -135,6 +136,52 @@ class BruteForceProtectionTest(IsolatedDatabaseTest):
 
         self.assertEqual(send_email.call_args.args[0], user["id"])
         self.assertEqual(send_email.call_args.args[1], "alice@example.com")
+
+
+class HttpCachingAndCompressionTest(unittest.TestCase):
+    def test_send_json_gzips_large_payload_when_client_accepts_it(self) -> None:
+        handler = object.__new__(app.AppHandler)
+        handler.headers = {"Accept-Encoding": "br, gzip"}
+        handler.wfile = BytesIO()
+        handler.send_response = mock.Mock()
+        handler.send_header = mock.Mock()
+        handler.end_headers = mock.Mock()
+
+        handler.send_json({"items": ["x" * 2000]})
+
+        header_calls = handler.send_header.call_args_list
+        self.assertIn(mock.call("Content-Encoding", "gzip"), header_calls)
+        self.assertIn(mock.call("Vary", "Accept-Encoding"), header_calls)
+        decompressed = gzip.decompress(handler.wfile.getvalue()).decode("utf-8")
+        self.assertIn('"items"', decompressed)
+
+    def test_static_file_returns_not_modified_with_matching_etag(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            web_root = Path(tmpdir)
+            (web_root / "app.js").write_text("console.log('ok');\n", encoding="utf-8")
+            first = object.__new__(app.AppHandler)
+            first.path = "/app.js"
+            first.headers = {}
+            first.wfile = BytesIO()
+            first.send_response = mock.Mock()
+            first.send_header = mock.Mock()
+            first.end_headers = mock.Mock()
+            with mock.patch.object(app, "WEB_ROOT", web_root):
+                first.serve_static()
+            etag = next(call.args[1] for call in first.send_header.call_args_list if call.args[0] == "ETag")
+
+            second = object.__new__(app.AppHandler)
+            second.path = "/app.js"
+            second.headers = {"If-None-Match": etag}
+            second.wfile = BytesIO()
+            second.send_response = mock.Mock()
+            second.send_header = mock.Mock()
+            second.end_headers = mock.Mock()
+            with mock.patch.object(app, "WEB_ROOT", web_root):
+                second.serve_static()
+
+        second.send_response.assert_called_once_with(HTTPStatus.NOT_MODIFIED)
+        self.assertEqual(second.wfile.getvalue(), b"")
 
 
 class IdorProtectionTest(IsolatedDatabaseTest):

@@ -2,8 +2,8 @@
 tipo: spec
 area: score-saude-financeira
 status: implementado
-versao: 3.5
-atualizado: 2026-08-07
+versao: 3.6
+atualizado: 2026-08-09
 relacionados:
   - "[[relatorios]]"
   - "[[limites-gastos]]"
@@ -18,7 +18,7 @@ aliases: ["Score de Saúde Financeira", "Diagnóstico Financeiro", "Financial He
 # Score de Saúde Financeira
 
 > [!info] Status
-> **implementado** · área: `score-saude-financeira` · atualizado em 2026-08-06 · relacionados: [[relatorios]], [[limites-gastos]], [[investimentos-portfolio]], [[cartoes]], [[contas-correntes]]
+> **implementado** · área: `score-saude-financeira` · atualizado em 2026-08-09 · relacionados: [[relatorios]], [[limites-gastos]], [[investimentos-portfolio]], [[cartoes]], [[contas-correntes]]
 
 ## Problema
 
@@ -106,6 +106,7 @@ Qualquer usuário autenticado localmente que deseje entender sua saúde financei
   - **Endividamento**: quando `receitas do mês <= 0`, retornar `score = 100` (metade de 200), `comprometimento_divida_mes_pct = 0.0`, `dados_insuficientes = true` e mensagem "Sem receitas no mês para medir comprometimento de dívida; nota neutra aplicada."
   - A pontuação total (`score_total`) deve refletir a soma dos pilares, e a API deve retornar o campo `dados_insuficientes` como `true` quando receitas e despesas de consumo do mês forem zero ou inexistentes.
 - **Validação do histórico de Score**: A função/rota de histórico deve validar o parâmetro `months` (int) entre 1 e 36 antes de realizar qualquer cálculo ou acesso ao banco. Valores inválidos devem retornar erro de domínio amigável (`HTTP 400`), sem expor detalhes internos. O limite de 36 meses (3 anos) equilibra utilidade analítica e proteção de performance.
+- **Performance do histórico de Score**: A rota de histórico deve reutilizar uma única fotografia do Portfólio para todos os meses do request. Como o Portfólio usado no Score é a posição corrente cadastrada, a consulta não deve recalcular cotações externas N vezes para `months = N`.
 
 ## API e dados
 
@@ -137,6 +138,7 @@ Tabelas: consulta `transactions`, `credit_card_transactions`, `spending_limits`,
 - Dado um usuário autenticado A, quando tenta consultar a rota `/api/financial-health-score`, então somente os lançamentos e ativos associados ao `user_id` de A são considerados no cálculo.
 - Dado um usuário autenticado que consulta `/api/financial-health-score/history?months=1000`, quando a API recebe o parâmetro, então retorna `400 Bad Request` com mensagem informando que `months` deve estar entre 1 e 36, sem consultar o banco de dados.
 - Dado um usuário autenticado que consulta `/api/financial-health-score/history?months=12`, quando a API recebe o parâmetro válido, então retorna o histórico dos últimos 12 meses.
+- Dado um usuário autenticado que consulta `/api/financial-health-score/history?months=12`, quando a API calcula o histórico, então o Portfólio é carregado/cotado uma única vez e reutilizado nos 12 pontos mensais.
 - Dado o Cockpit carregado, quando o usuário seleciona a aba dedicada de Saúde Financeira no tema claro ou escuro, o medidor do Score utiliza o token semântico `var(--color-success, #10B981)` para indicar status saudável, com texto `var(--color-success-text, #ffffff)` para garantir contraste acessível (WCAG AA) em ambos os temas, respeitando o design system.
 - Dado o Cockpit carregado com a aba **Situação do mês** ativa, quando o usuário clica em **Saúde Financeira**, então a aba dedicada do score é exibida diretamente, sem o conteúdo do resumo financeiro acima dela.
 - Dado o Cockpit carregado, quando a aba dedicada de Saúde Financeira exibe os pilares, então há um gráfico de barras horizontais com os 5 pilares, cada um exibindo pontuação obtida, pontuação máxima, percentual e peso, sem depender de biblioteca externa.
@@ -172,6 +174,7 @@ Nenhuma pendência conhecida.
 
 ## Changelog
 
+- `3.6` — 2026-08-09 — Histórico de Score passa a reutilizar uma única fotografia do Portfólio por request, evitando recálculo de cotações externas para cada mês solicitado.
 - `3.5` — 2026-08-07 — Alinhamento com a regra de **Normalização de Moedas**: lançamentos de cartão (fatura) passam a entrar no cálculo do Score via `amount_brl_cents` (BRL normalizado) em todas as consultas de soma (resumo mensal, contexto de dívida e aderência a limites), garantindo consistência com [[tendencias-saude-financeira]] e com a regra vigente de \[\[relatorios\]\] para cartões em moeda estrangeira; teste de regressão adicionado.
 - `3.4` — 2026-08-07 — Aba dedicada extraída para módulo próprio `web/modules/financial-health-view.js` (fábrica `registerFinancialHealthView`), seguindo o padrão de `trends-view.js`/`consultor-view.js`; estado de tela local migra para o módulo e `invalidateFinancialHealth` passa a ser delegado pelo `cockpit-view.js`.
 - `3.3` — 2026-08-06 — Status e posição ajustados no Map of Content (`docs/README.md`): movida para a seção de specs implementadas, área `Diagnóstico`.

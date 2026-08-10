@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import gzip
+import hashlib
 import json
 import mimetypes
 import os
@@ -7,6 +9,7 @@ import re
 import sqlite3
 import sys
 from datetime import date
+from email.utils import formatdate, parsedate_to_datetime
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -132,6 +135,7 @@ DEFAULT_ALLOWED_ORIGINS = frozenset({
     "http://192.168.1.212:8030",
 })
 MAX_JSON_BODY_BYTES = 1 * 1024 * 1024
+GZIP_MIN_BYTES = 1024
 SESSION_COOKIE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60
 SECURITY_HEADERS = {
     "Content-Security-Policy": (
@@ -1301,16 +1305,41 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         content_type = mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
         body = file_path.read_bytes()
+        stat = file_path.stat()
+        etag = f'"{hashlib.sha256(body).hexdigest()}"'
+        last_modified = formatdate(stat.st_mtime, usegmt=True)
+        if self.headers.get("If-None-Match") == etag or self.client_cache_is_fresh(stat.st_mtime):
+            self.send_response(HTTPStatus.NOT_MODIFIED)
+            self.send_header("ETag", etag)
+            self.send_header("Last-Modified", last_modified)
+            if path.startswith("/assets/"):
+                self.send_header("Cache-Control", "public, max-age=31536000, immutable")
+            else:
+                self.send_header("Cache-Control", "no-cache")
+            self.send_security_headers()
+            self.end_headers()
+            return
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", content_type)
+        self.send_header("ETag", etag)
+        self.send_header("Last-Modified", last_modified)
         if path.startswith("/assets/"):
             self.send_header("Cache-Control", "public, max-age=31536000, immutable")
         else:
-            self.send_header("Cache-Control", "no-store")
+            self.send_header("Cache-Control", "no-cache")
         self.send_header("Content-Length", str(len(body)))
         self.send_security_headers()
         self.end_headers()
         self.wfile.write(body)
+
+    def client_cache_is_fresh(self, mtime: float) -> bool:
+        raw = self.headers.get("If-Modified-Since")
+        if not raw:
+            return False
+        try:
+            return parsedate_to_datetime(raw).timestamp() >= int(mtime)
+        except (TypeError, ValueError, OverflowError):
+            return False
 
     def require_user(self, allow_anonymous: bool = False) -> dict | None:
         token = self.get_cookie("session")
@@ -1382,8 +1411,14 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def send_json(self, payload: dict, status: HTTPStatus = HTTPStatus.OK, headers: dict | None = None) -> None:
         body = json.dumps(payload, ensure_ascii=True).encode("utf-8")
+        use_gzip = len(body) >= GZIP_MIN_BYTES and "gzip" in self.headers.get("Accept-Encoding", "").lower()
+        if use_gzip:
+            body = gzip.compress(body)
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
+        if use_gzip:
+            self.send_header("Content-Encoding", "gzip")
+            self.send_header("Vary", "Accept-Encoding")
         self.send_header("Content-Length", str(len(body)))
         self.send_security_headers()
         for key, value in (headers or {}).items():

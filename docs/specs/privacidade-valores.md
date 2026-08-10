@@ -2,8 +2,8 @@
 tipo: spec
 area: privacidade
 status: implementado
-versao: 1.0
-atualizado: 2026-08-02
+versao: 1.1
+atualizado: 2026-08-09
 relacionados:
   - "[[frontend-modularizacao]]"
   - "[[seguranca-autenticacao]]"
@@ -15,7 +15,7 @@ aliases: ["Modo Privacidade", "Ocultar Valores", "Hide/Show Values"]
 # Modo Privacidade — Ocultar Valores
 
 > [!info] Status
-> **implementado** · área: `privacidade` · atualizado em 2026-08-02 · relacionados: [[frontend-modularizacao]], [[seguranca-autenticacao]], [[../design/design-system|Design System]]
+> **implementado** · área: `privacidade` · atualizado em 2026-08-09 · relacionados: [[frontend-modularizacao]], [[seguranca-autenticacao]], [[../design/design-system|Design System]]
 
 ## Problema
 
@@ -29,9 +29,9 @@ Usuário autenticado que deseja navegar pelo app sem expor valores monetários s
 
 1. O usuário acessa o app autenticado.
 2. No cabeçalho superior, aciona um botão discreto de privacidade com ícone de olho (ou pressiona a tecla de atalho `P`).
-3. O app alterna imediatamente entre valores visíveis e valores ocultos usando desfoque suave (Opção A / Glass Blur).
-4. Com valores ocultos, montantes financeiros aparecem desfocados (`blur(7px)`), preservando o alinhamento visual e a estrutura da tela.
-5. Se o usuário passar o ponteiro do mouse (*hover*) sobre um valor mascarado específico, o desfoque daquele elemento reduz para `blur(0px)`, permitindo uma consulta rápida ("espiadinha") sem desativar o modo global.
+3. O app alterna imediatamente entre valores visíveis e valores ocultos usando máscara visual leve.
+4. Com valores ocultos, montantes financeiros aparecem ilegíveis por cor transparente e sombra textual, preservando o alinhamento visual e a estrutura da tela sem aplicar filtro pesado em massa.
+5. Se o usuário passar o ponteiro do mouse (*hover*) sobre um valor mascarado específico, a máscara daquele elemento é removida, permitindo uma consulta rápida ("espiadinha") sem desativar o modo global.
 6. O usuário aciona novamente o botão (ou pressiona a tecla `P`) para revelar todos os valores.
 7. A preferência permanece salva localmente no navegador (`localStorage`) após reload.
 
@@ -50,8 +50,8 @@ Usuário autenticado que deseja navegar pelo app sem expor valores monetários s
 - O estado deve ser aplicado por classe/atributo global `data-privacy="true"` no `documentElement`.
 - A preferência deve ser persistida apenas em `localStorage` sob a chave `sistemaFinanceiro.privacyMode`.
 - O botão deve indicar claramente o estado e a próxima ação, com ícone e rótulo acessível: `Ocultar valores` ou `Mostrar valores`.
-- **Efeito Visual (Opção A - Desfoque Suave / Glass Blur)**: Aplica `filter: blur(7px)` e `user-select: none` nos elementos de valor monetário (`.money-value`, `.privacy-mask`).
-- **Revelação em Hover**: Ao passar o ponteiro do mouse sobre um elemento desfocado em modo privacidade, a propriedade é alterada para `filter: blur(0px)` com `transition: filter 0.2s ease`, permitindo a leitura individual temporária.
+- **Efeito Visual**: Aplica máscara visual leve por `color: transparent`, `text-shadow` e `user-select: none` nos elementos de valor monetário (`.money-value`, `.privacy-mask`), evitando `filter: blur()` em massa por custo de pintura.
+- **Revelação em Hover**: Ao passar o ponteiro do mouse sobre um elemento mascarado em modo privacidade, a cor volta a `inherit` e a sombra é removida com transição curta, permitindo a leitura individual temporária.
 - **Atalhos de Teclado**: A tecla de atalho `P` alterna o modo privacidade instantaneamente, exceto quando o foco de digitação do teclado estiver ativo em elementos `<input>`, `<textarea>` ou `<select>`.
 - O MVP deve mascarar valores monetários e totais financeiros, incluindo saldos, receitas, despesas, faturas, limites, dívidas, patrimônio e rentabilidade monetária.
 - O MVP não precisa mascarar nomes de contas, cartões, categorias, descrições de lançamentos, datas, percentuais ou quantidades de ativos.
@@ -66,8 +66,8 @@ Usuário autenticado que deseja navegar pelo app sem expor valores monetários s
 
 ## Critérios de aceite
 
-- Dado o usuário autenticado com valores visíveis, quando aciona o botão de privacidade (ou digita a tecla `P`), então o atributo `data-privacy="true"` é adicionado ao `<html>` e todos os valores monetários marcados passam a exibir desfoque visual.
-- Dado o modo privacidade ativo (`data-privacy="true"`), quando o usuário passa o mouse sobre um valor desfocado específico (`:hover`), então aquele valor torna-se legível temporariamente com transição suave (`blur(0px)`).
+- Dado o usuário autenticado com valores visíveis, quando aciona o botão de privacidade (ou digita a tecla `P`), então o atributo `data-privacy="true"` é adicionado ao `<html>` e todos os valores monetários marcados passam a exibir máscara visual.
+- Dado o modo privacidade ativo (`data-privacy="true"`), quando o usuário passa o mouse sobre um valor mascarado específico (`:hover`), então aquele valor torna-se legível temporariamente com transição suave.
 - Dado o usuário autenticado com valores ocultos, quando aciona o botão de privacidade novamente (ou digita `P`), então os valores reais voltam a aparecer com clareza.
 - Dado uma tela com tabelas ou listas financeiras, quando o modo privacidade é alternado, então o alinhamento e a estrutura dos cards e tabelas permanecem 100% estáveis.
 - Dado o usuário com modo privacidade ativo, quando recarrega a página no mesmo navegador, então o estado mascarado permanece ativo.
@@ -93,6 +93,7 @@ Usuário autenticado que deseja navegar pelo app sem expor valores monetários s
 
 ## Changelog
 
+- `1.1` — 2026-08-09 — Modo privacidade troca `filter: blur()` em massa por máscara textual leve com cor transparente e `text-shadow`, mantendo revelação no hover/foco e reduzindo custo de pintura.
 - `1.0` — 2026-08-02 — MVP implementado com utilitário frontend, botão no cabeçalho, atalho `P`, persistência local e desfoque Glass Blur com revelação no hover.
 - `0.2` — 2026-08-02 — Adicionada especificação do efeito de desfoque suave (Opção A / Glass Blur com hover reveal) e suporte ao atalho de teclado 'P'.
 - `0.1` — 2026-08-02 — Spec inicial do Modo Privacidade para ocultar/exibir valores financeiros via camada visual local.

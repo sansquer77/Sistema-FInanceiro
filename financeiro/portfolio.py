@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from http import HTTPStatus
@@ -28,6 +29,8 @@ MARKET_QUOTE_TTL_SECONDS = 6 * 60 * 60
 INDEXER_QUOTE_TTL_SECONDS = 24 * 60 * 60
 QUOTE_MEMORY_CACHE: dict[str, tuple[datetime, dict | list]] = {}
 FX_MEMORY_CACHE: dict[tuple[str, str], int] = {}
+QUOTE_MEMORY_CACHE_MAX_ENTRIES = 512
+FX_MEMORY_CACHE_MAX_ENTRIES = 128
 
 ASSET_TYPE_LABELS = {
     "stock": "Renda variável",
@@ -130,7 +133,6 @@ def get_portfolio(user_id: int, force_refresh: bool = False) -> dict:
                 ON checking_accounts.id = investment_operations.account_id
                 AND checking_accounts.user_id = investment_operations.user_id
             WHERE investment_operations.user_id = ?
-            ORDER BY transactions.date ASC, investment_operations.id ASC
             """,
             (user_id,),
         ).fetchall()
@@ -1323,17 +1325,28 @@ def empty_position(row, asset_type: str, identifier: str) -> dict:
 
 
 def quote_positions(positions: list[dict], user_id: int | None = None, force_refresh: bool = False) -> None:
-    for position in positions:
-        if position["asset_type"] in {"stock", "crypto"}:
-            apply_market_quote(position, force_refresh=force_refresh)
-        elif position["asset_type"] == "fund":
-            apply_fund_quote(position, user_id=user_id, force_refresh=force_refresh)
-        elif position["asset_type"] == "fixed_income":
-            apply_fixed_income_value(position, force_refresh=force_refresh)
-        elif position["asset_type"] == "savings":
-            apply_savings_value(position, force_refresh=force_refresh)
-        else:
-            apply_cost_value(position, "Cotacao manual pendente")
+    if len(positions) <= 1:
+        for position in positions:
+            quote_position(position, user_id=user_id, force_refresh=force_refresh)
+        return
+    workers = min(8, len(positions))
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = [executor.submit(quote_position, position, user_id, force_refresh) for position in positions]
+        for future in futures:
+            future.result()
+
+
+def quote_position(position: dict, user_id: int | None = None, force_refresh: bool = False) -> None:
+    if position["asset_type"] in {"stock", "crypto"}:
+        apply_market_quote(position, force_refresh=force_refresh)
+    elif position["asset_type"] == "fund":
+        apply_fund_quote(position, user_id=user_id, force_refresh=force_refresh)
+    elif position["asset_type"] == "fixed_income":
+        apply_fixed_income_value(position, force_refresh=force_refresh)
+    elif position["asset_type"] == "savings":
+        apply_savings_value(position, force_refresh=force_refresh)
+    else:
+        apply_cost_value(position, "Cotacao manual pendente")
 
 
 def apply_market_quote(position: dict, force_refresh: bool = False) -> None:
@@ -1600,15 +1613,16 @@ def _monthly_return_pct(prev_value: int, end_value: int, net_contribution: int) 
     return (Decimal(end_value - prev_value - net_contribution) * Decimal("100")) / Decimal(denominator)
 
 
-def get_portfolio_returns(user_id: int, force_refresh: bool = False) -> dict:
+def get_portfolio_returns(user_id: int, force_refresh: bool = False, positions: list[dict] | None = None) -> dict:
     # spec: rentabilidade-portfolio v1.5 — critérios 1 a 10
     # Rentabilidade mensal (em percentual) por moeda consolidada (BRL e USD),
     # comparada ao CDI e ao IPCA do mês. Últimos 12 meses, ou todos os meses
     # disponíveis quando a base é menor. Cada moeda é calculada na própria
     # moeda (valores nativos), sem efeito de câmbio na série.
     try:
-        portfolio = get_portfolio(user_id, force_refresh=force_refresh)
-        positions = portfolio.get("positions") or []
+        if positions is None:
+            portfolio = get_portfolio(user_id, force_refresh=force_refresh)
+            positions = portfolio.get("positions") or []
         if not positions:
             return {"series": [], "start_month": None, "end_month": None, "has_historical_approximation": False, "error": None}
 
@@ -2230,6 +2244,7 @@ def cached_json_url(
 
 
 def get_memory_cached_payload(cache_key: str, now: datetime) -> dict | list | None:
+    prune_quote_memory_cache(now)
     cached = QUOTE_MEMORY_CACHE.get(cache_key)
     if not cached:
         return None
@@ -2258,12 +2273,12 @@ def get_persistent_cached_payload(cache_key: str, now: datetime, allow_stale: bo
         return None
     if not allow_stale and expires_at <= now:
         return None
-    QUOTE_MEMORY_CACHE[cache_key] = (expires_at, payload)
+    set_quote_memory_cache(cache_key, expires_at, payload, now)
     return payload
 
 
 def store_cached_payload(cache_key: str, payload: dict | list, expires_at: datetime) -> None:
-    QUOTE_MEMORY_CACHE[cache_key] = (expires_at, payload)
+    set_quote_memory_cache(cache_key, expires_at, payload, datetime.now())
     try:
         with get_connection() as conn:
             conn.execute(
@@ -2279,6 +2294,24 @@ def store_cached_payload(cache_key: str, payload: dict | list, expires_at: datet
             )
     except Exception:
         return
+
+
+def set_quote_memory_cache(cache_key: str, expires_at: datetime, payload: dict | list, now: datetime) -> None:
+    prune_quote_memory_cache(now)
+    QUOTE_MEMORY_CACHE[cache_key] = (expires_at, payload)
+    trim_cache_to_limit(QUOTE_MEMORY_CACHE, QUOTE_MEMORY_CACHE_MAX_ENTRIES)
+
+
+def prune_quote_memory_cache(now: datetime) -> None:
+    for key, (expires_at, _payload) in list(QUOTE_MEMORY_CACHE.items()):
+        if expires_at <= now:
+            QUOTE_MEMORY_CACHE.pop(key, None)
+
+
+def trim_cache_to_limit(cache: dict, max_entries: int) -> None:
+    while len(cache) > max_entries:
+        oldest_key = next(iter(cache))
+        cache.pop(oldest_key, None)
 
 
 def read_json_url(url: str, message: str, headers: dict | None = None) -> dict | list:
@@ -2582,6 +2615,7 @@ def portfolio_exchange_rate_micros(currency: str) -> int:
             FX_MEMORY_CACHE[cache_key] = rate_to_micros(get_exchange_rate_to_brl(currency, quote_date))
         except Exception:
             FX_MEMORY_CACHE[cache_key] = rate_to_micros(Decimal("1"))
+        trim_cache_to_limit(FX_MEMORY_CACHE, FX_MEMORY_CACHE_MAX_ENTRIES)
     return FX_MEMORY_CACHE[cache_key]
 
 

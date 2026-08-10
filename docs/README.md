@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 7.2
+versao: 7.5
 atualizado: 2026-08-09
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -132,6 +132,9 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `7.5` — 2026-08-09 — Fechamento dos ajustes leves de performance: removido log de debug no Portfólio, Tendências filtra por intervalo indexável, histórico do Portfólio ganha índice compatível, BMC carrega assíncrono, dashboard não anima grid estrutural e Modo Privacidade troca blur massivo por máscara textual leve.
+- `7.4` — 2026-08-09 — Performance média do Portfólio/HTTP: abas do Portfólio e rentabilidade sob demanda, agrupamento renderiza só posições, cache de cotações/câmbio limitado, `ETag`/`Last-Modified` para estáticos e gzip para JSON grande.
+- `7.3` — 2026-08-09 — Ajustes de performance documentados: Cockpit reaproveita snapshot em memória, histórico do Score reutiliza uma fotografia do Portfólio e cotações do Portfólio passam a paralelizar posições independentes.
 - `7.2` — 2026-08-09 — Adicionado [[adr/0010-segredos-criptografados-sqlite]] e atualizada [[specs/preferencias-abas]] para v0.8 com segredos criptografados em `secure_configs` e migração compatível de arquivos legados.
 - `7.1` — 2026-08-09 — [[specs/consultor]] atualizada para v0.18, ainda em rascunho, com ajustes pré-implementação sobre disponibilidade IA/Consultor/consentimento, 4 categorias e Perfil Complementar criptografado em SQLite por usuário.
 - `7.0` — 2026-08-09 — [[specs/rentabilidade-portfolio]] atualizada para v1.5 com refinamento visual do gráfico de rentabilidade: linhas mais finas e pontos discretos.

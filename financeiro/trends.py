@@ -157,6 +157,8 @@ def build_monthly_series(conn, user_id: int, month: str) -> dict[str, dict[str, 
     """
     months_window = trailing_months(month, 12)
     series = {m: {"income_cents": 0, "expense_cents": 0} for m in months_window}
+    start_date = f"{months_window[0]}-01"
+    end_date = month_bounds(months_window[-1])[1]
 
     # spec: relatorios/relatorios v2.6 — critério 6
     # (pagamento de fatura em conta-corrente fica fora das despesas analíticas)
@@ -173,11 +175,12 @@ def build_monthly_series(conn, user_id: int, month: str) -> dict[str, dict[str, 
         WHERE transactions.user_id = ?
             AND transactions.archived_at IS NULL
             AND transactions.type IN ('income', 'expense')
-            AND substr(transactions.date, 1, 7) IN ({})
+            AND transactions.date >= ?
+            AND transactions.date <= ?
             AND credit_card_payments.id IS NULL
         GROUP BY substr(transactions.date, 1, 7), transactions.type
-        """.format(",".join("?" for _ in months_window)),
-        (user_id, *months_window),
+        """,
+        (user_id, start_date, end_date),
     ).fetchall()
 
     # spec: tendencias-saude-financeira v2.16 — critério 26

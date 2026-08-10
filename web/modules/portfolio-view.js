@@ -76,6 +76,7 @@ export function registerPortfolioView({
     history: document.querySelector("#portfolioHistoryPanel"),
   };
   const showPortfolioTab = (name) => {
+    state.portfolioTab = name || "position";
     const panel = portfolioTabPanels[name];
     if (!panel) return;
     portfolioTabButtons.forEach((button) => {
@@ -86,6 +87,7 @@ export function registerPortfolioView({
     Object.entries(portfolioTabPanels).forEach(([key, currentPanel]) => {
       currentPanel.hidden = key !== name;
     });
+    renderActivePortfolioTab();
   };
   portfolioTabButtons.forEach((button) => {
     button.addEventListener("click", () => showPortfolioTab(button.dataset.portfolioTab));
@@ -117,7 +119,8 @@ export function registerPortfolioView({
   deletePortfolioAssetButton.addEventListener("click", deletePortfolioAsset);
   portfolioGroupFilter.addEventListener("change", () => {
     state.portfolioGroup = portfolioGroupFilter.value;
-    renderPortfolio();
+    renderPortfolioPositions(state.portfolio?.positions || []);
+    renderHighlightedPortfolioPosition();
   });
   portfolioPositions.addEventListener("click", handlePortfolioPositionsClick);
   portfolioReturnChartBtn?.addEventListener("click", openPortfolioReturnDrawer);
@@ -164,11 +167,10 @@ export function registerPortfolioView({
     }
     let portfolioErrorMessage = "";
     const portfolioEndpoint = options.refreshMessage || options.force ? "/api/portfolio?refresh=1" : "/api/portfolio";
-    const returnsEndpoint = options.refreshMessage || options.force ? "/api/portfolio/returns?refresh=1" : "/api/portfolio/returns";
-    const [portfolioResult, returnsResult] = await Promise.allSettled([
-      api(portfolioEndpoint),
-      api(returnsEndpoint),
-    ]);
+    const portfolioResult = await Promise.resolve(api(portfolioEndpoint)).then(
+      (value) => ({ status: "fulfilled", value }),
+      (reason) => ({ status: "rejected", reason }),
+    );
     if (portfolioResult.status === "fulfilled") {
       state.portfolio = portfolioResult.value;
       state.portfolioDirty = false;
@@ -182,11 +184,8 @@ export function registerPortfolioView({
         setMessage(portfolioMessage, portfolioErrorMessage, "error");
       }
     }
-    if (returnsResult.status === "fulfilled") {
-      state.portfolioReturns = returnsResult.value;
-    } else {
+    if (options.refreshMessage || options.force) {
       state.portfolioReturns = null;
-      console.error("Erro ao carregar rentabilidade:", returnsResult.reason);
     }
 
     state.portfolioLoading = false;
@@ -196,6 +195,7 @@ export function registerPortfolioView({
 
   function markPortfolioDirty() {
     state.portfolioDirty = true;
+    state.portfolioReturns = null;
   }
 
   async function handlePortfolioAssetSubmit(event) {
@@ -220,6 +220,8 @@ export function registerPortfolioView({
       });
       state.portfolio = response;
       state.portfolioDirty = false;
+      state.portfolioReturns = null;
+      state.portfolioReturns = null;
       resetPortfolioAssetForm();
       renderPortfolio();
       onPortfolioChanged();
@@ -307,6 +309,7 @@ export function registerPortfolioView({
       const response = await api(`/api/portfolio/positions/${positionId}`, { method: "DELETE" });
       state.portfolio = response;
       state.portfolioDirty = false;
+      state.portfolioReturns = null;
       resetPortfolioAssetForm();
       renderPortfolio();
       onPortfolioChanged();
@@ -360,6 +363,8 @@ export function registerPortfolioView({
       });
       state.portfolio = response;
       state.portfolioDirty = false;
+      state.portfolioReturns = null;
+      state.portfolioReturns = null;
       await onPortfolioRedeemed();
       renderPortfolio();
       onPortfolioChanged();
@@ -530,7 +535,11 @@ export function registerPortfolioView({
       portfolioHistory.innerHTML = '<div class="empty-state compact">Nenhuma posição encerrada.</div>';
       return;
     }
-    const summary = portfolio.summary;
+    renderPortfolioSummary(portfolio.summary);
+    renderActivePortfolioTab();
+  }
+
+  function renderPortfolioSummary(summary) {
     const currencyRows = portfolioSummaryCurrencyRows(summary);
     portfolioCostSummary.innerHTML = portfolioSummaryMetric(currencyRows, (row) => formatMoney(row.cost_brl, row.currency));
     portfolioCurrentSummary.innerHTML = portfolioSummaryMetric(currencyRows, (row) => formatMoney(row.current_brl, row.currency));
@@ -540,16 +549,31 @@ export function registerPortfolioView({
     portfolioPositionCount.textContent = String(summary.position_count || 0);
     if (portfolioReturnChartBtn) {
       const hasPositions = (summary.position_count || 0) > 0;
-      console.log("[portfolio-returns-debug] returns:", state.portfolioReturns, "hasPositions:", hasPositions);
       portfolioReturnChartBtn.hidden = !hasPositions;
     }
+  }
+
+  function renderActivePortfolioTab() {
+    const portfolio = state.portfolio;
+    if (!portfolio) {
+      return;
+    }
+    const activeTab = state.portfolioTab || "position";
+    if (activeTab === "analysis") {
+      renderPortfolioAnalysis(portfolio.summary);
+    } else if (activeTab === "history") {
+      renderPortfolioHistory(portfolio.history || []);
+    } else {
+      renderPortfolioPositions(portfolio.positions || []);
+      renderHighlightedPortfolioPosition();
+    }
+  }
+
+  function renderPortfolioAnalysis(summary) {
     renderPortfolioGroupList(portfolioTypeList, summary.by_type);
     renderPortfolioGroupList(portfolioIndexerList, summary.by_indexer);
     renderPortfolioGroupList(portfolioCurrencyList, summary.by_currency);
     renderPortfolioGroupList(portfolioAccountList, summary.by_account);
-    renderPortfolioPositions(portfolio.positions || []);
-    renderHighlightedPortfolioPosition();
-    renderPortfolioHistory(portfolio.history || []);
   }
 
   function renderHighlightedPortfolioPosition() {

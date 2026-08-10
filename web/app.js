@@ -97,6 +97,7 @@ const state = {
   transactions: [],
   accountTransactions: [],
   cockpit: null,
+  cockpitLoadedMonth: "",
   cockpitTab: "summary",
   cockpitMonth: currentMonthValue(),
   categories: [],
@@ -115,6 +116,7 @@ const state = {
   portfolioCollapsedGroups: new Set(),
   portfolioAssetSaving: false,
   portfolioHighlightId: "",
+  portfolioTab: "position",
   view: "cockpit",
   cockpitRefreshRequestId: 0,
   transactionMonth: currentMonthValue(),
@@ -1255,6 +1257,7 @@ async function loadAll() {
     state.cardTransactions = cardTransactionsResponse;
     state.cardPayments = cardPaymentsResponse || [];
     state.cockpit = cockpitResponse;
+    state.cockpitLoadedMonth = cockpitMonthValue();
     invalidateFinancialHealth();
     await loadArchivedAccounts();
     await loadArchivedCreditCards();
@@ -1276,6 +1279,7 @@ async function loadAll() {
     state.transactions = [];
     state.accountTransactions = [];
     state.cockpit = null;
+    state.cockpitLoadedMonth = "";
     state.categories = [];
     state.tags = [];
     state.spendingLimits = [];
@@ -1329,6 +1333,7 @@ async function loadTransactionsAndAccounts() {
   state.cardTransactions = cardTransactionsResponse;
   state.cardPayments = cardPaymentsResponse || [];
   state.cockpit = cockpitResponse;
+  state.cockpitLoadedMonth = cockpitMonthValue();
   invalidateFinancialHealth();
   await loadArchivedAccounts();
   await loadArchivedCreditCards();
@@ -1349,12 +1354,17 @@ async function loadTransactionSlice() {
 async function loadCockpit() {
   const response = await api(`/api/cockpit?month=${encodeURIComponent(cockpitMonthValue())}`);
   state.cockpit = response;
+  state.cockpitLoadedMonth = cockpitMonthValue();
   invalidateFinancialHealth();
 }
 
 async function refreshCockpitData() {
   const requestId = ++state.cockpitRefreshRequestId;
   const month = cockpitMonthValue();
+  if (state.cockpit && state.cockpitLoadedMonth === month) {
+    renderCockpit();
+    return;
+  }
   const [
     accountsResponse,
     transactionsResponse,
@@ -1379,6 +1389,7 @@ async function refreshCockpitData() {
   state.cardTransactions = cardTransactionsResponse || [];
   state.cardPayments = cardPaymentsResponse || [];
   state.cockpit = cockpitResponse;
+  state.cockpitLoadedMonth = month;
   state.currentSpendingLimits = spendingLimitsResponse.limits || [];
   invalidateFinancialHealth();
   renderBaseViews();

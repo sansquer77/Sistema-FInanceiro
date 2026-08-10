@@ -33,7 +33,7 @@ class FinancialHealthError(Exception):
         super().__init__(message)
 
 
-def calculate_financial_health_score(user_id: int, month: object | None = None) -> dict:
+def calculate_financial_health_score(user_id: int, month: object | None = None, portfolio_positions: list[dict] | None = None) -> dict:
     normalized_month = normalize_month(month)
     with get_connection() as conn:
         month_summary = fetch_month_summary(conn, user_id, normalized_month)
@@ -41,7 +41,8 @@ def calculate_financial_health_score(user_id: int, month: object | None = None) 
         debt_context = fetch_debt_context(conn, user_id, normalized_month)
         limits_context = fetch_limits_context(conn, user_id, normalized_month)
         recurring_income_context = fetch_recurring_income_reference(conn, user_id, normalized_month)
-    portfolio_positions = current_portfolio_positions(user_id, force_refresh=False)
+    if portfolio_positions is None:
+        portfolio_positions = current_portfolio_positions(user_id, force_refresh=False)
     eligible_reserve_cents = emergency_reserve_cents_from_positions(portfolio_positions)
 
     savings_pillar = calculate_savings_pillar(
@@ -116,9 +117,10 @@ def calculate_financial_health_score_history(user_id: int, months: object | None
     if months_count < 1 or months_count > 36:
         raise FinancialHealthError("O parametro months deve estar entre 1 e 36.")
     reference_month = normalize_month()
+    portfolio_positions = current_portfolio_positions(user_id, force_refresh=False)
     history = []
     for candidate_month in trailing_months(reference_month, months_count):
-        entry = calculate_financial_health_score(user_id, candidate_month)
+        entry = calculate_financial_health_score(user_id, candidate_month, portfolio_positions=portfolio_positions)
         history.append({
             "month": entry["month"],
             "score_total": entry["score_total"],
