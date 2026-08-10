@@ -2,8 +2,8 @@
 tipo: spec
 area: landing-page
 status: implementado
-versao: 1.9
-atualizado: 2026-08-06
+versao: 2.1
+atualizado: 2026-08-09
 relacionados:
   - "[[sobre-app]]"
   - "[[../design/design-system|Design System]]"
@@ -15,7 +15,7 @@ aliases: ["Landing Page do Produto", "Site Institucional de Apresentação"]
 # Landing Page do Produto e Showcase Visual
 
 > [!info] Status
-> **implementado** · área: `landing-page` · atualizado em 2026-08-06 · relacionados: [[sobre-app]], [[../design/design-system|Design System]], [[../adr/0007-landing-page-institucional-isolada|ADR-0007]]
+> **implementado** · área: `landing-page` · atualizado em 2026-08-09 · relacionados: [[sobre-app]], [[../design/design-system|Design System]], [[../adr/0007-landing-page-institucional-isolada|ADR-0007]]
 
 ### Problema
 
@@ -45,9 +45,13 @@ Visitante ou usuário interessado que busca entender a proposta de valor, visual
 ### Dados
 
 - `/Users/sansquer/Documents/GitHub/sistemafinanceiropage/public/images/cockpit-preview.png`: captura de tela demonstrativa do Cockpit financeiro.
-- `/Users/sansquer/Documents/GitHub/sistemafinanceiropage/public/images/trends-preview.png`: captura de tela demonstrativa da aba Tendências do Cockpit.
+- `/Users/sansquer/Documents/GitHub/sistemafinanceiropage/public/images/trends-preview.jpg`: captura de tela demonstrativa da aba Tendências do Cockpit.
+- `/Users/sansquer/Documents/GitHub/sistemafinanceiropage/public/images/consultor-preview.jpg`: captura de tela demonstrativa da aba Consultor do Cockpit.
 - `/Users/sansquer/Documents/GitHub/sistemafinanceiropage/public/images/saude-financeira-preview.png`: captura de tela do painel de Saúde Financeira com o velocímetro de score.
 - `/Users/sansquer/Documents/GitHub/sistemafinanceiropage/public/images/portfolio-preview.png`: captura de tela da visão de investimentos e renda fixa.
+- `/Users/sansquer/Documents/GitHub/sistemafinanceiropage/public/images/portfolio-analysis-preview.jpg`: captura de tela demonstrativa da aba Análise do Portfólio.
+- `/Users/sansquer/Documents/GitHub/sistemafinanceiropage/public/images/apis-preview.jpg`: captura de tela demonstrativa das configurações opcionais de APIs.
+- `/Users/sansquer/Documents/GitHub/sistemafinanceiropage/public/images/demonstrativos-preview.jpg`: captura de tela demonstrativa da aba Demonstrativos em Relatórios.
 - `/Users/sansquer/Documents/GitHub/sistemafinanceiropage/public/images/privacy-mode-preview.png`: captura demonstrativa do efeito de mascaramento/desfoque do Modo Privacidade.
 - `/Users/sansquer/Documents/GitHub/sistemafinanceiropage/public/images/cards-preview.png`: captura de tela da gestão de cartões e faturas.
 - `/Users/sansquer/Documents/GitHub/sistemafinanceiropage/assets/demo-data/`: dados demonstrativos ou fixtures visuais usados para gerar capturas fictícias, sem relação com a base de homologação, caso esse diretório seja usado.
@@ -70,6 +74,8 @@ Visitante ou usuário interessado que busca entender a proposta de valor, visual
 - A árvore visual deve apresentar o app como um sistema integrado, com tronco central representando o **Sistema Financeiro** e ramos para Contas, Cartões, Cockpit, Saúde Financeira, Tendências, Portfólio, Relatórios, Simulação, Privacidade e Preferências.
 - A seção de exemplos reais deve usar capturas ou mockups fiéis às páginas do app, mas sempre renderizados com massa de dados demonstrativa.
 - As capturas fiéis devem ser geradas preferencialmente a partir de uma instância local isolada do app com `SISTEMA_FINANCEIRO_DATA_DIR` temporário e usuário demonstrativo, sem reutilizar `data/` de desenvolvimento ou homologação.
+- A vitrine visual deve contemplar, além dos módulos principais, telas demonstrativas de Preferências/APIs, Consultor, Tendências, Análise do Portfólio e Demonstrativos quando esses módulos estiverem implementados e visualmente maduros.
+- A landing deve dar destaque ao Portfólio explicando que cotações podem ser atualizadas por Yahoo Finance, CoinGecko e BACEN/SGS, e que cotas de fundos podem ser complementadas pela API Mais Retorno quando o usuário configurar sua própria chave.
 - A seção “Como começar” deve orientar o visitante por módulos em linguagem didática, explicando a lógica de uso do app sem substituir a documentação completa.
 - A orientação de Portfólio deve deixar claro que o ativo representa a posição cadastrada, enquanto aportes e resgates posteriores são registrados pelos lançamentos da conta para preservar histórico, saldo e relatórios.
 - A seção de downloads deve indicar que o app é gratuito e apontar para pacotes oficiais publicados em GitHub Releases do repositório do app principal.
@@ -145,6 +151,8 @@ Visitante ou usuário interessado que busca entender a proposta de valor, visual
 
 ### Changelog
 
+- `2.1` — 2026-08-09 — Landing passa a destacar o Portfólio conectado, citando Yahoo Finance, CoinGecko, BACEN/SGS e a integração opcional com Mais Retorno para fundos.
+- `2.0` — 2026-08-09 — Atualizada a vitrine visual da landing com screenshots demonstrativos de APIs, Consultor, Tendências, Análise do Portfólio e Demonstrativos gerados a partir de instância temporária anonimizada.
 - `1.9` — 2026-08-06 — Status e posição ajustados no Map of Content (`docs/README.md`): movida para a seção de specs implementadas, área `Institucional`.
 - `1.8` — 2026-08-04 — Spec marcada como `implementado` na documentação do repositório principal; a landing page vive em `sistemafinanceiropage` e este repositório mantém apenas a especificação/decisão do produto.
 - `1.7` — 2026-08-04 — Adicionado endpoint público `/api/latest-version` para que o app principal detecte novas versões sem scraping de HTML.

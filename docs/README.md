@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 7.5
+versao: 7.7
 atualizado: 2026-08-09
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -132,6 +132,8 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `7.7` — 2026-08-09 — [[specs/landing-page]] atualizada para v2.1 com destaque público do Portfólio conectado a Yahoo Finance, CoinGecko, BACEN/SGS e Mais Retorno opcional.
+- `7.6` — 2026-08-09 — [[specs/landing-page]] atualizada para v2.0 com nova vitrine de screenshots demonstrativos: APIs, Consultor, Tendências, Análise do Portfólio e Demonstrativos.
 - `7.5` — 2026-08-09 — Fechamento dos ajustes leves de performance: removido log de debug no Portfólio, Tendências filtra por intervalo indexável, histórico do Portfólio ganha índice compatível, BMC carrega assíncrono, dashboard não anima grid estrutural e Modo Privacidade troca blur massivo por máscara textual leve.
 - `7.4` — 2026-08-09 — Performance média do Portfólio/HTTP: abas do Portfólio e rentabilidade sob demanda, agrupamento renderiza só posições, cache de cotações/câmbio limitado, `ETag`/`Last-Modified` para estáticos e gzip para JSON grande.
 - `7.3` — 2026-08-09 — Ajustes de performance documentados: Cockpit reaproveita snapshot em memória, histórico do Score reutiliza uma fotografia do Portfólio e cotações do Portfólio passam a paralelizar posições independentes.
