@@ -12,7 +12,7 @@ from typing import Any
 
 from financeiro.app_metadata import APP_VERSION
 
-# spec: alerta-nova-versao v1.0 — regras de cache e timeout
+# spec: alerta-nova-versao v1.2 — regras de cache, timeout e fallback TLS
 _LANDING_LATEST_VERSION_URL = os.environ.get(
     "SISTEMA_FINANCEIRO_LANDING_URL",
     "https://sistemafinanceiropage.vercel.app/api/latest-version",
@@ -44,9 +44,18 @@ def _version_greater(left: str | None, right: str | None) -> bool:
     return left_parsed > right_parsed
 
 
+def _create_ssl_context() -> ssl.SSLContext:
+    try:
+        import certifi  # type: ignore
+
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        return ssl.create_default_context()
+
+
 def _fetch_latest_release() -> dict[str, Any] | None:
     try:
-        context = ssl.create_default_context()
+        context = _create_ssl_context()
         with urllib.request.urlopen(
             urllib.request.Request(
                 _LANDING_LATEST_VERSION_URL,

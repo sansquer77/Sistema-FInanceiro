@@ -622,7 +622,7 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_json(app_info())
 
     def handle_latest_version(self) -> None:
-        # spec: alerta-nova-versao v1.0 — critérios 1, 2, 3 e 6
+        # spec: alerta-nova-versao v1.2 — critérios 1, 2, 3 e 6
         self.send_json(latest_version_info())
 
     def handle_list_accounts(self) -> None:

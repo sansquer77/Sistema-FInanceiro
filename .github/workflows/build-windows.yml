@@ -37,8 +37,8 @@ jobs:
           "release_tag=$releaseTag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "asset_name=$assetName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
-      - name: Instalar PyInstaller
-        run: python -m pip install --upgrade pip pyinstaller
+      - name: Instalar dependencias de empacotamento
+        run: python -m pip install --upgrade pip pyinstaller certifi
 
       - name: Validar Python
         shell: pwsh

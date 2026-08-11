@@ -2,8 +2,8 @@
 tipo: spec
 area: alerta-nova-versao
 status: implementado
-versao: 1.1
-atualizado: 2026-08-09
+versao: 1.2
+atualizado: 2026-08-11
 relacionados:
   - "[[landing-page]]"
   - "[[sobre-app]]"
@@ -15,7 +15,7 @@ aliases: ["Alerta de Nova Versão no Cockpit"]
 # Alerta de Nova Versão no Cockpit
 
 > [!info] Status
-> **implementado** · área: `alerta-nova-versao` · atualizado em 2026-08-09 · relacionados: [[landing-page]], [[sobre-app]], [[../adr/0007-landing-page-institucional-isolada|ADR-0007]]
+> **implementado** · área: `alerta-nova-versao` · atualizado em 2026-08-11 · relacionados: [[landing-page]], [[sobre-app]], [[../adr/0007-landing-page-institucional-isolada|ADR-0007]]
 
 ### Problema
 
@@ -49,6 +49,7 @@ Usuário do app local que quer ser notificado dentro da própria interface quand
 - A URL da landing page pode ser sobrescrita pela variável de ambiente `SISTEMA_FINANCEIRO_LANDING_URL` para fins de teste.
 - A consulta deve ter timeout curto (máximo 5 segundos) e nunca bloquear o carregamento do Cockpit.
 - Se o site institucional ou a rede estiver indisponível, o app deve silenciosamente omitir o alerta.
+- Em ambientes Python sem bundle de certificados do sistema disponível, o backend deve tentar criar o contexto TLS com `certifi` quando o pacote estiver instalado, mantendo validação HTTPS sem usar contexto inseguro.
 - O alerta deve aparecer apenas quando `latest_version` for estritamente maior que `current_version`.
 - O link do alerta deve apontar para `https://sistemafinanceiropage.vercel.app/#downloads`.
 - O alerta deve ser renderizado no Cockpit, acima dos KPIs, e pode ser dispensado na sessão atual.
@@ -96,6 +97,7 @@ Usuário do app local que quer ser notificado dentro da própria interface quand
 
 ### Changelog
 
+- `1.2` — 2026-08-11 — Validação operacional identificou falha de TLS em Python local sem CA bundle; `financeiro/version_check.py` passa a usar `certifi` como fallback opcional e os workflows de pacote instalam `certifi` junto com PyInstaller para manter o alerta funcional nos executáveis.
 - `1.1` — 2026-08-09 — Status visual da nota sincronizado com o frontmatter e com o MoC.
 - `1.0` — 2026-08-04 — Spec implementada: endpoint `/api/latest-version` na landing page, módulo `financeiro/version_check.py`, rota no `app.py` e alerta no Cockpit com testes automatizados.
 

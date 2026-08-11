@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from unittest import mock
 
 from financeiro import version_check as version_check_module
-from financeiro.version_check import _parse_version, _version_greater, latest_version_info
+from financeiro.version_check import _create_ssl_context, _parse_version, _version_greater, latest_version_info
 
 
 class VersionParsingTest(unittest.TestCase):
@@ -27,6 +27,10 @@ class VersionParsingTest(unittest.TestCase):
         self.assertFalse(_version_greater("1.2.0", "1.2.0"))
         self.assertFalse(_version_greater("1.1.0", "1.2.0"))
         self.assertFalse(_version_greater("1.2.0", None))
+
+    def test_ssl_context_is_created(self) -> None:
+        context = _create_ssl_context()
+        self.assertTrue(hasattr(context, "wrap_socket"))
 
 
 class LatestVersionInfoTest(unittest.TestCase):

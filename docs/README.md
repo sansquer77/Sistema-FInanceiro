@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 11.10
-atualizado: 2026-08-10
+versao: 11.11
+atualizado: 2026-08-11
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -132,6 +132,7 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `11.11` — 2026-08-11 — [[specs/alerta-nova-versao]] atualizada para v1.2: validação operacional do alerta de nova versão e fallback TLS com `certifi` para ambientes Python sem bundle de certificados.
 - `11.10` — 2026-08-10 — [[specs/sobre-app]] atualizada para v1.8: tela Sobre passa a exibir **Sansquer** como desenvolvedor e `darksansquer@gmail.com` como contato.
 - `11.9` — 2026-08-10 — [[specs/investimentos-portfolio]] atualizada para v2.23: formulário de posição inicial do Portfólio exibe o campo CNPJ opcional também para Previdência Privada, alinhado aos Fundos (mesma integração Mais Retorno).
 - `11.8` — 2026-08-10 — [[specs/investimentos-portfolio]] atualizada para v2.22: renda fixa e Poupança passam a exibir variação do dia no Portfólio (diferença do valor na curva entre hoje e o dia anterior); [[arquitetura]] v3.28 documenta o cálculo via `day_variation_cents`.
