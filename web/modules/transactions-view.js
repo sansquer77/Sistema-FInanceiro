@@ -41,10 +41,10 @@ export function registerTransactionsView({
   renderPortfolio,
   renderImportTargets,
 }) {
-  const balanceHistoryChartTop = 24;
-  const balanceHistoryChartBottom = 48;
-  const balanceHistoryChartBaseline = 54;
-  const balanceHistoryChartFlat = 36;
+  const balanceHistoryChartTop = 10;
+  const balanceHistoryChartBottom = 88;
+  const balanceHistoryChartBaseline = 94;
+  const balanceHistoryChartFlat = 49;
   const {
     transactionForm,
     transactionFormTitle,
@@ -62,6 +62,7 @@ export function registerTransactionsView({
     transferExchangeRate,
     investmentOperationFields,
     investmentAmount,
+    investmentAmountRow,
     investmentFundFields,
     fetchInvestmentFundQuoteButton,
     investmentFundQuoteHint,
@@ -441,6 +442,7 @@ export function registerTransactionsView({
     transactionAmount.disabled = false;
     transactionAmount.required = true;
     transactionAmountRow.hidden = false;
+    investmentAmountRow.hidden = true;
     transactionFormTitle.textContent = "Novo lançamento";
     cancelTransactionEditButton.hidden = false;
     transactionForm.querySelector('button[type="submit"]').textContent = "Salvar lançamento";
@@ -698,27 +700,29 @@ export function registerTransactionsView({
     `).join("");
     transactionBalanceHistoryChart.innerHTML = `
       <div class="invoice-history-rail" role="list">
-        <svg class="invoice-history-svg" viewBox="0 0 100 100" aria-hidden="true" preserveAspectRatio="none">
-          <defs>
-            <linearGradient id="accountBalanceHistoryAreaGradient" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.18"></stop>
-              <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"></stop>
-            </linearGradient>
-          </defs>
-          <path class="invoice-history-area account-balance-history-area" d="${areaPath}"></path>
-          <path class="invoice-history-line" d="${path}"></path>
-          <path class="invoice-history-line future" d="${futurePath}"></path>
-        </svg>
-        ${points}
         ${rows.map((row) => {
           const amountText = formatMoney(Math.abs(row.amount), row.currency);
           return `
-          <button class="invoice-history-card ${row.isCurrent ? "current" : ""}" type="button" data-transaction-balance-month="${escapeHtml(row.month)}" role="listitem" aria-current="${row.isCurrent ? "true" : "false"}">
+          <button class="invoice-history-card ${row.isCurrent ? "current" : ""} ${row.offset > 0 ? "future" : ""}" type="button" data-transaction-balance-month="${escapeHtml(row.month)}" role="listitem" aria-current="${row.isCurrent ? "true" : "false"}">
             <span>${escapeHtml(row.label)}</span>
             <strong class="${chartAmountSizeClass(amountText)} ${row.amount < 0 ? "danger-text" : row.amount > 0 ? "positive-text" : ""}">${amountText}</strong>
           </button>
         `;
         }).join("")}
+        <div class="invoice-history-plot" aria-hidden="true">
+          <svg class="invoice-history-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="accountBalanceHistoryAreaGradient" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.18"></stop>
+                <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"></stop>
+              </linearGradient>
+            </defs>
+            <path class="invoice-history-area account-balance-history-area" d="${areaPath}"></path>
+            <path class="invoice-history-line" d="${path}"></path>
+            <path class="invoice-history-line future" d="${futurePath}"></path>
+          </svg>
+          ${points}
+        </div>
       </div>
     `;
   }
@@ -1089,6 +1093,7 @@ export function registerTransactionsView({
     investmentAmount.disabled = !isInvestment;
     investmentAmount.required = isInvestment;
     transactionAmountRow.hidden = isInvestment;
+    investmentAmountRow.hidden = !isInvestment;
     transactionAmount.disabled = isInvestment;
     transactionAmount.required = !isInvestment;
     transactionCategoryRow.hidden = !needsCategory;
@@ -1207,6 +1212,7 @@ export function registerTransactionsView({
       transactionForm.elements.investment_asset_identifier.value = "";
     }
     investmentAmount.required = isInvestment;
+    investmentAmount.disabled = !isInvestment;
   }
 
   async function fetchInvestmentFundQuote() {

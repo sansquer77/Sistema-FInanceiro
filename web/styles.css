@@ -350,26 +350,6 @@ input[type="checkbox"] {
   align-items: center;
 }
 
-.checkbox-label.compact-checkbox {
-  justify-self: start;
-  width: auto;
-  min-height: 0;
-  padding: 6px 10px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--surface-low);
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1.2;
-}
-
-.checkbox-label.compact-checkbox input[type="checkbox"] {
-  inline-size: 14px;
-  block-size: 14px;
-  margin: 0;
-}
-
 input:hover,
 select:hover,
 textarea:hover {
@@ -2739,6 +2719,12 @@ textarea:focus {
   align-items: start;
 }
 
+#transactionsView .workspace {
+  margin-left: -8px;
+  grid-template-columns: minmax(300px, 460px) minmax(0, 1fr);
+  gap: 16px;
+}
+
 .launch-form-sticky {
   position: sticky;
   top: 24px;
@@ -3314,6 +3300,93 @@ padding: 8px 16px;
   padding: 18px;
 }
 
+.transaction-form-panel {
+  padding: 14px;
+}
+
+.transaction-form-panel h2 {
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+  font-size: 18px;
+}
+
+.transaction-form-panel .form {
+  gap: 10px;
+}
+
+.transaction-form-panel label {
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.transaction-form-panel input,
+.transaction-form-panel select {
+  min-height: 38px;
+  padding: 8px 10px;
+}
+
+.transaction-form-panel textarea {
+  min-height: 70px;
+  padding: 8px 10px;
+}
+
+.transaction-form-panel .field-row {
+  gap: 10px;
+}
+
+.transaction-form-panel .field-hint {
+  margin: -4px 0 0;
+  font-size: 12px;
+}
+
+.transaction-form-panel .actions {
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.transaction-form-panel .actions .primary {
+  min-height: 38px;
+}
+
+.transaction-conditional-block,
+.transaction-conditional-subblock {
+  position: relative;
+  padding: 26px 10px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-low) 68%, transparent);
+}
+
+.transaction-conditional-block.compact,
+.transaction-conditional-subblock.compact {
+  padding-top: 24px;
+}
+
+.transaction-conditional-block::before,
+.transaction-conditional-subblock::before {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  color: var(--muted);
+  content: attr(data-section-label);
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.transaction-conditional-subblock {
+  background: color-mix(in srgb, var(--panel) 84%, var(--surface-low));
+}
+
+.transaction-conditional-block[hidden],
+.transaction-conditional-subblock[hidden] {
+  display: none;
+}
+
 .accounts-panel,
 .cards-panel,
 .panel {
@@ -3344,6 +3417,11 @@ padding: 8px 16px;
 
 .fixed-income-mode-field {
   position: relative;
+}
+
+.field-label-title {
+  display: inline-flex;
+  align-items: center;
 }
 
 .field-label-with-help {
@@ -3420,57 +3498,6 @@ padding: 8px 16px;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: color-mix(in srgb, var(--panel) 90%, var(--line));
-}
-
-.segment-btn,
-.chip-preset {
-  border: 1px solid transparent;
-  border-radius: 9px;
-  background: transparent;
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.segment-btn {
-  padding: 8px 6px;
-}
-
-.segment-btn:hover,
-.segment-btn:focus-visible,
-.segment-btn.active {
-  border-color: var(--line);
-  background: var(--panel);
-  color: var(--ink);
-  box-shadow: var(--control-shadow-sm);
-}
-
-.quick-presets {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.quick-presets small {
-  color: var(--muted);
-  font-size: 0.72rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.chip-preset {
-  padding: 5px 8px;
-  border-color: var(--line);
-  background: var(--panel);
-}
-
-.chip-preset:hover,
-.chip-preset:focus-visible {
-  color: var(--ink);
-  border-color: var(--accent);
 }
 
 .fixed-income-preview {
@@ -4898,6 +4925,74 @@ padding: 8px 16px;
   color: var(--accent);
 }
 
+.invoice-history-chart {
+  margin: 6px 0 18px;
+  padding: 0;
+}
+
+.invoice-history-chart .invoice-history-rail {
+  grid-template-rows: 72px minmax(92px, 1fr);
+  row-gap: 12px;
+  min-height: 178px;
+  align-items: start;
+}
+
+.invoice-history-chart .invoice-history-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 7px;
+  min-height: 72px;
+  margin: 0 6px;
+  padding: 12px 10px;
+  border-color: var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-low) 72%, var(--panel));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--panel) 76%, transparent);
+}
+
+.invoice-history-chart .invoice-history-card:hover {
+  background: var(--surface-container);
+  border-color: var(--focus-border-soft);
+  transform: translateY(-1px);
+}
+
+.invoice-history-chart .invoice-history-card.current {
+  border: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.invoice-history-chart .invoice-history-card.future {
+  opacity: 0.58;
+}
+
+.invoice-history-chart .invoice-history-card span {
+  color: var(--text-soft);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.invoice-history-chart .invoice-history-card.current span,
+.invoice-history-chart .invoice-history-card.current strong {
+  color: var(--accent);
+}
+
+.invoice-history-chart .invoice-history-card strong {
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 900;
+}
+
+.invoice-history-chart .invoice-history-plot {
+  position: relative;
+  grid-column: 1 / -1;
+  grid-row: 2;
+  height: 100%;
+  min-height: 92px;
+  margin: 0 8px;
+}
+
 .invoice-history-card span {
   font-size: 19px;
   font-weight: 900;
@@ -5028,6 +5123,10 @@ padding: 8px 16px;
   pointer-events: none;
 }
 
+.invoice-history-chart .invoice-history-svg {
+  z-index: 1;
+}
+
 .invoice-history-area {
   fill: url("#invoiceHistoryAreaGradient");
   pointer-events: none;
@@ -5045,6 +5144,16 @@ padding: 8px 16px;
   color: var(--danger);
 }
 
+.account-balance-history-chart .invoice-history-card strong.positive-text,
+.account-balance-history-chart .invoice-history-card.current strong.positive-text {
+  color: var(--positive);
+}
+
+.account-balance-history-chart .invoice-history-card strong.danger-text,
+.account-balance-history-chart .invoice-history-card.current strong.danger-text {
+  color: var(--danger);
+}
+
 .invoice-history-line {
   fill: none;
   stroke: var(--accent);
@@ -5053,10 +5162,14 @@ padding: 8px 16px;
   vector-effect: non-scaling-stroke;
 }
 
+.invoice-history-chart .invoice-history-line {
+  stroke-width: 1.65;
+}
+
 .invoice-history-line.future {
-  stroke-dasharray: 0.1 7;
+  stroke-dasharray: 0.1 6;
   stroke-linecap: round;
-  opacity: 0.82;
+  opacity: 0.72;
 }
 
 .invoice-history-point {
@@ -5080,6 +5193,27 @@ padding: 8px 16px;
 .invoice-history-point.current {
   width: 22px;
   height: 22px;
+}
+
+.invoice-history-chart .invoice-history-point {
+  z-index: 2;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--panel);
+  background: var(--panel);
+  box-shadow: 0 0 0 1.7px var(--accent);
+}
+
+.invoice-history-chart .invoice-history-point.future {
+  box-shadow: 0 0 0 1.6px color-mix(in srgb, var(--accent) 72%, var(--muted));
+}
+
+.invoice-history-chart .invoice-history-point.current {
+  width: 16px;
+  height: 16px;
+  border: 3px solid var(--panel);
+  background: var(--panel);
+  box-shadow: 0 0 0 2px var(--accent), 0 8px 18px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 .simulation-chart .invoice-history-rail {
@@ -5431,6 +5565,45 @@ padding: 8px 16px;
   margin-bottom: 8px;
 }
 
+.transaction-ledger-panel {
+  padding: 14px;
+}
+
+.transaction-ledger-panel > .section-heading {
+  margin-bottom: 10px;
+}
+
+.transaction-ledger-panel .account-balance-history-chart {
+  margin-bottom: 10px;
+}
+
+.transaction-ledger-panel .month-balance-summary {
+  grid-template-columns: repeat(2, minmax(150px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.transaction-ledger-panel .month-balance-summary > div {
+  min-height: 50px;
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--surface-low) 70%, var(--panel));
+}
+
+.transaction-ledger-panel .month-balance-summary span {
+  font-size: 11px;
+}
+
+.transaction-ledger-panel .month-balance-summary strong {
+  font-size: 15px;
+}
+
+.transaction-ledger-panel .transaction-list-toolbar {
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-low) 74%, transparent);
+}
+
 .transaction-list-toolbar .transaction-search {
   margin-bottom: 0;
 }
@@ -5470,7 +5643,7 @@ padding: 8px 16px;
 }
 
 .transaction-context-count {
-  margin: 0 0 10px;
+  margin: 0 2px 8px;
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
@@ -5562,11 +5735,13 @@ padding: 8px 16px;
 
 .transaction-group {
   display: grid;
-  gap: 6px;
+  gap: 5px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
 }
 
 .transaction-group + .transaction-group {
-  margin-top: 12px;
+  margin-top: 8px;
 }
 
 .transaction-group h3 {
@@ -5580,20 +5755,20 @@ padding: 8px 16px;
   position: sticky;
   top: 6px;
   z-index: 8;
-  padding: 2px 0;
-  background: var(--bg);
+  padding: 1px 0;
+  background: var(--panel);
 }
 
 .transaction-day-toggle {
   display: flex;
   width: 100%;
-  min-height: 30px;
+  min-height: 34px;
   align-items: center;
   gap: 7px;
-  padding: 4px 6px;
-  border: 0;
-  border-radius: 6px;
-  background: var(--bg);
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-low) 72%, transparent);
   color: inherit;
   text-align: left;
 }
@@ -5616,9 +5791,12 @@ padding: 8px 16px;
 
 .transaction-day-count {
   margin-left: auto;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--panel);
   color: var(--muted);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 850;
 }
 
 .transaction-day-content {
@@ -5693,7 +5871,14 @@ padding: 8px 16px;
   grid-template-columns: minmax(0, 1fr) minmax(132px, auto);
   gap: 10px;
   align-items: center;
-  padding: 10px 12px;
+  padding: 9px 10px;
+  background: color-mix(in srgb, var(--panel) 88%, var(--surface-low));
+  transition: background 0.16s ease, border-color 0.16s ease;
+}
+
+.transaction-row:hover {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--line));
+  background: var(--surface-container);
 }
 
 .transaction-row.recently-saved {
@@ -5833,7 +6018,10 @@ padding: 8px 16px;
   justify-content: flex-end;
   align-items: flex-end;
   gap: 4px;
-  padding: 2px 4px 8px;
+  padding: 6px 8px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-low) 62%, transparent);
   color: var(--muted);
   font-size: 13px;
 }
@@ -5865,12 +6053,12 @@ padding: 8px 16px;
 .transaction-subtotals {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 16px;
-  margin-top: 12px;
-  background-color: var(--bg-alt);
+  gap: 6px;
+  padding: 10px 12px;
+  margin-top: 8px;
+  background: color-mix(in srgb, var(--surface-low) 72%, transparent);
+  border: 1px solid var(--line);
   border-radius: 8px;
-  border-top: 2px solid var(--accent-dark);
 }
 
 .subtotal-row {

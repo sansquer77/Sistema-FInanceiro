@@ -809,27 +809,29 @@ export function registerCardsView({
     `).join("");
     cardInvoiceHistoryChart.innerHTML = `
       <div class="invoice-history-rail" role="list">
-        <svg class="invoice-history-svg" viewBox="0 0 100 100" aria-hidden="true" preserveAspectRatio="none">
-          <defs>
-            <linearGradient id="invoiceHistoryAreaGradient" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.26"></stop>
-              <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"></stop>
-            </linearGradient>
-          </defs>
-          <path class="invoice-history-area" d="${areaPath}"></path>
-          <path class="invoice-history-line" d="${path}"></path>
-          <path class="invoice-history-line future" d="${futurePath}"></path>
-        </svg>
-        ${points}
         ${rows.map((row) => {
           const amountText = formatMoney(row.amount, card.currency);
           return `
-          <button class="invoice-history-card ${row.isCurrent ? "current" : ""}" type="button" data-invoice-history-month="${escapeHtml(row.month)}" role="listitem" aria-current="${row.isCurrent ? "true" : "false"}">
+          <button class="invoice-history-card ${row.isCurrent ? "current" : ""} ${row.offset > 0 ? "future" : ""}" type="button" data-invoice-history-month="${escapeHtml(row.month)}" role="listitem" aria-current="${row.isCurrent ? "true" : "false"}">
             <span>${escapeHtml(row.label)}</span>
             <strong class="${chartAmountSizeClass(amountText)}">${amountText}</strong>
           </button>
         `;
         }).join("")}
+        <div class="invoice-history-plot" aria-hidden="true">
+          <svg class="invoice-history-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="invoiceHistoryAreaGradient" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.18"></stop>
+                <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"></stop>
+              </linearGradient>
+            </defs>
+            <path class="invoice-history-area" d="${areaPath}"></path>
+            <path class="invoice-history-line" d="${path}"></path>
+            <path class="invoice-history-line future" d="${futurePath}"></path>
+          </svg>
+          ${points}
+        </div>
       </div>
     `;
   }
@@ -864,7 +866,7 @@ export function registerCardsView({
     return months.map((row, index) => ({
       ...row,
       x: xPositions[index],
-      y: 76 - (Math.abs(row.amount) / max) * 48,
+      y: 88 - (Math.abs(row.amount) / max) * 78,
     }));
   }
 

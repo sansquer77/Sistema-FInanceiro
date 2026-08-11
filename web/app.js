@@ -378,6 +378,7 @@ const destinationAmount = document.querySelector("#destinationAmount");
 const transferExchangeRate = document.querySelector("#transferExchangeRate");
 const investmentOperationFields = document.querySelector("#investmentOperationFields");
 const investmentAmount = document.querySelector("#investmentAmount");
+const investmentAmountRow = document.querySelector("#investmentAmountRow");
 const investmentFundFields = document.querySelector("#investmentFundFields");
 const fetchInvestmentFundQuoteButton = document.querySelector("#fetchInvestmentFundQuoteButton");
 const investmentFundQuoteHint = document.querySelector("#investmentFundQuoteHint");
@@ -902,6 +903,7 @@ const transactionsView = registerTransactionsView({
     transferExchangeRate,
     investmentOperationFields,
     investmentAmount,
+    investmentAmountRow,
     investmentFundFields,
     fetchInvestmentFundQuoteButton,
     investmentFundQuoteHint,

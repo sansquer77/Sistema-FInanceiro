@@ -2,7 +2,7 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 3.7
+versao: 3.20
 atualizado: 2026-08-11
 relacionados:
   - "[[contas-correntes]]"
@@ -78,6 +78,14 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 - Ao editar uma ocorrência de uma série recorrente com `use_average` ativo, o sistema não exibe o modal de escopo; a alteração é aplicada automaticamente a todas as ocorrências futuras não conciliadas e seus valores são recalculados pela média dos últimos 12 lançamentos com a mesma descrição normalizada, mesmo tipo e mesma categoria/subcategoria.
 - Se `use_average` não estiver ativo, o comportamento atual de edição/exclusão em cascata se mantém.
 - Lançamentos parcelados exibem índice e total (`1/36`, `2/36`...) sem reiniciar a contagem em edições pontuais.
+- A tela de Lançamentos organiza o formulário em uma composição compacta, mantendo todos os campos relevantes visíveis na edição, sem blocos contextuais escurecidos (inclusive nos campos de renda fixa).
+- A modalidade de renda fixa (Pós-fixada, Pré-fixada, Híbrida) é escolhida em combo na linha do Indexador, com o botão de ajuda (?) alinhado inline ao rótulo Modalidade.
+- O formulário de renda fixa não exibe os atalhos de presets (100% do CDI, 120% do CDI, IPCA + 6,5%) — a modalidade, o indexador e a taxa são preenchidos diretamente; marcadores tipo checkbox (média histórica e reserva de emergência) aparecem como checkbox simples, sem moldura tipo pill.
+- O campo Valor fica logo abaixo da Descrição e acima de Categoria/Subcategoria, mantendo posição estável no formulário independentemente do tipo de lançamento; em investimento, o campo **Valor investido** ocupa exatamente a mesma posição (o campo Valor fica oculto), de forma que o valor aparece na mesma altura em todos os tipos de lançamento.
+- Câmbio, transferência e o agrupamento geral de investimento não usam bloco contextual: os campos aparecem como linhas diretas, como as demais linhas simples do formulário.
+- Linhas simples do formulário (Valor, Repetição, Recorrência e Média) dispensam o bloco contextual escurecido e o título em caixa alta, aparecendo como linhas de campo diretas para aumentar a densidade e reduzir repetição de rótulos — os blocos ficam reservados a grupos com múltiplos campos.
+- O formulário de lançamento fica mais largo que o padrão (até 460px) e equilibra os espaços laterais: o mesmo espaço à esquerda entre o formulário e o menu e à direita entre o formulário e o extrato, sem encostar no menu.
+- O painel de extrato prioriza leitura rápida: gráfico de saldos e cards de saldo previsto/conciliado compactos no topo, filtros e busca em bloco próprio e lista agrupada por dia com cabeçalhos discretos, contadores e linhas densas.
 - Em lançamentos parcelados, o valor informado é o total da compra/lançamento e deve ser dividido pela quantidade total de parcelas. Ex.: R$ 500 em 5x gera 5 lançamentos de R$ 100.
 - Em lançamentos recorrentes, cada ocorrência futura deve manter exatamente o valor informado, a menos que o usuário ative a opção de calcular valores futuros pela média dos últimos 12 lançamentos com a mesma descrição normalizada, mesmo tipo e mesma categoria/subcategoria.
 - Um lançamento avulso existente pode ser editado para se tornar parcelado ou recorrente; nesse caso, a ocorrência atual vira a primeira parcela/ocorrência, as próximas são criadas a partir dela e todas recebem o mesmo `series_id`.
@@ -92,7 +100,7 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 - Após criação ou edição, o lançamento retornado pela API recebe destaque visual temporário quando estiver visível pelos filtros atuais.
 - Valores financeiros usam algarismos tabulares, largura consistente e alinhamento à direita para facilitar comparação vertical.
 - Valores de lançamentos usam o mesmo tamanho de fonte dos textos de saldo do grupo diário, preservando densidade visual.
-- O gráfico de histórico/projeção de saldos em Lançamentos de Contas deve manter o mesmo layout do gráfico de faturas de cartão: mês no topo de cada cartão, valor na base e sem marcadores textuais de `Previsto` ou `Conciliado` dentro do gráfico.
+- O gráfico de histórico/projeção de saldos em Lançamentos de Contas deve manter a mesma linguagem visual do gráfico de evolução de faturas: cards mensais compactos acima da curva, mês atual destacado, meses futuros atenuados e linha futura pontilhada, preservando cores semânticas para saldos positivos e negativos.
 - O seletor mensal de Lançamentos de Contas deve usar botões compactos por ícone para mês anterior, mês atual e próximo mês, preservando rótulos acessíveis.
 - O rótulo do mês no seletor mensal deve usar o formato compacto `MM/AAAA`.
 - Categoria e subcategoria são apresentadas como caminho único no formato `Categoria › Subcategoria`.
@@ -153,6 +161,7 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dado um cabeçalho diário, quando acionado, então alterna o conteúdo do dia e informa o estado por `aria-expanded`.
 - Dado um grupo diário longo, quando a página é rolada dentro dele, então o cabeçalho da data permanece brevemente visível.
 - Dado o gráfico de histórico/projeção de saldos, quando exibido, então cada cartão mensal mostra o mês no topo e não exibe marcadores `Previsto` ou `Conciliado` dentro da área do gráfico.
+- Dado o gráfico de histórico/projeção de saldos em Lançamentos de Contas, quando há meses passados, atual e futuros, então ele usa o mesmo padrão visual do gráfico de faturas com cards mensais compactos, curva SVG suave e projeção futura atenuada/pontilhada.
 - Dado o gráfico de histórico/projeção de saldos com valores extensos, quando exibido em qualquer tamanho de tela, então os valores cabem nos cartões mensais por ajuste responsivo de tipografia e de largura mínima dos cartões, mantendo o tamanho atual da área e sem truncar centavos.
 - Dado o usuário visualizando o seletor mensal de Lançamentos de Contas, quando os botões de navegação aparecem, então usam ícones compactos com rótulo acessível em vez de palavras longas.
 - Dado o usuário visualizando o seletor mensal de Lançamentos de Contas, quando o mês é exibido, então o rótulo usa o formato `MM/AAAA`.
@@ -178,9 +187,26 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dado `GET /api/transactions` com `limit` e `offset` válidos, quando os filtros de mês/conta também estão presentes, então retorna no máximo `limit` lançamentos da página solicitada com `has_more` indicando se há páginas seguintes.
 - Dado `GET /api/transactions` com `limit` acima de 5000, quando processado, então o servidor reduz o limite para 5000 sem erro.
 - Dado um lançamento avulso existente, quando o usuário edita a repetição para parcelado ou recorrente, então o sistema preserva o lançamento atual como primeira ocorrência, cria as próximas ocorrências futuras e passa a listar todas com o mesmo identificador de série.
+- Dado o usuário preenchendo ou editando um lançamento, quando o tipo ou categoria exige campos específicos, então os campos aparecem em blocos contextuais claramente rotulados e os campos não aplicáveis permanecem ocultos/desabilitados sem deixar espaços vazios no formulário.
+- Dado o usuário visualizando Lançamentos, quando o painel superior é exibido, então o gráfico e os saldos previsto/conciliado usam apresentação compacta para deixar mais área útil para a lista.
+- Dado uma lista mensal com filtros, quando exibida, então busca, filtro de conciliação e contador ficam destacados antes dos grupos diários.
+- Dado uma lista agrupada por dia, quando exibida, então os cabeçalhos diários, contadores, linhas e subtotais usam hierarquia visual compacta e preservam ações, metadados e valores sem ocultar informações importantes.
 
 ## Changelog
 
+- `3.20` — 2026-08-11 — Escala vertical do gráfico de histórico/projeção de saldos corrigida: a curva usava só a faixa central (24–48 de 100), achatezendo variações grandes; agora ocupa quase toda a altura do plot (10–88), sem aumentar a área do gráfico.
+- `3.19` — 2026-08-11 — Helper (?) de modalidade da renda fixa alinhado inline ao rótulo (`field-label-title`), corrigindo a quebra de layout no formulário de Lançamentos (mesma correção aplicada no Portfólio).
+- `3.18` — 2026-08-11 — Modalidade de renda fixa (Pós/Pré/Híbrida) volta a ser combo ao lado do Indexador, com o helper (?) junto ao rótulo; removidos os controles segmentados e o CSS de presets/chips (sem usos restantes).
+- `3.17` — 2026-08-11 — Checkboxes de média histórica sem moldura pill (checkbox simples), seguindo o marcador de reserva de emergência; o layout pill de checkboxes é descontinuado no app (CSS removido).
+- `3.16` — 2026-08-11 — Renda fixa sem presets (100% do CDI, 120% do CDI, IPCA + 6,5%); opção selecionada da modalidade Pós/Pré/Híbrida destacada em cor de accent; marcador de reserva de emergência sem moldura (checkbox simples).
+- `3.15` — 2026-08-11 — Renda fixa sem bloco escurecido; a escolha de modalidade (Pós/Pré/Híbrida) passa a uma lista segmentada centralizada em linha própria, sempre visível; removida a frase "Atalhos comuns:" sobre os presets (que ficam centralizados).
+- `3.14` — 2026-08-11 — Bloco escurecido também removido dos campos de **Fundo ou previdência** (CNPJ e Cota) no lançamento de Investimento; o único bloco restante é o de Renda fixa.
+- `3.13` — 2026-08-11 — **Valor investido** passa a ocupar a mesma posição do campo Valor (logo abaixo da Descrição) quando o tipo é Investimento, mantendo o valor na mesma altura em todos os tipos de lançamento.
+- `3.12` — 2026-08-11 — Formulário de Lançamentos: Valor movido para logo abaixo da Descrição (posição estável em todos os tipos de lançamento); blocos escurecidos removidos também de Câmbio, Transferência e do agrupamento geral de Investimento — permanecem apenas nos grupos complexos (Fundos/previdência e Renda fixa).
+- `3.11` — 2026-08-11 — Formulário de Lançamentos mais largo (até 460px) e espaçamento lateral equilibrado: 16px entre menu e formulário, iguais aos 16px entre formulário e extrato.
+- `3.10` — 2026-08-11 — Formulário de Lançamentos mais denso: linhas simples (Valor, Repetição, Recorrência e Média) deixam de usar o bloco contextual escurecido com título em caixa alta, ficando diretas no fluxo do formulário; blocos permanecem apenas para grupos de múltiplos campos.
+- `3.9` — 2026-08-11 — Tela de Lançamentos ganha refinamento de layout: formulário mais compacto, blocos condicionais por tipo/categoria, filtros em destaque, cards de saldo menores e grupos diários mais limpos.
+- `3.8` — 2026-08-11 — Gráfico de histórico/projeção de saldos em Lançamentos passa a usar a mesma linguagem visual refinada do gráfico de faturas, com cards compactos e curva SVG nativa.
 - `3.7` — 2026-08-11 — Edição de lançamento avulso passa a permitir alterar a repetição para parcelado ou recorrente, criando as ocorrências futuras a partir da ocorrência atual.
 - `3.6` — 2026-08-10 — Campo CNPJ e busca assistida de cota pela Mais Retorno passam a aparecer também para lançamentos de Previdência Privada, mantendo CNPJ opcional.
 - `3.5` — 2026-08-10 — Formulário de investimento em Fundos passa a oferecer busca assistida de cota pela Mais Retorno a partir do CNPJ, preenchendo **Preço unitário** como sugestão editável.

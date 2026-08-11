@@ -640,7 +640,7 @@
                   </label>
                 </div>
                 <div class="field-row" id="cardRecurrenceAverageFields" hidden>
-                  <label class="checkbox-label compact-checkbox">Calcular valores futuros pela média dos últimos lançamentos
+                  <label class="checkbox-label">Calcular valores futuros pela média dos últimos lançamentos
                     <input name="use_average" id="cardUseAverage" type="checkbox" value="1">
                   </label>
                 </div>
@@ -714,6 +714,16 @@
                 <label>Descrição
                   <input name="description" type="text" placeholder="Ex.: Mercado, salário, transferência..." required>
                 </label>
+                <div class="field-row" id="investmentAmountRow" hidden>
+                  <label>Valor investido
+                    <input name="investment_amount" id="investmentAmount" type="text" inputmode="decimal" placeholder="0,00">
+                  </label>
+                </div>
+                <div class="field-row" id="transactionAmountRow">
+                  <label>Valor
+                    <input name="amount" id="transactionAmount" type="text" inputmode="decimal" placeholder="0,00" required>
+                  </label>
+                </div>
                 <div class="field-row" id="transactionCategoryRow">
                   <label>Categoria
                     <select name="category" id="transactionCategory" required></select>
@@ -724,11 +734,6 @@
                 </div>
                 <p class="field-hint" id="transactionClassificationSuggestion" aria-live="polite"></p>
                 <div class="investment-fields" id="investmentOperationFields" hidden>
-                  <div class="field-row">
-                    <label>Valor investido
-                      <input name="investment_amount" id="investmentAmount" type="text" inputmode="decimal" placeholder="0,00">
-                    </label>
-                  </div>
                   <div class="field-row">
                     <label>Ativo
                       <input name="investment_asset_identifier" id="investmentAssetIdentifier" type="text" placeholder="Ex.: PETR4, IVVB11, BTC">
@@ -748,7 +753,7 @@
                   <p class="field-hint" id="investmentFundQuoteHint" aria-live="polite"></p>
                   <div class="investment-fixed-fields" id="investmentFixedFields" hidden>
                     <div class="field-row fixed-income-mode-row">
-                      <label class="fixed-income-mode-field">Modalidade
+                      <label class="fixed-income-mode-field"><span class="field-label-title">Modalidade
                         <span class="field-label-with-help">
                           <button type="button" class="field-helper-button" aria-label="Ajuda sobre modalidade de renda fixa" aria-describedby="investmentFixedIncomeHelp">?</button>
                           <span class="field-popover" id="investmentFixedIncomeHelp" role="tooltip">
@@ -758,17 +763,13 @@
                             <span>Híbrida: indexador + taxa fixa, ex.: IPCA + 6,50% a.a.</span>
                           </span>
                         </span>
-                        <select name="investment_fixed_income_mode" id="investmentFixedIncomeMode" class="sr-only" tabindex="-1" aria-hidden="true">
+                      </span>
+                      <select name="investment_fixed_income_mode" id="investmentFixedIncomeMode">
                           <option value="">Selecione</option>
                           <option value="post">Pós-fixada</option>
                           <option value="pre">Pré-fixada</option>
                           <option value="hybrid">Híbrida</option>
                         </select>
-                        <span class="segmented-control fixed-income-mode-control" role="group" aria-label="Modalidade de Renda Fixa" data-mode-target="investment">
-                          <button type="button" class="segment-btn" data-fixed-income-mode="post">Pós-fixada</button>
-                          <button type="button" class="segment-btn" data-fixed-income-mode="pre">Pré-fixada</button>
-                          <button type="button" class="segment-btn" data-fixed-income-mode="hybrid">Híbrida</button>
-                        </span>
                       </label>
                       <label>Indexador
                         <select name="investment_fixed_income_indexer" id="investmentFixedIncomeIndexer">
@@ -780,12 +781,6 @@
                           <option value="TR">TR</option>
                         </select>
                       </label>
-                    </div>
-                    <div class="quick-presets fixed-income-presets" aria-label="Atalhos comuns de Renda Fixa">
-                      <small>Atalhos comuns:</small>
-                      <button type="button" class="chip-preset" data-fixed-income-preset="post:CDI:100" data-mode-target="investment">100% do CDI</button>
-                      <button type="button" class="chip-preset" data-fixed-income-preset="post:CDI:120" data-mode-target="investment">120% do CDI</button>
-                      <button type="button" class="chip-preset" data-fixed-income-preset="hybrid:IPCA:6,50" data-mode-target="investment">IPCA + 6,5%</button>
                     </div>
                     <div class="field-row">
                       <label><span id="investmentFixedIncomeRateLabel">Taxa</span>
@@ -806,7 +801,7 @@
                     </label>
                   </div>
                   <div class="field-row" id="investmentEmergencyReserveFields" hidden>
-                    <label class="checkbox-label compact-checkbox">Usar este aporte como reserva de emergência
+                    <label class="checkbox-label">Usar este aporte como reserva de emergência
                       <input name="investment_emergency_reserve_eligible" type="checkbox" value="1">
                     </label>
                   </div>
@@ -826,11 +821,6 @@
                       <input name="investment_other_costs" type="text" inputmode="decimal" placeholder="0,00">
                     </label>
                   </div>
-                </div>
-                <div class="field-row" id="transactionAmountRow">
-                  <label>Valor
-                    <input name="amount" id="transactionAmount" type="text" inputmode="decimal" placeholder="0,00" required>
-                  </label>
                 </div>
                 <div class="field-row" id="seriesKindRow">
                   <label>Repetição
@@ -856,7 +846,7 @@
                   </label>
                 </div>
                 <div class="field-row" id="recurrenceAverageFields" hidden>
-                  <label class="checkbox-label compact-checkbox">Calcular valores futuros pela média dos últimos lançamentos
+                  <label class="checkbox-label">Calcular valores futuros pela média dos últimos lançamentos
                     <input name="use_average" id="useAverage" type="checkbox" value="1">
                   </label>
                 </div>
@@ -892,7 +882,7 @@
               <p class="message" id="transactionMessage" role="alert"></p>
             </section>
 
-            <section class="panel">
+            <section class="panel transaction-ledger-panel">
               <div class="section-heading">
                 <h2>Lançamentos</h2>
                 <div class="month-navigator">
@@ -1085,7 +1075,7 @@
                       <option value="Cofrinho">Cofrinho</option>
                     </select>
                   </label>
-                  <label class="fixed-income-mode-field">Modalidade
+                  <label class="fixed-income-mode-field"><span class="field-label-title">Modalidade
                     <span class="field-label-with-help">
                       <button type="button" class="field-helper-button" aria-label="Ajuda sobre modalidade de renda fixa" aria-describedby="portfolioFixedIncomeHelp">?</button>
                       <span class="field-popover" id="portfolioFixedIncomeHelp" role="tooltip">
@@ -1095,24 +1085,14 @@
                         <span>Híbrida: indexador + taxa fixa, ex.: IPCA + 6,50% a.a.</span>
                       </span>
                     </span>
-                    <select name="fixed_income_mode" id="portfolioFixedIncomeMode" class="sr-only" tabindex="-1" aria-hidden="true">
+                  </span>
+                  <select name="fixed_income_mode" id="portfolioFixedIncomeMode">
                       <option value="">Selecione</option>
                       <option value="post">Pós-fixada</option>
                       <option value="pre">Pré-fixada</option>
                       <option value="hybrid">Híbrida</option>
                     </select>
-                    <span class="segmented-control fixed-income-mode-control" role="group" aria-label="Modalidade de Renda Fixa" data-mode-target="portfolio">
-                      <button type="button" class="segment-btn" data-fixed-income-mode="post">Pós-fixada</button>
-                      <button type="button" class="segment-btn" data-fixed-income-mode="pre">Pré-fixada</button>
-                      <button type="button" class="segment-btn" data-fixed-income-mode="hybrid">Híbrida</button>
-                    </span>
                   </label>
-                </div>
-                <div class="quick-presets fixed-income-presets" aria-label="Atalhos comuns de Renda Fixa">
-                  <small>Atalhos comuns:</small>
-                  <button type="button" class="chip-preset" data-fixed-income-preset="post:CDI:100" data-mode-target="portfolio">100% do CDI</button>
-                  <button type="button" class="chip-preset" data-fixed-income-preset="post:CDI:120" data-mode-target="portfolio">120% do CDI</button>
-                  <button type="button" class="chip-preset" data-fixed-income-preset="hybrid:IPCA:6,50" data-mode-target="portfolio">IPCA + 6,5%</button>
                 </div>
                 <div class="field-row">
                   <label>Indexador
@@ -1140,7 +1120,7 @@
                 </div>
               </div>
               <div class="field-row" id="portfolioEmergencyReserveFields" hidden>
-                <label class="checkbox-label compact-checkbox">Usar esta posição como reserva de emergência
+                <label class="checkbox-label">Usar esta posição como reserva de emergência
                   <input name="emergency_reserve_eligible" type="checkbox" value="1">
                 </label>
               </div>

@@ -2,8 +2,8 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.23
-atualizado: 2026-08-10
+versao: 2.27
+atualizado: 2026-08-11
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -62,7 +62,8 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 - Pré-fixados usam a taxa acordada anual nominal/efetiva informada no campo de taxa; exibem `Pré-fixado` e a taxa antes do vencimento.
 - No cadastro de renda fixa, a interface deve diferenciar claramente: `Pré-fixada` usa taxa em `% a.a.`; `Pós-fixada` usa percentual do indexador (ex.: `123` com CDI significa `123% do CDI`, enquanto vazio/zero representa `100% do CDI`); `Híbrida` usa indexador mais taxa adicional em `% a.a.`.
 - Para aplicações como CDB `123% do CDI`, a interface deve orientar o usuário a selecionar modalidade `Pós-fixada`, indexador `CDI` e percentual `123`, evitando cadastrar como `Pré-fixada` ou `Híbrida`; essa orientação deve ficar em helper contextual acionado por ícone discreto para preservar espaço e alinhamento do formulário, com exemplos objetivos de pré-fixada, pós-fixada e híbrida.
-- Formulários de Renda Fixa devem reduzir ruído visual: modalidade por chips de opção única, ajuda longa apenas sob demanda, rótulo/placeholder de taxa dinâmicos, atalhos comuns e preview compacto da configuração.
+- Formulários de Renda Fixa devem reduzir ruído visual: modalidade por combo com helper de ajuda sob demanda, rótulo/placeholder de taxa dinâmicos e preview compacto da configuração.
+- O formulário de posição (Renda Fixa) do Portfólio segue a mesma linguagem do formulário de Lançamentos: modalidade em combo com o ícone de ajuda (?) ao lado do rótulo, sem controles segmentados, chips, presets ou checkboxes com moldura pill.
 - Campos de quantidade e preço médio/unitário não devem ser exibidos para renda fixa, pois o custo total/aporte é a base de cálculo relevante.
 - O sistema calcula e deduz estimativas de IOF (até 30 dias) e IR (tabela regressiva de 22,5% a 15%).
 - Para títulos do Tesouro Direto, o sistema mantém o cálculo de rentabilidade **na curva**, usando a taxa contratada cadastrada, sem tentar igualar a marcação a mercado exibida pelo site do Tesouro em resgate antecipado.
@@ -199,6 +200,10 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 
 ## Changelog
 
+- `2.27` — 2026-08-11 — Helper (?) de modalidade da renda fixa alinhado inline ao rótulo (`field-label-title`), corrigindo a quebra de layout no formulário do Portfólio (mesma correção aplicada em Lançamentos).
+- `2.26` — 2026-08-11 — Formulário de posição do Portfólio equalizado com o de Lançamentos: modalidade (Pós/Pré/Híbrida) em combo com helper (?); controles segmentados, chips e presets removidos do app.
+- `2.25` — 2026-08-11 — Formulário de Renda Fixa do Portfólio: removidos os presets (100% do CDI, 120% do CDI, IPCA + 6,5%); opção selecionada da modalidade destacada em cor de accent; marcador de reserva de emergência sem moldura.
+- `2.24` — 2026-08-11 — Formulário de Renda Fixa do Portfólio alinhado ao de Lançamentos: escolha de modalidade (Pós/Pré/Híbrida) em lista segmentada centralizada em linha própria, sempre visível; removida a frase "Atalhos comuns:" dos presets.
 - `2.23` — 2026-08-10 — Formulário de posição inicial do Portfólio passa a exibir o campo CNPJ opcional também para Previdência Privada (rótulo `CNPJ do fundo/plano`), alinhado aos Fundos, que usam a mesma integração Mais Retorno.
 - `2.22` — 2026-08-10 — Renda fixa e Poupança passam a exibir variação do dia no Portfólio: diferença do valor na curva entre hoje e o dia anterior, limitada à data de aquisição (zero no dia da aquisição); pós-fixados variam apenas em dias úteis com taxa publicada, pré-fixados variam pro rata diário.
 - `2.21` — 2026-08-10 — Resgates de Poupança passam a consumir saldos de aniversários por FIFO; resgate total remove a posição aberta automaticamente.

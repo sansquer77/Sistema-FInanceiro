@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 11.13
+versao: 11.28
 atualizado: 2026-08-11
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -132,6 +132,21 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `11.28` — 2026-08-11 — [[specs/lancamentos]] v3.20 e [[specs/cartoes]] v2.8: escala vertical dos gráficos de histórico de saldos (Extrato) e de evolução de faturas ampliada para a faixa 10–88 do plot (antes 24–48 e 28–74), sem aumentar a área do gráfico.
+- `11.27` — 2026-08-11 — [[specs/lancamentos]] v3.19 e [[specs/investimentos-portfolio]] v2.27: helper (?) de modalidade alinhado inline ao rótulo nos dois formulários (correção de layout).
+- `11.26` — 2026-08-11 — [[specs/investimentos-portfolio]] atualizada para v2.26: formulário do Portfólio equalizado com Lançamentos — modalidade em combo com helper (?); controles segmentados/chips/presets removidos do app.
+- `11.25` — 2026-08-11 — [[specs/lancamentos]] atualizada para v3.18: modalidade de renda fixa (Pós/Pré/Híbrida) volta a ser combo ao lado do Indexador com helper (?); CSS de presets/chips removido (sem usos restantes).
+- `11.24` — 2026-08-11 — [[specs/lancamentos]] atualizada para v3.17: checkboxes de média histórica sem moldura pill (checkbox simples); layout pill de checkboxes descontinuado no app (CSS removido).
+- `11.23` — 2026-08-11 — [[specs/lancamentos]] v3.16 e [[specs/investimentos-portfolio]] v2.25: presets de renda fixa removidos; modalidade selecionada (Pós/Pré/Híbrida) destacada em cor de accent; marcador de reserva de emergência sem moldura.
+- `11.22` — 2026-08-11 — [[specs/lancamentos]] v3.15 e [[specs/investimentos-portfolio]] v2.24: renda fixa sem blocos escurecidos; modalidade (Pós/Pré/Híbrida) em lista segmentada centralizada sempre visível; presets sem a frase "Atalhos comuns:".
+- `11.21` — 2026-08-11 — [[specs/lancamentos]] atualizada para v3.14: bloco escurecido removido dos campos Fundo ou previdência (CNPJ e Cota); Renda fixa é o único bloco restante no formulário de Lançamentos.
+- `11.20` — 2026-08-11 — [[specs/lancamentos]] atualizada para v3.13: **Valor investido** ocupa a mesma posição do Valor (abaixo da Descrição) no tipo Investimento — mesmo altura do valor em todos os tipos de lançamento.
+- `11.19` — 2026-08-11 — [[specs/lancamentos]] atualizada para v3.12: campo Valor abaixo da Descrição em posição estável para todos os tipos; blocos escurecidos removidos também de Câmbio, Transferência e do agrupamento geral de Investimento (permanecem apenas Fundos/previdência e Renda fixa).
+- `11.18` — 2026-08-11 — [[specs/lancamentos]] atualizada para v3.11: formulário de Lançamentos mais largo (até 460px) com espaçamento lateral equilibrado — 16px entre menu e formulário, iguais aos 16px entre formulário e extrato.
+- `11.17` — 2026-08-11 — [[specs/lancamentos]] atualizada para v3.10: linhas simples do formulário (Valor, Repetição, Recorrência e Média) deixam de usar o bloco contextual escurecido com título em caixa alta — formulário mais denso; blocos permanecem apenas para grupos de múltiplos campos.
+- `11.16` — 2026-08-11 — [[specs/lancamentos]] atualizada para v3.9: layout de Lançamentos ganha formulário compacto, blocos condicionais por tipo/categoria e lista diária mais limpa.
+- `11.15` — 2026-08-11 — [[specs/lancamentos]] atualizada para v3.8: gráfico de saldos passa a usar a mesma linguagem visual refinada do gráfico de faturas.
+- `11.14` — 2026-08-11 — [[specs/cartoes]] atualizada para v2.7: gráfico de evolução de faturas refinado visualmente com cards compactos e curva SVG nativa.
 - `11.13` — 2026-08-11 — [[specs/lancamentos]] atualizada para v3.7: edição de lançamento avulso permite alterar a repetição para parcelado ou recorrente.
 - `11.12` — 2026-08-11 — [[specs/tendencias-saude-financeira]] atualizada para v2.21: Tendências passa a sinalizar oportunidade de revisar caixa quando o saldo previsto de fim do mês em contas de liquidez/carteira fica igual ou acima de 2x as despesas planejadas.
 - `11.11` — 2026-08-11 — [[specs/alerta-nova-versao]] atualizada para v1.2: validação operacional do alerta de nova versão e fallback TLS com `certifi` para ambientes Python sem bundle de certificados.
