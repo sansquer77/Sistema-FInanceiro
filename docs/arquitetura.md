@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.27
+versao: 3.28
 atualizado: 2026-08-10
 relacionados:
   - "[[requisitos]]"
@@ -438,6 +438,7 @@ Ver [[cartoes]].
 7. Ativos em moeda estrangeira exibidos na moeda da carteira; conversão via lançamentos de câmbio.
 8. Consolidações do Portfólio mantêm valores exibidos na moeda original, mas expõem valor atual normalizado em BRL para a escala das barras visuais, usando cotação do fechamento anterior quando a moeda não é BRL.
 9. A UI do Portfólio carrega a aba **Posição** primeiro; Análise, Histórico e rentabilidade detalhada são renderizados/carregados sob demanda.
+10. Renda fixa e Poupança exibem variação do dia calculada como a diferença do valor na curva entre hoje e o dia anterior (base limitada à data de aquisição), reutilizando `fixed_income_value_as_of`/`savings_value_as_of` com cache de fatores compartilhado; dias sem taxa publicada produzem variação zero em pós-fixados.
 
 Ver [[investimentos-portfolio]].
 
@@ -498,6 +499,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.28` — 2026-08-10 — Renda fixa e Poupança passam a calcular variação do dia no Portfólio pela diferença do valor na curva entre hoje e o dia anterior, via `day_variation_cents` com cache de fatores compartilhado. Ver [[specs/investimentos-portfolio]] v2.22.
 - `3.27` — 2026-08-10 — Arquitetura sincronizada após implementação do Consultor: removidas marcações de "futuro", documentado fluxo Preferências/Cockpit, catálogo fechado de 7 análises, histórico em subaba própria e persistência criptografada do Perfil Complementar.
 - `3.26` — 2026-08-10 — `consultor-view.js` documentado com grade de cards, execução sob demanda e histórico da aba Consultor no Cockpit. Ver [[specs/consultor]] v0.33.
 - `3.25` — 2026-08-10 — Preferências documentadas com ativação do Consultor, seleção de perfil e Perfil Complementar opcional. Ver [[specs/consultor]] v0.32.

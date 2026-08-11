@@ -1514,8 +1514,10 @@ def fetch_mais_retorno_quote(identifier: str, api_key: str, force_refresh: bool 
 
 
 def apply_fixed_income_value(position: dict, force_refresh: bool = False) -> None:
+    today = date.today()
+    factor_cache: dict[str, Decimal] = {}
     net_cents, gross_cents, iof_tax_cents, income_tax_cents, custody_fee_cents, rate_factor, source = fixed_income_value_as_of(
-        position, date.today(), force_refresh=force_refresh
+        position, today, force_refresh=force_refresh, factor_cache=factor_cache
     )
     mode = position["fixed_income_mode"] or "post"
     indexer = position["fixed_income_indexer"] or "CDI"
@@ -1531,8 +1533,38 @@ def apply_fixed_income_value(position: dict, force_refresh: bool = False) -> Non
     position["fixed_income_income_tax_cents"] = income_tax_cents
     position["fixed_income_custody_fee_cents"] = custody_fee_cents
     position["fixed_income_net_value_cents"] = net_cents
-    position["day_result_cents"] = 0
-    position["day_result_brl_cents"] = 0
+    position["day_result_cents"] = day_variation_cents(
+        position,
+        net_cents,
+        today,
+        lambda pos, as_of, refresh, cache: fixed_income_value_as_of(pos, as_of, force_refresh=refresh, factor_cache=cache)[0],
+        force_refresh=force_refresh,
+        factor_cache=factor_cache,
+    )
+    position["day_result_brl_cents"] = value_to_brl(position["day_result_cents"], position["currency"])
+
+
+def day_variation_cents(
+    position: dict,
+    current_value_cents: int,
+    as_of_date: date,
+    value_provider: object,
+    force_refresh: bool = False,
+    factor_cache: dict[str, Decimal] | None = None,
+) -> int:
+    # spec: investimentos/investimentos-portfolio v2.22 — criterios 43 a 45
+    # (variacao do dia = valor hoje menos valor no dia anterior, com a base de
+    #  comparacao limitada a data de aquisicao: no dia da aquisicao a variacao
+    #  exibida e zero. Para pos-fixados, dias sem taxa publicada (fim de
+    #  semana/feriado) naturalmente produzem variacao zero no indexador)
+    baseline_date = date.fromisoformat(position["first_operation_date"])
+    if as_of_date <= baseline_date:
+        return 0
+    previous_date = as_of_date - timedelta(days=1)
+    if previous_date < baseline_date:
+        previous_date = baseline_date
+    previous_value = int(value_provider(position, previous_date, force_refresh, factor_cache))
+    return current_value_cents - previous_value
 
 
 def fixed_income_value_as_of(
@@ -1825,8 +1857,9 @@ def _ipca_factor_for_month(month_date: date, as_of: date, cache: dict[str, float
 
 def apply_savings_value(position: dict, force_refresh: bool = False) -> None:
     today = date.today()
+    factor_cache: dict[str, Decimal] = {}
     current_cents, additional_monthly_rate, source, status = savings_value_as_of_with_meta(
-        position, today, force_refresh=force_refresh
+        position, today, force_refresh=force_refresh, factor_cache=factor_cache
     )
     position["quote"] = savings_quote_label(additional_monthly_rate)
     position["quote_source"] = source
@@ -1839,8 +1872,15 @@ def apply_savings_value(position: dict, force_refresh: bool = False) -> None:
     position["fixed_income_income_tax_cents"] = 0
     position["fixed_income_custody_fee_cents"] = 0
     position["fixed_income_net_value_cents"] = current_cents
-    position["day_result_cents"] = 0
-    position["day_result_brl_cents"] = 0
+    position["day_result_cents"] = day_variation_cents(
+        position,
+        current_cents,
+        today,
+        lambda pos, as_of, refresh, cache: savings_value_as_of(pos, as_of, force_refresh=refresh, factor_cache=cache),
+        force_refresh=force_refresh,
+        factor_cache=factor_cache,
+    )
+    position["day_result_brl_cents"] = value_to_brl(position["day_result_cents"], position["currency"])
 
 
 def savings_value_as_of_with_meta(

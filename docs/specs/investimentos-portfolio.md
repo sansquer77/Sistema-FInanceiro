@@ -2,7 +2,7 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.21
+versao: 2.22
 atualizado: 2026-08-10
 relacionados:
   - "[[contas-correntes]]"
@@ -70,6 +70,7 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 - O módulo Portfólio deve exibir nota discreta informando que diferenças frente ao site do Tesouro podem ocorrer por marcação a mercado em resgate antecipado, provisão oficial de taxas e regras específicas do título.
 - Posições de renda fixa com vencimento igual ou anterior à data atual devem gerar alerta visual no menu Portfólio e aviso no Cockpit até que sejam encerradas.
 - Posições iniciais e aportes de renda fixa podem ser marcados explicitamente como reserva de emergência quando o usuário entender que têm liquidez compatível, sem inferência automática pelo sistema.
+- A variação do dia de renda fixa é a diferença entre o valor líquido na curva hoje e o valor líquido no dia anterior, com base de comparação limitada à data de aquisição (no dia da aquisição a variação exibida é zero). Pós-fixados/híbridos variam apenas em dias com taxa publicada (dias úteis); pré-fixados variam pro rata diário sobre calendário (365 dias), incluindo fins de semana.
 
 **Poupança (`savings`):**
 - Não aparece como subcategoria de Renda Fixa no formulário.
@@ -81,6 +82,7 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 - Posições e aportes de Poupança podem ser marcados explicitamente como reserva de emergência, mas a marcação deve ser decisão do usuário.
 - A marcação de reserva de emergência deve ser visualmente discreta no formulário, com peso menor que campos financeiros principais.
 - Em aportes de Poupança criados por Lançamentos de Contas, o formulário deve ocultar campos não aplicáveis como quantidade, preço unitário, renda fixa, CNPJ, corretagem, emolumentos, impostos e outros custos.
+- A variação do dia de Poupança usa o mesmo método da renda fixa (diferença do valor atual entre hoje e o dia anterior, limitada à data do aniversário mais antigo); na prática a variação concentra-se no mês do aniversário, quando o adicional mensal é creditado.
 
 **Previdência Privada (`private_pension`):**
 - Lançamentos classificados como `Previdência Privada`, `PGBL` ou `VGBL` geram operações do tipo `private_pension`.
@@ -189,9 +191,13 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado uma posição de fundo com a API Mais Retorno indisponível, quando o Portfólio é carregado, então a posição mantém o valor de custo com status amigável e o restante do portfólio segue funcionando.
 - Dado posições com quantidade de alta precisão (ex.: `94,65389`), quando o Portfólio é exibido, então a quantidade aparece com no máximo 2 casas decimais para preservar o layout das tabelas.
 - Dado o módulo Portfólio aberto, quando o usuário navega entre as abas **Posição**, **Análise** e **Histórico**, então apenas o painel da aba ativa é exibido e os dados das demais abas permanecem preservados.
+- Dado um ativo de renda fixa com taxa cadastrada, quando listado no Portfólio, então a variação do dia é a diferença entre o valor líquido na curva de hoje e o do dia anterior, zerada no dia da aquisição.
+- Dado um ativo de renda fixa pós-fixado em dia sem taxa publicada (fim de semana/feriado), quando listado no Portfólio, então a variação do dia exibe zero, sem crescimento artificial do indexador.
+- Dado um ativo de Poupança com aniversários cadastrados, quando listado no Portfólio, então a variação do dia reflete a diferença de valor entre hoje e o dia anterior, concentrada no mês do aniversário.
 
 ## Changelog
 
+- `2.22` — 2026-08-10 — Renda fixa e Poupança passam a exibir variação do dia no Portfólio: diferença do valor na curva entre hoje e o dia anterior, limitada à data de aquisição (zero no dia da aquisição); pós-fixados variam apenas em dias úteis com taxa publicada, pré-fixados variam pro rata diário.
 - `2.21` — 2026-08-10 — Resgates de Poupança passam a consumir saldos de aniversários por FIFO; resgate total remove a posição aberta automaticamente.
 - `2.20` — 2026-08-10 — Previdência Privada com CNPJ passa a usar Mais Retorno para cotação no Portfólio e no preenchimento assistido de lançamentos.
 - `2.19` — 2026-08-10 — Integração Mais Retorno exposta também como busca assistida de cota por CNPJ para o formulário de Lançamentos de Contas, sem persistência automática.
