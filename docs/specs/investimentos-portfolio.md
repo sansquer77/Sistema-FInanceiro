@@ -2,7 +2,7 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.27
+versao: 2.28
 atualizado: 2026-08-11
 relacionados:
   - "[[contas-correntes]]"
@@ -197,9 +197,11 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado um ativo de renda fixa pós-fixado em dia sem taxa publicada (fim de semana/feriado), quando listado no Portfólio, então a variação do dia exibe zero, sem crescimento artificial do indexador.
 - Dado um ativo de Poupança com aniversários cadastrados, quando listado no Portfólio, então a variação do dia reflete a diferença de valor entre hoje e o dia anterior, concentrada no mês do aniversário.
 - Dado o usuário cadastrando posição inicial no Portfólio, quando seleciona **Previdência Privada**, então o campo CNPJ opcional aparece com o mesmo comportamento dos Fundos de investimento e o valor preenchido é persistido na posição.
+- Dado uma posição marcada como reserva de emergência, quando a aba **Posição** é exibida, então a coluna **Tipo** mostra um ícone pequeno de escudo ao lado do tipo do ativo, com tooltip "Reserva de emergência", sem alterar a largura nem a área da tabela.
 
 ## Changelog
 
+- `2.28` — 2026-08-11 — Coluna **Tipo** da aba Posição ganha ícone pequeno de escudo (verde, indicador de saúde financeira) ao lado do tipo do ativo para posições marcadas como reserva de emergência, com tooltip; sem aumento de área do gráfico/tabela.
 - `2.27` — 2026-08-11 — Helper (?) de modalidade da renda fixa alinhado inline ao rótulo (`field-label-title`), corrigindo a quebra de layout no formulário do Portfólio (mesma correção aplicada em Lançamentos).
 - `2.26` — 2026-08-11 — Formulário de posição do Portfólio equalizado com o de Lançamentos: modalidade (Pós/Pré/Híbrida) em combo com helper (?); controles segmentados, chips e presets removidos do app.
 - `2.25` — 2026-08-11 — Formulário de Renda Fixa do Portfólio: removidos os presets (100% do CDI, 120% do CDI, IPCA + 6,5%); opção selecionada da modalidade destacada em cor de accent; marcador de reserva de emergência sem moldura.
