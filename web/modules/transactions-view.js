@@ -481,9 +481,10 @@ export function registerTransactionsView({
     updateSeriesState();
     updateTransactionTypeState();
     applyWalletAccountRestrictions();
-    seriesKind.disabled = true;
-    installmentCount.disabled = true;
-    recurrenceFrequency.disabled = true;
+    const canChangeRepetition = canChangeCurrentTransactionRepetition();
+    seriesKind.disabled = !canChangeRepetition;
+    installmentCount.disabled = !canChangeRepetition || seriesKind.value !== "installment";
+    recurrenceFrequency.disabled = !canChangeRepetition || seriesKind.value !== "recurring";
     if (transaction.destination_account_id) {
       destinationAccount.value = String(transaction.destination_account_id);
     }
@@ -1137,7 +1138,7 @@ export function registerTransactionsView({
       for (const option of transactionType.options) {
         option.disabled = false;
       }
-      seriesKind.disabled = false;
+      seriesKind.disabled = !canChangeCurrentTransactionRepetition();
     }
   }
 
@@ -1278,20 +1279,30 @@ export function registerTransactionsView({
     if (isWallet) {
       seriesKind.value = "single";
     }
+    const canChangeRepetition = canChangeCurrentTransactionRepetition();
     seriesKindRow.hidden = Boolean(isWallet);
-    seriesKind.disabled = Boolean(isWallet);
+    seriesKind.disabled = Boolean(isWallet) || !canChangeRepetition;
     const isInstallment = seriesKind.value === "installment";
     const isRecurring = seriesKind.value === "recurring";
     installmentCountLabel.hidden = !isInstallment;
-    installmentCount.disabled = !isInstallment;
+    installmentCount.disabled = !isInstallment || !canChangeRepetition;
     recurrenceFields.hidden = !isRecurring;
-    recurrenceFrequency.disabled = !isRecurring;
+    recurrenceFrequency.disabled = !isRecurring || !canChangeRepetition;
     if (recurrenceAverageFields) {
       recurrenceAverageFields.hidden = !isRecurring;
     }
     if (useAverage) {
-      useAverage.disabled = !isRecurring;
+      useAverage.disabled = !isRecurring || !canChangeRepetition;
     }
+  }
+
+  function canChangeCurrentTransactionRepetition() {
+    const editingId = transactionForm.elements.id.value;
+    if (!editingId) {
+      return true;
+    }
+    const transaction = findTransactionById(editingId);
+    return Boolean(transaction && !transaction.series_id);
   }
 
   function shiftTransactionMonth(delta) {

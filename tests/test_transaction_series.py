@@ -112,6 +112,84 @@ class TransactionSeriesUpdateTest(unittest.TestCase):
             "Compra parcelada (5/5)",
         ])
 
+    def test_single_transaction_can_be_edited_to_installment_series(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta principal",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "1000,00",
+        })
+        transaction = create_transaction(user["id"], {
+            "type": "expense",
+            "description": "Compra",
+            "amount": "300,00",
+            "date": "2026-01-10",
+            "account_id": str(account["id"]),
+            "category": "Compras",
+        })
+
+        updated = update_transaction(user["id"], str(transaction["id"]), {
+            "type": "expense",
+            "description": "Compra parcelada",
+            "amount": "300,00",
+            "date": "2026-01-10",
+            "account_id": str(account["id"]),
+            "category": "Compras",
+            "series_kind": "installment",
+            "installment_count": "3",
+        })
+
+        rows = sorted(list_transactions(user["id"], account_id=account["id"]), key=lambda row: row["installment_index"])
+        self.assertEqual(updated["series_kind"], "installment")
+        self.assertEqual(len(rows), 3)
+        self.assertEqual([row["amount"] for row in rows], ["100.00", "100.00", "100.00"])
+        self.assertEqual([row["description"] for row in rows], [
+            "Compra parcelada (1/3)",
+            "Compra parcelada (2/3)",
+            "Compra parcelada (3/3)",
+        ])
+        self.assertEqual(len({row["series_id"] for row in rows}), 1)
+
+    def test_single_transaction_can_be_edited_to_recurring_series(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta principal",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "1000,00",
+        })
+        transaction = create_transaction(user["id"], {
+            "type": "expense",
+            "description": "Assinatura",
+            "amount": "30,00",
+            "date": "2026-01-10",
+            "account_id": str(account["id"]),
+            "category": "Servicos",
+        })
+
+        update_transaction(user["id"], str(transaction["id"]), {
+            "type": "expense",
+            "description": "Assinatura",
+            "amount": "30,00",
+            "date": "2026-01-10",
+            "account_id": str(account["id"]),
+            "category": "Servicos",
+            "series_kind": "recurring",
+            "recurrence_frequency": "monthly",
+            "recurrence_count": "4",
+        })
+
+        rows = sorted(list_transactions(user["id"], account_id=account["id"]), key=lambda row: row["date"])
+        self.assertEqual(len(rows), 4)
+        self.assertTrue(all(row["series_kind"] == "recurring" for row in rows))
+        self.assertEqual([row["date"] for row in rows], [
+            "2026-01-10",
+            "2026-02-10",
+            "2026-03-10",
+            "2026-04-10",
+        ])
+
     def test_recurring_transaction_keeps_full_amount_on_each_occurrence(self) -> None:
         user = create_user("Alice", "alice@example.com", "correct-password")
         account = create_checking_account(user["id"], {

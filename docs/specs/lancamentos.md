@@ -2,8 +2,8 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 3.6
-atualizado: 2026-08-10
+versao: 3.7
+atualizado: 2026-08-11
 relacionados:
   - "[[contas-correntes]]"
   - "[[categorias-tags-gestao]]"
@@ -17,7 +17,7 @@ aliases: ["Lançamentos", "Transações"]
 # Lançamentos
 
 > [!info] Status
-> **implementado** · área: `lancamentos` · atualizado em 2026-08-10 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]]
+> **implementado** · área: `lancamentos` · atualizado em 2026-08-11 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]]
 
 ## Problema
 
@@ -80,6 +80,7 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 - Lançamentos parcelados exibem índice e total (`1/36`, `2/36`...) sem reiniciar a contagem em edições pontuais.
 - Em lançamentos parcelados, o valor informado é o total da compra/lançamento e deve ser dividido pela quantidade total de parcelas. Ex.: R$ 500 em 5x gera 5 lançamentos de R$ 100.
 - Em lançamentos recorrentes, cada ocorrência futura deve manter exatamente o valor informado, a menos que o usuário ative a opção de calcular valores futuros pela média dos últimos 12 lançamentos com a mesma descrição normalizada, mesmo tipo e mesma categoria/subcategoria.
+- Um lançamento avulso existente pode ser editado para se tornar parcelado ou recorrente; nesse caso, a ocorrência atual vira a primeira parcela/ocorrência, as próximas são criadas a partir dela e todas recebem o mesmo `series_id`.
 - Quando a opção de média estiver ativa em um lançamento recorrente, o valor de cada ocorrência futura usa a média aritmética inteira (em centavos) dos valores dos últimos 12 lançamentos do usuário com a mesma descrição normalizada, mesmo tipo e mesma categoria/subcategoria; se houver menos de 12, usa todos os disponíveis; se não houver histórico, mantém o valor informado no formulário.
 - Lançamentos recorrentes não exibem o campo de quantidade de ocorrências no formulário; o sistema grava a série com 120 ocorrências automaticamente para manter compatibilidade com lançamentos antigos que usam o campo.
 - Ao final de cada grupo diário na tela de Lançamentos, `Saldo previsto` considera todos os lançamentos até a data e `Saldo conciliado` considera somente lançamentos com `reconciled_at`, ambos partindo do saldo inicial da conta selecionada.
@@ -176,9 +177,11 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dado uma série recorrente sem `use_average`, quando o usuário edita uma ocorrência, então o sistema mantém o comportamento atual de perguntar se deseja alterar apenas o lançamento atual ou também os futuros.
 - Dado `GET /api/transactions` com `limit` e `offset` válidos, quando os filtros de mês/conta também estão presentes, então retorna no máximo `limit` lançamentos da página solicitada com `has_more` indicando se há páginas seguintes.
 - Dado `GET /api/transactions` com `limit` acima de 5000, quando processado, então o servidor reduz o limite para 5000 sem erro.
+- Dado um lançamento avulso existente, quando o usuário edita a repetição para parcelado ou recorrente, então o sistema preserva o lançamento atual como primeira ocorrência, cria as próximas ocorrências futuras e passa a listar todas com o mesmo identificador de série.
 
 ## Changelog
 
+- `3.7` — 2026-08-11 — Edição de lançamento avulso passa a permitir alterar a repetição para parcelado ou recorrente, criando as ocorrências futuras a partir da ocorrência atual.
 - `3.6` — 2026-08-10 — Campo CNPJ e busca assistida de cota pela Mais Retorno passam a aparecer também para lançamentos de Previdência Privada, mantendo CNPJ opcional.
 - `3.5` — 2026-08-10 — Formulário de investimento em Fundos passa a oferecer busca assistida de cota pela Mais Retorno a partir do CNPJ, preenchendo **Preço unitário** como sugestão editável.
 - `3.4` — 2026-08-07 — Corrigida uma regressão da v3.3: a fatia de `GET /api/transactions` com **mês + conta** voltou a retornar todo o histórico da conta até o fim do mês (`date <= fim do mês`, sem limite inferior), pois o extrato calcula saldos acumulados partindo do saldo inicial da conta somado aos lançamentos até a data (ver `getBalanceUntil` no frontend). O intervalo estrito do mês aplica-se apenas à listagem sem conta. Teste de regressão adicionado.

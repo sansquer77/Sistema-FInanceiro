@@ -257,7 +257,11 @@ def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
         ).fetchone()
         if not existing:
             raise TransactionError("Lancamento nao encontrado.", HTTPStatus.NOT_FOUND)
+        if "series_kind" not in data and "payment_mode" not in data:
+            preserve_existing_series_metadata(transaction, existing)
         source = get_active_account(conn, user_id, transaction["account_id"])
+        if source["account_type"] == "wallet" or transaction["type"] == "transfer":
+            force_single_transaction(transaction)
         destination = None
         if transaction["type"] == "transfer":
             destination = get_active_account(conn, user_id, transaction["destination_account_id"])
@@ -267,34 +271,64 @@ def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
         amount_brl_cents = convert_to_brl_cents(transaction["amount_cents"], exchange_rate_micros)
         category_id, subcategory_id = resolve_transaction_category(conn, user_id, transaction, destination)
         tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
+        series_id = existing["series_id"]
+        current_occurrence = {
+            "description": transaction["description"],
+            "amount_cents": transaction["amount_cents"],
+            "destination_amount_cents": transaction["destination_amount_cents"],
+            "date": transaction["date"],
+            "installment_index": existing["installment_index"],
+            "installment_count": existing["installment_count"],
+        }
+        additional_occurrences: list[dict] = []
+        if not existing["series_id"] and transaction["series_kind"] != "single":
+            if transaction.get("use_average") and transaction["series_kind"] == "recurring":
+                average_amount = average_amount_for_recurring_description(
+                    conn, user_id, transaction["description"], transaction["type"], category_id, subcategory_id,
+                    max_date=transaction["date"],
+                )
+                if average_amount is not None:
+                    transaction["average_amount_cents"] = average_amount
+            occurrences = build_transaction_occurrences(transaction)
+            current_occurrence = occurrences[0]
+            additional_occurrences = occurrences[1:]
+            series_id = str(uuid4())
 
         # spec: lancamentos v3.3 — criterios 26 e 27
         # (series recorrentes com use_average ativo aplicam edicao em cascata
         #  automaticamente e recalculam valores futuros pela media)
         force_apply_to_future = bool(existing["use_average"]) and existing["series_kind"] == "recurring"
+        current_amount_brl_cents = convert_to_brl_cents(current_occurrence["amount_cents"], exchange_rate_micros)
         conn.execute(
             """
             UPDATE transactions
             SET type = ?, description = ?, normalized_description = ?, amount_cents = ?, destination_amount_cents = ?,
                 exchange_rate_micros = ?, transfer_exchange_rate_micros = ?,
                 amount_brl_cents = ?, date = ?, account_id = ?, destination_account_id = ?,
-                category_id = ?, subcategory_id = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+                category_id = ?, subcategory_id = ?, series_id = ?, series_kind = ?, installment_index = ?,
+                installment_count = ?, recurrence_frequency = ?, use_average = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND user_id = ? AND archived_at IS NULL
             """,
             (
                 transaction["type"],
-                transaction["description"],
-                normalize_description(transaction["description"]),
-                transaction["amount_cents"],
-                transaction["destination_amount_cents"],
+                current_occurrence["description"],
+                normalize_description(current_occurrence["description"]),
+                current_occurrence["amount_cents"],
+                current_occurrence["destination_amount_cents"],
                 exchange_rate_micros,
                 transaction["transfer_exchange_rate_micros"],
-                amount_brl_cents,
-                transaction["date"],
+                current_amount_brl_cents,
+                current_occurrence["date"],
                 source["id"],
                 destination["id"] if destination else None,
                 category_id,
                 subcategory_id,
+                series_id,
+                transaction["series_kind"],
+                current_occurrence["installment_index"],
+                current_occurrence["installment_count"],
+                transaction["recurrence_frequency"],
+                1 if transaction.get("use_average") else 0,
                 transaction["notes"],
                 normalized_id,
                 user_id,
@@ -302,6 +336,11 @@ def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
         )
         replace_transaction_tags(conn, normalized_id, tag_ids)
         upsert_investment_operation(conn, user_id, normalized_id, source["id"], transaction)
+        if additional_occurrences:
+            insert_additional_series_occurrences(
+                conn, user_id, transaction, additional_occurrences, source, destination,
+                exchange_rate_micros, category_id, subcategory_id, tag_ids, series_id,
+            )
         if apply_to_future or force_apply_to_future:
             update_future_series_transactions(conn, user_id, existing, transaction, force_apply_to_future)
         recompute_account_balance(conn, user_id, existing["account_id"])
@@ -448,6 +487,69 @@ def apply_future_series_updates(
         recompute_account_balance(conn, user_id, affected_account_id)
 
 
+def insert_additional_series_occurrences(
+    conn,
+    user_id: int,
+    transaction: dict,
+    occurrences: list[dict],
+    source,
+    destination,
+    exchange_rate_micros: int,
+    category_id: int | None,
+    subcategory_id: int | None,
+    tag_ids: list[int],
+    series_id: str,
+) -> None:
+    # spec: lancamentos v3.7 — critério 47
+    # (editar um lançamento avulso para parcelado/recorrente reaproveita a
+    # ocorrência atual como primeira parcela e cria somente as próximas)
+    for occurrence in occurrences:
+        amount_brl_cents = convert_to_brl_cents(occurrence["amount_cents"], exchange_rate_micros)
+        cursor = conn.execute(
+            """
+            INSERT INTO transactions (
+                user_id, type, description, normalized_description, amount_cents, destination_amount_cents,
+                exchange_rate_micros, transfer_exchange_rate_micros, amount_brl_cents, date, account_id,
+                destination_account_id, category_id, subcategory_id, series_id, series_kind, installment_index,
+                installment_count, recurrence_frequency, use_average, notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                user_id,
+                transaction["type"],
+                occurrence["description"],
+                normalize_description(occurrence["description"]),
+                occurrence["amount_cents"],
+                occurrence["destination_amount_cents"],
+                exchange_rate_micros,
+                transaction["transfer_exchange_rate_micros"],
+                amount_brl_cents,
+                occurrence["date"],
+                source["id"],
+                destination["id"] if destination else None,
+                category_id,
+                subcategory_id,
+                series_id,
+                transaction["series_kind"],
+                occurrence["installment_index"],
+                occurrence["installment_count"],
+                transaction["recurrence_frequency"],
+                1 if transaction.get("use_average") else 0,
+                transaction["notes"],
+            ),
+        )
+        replace_transaction_tags(conn, cursor.lastrowid, tag_ids)
+        upsert_investment_operation(conn, user_id, cursor.lastrowid, source["id"], transaction)
+
+
+def preserve_existing_series_metadata(transaction: dict, existing) -> None:
+    transaction["series_kind"] = existing["series_kind"] or "single"
+    transaction["installment_count"] = existing["installment_count"]
+    transaction["recurrence_frequency"] = existing["recurrence_frequency"]
+    transaction["recurrence_count"] = existing["installment_count"]
+    transaction["use_average"] = bool(existing["use_average"])
+
+
 def delete_transaction(user_id: int, transaction_id: str, apply_to_future: bool = False) -> None:
     with get_connection() as conn:
         begin_immediate(conn)
@@ -555,12 +657,7 @@ def normalize_transaction_payload(data: dict) -> dict:
 
 
 def normalize_transaction_update_payload(data: dict) -> dict:
-    transaction = normalize_transaction_payload({**data, "series_kind": "single"})
-    transaction.pop("series_kind", None)
-    transaction.pop("installment_count", None)
-    transaction.pop("recurrence_frequency", None)
-    transaction.pop("recurrence_count", None)
-    return transaction
+    return normalize_transaction_payload(data)
 
 
 def normalize_transaction_category(transaction_type: str, value: object) -> str | None:
