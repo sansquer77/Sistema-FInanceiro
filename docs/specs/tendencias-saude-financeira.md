@@ -2,8 +2,8 @@
 tipo: spec
 area: tendencias-saude-financeira
 status: implementado
-versao: 2.20
-atualizado: 2026-08-10
+versao: 2.21
+atualizado: 2026-08-11
 relacionados:
   - "[[score-saude-financeira]]"
   - "[[relatorios]]"
@@ -20,7 +20,7 @@ aliases: ["Tendências de Saúde Financeira", "Achados Financeiros", "Insights F
 # Tendências e Achados de Saúde Financeira
 
 > [!info] Status
-> **implementado** · área: `tendencias-saude-financeira` · atualizado em 2026-08-10 · relacionados: [[score-saude-financeira]], [[relatorios]], [[lancamentos]], [[cartoes]]
+> **implementado** · área: `tendencias-saude-financeira` · atualizado em 2026-08-11 · relacionados: [[score-saude-financeira]], [[relatorios]], [[lancamentos]], [[cartoes]]
 
 ## Problema
 
@@ -135,6 +135,7 @@ Usuário autenticado que consulta o Cockpit e deseja entender, em linguagem simp
 - Pagamentos de fatura em conta-corrente continuam excluídos das despesas analíticas para evitar duplicidade, conforme [[relatorios]].
 - Lançamentos de cartão devem entrar pela competência da fatura (`invoice_month`) nas análises mensais, conforme [[relatorios]].
 - O card de **Despesas** no topo da aba deve oferecer indicação discreta de fonte, explicando que o valor soma despesas de contas pela data e lançamentos de cartão pela competência da fatura, com pagamentos de fatura excluídos para evitar duplicidade.
+- Quando o saldo previsto no fim do mês em contas de liquidez ou carteira, considerando lançamentos futuros e faturas abertas dos cartões vinculados, ficar igual ou acima de 2x as despesas planejadas do mês, a aba deve exibir um aviso explicativo de oportunidade para revisar o caixa. O texto deve usar tom informativo, sem recomendar investimento específico, e pode indicar reserva ou objetivo financeiro como possibilidades.
 - Sugestões devem ser explicativas e não prescritivas, evitando tom de aconselhamento financeiro personalizado.
 - Em moeda estrangeira ou cenário multi-moeda, a primeira versão deve evitar misturar moedas sem explicação; quando necessário, gerar achados por moeda ou usar os valores normalizados já definidos pelo Score.
 - O aviso de cenário multi-moeda deve aparecer apenas no bloco **Tendências e achados**, preferencialmente como último ponto do resumo textual, evitando repetição na linha de metadados da aba.
@@ -256,6 +257,7 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 - Dado um usuário com IA ativa e resumo reescrito com sucesso, quando visualiza o bloco **Tendências e achados**, então o título do bloco exibe um marcador discreto com ícone indicando IA.
 - Dado um usuário com histórico curto, quando visualiza **Tendências e achados**, então o aviso **Histórico curto** aparece fora dos cards de achados, como texto de seção.
 - Dado um usuário em tela estreita ou intermediária, quando visualiza a aba **Tendências**, então **Tendências e achados**, **Budget x Realizado** e os cards de confiança aparecem em fluxo vertical usando a largura disponível.
+- Dado um usuário com saldo previsto no fim do mês em contas de liquidez/carteira igual ou acima de 2x as despesas planejadas, quando consulta a aba **Tendências**, então o resumo exibe um aviso explicativo de oportunidade de revisar o caixa usando o saldo previsto que considera lançamentos futuros e faturas abertas dos cartões vinculados.
 
 ## Pendências
 
@@ -278,7 +280,7 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 
 - [x] Passo 1 — Atualizar specs afetadas e resolver pendências obrigatórias antes de codificar. Fecha: critérios 1 a 28.
 - [x] Passo 2 — Criar armazenamento local criptografado de configuração de IA por usuário, seguindo o padrão de segurança aplicável. Fecha: critérios 17, 18, 19, 21, 23, 27 e 28.
-- [x] Passo 3 — Implementar núcleo local de cálculo de tendências em Python, com série mensal, Budget x Realizado, achados estruturados em centavos inteiros, eventos pontuais, assinaturas e serviços recorrentes, e confiança. Fecha: critérios 1, 3, 4, 5, 6, 7, 8, 9, 13, 22, 25, 26, 27, 28 e 29.
+- [x] Passo 3 — Implementar núcleo local de cálculo de tendências em Python, com série mensal, Budget x Realizado, achados estruturados em centavos inteiros, eventos pontuais, assinaturas e serviços recorrentes, oportunidade de caixa e confiança. Fecha: critérios 1, 3, 4, 5, 6, 7, 8, 9, 13, 22, 25, 26, 27, 28, 29 e 54.
 - [x] Passo 4 — Criar rotas autenticadas e validadas para tendências e preferências de IA. Fecha: critérios 1, 12, 13, 14, 15, 16, 17, 18 e 19.
 - [x] Passo 5 — Adicionar UI em Preferências para ligar/desligar IA, escolher provedor em combo e salvar configuração sem expor segredos. Fecha: critérios 10, 11, 12, 13, 15, 16 e 20.
 - [x] Passo 6 — Adicionar aba **Tendências** no Cockpit, com gráfico mês a mês, tabela Budget x Realizado e bloco **Tendências e achados**, preservando identidade visual e leitura local sem IA. Fecha: critérios 1, 2, 3, 4, 5, 6, 7, 10, 20, 21, 25, 26, 27 e 28.
@@ -287,6 +289,7 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 
 ## Changelog
 
+- `2.21` — 2026-08-11 — Tendências passa a sinalizar oportunidade de revisar caixa quando o saldo previsto no fim do mês em contas de liquidez/carteira fica igual ou acima de 2x as despesas planejadas.
 - `2.20` — 2026-08-10 — Card **Despesas** da aba Tendências ganha indicador discreto de fonte, explicando contas por data, cartões por competência e exclusão de pagamentos de fatura.
 - `2.19` — 2026-08-09 — Prompt da IA de Tendências refinado para síntese executiva integrada em 2 a 4 frases e payload enriquecido apenas com contexto operacional agregado, sem detalhes de cards.
 - `2.18` — 2026-08-09 — Ajustada a fronteira entre resumo e cards: IA e resumo local passam a evitar repetição de limites, eventos pontuais e antecipações já detalhados nos cards.

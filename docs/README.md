@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 11.11
+versao: 11.12
 atualizado: 2026-08-11
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -132,6 +132,7 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `11.12` — 2026-08-11 — [[specs/tendencias-saude-financeira]] atualizada para v2.21: Tendências passa a sinalizar oportunidade de revisar caixa quando o saldo previsto de fim do mês em contas de liquidez/carteira fica igual ou acima de 2x as despesas planejadas.
 - `11.11` — 2026-08-11 — [[specs/alerta-nova-versao]] atualizada para v1.2: validação operacional do alerta de nova versão e fallback TLS com `certifi` para ambientes Python sem bundle de certificados.
 - `11.10` — 2026-08-10 — [[specs/sobre-app]] atualizada para v1.8: tela Sobre passa a exibir **Sansquer** como desenvolvedor e `darksansquer@gmail.com` como contato.
 - `11.9` — 2026-08-10 — [[specs/investimentos-portfolio]] atualizada para v2.23: formulário de posição inicial do Portfólio exibe o campo CNPJ opcional também para Previdência Privada, alinhado aos Fundos (mesma integração Mais Retorno).

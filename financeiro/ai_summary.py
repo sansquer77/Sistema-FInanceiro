@@ -159,7 +159,7 @@ def minimize_trends_payload(trends_payload: dict) -> dict:
     contadores operacionais, sem valores brutos completos, histórico ou segredos.
     """
     findings = trends_payload.get("achados") or []
-    narrative_finding_types = {"confianca", "receita", "despesa", "assinatura_servico"}
+    narrative_finding_types = {"confianca", "receita", "despesa", "assinatura_servico", "oportunidade_caixa"}
     minimized_findings = [
         {
             "tipo": f.get("tipo"),

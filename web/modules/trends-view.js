@@ -442,7 +442,7 @@ export function registerTrendsView({
 
   function renderFindings() {
     const findings = currentData.achados || [];
-    const textOnlyTypes = new Set(["confianca", "receita", "despesa", "assinatura_servico"]);
+    const textOnlyTypes = new Set(["confianca", "receita", "despesa", "assinatura_servico", "oportunidade_caixa"]);
     const cardFindings = findings.filter((finding) => !textOnlyTypes.has(finding.tipo));
     const hasIaSummary = currentData.ia_usada && currentData.ia_resumo;
     const summaryText = hasIaSummary ? currentData.ia_resumo : currentData.resumo_local;
