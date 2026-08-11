@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 11.8
+versao: 11.10
 atualizado: 2026-08-10
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -132,6 +132,8 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `11.10` — 2026-08-10 — [[specs/sobre-app]] atualizada para v1.8: tela Sobre passa a exibir **Sansquer** como desenvolvedor e `darksansquer@gmail.com` como contato.
+- `11.9` — 2026-08-10 — [[specs/investimentos-portfolio]] atualizada para v2.23: formulário de posição inicial do Portfólio exibe o campo CNPJ opcional também para Previdência Privada, alinhado aos Fundos (mesma integração Mais Retorno).
 - `11.8` — 2026-08-10 — [[specs/investimentos-portfolio]] atualizada para v2.22: renda fixa e Poupança passam a exibir variação do dia no Portfólio (diferença do valor na curva entre hoje e o dia anterior); [[arquitetura]] v3.28 documenta o cálculo via `day_variation_cents`.
 - `11.7` — 2026-08-10 — [[specs/consultor]] atualizada para v1.0 e movida para implementado; Passos 19 e 20 concluídos com homologação registrada e versão do app elevada para `1.4.0`.
 - `11.6` — 2026-08-10 — [[specs/consultor]] atualizada para v0.50 com Passo 18 concluído: documentação pós-implementação sincronizada em [[arquitetura]], [[requisitos]], [[instrucoes-app]] e no MoC do vault.

@@ -2,8 +2,8 @@
 tipo: spec
 area: usuario
 status: implementado
-versao: 1.7
-atualizado: 2026-08-08
+versao: 1.8
+atualizado: 2026-08-10
 relacionados:
   - "[[frontend-modularizacao]]"
   - "[[../arquitetura|Arquitetura]]"
@@ -50,10 +50,10 @@ Usuários finais e mantenedores que usam o Sistema Financeiro localmente, instal
 - O conteúdo deve mencionar o objetivo principal: controle financeiro local, privado e simples.
 - As funcionalidades devem cobrir contas, cartões, lançamentos, categorias/tags, limites, relatórios, cockpit, planejamento, saúde financeira, portfólio (renda fixa, ações, fundos, cripto, poupança e previdência), importação, histórico/auditoria, instruções e preferências/segurança.
 - Os dados de desenvolvimento devem informar:
-  - Desenvolvedor: Cristiano Gaspar.
+  - Desenvolvedor: Sansquer.
   - Versão atual do sistema, a partir do endpoint de metadados do app.
   - Tecnologias utilizadas no app.
-  - Contato: `cristiano_gaspar@outlook.com`.
+  - Contato: `darksansquer@gmail.com`.
 - A versão de produto deve partir de `1.0.50`, ficar centralizada em `financeiro/app_metadata.py`, ser exposta por `/api/app-info` e seguir versionamento semântico:
   - `PATCH` (`3.0.5` → `3.0.6`): correção compatível, segurança, desempenho ou ajuste operacional sem nova capacidade relevante para o usuário.
   - `MINOR` (`3.0.5` → `3.1.0`): nova funcionalidade ou capacidade relevante, compatível com os fluxos e dados existentes.
@@ -92,6 +92,7 @@ Usuários finais e mantenedores que usam o Sistema Financeiro localmente, instal
 
 ## Changelog
 
+- `1.8` — 2026-08-10 — Dados de desenvolvimento atualizados na tela Sobre: desenvolvedor passa a ser **Sansquer** e contato `darksansquer@gmail.com`.
 - `1.7` — 2026-08-08 — Tela Sobre atualizada: novo texto de funcionalidades e tecnologias refletindo a stack vigente e widget opcional Buy Me a Coffee ao lado do contato (recurso externo, não bloqueia sem internet).
 - `1.6` — 2026-07-31 — Versão atual do app elevada para `1.0.52` após ajustes compatíveis de UX no Cockpit.
 - `1.5` — 2026-07-31 — Política de versionamento do produto formalizada com critérios para PATCH, MINOR, MAJOR e casos sem incremento de versão.

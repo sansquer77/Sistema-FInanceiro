@@ -30,7 +30,7 @@ export function registerPortfolioView({
     portfolioAssetType,
     portfolioAssetIdentifier,
     portfolioAssetIdentifierLabel,
-    portfolioFundFields,
+    portfolioCnpjFields,
     portfolioPensionFields,
     portfolioPensionSubtype,
     portfolioSavingsFields,
@@ -377,7 +377,7 @@ export function registerPortfolioView({
   function updatePortfolioAssetTypeState() {
     const assetType = portfolioAssetType.value;
     const canBeEmergencyReserve = assetType === "fixed_income" || assetType === "savings";
-    portfolioFundFields.hidden = assetType !== "fund";
+    portfolioCnpjFields.hidden = assetType !== "fund" && assetType !== "private_pension";
     portfolioFixedFields.hidden = assetType !== "fixed_income";
     portfolioPricingFields.hidden = assetType === "fixed_income" || assetType === "savings";
     portfolioPensionFields.hidden = assetType !== "private_pension";

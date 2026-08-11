@@ -2,7 +2,7 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.22
+versao: 2.23
 atualizado: 2026-08-10
 relacionados:
   - "[[contas-correntes]]"
@@ -87,6 +87,7 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 **Previdência Privada (`private_pension`):**
 - Lançamentos classificados como `Previdência Privada`, `PGBL` ou `VGBL` geram operações do tipo `private_pension`.
 - Quando houver CNPJ preenchido, carteira em BRL e Mais Retorno configurada, o valor atual pode usar a última cota disponível pela mesma integração de fundos; sem isso, permanece ajustável manualmente.
+- O formulário de posição inicial do Portfólio exibe o campo **CNPJ** opcional tanto para Fundos quanto para Previdência Privada (rótulo `CNPJ do fundo/plano`), pois ambos usam a mesma integração Mais Retorno; o CNPJ preenchido é persistido na posição.
 
 **Renda Variável / Criptos:**
 - Cotações via Yahoo Finance (ações/fundos) e CoinGecko/Yahoo (criptoativos).
@@ -194,9 +195,11 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado um ativo de renda fixa com taxa cadastrada, quando listado no Portfólio, então a variação do dia é a diferença entre o valor líquido na curva de hoje e o do dia anterior, zerada no dia da aquisição.
 - Dado um ativo de renda fixa pós-fixado em dia sem taxa publicada (fim de semana/feriado), quando listado no Portfólio, então a variação do dia exibe zero, sem crescimento artificial do indexador.
 - Dado um ativo de Poupança com aniversários cadastrados, quando listado no Portfólio, então a variação do dia reflete a diferença de valor entre hoje e o dia anterior, concentrada no mês do aniversário.
+- Dado o usuário cadastrando posição inicial no Portfólio, quando seleciona **Previdência Privada**, então o campo CNPJ opcional aparece com o mesmo comportamento dos Fundos de investimento e o valor preenchido é persistido na posição.
 
 ## Changelog
 
+- `2.23` — 2026-08-10 — Formulário de posição inicial do Portfólio passa a exibir o campo CNPJ opcional também para Previdência Privada (rótulo `CNPJ do fundo/plano`), alinhado aos Fundos, que usam a mesma integração Mais Retorno.
 - `2.22` — 2026-08-10 — Renda fixa e Poupança passam a exibir variação do dia no Portfólio: diferença do valor na curva entre hoje e o dia anterior, limitada à data de aquisição (zero no dia da aquisição); pós-fixados variam apenas em dias úteis com taxa publicada, pré-fixados variam pro rata diário.
 - `2.21` — 2026-08-10 — Resgates de Poupança passam a consumir saldos de aniversários por FIFO; resgate total remove a posição aberta automaticamente.
 - `2.20` — 2026-08-10 — Previdência Privada com CNPJ passa a usar Mais Retorno para cotação no Portfólio e no preenchimento assistido de lançamentos.

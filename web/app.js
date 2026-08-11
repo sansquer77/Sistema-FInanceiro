@@ -248,7 +248,7 @@ const portfolioAssetAccount = document.querySelector("#portfolioAssetAccount");
 const portfolioAssetType = document.querySelector("#portfolioAssetType");
 const portfolioAssetIdentifier = document.querySelector("#portfolioAssetIdentifier");
 const portfolioAssetIdentifierLabel = document.querySelector("#portfolioAssetIdentifierLabel");
-const portfolioFundFields = document.querySelector("#portfolioFundFields");
+const portfolioCnpjFields = document.querySelector("#portfolioCnpjFields");
 const portfolioPensionFields = document.querySelector("#portfolioPensionFields");
 const portfolioPensionSubtype = document.querySelector("#portfolioPensionSubtype");
 const portfolioSavingsFields = document.querySelector("#portfolioSavingsFields");
@@ -1019,7 +1019,7 @@ const portfolioView = registerPortfolioView({
     portfolioAssetType,
     portfolioAssetIdentifier,
     portfolioAssetIdentifierLabel,
-    portfolioFundFields,
+    portfolioCnpjFields,
     portfolioPensionFields,
     portfolioPensionSubtype,
     portfolioSavingsFields,
