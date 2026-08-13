@@ -689,7 +689,7 @@ def pay_credit_card_invoice(user_id: int, data: dict) -> dict:
             if is_partial:
                 # spec: cartoes v2.10 — criterio 169
                 # (saldo restante vira despesa na proxima fatura aberta, categoria
-                #  Emprestimos, descricao padrao "Saldo da fatura MM/AA")
+                #  Emprestimos, descricao padrao "Saldo da fatura MM/AAAA")
                 remainder_cents = amount_cents - paid_cents
                 next_invoice = first_open_invoice_month(conn, user_id, card_id, shift_month(invoice_month, 1))
                 category_id = get_or_create_category(conn, user_id, "Empréstimos", "expense")
