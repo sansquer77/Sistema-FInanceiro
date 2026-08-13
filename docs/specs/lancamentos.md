@@ -2,7 +2,7 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 3.20
+versao: 3.21
 atualizado: 2026-08-11
 relacionados:
   - "[[contas-correntes]]"
@@ -144,6 +144,8 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dado uma transferência criada, quando listada, origem e destino são atualizados corretamente.
 - Dado um câmbio criado, quando listado, origem reduz pelo valor de origem e destino aumenta pelo valor de destino.
 - Dado um lançamento em moeda estrangeira sem cotação manual, quando criado ou importado, então o valor em BRL usa a última PTAX de venda disponível até a data do lançamento.
+- Dado um lançamento em conta de moeda estrangeira, quando o formulário é aberto, então a cotação é pré-preenchida com a última PTAX disponível até a data; se a PTAX estiver indisponível, um campo de cotação manual visível aparece com a moeda da conta e nenhum valor falso (ex.: 1,0) é enviado.
+- Dado um lançamento em moeda estrangeira sendo editado, quando a data ou a conta mudam, então a cotação armazenada é preservada e não é sobrescrita automaticamente pela PTAX.
 - Dado um lançamento excluído, quando consultado, o saldo volta ao estado anterior.
 - Dado `scope=future` na exclusão, quando executado, as parcelas/recorrências futuras não conciliadas são removidas e os saldos revertidos.
 - Dado `apply_to_future` na edição, quando executado, os dados e saldos das ocorrências futuras não conciliadas são atualizados.
@@ -194,6 +196,7 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 
 ## Changelog
 
+- `3.21` — 2026-08-11 — Formulário de Lançamentos em conta estrangeira pré-preenche a cotação com a última PTAX até a data (antes enviava silenciosamente `1,0`, gravando `amount_brl` sem conversão — ex.: despesas de imposto em USD entravam no Cockpit como R$ 1:1); se a PTAX estiver indisponível, campo de cotação manual visível é exibido; na edição a cotação armazenada é preservada.
 - `3.20` — 2026-08-11 — Escala vertical do gráfico de histórico/projeção de saldos corrigida: a curva usava só a faixa central (24–48 de 100), achatezendo variações grandes; agora ocupa quase toda a altura do plot (10–88), sem aumentar a área do gráfico.
 - `3.19` — 2026-08-11 — Helper (?) de modalidade da renda fixa alinhado inline ao rótulo (`field-label-title`), corrigindo a quebra de layout no formulário de Lançamentos (mesma correção aplicada no Portfólio).
 - `3.18` — 2026-08-11 — Modalidade de renda fixa (Pós/Pré/Híbrida) volta a ser combo ao lado do Indexador, com o helper (?) junto ao rótulo; removidos os controles segmentados e o CSS de presets/chips (sem usos restantes).

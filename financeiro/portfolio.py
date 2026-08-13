@@ -1163,7 +1163,10 @@ def resolve_position_exchange_rate(currency: str, acquisition_date: str, raw_rat
         return rate_to_micros(Decimal("1"))
     if str(raw_rate or "").strip():
         return rate_to_micros(parse_exchange_rate(raw_rate))
-    return rate_to_micros(Decimal("1"))
+    # spec: investimentos-portfolio v2.29 — criterio 48
+    # (sem cotacao manual, consulta a ultima PTAX de venda disponivel
+    #  ate a data de aquisicao, como em Lancamentos)
+    return rate_to_micros(get_exchange_rate_to_brl(currency, acquisition_date))
 
 
 def normalize_id(value: object, message: str) -> int:

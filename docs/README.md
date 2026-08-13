@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 11.29
+versao: 11.30
 atualizado: 2026-08-11
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -132,6 +132,7 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `11.30` — 2026-08-11 — [[specs/lancamentos]] v3.21 e [[specs/investimentos-portfolio]] v2.29: cotações de moeda estrangeira corrigidas — formulário de Lançamentos pré-preenche a PTAX (campo manual visível se indisponível); posição inicial do Portfólio consulta PTAX; sem mais taxa `1,0` silenciosa.
 - `11.29` — 2026-08-11 — [[specs/investimentos-portfolio]] v2.28: coluna **Tipo** da aba Posição mostra ícone de escudo para posições de reserva de emergência.
 - `11.28` — 2026-08-11 — [[specs/lancamentos]] v3.20 e [[specs/cartoes]] v2.8: escala vertical dos gráficos de histórico de saldos (Extrato) e de evolução de faturas ampliada para a faixa 10–88 do plot (antes 24–48 e 28–74), sem aumentar a área do gráfico.
 - `11.27` — 2026-08-11 — [[specs/lancamentos]] v3.19 e [[specs/investimentos-portfolio]] v2.27: helper (?) de modalidade alinhado inline ao rótulo nos dois formulários (correção de layout).

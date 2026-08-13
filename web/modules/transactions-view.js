@@ -90,6 +90,7 @@ export function registerTransactionsView({
     useAverage,
     exchangeRate,
     exchangeRateLabel,
+    exchangeRateLabelText,
     cancelTransactionEditButton,
     transactionMonthLabel,
     previousMonthButton,
@@ -1346,8 +1347,29 @@ export function registerTransactionsView({
 
   async function updateExchangeRateState() {
     exchangeRateLabel.hidden = true;
+    exchangeRate.type = "hidden";
     exchangeRate.disabled = false;
+    exchangeRate.placeholder = "";
     exchangeRate.value = "1,000000";
+    const account = state.accounts.find((entry) => String(entry.id) === transactionAccount.value);
+    const dateValue = transactionForm.elements.date.value;
+    const isEditing = Boolean(transactionForm.elements.id.value);
+    if (isEditing || !account || account.currency === "BRL" || !dateValue) {
+      return;
+    }
+    try {
+      const rate = await exchangeRateToBrl(account.currency, dateValue);
+      exchangeRate.value = rate.toLocaleString("pt-BR", {
+        minimumFractionDigits: 6,
+        maximumFractionDigits: 6,
+      });
+    } catch {
+      exchangeRateLabelText.textContent = `Cotação (${account.currency} → BRL)`;
+      exchangeRate.type = "text";
+      exchangeRate.value = "";
+      exchangeRate.placeholder = "Informe a cotação manualmente (ex.: 5,900000)";
+      exchangeRateLabel.hidden = false;
+    }
   }
 
   async function updateTransferExchangeRateState() {

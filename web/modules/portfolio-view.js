@@ -251,6 +251,8 @@ export function registerPortfolioView({
   function resetPortfolioAssetForm() {
     portfolioAssetForm.reset();
     portfolioAssetForm.elements.id.value = "";
+    // spec: investimentos-portfolio v2.29 — criterio 48
+    portfolioAssetForm.elements.exchange_rate_to_brl.value = "";
     portfolioAssetFormTitle.textContent = "Ativo em carteira";
     deletePortfolioAssetButton.hidden = true;
     portfolioAssetForm.elements.acquisition_date.value = todayLocalDateValue();

@@ -104,7 +104,9 @@ class PortfolioReturnsTest(unittest.TestCase):
             "currency": "USD",
             "initial_balance": "1000,00",
         })
-        with self._mock_benchmarks():
+        with self._mock_benchmarks(), mock.patch(
+            "financeiro.portfolio.get_exchange_rate_to_brl", return_value=Decimal("5.400000")
+        ):
             self._create_fixed_position(user["id"], brl_account["id"], "CDB-BRL", "1000,00")
             create_opening_position(user["id"], {
                 "account_id": str(usd_account["id"]),
