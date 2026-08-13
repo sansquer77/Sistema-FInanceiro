@@ -357,7 +357,7 @@ def update_credit_card_transaction(user_id: int, transaction_id: str, data: dict
             ),
         )
         replace_credit_card_transaction_tags(conn, normalized_id, tag_ids)
-        # spec: cartoes v2.6 — critérios 21 e 22
+        # spec: cartoes v2.10 — critérios 21 e 22
         # (series recorrentes de cartao com use_average ativo aplicam edicao em cascata
         #  automaticamente e recalculam valores futuros pela media)
         force_apply_to_future = bool(existing["use_average"]) and existing["series_kind"] == "recurring"
@@ -429,7 +429,7 @@ def update_future_card_series(
     tag_ids: list[int],
     force_apply_to_future: bool = False,
 ) -> None:
-    # spec: cartoes v2.6 — critérios 21 e 22
+    # spec: cartoes v2.10 — critérios 21 e 22
     # (series recorrentes de cartao com use_average ativo propagam edicao automaticamente
     #  e recalculam valores futuros pela media; demais series mantem apply_to_future)
     if not existing["series_id"]:
@@ -450,7 +450,7 @@ def update_future_card_series(
         """,
         (user_id, existing["series_id"], existing["id"], future_marker),
     ).fetchall()
-    # spec: cartoes v2.6 — criterio 22
+    # spec: cartoes v2.10 — criterio 22
     # (quando use_average estiver ativo, recalcula o valor da serie pela media)
     if force_apply_to_future and existing["series_kind"] == "recurring":
         average_amount = average_amount_for_recurring_description(
@@ -591,9 +591,10 @@ def set_credit_card_transaction_reconciled(user_id: int, transaction_id: str, re
 
 
 def pay_credit_card_invoice(user_id: int, data: dict) -> dict:
-    # spec: cartoes v1.7 — criterio 9
-    # (pagamento reduz o saldo da conta escolhida pelo valor total da fatura
-    #  e marca a fatura como paga via credit_card_payments; nao permite pagar 2x)
+    # spec: cartoes v2.10 — criterios 7 e 169
+    # (pagamento integral debita o saldo total da fatura; pagamento parcial
+    #  debita apenas o valor informado e o saldo restante e lancado na proxima
+    #  fatura aberta como despesa "Saldo da fatura MM/AAAA" na categoria Emprestimos)
     card_id = normalize_card_id(data.get("credit_card_id"))
     invoice_month = normalize_month(data.get("invoice_month"))
     account_id = normalize_card_id(data.get("account_id"))
@@ -628,19 +629,37 @@ def pay_credit_card_invoice(user_id: int, data: dict) -> dict:
             amount_cents = invoice_balance_cents(conn, user_id, card_id, invoice_month)
             if amount_cents <= 0:
                 raise CreditCardError("Nao ha valor em aberto para pagar nesta fatura.")
+            # spec: cartoes v2.10 — criterios 169 e 170
+            raw_amount = str(data.get("amount") or "").strip()
+            if raw_amount:
+                try:
+                    paid_cents = money_to_cents(raw_amount)
+                except Exception as exc:
+                    raise CreditCardError("Valor invalido.") from exc
+                if paid_cents <= 0:
+                    raise CreditCardError("Informe um valor maior que zero.")
+                if paid_cents >= amount_cents:
+                    raise CreditCardError("O valor informado cobre toda a fatura; use o pagamento integral.")
+                is_partial = True
+            else:
+                paid_cents = amount_cents
+                is_partial = False
             payment_transaction = create_transaction_with_conn(
                 conn,
                 user_id,
                 {
                     "type": "expense",
                     "description": f"Pagamento fatura {card['name']} {format_invoice_month(invoice_month)}",
-                    "amount": cents_to_money(amount_cents).replace(".", ","),
+                    "amount": cents_to_money(paid_cents).replace(".", ","),
                     "date": payment_date,
                     "account_id": str(account_id),
                     "category": "Serviços Financeiros e Impostos",
                     "subcategory": "Pagamento de Fatura de Cartão",
                     "tags": "Cartão de Crédito",
-                    "notes": notes or f"Pagamento da fatura {invoice_month}.",
+                    "notes": notes or (
+                        f"Pagamento parcial da fatura {invoice_month}."
+                        if is_partial else f"Pagamento da fatura {invoice_month}."
+                    ),
                 },
             )
             # spec: relatorios/relatorios v2.6 — criterio 6
@@ -662,10 +681,53 @@ def pay_credit_card_invoice(user_id: int, data: dict) -> dict:
                     account_id,
                     payment_transaction["id"],
                     payment_date,
-                    amount_cents,
+                    paid_cents,
                     notes,
                 ),
             )
+            carried_transaction = None
+            if is_partial:
+                # spec: cartoes v2.10 — criterio 169
+                # (saldo restante vira despesa na proxima fatura aberta, categoria
+                #  Emprestimos, descricao padrao "Saldo da fatura MM/AA")
+                remainder_cents = amount_cents - paid_cents
+                next_invoice = first_open_invoice_month(conn, user_id, card_id, shift_month(invoice_month, 1))
+                category_id = get_or_create_category(conn, user_id, "Empréstimos", "expense")
+                exchange_rate_micros = resolve_exchange_rate_micros(card["currency"], payment_date, None)
+                carried_cursor = conn.execute(
+                    """
+                    INSERT INTO credit_card_transactions (
+                        user_id, credit_card_id, type, description, normalized_description,
+                        amount_cents, exchange_rate_micros, amount_brl_cents, date,
+                        invoice_month, series_id, series_kind, installment_index,
+                        installment_count, recurrence_frequency, use_average,
+                        category_id, subcategory_id, notes
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        user_id,
+                        card_id,
+                        "expense",
+                        f"Saldo da fatura {format_invoice_month(invoice_month)}",
+                        normalize_description(f"Saldo da fatura {format_invoice_month(invoice_month)}"),
+                        remainder_cents,
+                        exchange_rate_micros,
+                        convert_to_brl_cents(remainder_cents, exchange_rate_micros),
+                        payment_date,
+                        next_invoice,
+                        None,
+                        "single",
+                        None,
+                        None,
+                        None,
+                        0,
+                        category_id,
+                        None,
+                        None,
+                    ),
+                )
+                carried_row = fetch_card_transaction(conn, user_id, carried_cursor.lastrowid)
+                carried_transaction = format_card_transaction(carried_row, card["currency"])
             row = conn.execute(
                 """
                 SELECT
@@ -684,10 +746,13 @@ def pay_credit_card_invoice(user_id: int, data: dict) -> dict:
         if "UNIQUE constraint failed" in str(exc):
             raise CreditCardError("Esta fatura ja foi paga.", HTTPStatus.CONFLICT) from exc
         raise
-    return {
+    result = {
         "payment": format_card_payment(row_to_dict(row), card["currency"]),
         "transaction": payment_transaction,
     }
+    if carried_transaction is not None:
+        result["carried_transaction"] = carried_transaction
+    return result
 
 
 def update_credit_card(user_id: int, card_id: str, data: dict) -> dict:
@@ -843,7 +908,7 @@ def normalize_card_repeat_count(value: object, series_kind: str) -> int | None:
     raw = str(value or "").strip()
     if not raw and series_kind == "installment":
         return None
-    # spec: cartoes v2.4 — critérios 21 e 22
+    # spec: cartoes v2.10 — critérios 21 e 22
     # (recorrentes usam 120 ocorrencias automaticamente quando o campo nao e enviado;
     #  o campo nao e mais exibido no formulario, mas a API mantem compatibilidade)
     if series_kind == "recurring":
@@ -950,9 +1015,8 @@ def shift_month(value: str, delta: int) -> str:
 
 
 def invoice_month_for_transaction_date(card, transaction_date: str) -> str:
-    # spec: cartoes v1.7 — criterio 1
-    # (competencia = mes da data da compra, exceto quando a data e posterior
-    #  ao dia de fechamento do cartao: nesse caso a compra entra na fatura seguinte)
+    # spec: cartoes v2.10 — secao "Regras": fatura calculada pela data do
+    # lancamento e pelo dia de fechamento (apos o fechamento, entra na proxima)
     parsed_date = date.fromisoformat(transaction_date)
     base_month = f"{parsed_date.year}-{parsed_date.month:02d}"
     closing_date = date.fromisoformat(card_invoice_date(base_month, card["closing_day"]))
@@ -967,7 +1031,7 @@ def open_invoice_month_for_transaction_date(conn, user_id: int, card, transactio
 
 
 def first_open_invoice_month(conn, user_id: int, card_id: int, invoice_month: str) -> str:
-    # spec: cartoes v1.7 — criterio 2 (secao "Regras": fatura calculada ja paga
+    # spec: cartoes v2.10 — criterio 2 (secao "Regras": fatura calculada ja paga
     # deve avancar automaticamente para a proxima fatura aberta, sem perder o lancamento)
     candidate = invoice_month
     for _ in range(240):
@@ -1129,7 +1193,7 @@ def invoice_balance_cents(conn, user_id: int, card_id: int, invoice_month: str) 
 
 
 def ensure_invoice_is_open(conn, user_id: int, card_id: int, invoice_month: str) -> None:
-    # spec: cartoes v1.7 — secao "Regras": nao e permitido adicionar/editar
+    # spec: cartoes v2.10 — secao "Regras": nao e permitido adicionar/editar
     # lancamentos diretamente em fatura ja paga (fechada)
     row = conn.execute(
         """

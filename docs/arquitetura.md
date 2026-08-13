@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.28
-atualizado: 2026-08-10
+versao: 3.29
+atualizado: 2026-08-13
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -16,7 +16,7 @@ tags: [arquitetura, meta]
 # Arquitetura
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-08-10 · relacionados: [[requisitos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
+> **implementado** · área: `meta` · atualizado em 2026-08-13 · relacionados: [[requisitos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
 
 ## Visão geral
 
@@ -424,6 +424,7 @@ Ver [[classificacao-assistida]], [[adr/0006-classificacao-assistida-local]].
 3. Faturas acumulam despesas/receitas e exibem total atual, total conciliado e contador de não conciliados.
 4. Lançamentos de fatura podem ser movidos para fatura anterior/posterior se a fatura destino estiver aberta.
 5. Pagamento de fatura deduz saldo da conta-corrente, respeita moeda e conta preferencial.
+6. Pagamento pode ser **integral** (saldo em aberto) ou **parcial** (`amount` < saldo): no parcial, a fatura fecha como no integral e o saldo restante é gravado como novo lançamento de cartão na próxima fatura aberta, categoria **Empréstimos**, descrição `Saldo da fatura MM/AAAA`, junto da mesma transação atômica do pagamento.
 
 Ver [[cartoes]].
 
@@ -499,6 +500,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.29` — 2026-08-13 — Pagamento parcial de fatura documentado: `POST /api/credit-card-invoice/pay` aceita `amount` opcional; no parcial, saldo residual é lançado na próxima fatura aberta (categoria Empréstimos, `Saldo da fatura MM/AAAA`) na mesma transação atômica. Ver [[specs/cartoes]] v2.9.
 - `3.28` — 2026-08-10 — Renda fixa e Poupança passam a calcular variação do dia no Portfólio pela diferença do valor na curva entre hoje e o dia anterior, via `day_variation_cents` com cache de fatores compartilhado. Ver [[specs/investimentos-portfolio]] v2.22.
 - `3.27` — 2026-08-10 — Arquitetura sincronizada após implementação do Consultor: removidas marcações de "futuro", documentado fluxo Preferências/Cockpit, catálogo fechado de 7 análises, histórico em subaba própria e persistência criptografada do Perfil Complementar.
 - `3.26` — 2026-08-10 — `consultor-view.js` documentado com grade de cards, execução sob demanda e histórico da aba Consultor no Cockpit. Ver [[specs/consultor]] v0.33.

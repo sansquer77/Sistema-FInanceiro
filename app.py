@@ -1110,7 +1110,11 @@ class AppHandler(BaseHTTPRequestHandler):
             f"Fatura paga: {data.get('invoice_month', '')}", payment.get("id"),
             account_id=data.get("account_id"),
             credit_card_id=data.get("credit_card_id"),
-            metadata={"invoice_month": data.get("invoice_month"), "transaction_id": payment.get("transaction_id")},
+            metadata={
+                "invoice_month": data.get("invoice_month"),
+                "transaction_id": payment.get("transaction_id"),
+                "amount": payment.get("amount"),
+            },
         )
         self.send_json(result, status=HTTPStatus.CREATED)
 

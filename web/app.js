@@ -174,6 +174,7 @@ const cardInvoicePaymentForm = document.querySelector("#cardInvoicePaymentForm")
 const cardPaymentAccount = document.querySelector("#cardPaymentAccount");
 const cardPaymentDate = document.querySelector("#cardPaymentDate");
 const payCardInvoiceButton = document.querySelector("#payCardInvoiceButton");
+const payPartialCardInvoiceButton = document.querySelector("#payPartialCardInvoiceButton");
 const cardInvoiceMessage = document.querySelector("#cardInvoiceMessage");
 const cardInvoiceOpenCount = document.querySelector("#cardInvoiceOpenCount");
 const cardTransactionForm = document.querySelector("#cardTransactionForm");
@@ -825,6 +826,7 @@ const cardsView = registerCardsView({
     cardPaymentAccount,
     cardPaymentDate,
     payCardInvoiceButton,
+    payPartialCardInvoiceButton,
     cardInvoiceMessage,
     cardInvoiceOpenCount,
     cardInvoiceSearch,

@@ -53,6 +53,7 @@ export function registerCardsView({
     cardPaymentAccount,
     cardPaymentDate,
     payCardInvoiceButton,
+    payPartialCardInvoiceButton,
     cardInvoiceMessage,
     cardInvoiceOpenCount,
     cardInvoiceSearch,
@@ -106,6 +107,7 @@ export function registerCardsView({
   });
   nextCardInvoiceButton.addEventListener("click", () => shiftCardInvoiceMonth(1));
   cardInvoicePaymentForm.addEventListener("submit", handleCardInvoicePaymentSubmit);
+  payPartialCardInvoiceButton.addEventListener("click", handlePartialCardInvoicePayment);
   cardPaymentAccount.addEventListener("change", renderCardInvoice);
   cardTransactionForm.addEventListener("submit", handleCardTransactionSubmit);
   cardTransactionType.addEventListener("change", () => {
@@ -279,7 +281,7 @@ export function registerCardsView({
     if (isEditing && shouldAskFutureCardReplication(data.id)) {
       const transaction = state.cardTransactions.find((entry) => String(entry.id) === String(data.id));
       if (transaction && transaction.use_average) {
-        // spec: cartoes v2.5 — critério 22
+        // spec: cartoes v2.10 — critério 22
         // (series com use_average ativo nao exibem modal e aplicam em cascata)
         data.apply_to_future = true;
       } else {
@@ -316,6 +318,55 @@ export function registerCardsView({
       await api("/api/credit-card-invoice/pay", { method: "POST", body: data });
       await onInvoicePaid();
       setMessage(cardInvoiceMessage, "Fatura paga e débito lançado na conta.", "success");
+    } catch (error) {
+      setMessage(cardInvoiceMessage, error.message, "error");
+    }
+  }
+
+  async function handlePartialCardInvoicePayment() {
+    // spec: cartoes v2.10 — criterio 174
+    setMessage(cardInvoiceMessage, "");
+    const card = selectedCreditCard();
+    const total = cardInvoiceOpenAmount();
+    if (!card || total <= 0) {
+      return;
+    }
+    const carriedDescription = `Saldo da fatura ${state.cardInvoiceMonth.slice(5, 7)}/${state.cardInvoiceMonth.slice(0, 4)}`;
+    const values = await decisionModal.form({
+      title: "Pagar parte da fatura",
+      message: `Saldo em aberto: ${formatMoney(total, card.currency)}. O restante será lançado na próxima fatura como "${carriedDescription}" (categoria Empréstimos).`,
+      fields: [
+        {
+          name: "amount",
+          label: `Valor a pagar (${card.currency})`,
+          type: "text",
+          inputMode: "decimal",
+          required: true,
+          placeholder: "0,00",
+        },
+      ],
+      primaryLabel: "Pagar",
+    });
+    if (!values) {
+      return;
+    }
+    const parsedAmount = Number(String(values.amount || "").trim().replace(/\./g, "").replace(",", "."));
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      setMessage(cardInvoiceMessage, "Informe um valor maior que zero.", "error");
+      return;
+    }
+    if (parsedAmount >= total) {
+      setMessage(cardInvoiceMessage, "O valor informado cobre toda a fatura; use o pagamento integral.", "error");
+      return;
+    }
+    const data = formData(cardInvoicePaymentForm);
+    data.credit_card_id = state.selectedCreditCardId;
+    data.invoice_month = state.cardInvoiceMonth;
+    data.amount = String(values.amount).trim();
+    try {
+      await api("/api/credit-card-invoice/pay", { method: "POST", body: data });
+      await onInvoicePaid();
+      setMessage(cardInvoiceMessage, "Pagamento parcial registrado. O saldo restante foi lançado na próxima fatura.", "success");
     } catch (error) {
       setMessage(cardInvoiceMessage, error.message, "error");
     }
@@ -559,6 +610,7 @@ export function registerCardsView({
       cardPaymentDate.value = "";
       cardTransactionForm.querySelector('button[type="submit"]').disabled = true;
       payCardInvoiceButton.disabled = true;
+      payPartialCardInvoiceButton.hidden = true;
       updateCardInvoiceOpenCount();
       cardInvoiceList.innerHTML = "";
       cardInvoiceList.append(emptyState("Cadastre um cartão para lançar faturas."));
@@ -579,7 +631,8 @@ export function registerCardsView({
     const alreadyPaid = state.cardInvoicePayments.length > 0;
     cardTransactionForm.querySelector('button[type="submit"]').disabled = alreadyPaid;
     payCardInvoiceButton.disabled = total <= 0 || alreadyPaid || !cardPaymentAccount.value;
-    payCardInvoiceButton.textContent = alreadyPaid ? "Fatura paga" : "Pagar fatura";
+    payCardInvoiceButton.textContent = alreadyPaid ? "Fatura paga" : "Pagar fatura integral";
+    payPartialCardInvoiceButton.hidden = alreadyPaid || total <= 0 || !cardPaymentAccount.value;
     updateCardInvoiceOpenCount();
     renderCardInvoiceFilters();
     renderCardInvoiceList(card);

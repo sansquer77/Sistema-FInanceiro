@@ -2,8 +2,8 @@
 tipo: spec
 area: cartoes
 status: implementado
-versao: 2.8
-atualizado: 2026-08-11
+versao: 2.10
+atualizado: 2026-08-13
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -18,7 +18,7 @@ aliases: ["Cartões de Crédito", "Faturas"]
 # Cartões de Crédito
 
 > [!info] Status
-> **implementado** · área: `cartoes` · atualizado em 2026-08-11 · relacionados: [[contas-correntes]], [[lancamentos]], [[limites-gastos]], [[relatorios]]
+> **implementado** · área: `cartoes` · atualizado em 2026-08-13 · relacionados: [[contas-correntes]], [[lancamentos]], [[limites-gastos]], [[relatorios]]
 
 ## Problema
 
@@ -36,7 +36,7 @@ Qualquer usuário autenticado localmente que utilize cartões de crédito para d
 4. Realiza a conciliação (`reconciled_at`) de transações contra a fatura oficial.
 5. Filtra a lista da fatura por todos, não conciliados ou conciliados, e busca lançamentos por texto.
 6. Move lançamentos entre faturas anterior/próxima quando necessário.
-7. Paga a fatura escolhendo uma conta-corrente de mesma moeda; o sistema gera automaticamente uma despesa na conta de pagamento.
+7. Paga a fatura — integral ou parcial — escolhendo uma conta-corrente de mesma moeda; o sistema gera automaticamente uma despesa na conta de pagamento. No pagamento parcial, o saldo restante é lançado na fatura seguinte como "Saldo da fatura MM/AAAA" na categoria Empréstimos.
 
 ## Dados
 
@@ -68,6 +68,17 @@ Qualquer usuário autenticado localmente que utilize cartões de crédito para d
 | `use_average` | booleano | Opcional. Apenas para recorrentes. Persiste em todas as ocorrências da série. |
 | `reconciled_at` | timestamp | Opcional. Marcado na conciliação. |
 
+**Pagamento de fatura:**
+
+| Campo | Tipo | Regra |
+|---|---|---|
+| `credit_card_id` | FK | Obrigatório. |
+| `invoice_month` | `AAAA-MM` | Obrigatório. Uma fatura só pode ter um pagamento. |
+| `account_id` | FK | Obrigatório. Conta-corrente com a mesma moeda do cartão. |
+| `payment_date` | ISO `YYYY-MM-DD` | Obrigatório. |
+| `amount` | inteiro (centavos) | Obrigatório no pagamento parcial. Ausente/vazio = pagamento integral (saldo em aberto da fatura). |
+| `notes` | texto | Opcional. |
+
 ## Regras
 
 - Gasto em cartão pertence obrigatoriamente a uma fatura mensal (`AAAA-MM`).
@@ -98,6 +109,11 @@ Qualquer usuário autenticado localmente que utilize cartões de crédito para d
 - Faturas não pagas com lançamentos conciliados devem entrar como abatimento no saldo previsto da conta preferencial de pagamento, no mês de vencimento da fatura.
 - Faturas já pagas não devem ser abatidas novamente no saldo previsto da conta preferencial.
 - O lançamento de conta gerado pelo pagamento da fatura deve reduzir o saldo da conta de pagamento, mas deve ser identificado como pagamento de fatura para não entrar em análises de despesa e evitar duplicidade com os lançamentos detalhados do cartão.
+- O pagamento da fatura pode ser **integral** ou **parcial**. No integral, o valor debitado da conta escolhida é o saldo em aberto da fatura.
+- No pagamento **parcial**, o valor deve ser maior que zero e menor que o saldo em aberto da fatura; o valor pago é debitado da conta escolhida.
+- No pagamento parcial, a fatura é marcada como paga e fechada (não recebe novos lançamentos, como hoje), e o saldo restante é lançado automaticamente na próxima fatura aberta como despesa, na categoria **Empréstimos**, com descrição padrão `Saldo da fatura MM/AAAA` (competência da fatura original).
+- O saldo residual lançado na fatura seguinte se comporta como um lançamento comum de cartão: aparece no total da fatura, pode ser conciliado, movido entre faturas abertas, editado e pago junto com a próxima fatura.
+- Faturas pagas parcialmente não são abatidas novamente no saldo previsto da conta preferencial; o residual entra pelo vencimento da fatura seguinte, conforme a regra de faturas não pagas com lançamentos conciliados.
 - Valores de lançamentos de cartão usam o mesmo tamanho de fonte compacto dos lançamentos de conta para melhorar a densidade de leitura.
 - Valores financeiros extensos no gráfico de faturas devem se adaptar ao espaço disponível reduzindo a tipografia, sem aumentar a área do gráfico nem truncar centavos.
 - O gráfico de evolução de faturas deve usar cards mensais compactos na faixa superior e curva suave em SVG nativo abaixo, com mês atual destacado, meses futuros atenuados e linha futura pontilhada, sem dependências externas de gráfico ou CSS.
@@ -166,9 +182,16 @@ Tabelas: `credit_cards`, `credit_card_transactions`, `credit_card_payments`, `cr
 - Dado uma série recorrente de cartão sem `use_average`, quando o usuário edita uma ocorrência, então o sistema mantém o comportamento atual de perguntar se deseja alterar apenas o lançamento atual ou também os futuros.
 - Dado `GET /api/credit-card-transactions` com `limit` e `offset` válidos, quando consultado, então retorna no máximo `limit` lançamentos da página solicitada com `has_more` adequado.
 - Dado `GET /api/credit-card-payments` com `limit` e `offset` válidos, quando consultado, então retorna no máximo `limit` pagamentos da página solicitada com `has_more` adequado.
+- Dado uma fatura com saldo em aberto, quando o usuário paga parcialmente com valor entre zero e o saldo, então o valor informado é debitado da conta escolhida, a fatura é marcada como paga e o saldo restante é lançado na próxima fatura aberta como despesa na categoria **Empréstimos**, com descrição padrão `Saldo da fatura MM/AAAA`.
+- Dado um pagamento parcial, quando o valor informado é maior ou igual ao saldo em aberto da fatura, então o sistema recusa com mensagem orientando a usar o pagamento integral.
+- Dado um pagamento parcial de fatura, quando a fatura seguinte é aberta, então o saldo residual aparece no total dela e pode ser conciliado, movido entre faturas abertas, editado e pago junto com a próxima fatura.
+- Dado uma fatura paga parcialmente, quando a conta preferencial exibe saldo previsto, então a fatura paga não é abatida novamente e o residual entra pelo vencimento da fatura seguinte.
+- Dado o usuário visualizando a seção de pagamento da fatura, quando a fatura está aberta com saldo, então dois botões aparecem: **Pagar fatura integral** (debitar o saldo total) e **Pagar parte da fatura** (abre tela para digitar o valor a pagar, reconhecido na conta corrente).
 
 ## Changelog
 
+- `2.10` — 2026-08-13 — Versionamento da app registrado: PATCH `1.4.1` → `1.4.2` aplicado em `financeiro/app_metadata.py` junto com o pagamento parcial desta spec (v2.9), documentado no changelog do MoC.
+- `2.9` — 2026-08-13 — Pagamento parcial de fatura: o botão **Pagar fatura** vira **Pagar fatura integral** + **Pagar parte da fatura** (modal com valor); no parcial, a fatura fecha como hoje, o valor pago é debitado da conta e o saldo restante é lançado na próxima fatura aberta como despesa na categoria **Empréstimos**, com descrição `Saldo da fatura MM/AAAA`.
 - `2.8` — 2026-08-11 — Escala vertical do gráfico de evolução de faturas corrigida: a curva usava apenas a faixa central da área (28–74 de 100), achatando variações grandes (ex.: queda de 35k para 2k); agora ocupa quase toda a altura do plot (10–88), sem aumentar a área do gráfico.
 - `2.7` — 2026-08-11 — Gráfico de evolução de faturas refinado visualmente com cards mensais compactos, curva SVG mais suave, destaque do mês atual e projeção futura atenuada, sem dependências externas.
 - `2.6` — 2026-08-07 — Listagens completas de cartão paginadas: `GET /api/credit-card-transactions` e `GET /api/credit-card-payments` aceitam `limit`/`offset` (padrão 2000, máximo 5000) e respondem `has_more`; o frontend itera as páginas automaticamente.

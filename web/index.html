@@ -587,7 +587,10 @@
                   <input name="payment_date" id="cardPaymentDate" type="date" required>
                 </label>
               </div>
-              <button class="primary" type="submit" id="payCardInvoiceButton">Pagar fatura</button>
+              <div class="field-row">
+                <button class="primary" type="submit" id="payCardInvoiceButton">Pagar fatura integral</button>
+                <button class="ghost" type="button" id="payPartialCardInvoiceButton">Pagar parte da fatura</button>
+              </div>
             </form>
             <p class="message" id="cardInvoiceMessage" role="alert"></p>
           </section>
