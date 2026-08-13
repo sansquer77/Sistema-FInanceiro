@@ -2,7 +2,7 @@
 tipo: spec
 area: tendencias-saude-financeira
 status: implementado
-versao: 2.21
+versao: 2.22
 atualizado: 2026-08-11
 relacionados:
   - "[[score-saude-financeira]]"
@@ -289,6 +289,7 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 
 ## Changelog
 
+- `2.22` — 2026-08-11 — Versionamento da app registrado: PATCH `1.4.0` → `1.4.1` aplicado em `financeiro/app_metadata.py` junto com a melhoria desta spec (v2.21), documentado no changelog do MoC.
 - `2.21` — 2026-08-11 — Tendências passa a sinalizar oportunidade de revisar caixa quando o saldo previsto no fim do mês em contas de liquidez/carteira fica igual ou acima de 2x as despesas planejadas.
 - `2.20` — 2026-08-10 — Card **Despesas** da aba Tendências ganha indicador discreto de fonte, explicando contas por data, cartões por competência e exclusão de pagamentos de fatura.
 - `2.19` — 2026-08-09 — Prompt da IA de Tendências refinado para síntese executiva integrada em 2 a 4 frases e payload enriquecido apenas com contexto operacional agregado, sem detalhes de cards.
