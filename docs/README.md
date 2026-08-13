@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 11.33
+versao: 11.35
 atualizado: 2026-08-13
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -132,6 +132,8 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `11.35` — 2026-08-13 — [[specs/frontend-modularizacao]] v2.8: modo ícones da sidebar compactado (botões 36px, gaps 4px) para todos os itens, incluindo **Sair**, ficarem visíveis sem rolagem.
+- `11.34` — 2026-08-13 — [[specs/frontend-modularizacao]] v2.7: navegação lateral com grupos colapsáveis — **Cadastro**, **Lançamentos**, **Gestão** e **Usuário** colapsam pelo rótulo (seta + `aria-expanded`), estado persistido localmente e grupo da view ativa abre automaticamente; **Cockpit** vira item de primeiro nível e o grupo **Visão geral** é removido.
 - `11.33` — 2026-08-13 — Versão do app elevada para `1.4.2` (PATCH): [[specs/cartoes]] v2.9 pagamento parcial de fatura (registrada também na spec como v2.10).
 - `11.32` — 2026-08-13 — [[specs/cartoes]] v2.9: pagamento parcial de fatura — botões **Pagar fatura integral** / **Pagar parte da fatura** (modal com valor); no parcial, a fatura fecha como hoje e o saldo restante é lançado na próxima fatura aberta como despesa na categoria **Empréstimos**, com descrição `Saldo da fatura MM/AAAA`. [[arquitetura]] atualizada para v3.29.
 - `11.31` — 2026-08-11 — Versão do app elevada para `1.4.1` (PATCH): [[specs/tendencias-saude-financeira]] v2.21 passa a sinalizar oportunidade de revisar caixa quando o saldo previsto no fim do mês em contas de liquidez/carteira fica igual ou acima de 2x as despesas planejadas.

@@ -2,8 +2,8 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 2.6
-atualizado: 2026-08-09
+versao: 2.8
+atualizado: 2026-08-13
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
   - "[[arquitetura]]"
@@ -14,7 +14,7 @@ aliases: ["Modularização Frontend", "ES Modules"]
 # Modularização do Frontend
 
 > [!info] Status
-> **implementado** · área: `frontend` · atualizado em 2026-08-09 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]]
+> **implementado** · área: `frontend` · atualizado em 2026-08-13 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]]
 
 ## Problema
 
@@ -94,6 +94,9 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - `user-admin-view.js` apenas orquestra o controle de Preferências; persistência e aplicação do tema permanecem em `theme-utils.js`.
 - Fluxos com decisão financeira, destrutiva ou de cascata devem usar `decision-modal.js`, evitando `window.confirm()` e `window.prompt()` para escolhas de domínio.
 - A navegação lateral deve usar rótulos desambiguados quando dois módulos compartilham o mesmo substantivo de domínio: em **Cadastro**, usar **Minhas Contas** e **Meus Cartões**; em **Lançamentos**, usar **Extrato de Contas** e **Fatura de Cartões**.
+- A navegação lateral permite colapsar/expandir cada grupo (**Cadastro**, **Lançamentos**, **Gestão** e **Usuário**) pelo rótulo do grupo, que funciona como botão com indicador de seta e `aria-expanded` coerente; o estado colapsado é uma preferência local persistida, e o grupo da view ativa abre automaticamente ao navegar.
+- O item **Cockpit** é de primeiro nível na navegação; não existe mais o grupo **Visão geral**.
+- Com a sidebar inteira no modo ícones (recolhida), os rótulos de grupo ficam ocultos e todos os itens permanecem acessíveis, ignorando o estado colapsado individual dos grupos.
 - Os títulos de página controlados por `app.js` devem acompanhar os rótulos desambiguados da navegação para reforçar a intenção da tela ativa.
 - A troca entre módulos do dashboard deve usar `document.startViewTransition()` quando disponível, como melhoria progressiva, preservando fallback instantâneo em navegadores sem suporte.
 - A transição de visão deve respeitar `prefers-reduced-motion: reduce` e nunca aguardar chamadas de API, carregamentos remotos ou cálculos de tela para iniciar a navegação.
@@ -126,6 +129,11 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Dado uma função de renderização frequente, quando executada, então não deve emitir logs de debug no console em operação normal.
 - Dado o usuário autenticado, quando alterna o modo privacidade, então `privacy-utils.js` aplica `data-privacy` no documento sem alterar endpoints, banco ou regras financeiras.
 - Dado um navegador sem suporte à API ou com redução de movimento ativa, quando o usuário alterna módulos, então a navegação continua funcionando de forma instantânea.
+- Dado o menu lateral, quando o usuário clica no rótulo de um grupo, então os itens do grupo colapsam/expandem com indicador de seta e `aria-expanded` coerente.
+- Dado um grupo colapsado, quando a página recarrega, então o estado colapsado persiste como preferência local.
+- Dado um grupo colapsado contendo a view ativa, quando outra view do mesmo grupo é acionada, então o grupo abre automaticamente antes da navegação.
+- Dado o menu lateral com a sidebar inteira no modo ícones, quando um grupo está colapsado individualmente, então todos os itens permanecem acessíveis como ícones.
+- Dado o menu lateral, então o item **Cockpit** aparece como primeiro nível, sem o grupo **Visão geral**.
 
 ## Fora de escopo
 
@@ -135,6 +143,8 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Changelog
 
+- `2.8` — 2026-08-13 — Modo ícones da sidebar compactado para caber sem rolagem em telas comuns: botões com `min-height` 36px (antes 42px), gaps reduzidos de 8px para 4px e marca com menos respiro; **Sair** e todos os itens ficam visíveis sem rolar a página.
+- `2.7` — 2026-08-13 — Navegação lateral com grupos colapsáveis: **Cadastro**, **Lançamentos**, **Gestão** e **Usuário** colapsam/expandem pelo rótulo (seta + `aria-expanded`), com preferência local persistida e abertura automática do grupo da view ativa; **Cockpit** passa a ser item de primeiro nível e o grupo **Visão geral** é removido.
 - `2.6` — 2026-08-09 — Ajustes finais de performance frontend: widget externo BMC passa a carregar com `async/defer`, transição de `grid-template-columns` removida do dashboard e logs de debug removidos de renderizações frequentes.
 - `2.5` — 2026-08-09 — Portfólio passa a renderizar abas sob demanda: Posição no carregamento inicial, Análise/Histórico no primeiro acesso e rentabilidade detalhada apenas ao abrir o drawer; agrupamento/colapso atualiza só a lista de posições.
 - `2.4` — 2026-08-09 — Navegação para Cockpit passa a reaproveitar o snapshot em memória do mês já carregado, evitando a segunda busca pesada no load inicial e re-buscas completas ao clicar novamente no módulo.

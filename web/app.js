@@ -538,6 +538,7 @@ const CONTEXTUAL_HELP_TOPICS = {
 };
 
 const SIDEBAR_COLLAPSED_KEY = "financeiro.sidebar.collapsed";
+const NAV_GROUPS_COLLAPSED_KEY = "financeiro.sidebar.navGroupsCollapsed";
 
 const classificationsView = registerClassificationsView({
   state,
@@ -1087,6 +1088,15 @@ const portfolioView = registerPortfolioView({
 });
 
 navButtons.forEach((button) => button.addEventListener("click", () => showModule(button.dataset.view)));
+document.querySelectorAll(".nav-group-toggle").forEach((toggle) => {
+  toggle.addEventListener("click", () => {
+    const group = toggle.closest(".nav-group");
+    const collapsed = !group.classList.contains("collapsed");
+    group.classList.toggle("collapsed", collapsed);
+    toggle.setAttribute("aria-expanded", String(!collapsed));
+    persistNavGroups();
+  });
+});
 sidebarToggle.addEventListener("click", () => toggleSidebar());
 privacyToggleButton?.addEventListener("click", () => {
   const mode = togglePrivacyMode();
@@ -1113,6 +1123,7 @@ observePrivacyMoneyValues(document.body);
 
 updateAccountTypeState();
 initializeSidebar();
+initializeNavGroups();
 const authViewController = registerAuthView({
   api,
   elements: {
@@ -1532,6 +1543,7 @@ function showModule(view) {
       element.hidden = name !== view;
     }
     navButtons.forEach((button) => button.classList.toggle("active", button.dataset.view === view));
+    expandNavGroupOfView(view);
     moduleEyebrow.textContent = viewTitles[view][0];
     pageTitle.textContent = viewTitles[view][1];
   };
@@ -1611,6 +1623,44 @@ function initializeSidebar() {
   const storedValue = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
   const preferCollapsed = window.matchMedia("(max-width: 860px)").matches;
   setSidebarCollapsed(storedValue === null ? preferCollapsed : storedValue === "1", false);
+}
+
+function initializeNavGroups() {
+  const storedValue = localStorage.getItem(NAV_GROUPS_COLLAPSED_KEY);
+  const collapsedKeys = new Set(storedValue ? String(storedValue).split(",").filter(Boolean) : []);
+  document.querySelectorAll(".nav-group").forEach((group) => {
+    const key = group.dataset.navGroup;
+    if (!key) {
+      return;
+    }
+    const collapsed = collapsedKeys.has(key);
+    group.classList.toggle("collapsed", collapsed);
+    const toggle = group.querySelector(".nav-group-toggle");
+    if (toggle) {
+      toggle.setAttribute("aria-expanded", String(!collapsed));
+    }
+  });
+}
+
+function persistNavGroups() {
+  const collapsedKeys = [...document.querySelectorAll(".nav-group.collapsed")]
+    .map((group) => group.dataset.navGroup)
+    .filter(Boolean);
+  localStorage.setItem(NAV_GROUPS_COLLAPSED_KEY, collapsedKeys.join(","));
+}
+
+function expandNavGroupOfView(view) {
+  const button = document.querySelector(`.nav-button[data-view="${view}"]`);
+  const group = button?.closest(".nav-group");
+  if (!group || !group.classList.contains("collapsed")) {
+    return;
+  }
+  group.classList.remove("collapsed");
+  const toggle = group.querySelector(".nav-group-toggle");
+  if (toggle) {
+    toggle.setAttribute("aria-expanded", "true");
+  }
+  persistNavGroups();
 }
 
 function toggleSidebar() {
