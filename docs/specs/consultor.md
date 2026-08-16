@@ -2,8 +2,8 @@
 tipo: spec
 area: consultor
 status: implementado
-versao: 1.3
-atualizado: 2026-08-15
+versao: 1.5
+atualizado: 2026-08-16
 relacionados:
   - "[[instrucoes-app]]"
   - "[[investimentos-portfolio]]"
@@ -17,7 +17,7 @@ aliases: ["Consultor Virtual", "Assistente de Investimentos", "Especialista em F
 # Consultor Virtual de Investimentos e Planejamento Financeiro
 
 > [!info] Status
-> **implementado** · área: `consultor` · atualizado em 2026-08-15 · relacionados: [[instrucoes-app]], [[investimentos-portfolio]], [[score-saude-financeira]], [[tendencias-saude-financeira]], [[cockpit-calendario]]
+> **implementado** · área: `consultor` · atualizado em 2026-08-16 · relacionados: [[instrucoes-app]], [[investimentos-portfolio]], [[score-saude-financeira]], [[tendencias-saude-financeira]], [[cockpit-calendario]]
 
 > [!warning] Pivô arquitetural (v0.13, refinado em v0.14/v0.15)
 > A partir desta versão, o Consultor **não possui campo de prompt livre**. O usuário interage exclusivamente através de um **catálogo de análises pré-formatadas** (cards). Essa mudança é uma decisão de **Security by Design**: eliminar a superfície de entrada de texto livre remove pela raiz os vetores de vazamento acidental de dados sensíveis (PII) e de *prompt injection* via chat. As seções "Prevenção de vazamento de dados no prompt (DLP)" e "Blindagem de prompt injection" da v0.12 são **removidas** desta spec — ver "Segurança by Design" e "Nota de segurança residual" abaixo para o que substitui essas salvaguardas.
@@ -291,7 +291,7 @@ Toda análise deve encerrar com o disclaimer:
 - Em telas largas, a subtab **Análises** deve usar layout em duas colunas: catálogo compacto alinhado à esquerda e painel de resposta à direita, reduzindo rolagem para leitura após gerar uma análise; em telas estreitas, o layout volta para coluna única.
 - Nos cards de Portfólio e Risco, o payload enviado à IA deve explicitar que campos `_cents` estão em centavos e também incluir valores em reais já convertidos/formatados, reduzindo risco de a IA interpretar centavos como reais.
 - O card **Termômetro de Assinaturas e Recorrências** deve consumir o formato atual do módulo Tendências para `assinaturas_e_servicos`, que é uma lista de itens por subcategoria com `valor_cents`, mantendo compatibilidade com o formato legado em objeto.
-- O card **Análise da Carteira** deve enviar à IA o perfil de investidor configurado, o Perfil Complementar (quando preenchido) e o pilar Reserva do Score em meses, para que a seção **Adequação ao Perfil Configurado** da resposta reflita o perfil cadastrado no app — nunca um perfil fixo. A resposta deste card é detalhada por natureza: a restrição de concisão dos demais cards não se aplica a ele.
+- O card **Análise da Carteira** deve enviar à IA o perfil de investidor configurado, o Perfil Complementar (quando preenchido) e o pilar Reserva do Score em meses, para que a seção **Adequação ao Perfil Configurado** da resposta reflita o perfil cadastrado no app — nunca um perfil fixo. A resposta deste card é detalhada por natureza: a restrição de concisão dos demais cards não se aplica a ele, mas o prompt deve orientar a IA a encerrar **todas** as seções obrigatórias dentro do teto de 900 tokens de saída, encurtando justificativas da tabela (até ~8 palavras por célula) e bullets quando necessário — nunca deixando uma seção pela metade, para a resposta não ser bloqueada pelo pós-processamento por seções ausentes.
 - **Todos os cards** do catálogo devem incluir no payload `investor_profile` e o Perfil Complementar (quando preenchido), para que a IA contextualize cada análise com o perfil e os dados complementares cadastrados no app; quando o Perfil Complementar não está preenchido, o payload carrega apenas `investor_profile`.
 - Tabelas markdown nas respostas do Consultor devem ser renderizadas como tabelas HTML na aba **Consultor** (primeira linha como cabeçalho), não como texto cru.
 - O card **Detecção de Anomalias e "Ralos" Financeiros** deve consumir o formato atual de `antecipacao_parcelas` em lista, somando `valor_cents` e contando os itens sem depender do formato legado agregado.
@@ -476,6 +476,8 @@ _Nenhuma pendência em aberto._
 
 ## Changelog
 
+- `1.5` — 2026-08-16 — Card **Análise da Carteira**: o prompt deixa de pedir resposta "sem restrição de concisão" (que fazia a IA esgotar os 900 tokens de saída e truncar no meio das seções finais, bloqueando a entrega com "indisponível") e passa a orientar completude dentro do teto — encerrar todas as seções obrigatórias, encurtando justificativas da tabela/bullets se preciso, nunca deixando seção pela metade. Homologação: `max_tokens` do usuário elevado de 700 para 900 (teto da spec) e execuções reais do card validados (2 execuções completas com todas as seções).
+- `1.4` — 2026-08-15 — Correções no pós-processamento: (a) `has_section` — o quantificador `#{1,6}` dentro de f-string era interpretado como tupla `(1, 6)`, fazendo respostas com cabeçalhos markdown `### Seção` (formato comum do Gemini) falharem na validação de seções obrigatórias e derrubarem o Consultor com "indisponível"; corrigido com `#{{1,6}}` e coberto por testes de regressão (formatos `###`, `##` e `**bold**`). (b) `has_section` passa a normalizar acentos no texto (a IA alterna "Análise de Dados" e "Analise de Dados"), evitando bloqueio indevido de respostas com cabeçalhos acentuados. (c) `contains_forbidden_recommendation` — frases defensivas da IA ("não constitui recomendação de compra de ações", "sem recomendar compra de fundos") eram bloqueadas como recomendação vedada, gerando resposta de recusa indevida; o match agora exige ausência de negação/ressalva na janela anterior (janela curta para o padrão "recomendo <verbo>", preservando o bloqueio de recomendações afirmativas como "sem dúvida, recomendo comprar ações X").
 - `1.3` — 2026-08-15 — Todos os cards do catálogo passam a considerar o perfil de investidor e o Perfil Complementar quando preenchidos: o enriquecimento foi centralizado em `build_analysis_context` (que injeta `investor_profile` + `complementary_profile` em qualquer card; `build_portfolio_analysis_context` delegou a leitura ao contexto central) e o `system_prompt` ganhou regra global para usar esses dados na contextualização de todos os cards; critério de aceite 38 adicionado.
 - `1.2` — 2026-08-15 — Card **Análise da Carteira** aprofundado: prompt exige tabela por classe de ativo (nível de risco + impacto macro), seção própria **Adequação ao Perfil Configurado** alinhada ao perfil/Perfil Complementar/Reserva cadastrados, payload do card enriquecido com `investor_profile`, Perfil Complementar e pilar Reserva do Score, restrição de concisão suspensa para este card e renderização de tabelas markdown na aba Consultor.
 - `1.1` — 2026-08-15 — Adicionado o card **Análise da Carteira** (`analise_carteira`) na Categoria Portfólio e Risco, com contexto consolidado por classe/moeda/mercado e limitação explícita para eventos macro fora do `quote_cache`; persona do consultor ampliada (perfil de especialização, características do perfil padrão, diretrizes de alocação, forma de responder, processo de análise, análises de mercado e limitações) e normalizada ao formato de resposta obrigatório; contagens do catálogo atualizadas de 7 para 8 cards nos critérios de aceite e no plano; implementação sincronizada em `financeiro/consultor.py` e testes.

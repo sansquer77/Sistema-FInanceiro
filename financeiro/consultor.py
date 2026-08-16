@@ -46,6 +46,10 @@ FORBIDDEN_OUTPUT_PATTERNS = (
     r"\b(retorno|rentabilidade)\s+(garantido|garantida|garantidos|garantidas)\b",
     r"\b(sem risco|risco zero)\b",
 )
+_FORBIDDEN_NEGATION_WINDOW = (
+    r"\b(nao|nunca|sem|evite|evitar|evitando|desaconselho|desaconselha|desaconselhar|apenas|somente)"
+    r"|deixe\s+de|deixa\s+de|deixar\s+de"
+)
 INVESTOR_PROFILES = {
     "conservador": {
         "label": "Conservador",
@@ -333,8 +337,10 @@ def build_system_prompt(
     sections = "\n".join(f"- {section}" for section in RESPONSE_SECTIONS)
     if normalized_analysis_id == "analise_carteira":
         conciseness = (
-            "A analise deste card deve ser detalhada e rica em dados, sem restricao de concisao: "
-            "use tabelas e justificativas completas, respeitando o limite de tokens da resposta.\n"
+            "A analise deste card deve ser rica em dados, com tabela completa e secao Adequacao ao "
+            "Perfil Configurado, mas dentro do limite de tokens de saida do app: encerre TODAS as "
+            "secoes obrigatorias, encurtando justificativas (ate 8 palavras por celula da tabela) "
+            "e bullets se necessario; nunca deixe uma secao pela metade.\n"
         )
     else:
         conciseness = "Seja conciso: use no maximo 2 frases no Resumo e ate 3 bullets curtos nas demais secoes.\n"
@@ -569,16 +575,31 @@ def postprocess_consultor_output(output: object) -> str:
 
 
 def has_section(text: str, section: str) -> bool:
+    # spec: consultor/consultor v1.4 - cabeçalhos com acentos normalizados
+    normalized_text = normalize_text(text)
     escaped = re.escape(section)
     return bool(re.search(
-        rf"(^|\n)\s*(?:[-*]\s+)?(?:#{1,6}\s*)?(\*\*)?{escaped}(\*\*)?\s*:?",
-        text,
+        rf"(^|\n)\s*(?:[-*]\s+)?(?:#{{1,6}}\s*)?(\*\*)?{escaped}(\*\*)?\s*:?",
+        normalized_text,
         flags=re.IGNORECASE,
     ))
 
 
 def contains_forbidden_recommendation(normalized_text: str) -> bool:
-    return any(re.search(pattern, normalized_text) for pattern in FORBIDDEN_OUTPUT_PATTERNS)
+    # spec: consultor/consultor v1.4 - correcao de falso positivo
+    # Frases defensivas da IA ("nao constitui recomendacao de compra de acoes",
+    # "sem recomendar compra de fundos", "evite comprar por impulso") casavam os
+    # padroes vedados; o match so vale se nao houver negacao/ressalva na janela anterior.
+    # O padrao "recomendo <verbo>" usa janela curta para nao engolir idiomas
+    # afirmativos como "sem duvida, recomendo comprar".
+    for pattern in FORBIDDEN_OUTPUT_PATTERNS:
+        window = 10 if pattern.startswith(r"\brecomendo") else 60
+        for match in re.finditer(pattern, normalized_text):
+            before = normalized_text[max(0, match.start() - window):match.start()]
+            if re.search(_FORBIDDEN_NEGATION_WINDOW, before):
+                continue
+            return True
+    return False
 
 
 def has_risk_level(normalized_text: str) -> bool:

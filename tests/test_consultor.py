@@ -27,6 +27,7 @@ from financeiro.consultor import (
     execute_consultor_analysis,
     get_complementary_profile,
     get_consultor_settings,
+    has_section,
     list_analysis_cards,
     postprocess_consultor_output,
     save_complementary_profile,
@@ -545,7 +546,7 @@ class ConsultorContextTest(unittest.TestCase):
 
         self.assertIn("Analise da Carteira", prompt)
         self.assertIn("Adequacao ao Perfil Configurado", prompt)
-        self.assertIn("sem restricao de concisao", prompt)
+        self.assertIn("nunca deixe uma secao pela metade", prompt)
         self.assertIn("aviso explicito de defasagem", prompt)
         self.assertIn("nunca recomende compra", prompt)
         self.assertNotIn("{period_label}", prompt)
@@ -860,6 +861,39 @@ class ConsultorAIExecutorTest(unittest.TestCase):
 
         self.assertEqual(postprocess_consultor_output(text), text)
 
+    def test_postprocess_accepts_markdown_heading_sections(self) -> None:
+        # spec: consultor/consultor v1.4 - correcao de has_section
+        # O padrao #{1,6} dentro de f-string era interpretado como tupla (1, 6),
+        # fazendo respostas com "### Secao" (formato comum do Gemini) falharem
+        # a validacao de secoes obrigatorias e derrubarem o Consultor.
+        text = (
+            "### Resumo\nTexto educacional.\n\n"
+            "### Analise de Dados\nDados agregados.\n\n"
+            "### Pontos de Atencao (Riscos)\nRisco Baixo: acompanhamento simples.\n\n"
+            "### Plano de Acao (Educacional)\nCompare os dados antes de decidir.\n\n"
+            f"### Disclaimer\n{DISCLAIMER}"
+        )
+
+        self.assertEqual(postprocess_consultor_output(text), text)
+
+    def test_has_section_matches_markdown_headings(self) -> None:
+        self.assertTrue(has_section("### Resumo\nx", "Resumo"))
+        self.assertTrue(has_section("## Analise de Dados\nx", "Analise de Dados"))
+        self.assertTrue(has_section("**Pontos de Atencao (Riscos)**\nx", "Pontos de Atencao (Riscos)"))
+        self.assertTrue(has_section("### Análise de Dados\nx", "Analise de Dados"))
+
+    def test_postprocess_accepts_accented_markdown_headings(self) -> None:
+        # spec: consultor/consultor v1.4 - modelo alterna "Analise"/"Análise"
+        text = (
+            "### Resumo\nTexto educacional.\n\n"
+            "### Análise de Dados\nDados agregados.\n\n"
+            "### Pontos de Atenção (Riscos)\nRisco Baixo: acompanhamento simples.\n\n"
+            "### Plano de Ação (Educacional)\nCompare os dados antes de decidir.\n\n"
+            f"### Disclaimer\n{DISCLAIMER}"
+        )
+
+        self.assertEqual(postprocess_consultor_output(text), text)
+
     def test_postprocess_rejects_response_without_required_sections(self) -> None:
         with self.assertRaisesRegex(ConsultorError, "indisponivel"):
             postprocess_consultor_output("Resumo\nTexto solto sem a estrutura completa.")
@@ -884,6 +918,31 @@ class ConsultorAIExecutorTest(unittest.TestCase):
         text = valid_consultor_response().replace(
             "Compare os dados antes de decidir.",
             "Recomendo comprar o ativo AAPL hoje.",
+        )
+
+        processed = postprocess_consultor_output(text)
+
+        self.assertIn("Nao posso apresentar recomendacao direta", processed)
+
+    def test_postprocess_does_not_refuse_defensive_negation_phrases(self) -> None:
+        # spec: consultor/consultor v1.4 - correcao de falso positivo
+        # A IA costuma explicitar a propria vedacao ("nao constitui recomendacao
+        # de compra de acoes", "sem recomendar compra de fundos"); isso nao e
+        # recomendacao direta e nao deve derrubar a resposta.
+        text = valid_consultor_response().replace(
+            "Os dados indicam diferencas entre classes de ativos sem sugerir compra ou venda.",
+            "Nao constitui recomendacao de compra de acoes ou fundos especificos; sem recomendar "
+            "compra de criptoativos, apenas um recorte educacional.",
+        )
+
+        processed = postprocess_consultor_output(text)
+
+        self.assertEqual(processed, text)
+
+    def test_postprocess_refuses_affirmative_recommendation_even_near_negation(self) -> None:
+        text = valid_consultor_response().replace(
+            "Compare os dados antes de decidir.",
+            "Sem duvida, recomendo comprar acoes da empresa XPTO agora.",
         )
 
         processed = postprocess_consultor_output(text)

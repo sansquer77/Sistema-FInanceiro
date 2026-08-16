@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.32
+versao: 3.34
 atualizado: 2026-08-15
 relacionados:
   - "[[requisitos]]"
@@ -500,6 +500,8 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.34` — 2026-08-16 — Consultor: prompt do card `analise_carteira` orienta a IA a encerrar todas as seções obrigatórias dentro do teto de 900 tokens de saída (encurtando justificativas se preciso, sem deixar seção pela metade), eliminando truncamento que bloqueava a entrega da análise; `max_tokens` do usuário na homologação elevado para 900. Ver [[specs/consultor]] v1.5.
+- `3.33` — 2026-08-15 — Consultor: correções no pós-processamento em `financeiro/consultor.py` — `has_section` passa a reconhecer cabeçalhos markdown (`###`) e `contains_forbidden_recommendation` ignora negações/ressalvas na janela anterior ao match (frases defensivas da IA), mantendo bloqueio de recomendações afirmativas. Ver [[specs/consultor]] v1.4.
 - `3.32` — 2026-08-15 — Consultor: todos os cards passam a receber `investor_profile` e Perfil Complementar (quando preenchido) no payload, com enriquecimento centralizado em `build_analysis_context` (perfil injetado também no card `analise_carteira`, cujo builder delegou a leitura ao contexto central) e regra global no `system_prompt` para contextualizar qualquer análise com esses dados. Ver [[specs/consultor]] v1.3.
 - `3.31` — 2026-08-15 — Card `analise_carteira` do Consultor aprofundado: contexto enriquecido com `investor_profile`, Perfil Complementar e pilar Reserva do Score; prompt exige tabela por classe de ativo e seção Adequação ao Perfil Configurado; concisão suspensa para o card e `consultor-view.js` passa a renderizar tabelas markdown como HTML. Ver [[specs/consultor]] v1.2.
 - `3.30` — 2026-08-15 — Catálogo do Consultor ampliado para 8 análises com o card `analise_carteira` (contexto consolidado por classe/moeda/mercado via `summarize_portfolio` + `group_positions_by`, sem nomes/identificadores de ativos). Ver [[specs/consultor]] v1.1.
