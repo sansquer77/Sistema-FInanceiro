@@ -40,19 +40,20 @@ from financeiro.secure_config import save_ai_settings
 
 
 class ConsultorDomainTest(unittest.TestCase):
-    def test_catalog_is_closed_with_seven_cards_in_four_categories(self) -> None:
+    def test_catalog_is_closed_with_eight_cards_in_four_categories(self) -> None:
         cards = list_analysis_cards()
         analysis_ids = {card["analysis_id"] for card in cards}
         categories = {card["category"] for card in cards}
 
-        self.assertEqual(len(cards), 7)
-        self.assertEqual(len(analysis_ids), 7)
+        self.assertEqual(len(cards), 8)
+        self.assertEqual(len(analysis_ids), 8)
         self.assertEqual(
             {
                 "ralos_financeiros",
                 "assinaturas_recorrencias",
                 "alocacao_perfil",
                 "exposicao_cambial",
+                "analise_carteira",
                 "score_saude_financeira",
                 "sustentabilidade_padrao_vida",
                 "destino_vencimentos",
@@ -482,6 +483,30 @@ class ConsultorContextTest(unittest.TestCase):
 
         self.assertEqual(context["portfolio"]["by_currency"][0]["label"], "BRL")
         self.assertEqual(context["portfolio"]["by_market"][0]["label"], "Brasil")
+
+    def test_portfolio_analysis_context_consolidates_by_class_currency_and_market(self) -> None:
+        with mock.patch("financeiro.portfolio.current_portfolio_positions", return_value=portfolio_positions()):
+            context = build_analysis_context(7, "analise_carteira")
+
+        self.assertEqual(context["analysis_id"], "analise_carteira")
+        self.assertEqual(context["portfolio"]["total_brl_cents"], 300000)
+        self.assertEqual(context["portfolio"]["total_display"], "R$ 3.000,00")
+        self.assertEqual(context["portfolio"]["by_asset_type"][0]["label"], "Renda Fixa")
+        self.assertEqual(context["by_currency"][0]["label"], "BRL")
+        self.assertEqual(context["by_market"][0]["label"], "Brasil")
+        self.assertIn("Yahoo Finance (AAPL)", context["market_data"]["observed_sources"])
+        self.assertTrue(context["market_data"]["uses_quote_cache"])
+        self.assertEqual(context["portfolio"]["positions"][0]["current_value_display"], "R$ 2.000,00")
+        self.assertNotIn("asset_identifier", context["portfolio"]["positions"][0])
+        self.assertNotIn("asset_name", context["portfolio"]["positions"][0])
+
+    def test_system_prompt_limits_macro_scenario_to_app_quotes(self) -> None:
+        prompt = build_system_prompt("analise_carteira")
+
+        self.assertIn("Analise da Carteira", prompt)
+        self.assertIn("aviso explicito de defasagem", prompt)
+        self.assertIn("nunca recomende compra", prompt)
+        self.assertNotIn("{period_label}", prompt)
 
     def test_maturities_context_uses_calendar_maturities_not_full_portfolio(self) -> None:
         with mock.patch("financeiro.calendar.get_cockpit_calendar", return_value=calendar_payload()):

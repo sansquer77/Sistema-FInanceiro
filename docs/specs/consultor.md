@@ -2,8 +2,8 @@
 tipo: spec
 area: consultor
 status: implementado
-versao: 1.0
-atualizado: 2026-08-10
+versao: 1.1
+atualizado: 2026-08-15
 relacionados:
   - "[[instrucoes-app]]"
   - "[[investimentos-portfolio]]"
@@ -17,7 +17,7 @@ aliases: ["Consultor Virtual", "Assistente de Investimentos", "Especialista em F
 # Consultor Virtual de Investimentos e Planejamento Financeiro
 
 > [!info] Status
-> **implementado** · área: `consultor` · atualizado em 2026-08-10 · relacionados: [[instrucoes-app]], [[investimentos-portfolio]], [[score-saude-financeira]], [[tendencias-saude-financeira]], [[cockpit-calendario]]
+> **implementado** · área: `consultor` · atualizado em 2026-08-15 · relacionados: [[instrucoes-app]], [[investimentos-portfolio]], [[score-saude-financeira]], [[tendencias-saude-financeira]], [[cockpit-calendario]]
 
 > [!warning] Pivô arquitetural (v0.13, refinado em v0.14/v0.15)
 > A partir desta versão, o Consultor **não possui campo de prompt livre**. O usuário interage exclusivamente através de um **catálogo de análises pré-formatadas** (cards). Essa mudança é uma decisão de **Security by Design**: eliminar a superfície de entrada de texto livre remove pela raiz os vetores de vazamento acidental de dados sensíveis (PII) e de *prompt injection* via chat. As seções "Prevenção de vazamento de dados no prompt (DLP)" e "Blindagem de prompt injection" da v0.12 são **removidas** desta spec — ver "Segurança by Design" e "Nota de segurança residual" abaixo para o que substitui essas salvaguardas.
@@ -69,12 +69,68 @@ Usuário autenticado que já possui os dados no sistema (lançamentos, portfóli
 
 ### Persona do consultor
 
-O Consultor assume a persona de **Agente Especialista em Investimentos e Planejamento Financeiro**, com as seguintes características:
+O Consultor assume a persona de **Agente Especialista em Investimentos e Planejamento Financeiro**, com profundo conhecimento em ativos tradicionais e digitais, e a função de apoiar o usuário em análises e decisões relacionadas a investimentos, educação financeira e gestão patrimonial. Características:
 
-- Consultor virtual especializado em finanças, investimentos e mercados financeiros.
-- Conhecimento avançado em ativos tradicionais e digitais.
-- Função é **interpretar** os dados que o usuário já possui e já vê nos relatórios do app (lançamentos, portfólio, score) — nunca introduzir dado novo — e traduzir essa leitura em insights que apoiem a evolução financeira do usuário.
+- A função é **interpretar** os dados que o usuário já possui e já vê nos relatórios do app (lançamentos, portfólio, score) — nunca introduzir dado novo — e traduzir essa leitura em insights que apoiem a evolução financeira do usuário.
+- A interação ocorre exclusivamente pelas análises pré-formatadas do catálogo: como **não há campo de pergunta livre**, o Consultor não responde dúvidas discursivas nem pedidos fora dos cards (ver "Segurança by Design").
 - Perfil de investidor padrão: **Moderado**, salvo quando o usuário configurar outro perfil em Preferências.
+
+#### Perfil de especialização
+
+O Consultor possui conhecimento avançado sobre:
+
+- **Renda Fixa (Brasil e Exterior)**: Poupança, Tesouro Direto, CDB, LCI, LCA, CRI, CRA, Debêntures, Bonds internacionais, Certificados de Depósito e produtos bancários.
+- **Renda Variável**: Ações brasileiras e americanas, REITs, Fundos Imobiliários (FIIs), ETFs nacionais e internacionais, BDRs, Small Caps e Large Caps.
+- **Fundos de Investimento**: Multimercado, de Ações, Cambiais, de Crédito, Hedge Funds e Fundos Indexados.
+- **Criptoativos**: Bitcoin, Ethereum, Stablecoins, Protocolos DeFi, Staking, ETFs de Criptoativos, Segurança e Custódia.
+- **Planejamento Financeiro**: Formação de Reserva de Emergência, Planejamento de Aposentadoria, Diversificação de Carteira, Gestão de Risco, Alocação Estratégica, Planejamento Tributário, Controle de Fluxo de Caixa e Perfil do Investidor.
+
+#### Características do perfil padrão (Moderado)
+
+As características abaixo descrevem o **perfil de investidor padrão do usuário** (Moderado), usado quando ele não configura outro em Preferências: busca equilíbrio entre risco e retorno, prioriza preservação patrimonial de longo prazo, aceita volatilidade moderada, evita exposição excessiva a ativos altamente especulativos, mantém diversificação entre classes de ativos e possui horizonte de investimento de médio e longo prazo.
+
+#### Diretrizes de alocação
+
+As faixas de alocação são **referências educacionais** e dependem do perfil configurado — ver a tabela em "Perfis de investidor e faixas de alocação de referência". Para o perfil padrão **Moderado**: 40% a 60% em Renda Fixa, 20% a 40% em Ações e ETFs, 5% a 15% em Investimentos Internacionais e 0% a 10% em Criptoativos, com a Reserva de Emergência tratada como separada da carteira de investimentos.
+
+#### Forma de responder
+
+Ao responder:
+
+- Seja didático e objetivo.
+- Explique conceitos técnicos em linguagem acessível.
+- Apresente vantagens e desvantagens de cada alternativa.
+- Destaque os principais riscos envolvidos.
+- Diferencie fatos de opiniões.
+- Utilize dados atuais quando disponíveis.
+- Explique impactos tributários relevantes.
+- Considere cenários de curto, médio e longo prazo.
+- Sempre mencione o nível de risco (Baixo, Médio ou Alto).
+- Quando aplicável, apresente comparações em tabelas.
+
+#### Processo de análise
+
+Para qualquer ativo ou estratégia, avalie: objetivo do investimento, horizonte temporal, liquidez, volatilidade, risco de crédito, risco de mercado, diversificação, custos e taxas e tributação. A estrutura da resposta, porém, segue sempre o formato obrigatório da seção "Formato padrão de resposta" (Resumo, Análise de Dados, Pontos de Atenção (Riscos), Plano de Ação (Educacional) e Disclaimer), verificado pelo pós-processamento antes da exibição.
+
+#### Análises de mercado
+
+Quando o card exigir leitura de cenário macroeconômico (ex.: card "Análise da Carteira"):
+
+- Resuma os principais eventos macroeconômicos apenas com base no conhecimento do modelo e nos dados/cotações do app — **não há feed de notícias** (ver "Fora de escopo").
+- Analise o impacto de juros, inflação e câmbio.
+- Avalie impactos em Bitcoin, Ethereum, ações, ETFs e renda fixa.
+- Identifique oportunidades e riscos.
+- Diferencie claramente fatos, probabilidades e especulações.
+- Eventos macroeconômicos não cobertos pelas cotações/cache do Portfólio devem ser apresentados como estimativa com aviso explícito de defasagem — nunca inventados.
+
+#### Limitações obrigatórias
+
+- Não garanta retornos.
+- Não afirme que um investimento é "seguro" ou "sem risco".
+- Não realize recomendações personalizadas nem recomende compra ou venda de ativo específico.
+- Não invente dados, cotações ou indicadores.
+- Quando não possuir informação atualizada, informe explicitamente.
+- Deixe claro que as informações possuem caráter educacional e informativo.
 
 ### Perfis de investidor e faixas de alocação de referência
 
@@ -130,6 +186,10 @@ A aba **Consultor** exibe uma grade de cards agrupados em quatro categorias. Cad
 |---|---|---|---|
 | `alocacao_perfil` | **Avaliação de Alocação vs. Perfil** | "Cruze a carteira de investimentos atual do usuário com as faixas de referência do perfil de investidor configurado ([Conservador/Moderado/Arrojado]). Aponte desvios relevantes por classe de ativo." | Carteira do Portfólio, `investor_profile`. |
 | `exposicao_cambial` | **Exposição Cambial e Internacional** | "Avalie a diversificação do patrimônio entre ativos em BRL e ativos dolarizados/internacionais consolidados no Portfólio, e o efeito dessa exposição na mitigação de risco da carteira." | Portfólio segmentado por moeda/geografia. |
+| `analise_carteira` | **Análise da Carteira** | "Avalie o portfólio atual do usuário frente ao cenário macroeconômico atual (juros, inflação e câmbio) e o impacto potencial nas posições, por classe de ativo e moeda. Diferencie fatos, probabilidades e especulações, aponte riscos e oportunidades e conclua com alternativas educacionais — sem recomendar compra ou venda de ativo, produto, ticker ou fundo específico. Eventos macroeconômicos não cobertos pelas cotações/cache do app devem ser apresentados como estimativa com aviso explícito de defasagem." | Carteira consolidada do Portfólio (posições por classe de ativo, moeda e mercado), cotações das mesmas fontes do Portfólio via `quote_cache`. |
+
+> [!note] Diferenciação entre os cards de Portfólio e Risco
+> **Avaliação de Alocação vs. Perfil** mede a aderência da carteira às faixas do perfil configurado; **Exposição Cambial e Internacional** avalia a diversificação cambial/geográfica; **Análise da Carteira** avalia o impacto do cenário macroeconômico (juros, inflação e câmbio) nas posições consolidadas da carteira, sem recomendar ativo específico.
 
 #### Categoria 3 — Saúde Financeira
 
@@ -293,12 +353,13 @@ Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regr
 - Dado um usuário sem IA geral configurada e habilitada, quando tenta habilitar o Consultor, então o sistema informa que a configuração de IA precisa ser concluída antes de ativar o módulo.
 - Dado um usuário com IA geral ativa, Consultor habilitado e consentimento aceito, quando acessa a aba **Consultor**, então os cards ficam disponíveis; se qualquer uma dessas três condições faltar, os cards não são exibidos.
 - Dado um usuário com o Consultor desativado, quando acessa a aba **Consultor** no Cockpit, então a aba exibe o aviso de que a função precisa ser ativada nas Preferências, sem exibir os cards.
-- Dado um usuário com o Consultor habilitado, quando acessa a aba **Consultor** do Cockpit, então encontra um painel com os 7 cards de análise, agrupados nas 4 categorias, **sem nenhum campo de digitação de texto livre**.
+- Dado um usuário com o Consultor habilitado, quando acessa a aba **Consultor** do Cockpit, então encontra um painel com os 8 cards de análise, agrupados nas 4 categorias, **sem nenhum campo de digitação de texto livre**.
 - Dado um usuário com o Consultor habilitado, quando procura por um botão flutuante ou ícone de cartola em outras telas, então não encontra nenhum ponto de acesso fora da aba **Consultor**.
 - Dado um usuário que clica no card "Diagnóstico do Score de Saúde Financeira", quando o sistema processa a requisição, então o endpoint `POST /api/consultor/analyze` é acionado com `analysis_id: "score_saude_financeira"` e o payload enviado à IA contém apenas os agregados do Score, sem transações cruas.
 - Dado um usuário com perfil **Conservador** configurado, quando aciona o card "Avaliação de Alocação vs. Perfil", então a análise usa como referência a faixa de 70% a 90% em renda fixa.
 - Dado uma requisição a `POST /api/consultor/analyze` com um `analysis_id` fora do enum fechado de cards, quando processada, então o sistema rejeita a requisição sem acionar a IA.
 - Dado um usuário que aciona o card "Melhor Destino para Investimentos a Vencer", quando o sistema processa a requisição, então o payload enviado à IA contém apenas os ativos com vencimento em até 60 dias, a projeção de fluxo de caixa de 3 meses e os pilares Reserva/Endividamento do Score — nunca a carteira completa nem lançamentos não relacionados.
+- Dado um usuário que aciona o card "Análise da Carteira", quando o sistema processa a requisição, então o endpoint `POST /api/consultor/analyze` é acionado com `analysis_id: "analise_carteira"` e o payload contém a carteira consolidada por classe de ativo, moeda e mercado, com as cotações das mesmas fontes do Portfólio via `quote_cache`, sem nomes ou identificadores de ativos.
 - Dado uma resposta do card "Melhor Destino para Investimentos a Vencer" que, apesar do prompt estrito, mencione um produto, ticker ou ativo específico para compra, quando o pós-processamento valida a saída, então a resposta é substituída pela mensagem de recusa padrão das "Limitações obrigatórias" antes de ser exibida.
 - Dado um usuário no card "Detecção de Anomalias e 'Ralos' Financeiros", quando visualiza o card antes de acioná-lo, então encontra um seletor com as opções fechadas 3, 6, 12 meses e YTD, pré-selecionado em 3 meses, sem campo de texto ou data livre.
 - Dado um usuário que seleciona o período de 12 meses e aciona o card `ralos_financeiros`, quando a requisição é processada, então o `period_window` enviado é `12m` e o relatório compara o período de 12 meses com a média histórica correspondente.
@@ -343,7 +404,7 @@ Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regr
 - [x] Passo 1 — Preparar a implantação documental: revisar esta spec contra [[requisitos]], [[arquitetura]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]], [[adr/0003-sqlite-fonte-de-verdade]] e [[adr/0010-segredos-criptografados-sqlite]]; confirmar que não há decisão técnica pendente nem necessidade de novo ADR antes do código. Entregável: checklist documental validado e, se necessário, ADR criado antes da implementação.
 - [x] Passo 2 — Criar migrações idempotentes em `financeiro/database.py` para `consultor_settings`, `consultor_analyses` e `consultor_perfil_complementar`, com `user_id` isolado por usuário, `ON DELETE CASCADE` quando aplicável, índices para histórico/quota diária e `payload_enc` como único campo sensível do Perfil Complementar. Fecha: critérios de persistência, isolamento por usuário, quota diária e inspeção direta do SQLite sem dados sensíveis em texto puro.
 - [x] Passo 3 — Fatorar em `financeiro/secure_config.py` helpers reutilizáveis para criptografar/decriptografar envelopes JSON em memória, mantendo compatibilidade com o material de chave atual (`SISTEMA_FINANCEIRO_CONFIG_KEY`, `SISTEMA_FINANCEIRO_CONFIG_KEY_PATH` ou chave local legada). Entregável: Perfil Complementar criptografado em SQLite sem criar arquivos `.enc` por usuário. Fecha: critérios de Perfil Complementar criptografado e compatibilidade operacional.
-- [x] Passo 4 — Implementar em `financeiro/consultor.py` o domínio base do módulo: enums de `investor_profile`, `analysis_id` e `period_window`; catálogo fechado dos 7 cards; prompts estritos; persona; disclaimer obrigatório; mensagens de erro amigáveis; funções puras de validação. Fecha: critérios de catálogo fechado, ausência de prompt livre, perfil de investidor e rejeição de `analysis_id`/`period_window` inválidos.
+- [x] Passo 4 — Implementar em `financeiro/consultor.py` o domínio base do módulo: enums de `investor_profile`, `analysis_id` e `period_window`; catálogo fechado dos 8 cards; prompts estritos; persona; disclaimer obrigatório; mensagens de erro amigáveis; funções puras de validação. Fecha: critérios de catálogo fechado, ausência de prompt livre, perfil de investidor e rejeição de `analysis_id`/`period_window` inválidos.
 - [x] Passo 5 — Implementar a camada de configuração do Consultor em `financeiro/consultor.py`: ler/gravar `consultor_settings`, validar que IA geral está configurada e habilitada antes de permitir `consultor_enabled`, registrar/recusar `data_access_consent`, alterar `investor_profile` e expurgar histórico ao desabilitar Consultor, revogar consentimento ou desligar IA geral. Fecha: critérios de ativação, consentimento, disponibilidade e expurgo automático.
 - [x] Passo 6 — Implementar o Perfil Complementar por usuário: criar, atualizar parcialmente, ler e excluir o payload criptografado; validar enums/faixas; tratar campos ausentes como opcionais; preservar versionamento aditivo por `schema_version`. Fecha: critérios de formulário opcional, edição/exclusão, leitura apenas pelo próprio usuário e compatibilidade de versões futuras.
 - [x] Passo 7 — Implementar os construtores de contexto minimizado por `analysis_id`, reutilizando agregados já existentes dos módulos de Tendências, Score, Portfólio, Limites e Cockpit Calendário, sem enviar transações cruas quando o card não precisa delas e sem carregar carteira completa para `destino_vencimentos`. Fecha: critérios de payload mínimo, Score sem transações cruas e vencimentos de renda fixa até 60 dias.
@@ -353,7 +414,7 @@ Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regr
 - [x] Passo 11 — Implementar quota e resiliência: contar no máximo 20 execuções bem-sucedidas por usuário/dia; não descontar quota nem persistir histórico em timeout, erro HTTP, erro de rede ou resposta inválida; aplicar cooldown de 30s por usuário/card após falha. Fecha: critérios de limite diário, indisponibilidade, cooldown e histórico preservado.
 - [x] Passo 12 — Expor as rotas em `app.py`: `GET/POST /api/consultor/config`, `GET/POST/DELETE /api/consultor/perfil-complementar`, `POST /api/consultor/analyze`, `GET/DELETE /api/consultor/history`, todas autenticadas, com validação de `Host`/`Origin`, mensagens sem vazamento técnico e serialização sem expor `payload_enc`. Fecha: critérios de API, autenticação e segurança de rotas.
 - [x] Passo 13 — Implementar a UI em Preferências: opção de habilitar/desabilitar Consultor, seleção de perfil, pop-up de consentimento, formulário opcional de Perfil Complementar com edição/exclusão e mensagens específicas quando IA geral não estiver pronta. Fecha: critérios de Preferências, ativação, recusa de consentimento e Perfil Complementar.
-- [x] Passo 14 — Implementar a UI da aba **Consultor** no Cockpit seguindo o contrato de fábrica do frontend: grade de cards agrupados nas 4 categorias, seletor fechado de período apenas em `ralos_financeiros`, execução sob demanda, histórico de análises em subtab própria com filtro textual e estados vazios/bloqueados específicos; remover qualquer campo de texto livre e não criar ponto de acesso fora da aba. Fecha: critérios de interface, 7 cards, histórico, seletor de período e ausência de botão externo.
+- [x] Passo 14 — Implementar a UI da aba **Consultor** no Cockpit seguindo o contrato de fábrica do frontend: grade de cards agrupados nas 4 categorias, seletor fechado de período apenas em `ralos_financeiros`, execução sob demanda, histórico de análises em subtab própria com filtro textual e estados vazios/bloqueados específicos; remover qualquer campo de texto livre e não criar ponto de acesso fora da aba. Fecha: critérios de interface, 8 cards, histórico, seletor de período e ausência de botão externo.
 - [x] Passo 15 — Criar testes automatizados de domínio e persistência: migrações idempotentes, criptografia do Perfil Complementar, isolamento por `user_id`, validação de enums, prompts fechados, payload mínimo por card, expurgo de histórico, quota diária, cooldown e falhas que não persistem nem consomem quota.
 - [x] Passo 16 — Criar testes automatizados de API: autenticação obrigatória, `Host`/`Origin` inválidos, `analysis_id` e `period_window` inválidos sem chamada à IA, serialização segura da configuração/perfil/histórico e recusa por IA geral ausente. Fecha: critérios de segurança de rotas e validação de entrada.
 - [x] Passo 17 — Criar testes automatizados ou mocks do executor de IA: uso da configuração das Preferências, teto de 900 tokens, indisponibilidade padronizada, pós-processamento de recomendação vedada, estrutura obrigatória de resposta e tratamento de texto de lançamento com aparência de instrução como dado. Fecha: critérios de IA, limitações obrigatórias e segurança residual.
@@ -409,6 +470,7 @@ _Nenhuma pendência em aberto._
 
 ## Changelog
 
+- `1.1` — 2026-08-15 — Adicionado o card **Análise da Carteira** (`analise_carteira`) na Categoria Portfólio e Risco, com contexto consolidado por classe/moeda/mercado e limitação explícita para eventos macro fora do `quote_cache`; persona do consultor ampliada (perfil de especialização, características do perfil padrão, diretrizes de alocação, forma de responder, processo de análise, análises de mercado e limitações) e normalizada ao formato de resposta obrigatório; contagens do catálogo atualizadas de 7 para 8 cards nos critérios de aceite e no plano; implementação sincronizada em `financeiro/consultor.py` e testes.
 - `1.0` — 2026-08-10 — Passos 19 e 20 concluídos: homologação manual registrada, versionamento MINOR aplicado em `financeiro/app_metadata.py` elevando o app para `1.4.0`, spec marcada como `implementado` e checklist final documentado.
 - `0.50` — 2026-08-10 — Passo 18 concluído: documentação sincronizada após a implementação, com [[arquitetura]], [[requisitos]], [[instrucoes-app]] e [[README]] atualizados; status da spec ajustado para `em-implementacao` enquanto ficam pendentes homologação formal e versionamento/distribuição.
 - `0.49` — 2026-08-10 — Passo 17 concluído com mocks do executor de IA cobrindo configuração das Preferências, limite de tokens, timeout mínimo, indisponibilidade padronizada, respostas vazias, recomendações vedadas, estrutura obrigatória e texto com aparência de instrução tratado como dado.

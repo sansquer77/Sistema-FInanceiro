@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.29
-atualizado: 2026-08-13
+versao: 3.30
+atualizado: 2026-08-15
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -281,7 +281,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `financial_health.py` | Núcleo analítico do Score de Saúde Financeira: cálculo atômico dos pilares, lista `pilares`, Paz Financeira e função de histórico com validação de `months` (1-36). Ver [[score-saude-financeira]]. |
 | `trends.py` | Núcleo local de Tendências e Achados: série mensal, Budget x Realizado, achados estruturados, eventos pontuais, assinaturas/serviços recorrentes, confiança e resumo determinístico. Ver [[tendencias-saude-financeira]]. |
 | `ai_summary.py` | Reescrita opcional do resumo por IA com payload minimizado, timeout curto e fallback para resumo local. Ver [[tendencias-saude-financeira]]. |
-| `consultor.py` | Domínio do Consultor: catálogo fechado de 7 análises, validações de enums, prompts estritos, persona, disclaimer, configuração por usuário, Perfil Complementar criptografado, contexto minimizado por card, metadados de cotações herdados do Portfólio, executor de IA via `user_ai_settings`, pós-processamento de respostas, quota/cooldown de resiliência e expurgo de histórico por privacidade. Ver [[specs/consultor]]. |
+| `consultor.py` | Domínio do Consultor: catálogo fechado de 8 análises, validações de enums, prompts estritos, persona, disclaimer, configuração por usuário, Perfil Complementar criptografado, contexto minimizado por card, metadados de cotações herdados do Portfólio, executor de IA via `user_ai_settings`, pós-processamento de respostas, quota/cooldown de resiliência e expurgo de histórico por privacidade. Ver [[specs/consultor]]. |
 | `imports.py` | Leitura de exportações Organizze e planilhas modelo. Ver [[importacao-organizze]]. |
 | `operation_logs.py` | Auditoria funcional das operações do usuário. Ver [[historico-operacoes]]. |
 | `emailer.py` | Envio SMTP do código de recuperação de senha. Ver [[recuperacao-senha]]. |
@@ -500,6 +500,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.30` — 2026-08-15 — Catálogo do Consultor ampliado para 8 análises com o card `analise_carteira` (contexto consolidado por classe/moeda/mercado via `summarize_portfolio` + `group_positions_by`, sem nomes/identificadores de ativos). Ver [[specs/consultor]] v1.1.
 - `3.29` — 2026-08-13 — Pagamento parcial de fatura documentado: `POST /api/credit-card-invoice/pay` aceita `amount` opcional; no parcial, saldo residual é lançado na próxima fatura aberta (categoria Empréstimos, `Saldo da fatura MM/AAAA`) na mesma transação atômica. Ver [[specs/cartoes]] v2.9.
 - `3.28` — 2026-08-10 — Renda fixa e Poupança passam a calcular variação do dia no Portfólio pela diferença do valor na curva entre hoje e o dia anterior, via `day_variation_cents` com cache de fatores compartilhado. Ver [[specs/investimentos-portfolio]] v2.22.
 - `3.27` — 2026-08-10 — Arquitetura sincronizada após implementação do Consultor: removidas marcações de "futuro", documentado fluxo Preferências/Cockpit, catálogo fechado de 7 análises, histórico em subaba própria e persistência criptografada do Perfil Complementar.
