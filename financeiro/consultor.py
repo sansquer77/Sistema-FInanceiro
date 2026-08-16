@@ -205,15 +205,23 @@ ANALYSIS_CATALOG: tuple[AnalysisCard, ...] = (
         category="Portfolio e Risco",
         strict_prompt=(
             "Avalie o portfolio atual do usuario frente ao cenario macroeconomico atual (juros, inflacao "
-            "e cambio) e o impacto potencial nas posicoes, por classe de ativo e moeda. Diferencie fatos, "
-            "probabilidades e especulacoes, aponte riscos e oportunidades e conclua com alternativas "
-            "educacionais - sem recomendar compra ou venda de ativo, produto, ticker ou fundo especifico. "
-            "Eventos macroeconomicos nao cobertos pelas cotacoes/cache do app devem ser apresentados como "
-            "estimativa com aviso explicito de defasagem."
+            "e cambio) e o impacto potencial nas posicoes, por classe de ativo e moeda. Na secao Analise "
+            "de Dados, apresente uma tabela com tres colunas - Classe de Ativo, Nivel de Risco "
+            "(Baixo/Medio/Alto) e Impacto do Cenario Macro (Positivo/Neutro/Negativo com justificativa "
+            "curta) - citando apenas as classes presentes na carteira. Inclua a secao Adequacao ao Perfil "
+            "Configurado, alinhada ao perfil de investidor registrado no app ({profile_label}) e aos "
+            "dados complementares do usuario (idade, dependentes, objetivo, tolerancia a perdas) e a "
+            "reserva de emergencia em meses, comparando a carteira com as faixas de referencia do perfil. "
+            "Diferencie fatos, probabilidades e especulacoes, aponte riscos e oportunidades e conclua "
+            "com recomendacoes educacionais - sem recomendar compra ou venda de ativo, produto, ticker "
+            "ou fundo especifico. Eventos macroeconomicos nao cobertos pelas cotacoes/cache do app devem "
+            "ser apresentados como estimativa com aviso explicito de defasagem."
         ),
         input_scope=(
             "Carteira consolidada do Portfolio (posicoes por classe de ativo, moeda e mercado), "
-            "cotacoes das mesmas fontes do Portfolio via quote_cache."
+            "perfil de investidor configurado, Perfil Complementar (idade, dependentes, objetivo, "
+            "tolerancia a perdas), pilar Reserva do Score em meses e cotacoes das mesmas fontes do "
+            "Portfolio via quote_cache."
         ),
     ),
     AnalysisCard(
@@ -312,7 +320,7 @@ def build_system_prompt(
     investor_profile: object = "moderado",
     period_window: object = None,
 ) -> str:
-    # spec: consultor/consultor v1.1 - criterios 8, 9, 12, 14 e 34
+    # spec: consultor/consultor v1.3 - criterios 8, 9, 12, 14, 34 e 38
     normalized_analysis_id = validate_analysis_id(analysis_id)
     profile = validate_investor_profile(investor_profile)
     period = validate_period_window(period_window, analysis_id=normalized_analysis_id)
@@ -323,6 +331,13 @@ def build_system_prompt(
         period_label=PERIOD_WINDOWS[period] if period else PERIOD_WINDOWS["3m"],
     )
     sections = "\n".join(f"- {section}" for section in RESPONSE_SECTIONS)
+    if normalized_analysis_id == "analise_carteira":
+        conciseness = (
+            "A analise deste card deve ser detalhada e rica em dados, sem restricao de concisao: "
+            "use tabelas e justificativas completas, respeitando o limite de tokens da resposta.\n"
+        )
+    else:
+        conciseness = "Seja conciso: use no maximo 2 frases no Resumo e ate 3 bullets curtos nas demais secoes.\n"
     return (
         "Voce e o Consultor Virtual do Sistema Financeiro: um agente especialista em investimentos "
         "e planejamento financeiro, com conhecimento avancado em ativos tradicionais e digitais "
@@ -336,6 +351,10 @@ def build_system_prompt(
         "- Apresente vantagens e desvantagens e impactos tributarios relevantes quando aplicavel.\n"
         "- Ao avaliar ativos ou estrategias, considere objetivo, horizonte, liquidez, volatilidade, "
         "risco de credito e de mercado, diversificacao, custos e tributacao quando pertinente ao card.\n"
+        "- O payload pode incluir `investor_profile` e dados complementares do usuario (idade, "
+        "dependentes, objetivo, horizonte, renda mensal e tolerancia a perdas) quando preenchidos; "
+        "use-os para contextualizar a linguagem, os exemplos e as recomendacoes educacionais de "
+        "qualquer card, sem nunca apresentar recomendacao direta de compra ou venda.\n"
         "- Em cards de cenario macroeconomico (juros, inflacao, cambio), use apenas as cotacoes/cache do "
         "app e o conhecimento do modelo; eventos fora dessas fontes sao estimativas com aviso explicito "
         "de defasagem, nunca inventados.\n"
@@ -347,9 +366,11 @@ def build_system_prompt(
         f"Perfil de investidor: {profile_label}.\n"
         f"Analise solicitada: {card.title}.\n"
         f"Prompt estrito: {prompt}\n\n"
-        "A resposta deve seguir exatamente estas secoes:\n"
+        "A resposta deve conter estas secoes obrigatorias, na ordem:\n"
         f"{sections}\n\n"
-        "Seja conciso: use no maximo 2 frases no Resumo e ate 3 bullets curtos nas demais secoes.\n"
+        "Secoes adicionais podem ser acrescentadas quando o prompt estrito do card as exigir "
+        "(ex.: Adequacao ao Perfil Configurado).\n"
+        f"{conciseness}"
         "Na secao Pontos de Atencao (Riscos), a primeira linha deve ser exatamente "
         "`Risco Baixo: ...`, `Risco Medio: ...` ou `Risco Alto: ...`, com justificativa curta.\n"
         f"Disclaimer obrigatorio ao final: {DISCLAIMER}"
@@ -370,7 +391,7 @@ def execute_consultor_analysis(
     ai_client=None,
     now: datetime | None = None,
 ) -> dict:
-    # spec: consultor/consultor v1.1 - criterios 7, 8, 10, 13 e 34
+    # spec: consultor/consultor v1.3 - criterios 7, 8, 10, 13, 34 e 38
     normalized_user_id = int(user_id)
     normalized_analysis_id = validate_analysis_id(analysis_id)
     current_time = now or datetime.now()
@@ -390,6 +411,7 @@ def execute_consultor_analysis(
         month=month,
         period_window=normalized_period,
         reference_date=reference_date,
+        investor_profile=consultor_settings["investor_profile"],
     )
     system_prompt = build_system_prompt(
         normalized_analysis_id,
@@ -530,7 +552,7 @@ def failure_cooldown_remaining(user_id: int, analysis_id: str, current_time: dat
 
 
 def postprocess_consultor_output(output: object) -> str:
-    # spec: consultor/consultor v1.1 - criterios 11, 12, 14 e 15
+    # spec: consultor/consultor v1.3 - criterios 11, 12, 14 e 15
     text = str(output or "").strip()
     if not text:
         raise ConsultorError("O Consultor esta indisponivel no momento.")
@@ -704,27 +726,38 @@ def build_analysis_context(
     month: object | None = None,
     period_window: object | None = None,
     reference_date: date | None = None,
+    investor_profile: object | None = None,
 ) -> dict:
-    # spec: consultor/consultor v1.1 - criterios 7, 10, 27, 30 e 34
+    # spec: consultor/consultor v1.3 - criterios 7, 10, 27, 30, 34 e 38
     normalized_analysis_id = validate_analysis_id(analysis_id)
     normalized_period = validate_period_window(period_window, analysis_id=normalized_analysis_id)
     if normalized_analysis_id == "ralos_financeiros":
-        return build_ralos_context(user_id, month=month, period_window=normalized_period or "3m")
-    if normalized_analysis_id == "assinaturas_recorrencias":
-        return build_subscriptions_context(user_id, month=month)
-    if normalized_analysis_id == "alocacao_perfil":
-        return build_allocation_context(user_id)
-    if normalized_analysis_id == "exposicao_cambial":
-        return build_currency_exposure_context(user_id)
-    if normalized_analysis_id == "analise_carteira":
-        return build_portfolio_analysis_context(user_id)
-    if normalized_analysis_id == "score_saude_financeira":
-        return build_score_context(user_id, month=month)
-    if normalized_analysis_id == "sustentabilidade_padrao_vida":
-        return build_lifestyle_context(user_id, month=month)
-    if normalized_analysis_id == "destino_vencimentos":
-        return build_maturities_context(user_id, month=month, reference_date=reference_date)
-    raise ConsultorError("Analise do Consultor invalida.")
+        context = build_ralos_context(user_id, month=month, period_window=normalized_period or "3m")
+    elif normalized_analysis_id == "assinaturas_recorrencias":
+        context = build_subscriptions_context(user_id, month=month)
+    elif normalized_analysis_id == "alocacao_perfil":
+        context = build_allocation_context(user_id)
+    elif normalized_analysis_id == "exposicao_cambial":
+        context = build_currency_exposure_context(user_id)
+    elif normalized_analysis_id == "analise_carteira":
+        context = build_portfolio_analysis_context(user_id)
+    elif normalized_analysis_id == "score_saude_financeira":
+        context = build_score_context(user_id, month=month)
+    elif normalized_analysis_id == "sustentabilidade_padrao_vida":
+        context = build_lifestyle_context(user_id, month=month)
+    elif normalized_analysis_id == "destino_vencimentos":
+        context = build_maturities_context(user_id, month=month, reference_date=reference_date)
+    else:
+        raise ConsultorError("Analise do Consultor invalida.")
+    # spec: consultor/consultor v1.3 - criterio 38
+    # Todos os cards recebem perfil de investidor e Perfil Complementar (quando preenchido)
+    # para contextualizar a analise - nunca dados de outro usuario.
+    if investor_profile is None:
+        investor_profile = get_consultor_settings(int(user_id))["investor_profile"]
+    complementary = get_complementary_profile(int(user_id))
+    context["investor_profile"] = INVESTOR_PROFILES[validate_investor_profile(investor_profile)]["label"]
+    context["complementary_profile"] = complementary["profile"] if complementary["configured"] else {}
+    return context
 
 
 def build_ralos_context(user_id: int, *, month: object | None, period_window: str) -> dict:
@@ -785,13 +818,23 @@ def build_currency_exposure_context(user_id: int) -> dict:
 
 
 def build_portfolio_analysis_context(user_id: int) -> dict:
-    # spec: consultor/consultor v1.1 - criterio 30
+    # spec: consultor/consultor v1.3 - criterio 30
+    from financeiro.financial_health import calculate_financial_health_score
+
     positions = portfolio_positions(user_id)
+    score = calculate_financial_health_score(user_id)
     return {
         "analysis_id": "analise_carteira",
         "portfolio": summarize_portfolio(positions),
         "by_currency": group_positions_by(positions, "currency"),
         "by_market": group_positions_by(positions, "market_label"),
+        "score": {
+            "month": score["month"],
+            "reserve_months": score.get("meses_reserva") or 0,
+            "reserve_pillar": int(score.get("pilar_reserva") or 0),
+            "eligible_reserve_cents": int(score.get("reserva_elegivel_cents") or 0),
+            "debt_pillar": int(score.get("pilar_endividamento") or 0),
+        },
         "market_data": market_data_context(positions),
     }
 
@@ -1095,7 +1138,7 @@ def consultor_blocked_reason(settings: dict) -> str:
 
 
 def save_consultor_settings(user_id: int, data: dict) -> dict:
-    # spec: consultor/consultor v1.1 - criterios 1, 2, 3, 25, 26 e 32
+    # spec: consultor/consultor v1.3 - criterios 1, 2, 3, 25, 26 e 32
     normalized_user_id = int(user_id)
     current = get_consultor_settings(normalized_user_id)
     consultor_enabled = bool(data.get("consultor_enabled", current["consultor_enabled"]))
@@ -1193,7 +1236,7 @@ def get_complementary_profile(user_id: int) -> dict:
 
 
 def save_complementary_profile(user_id: int, data: dict) -> dict:
-    # spec: consultor/consultor v1.1 - criterios 22, 23, 24, 25 e 33
+    # spec: consultor/consultor v1.3 - criterios 22, 23, 24, 25 e 33
     current = get_complementary_profile(int(user_id))["profile"]
     normalized_patch = normalize_complementary_profile(data, partial=True)
     merged = {**current, **normalized_patch}

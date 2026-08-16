@@ -1333,6 +1333,34 @@ textarea:focus {
   line-height: 1.45;
 }
 
+.consultor-response .consultor-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 4px 0;
+}
+
+.consultor-response .consultor-table th,
+.consultor-response .consultor-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.consultor-response .consultor-table th {
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.consultor-response .consultor-table td {
+  color: var(--muted);
+}
+
+.consultor-response .consultor-table tr:last-child td {
+  border-bottom: none;
+}
+
 .consultor-analysis-card p {
   font-size: 0.8rem;
 }

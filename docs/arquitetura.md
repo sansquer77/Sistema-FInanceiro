@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.30
+versao: 3.32
 atualizado: 2026-08-15
 relacionados:
   - "[[requisitos]]"
@@ -74,7 +74,7 @@ O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Co
 | `cockpit-view.js` | Resumo, saldos, planejamento, dívidas, portfólio e alertas; registra sub-views de Calendário, Tendências e Saúde Financeira. |
 | `financial-health-view.js` | Aba **Saúde Financeira** do Cockpit: score/gauge, pilares, Paz Financeira e consolidado do diagnóstico. |
 | `trends-view.js` | Aba **Tendências** do Cockpit: gráfico mês a mês, Budget x Realizado e achados local. |
-| `consultor-view.js` | Aba **Consultor** do Cockpit: cards de análise, execução sob demanda, histórico, vencimentos e atrasos. |
+| `consultor-view.js` | Aba **Consultor** do Cockpit: cards de análise, execução sob demanda, histórico, vencimentos e atrasos, com renderização de tabelas markdown nas respostas. |
 | `accounts-view.js` | Contas: cadastro, edição, arquivamento, restauração. |
 | `cards-view.js` | Cartões: cadastro, faturas, pagamento, conciliação. |
 | `portfolio-view.js` | Ativos: posições, histórico, resgate, encerramento. |
@@ -500,6 +500,8 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.32` — 2026-08-15 — Consultor: todos os cards passam a receber `investor_profile` e Perfil Complementar (quando preenchido) no payload, com enriquecimento centralizado em `build_analysis_context` (perfil injetado também no card `analise_carteira`, cujo builder delegou a leitura ao contexto central) e regra global no `system_prompt` para contextualizar qualquer análise com esses dados. Ver [[specs/consultor]] v1.3.
+- `3.31` — 2026-08-15 — Card `analise_carteira` do Consultor aprofundado: contexto enriquecido com `investor_profile`, Perfil Complementar e pilar Reserva do Score; prompt exige tabela por classe de ativo e seção Adequação ao Perfil Configurado; concisão suspensa para o card e `consultor-view.js` passa a renderizar tabelas markdown como HTML. Ver [[specs/consultor]] v1.2.
 - `3.30` — 2026-08-15 — Catálogo do Consultor ampliado para 8 análises com o card `analise_carteira` (contexto consolidado por classe/moeda/mercado via `summarize_portfolio` + `group_positions_by`, sem nomes/identificadores de ativos). Ver [[specs/consultor]] v1.1.
 - `3.29` — 2026-08-13 — Pagamento parcial de fatura documentado: `POST /api/credit-card-invoice/pay` aceita `amount` opcional; no parcial, saldo residual é lançado na próxima fatura aberta (categoria Empréstimos, `Saldo da fatura MM/AAAA`) na mesma transação atômica. Ver [[specs/cartoes]] v2.9.
 - `3.28` — 2026-08-10 — Renda fixa e Poupança passam a calcular variação do dia no Portfólio pela diferença do valor na curva entre hoje e o dia anterior, via `day_variation_cents` com cache de fatores compartilhado. Ver [[specs/investimentos-portfolio]] v2.22.

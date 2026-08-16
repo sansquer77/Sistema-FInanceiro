@@ -367,7 +367,35 @@ export function registerConsultorView({
 
   function formatConsultorText(text) {
     const escaped = escapeHtml(String(text || ""));
-    return escaped
+    const lines = escaped.split("\n");
+    let html = "";
+    let tableRows = [];
+    const flushTable = () => {
+      if (!tableRows.length) {
+        return;
+      }
+      html += `<table class="consultor-table">${tableRows
+        .map((cells, index) => {
+          const tag = index === 0 ? "th" : "td";
+          return `<tr>${cells.map((cell) => `<${tag}>${cell}</${tag}>`).join("")}</tr>`;
+        })
+        .join("")}</table>`;
+      tableRows = [];
+    };
+    for (const line of lines) {
+      if (/^\|.*\|$/.test(line)) {
+        const cells = line.slice(1, -1).split("|").map((cell) => cell.trim());
+        if (cells.every((cell) => /^:?-+:?$/.test(cell))) {
+          continue;
+        }
+        tableRows.push(cells);
+        continue;
+      }
+      flushTable();
+      html += line + "\n";
+    }
+    flushTable();
+    return html
       .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
       .replace(/\n{2,}/g, "</p><p>")
       .replace(/\n/g, "<br>")
