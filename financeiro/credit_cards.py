@@ -320,6 +320,11 @@ def update_credit_card_transaction(user_id: int, transaction_id: str, data: dict
         ).fetchone()
         if not existing:
             raise CreditCardError("Lancamento do cartao nao encontrado.", HTTPStatus.NOT_FOUND)
+        # spec: cartoes v2.11 — criterio 33
+        # (a flag de media so e herdada da serie quando o payload nao a envia;
+        #  ao editar um recorrente, o frontend envia o estado do checkbox explicitamente)
+        if "use_average" not in data:
+            transaction["use_average"] = bool(existing["use_average"])
         ensure_invoice_is_open(conn, user_id, existing["credit_card_id"], existing["invoice_month"])
         card = get_active_credit_card(conn, user_id, transaction["credit_card_id"])
         if card["id"] != existing["credit_card_id"]:
@@ -337,7 +342,7 @@ def update_credit_card_transaction(user_id: int, transaction_id: str, data: dict
             UPDATE credit_card_transactions
             SET type = ?, description = ?, normalized_description = ?, amount_cents = ?,
                 exchange_rate_micros = ?, amount_brl_cents = ?, date = ?, invoice_month = ?, category_id = ?,
-                subcategory_id = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+                subcategory_id = ?, use_average = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND user_id = ? AND archived_at IS NULL
             """,
             (
@@ -351,16 +356,18 @@ def update_credit_card_transaction(user_id: int, transaction_id: str, data: dict
                 transaction["invoice_month"],
                 category_id,
                 subcategory_id,
+                1 if transaction.get("use_average") else 0,
                 transaction["notes"],
                 normalized_id,
                 user_id,
             ),
         )
         replace_credit_card_transaction_tags(conn, normalized_id, tag_ids)
-        # spec: cartoes v2.10 — critérios 21 e 22
-        # (series recorrentes de cartao com use_average ativo aplicam edicao em cascata
-        #  automaticamente e recalculam valores futuros pela media)
-        force_apply_to_future = bool(existing["use_average"]) and existing["series_kind"] == "recurring"
+        # spec: cartoes v2.11 — criterios 34 e 35
+        # (series recorrentes com use_average ativo no salvamento — ja ativo ou
+        #  ativado agora — aplicam edicao em cascata automaticamente e recalculam
+        #  valores futuros pela media; se a flag foi desmarcada, propaga a remocao)
+        force_apply_to_future = bool(transaction.get("use_average")) and existing["series_kind"] == "recurring"
         if apply_to_future or force_apply_to_future:
             update_future_card_series(conn, user_id, existing, transaction, category_id, subcategory_id, tag_ids, force_apply_to_future)
         row = fetch_card_transaction(conn, user_id, normalized_id)
@@ -429,9 +436,10 @@ def update_future_card_series(
     tag_ids: list[int],
     force_apply_to_future: bool = False,
 ) -> None:
-    # spec: cartoes v2.10 — critérios 21 e 22
-    # (series recorrentes de cartao com use_average ativo propagam edicao automaticamente
-    #  e recalculam valores futuros pela media; demais series mantem apply_to_future)
+    # spec: cartoes v2.11 — criterios 34 e 35
+    # (series recorrentes com use_average ativo no salvamento propagam edicao
+    #  automaticamente e recalculam valores futuros pela media; demais series
+    #  mantem apply_to_future)
     if not existing["series_id"]:
         return
     if not is_card_series(existing):
@@ -450,8 +458,8 @@ def update_future_card_series(
         """,
         (user_id, existing["series_id"], existing["id"], future_marker),
     ).fetchall()
-    # spec: cartoes v2.10 — criterio 22
-    # (quando use_average estiver ativo, recalcula o valor da serie pela media)
+    # spec: cartoes v2.11 — criterio 34
+    # (quando use_average estiver ativo no salvamento, recalcula o valor da serie pela media)
     if force_apply_to_future and existing["series_kind"] == "recurring":
         average_amount = average_amount_for_recurring_description(
             conn, user_id, transaction["description"], transaction["type"], category_id, subcategory_id,
@@ -471,7 +479,7 @@ def update_future_card_series(
             UPDATE credit_card_transactions
             SET type = ?, description = ?, normalized_description = ?, amount_cents = ?,
                 exchange_rate_micros = ?, amount_brl_cents = ?, date = ?, category_id = ?,
-                subcategory_id = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+                subcategory_id = ?, use_average = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND user_id = ? AND archived_at IS NULL
             """,
             (
@@ -484,6 +492,7 @@ def update_future_card_series(
                 shifted_date,
                 category_id,
                 subcategory_id,
+                1 if transaction.get("use_average") else 0,
                 transaction["notes"],
                 row["id"],
                 user_id,
@@ -591,7 +600,7 @@ def set_credit_card_transaction_reconciled(user_id: int, transaction_id: str, re
 
 
 def pay_credit_card_invoice(user_id: int, data: dict) -> dict:
-    # spec: cartoes v2.10 — criterios 7 e 169
+    # spec: cartoes v2.11 — criterios 7 e 169
     # (pagamento integral debita o saldo total da fatura; pagamento parcial
     #  debita apenas o valor informado e o saldo restante e lancado na proxima
     #  fatura aberta como despesa "Saldo da fatura MM/AAAA" na categoria Emprestimos)
@@ -629,7 +638,7 @@ def pay_credit_card_invoice(user_id: int, data: dict) -> dict:
             amount_cents = invoice_balance_cents(conn, user_id, card_id, invoice_month)
             if amount_cents <= 0:
                 raise CreditCardError("Nao ha valor em aberto para pagar nesta fatura.")
-            # spec: cartoes v2.10 — criterios 169 e 170
+            # spec: cartoes v2.11 — criterios 169 e 170
             raw_amount = str(data.get("amount") or "").strip()
             if raw_amount:
                 try:
@@ -687,7 +696,7 @@ def pay_credit_card_invoice(user_id: int, data: dict) -> dict:
             )
             carried_transaction = None
             if is_partial:
-                # spec: cartoes v2.10 — criterio 169
+                # spec: cartoes v2.11 — criterio 169
                 # (saldo restante vira despesa na proxima fatura aberta, categoria
                 #  Emprestimos, descricao padrao "Saldo da fatura MM/AAAA")
                 remainder_cents = amount_cents - paid_cents
@@ -908,7 +917,7 @@ def normalize_card_repeat_count(value: object, series_kind: str) -> int | None:
     raw = str(value or "").strip()
     if not raw and series_kind == "installment":
         return None
-    # spec: cartoes v2.10 — critérios 21 e 22
+    # spec: cartoes v2.11 — critérios 21 e 22
     # (recorrentes usam 120 ocorrencias automaticamente quando o campo nao e enviado;
     #  o campo nao e mais exibido no formulario, mas a API mantem compatibilidade)
     if series_kind == "recurring":
@@ -1015,7 +1024,7 @@ def shift_month(value: str, delta: int) -> str:
 
 
 def invoice_month_for_transaction_date(card, transaction_date: str) -> str:
-    # spec: cartoes v2.10 — secao "Regras": fatura calculada pela data do
+    # spec: cartoes v2.11 — secao "Regras": fatura calculada pela data do
     # lancamento e pelo dia de fechamento (apos o fechamento, entra na proxima)
     parsed_date = date.fromisoformat(transaction_date)
     base_month = f"{parsed_date.year}-{parsed_date.month:02d}"
@@ -1031,7 +1040,7 @@ def open_invoice_month_for_transaction_date(conn, user_id: int, card, transactio
 
 
 def first_open_invoice_month(conn, user_id: int, card_id: int, invoice_month: str) -> str:
-    # spec: cartoes v2.10 — criterio 2 (secao "Regras": fatura calculada ja paga
+    # spec: cartoes v2.11 — criterio 2 (secao "Regras": fatura calculada ja paga
     # deve avancar automaticamente para a proxima fatura aberta, sem perder o lancamento)
     candidate = invoice_month
     for _ in range(240):
@@ -1193,7 +1202,7 @@ def invoice_balance_cents(conn, user_id: int, card_id: int, invoice_month: str) 
 
 
 def ensure_invoice_is_open(conn, user_id: int, card_id: int, invoice_month: str) -> None:
-    # spec: cartoes v2.10 — secao "Regras": nao e permitido adicionar/editar
+    # spec: cartoes v2.11 — secao "Regras": nao e permitido adicionar/editar
     # lancamentos diretamente em fatura ja paga (fechada)
     row = conn.execute(
         """

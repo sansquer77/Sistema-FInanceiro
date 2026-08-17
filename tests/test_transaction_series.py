@@ -494,6 +494,117 @@ class TransactionSeriesUpdateTest(unittest.TestCase):
         self.assertEqual(recurring_rows[1]["amount"], "159.00")
         self.assertTrue(all(row["amount"] == "141.00" for row in recurring_rows[2:]))
 
+    def test_recurring_transaction_use_average_activated_on_edit_recalculates_future(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta principal",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "10000,00",
+        })
+
+        for amount, date_value in [("100,00", "2025-10-10"), ("200,00", "2025-11-10"), ("300,00", "2025-12-10")]:
+            create_transaction(user["id"], {
+                "type": "expense",
+                "description": "Conta de luz",
+                "amount": amount,
+                "date": date_value,
+                "account_id": str(account["id"]),
+                "category": "Servicos",
+                "subcategory": "Energia",
+            })
+
+        first = create_transaction(user["id"], {
+            "type": "expense",
+            "description": "Conta de luz",
+            "amount": "999,00",
+            "date": "2026-01-10",
+            "account_id": str(account["id"]),
+            "category": "Servicos",
+            "subcategory": "Energia",
+            "series_kind": "recurring",
+            "recurrence_frequency": "monthly",
+        })
+
+        update_transaction(user["id"], str(first["id"]), {
+            "type": "expense",
+            "description": "Conta de luz",
+            "amount": "999,00",
+            "date": "2026-01-15",
+            "account_id": str(account["id"]),
+            "category": "Servicos",
+            "subcategory": "Energia",
+            "use_average": "true",
+        })
+
+        rows = sorted(
+            list_transactions(user["id"], account_id=account["id"]),
+            key=lambda row: row["date"],
+        )
+        recurring_rows = [row for row in rows if row["series_kind"] == "recurring"]
+
+        self.assertEqual(len(recurring_rows), 120)
+        self.assertEqual(recurring_rows[0]["amount"], "999.00")
+        self.assertEqual(recurring_rows[0]["date"], "2026-01-15")
+        self.assertTrue(all(row["amount"] == "200.00" for row in recurring_rows[1:]))
+        self.assertTrue(all(row["use_average"] for row in recurring_rows))
+
+    def test_recurring_transaction_use_average_deactivated_on_edit_keeps_value(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta principal",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "10000,00",
+        })
+
+        for amount, date_value in [("100,00", "2025-10-10"), ("200,00", "2025-11-10"), ("300,00", "2025-12-10")]:
+            create_transaction(user["id"], {
+                "type": "expense",
+                "description": "Conta de luz",
+                "amount": amount,
+                "date": date_value,
+                "account_id": str(account["id"]),
+                "category": "Servicos",
+                "subcategory": "Energia",
+            })
+
+        first = create_transaction(user["id"], {
+            "type": "expense",
+            "description": "Conta de luz",
+            "amount": "999,00",
+            "date": "2026-01-10",
+            "account_id": str(account["id"]),
+            "category": "Servicos",
+            "subcategory": "Energia",
+            "series_kind": "recurring",
+            "recurrence_frequency": "monthly",
+            "use_average": "true",
+        })
+
+        update_transaction(user["id"], str(first["id"]), {
+            "type": "expense",
+            "description": "Conta de luz",
+            "amount": "777,00",
+            "date": "2026-01-15",
+            "account_id": str(account["id"]),
+            "category": "Servicos",
+            "subcategory": "Energia",
+            "use_average": "0",
+            "apply_to_future": "true",
+        })
+
+        rows = sorted(
+            list_transactions(user["id"], account_id=account["id"]),
+            key=lambda row: row["date"],
+        )
+        recurring_rows = [row for row in rows if row["series_kind"] == "recurring"]
+
+        self.assertEqual(len(recurring_rows), 120)
+        self.assertEqual(recurring_rows[0]["amount"], "777.00")
+        self.assertTrue(all(row["amount"] == "777.00" for row in recurring_rows[1:]))
+        self.assertTrue(all(not row["use_average"] for row in recurring_rows))
+
 
 if __name__ == "__main__":
     unittest.main()

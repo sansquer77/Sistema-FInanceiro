@@ -278,11 +278,23 @@ export function registerCardsView({
     data.credit_card_id = state.selectedCreditCardId;
     data.invoice_month = state.cardInvoiceMonth;
     const isEditing = Boolean(data.id);
+    const editingCardTransaction = isEditing
+      ? state.cardTransactions.find((entry) => String(entry.id) === String(data.id))
+      : null;
+    if (editingCardTransaction && editingCardTransaction.series_kind === "recurring" && cardUseAverage) {
+      // spec: cartoes v2.11 — critério 33
+      // (ao editar recorrente, o estado do checkbox de média é enviado explicitamente)
+      data.use_average = cardUseAverage.checked ? "1" : "0";
+    }
     if (isEditing && shouldAskFutureCardReplication(data.id)) {
-      const transaction = state.cardTransactions.find((entry) => String(entry.id) === String(data.id));
-      if (transaction && transaction.use_average) {
-        // spec: cartoes v2.10 — critério 22
-        // (series com use_average ativo nao exibem modal e aplicam em cascata)
+      const averageActive = Boolean(
+        editingCardTransaction && editingCardTransaction.series_kind === "recurring"
+          && (editingCardTransaction.use_average || data.use_average === "1"),
+      );
+      if (averageActive) {
+        // spec: cartoes v2.11 — critérios 34 e 35
+        // (série recorrente com flag de média ativa — ativada agora ou já ativa —
+        //  não exibe modal e aplica em cascata)
         data.apply_to_future = true;
       } else {
         const scope = await chooseSeriesEditScope();
@@ -324,7 +336,7 @@ export function registerCardsView({
   }
 
   async function handlePartialCardInvoicePayment() {
-    // spec: cartoes v2.10 — criterio 174
+    // spec: cartoes v2.11 — criterio 174
     setMessage(cardInvoiceMessage, "");
     const card = selectedCreditCard();
     const total = cardInvoiceOpenAmount();

@@ -2,8 +2,8 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 3.21
-atualizado: 2026-08-11
+versao: 3.22
+atualizado: 2026-08-17
 relacionados:
   - "[[contas-correntes]]"
   - "[[categorias-tags-gestao]]"
@@ -17,7 +17,7 @@ aliases: ["Lançamentos", "Transações"]
 # Lançamentos
 
 > [!info] Status
-> **implementado** · área: `lancamentos` · atualizado em 2026-08-11 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]]
+> **implementado** · área: `lancamentos` · atualizado em 2026-08-17 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]]
 
 ## Problema
 
@@ -53,7 +53,7 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 | `observacoes` | texto | Opcional. |
 | `recorrente` | booleano + frequência | Opcional. |
 | `parcelas` | inteiro | Opcional. Gera série com índice `1/N`. |
-| `use_average` | booleano | Opcional. Apenas para recorrentes. Persiste em todas as ocorrências da série. |
+| `use_average` | booleano | Opcional. Apenas para recorrentes. Persiste em todas as ocorrências da série; na edição de um recorrente, o checkbox fica habilitado e o estado salvo propaga para as ocorrências futuras não conciliadas. |
 | `reconciled_at` | timestamp | Opcional. Marcado na conciliação bancária. |
 
 ## Regras de negócio
@@ -75,8 +75,10 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 - **Exclusão em cascata** (`scope=future`): remove recursivamente todos os lançamentos futuros não conciliados da mesma série, revertendo os respectivos impactos nos saldos.
 - A escolha de edição/exclusão em cascata deve usar modal com ações explícitas, como `Apenas este lançamento`, `Este e os próximos`, `Excluir apenas este`, `Excluir este e os próximos` e `Voltar`.
 - A marcação de média (`use_average`) em lançamentos recorrentes é persistida em todas as ocorrências geradas da série.
-- Ao editar uma ocorrência de uma série recorrente com `use_average` ativo, o sistema não exibe o modal de escopo; a alteração é aplicada automaticamente a todas as ocorrências futuras não conciliadas e seus valores são recalculados pela média dos últimos 12 lançamentos com a mesma descrição normalizada, mesmo tipo e mesma categoria/subcategoria.
-- Se `use_average` não estiver ativo, o comportamento atual de edição/exclusão em cascata se mantém.
+- Ao editar uma ocorrência de uma série recorrente, o checkbox de cálculo pela média permanece habilitado e reflete a marcação da ocorrência; o usuário pode ativar ou desativar a flag no próprio formulário de edição.
+- Se `use_average` estiver ativo ao salvar a edição (já ativo na série ou ativado agora), o sistema não exibe o modal de escopo; a alteração é aplicada automaticamente a todas as ocorrências futuras não conciliadas, a marcação é persistida nelas e seus valores são recalculados pela média dos últimos 12 lançamentos com a mesma descrição normalizada, mesmo tipo e mesma categoria/subcategoria.
+- Se a flag for desmarcada ao salvar a edição de uma série que a tinha ativa, o sistema não exibe o modal de escopo; a alteração é aplicada automaticamente a todas as ocorrências futuras não conciliadas com o valor informado no formulário, sem recálculo pela média, e a marcação é removida das ocorrências no escopo.
+- Se `use_average` não estiver ativo e a série nunca tiver tido a flag ativa, o comportamento atual de edição/exclusão em cascata se mantém.
 - Lançamentos parcelados exibem índice e total (`1/36`, `2/36`...) sem reiniciar a contagem em edições pontuais.
 - A tela de Lançamentos organiza o formulário em uma composição compacta, mantendo todos os campos relevantes visíveis na edição, sem blocos contextuais escurecidos (inclusive nos campos de renda fixa).
 - A modalidade de renda fixa (Pós-fixada, Pré-fixada, Híbrida) é escolhida em combo na linha do Indexador, com o botão de ajuda (?) alinhado inline ao rótulo Modalidade.
@@ -193,9 +195,13 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dado o usuário visualizando Lançamentos, quando o painel superior é exibido, então o gráfico e os saldos previsto/conciliado usam apresentação compacta para deixar mais área útil para a lista.
 - Dado uma lista mensal com filtros, quando exibida, então busca, filtro de conciliação e contador ficam destacados antes dos grupos diários.
 - Dado uma lista agrupada por dia, quando exibida, então os cabeçalhos diários, contadores, linhas e subtotais usam hierarquia visual compacta e preservam ações, metadados e valores sem ocultar informações importantes.
+- Dado um lançamento recorrente existente sendo editado, quando o formulário é aberto, então o checkbox de cálculo pela média permanece habilitado e reflete a marcação da ocorrência.
+- Dado um lançamento recorrente existente sem `use_average` sendo editado, quando o usuário marca a opção de média e salva, então o sistema não exibe o modal de escopo, aplica a alteração a todas as ocorrências futuras não conciliadas, persiste a marcação nelas e recalcula seus valores pela média dos últimos 12 lançamentos com a mesma descrição, tipo e categoria/subcategoria.
+- Dado uma série recorrente com `use_average` ativo sendo editada, quando o usuário desmarca a opção de média e salva, então o sistema não exibe o modal de escopo, remove a marcação das ocorrências futuras não conciliadas e mantém nelas o valor informado no formulário, sem recálculo pela média.
 
 ## Changelog
 
+- `3.22` — 2026-08-17 — Edição de lançamento recorrente passa a permitir ativar/desativar a flag de cálculo pela média: o checkbox fica habilitado no formulário de edição; ao salvar com a flag ativa (já ativa ou ativada agora), a edição aplica-se em cascata às ocorrências futuras não conciliadas sem modal, persistindo a marcação e recalculando valores pela média; ao desmarcar em série que tinha a flag ativa, a cascata segue sem recálculo e a marcação é removida no escopo; séries nunca marcadas mantêm o modal de escopo.
 - `3.21` — 2026-08-11 — Formulário de Lançamentos em conta estrangeira pré-preenche a cotação com a última PTAX até a data (antes enviava silenciosamente `1,0`, gravando `amount_brl` sem conversão — ex.: despesas de imposto em USD entravam no Cockpit como R$ 1:1); se a PTAX estiver indisponível, campo de cotação manual visível é exibido; na edição a cotação armazenada é preservada.
 - `3.20` — 2026-08-11 — Escala vertical do gráfico de histórico/projeção de saldos corrigida: a curva usava só a faixa central (24–48 de 100), achatezendo variações grandes; agora ocupa quase toda a altura do plot (10–88), sem aumentar a área do gráfico.
 - `3.19` — 2026-08-11 — Helper (?) de modalidade da renda fixa alinhado inline ao rótulo (`field-label-title`), corrigindo a quebra de layout no formulário de Lançamentos (mesma correção aplicada no Portfólio).

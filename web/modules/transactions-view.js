@@ -298,11 +298,21 @@ export function registerTransactionsView({
         delete data.transfer_exchange_rate;
       }
       const isEditing = Boolean(data.id);
+      const editingTransaction = isEditing ? findTransactionById(data.id) : null;
+      if (editingTransaction && editingTransaction.series_kind === "recurring" && useAverage) {
+        // spec: lancamentos v3.22 — critério 52
+        // (ao editar recorrente, o estado do checkbox de média é enviado explicitamente)
+        data.use_average = useAverage.checked ? "1" : "0";
+      }
       if (isEditing && shouldAskFutureReplication(data.id)) {
-        const transaction = findTransactionById(data.id);
-        if (transaction && transaction.use_average) {
-          // spec: lancamentos v3.2 — critério 27
-          // (series com use_average ativo nao exibem modal e aplicam em cascata)
+        const averageActive = Boolean(
+          editingTransaction && editingTransaction.series_kind === "recurring"
+            && (editingTransaction.use_average || data.use_average === "1"),
+        );
+        if (averageActive) {
+          // spec: lancamentos v3.22 — critérios 53 e 54
+          // (série recorrente com flag de média ativa — ativada agora ou já ativa —
+          //  não exibe modal e aplica em cascata)
           data.apply_to_future = true;
         } else {
           const scope = await chooseSeriesEditScope("conta");
@@ -1299,7 +1309,10 @@ export function registerTransactionsView({
       recurrenceAverageFields.hidden = !isRecurring;
     }
     if (useAverage) {
-      useAverage.disabled = !isRecurring || !canChangeRepetition;
+      // spec: lancamentos v3.22 — criterio 52
+      // (na edicao de um recorrente o checkbox de media fica habilitado;
+      //  so a repeticao/frequencia permanecem travadas na serie)
+      useAverage.disabled = !isRecurring;
     }
   }
 

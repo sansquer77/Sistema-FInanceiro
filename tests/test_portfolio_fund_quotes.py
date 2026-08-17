@@ -230,7 +230,7 @@ class FetchMaisRetornoQuoteTest(IsolatedDatabaseMixin):
         self.assertEqual(mais_retorno_fund_identifier(fund_position(cnpj="")), "")
 
     def test_fetch_fund_quote_for_launch_form_returns_editable_unit_price_data(self) -> None:
-        # spec: lancamentos v3.5 — criterio cota-fundo-lancamento
+        # spec: lancamentos v3.22 — criterio cota-fundo-lancamento
         with (
             mock.patch("financeiro.portfolio.load_mais_retorno_api_key", return_value="mr-secret"),
             mock.patch("financeiro.portfolio.fetch_mais_retorno_quote", return_value=fake_quote(
@@ -249,7 +249,7 @@ class FetchMaisRetornoQuoteTest(IsolatedDatabaseMixin):
         self.assertEqual(quote["quote_source"], "Mais Retorno (46422299000173:fi)")
 
     def test_fetch_fund_quote_for_launch_form_requires_mais_retorno_key(self) -> None:
-        # spec: lancamentos v3.5 — criterio cota-fundo-lancamento
+        # spec: lancamentos v3.22 — criterio cota-fundo-lancamento
         with (
             mock.patch("financeiro.portfolio.load_mais_retorno_api_key", return_value=""),
             mock.patch("financeiro.portfolio.fetch_mais_retorno_quote", side_effect=AssertionError("nao deve chamar")),

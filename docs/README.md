@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 11.35
-atualizado: 2026-08-13
+versao: 11.37
+atualizado: 2026-08-17
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -132,6 +132,7 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `11.37` — 2026-08-17 — [[specs/lancamentos]] v3.22 e [[specs/cartoes]] v2.11: ao editar um lançamento recorrente, o checkbox de cálculo dos próximos pela média fica habilitado — ativando a flag, a edição aplica em cascata às ocorrências futuras não conciliadas (sem modal) persistindo a marcação e recalculando valores pela média; desmarcando em série que tinha a flag, a cascata segue sem recálculo e a marcação é removida no escopo.
 - `11.35` — 2026-08-13 — [[specs/frontend-modularizacao]] v2.8: modo ícones da sidebar compactado (botões 36px, gaps 4px) para todos os itens, incluindo **Sair**, ficarem visíveis sem rolagem.
 - `11.34` — 2026-08-13 — [[specs/frontend-modularizacao]] v2.7: navegação lateral com grupos colapsáveis — **Cadastro**, **Lançamentos**, **Gestão** e **Usuário** colapsam pelo rótulo (seta + `aria-expanded`), estado persistido localmente e grupo da view ativa abre automaticamente; **Cockpit** vira item de primeiro nível e o grupo **Visão geral** é removido.
 - `11.36` — 2026-08-16 — [[specs/consultor]] v1.5: prompt do card **Análise da Carteira** orienta completude dentro do teto de 900 tokens de saída (encerrar todas as seções, encurtando justificativas se preciso), corrigindo truncamento que bloqueava a análise com "indisponível"; [[arquitetura]] v3.34 sincronizada.

@@ -2,8 +2,8 @@
 tipo: spec
 area: cartoes
 status: implementado
-versao: 2.10
-atualizado: 2026-08-13
+versao: 2.11
+atualizado: 2026-08-17
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -18,7 +18,7 @@ aliases: ["Cartões de Crédito", "Faturas"]
 # Cartões de Crédito
 
 > [!info] Status
-> **implementado** · área: `cartoes` · atualizado em 2026-08-13 · relacionados: [[contas-correntes]], [[lancamentos]], [[limites-gastos]], [[relatorios]]
+> **implementado** · área: `cartoes` · atualizado em 2026-08-17 · relacionados: [[contas-correntes]], [[lancamentos]], [[limites-gastos]], [[relatorios]]
 
 ## Problema
 
@@ -65,7 +65,7 @@ Qualquer usuário autenticado localmente que utilize cartões de crédito para d
 | `subcategoria_id` | FK | Opcional. |
 | `tags` | lista de FK | Opcional. N:M via `credit_card_transaction_tags`. |
 | `parcelas` | inteiro | Opcional. Exibe `1/12`, `2/12` etc. |
-| `use_average` | booleano | Opcional. Apenas para recorrentes. Persiste em todas as ocorrências da série. |
+| `use_average` | booleano | Opcional. Apenas para recorrentes. Persiste em todas as ocorrências da série; na edição de um recorrente, o checkbox fica habilitado e o estado salvo propaga para as ocorrências futuras não conciliadas. |
 | `reconciled_at` | timestamp | Opcional. Marcado na conciliação. |
 
 **Pagamento de fatura:**
@@ -95,8 +95,10 @@ Qualquer usuário autenticado localmente que utilize cartões de crédito para d
 - Quando a opção de média estiver ativa em um lançamento recorrente de cartão, o valor de cada ocorrência futura usa a média aritmética inteira (em centavos) dos valores dos últimos 12 lançamentos do usuário com a mesma descrição normalizada, mesmo tipo e mesma categoria/subcategoria; se houver menos de 12, usa todos os disponíveis; se não houver histórico, mantém o valor informado no formulário.
 - Lançamentos recorrentes de cartão não exibem o campo de quantidade de ocorrências no formulário; o sistema grava a série com 120 ocorrências automaticamente para manter compatibilidade com lançamentos antigos que usam o campo.
 - A marcação de média (`use_average`) em lançamentos recorrentes de cartão é persistida em todas as ocorrências geradas da série.
-- Ao editar uma ocorrência de uma série recorrente de cartão com `use_average` ativo, o sistema não exibe o modal de escopo; a alteração é aplicada automaticamente a todas as ocorrências futuras não conciliadas e seus valores são recalculados pela média dos últimos 12 lançamentos com a mesma descrição normalizada, mesmo tipo e mesma categoria/subcategoria.
-- Se `use_average` não estiver ativo, o comportamento atual de edição/exclusão em cascata se mantém.
+- Ao editar uma ocorrência de uma série recorrente de cartão, o checkbox de cálculo pela média permanece habilitado e reflete a marcação da ocorrência; o usuário pode ativar ou desativar a flag no próprio formulário de edição.
+- Se `use_average` estiver ativo ao salvar a edição (já ativo na série ou ativado agora), o sistema não exibe o modal de escopo; a alteração é aplicada automaticamente a todas as ocorrências futuras não conciliadas, a marcação é persistida nelas e seus valores são recalculados pela média dos últimos 12 lançamentos com a mesma descrição normalizada, mesmo tipo e mesma categoria/subcategoria.
+- Se a flag for desmarcada ao salvar a edição de uma série que a tinha ativa, o sistema não exibe o modal de escopo; a alteração é aplicada automaticamente a todas as ocorrências futuras não conciliadas com o valor informado no formulário, sem recálculo pela média, e a marcação é removida das ocorrências no escopo.
+- Se `use_average` não estiver ativo e a série nunca tiver tido a flag ativa, o comportamento atual de edição/exclusão em cascata se mantém.
 - O formulário manual de lançamento no cartão deve oferecer o campo `Tag`, com as mesmas sugestões de tags usadas em lançamentos de contas e suporte a múltiplas tags separadas por vírgula.
 - Em novos lançamentos, descrições com histórico exato e confiança suficiente podem preencher categoria e subcategoria sem sobrescrever escolhas manuais. Ver [[classificacao-assistida]].
 - Em lançamentos parcelados de cartão, o valor informado é o total da compra e deve ser dividido pela quantidade de parcelas. Ex.: R$ 500 em 5x gera 5 lançamentos/faturas de R$ 100.
@@ -187,9 +189,13 @@ Tabelas: `credit_cards`, `credit_card_transactions`, `credit_card_payments`, `cr
 - Dado um pagamento parcial de fatura, quando a fatura seguinte é aberta, então o saldo residual aparece no total dela e pode ser conciliado, movido entre faturas abertas, editado e pago junto com a próxima fatura.
 - Dado uma fatura paga parcialmente, quando a conta preferencial exibe saldo previsto, então a fatura paga não é abatida novamente e o residual entra pelo vencimento da fatura seguinte.
 - Dado o usuário visualizando a seção de pagamento da fatura, quando a fatura está aberta com saldo, então dois botões aparecem: **Pagar fatura integral** (debitar o saldo total) e **Pagar parte da fatura** (abre tela para digitar o valor a pagar, reconhecido na conta corrente).
+- Dado um lançamento recorrente de cartão existente sendo editado, quando o formulário é aberto, então o checkbox de cálculo pela média permanece habilitado e reflete a marcação da ocorrência.
+- Dado um lançamento recorrente de cartão existente sem `use_average` sendo editado, quando o usuário marca a opção de média e salva, então o sistema não exibe o modal de escopo, aplica a alteração a todas as ocorrências futuras não conciliadas, persiste a marcação nelas e recalcula seus valores pela média dos últimos 12 lançamentos com a mesma descrição, tipo e categoria/subcategoria.
+- Dado uma série recorrente de cartão com `use_average` ativo sendo editada, quando o usuário desmarca a opção de média e salva, então o sistema não exibe o modal de escopo, remove a marcação das ocorrências futuras não conciliadas e mantém nelas o valor informado no formulário, sem recálculo pela média.
 
 ## Changelog
 
+- `2.11` — 2026-08-17 — Edição de lançamento recorrente de cartão passa a permitir ativar/desativar a flag de cálculo pela média: o checkbox fica habilitado no formulário de edição; ao salvar com a flag ativa (já ativa ou ativada agora), a edição aplica-se em cascata às ocorrências futuras não conciliadas sem modal, persistindo a marcação e recalculando valores pela média; ao desmarcar em série que tinha a flag ativa, a cascata segue sem recálculo e a marcação é removida no escopo; séries nunca marcadas mantêm o modal de escopo.
 - `2.10` — 2026-08-13 — Versionamento da app registrado: PATCH `1.4.1` → `1.4.2` aplicado em `financeiro/app_metadata.py` junto com o pagamento parcial desta spec (v2.9), documentado no changelog do MoC.
 - `2.9` — 2026-08-13 — Pagamento parcial de fatura: o botão **Pagar fatura** vira **Pagar fatura integral** + **Pagar parte da fatura** (modal com valor); no parcial, a fatura fecha como hoje, o valor pago é debitado da conta e o saldo restante é lançado na próxima fatura aberta como despesa na categoria **Empréstimos**, com descrição `Saldo da fatura MM/AAAA`.
 - `2.8` — 2026-08-11 — Escala vertical do gráfico de evolução de faturas corrigida: a curva usava apenas a faixa central da área (28–74 de 100), achatando variações grandes (ex.: queda de 35k para 2k); agora ocupa quase toda a altura do plot (10–88), sem aumentar a área do gráfico.
