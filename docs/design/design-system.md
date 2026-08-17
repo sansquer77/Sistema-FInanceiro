@@ -99,6 +99,7 @@ Regras de aplicação:
 
 - Cores de UI devem ser aplicadas por tokens CSS, nunca como literais espalhados em componentes.
 - Gráficos e barras de distribuição devem consumir tokens de paleta (`--chart-*`) para permitir troca de tema sem alterar módulos funcionais.
+- Linhas de referência neutras em gráficos (ex.: média) usam o token `--chart-average-line` (cinza `#9aa3b8` no claro, branco `#ffffff` no escuro) e nunca `--secondary`/`--secondary-container`.
 - Logos e cores institucionais de bancos podem permanecer literais quando representam marca ou ativo visual externo.
 - Novos componentes devem reutilizar tokens existentes antes de criar novos aliases.
 - A primeira etapa de implantação de tema escuro deve preservar o modo claro sem mudança visual perceptível.

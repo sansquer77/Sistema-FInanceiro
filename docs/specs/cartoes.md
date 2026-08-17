@@ -2,7 +2,7 @@
 tipo: spec
 area: cartoes
 status: implementado
-versao: 2.11
+versao: 2.13
 atualizado: 2026-08-17
 relacionados:
   - "[[contas-correntes]]"
@@ -119,6 +119,7 @@ Qualquer usuário autenticado localmente que utilize cartões de crédito para d
 - Valores de lançamentos de cartão usam o mesmo tamanho de fonte compacto dos lançamentos de conta para melhorar a densidade de leitura.
 - Valores financeiros extensos no gráfico de faturas devem se adaptar ao espaço disponível reduzindo a tipografia, sem aumentar a área do gráfico nem truncar centavos.
 - O gráfico de evolução de faturas deve usar cards mensais compactos na faixa superior e curva suave em SVG nativo abaixo, com mês atual destacado, meses futuros atenuados e linha futura pontilhada, sem dependências externas de gráfico ou CSS.
+- O gráfico de evolução de faturas pode exibir uma linha horizontal de referência com a média aritmética dos valores absolutos das 5 faturas em tela (2 anteriores, atual e 2 futuras), no mesmo estilo das linhas atuais (contínua, token `--chart-average-line`: branca no tema escuro, cinza no claro) e na mesma escala vertical do gráfico, com o valor da média em texto compacto ao final (lado direito) da linha.
 - O seletor mensal da fatura deve usar botões compactos por ícone para mês anterior, mês atual e próximo mês, preservando rótulos acessíveis.
 - O rótulo do mês no seletor mensal da fatura deve usar o formato compacto `MM/AAAA`.
 - Campos do formulário de lançamento no cartão devem manter altura e alinhamento consistentes dentro da mesma linha; linhas com apenas um campo visível devem ocupar a largura completa para evitar lacunas visuais.
@@ -192,9 +193,13 @@ Tabelas: `credit_cards`, `credit_card_transactions`, `credit_card_payments`, `cr
 - Dado um lançamento recorrente de cartão existente sendo editado, quando o formulário é aberto, então o checkbox de cálculo pela média permanece habilitado e reflete a marcação da ocorrência.
 - Dado um lançamento recorrente de cartão existente sem `use_average` sendo editado, quando o usuário marca a opção de média e salva, então o sistema não exibe o modal de escopo, aplica a alteração a todas as ocorrências futuras não conciliadas, persiste a marcação nelas e recalcula seus valores pela média dos últimos 12 lançamentos com a mesma descrição, tipo e categoria/subcategoria.
 - Dado uma série recorrente de cartão com `use_average` ativo sendo editada, quando o usuário desmarca a opção de média e salva, então o sistema não exibe o modal de escopo, remove a marcação das ocorrências futuras não conciliadas e mantém nelas o valor informado no formulário, sem recálculo pela média.
+- Dado o usuário visualizando o gráfico de evolução de faturas, quando há valores nas 5 faturas em tela, então uma linha horizontal de referência é desenhada na altura da média aritmética dos valores absolutos dessas faturas, no mesmo estilo das linhas atuais (contínua, `--chart-average-line`: branca no tema escuro, cinza no claro) e na mesma escala vertical do gráfico.
+- Dado o usuário visualizando o gráfico de evolução de faturas, quando a linha de referência da média é exibida, então o valor da média formatado na moeda do cartão aparece em texto compacto ao final (lado direito) da linha.
 
 ## Changelog
 
+- `2.13` — 2026-08-17 — Linha de referência da média no gráfico de evolução de faturas ajustada: cor passa a usar token `--chart-average-line` (branca no tema escuro, cinza no claro) e o valor da média formatado na moeda do cartão é exibido em texto compacto ao final (lado direito) da linha.
+- `2.12` — 2026-08-17 — Gráfico de evolução de faturas ganha linha horizontal de referência com a média aritmética dos valores absolutos das 5 faturas em tela (2 anteriores, atual e 2 futuras), desenhada no mesmo estilo das linhas atuais (contínua, branca) e na mesma escala vertical; não altera curva, cards ou dependências.
 - `2.11` — 2026-08-17 — Edição de lançamento recorrente de cartão passa a permitir ativar/desativar a flag de cálculo pela média: o checkbox fica habilitado no formulário de edição; ao salvar com a flag ativa (já ativa ou ativada agora), a edição aplica-se em cascata às ocorrências futuras não conciliadas sem modal, persistindo a marcação e recalculando valores pela média; ao desmarcar em série que tinha a flag ativa, a cascata segue sem recálculo e a marcação é removida no escopo; séries nunca marcadas mantêm o modal de escopo.
 - `2.10` — 2026-08-13 — Versionamento da app registrado: PATCH `1.4.1` → `1.4.2` aplicado em `financeiro/app_metadata.py` junto com o pagamento parcial desta spec (v2.9), documentado no changelog do MoC.
 - `2.9` — 2026-08-13 — Pagamento parcial de fatura: o botão **Pagar fatura** vira **Pagar fatura integral** + **Pagar parte da fatura** (modal com valor); no parcial, a fatura fecha como hoje, o valor pago é debitado da conta e o saldo restante é lançado na próxima fatura aberta como despesa na categoria **Empréstimos**, com descrição `Saldo da fatura MM/AAAA`.

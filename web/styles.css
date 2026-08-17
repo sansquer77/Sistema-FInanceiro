@@ -74,6 +74,7 @@
   --chart-4: #ec4899;
   --chart-5: #22c55e;
   --chart-6: #3b82f6;
+  --chart-average-line: #9aa3b8;
   --bank-logo-generic-surface: #f1f5f9;
   --bank-logo-wallet-surface: #e2e8f0;
   --bank-logo-generic-ink: #475569;
@@ -159,6 +160,7 @@
   --chart-4: #f472b6;
   --chart-5: #4ade80;
   --chart-6: #60a5fa;
+  --chart-average-line: #ffffff;
   --bank-logo-generic-surface: #252936;
   --bank-logo-wallet-surface: #303646;
   --bank-logo-generic-ink: #d7dde8;
@@ -5259,6 +5261,24 @@ padding: 8px 16px;
   stroke-dasharray: 0.1 6;
   stroke-linecap: round;
   opacity: 0.72;
+}
+
+.invoice-history-line.average {
+  stroke: var(--chart-average-line);
+  opacity: 0.9;
+}
+
+.invoice-history-average-label {
+  position: absolute;
+  z-index: 5;
+  transform: translateY(-50%);
+  color: var(--chart-average-line);
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 .invoice-history-point {

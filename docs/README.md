@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 11.37
+versao: 11.39
 atualizado: 2026-08-17
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -132,6 +132,8 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `11.39` — 2026-08-17 — [[specs/cartoes]] v2.13: linha de referência da média no gráfico de evolução de faturas passa a usar o token `--chart-average-line` (cinza no tema claro, branca no escuro) e exibe o valor da média formatado na moeda do cartão em texto compacto ao final (lado direito) da linha. [[design/design-system]] ganha a regra do token para linhas de referência neutras.
+- `11.38` — 2026-08-17 — [[specs/cartoes]] v2.12: gráfico de evolução de faturas ganha linha horizontal de referência com a média aritmética dos valores absolutos das 5 faturas em tela (2 anteriores, atual e 2 futuras), no mesmo estilo das linhas atuais (contínua, branca) e na mesma escala vertical.
 - `11.37` — 2026-08-17 — [[specs/lancamentos]] v3.22 e [[specs/cartoes]] v2.11: ao editar um lançamento recorrente, o checkbox de cálculo dos próximos pela média fica habilitado — ativando a flag, a edição aplica em cascata às ocorrências futuras não conciliadas (sem modal) persistindo a marcação e recalculando valores pela média; desmarcando em série que tinha a flag, a cascata segue sem recálculo e a marcação é removida no escopo.
 - `11.35` — 2026-08-13 — [[specs/frontend-modularizacao]] v2.8: modo ícones da sidebar compactado (botões 36px, gaps 4px) para todos os itens, incluindo **Sair**, ficarem visíveis sem rolagem.
 - `11.34` — 2026-08-13 — [[specs/frontend-modularizacao]] v2.7: navegação lateral com grupos colapsáveis — **Cadastro**, **Lançamentos**, **Gestão** e **Usuário** colapsam pelo rótulo (seta + `aria-expanded`), estado persistido localmente e grupo da view ativa abre automaticamente; **Cockpit** vira item de primeiro nível e o grupo **Visão geral** é removido.

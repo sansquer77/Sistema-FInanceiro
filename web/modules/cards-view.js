@@ -869,6 +869,8 @@ export function registerCardsView({
     const path = invoiceHistoryPath(rows, "past");
     const futurePath = invoiceHistoryPath(rows, "future");
     const areaPath = invoiceHistoryAreaPath(rows);
+    const average = invoiceHistoryAverage(rows);
+    const averageLabel = formatMoney(average.amount, card.currency);
     const points = rows.map((row) => `
       <span class="invoice-history-point ${row.isCurrent ? "current" : ""} ${row.offset > 0 ? "future" : ""}" style="left: ${row.x}%; top: ${row.y}%"></span>
     `).join("");
@@ -894,7 +896,9 @@ export function registerCardsView({
             <path class="invoice-history-area" d="${areaPath}"></path>
             <path class="invoice-history-line" d="${path}"></path>
             <path class="invoice-history-line future" d="${futurePath}"></path>
+            <path class="invoice-history-line average" d="M 10 ${average.y} L 90 ${average.y}"></path>
           </svg>
+          <span class="invoice-history-average-label" style="left: calc(90% + 12px); top: ${average.y}%">${escapeHtml(averageLabel)}</span>
           ${points}
         </div>
       </div>
@@ -943,6 +947,19 @@ export function registerCardsView({
       const amount = Number(transaction.amount || 0);
       return total + (transaction.type === "expense" ? amount : -amount);
     }, 0);
+  }
+
+  // spec: cartoes v2.13 — criterios 36 e 37
+  // (linha de referencia horizontal com a media dos valores absolutos das
+  //  5 faturas em tela, na mesma escala vertical do grafico, com o valor
+  //  da media em texto ao final da linha)
+  function invoiceHistoryAverage(rows) {
+    if (!rows.length) {
+      return { amount: 0, y: 88 };
+    }
+    const max = Math.max(...rows.map((row) => Math.abs(row.amount)), 1);
+    const amount = rows.reduce((total, row) => total + Math.abs(row.amount), 0) / rows.length;
+    return { amount, y: 88 - (amount / max) * 78 };
   }
 
   function invoiceHistoryPath(rows, mode = "all") {
