@@ -958,7 +958,7 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_json(get_portfolio_returns(user["id"], force_refresh=force_refresh))
 
     def handle_portfolio_fund_quote(self) -> None:
-        # spec: lancamentos v3.22 — criterio cota-fundo-lancamento
+        # spec: lancamentos v3.23 — criterio cota-fundo-lancamento
         if not self.validate_read_source():
             return
         user = self.require_user()

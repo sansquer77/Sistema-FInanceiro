@@ -299,22 +299,24 @@ export function registerTransactionsView({
       }
       const isEditing = Boolean(data.id);
       const editingTransaction = isEditing ? findTransactionById(data.id) : null;
+      const averageChanged = Boolean(
+        editingTransaction && editingTransaction.series_kind === "recurring" && useAverage
+          && Boolean(editingTransaction.use_average) !== useAverage.checked,
+      );
       if (editingTransaction && editingTransaction.series_kind === "recurring" && useAverage) {
-        // spec: lancamentos v3.22 — critério 52
+        // spec: lancamentos v3.23 — critério 55
         // (ao editar recorrente, o estado do checkbox de média é enviado explicitamente)
         data.use_average = useAverage.checked ? "1" : "0";
       }
       if (isEditing && shouldAskFutureReplication(data.id)) {
-        const averageActive = Boolean(
-          editingTransaction && editingTransaction.series_kind === "recurring"
-            && (editingTransaction.use_average || data.use_average === "1"),
-        );
-        if (averageActive) {
-          // spec: lancamentos v3.22 — critérios 53 e 54
-          // (série recorrente com flag de média ativa — ativada agora ou já ativa —
-          //  não exibe modal e aplica em cascata)
+        if (averageChanged) {
+          // spec: lancamentos v3.23 — critérios 56, 57 e 60
+          // (flag de média alterada — marcada em série sem a marcação ou desmarcada
+          //  em série que a tinha — não exibe modal e aplica em cascata)
           data.apply_to_future = true;
         } else {
+          // spec: lancamentos v3.23 — critérios 46 e 58
+          // (flag inalterada — ativa ou inativa — mantém o modal de escopo)
           const scope = await chooseSeriesEditScope("conta");
           if (!scope) {
             return;
@@ -1309,7 +1311,7 @@ export function registerTransactionsView({
       recurrenceAverageFields.hidden = !isRecurring;
     }
     if (useAverage) {
-      // spec: lancamentos v3.22 — criterio 52
+      // spec: lancamentos v3.23 — criterio 52
       // (na edicao de um recorrente o checkbox de media fica habilitado;
       //  so a repeticao/frequencia permanecem travadas na serie)
       useAverage.disabled = !isRecurring;

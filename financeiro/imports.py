@@ -36,6 +36,10 @@ SYSTEM_IMPORT_ACCOUNT_HEADERS = [
     "categoria",
     "subcategoria",
     "tags",
+    "repeticao",
+    "parcelas",
+    "recorrencia",
+    "media",
     "conta_destino_id",
     "valor_destino",
     "cotacao_cambio",
@@ -51,8 +55,32 @@ SYSTEM_IMPORT_CARD_HEADERS = [
     "categoria",
     "subcategoria",
     "tags",
+    "repeticao",
+    "parcelas",
+    "recorrencia",
+    "media",
     "observacoes",
 ]
+SERIES_KIND_ALIASES = {
+    "avulso": "single",
+    "single": "single",
+    "parcelado": "installment",
+    "installment": "installment",
+    "recorrente": "recurring",
+    "recurring": "recurring",
+}
+RECURRENCE_FREQUENCY_ALIASES = {
+    "semanal": "weekly",
+    "weekly": "weekly",
+    "mensal": "monthly",
+    "monthly": "monthly",
+    "trimestral": "quarterly",
+    "quarterly": "quarterly",
+    "semestral": "semiannual",
+    "semiannual": "semiannual",
+    "anual": "annual",
+    "annual": "annual",
+}
 END_OF_CHAIN = 0xFFFFFFFE
 FREE_SECTOR = 0xFFFFFFFF
 HEADER_ALIASES = {
@@ -168,13 +196,13 @@ def system_import_template(user_id: int, target: str) -> bytes:
     headers = SYSTEM_IMPORT_CARD_HEADERS if normalized_target == "card" else SYSTEM_IMPORT_ACCOUNT_HEADERS
     launch_rows = [headers]
     if normalized_target == "card":
-        launch_rows.append(["2026-06-15", "2026-06", "expense", "Exemplo compra no cartão", "123,45", "Alimentação", "Restaurantes / Bares / Delivery", "Organizze; Revisar", "Linha exemplo"])
-        launch_rows.append(["2026-06-20", "2026-06", "income", "Exemplo estorno", "10,00", "Outras Receitas", "Reembolsos Corporativos", "Organizze", "Linha exemplo"])
+        launch_rows.append(["15.06.2026", "2026-06", "expense", "Exemplo compra no cartão", "123,45", "Alimentação", "Restaurantes / Bares / Delivery", "Organizze; Revisar", "parcelado", "3", "", "", "Linha exemplo"])
+        launch_rows.append(["2026-06-20", "2026-06", "income", "Exemplo estorno", "10,00", "Outras Receitas", "Reembolsos Corporativos", "Organizze", "", "", "", "", "Linha exemplo"])
     else:
-        launch_rows.append(["2026-06-15", "expense", "Exemplo mercado", "123,45", "Alimentação", "Supermercado / Feira / Hortifruti", "Organizze; Revisar", "", "", "", "", "Linha exemplo"])
-        launch_rows.append(["2026-06-15", "income", "Exemplo salário", "1000,00", "Trabalho e Salário", "Salário Líquido", "Organizze", "", "", "", "", "Linha exemplo"])
-        launch_rows.append(["2026-06-15", "transfer", "Exemplo transferência", "500,00", "", "", "", "2", "", "", "", "Informe conta_destino_id"])
-        launch_rows.append(["2026-06-15", "exchange", "Exemplo câmbio", "1000,00", "", "", "Câmbio", "3", "197,10", "0,197100", "", "Conta destino em outra moeda"])
+        launch_rows.append(["15.06.2026", "expense", "Exemplo mercado", "123,45", "Alimentação", "Supermercado / Feira / Hortifruti", "Organizze; Revisar", "parcelado", "3", "", "", "", "", "", "", "Linha exemplo"])
+        launch_rows.append(["2026-06-15", "income", "Exemplo salário", "1000,00", "Trabalho e Salário", "Salário Líquido", "Organizze", "", "", "", "", "", "", "", "", "Linha exemplo"])
+        launch_rows.append(["2026-06-15", "transfer", "Exemplo transferência", "500,00", "", "", "", "", "", "", "", "2", "", "", "", "Informe conta_destino_id"])
+        launch_rows.append(["2026-06-15", "exchange", "Exemplo câmbio", "1000,00", "", "", "Câmbio", "", "", "", "", "3", "197,10", "0,197100", "", "Conta destino em outra moeda"])
     category_rows = [["grupo", "categoria", "subcategoria"]]
     with get_connection() as conn:
         categories = conn.execute(
@@ -300,11 +328,16 @@ def normalize_system_account_row(row: dict, account_id: object) -> dict:
         "transfer_exchange_rate": row.get("cotacao_cambio") or row.get("transfer_exchange_rate"),
         "exchange_rate_to_brl": row.get("cotacao_brl") or row.get("exchange_rate_to_brl"),
         "notes": row.get("observacoes") or row.get("notes"),
-        "series_kind": "single",
+        **normalize_system_series(row),
     }
     if payload["type"] == "transfer":
         payload["category"] = ""
         payload["subcategory"] = ""
+        # spec: importacao-organizze v1.2 — regras de repetição
+        # (transferencias e cambio sao sempre avulsos, mesmo se a linha trouxer repeticao)
+        payload["series_kind"] = "single"
+        payload["installment_count"] = None
+        payload["recurrence_frequency"] = None
     return payload
 
 
@@ -321,7 +354,41 @@ def normalize_system_card_row(row: dict, card_id: object) -> dict:
         "subcategory": row.get("subcategoria") or row.get("subcategory"),
         "tags": row.get("tags") or row.get("tag"),
         "notes": row.get("observacoes") or row.get("notes"),
+        **normalize_system_series(row),
     }
+
+
+def normalize_system_series(row: dict) -> dict:
+    # spec: importacao-organizze v1.2 — regras de repetição
+    # (avulso padrao; parcelado exige parcelas 2-120; recorrente exige frequencia;
+    #  media so se aplica a recorrentes)
+    series_kind = SERIES_KIND_ALIASES.get(normalize_key(row.get("repeticao") or row.get("series_kind")), "single")
+    installment_count = None
+    recurrence_frequency = None
+    use_average = normalize_import_flag(row.get("media") or row.get("use_average"))
+    if series_kind == "installment":
+        raw_count = str(row.get("parcelas") or row.get("installment_count") or "").strip()
+        try:
+            installment_count = int(raw_count)
+        except ValueError as exc:
+            raise ImportError("Informe a quantidade de parcelas (coluna parcelas).") from exc
+        if installment_count < 2 or installment_count > 120:
+            raise ImportError("Informe entre 2 e 120 parcelas (coluna parcelas).")
+    if series_kind == "recurring":
+        recurrence_frequency = RECURRENCE_FREQUENCY_ALIASES.get(normalize_key(row.get("recorrencia") or row.get("recurrence_frequency")))
+        if recurrence_frequency is None:
+            raise ImportError("Informe a frequencia da recorrencia (coluna recorrencia): semanal, mensal, trimestral, semestral ou anual.")
+    return {
+        "series_kind": series_kind,
+        "installment_count": installment_count,
+        "recurrence_frequency": recurrence_frequency,
+        "use_average": use_average,
+    }
+
+
+def normalize_import_flag(value: object) -> bool:
+    raw = str(value or "").strip().lower()
+    return raw in {"1", "true", "yes", "sim", "s", "on", "verdadeiro"}
 
 
 def normalize_import_target(value: object) -> str:
@@ -355,18 +422,6 @@ def normalize_card_import_type(value: object) -> str:
     if key not in {"expense", "income"}:
         raise ImportError("Cartao aceita apenas expense ou income.")
     return key
-
-
-def normalize_import_date(value: object) -> str:
-    raw = str(value or "").strip()
-    if not raw:
-        return raw
-    for pattern in ("%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y", "%d-%m-%Y"):
-        try:
-            return datetime.strptime(raw, pattern).date().isoformat()
-        except ValueError:
-            continue
-    return raw
 
 
 def normalize_import_month(value: object) -> str:
@@ -978,7 +1033,7 @@ def normalize_import_date(value: object) -> str:
     serial_date = excel_serial_to_date(raw)
     if serial_date and 2000 <= serial_date.year <= 2100:
         return serial_date.isoformat()
-    for fmt in ("%d.%m.%Y", "%d/%m/%Y", "%Y-%m-%d"):
+    for fmt in ("%d.%m.%Y", "%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d"):
         try:
             return datetime.strptime(raw, fmt).date().isoformat()
         except ValueError:

@@ -503,7 +503,7 @@ class CreditCardPaymentAtomicityTest(unittest.TestCase):
         self.assertEqual(len(recurring_rows), 120)
         self.assertTrue(all(row["use_average"] for row in recurring_rows))
 
-    def test_recurring_card_transaction_use_average_auto_recalculates_future_on_edit(self) -> None:
+    def test_recurring_card_transaction_use_average_recalculates_future_on_edit_with_future_scope(self) -> None:
         user = create_user("Alice", "alice@example.com", "correct-password")
         account = create_checking_account(user["id"], {
             "name": "Conta principal",
@@ -556,6 +556,7 @@ class CreditCardPaymentAtomicityTest(unittest.TestCase):
             "invoice_month": "2026-06",
             "category": "Servicos",
             "subcategory": "Energia",
+            "apply_to_future": "true",
         })
 
         rows = sorted(
@@ -568,6 +569,61 @@ class CreditCardPaymentAtomicityTest(unittest.TestCase):
         self.assertEqual(recurring_rows[0]["amount"], "999.00")
         self.assertEqual(recurring_rows[0]["date"], "2026-06-15")
         self.assertTrue(all(row["amount"] == "200.00" for row in recurring_rows[1:]))
+        self.assertTrue(all(row["use_average"] for row in recurring_rows))
+
+    def test_recurring_card_transaction_use_average_unchanged_edit_does_not_cascade(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta principal",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "10000,00",
+        })
+        card = create_credit_card(user["id"], {
+            "name": "Cartao",
+            "issuer": "Banco",
+            "currency": "BRL",
+            "limit": "20000,00",
+            "closing_day": "28",
+            "due_day": "10",
+            "preferred_payment_account_id": str(account["id"]),
+        })
+
+        first = create_credit_card_transaction(user["id"], {
+            "credit_card_id": str(card["id"]),
+            "type": "expense",
+            "description": "Conta de luz",
+            "amount": "999,00",
+            "date": "2026-06-10",
+            "invoice_month": "2026-06",
+            "category": "Servicos",
+            "subcategory": "Energia",
+            "series_kind": "recurring",
+            "recurrence_frequency": "monthly",
+            "use_average": "true",
+        })
+
+        update_credit_card_transaction(user["id"], str(first["id"]), {
+            "credit_card_id": str(card["id"]),
+            "type": "expense",
+            "description": "Conta de luz",
+            "amount": "777,00",
+            "date": "2026-06-15",
+            "invoice_month": "2026-06",
+            "category": "Servicos",
+            "subcategory": "Energia",
+        })
+
+        rows = sorted(
+            list_credit_card_transactions(user["id"]),
+            key=lambda row: row["date"],
+        )
+        recurring_rows = [row for row in rows if row["series_kind"] == "recurring"]
+
+        self.assertEqual(len(recurring_rows), 120)
+        self.assertEqual(recurring_rows[0]["amount"], "777.00")
+        self.assertEqual(recurring_rows[0]["date"], "2026-06-15")
+        self.assertTrue(all(row["amount"] == "999.00" for row in recurring_rows[1:]))
         self.assertTrue(all(row["use_average"] for row in recurring_rows))
 
     def test_recurring_card_transaction_use_average_activated_on_edit_recalculates_future(self) -> None:
@@ -749,7 +805,7 @@ class CreditCardPartialPaymentTest(unittest.TestCase):
         return user, account, card, card_transaction
 
     def test_partial_payment_debits_paid_amount_and_carries_remainder_to_next_invoice(self) -> None:
-        # spec: cartoes v2.11 — criterio 169
+        # spec: cartoes v2.14 — criterio 169
         user, account, card, card_transaction = self._create_user_account_card("100,00")
         result = pay_credit_card_invoice(user["id"], {
             "credit_card_id": str(card["id"]),
@@ -799,7 +855,7 @@ class CreditCardPartialPaymentTest(unittest.TestCase):
             self.assertFalse(is_invoice_paid(conn, user["id"], card["id"], "2026-07"))
 
     def test_partial_payment_rejects_amount_equal_or_greater_than_balance(self) -> None:
-        # spec: cartoes v2.11 — criterio 170
+        # spec: cartoes v2.14 — criterio 170
         user, account, card, card_transaction = self._create_user_account_card("100,00")
         for amount in ("100,00", "150,00"):
             with self.assertRaises(CreditCardError) as context:
@@ -821,7 +877,7 @@ class CreditCardPartialPaymentTest(unittest.TestCase):
         self.assertEqual(transaction_count, 0)
 
     def test_partial_payment_rejects_zero_or_negative_amount(self) -> None:
-        # spec: cartoes v2.11 — criterio 170
+        # spec: cartoes v2.14 — criterio 170
         user, account, card, card_transaction = self._create_user_account_card("100,00")
         with self.assertRaises(CreditCardError) as context:
             pay_credit_card_invoice(user["id"], {
@@ -834,7 +890,7 @@ class CreditCardPartialPaymentTest(unittest.TestCase):
         self.assertEqual(context.exception.message, "Informe um valor maior que zero.")
 
     def test_partial_payment_closes_invoice_like_full_payment(self) -> None:
-        # spec: cartoes v2.11 — criterio 171
+        # spec: cartoes v2.14 — criterio 171
         user, account, card, card_transaction = self._create_user_account_card("100,00")
         pay_credit_card_invoice(user["id"], {
             "credit_card_id": str(card["id"]),
@@ -856,7 +912,7 @@ class CreditCardPartialPaymentTest(unittest.TestCase):
         self.assertIn("fechada", context.exception.message)
 
     def test_partial_carried_transaction_lists_in_next_invoice_and_can_be_moved(self) -> None:
-        # spec: cartoes v2.11 — criterio 172
+        # spec: cartoes v2.14 — criterio 172
         user, account, card, card_transaction = self._create_user_account_card("100,00")
         result = pay_credit_card_invoice(user["id"], {
             "credit_card_id": str(card["id"]),
@@ -879,7 +935,7 @@ class CreditCardPartialPaymentTest(unittest.TestCase):
         self.assertEqual(len(list_credit_card_transactions(user["id"], invoice_month="2026-08")), 1)
 
     def test_partial_payment_still_creates_flagged_account_transaction(self) -> None:
-        # spec: cartoes v2.11 — criterios 9 e 169
+        # spec: cartoes v2.14 — criterios 9 e 169
         user, account, card, card_transaction = self._create_user_account_card("100,00")
         result = pay_credit_card_invoice(user["id"], {
             "credit_card_id": str(card["id"]),

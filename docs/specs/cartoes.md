@@ -2,7 +2,7 @@
 tipo: spec
 area: cartoes
 status: implementado
-versao: 2.13
+versao: 2.14
 atualizado: 2026-08-17
 relacionados:
   - "[[contas-correntes]]"
@@ -96,8 +96,8 @@ Qualquer usuário autenticado localmente que utilize cartões de crédito para d
 - Lançamentos recorrentes de cartão não exibem o campo de quantidade de ocorrências no formulário; o sistema grava a série com 120 ocorrências automaticamente para manter compatibilidade com lançamentos antigos que usam o campo.
 - A marcação de média (`use_average`) em lançamentos recorrentes de cartão é persistida em todas as ocorrências geradas da série.
 - Ao editar uma ocorrência de uma série recorrente de cartão, o checkbox de cálculo pela média permanece habilitado e reflete a marcação da ocorrência; o usuário pode ativar ou desativar a flag no próprio formulário de edição.
-- Se `use_average` estiver ativo ao salvar a edição (já ativo na série ou ativado agora), o sistema não exibe o modal de escopo; a alteração é aplicada automaticamente a todas as ocorrências futuras não conciliadas, a marcação é persistida nelas e seus valores são recalculados pela média dos últimos 12 lançamentos com a mesma descrição normalizada, mesmo tipo e mesma categoria/subcategoria.
-- Se a flag for desmarcada ao salvar a edição de uma série que a tinha ativa, o sistema não exibe o modal de escopo; a alteração é aplicada automaticamente a todas as ocorrências futuras não conciliadas com o valor informado no formulário, sem recálculo pela média, e a marcação é removida das ocorrências no escopo.
+- Se a flag de média for **alterada** ao salvar a edição de uma série recorrente de cartão — ativada agora (série sem a marcação) ou desmarcada (série que a tinha ativa) —, o sistema não exibe o modal de escopo e aplica a alteração automaticamente a todas as ocorrências futuras não conciliadas: ao ativar, a marcação é persistida nelas e seus valores são recalculados pela média dos últimos 12 lançamentos com a mesma descrição normalizada, mesmo tipo e mesma categoria/subcategoria; ao desmarcar, a marcação é removida e os valores mantêm o informado no formulário, sem recálculo.
+- Se a flag de média **não for alterada** na edição (permanecendo ativa ou inativa), o sistema mantém o modal de escopo (`Apenas este lançamento` / `Este e os próximos`); escolhendo os próximos em série com a flag ativa, os valores futuros são recalculados pela média; escolhendo apenas este, somente a ocorrência atual muda.
 - Se `use_average` não estiver ativo e a série nunca tiver tido a flag ativa, o comportamento atual de edição/exclusão em cascata se mantém.
 - O formulário manual de lançamento no cartão deve oferecer o campo `Tag`, com as mesmas sugestões de tags usadas em lançamentos de contas e suporte a múltiplas tags separadas por vírgula.
 - Em novos lançamentos, descrições com histórico exato e confiança suficiente podem preencher categoria e subcategoria sem sobrescrever escolhas manuais. Ver [[classificacao-assistida]].
@@ -181,7 +181,7 @@ Tabelas: `credit_cards`, `credit_card_transactions`, `credit_card_payments`, `cr
 - Dado um lançamento recorrente de cartão sendo criado, quando o usuário seleciona o tipo "Recorrente", então o campo de quantidade de ocorrências permanece oculto e a série é gravada com 120 ocorrências.
 - Dado um lançamento recorrente de cartão existente sendo editado, quando o formulário é aberto, então o campo de quantidade de ocorrências continua oculto e a frequência permanece desabilitada.
 - Dado um lançamento recorrente de cartão criado com a opção `use_average`, quando as ocorrências são geradas, então todas persistem `use_average` ativo.
-- Dado uma série recorrente de cartão com `use_average` ativo, quando o usuário edita qualquer ocorrência, então o sistema não exibe o modal de escopo e aplica automaticamente a alteração a todas as ocorrências futuras não conciliadas, recalculando seus valores pela média.
+- Dado uma série recorrente de cartão com `use_average` ativo, quando o usuário edita uma ocorrência sem alterar a flag de média, então o sistema exibe o modal de escopo perguntando se a alteração vale apenas para o lançamento atual ou também para os futuros.
 - Dado uma série recorrente de cartão sem `use_average`, quando o usuário edita uma ocorrência, então o sistema mantém o comportamento atual de perguntar se deseja alterar apenas o lançamento atual ou também os futuros.
 - Dado `GET /api/credit-card-transactions` com `limit` e `offset` válidos, quando consultado, então retorna no máximo `limit` lançamentos da página solicitada com `has_more` adequado.
 - Dado `GET /api/credit-card-payments` com `limit` e `offset` válidos, quando consultado, então retorna no máximo `limit` pagamentos da página solicitada com `has_more` adequado.
@@ -193,11 +193,15 @@ Tabelas: `credit_cards`, `credit_card_transactions`, `credit_card_payments`, `cr
 - Dado um lançamento recorrente de cartão existente sendo editado, quando o formulário é aberto, então o checkbox de cálculo pela média permanece habilitado e reflete a marcação da ocorrência.
 - Dado um lançamento recorrente de cartão existente sem `use_average` sendo editado, quando o usuário marca a opção de média e salva, então o sistema não exibe o modal de escopo, aplica a alteração a todas as ocorrências futuras não conciliadas, persiste a marcação nelas e recalcula seus valores pela média dos últimos 12 lançamentos com a mesma descrição, tipo e categoria/subcategoria.
 - Dado uma série recorrente de cartão com `use_average` ativo sendo editada, quando o usuário desmarca a opção de média e salva, então o sistema não exibe o modal de escopo, remove a marcação das ocorrências futuras não conciliadas e mantém nelas o valor informado no formulário, sem recálculo pela média.
+- Dado uma série recorrente de cartão com `use_average` ativo, quando o usuário edita uma ocorrência sem alterar a flag de média e escolhe `Apenas este lançamento`, então somente a ocorrência atual é alterada e as ocorrências futuras permanecem intactas.
+- Dado uma série recorrente de cartão com `use_average` ativo, quando o usuário edita uma ocorrência sem alterar a flag de média e escolhe `Este e os próximos`, então a alteração é aplicada às ocorrências futuras não conciliadas e seus valores são recalculados pela média.
+- Dado uma série recorrente de cartão sendo editada com a flag de média alterada (marcada ou desmarcada), quando o usuário salva, então o sistema não exibe o modal de escopo e aplica a alteração automaticamente às ocorrências futuras não conciliadas — ao marcar, persiste a marcação e recalcula pela média; ao desmarcar, mantém o valor informado sem recálculo e remove a marcação.
 - Dado o usuário visualizando o gráfico de evolução de faturas, quando há valores nas 5 faturas em tela, então uma linha horizontal de referência é desenhada na altura da média aritmética dos valores absolutos dessas faturas, no mesmo estilo das linhas atuais (contínua, `--chart-average-line`: branca no tema escuro, cinza no claro) e na mesma escala vertical do gráfico.
 - Dado o usuário visualizando o gráfico de evolução de faturas, quando a linha de referência da média é exibida, então o valor da média formatado na moeda do cartão aparece em texto compacto ao final (lado direito) da linha.
 
 ## Changelog
 
+- `2.14` — 2026-08-17 — Modal de escopo restaurado em edições de séries recorrentes de cartão: o sistema pula o modal **somente** quando a flag de média é alterada na edição (marcada em série sem a marcação ou desmarcada em série que a tinha); com a flag inalterada — ativa ou inativa — o modal `Apenas este lançamento` / `Este e os próximos` volta a aparecer; escolhendo os próximos em série com a flag ativa, os valores futuros continuam recalculados pela média; escolhendo apenas este, a cascata não ocorre.
 - `2.13` — 2026-08-17 — Linha de referência da média no gráfico de evolução de faturas ajustada: cor passa a usar token `--chart-average-line` (branca no tema escuro, cinza no claro) e o valor da média formatado na moeda do cartão é exibido em texto compacto ao final (lado direito) da linha.
 - `2.12` — 2026-08-17 — Gráfico de evolução de faturas ganha linha horizontal de referência com a média aritmética dos valores absolutos das 5 faturas em tela (2 anteriores, atual e 2 futuras), desenhada no mesmo estilo das linhas atuais (contínua, branca) e na mesma escala vertical; não altera curva, cards ou dependências.
 - `2.11` — 2026-08-17 — Edição de lançamento recorrente de cartão passa a permitir ativar/desativar a flag de cálculo pela média: o checkbox fica habilitado no formulário de edição; ao salvar com a flag ativa (já ativa ou ativada agora), a edição aplica-se em cascata às ocorrências futuras não conciliadas sem modal, persistindo a marcação e recalculando valores pela média; ao desmarcar em série que tinha a flag ativa, a cascata segue sem recálculo e a marcação é removida no escopo; séries nunca marcadas mantêm o modal de escopo.

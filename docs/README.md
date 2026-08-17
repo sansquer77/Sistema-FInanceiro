@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 11.39
+versao: 11.40
 atualizado: 2026-08-17
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -132,6 +132,7 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `11.40` — 2026-08-17 — [[specs/lancamentos]] v3.23 e [[specs/cartoes]] v2.14: modal de escopo de edição restaurado em séries recorrentes — o modal `Apenas este lançamento` / `Este e os próximos` volta a aparecer quando a flag de média **não** é alterada (ativa ou inativa); apenas a mudança da flag (marcar em série sem marcação ou desmarcar em série marcada) continua pulando o modal e aplicando a cascata automaticamente.
 - `11.39` — 2026-08-17 — [[specs/cartoes]] v2.13: linha de referência da média no gráfico de evolução de faturas passa a usar o token `--chart-average-line` (cinza no tema claro, branca no escuro) e exibe o valor da média formatado na moeda do cartão em texto compacto ao final (lado direito) da linha. [[design/design-system]] ganha a regra do token para linhas de referência neutras.
 - `11.38` — 2026-08-17 — [[specs/cartoes]] v2.12: gráfico de evolução de faturas ganha linha horizontal de referência com a média aritmética dos valores absolutos das 5 faturas em tela (2 anteriores, atual e 2 futuras), no mesmo estilo das linhas atuais (contínua, branca) e na mesma escala vertical.
 - `11.37` — 2026-08-17 — [[specs/lancamentos]] v3.22 e [[specs/cartoes]] v2.11: ao editar um lançamento recorrente, o checkbox de cálculo dos próximos pela média fica habilitado — ativando a flag, a edição aplica em cascata às ocorrências futuras não conciliadas (sem modal) persistindo a marcação e recalculando valores pela média; desmarcando em série que tinha a flag, a cascata segue sem recálculo e a marcação é removida no escopo.

@@ -2,8 +2,8 @@
 tipo: spec
 area: importacao
 status: implementado
-versao: 1.1
-atualizado: 2026-07-03
+versao: 1.2
+atualizado: 2026-08-17
 relacionados:
   - "[[contas-correntes]]"
   - "[[cartoes]]"
@@ -18,7 +18,7 @@ aliases: ["Importação", "Importação Organizze"]
 # Importação
 
 > [!info] Status
-> **implementado** · área: `importacao` · atualizado em 2026-07-03 · relacionados: [[contas-correntes]], [[cartoes]], [[categorias-tags-gestao]], [[adr/0004-importador-xls-sem-dependencia]]
+> **implementado** · área: `importacao` · atualizado em 2026-08-17 · relacionados: [[contas-correntes]], [[cartoes]], [[categorias-tags-gestao]], [[adr/0004-importador-xls-sem-dependencia]]
 
 ## Problema
 
@@ -40,7 +40,7 @@ Usuário que está migrando dados de outro sistema ou que deseja lançar movimen
 
 | Coluna | Regra |
 |---|---|
-| Data | ISO (`YYYY-MM-DD`), formato Organizze (`DD.MM.YYYY`) ou data serializada pelo Excel. |
+| Data | ISO (`YYYY-MM-DD`), `DD.MM.YYYY`, `DD/MM/YYYY`, `DD-MM-YYYY` ou data serializada pelo Excel. Data inválida rejeita a linha com motivo `Data invalida.` |
 | Descrição | Obrigatório. |
 | Categoria | Obrigatório para receitas, despesas e investimentos. |
 | Subcategoria | Opcional. |
@@ -51,6 +51,10 @@ Usuário que está migrando dados de outro sistema ou que deseja lançar movimen
 | Tipo | Tipo do lançamento. |
 | Conta destino | FK para transferências e câmbio. |
 | Competência da fatura | `invoice_month` para importações de cartão. |
+| Repetição | Modelo próprio: `avulso` (padrão), `parcelado` ou `recorrente`. Aceita também `single`, `installment` e `recurring`. |
+| Parcelas | Modelo próprio: quantidade de parcelas (2 a 120), obrigatória quando Repetição é `parcelado`. |
+| Recorrência | Modelo próprio: frequência (`semanal`, `mensal`, `trimestral`, `semestral` ou `anual`), obrigatória quando Repetição é `recorrente`. |
+| Média | Modelo próprio: `sim`/`não` para recorrentes usarem o valor médio do histórico (só se aplica a `recorrente`). |
 
 ## Modelos do sistema
 
@@ -69,6 +73,8 @@ Usuário que está migrando dados de outro sistema ou que deseja lançar movimen
 - Quando a coluna Tags trouxer mais de uma tag, todas devem ser vinculadas ao lançamento.
 - Arquivos Excel podem trazer valores numéricos formatados visualmente; o parser usa o valor real da célula sem multiplicações indevidas.
 - Importações de cartão preenchem `invoice_month` e consideram o mês da fatura para relatórios e limites. Ver [[cartoes]].
+- No modelo próprio, uma linha com Repetição `parcelado` gera uma série de N lançamentos parcelados; uma linha `recorrente` gera uma série recorrente (até 120 ocorrências) e pode usar a Média do histórico. Transferências e câmbio são sempre avulsos, mesmo se a linha trouxer Repetição.
+- Modelos gerados antes da coluna Repetição (sem `repeticao`, `parcelas`, `recorrencia` e `media`) continuam importando normalmente: as linhas entram como avulsas.
 - A importação retorna resumo com total lido, total importado, total ignorado e motivos das primeiras linhas rejeitadas.
 - Importações em lote devem processar a leitura/parsing fora da conexão SQLite e persistir cada linha em uma transação curta, preservando sucesso parcial sem segurar lock durante todo o arquivo.
 - O parser `.xls` é implementado sem dependência externa. Ver [[adr/0004-importador-xls-sem-dependencia]].
@@ -100,9 +106,15 @@ Tabelas: `transactions`, `credit_card_transactions`, `transaction_tags`, `credit
 - Dado o final da importação de cartão, quando consultado, os lançamentos aparecem na fatura correta.
 - Dado linhas rejeitadas, quando exibidas, mostram número da linha e motivo da rejeição.
 - Dado a listagem de lançamentos importados, quando exibida, mostra categoria, subcategoria e tags quando existirem.
+- Dado uma linha com data `02.05.2026` (DD.MM.YYYY) no modelo próprio, quando importada, é aceita normalmente.
+- Dado uma linha com data inválida, quando importada, é rejeitada com motivo `Data invalida.` sem afetar as demais linhas.
+- Dado uma linha parcelada com `parcelas` = 3, quando importada, gera 3 lançamentos da mesma série.
+- Dado uma linha recorrente com Média `sim`, quando importada, a série usa o valor médio do histórico.
+- Dado um modelo antigo sem as colunas de repetição, quando importado, continua funcionando (linhas avulsas).
 
 ## Changelog
 
+- `1.2` — 2026-08-17 — Modelo próprio ganha colunas de repetição (`repeticao`, `parcelas`, `recorrencia`, `media`); datas aceitas ampliadas (`DD/MM/YYYY`, `DD-MM-YYYY`) e data inválida rejeita a linha com motivo explícito.
 - `1.1` — 2026-07-03 — Regra de importação em lote atualizada para transações curtas por linha.
 - `1.0` — 2026-06-29 — Frontmatter e critérios formalizados.
 
