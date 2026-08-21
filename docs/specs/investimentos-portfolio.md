@@ -2,8 +2,8 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.29
-atualizado: 2026-08-11
+versao: 2.30
+atualizado: 2026-08-20
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -16,7 +16,7 @@ aliases: ["Investimentos", "Portfólio"]
 # Investimentos e Portfólio
 
 > [!info] Status
-> **implementado** · área: `investimentos` · atualizado em 2026-08-10 · relacionados: [[contas-correntes]], [[lancamentos]], [[relatorios]]
+> **implementado** · área: `investimentos` · atualizado em 2026-08-20 · relacionados: [[contas-correntes]], [[lancamentos]], [[relatorios]]
 
 ## Problema
 
@@ -202,6 +202,7 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 
 ## Changelog
 
+- `2.30` — 2026-08-20 — Sincronizada a data do callout de status com o frontmatter; sem alteração de comportamento.
 - `2.29` — 2026-08-11 — Posição inicial em moeda estrangeira sem cotação manual passa a usar a última PTAX de venda até a data de aquisição (antes gravava taxa fixa `1,0`, distorcendo valores em BRL do Portfólio); formulário de posição deixa de enviar `1,0` como padrão.
 - `2.28` — 2026-08-11 — Coluna **Tipo** da aba Posição ganha ícone pequeno de escudo (verde, indicador de saúde financeira) ao lado do tipo do ativo para posições marcadas como reserva de emergência, com tooltip; sem aumento de área do gráfico/tabela.
 - `2.27` — 2026-08-11 — Helper (?) de modalidade da renda fixa alinhado inline ao rótulo (`field-label-title`), corrigindo a quebra de layout no formulário do Portfólio (mesma correção aplicada em Lançamentos).

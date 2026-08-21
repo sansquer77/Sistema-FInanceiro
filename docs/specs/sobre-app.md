@@ -2,8 +2,8 @@
 tipo: spec
 area: usuario
 status: implementado
-versao: 1.8
-atualizado: 2026-08-10
+versao: 1.9
+atualizado: 2026-08-20
 relacionados:
   - "[[frontend-modularizacao]]"
   - "[[../arquitetura|Arquitetura]]"
@@ -16,7 +16,7 @@ aliases: ["Sobre o App", "Sobre"]
 # Sobre o App
 
 > [!info] Status
-> **implementado** · área: `usuario` · atualizado em 2026-07-31 · relacionados: [[frontend-modularizacao]], [[../arquitetura|Arquitetura]], [[../distribuição|Distribuicao]], [[../requisitos|Requisitos]]
+> **implementado** · área: `usuario` · atualizado em 2026-08-20 · relacionados: [[frontend-modularizacao]], [[../arquitetura|Arquitetura]], [[../distribuição|Distribuicao]], [[../requisitos|Requisitos]]
 
 ## Problema
 
@@ -92,6 +92,7 @@ Usuários finais e mantenedores que usam o Sistema Financeiro localmente, instal
 
 ## Changelog
 
+- `1.9` — 2026-08-20 — Sincronizada a data do callout de status com o frontmatter; sem alteração de comportamento.
 - `1.8` — 2026-08-10 — Dados de desenvolvimento atualizados na tela Sobre: desenvolvedor passa a ser **Sansquer** e contato `darksansquer@gmail.com`.
 - `1.7` — 2026-08-08 — Tela Sobre atualizada: novo texto de funcionalidades e tecnologias refletindo a stack vigente e widget opcional Buy Me a Coffee ao lado do contato (recurso externo, não bloqueia sem internet).
 - `1.6` — 2026-07-31 — Versão atual do app elevada para `1.0.52` após ajustes compatíveis de UX no Cockpit.

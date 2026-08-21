@@ -304,20 +304,20 @@ export function registerTransactionsView({
           && Boolean(editingTransaction.use_average) !== useAverage.checked,
       );
       if (editingTransaction && editingTransaction.series_kind === "recurring" && useAverage) {
-        // spec: lancamentos v3.23 — critério 55
+        // spec: lancamentos v3.24 — critério 55
         // (ao editar recorrente, o estado do checkbox de média é enviado explicitamente)
         data.use_average = useAverage.checked ? "1" : "0";
       }
       if (isEditing && shouldAskFutureReplication(data.id)) {
         if (averageChanged) {
-          // spec: lancamentos v3.23 — critérios 56, 57 e 60
+          // spec: lancamentos v3.24 — critérios 56, 57 e 60
           // (flag de média alterada — marcada em série sem a marcação ou desmarcada
           //  em série que a tinha — não exibe modal e aplica em cascata)
           data.apply_to_future = true;
         } else {
-          // spec: lancamentos v3.23 — critérios 46 e 58
+          // spec: lancamentos v3.24 — critérios 46 e 58
           // (flag inalterada — ativa ou inativa — mantém o modal de escopo)
-          const scope = await chooseSeriesEditScope("conta");
+          const scope = await chooseSeriesEditScope("conta", Boolean(editingTransaction.use_average));
           if (!scope) {
             return;
           }
@@ -385,10 +385,12 @@ export function registerTransactionsView({
     return scope === "future" ? "?scope=future" : "";
   }
 
-  function chooseSeriesEditScope(label) {
+  function chooseSeriesEditScope(label, useAverage = false) {
     return decisionModal.choose({
       title: "Aplicar alteração",
-      message: `Este lançamento pertence a uma série no módulo de ${label}. Como deseja aplicar a mudança?`,
+      message: useAverage
+        ? `Esta série no módulo de ${label} calcula os valores futuros pela média. Escolha \"Apenas este lançamento\" para alterar somente esta ocorrência, sem recalcular os próximos; escolha \"Este e os próximos\" para recalculá-los pela média.`
+        : `Este lançamento pertence a uma série no módulo de ${label}. Como deseja aplicar a mudança?`,
       actions: [
         { value: "single", label: "Apenas este lançamento", variant: "ghost" },
         { value: "future", label: "Este e os próximos", variant: "primary" },
@@ -1311,7 +1313,7 @@ export function registerTransactionsView({
       recurrenceAverageFields.hidden = !isRecurring;
     }
     if (useAverage) {
-      // spec: lancamentos v3.23 — criterio 52
+      // spec: lancamentos v3.24 — criterio 52
       // (na edicao de um recorrente o checkbox de media fica habilitado;
       //  so a repeticao/frequencia permanecem travadas na serie)
       useAverage.disabled = !isRecurring;

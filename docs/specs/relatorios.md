@@ -2,8 +2,8 @@
 tipo: spec
 area: relatorios
 status: implementado
-versao: 2.10
-atualizado: 2026-08-07
+versao: 2.11
+atualizado: 2026-08-20
 relacionados:
   - "[[lancamentos]]"
   - "[[cartoes]]"
@@ -17,7 +17,7 @@ aliases: ["Relatórios", "Cockpit"]
 # Relatórios
 
 > [!info] Status
-> **implementado** · área: `relatorios` · atualizado em 2026-08-04 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[limites-gastos]]
+> **implementado** · área: `relatorios` · atualizado em 2026-08-20 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[limites-gastos]]
 
 ## Problema
 
@@ -173,6 +173,7 @@ O ponto crítico é cartão de crédito: a fatura pertence ao mês de competênc
 
 ## Changelog
 
+- `2.11` — 2026-08-20 — Sincronizada a data do callout de status com o frontmatter; sem alteração de comportamento.
 - `2.10` — 2026-08-07 — A linha agregada `Outros` do gráfico **Maiores despesas do mês** ganha o indicador `i` ao lado do rótulo (mesmo padrão dos KPIs de Taxa de poupança/Aportes do mês), sinalizando que a linha abre o detalhamento em pop-up; o pop-up continua acessível por clique em toda a linha e por teclado.
 - `2.9` — 2026-08-07 — KPI **Aportes do mês** da aba Situação do mês ganha indicador `i` de ajuda (mesmo padrão do KPI Taxa de poupança) explicando a origem do valor: soma dos lançamentos do tipo Investimento/Aporte do mês selecionado, com conversão para BRL quando a conta é em outra moeda, excluindo posições iniciais cadastradas no Portfólio e transferências entre contas.
 - `2.8` — 2026-08-06 — Drawer de evolução de categoria ampliado em aproximadamente 20%; gráfico passa a exibir o valor formatado em cada ponto, inclusive nos pontos projetados pela linha de tendência SMA.

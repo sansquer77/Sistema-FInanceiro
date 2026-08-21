@@ -2,8 +2,8 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 3.23
-atualizado: 2026-08-17
+versao: 3.24
+atualizado: 2026-08-20
 relacionados:
   - "[[contas-correntes]]"
   - "[[categorias-tags-gestao]]"
@@ -17,7 +17,7 @@ aliases: ["Lançamentos", "Transações"]
 # Lançamentos
 
 > [!info] Status
-> **implementado** · área: `lancamentos` · atualizado em 2026-08-17 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]]
+> **implementado** · área: `lancamentos` · atualizado em 2026-08-20 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]]
 
 ## Problema
 
@@ -78,6 +78,7 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 - Ao editar uma ocorrência de uma série recorrente, o checkbox de cálculo pela média permanece habilitado e reflete a marcação da ocorrência; o usuário pode ativar ou desativar a flag no próprio formulário de edição.
 - Se a flag de média for **alterada** ao salvar a edição de uma série recorrente — ativada agora (série sem a marcação) ou desmarcada (série que a tinha ativa) —, o sistema não exibe o modal de escopo e aplica a alteração automaticamente a todas as ocorrências futuras não conciliadas: ao ativar, a marcação é persistida nelas e seus valores são recalculados pela média dos últimos 12 lançamentos com a mesma descrição normalizada, mesmo tipo e mesma categoria/subcategoria; ao desmarcar, a marcação é removida e os valores mantêm o informado no formulário, sem recálculo.
 - Se a flag de média **não for alterada** na edição (permanecendo ativa ou inativa), o sistema mantém o modal de escopo (`Apenas este lançamento` / `Este e os próximos`); escolhendo os próximos em série com a flag ativa, os valores futuros são recalculados pela média; escolhendo apenas este, somente a ocorrência atual muda.
+- Em uma série com média ativa e flag inalterada, o modal deve esclarecer que **Apenas este lançamento** não recalcula os próximos e **Este e os próximos** os recalcula pela média.
 - Se `use_average` não estiver ativo e a série nunca tiver tido a flag ativa, o comportamento atual de edição/exclusão em cascata se mantém.
 - Lançamentos parcelados exibem índice e total (`1/36`, `2/36`...) sem reiniciar a contagem em edições pontuais.
 - A tela de Lançamentos organiza o formulário em uma composição compacta, mantendo todos os campos relevantes visíveis na edição, sem blocos contextuais escurecidos (inclusive nos campos de renda fixa).
@@ -186,7 +187,7 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dado um lançamento recorrente sendo criado, quando o usuário seleciona o tipo "Recorrente", então o campo de quantidade de ocorrências permanece oculto e a série é gravada com 120 ocorrências.
 - Dado um lançamento recorrente existente sendo editado, quando o formulário é aberto, então o campo de quantidade de ocorrências continua oculto e a frequência permanece desabilitada.
 - Dado um lançamento recorrente criado com a opção `use_average`, quando as ocorrências são geradas, então todas persistem `use_average` ativo.
-- Dado uma série recorrente com `use_average` ativo, quando o usuário edita uma ocorrência sem alterar a flag de média, então o sistema exibe o modal de escopo perguntando se a alteração vale apenas para o lançamento atual ou também para os futuros.
+- Dado uma série recorrente com `use_average` ativo, quando o usuário edita uma ocorrência sem alterar a flag de média, então o sistema exibe o modal de escopo perguntando se a alteração vale apenas para o lançamento atual ou também para os futuros e explicando que **Apenas este lançamento** altera somente a ocorrência atual sem recalcular os próximos, enquanto **Este e os próximos** recalcula os futuros pela média.
 - Dado uma série recorrente sem `use_average`, quando o usuário edita uma ocorrência, então o sistema mantém o comportamento atual de perguntar se deseja alterar apenas o lançamento atual ou também os futuros.
 - Dado `GET /api/transactions` com `limit` e `offset` válidos, quando os filtros de mês/conta também estão presentes, então retorna no máximo `limit` lançamentos da página solicitada com `has_more` indicando se há páginas seguintes.
 - Dado `GET /api/transactions` com `limit` acima de 5000, quando processado, então o servidor reduz o limite para 5000 sem erro.
@@ -204,6 +205,7 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 
 ## Changelog
 
+- `3.24` — 2026-08-20 — Modal de escopo em série recorrente com média ativa passa a explicar que a escolha **Apenas este lançamento** não recalcula os próximos, enquanto **Este e os próximos** os recalcula pela média; sem mudança na regra de cálculo ou no escopo aplicado.
 - `3.23` — 2026-08-17 — Modal de escopo restaurado em edições de séries recorrentes: o sistema pula o modal **somente** quando a flag de média é alterada na edição (marcada em série sem a marcação ou desmarcada em série que a tinha); com a flag inalterada — ativa ou inativa — o modal `Apenas este lançamento` / `Este e os próximos` volta a aparecer; escolhendo os próximos em série com a flag ativa, os valores futuros continuam recalculados pela média; escolhendo apenas este, a cascata não ocorre.
 - `3.22` — 2026-08-17 — Edição de lançamento recorrente passa a permitir ativar/desativar a flag de cálculo pela média: o checkbox fica habilitado no formulário de edição; ao salvar com a flag ativa (já ativa ou ativada agora), a edição aplica-se em cascata às ocorrências futuras não conciliadas sem modal, persistindo a marcação e recalculando valores pela média; ao desmarcar em série que tinha a flag ativa, a cascata segue sem recálculo e a marcação é removida no escopo; séries nunca marcadas mantêm o modal de escopo.
 - `3.21` — 2026-08-11 — Formulário de Lançamentos em conta estrangeira pré-preenche a cotação com a última PTAX até a data (antes enviava silenciosamente `1,0`, gravando `amount_brl` sem conversão — ex.: despesas de imposto em USD entravam no Cockpit como R$ 1:1); se a PTAX estiver indisponível, campo de cotação manual visível é exibido; na edição a cotação armazenada é preservada.

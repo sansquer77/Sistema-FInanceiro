@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.34
-atualizado: 2026-08-15
+versao: 3.35
+atualizado: 2026-08-20
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -16,7 +16,7 @@ tags: [arquitetura, meta]
 # Arquitetura
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-08-13 · relacionados: [[requisitos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
+> **implementado** · área: `meta` · atualizado em 2026-08-20 · relacionados: [[requisitos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
 
 ## Visão geral
 
@@ -190,6 +190,12 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `PUT` | `/api/spending-limits/{id}` |
 | `DELETE` | `/api/spending-limits/{id}` |
 
+#### Rotas — Simulações → [[efeito-borboleta]]
+
+| Método | Rota |
+|---|---|
+| `POST` | `/api/simulations/butterfly-effect` |
+
 #### Rotas — Investimentos e Portfólio → [[investimentos-portfolio]]
 
 | Método | Rota |
@@ -288,6 +294,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `secure_config.py` | Armazenamento criptografado da configuração SMTP local, segredos de IA e chaves de integrações por usuário em `secure_configs`, com compatibilidade para arquivos `.enc` legados. Ver [[recuperacao-senha]], [[tendencias-saude-financeira]], [[specs/preferencias-abas]]. |
 | `version_check.py` | Consulta a landing page oficial por nova versão, compara com a versão local e mantém cache de 1h. Ver [[alerta-nova-versao]]. |
 | `calendar.py` | Cálculo da aba **Calendário** do Cockpit: contas a receber/pagar atrasadas e vencimentos de renda fixa em 30 e 60 dias. Ver [[specs/cockpit-calendario]]. |
+| `simulations.py` | Validação e projeção comparativa, sem persistência, de cenários hipotéticos do Efeito Borboleta. Ver [[efeito-borboleta]]. |
 
 ---
 
@@ -500,6 +507,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.35` — 2026-08-20 — Sincronizada a data do callout de status com o frontmatter; documentadas a rota `POST /api/simulations/butterfly-effect` e a responsabilidade de `financeiro/simulations.py`. Ver [[specs/efeito-borboleta]].
 - `3.34` — 2026-08-16 — Consultor: prompt do card `analise_carteira` orienta a IA a encerrar todas as seções obrigatórias dentro do teto de 900 tokens de saída (encurtando justificativas se preciso, sem deixar seção pela metade), eliminando truncamento que bloqueava a entrega da análise; `max_tokens` do usuário na homologação elevado para 900. Ver [[specs/consultor]] v1.5.
 - `3.33` — 2026-08-15 — Consultor: correções no pós-processamento em `financeiro/consultor.py` — `has_section` passa a reconhecer cabeçalhos markdown (`###`) e `contains_forbidden_recommendation` ignora negações/ressalvas na janela anterior ao match (frases defensivas da IA), mantendo bloqueio de recomendações afirmativas. Ver [[specs/consultor]] v1.4.
 - `3.32` — 2026-08-15 — Consultor: todos os cards passam a receber `investor_profile` e Perfil Complementar (quando preenchido) no payload, com enriquecimento centralizado em `build_analysis_context` (perfil injetado também no card `analise_carteira`, cujo builder delegou a leitura ao contexto central) e regra global no `system_prompt` para contextualizar qualquer análise com esses dados. Ver [[specs/consultor]] v1.3.

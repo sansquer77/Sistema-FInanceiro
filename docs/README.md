@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 11.40
-atualizado: 2026-08-17
+versao: 11.42
+atualizado: 2026-08-20
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -132,6 +132,8 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `11.42` — 2026-08-20 — [[specs/lancamentos]] v3.24 e [[specs/cartoes]] v2.15: modal de escopo de série recorrente com média ativa passa a explicar que editar somente a ocorrência atual não recalcula os próximos, enquanto aplicar aos próximos recalcula pela média.
+- `11.41` — 2026-08-20 — Auditoria documental: [[arquitetura]] v3.35 passa a registrar a rota e o módulo do [[specs/efeito-borboleta]]; callouts de status sincronizados em [[specs/investimentos-portfolio]] v2.30, [[specs/relatorios]] v2.11 e [[specs/sobre-app]] v1.9.
 - `11.40` — 2026-08-17 — [[specs/lancamentos]] v3.23 e [[specs/cartoes]] v2.14: modal de escopo de edição restaurado em séries recorrentes — o modal `Apenas este lançamento` / `Este e os próximos` volta a aparecer quando a flag de média **não** é alterada (ativa ou inativa); apenas a mudança da flag (marcar em série sem marcação ou desmarcar em série marcada) continua pulando o modal e aplicando a cascata automaticamente.
 - `11.39` — 2026-08-17 — [[specs/cartoes]] v2.13: linha de referência da média no gráfico de evolução de faturas passa a usar o token `--chart-average-line` (cinza no tema claro, branca no escuro) e exibe o valor da média formatado na moeda do cartão em texto compacto ao final (lado direito) da linha. [[design/design-system]] ganha a regra do token para linhas de referência neutras.
 - `11.38` — 2026-08-17 — [[specs/cartoes]] v2.12: gráfico de evolução de faturas ganha linha horizontal de referência com a média aritmética dos valores absolutos das 5 faturas em tela (2 anteriores, atual e 2 futuras), no mesmo estilo das linhas atuais (contínua, branca) e na mesma escala vertical.

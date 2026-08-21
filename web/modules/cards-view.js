@@ -286,20 +286,20 @@ export function registerCardsView({
         && Boolean(editingCardTransaction.use_average) !== cardUseAverage.checked,
     );
     if (editingCardTransaction && editingCardTransaction.series_kind === "recurring" && cardUseAverage) {
-      // spec: cartoes v2.14 — critério 33
+      // spec: cartoes v2.15 — critério 33
       // (ao editar recorrente, o estado do checkbox de média é enviado explicitamente)
       data.use_average = cardUseAverage.checked ? "1" : "0";
     }
     if (isEditing && shouldAskFutureCardReplication(data.id)) {
       if (averageChanged) {
-        // spec: cartoes v2.14 — critérios 34, 35 e 40
+        // spec: cartoes v2.15 — critérios 34, 35 e 40
         // (flag de média alterada — marcada em série sem a marcação ou desmarcada
         //  em série que a tinha — não exibe modal e aplica em cascata)
         data.apply_to_future = true;
       } else {
-        // spec: cartoes v2.14 — critérios 24 e 38
+        // spec: cartoes v2.15 — critérios 24 e 38
         // (flag inalterada — ativa ou inativa — mantém o modal de escopo)
-        const scope = await chooseSeriesEditScope();
+        const scope = await chooseSeriesEditScope(Boolean(editingCardTransaction.use_average));
         if (!scope) {
           setFormBusy(cardTransactionForm, false);
           return;
@@ -338,7 +338,7 @@ export function registerCardsView({
   }
 
   async function handlePartialCardInvoicePayment() {
-    // spec: cartoes v2.14 — criterio 174
+    // spec: cartoes v2.15 — criterio 174
     setMessage(cardInvoiceMessage, "");
     const card = selectedCreditCard();
     const total = cardInvoiceOpenAmount();
@@ -457,10 +457,12 @@ export function registerCardsView({
     return Boolean(transaction && transaction.series_id && isInstallmentTransaction(transaction));
   }
 
-  function chooseSeriesEditScope() {
+  function chooseSeriesEditScope(useAverage = false) {
     return decisionModal.choose({
       title: "Aplicar alteração",
-      message: "Este lançamento pertence a uma série do cartão. Como deseja aplicar a mudança?",
+      message: useAverage
+        ? "Esta série do cartão calcula os valores futuros pela média. Escolha \"Apenas este lançamento\" para alterar somente esta ocorrência, sem recalcular os próximos; escolha \"Este e os próximos\" para recalculá-los pela média."
+        : "Este lançamento pertence a uma série do cartão. Como deseja aplicar a mudança?",
       actions: [
         { value: "single", label: "Apenas este lançamento", variant: "ghost" },
         { value: "future", label: "Este e os próximos", variant: "primary" },
