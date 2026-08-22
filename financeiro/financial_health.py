@@ -105,7 +105,11 @@ def calculate_financial_health_score(user_id: int, month: object | None = None, 
     }
 
 
-def calculate_financial_health_score_history(user_id: int, months: object | None = None) -> list[dict]:
+def calculate_financial_health_score_history(
+    user_id: int,
+    months: object | None = None,
+    portfolio_positions: list[dict] | None = None,
+) -> list[dict]:
     # spec: score-saude-financeira v3.5 — critérios 15, 16 e 17
     raw_months = str(months or "").strip()
     if not raw_months:
@@ -117,7 +121,8 @@ def calculate_financial_health_score_history(user_id: int, months: object | None
     if months_count < 1 or months_count > 36:
         raise FinancialHealthError("O parametro months deve estar entre 1 e 36.")
     reference_month = normalize_month()
-    portfolio_positions = current_portfolio_positions(user_id, force_refresh=False)
+    if portfolio_positions is None:
+        portfolio_positions = current_portfolio_positions(user_id, force_refresh=False)
     history = []
     for candidate_month in trailing_months(reference_month, months_count):
         entry = calculate_financial_health_score(user_id, candidate_month, portfolio_positions=portfolio_positions)

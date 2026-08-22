@@ -461,11 +461,11 @@ class ConsultorContextTest(unittest.TestCase):
             "2026-03": score_payload(score_total=650),
         }
 
-        def fake_score(user_id, month=None):
+        def fake_score(user_id, month=None, **kwargs):
             key = month or "2026-08"
             return score_payloads.get(key, score_payload(score_total=600))
 
-        with mock.patch("financeiro.financial_health.calculate_financial_health_score", side_effect=fake_score), self.profile_context():
+        with mock.patch("financeiro.financial_health.calculate_financial_health_score", side_effect=fake_score), mock.patch("financeiro.portfolio.current_portfolio_positions", return_value=[]), self.profile_context():
             context = build_analysis_context(7, "evolucao_score_tempo", period_window="6m")
 
         self.assertEqual(context["analysis_id"], "evolucao_score_tempo")

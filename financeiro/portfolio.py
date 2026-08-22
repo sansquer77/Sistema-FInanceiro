@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
@@ -9,6 +9,7 @@ import json
 import re
 import ssl
 import sqlite3
+from threading import Lock
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
@@ -27,8 +28,10 @@ BCB_SERIES_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{series}/dados/u
 BCB_SERIES_RANGE_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{series}/dados?formato=json&dataInicial={start}&dataFinal={end}"
 MARKET_QUOTE_TTL_SECONDS = 6 * 60 * 60
 INDEXER_QUOTE_TTL_SECONDS = 24 * 60 * 60
-QUOTE_MEMORY_CACHE: dict[str, tuple[datetime, dict | list]] = {}
-FX_MEMORY_CACHE: dict[tuple[str, str], int] = {}
+QUOTE_MEMORY_CACHE: OrderedDict[str, tuple[datetime, dict | list]] = OrderedDict()
+FX_MEMORY_CACHE: OrderedDict[tuple[str, str], int] = OrderedDict()
+QUOTE_MEMORY_CACHE_LOCK = Lock()
+FX_MEMORY_CACHE_LOCK = Lock()
 QUOTE_MEMORY_CACHE_MAX_ENTRIES = 512
 FX_MEMORY_CACHE_MAX_ENTRIES = 128
 
@@ -2335,15 +2338,18 @@ def cached_json_url(
 
 
 def get_memory_cached_payload(cache_key: str, now: datetime) -> dict | list | None:
-    prune_quote_memory_cache(now)
-    cached = QUOTE_MEMORY_CACHE.get(cache_key)
-    if not cached:
+    with QUOTE_MEMORY_CACHE_LOCK:
+        prune_quote_memory_cache_locked(now)
+        cached = QUOTE_MEMORY_CACHE.get(cache_key)
+        if not cached:
+            return None
+        expires_at, payload = cached
+        if expires_at > now:
+            # Move para o fim para manter política LRU sob pressão de memória.
+            QUOTE_MEMORY_CACHE.move_to_end(cache_key)
+            return payload
+        QUOTE_MEMORY_CACHE.pop(cache_key, None)
         return None
-    expires_at, payload = cached
-    if expires_at > now:
-        return payload
-    QUOTE_MEMORY_CACHE.pop(cache_key, None)
-    return None
 
 
 def get_persistent_cached_payload(cache_key: str, now: datetime, allow_stale: bool = False) -> dict | list | None:
@@ -2388,21 +2394,26 @@ def store_cached_payload(cache_key: str, payload: dict | list, expires_at: datet
 
 
 def set_quote_memory_cache(cache_key: str, expires_at: datetime, payload: dict | list, now: datetime) -> None:
-    prune_quote_memory_cache(now)
-    QUOTE_MEMORY_CACHE[cache_key] = (expires_at, payload)
-    trim_cache_to_limit(QUOTE_MEMORY_CACHE, QUOTE_MEMORY_CACHE_MAX_ENTRIES)
+    with QUOTE_MEMORY_CACHE_LOCK:
+        prune_quote_memory_cache_locked(now)
+        QUOTE_MEMORY_CACHE[cache_key] = (expires_at, payload)
+        _trim_cache_to_limit(QUOTE_MEMORY_CACHE, QUOTE_MEMORY_CACHE_MAX_ENTRIES)
 
 
 def prune_quote_memory_cache(now: datetime) -> None:
-    for key, (expires_at, _payload) in list(QUOTE_MEMORY_CACHE.items()):
-        if expires_at <= now:
-            QUOTE_MEMORY_CACHE.pop(key, None)
+    with QUOTE_MEMORY_CACHE_LOCK:
+        prune_quote_memory_cache_locked(now)
 
 
-def trim_cache_to_limit(cache: dict, max_entries: int) -> None:
+def prune_quote_memory_cache_locked(now: datetime) -> None:
+    expired_keys = [key for key, (expires_at, _payload) in QUOTE_MEMORY_CACHE.items() if expires_at <= now]
+    for key in expired_keys:
+        QUOTE_MEMORY_CACHE.pop(key, None)
+
+
+def _trim_cache_to_limit(cache: OrderedDict, max_entries: int) -> None:
     while len(cache) > max_entries:
-        oldest_key = next(iter(cache))
-        cache.pop(oldest_key, None)
+        cache.popitem(last=False)
 
 
 def read_json_url(url: str, message: str, headers: dict | None = None) -> dict | list:
@@ -2701,13 +2712,16 @@ def value_to_brl(amount_cents: int, currency: str) -> int:
 def portfolio_exchange_rate_micros(currency: str) -> int:
     quote_date = previous_business_day(date.today()).isoformat()
     cache_key = (currency, quote_date)
-    if cache_key not in FX_MEMORY_CACHE:
-        try:
-            FX_MEMORY_CACHE[cache_key] = rate_to_micros(get_exchange_rate_to_brl(currency, quote_date))
-        except Exception:
-            FX_MEMORY_CACHE[cache_key] = rate_to_micros(Decimal("1"))
-        trim_cache_to_limit(FX_MEMORY_CACHE, FX_MEMORY_CACHE_MAX_ENTRIES)
-    return FX_MEMORY_CACHE[cache_key]
+    with FX_MEMORY_CACHE_LOCK:
+        if cache_key not in FX_MEMORY_CACHE:
+            try:
+                FX_MEMORY_CACHE[cache_key] = rate_to_micros(get_exchange_rate_to_brl(currency, quote_date))
+            except Exception:
+                FX_MEMORY_CACHE[cache_key] = rate_to_micros(Decimal("1"))
+            _trim_cache_to_limit(FX_MEMORY_CACHE, FX_MEMORY_CACHE_MAX_ENTRIES)
+        else:
+            FX_MEMORY_CACHE.move_to_end(cache_key)
+        return FX_MEMORY_CACHE[cache_key]
 
 
 def previous_business_day(reference_date: date) -> date:

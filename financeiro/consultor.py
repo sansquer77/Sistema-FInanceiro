@@ -431,6 +431,7 @@ def execute_consultor_analysis(
     reference_date: date | None = None,
     ai_client=None,
     now: datetime | None = None,
+    portfolio_positions: list[dict] | None = None,
 ) -> dict:
     # spec: consultor/consultor v1.3 - criterios 7, 8, 10, 13, 34 e 38
     normalized_user_id = int(user_id)
@@ -453,6 +454,7 @@ def execute_consultor_analysis(
         period_window=normalized_period,
         reference_date=reference_date,
         investor_profile=consultor_settings["investor_profile"],
+        portfolio_positions=portfolio_positions,
     )
     system_prompt = build_system_prompt(
         normalized_analysis_id,
@@ -783,29 +785,43 @@ def build_analysis_context(
     period_window: object | None = None,
     reference_date: date | None = None,
     investor_profile: object | None = None,
+    portfolio_positions: list[dict] | None = None,
 ) -> dict:
     # spec: consultor/consultor v1.3 - criterios 7, 10, 27, 30, 34 e 38
     normalized_analysis_id = validate_analysis_id(analysis_id)
     normalized_period = validate_period_window(period_window, analysis_id=normalized_analysis_id)
+    # Otimização: calcula o portfólio uma única vez e repassa aos cards que o consomem,
+    # evitando recalcular posições/cotações múltiplas vezes na mesma análise.
+    if portfolio_positions is None and normalized_analysis_id in {
+        "alocacao_perfil",
+        "exposicao_cambial",
+        "analise_carteira",
+        "score_saude_financeira",
+        "evolucao_score_tempo",
+        "sustentabilidade_padrao_vida",
+        "destino_vencimentos",
+    }:
+        from financeiro.portfolio import current_portfolio_positions
+        portfolio_positions = current_portfolio_positions(user_id, force_refresh=False)
     if normalized_analysis_id == "ralos_financeiros":
         context = build_ralos_context(user_id, month=month, period_window=normalized_period or "3m")
     elif normalized_analysis_id == "assinaturas_recorrencias":
         context = build_subscriptions_context(user_id, month=month)
     elif normalized_analysis_id == "alocacao_perfil":
-        context = build_allocation_context(user_id)
+        context = build_allocation_context(user_id, portfolio_positions=portfolio_positions)
     elif normalized_analysis_id == "exposicao_cambial":
-        context = build_currency_exposure_context(user_id)
+        context = build_currency_exposure_context(user_id, portfolio_positions=portfolio_positions)
     elif normalized_analysis_id == "analise_carteira":
-        context = build_portfolio_analysis_context(user_id)
+        context = build_portfolio_analysis_context(user_id, portfolio_positions=portfolio_positions)
     elif normalized_analysis_id == "score_saude_financeira":
-        context = build_score_context(user_id, month=month)
+        context = build_score_context(user_id, month=month, portfolio_positions=portfolio_positions)
     elif normalized_analysis_id == "evolucao_score_tempo":
         # spec: consultor/consultor v1.7 — critério 10
-        context = build_score_evolution_context(user_id, period_window=normalized_period or "6m")
+        context = build_score_evolution_context(user_id, period_window=normalized_period or "6m", portfolio_positions=portfolio_positions)
     elif normalized_analysis_id == "sustentabilidade_padrao_vida":
-        context = build_lifestyle_context(user_id, month=month)
+        context = build_lifestyle_context(user_id, month=month, portfolio_positions=portfolio_positions)
     elif normalized_analysis_id == "destino_vencimentos":
-        context = build_maturities_context(user_id, month=month, reference_date=reference_date)
+        context = build_maturities_context(user_id, month=month, reference_date=reference_date, portfolio_positions=portfolio_positions)
     else:
         raise ConsultorError("Analise do Consultor invalida.")
     # spec: consultor/consultor v1.3 - criterio 38
@@ -854,8 +870,8 @@ def build_subscriptions_context(user_id: int, *, month: object | None) -> dict:
     }
 
 
-def build_allocation_context(user_id: int) -> dict:
-    positions = portfolio_positions(user_id)
+def build_allocation_context(user_id: int, *, portfolio_positions: list[dict] | None = None) -> dict:
+    positions = _load_portfolio_positions(user_id, portfolio_positions)
     return {
         "analysis_id": "alocacao_perfil",
         "portfolio": summarize_portfolio(positions),
@@ -863,8 +879,8 @@ def build_allocation_context(user_id: int) -> dict:
     }
 
 
-def build_currency_exposure_context(user_id: int) -> dict:
-    positions = portfolio_positions(user_id)
+def build_currency_exposure_context(user_id: int, *, portfolio_positions: list[dict] | None = None) -> dict:
+    positions = _load_portfolio_positions(user_id, portfolio_positions)
     return {
         "analysis_id": "exposicao_cambial",
         "portfolio": {
@@ -876,12 +892,12 @@ def build_currency_exposure_context(user_id: int) -> dict:
     }
 
 
-def build_portfolio_analysis_context(user_id: int) -> dict:
+def build_portfolio_analysis_context(user_id: int, *, portfolio_positions: list[dict] | None = None) -> dict:
     # spec: consultor/consultor v1.3 - criterio 30
     from financeiro.financial_health import calculate_financial_health_score
 
-    positions = portfolio_positions(user_id)
-    score = calculate_financial_health_score(user_id)
+    positions = _load_portfolio_positions(user_id, portfolio_positions)
+    score = calculate_financial_health_score(user_id, portfolio_positions=positions)
     return {
         "analysis_id": "analise_carteira",
         "portfolio": summarize_portfolio(positions),
@@ -898,10 +914,15 @@ def build_portfolio_analysis_context(user_id: int) -> dict:
     }
 
 
-def build_score_context(user_id: int, *, month: object | None) -> dict:
+def build_score_context(
+    user_id: int,
+    *,
+    month: object | None,
+    portfolio_positions: list[dict] | None = None,
+) -> dict:
     from financeiro.financial_health import calculate_financial_health_score
 
-    score = calculate_financial_health_score(user_id, month)
+    score = calculate_financial_health_score(user_id, month, portfolio_positions=portfolio_positions)
     return {
         "analysis_id": "score_saude_financeira",
         "month": score["month"],
@@ -913,15 +934,29 @@ def build_score_context(user_id: int, *, month: object | None) -> dict:
 
 
 # spec: consultor/consultor v1.7 — critérios 8 e 10
-def build_score_evolution_context(user_id: int, *, period_window: str) -> dict:
+def build_score_evolution_context(
+    user_id: int,
+    *,
+    period_window: str,
+    portfolio_positions: list[dict] | None = None,
+) -> dict:
     from financeiro.financial_health import calculate_financial_health_score
     from financeiro.financial_health import trailing_months
+    from financeiro.portfolio import current_portfolio_positions
 
-    reference_month = calculate_financial_health_score(user_id)["month"]
+    # Otimização: calcula o portfólio uma única vez e reutiliza para todos os
+    # meses da série, evitando recalcular posições/cotações 6-12 vezes.
+    if portfolio_positions is None:
+        portfolio_positions = current_portfolio_positions(user_id, force_refresh=False)
+    reference_month = calculate_financial_health_score(
+        user_id, portfolio_positions=portfolio_positions
+    )["month"]
     months = trailing_months(reference_month, 12 if period_window == "12m" else 6)
     series = []
     for month in months:
-        score = calculate_financial_health_score(user_id, month)
+        score = calculate_financial_health_score(
+            user_id, month, portfolio_positions=portfolio_positions
+        )
         series.append({
             "month": month,
             "score_total": int(score.get("score_total") or 0),
@@ -951,10 +986,15 @@ def _compact_pillars(pillars: list[dict]) -> list[dict]:
     ]
 
 
-def build_lifestyle_context(user_id: int, *, month: object | None) -> dict:
+def build_lifestyle_context(
+    user_id: int,
+    *,
+    month: object | None,
+    portfolio_positions: list[dict] | None = None,
+) -> dict:
     from financeiro.financial_health import calculate_financial_health_score
 
-    score = calculate_financial_health_score(user_id, month)
+    score = calculate_financial_health_score(user_id, month, portfolio_positions=portfolio_positions)
     return {
         "analysis_id": "sustentabilidade_padrao_vida",
         "month": score["month"],
@@ -964,14 +1004,20 @@ def build_lifestyle_context(user_id: int, *, month: object | None) -> dict:
     }
 
 
-def build_maturities_context(user_id: int, *, month: object | None, reference_date: date | None) -> dict:
+def build_maturities_context(
+    user_id: int,
+    *,
+    month: object | None,
+    reference_date: date | None,
+    portfolio_positions: list[dict] | None = None,
+) -> dict:
     from financeiro.calendar import get_cockpit_calendar
     from financeiro.trends import calculate_trends
     from financeiro.financial_health import calculate_financial_health_score
 
-    calendar = get_cockpit_calendar(user_id, reference_date=reference_date)
+    calendar = get_cockpit_calendar(user_id, reference_date=reference_date, portfolio_positions=portfolio_positions)
     trends = calculate_trends(user_id, month)
-    score = calculate_financial_health_score(user_id, month)
+    score = calculate_financial_health_score(user_id, month, portfolio_positions=portfolio_positions)
     maturity_assets = [
         *calendar.get("maturity_30_days", []),
         *calendar.get("maturity_60_days", []),
@@ -997,7 +1043,9 @@ def build_maturities_context(user_id: int, *, month: object | None, reference_da
     }
 
 
-def portfolio_positions(user_id: int) -> list[dict]:
+def _load_portfolio_positions(user_id: int, portfolio_positions: list[dict] | None = None) -> list[dict]:
+    if portfolio_positions is not None:
+        return portfolio_positions
     from financeiro.portfolio import current_portfolio_positions
 
     return current_portfolio_positions(user_id, force_refresh=False)

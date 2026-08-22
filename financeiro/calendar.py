@@ -15,14 +15,20 @@ class CalendarError(Exception):
         super().__init__(message)
 
 
-def get_cockpit_calendar(user_id: int, reference_date: date | None = None) -> dict:
+def get_cockpit_calendar(
+    user_id: int,
+    reference_date: date | None = None,
+    portfolio_positions: list[dict] | None = None,
+) -> dict:
     # spec: cockpit-calendario v0.6 — critérios 3, 4, 7, 8, 9, 10, 11, 12, 13, 14 e 15
     # (consolida contas a receber/pagar atrasadas e vencimentos de renda fixa
     #  em 30 e 60 dias a partir da data de referência do servidor)
     reference_date = reference_date or date.today()
     overdue_receivables = _fetch_overdue_transactions(user_id, reference_date, "income")
     overdue_payables = _fetch_overdue_transactions(user_id, reference_date, "expense")
-    maturity_30_days, maturity_60_days = _fetch_fixed_income_maturities(user_id, reference_date)
+    maturity_30_days, maturity_60_days = _fetch_fixed_income_maturities(
+        user_id, reference_date, portfolio_positions=portfolio_positions
+    )
 
     return {
         "reference_date": reference_date.isoformat(),
@@ -97,11 +103,18 @@ def _format_overdue_transaction(row: dict, reference_date: date) -> dict:
     }
 
 
-def _fetch_fixed_income_maturities(user_id: int, reference_date: date) -> tuple[list[dict], list[dict]]:
+def _fetch_fixed_income_maturities(
+    user_id: int,
+    reference_date: date,
+    portfolio_positions: list[dict] | None = None,
+) -> tuple[list[dict], list[dict]]:
     # spec: cockpit-calendario v0.6 — critérios 7, 8, 9, 10, 11, 12, 13, 14 e 15
     # (somente posições abertas de renda fixa; exclui encerradas, poupança, ações,
     #  fundos, cripto, previdência e outros tipos; janelas de 30 e 60 dias sem sobreposição)
-    positions = current_portfolio_positions(user_id)
+    if portfolio_positions is None:
+        positions = current_portfolio_positions(user_id)
+    else:
+        positions = portfolio_positions
     maturity_30_days: list[dict] = []
     maturity_60_days: list[dict] = []
     for position in positions:

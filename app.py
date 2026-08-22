@@ -97,7 +97,7 @@ from financeiro.financial_health import (
 )
 from financeiro.imports import import_organizze_transactions, import_system_template, system_import_template
 from financeiro.operation_logs import create_operation_log, get_operation_log, list_operation_logs
-from financeiro.portfolio import close_position, create_opening_position, delete_opening_position, fetch_fund_quote_for_user, get_portfolio, get_portfolio_returns, redeem_position, update_opening_position, update_position_value_override
+from financeiro.portfolio import close_position, create_opening_position, current_portfolio_positions, delete_opening_position, fetch_fund_quote_for_user, get_portfolio, get_portfolio_returns, redeem_position, update_opening_position, update_position_value_override
 from financeiro.portfolio import PortfolioError
 from financeiro.secure_config import (
     SecureConfigError,
@@ -713,7 +713,9 @@ class AppHandler(BaseHTTPRequestHandler):
         if not self.validate_read_source():
             return
         user = self.require_user()
-        payload = get_cockpit_calendar(user["id"])
+        # Otimização: calcula o portfólio uma única vez por requisição.
+        positions = current_portfolio_positions(user["id"], force_refresh=False)
+        payload = get_cockpit_calendar(user["id"], portfolio_positions=positions)
         payload["ia_ativa"] = ai_summary_enabled(user["id"])
         self.send_json(payload)
 
@@ -725,7 +727,9 @@ class AppHandler(BaseHTTPRequestHandler):
         query = parse_qs(urlsplit(self.path).query)
         month = (query.get("month") or [date.today().strftime("%Y-%m")])[0]
         try:
-            self.send_json(calculate_financial_health_score(user["id"], month))
+            # Otimização: calcula o portfólio uma única vez por requisição.
+            positions = current_portfolio_positions(user["id"], force_refresh=False)
+            self.send_json(calculate_financial_health_score(user["id"], month, portfolio_positions=positions))
         except FinancialHealthError as exc:
             self.send_json({"error": exc.message}, exc.status)
 
@@ -737,7 +741,9 @@ class AppHandler(BaseHTTPRequestHandler):
         query = parse_qs(urlsplit(self.path).query)
         months = (query.get("months") or [None])[0]
         try:
-            self.send_json({"history": calculate_financial_health_score_history(user["id"], months)})
+            # Otimização: calcula o portfólio uma única vez por requisição.
+            positions = current_portfolio_positions(user["id"], force_refresh=False)
+            self.send_json({"history": calculate_financial_health_score_history(user["id"], months, portfolio_positions=positions)})
         except FinancialHealthError as exc:
             self.send_json({"error": exc.message}, exc.status)
 
@@ -846,11 +852,14 @@ class AppHandler(BaseHTTPRequestHandler):
         user = self.require_user()
         data = self.read_json()
         try:
+            # Otimização: calcula o portfólio uma única vez por requisição.
+            positions = current_portfolio_positions(user["id"], force_refresh=False)
             self.send_json(execute_consultor_analysis(
                 user["id"],
                 data.get("analysis_id"),
                 month=data.get("month"),
                 period_window=data.get("period_window"),
+                portfolio_positions=positions,
             ), status=HTTPStatus.CREATED)
         except ConsultorError as exc:
             self.send_consultor_error(exc)
@@ -955,7 +964,9 @@ class AppHandler(BaseHTTPRequestHandler):
         user = self.require_user()
         query = parse_qs(urlsplit(self.path).query)
         force_refresh = (query.get("refresh") or [""])[0].lower() in {"1", "true", "yes", "sim"}
-        self.send_json(get_portfolio_returns(user["id"], force_refresh=force_refresh))
+        # Otimização: reutiliza as posições já calculadas por get_portfolio.
+        portfolio = get_portfolio(user["id"], force_refresh=force_refresh)
+        self.send_json(get_portfolio_returns(user["id"], force_refresh=force_refresh, positions=portfolio.get("positions") or []))
 
     def handle_portfolio_fund_quote(self) -> None:
         # spec: lancamentos v3.24 — criterio cota-fundo-lancamento
