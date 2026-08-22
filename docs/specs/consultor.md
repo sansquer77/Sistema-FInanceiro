@@ -2,7 +2,7 @@
 tipo: spec
 area: consultor
 status: implementado
-versao: 1.6
+versao: 1.7
 atualizado: 2026-08-22
 relacionados:
   - "[[instrucoes-app]]"
@@ -36,7 +36,7 @@ Usuário autenticado que já possui os dados no sistema (lançamentos, portfóli
 2. Em Preferências, o usuário ativa especificamente o módulo **Consultor**. Ao habilitar, um pop-up de consentimento informa que o Consultor usará a IA configurada e terá acesso aos dados financeiros já registrados no app (carteira, lançamentos, contas, score) para gerar as análises; se o usuário recusar, o Consultor permanece **desabilitado**.
 3. O usuário seleciona seu perfil de investidor: **Conservador**, **Moderado** ou **Arrojado** no menu de Preferências.
 4. Na primeira ativação, o sistema exibe o formulário opcional **Perfil Complementar** (idade, imóvel próprio, dependentes, objetivo financeiro principal, horizonte de investimento, renda aproximada, tolerância a perdas). O usuário pode responder total ou parcialmente, ou pular todas as perguntas sem impedir a ativação do módulo. As respostas ficam disponíveis para edição ou remoção a qualquer momento em Preferências.
-5. O usuário acessa a aba **Consultor** do Cockpit, único ponto de entrada do módulo. Em vez de um campo de texto, o sistema exibe o **Catálogo de Análises** em um seletor fechado, com categoria e nome de cada análise (Orçamento e Tendências, Portfólio e Risco, Saúde Financeira, Decisões e Planejamento).
+5. O usuário acessa a aba **Consultor** do Cockpit, único ponto de entrada do módulo. Em vez de um campo de texto, o sistema exibe o **Catálogo de Análises** em um seletor fechado, com categoria e nome de cada análise (Orçamento e Tendências, Portfólio e Risco, Saúde Financeira, Decisões e Planejamento), incluindo a opção de evolução histórica do Score.
 6. O usuário escolhe a análise desejada no seletor (ex.: "Termômetro de Assinaturas e Recorrências") e aciona o botão único **Gerar**. Para "Detecção de Anomalias e 'Ralos' Financeiros", o seletor de período aparece ao lado, com opções fechadas (**3, 6, 12 meses ou YTD**) — nunca um campo de texto ou data livre.
 7. O sistema monta o payload minimizado com os dados relevantes daquele domínio (ex.: lançamentos recorrentes da categoria "Assinaturas e Serviços"), aplica o `analysis_id` a um prompt estrito e imutável já blindado no backend, envia à IA e renderiza o relatório estruturado na tela, com o disclaimer educacional ao final.
 8. O usuário pode consultar o histórico de análises já geradas na mesma aba, revisitando relatórios anteriores. Se desabilitar a IA geral ou desabilitar o Consultor nas Preferências (revogando o consentimento), todo o histórico é **expurgado automaticamente**.
@@ -49,7 +49,7 @@ Usuário autenticado que já possui os dados no sistema (lançamentos, portfóli
 | `consultor_enabled` | booleano | Indica se o módulo Consultor está habilitado para o usuário. Fica em tabela própria do Consultor, separada da configuração geral de IA. |
 | `data_access_consent` | booleano | Indica se o usuário aceitou, via pop-up nas Preferências, que a IA acesse os dados financeiros do app. Se `false`/recusado, o Consultor permanece desabilitado. |
 | `analysis_id` | texto (enum) | Identificador da análise selecionada (ver "Catálogo de Análises"). |
-| `period_window` | texto (enum), opcional | Período de comparação selecionado pelo usuário: `3m`, `6m`, `12m` ou `ytd`. Padrão: `3m`. Aplicável apenas ao card `ralos_financeiros`; `null`/ausente para os demais cards. |
+| `period_window` | texto (enum), opcional | Período de comparação selecionado pelo usuário. Opções permitidas dependem do card: `ralos_financeiros` aceita `3m`, `6m`, `12m` ou `ytd` (padrão `3m`); `evolucao_score_tempo` aceita `6m` ou `12m` (padrão `6m`). `null`/ausente para os demais cards. |
 | `analysis_output` | texto | Conteúdo do relatório gerado pela IA para aquela execução. |
 | `analysis_history` | lista | Histórico de análises geradas, persistido no **SQLite** — uma linha por execução em `consultor_analyses`, com `analysis_id`, `analysis_output` e `created_at`. |
 | `analysis_execution_id` | inteiro | Identificador único da execução no histórico. |
@@ -172,7 +172,7 @@ Regras específicas:
 
 ### Catálogo de Análises
 
-A aba **Consultor** exibe um seletor fechado com as 8 análises; cada opção inclui sua categoria e nome. A análise selecionada aciona um prompt estrito, fixo e **imutável pelo usuário**, blindado no backend — o usuário nunca edita o texto da instrução, apenas escolhe qual análise executar.
+A aba **Consultor** exibe um seletor fechado com as 9 análises; cada opção inclui sua categoria e nome. A análise selecionada aciona um prompt estrito, fixo e **imutável pelo usuário**, blindado no backend — o usuário nunca edita o texto da instrução, apenas escolhe qual análise executar.
 
 #### Categoria 1 — Orçamento e Tendências
 
@@ -197,6 +197,7 @@ A aba **Consultor** exibe um seletor fechado com as 8 análises; cada opção in
 | `analysis_id` | Card | Prompt estrito (backend) | Dados de entrada |
 |---|---|---|---|
 | `score_saude_financeira` | **Diagnóstico do Score de Saúde Financeira** | "Analise os 5 pilares do Score de Saúde Financeira do usuário (Poupança, Reserva, Endividamento, Limites, Concentração) e indique qual pilar está mais fraco, propondo foco de melhoria." | Score e seus 5 pilares. |
+| `evolucao_score_tempo` | **Evolução do Score no Tempo** | "Analise a trajetória dos 5 pilares do Score de Saúde Financeira nos últimos {period_label}. Compare mês a mês os pilares Poupança, Reserva, Endividamento, Limites e Concentração, identifique qual pilar melhorou, qual piorou e se as ações do usuário estão produzindo resultado. Apresente a evolução em uma tabela markdown com os meses nas linhas e os cinco pilares nas colunas, e conclua com uma interpretação textual objetiva." | Série histórica do Score de Saúde Financeira (6 ou 12 meses) com os 5 pilares por mês. |
 | `sustentabilidade_padrao_vida` | **Sustentabilidade do Padrão de Vida (Paz Financeira)** | "Usando a base de receitas recorrentes do usuário, compare o padrão de vida atual (gastos e composição do orçamento) com referências ideais de gastos e independência financeira." | Receitas recorrentes, indicadores de Paz Financeira. |
 
 #### Categoria 4 — Decisões e Planejamento
@@ -213,6 +214,7 @@ A aba **Consultor** exibe um seletor fechado com as 8 análises; cada opção in
 - Cada card exibe, junto ao título, uma frase curta descrevendo o que a análise entrega (ex.: "Descubra seus 3 maiores gastos atípicos do mês").
 - Os `[placeholders]` como `[Conservador/Moderado/Arrojado]` são resolvidos no backend a partir de `investor_profile` antes de montar o prompt final — nunca chegam como texto livre editável.
 - O card `ralos_financeiros` exibe, antes do botão de acionar, um seletor de **período** com quatro opções fechadas: **3 meses**, **6 meses**, **12 meses** e **YTD (ano corrente)**. O valor escolhido é enviado como `period_window` (enum) e resolvido no `[período selecionado]` do prompt estrito acima — não é um campo de texto nem aceita datas arbitrárias. Padrão pré-selecionado: **3 meses**.
+- O card `evolucao_score_tempo` exibe um seletor de **período** com duas opções fechadas: **6 meses** e **12 meses**. O valor escolhido é enviado como `period_window` (`6m` ou `12m`) e reflete a janela histórica dos pilares do Score. Padrão pré-selecionado: **6 meses**.
 
 ### Diretrizes de resposta
 
@@ -357,9 +359,13 @@ Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regr
 - Dado um usuário sem IA geral configurada e habilitada, quando tenta habilitar o Consultor, então o sistema informa que a configuração de IA precisa ser concluída antes de ativar o módulo.
 - Dado um usuário com IA geral ativa, Consultor habilitado e consentimento aceito, quando acessa a aba **Consultor**, então o seletor de análises e o botão **Gerar** ficam disponíveis; se qualquer uma dessas três condições faltar, eles não são exibidos.
 - Dado um usuário com o Consultor desativado, quando acessa a aba **Consultor** no Cockpit, então a aba exibe o aviso de que a função precisa ser ativada nas Preferências, sem exibir os cards.
-- Dado um usuário com o Consultor habilitado, quando acessa a aba **Consultor** do Cockpit, então encontra um seletor com as 8 análises, identificadas por categoria e nome, um único botão **Gerar** e a resposta abaixo dos controles ocupando toda a largura disponível, **sem nenhum campo de digitação de texto livre**.
+- Dado um usuário com o Consultor habilitado, quando acessa a aba **Consultor** do Cockpit, então encontra um seletor com as 9 análises, identificadas por categoria e nome, um único botão **Gerar** e a resposta abaixo dos controles ocupando toda a largura disponível, **sem nenhum campo de digitação de texto livre**.
 - Dado um usuário com o Consultor habilitado, quando procura por um botão flutuante ou ícone de cartola em outras telas, então não encontra nenhum ponto de acesso fora da aba **Consultor**.
 - Dado um usuário que clica no card "Diagnóstico do Score de Saúde Financeira", quando o sistema processa a requisição, então o endpoint `POST /api/consultor/analyze` é acionado com `analysis_id: "score_saude_financeira"` e o payload enviado à IA contém apenas os agregados do Score, sem transações cruas.
+- Dado um usuário que seleciona o card "Evolução do Score no Tempo", quando visualiza os controles antes de acionar a análise, então encontra um seletor com as opções fechadas **6 meses** e **12 meses**, pré-selecionado em **6 meses**, sem campo de texto ou data livre.
+- Dado um usuário que seleciona **12 meses** e aciona o card `evolucao_score_tempo`, quando a requisição é processada, então o `period_window` enviado é `12m` e o payload contém a série histórica dos 5 pilares do Score (Poupança, Reserva, Endividamento, Limites, Concentração) para cada um dos 12 meses, sem transações cruas.
+- Dado uma requisição a `POST /api/consultor/analyze` com `analysis_id: "evolucao_score_tempo"` e um `period_window` fora do enum (`6m` ou `12m`), quando processada, então o sistema rejeita a requisição sem acionar a IA.
+- Dado o resultado do card "Evolução do Score no Tempo", quando renderizado, então a resposta inclui uma tabela markdown comparando os 5 pilares mês a mês (convertida para HTML na interface) seguida de interpretação textual da trajetória.
 - Dado um usuário com perfil **Conservador** configurado, quando aciona o card "Avaliação de Alocação vs. Perfil", então a análise usa como referência a faixa de 70% a 90% em renda fixa.
 - Dado uma requisição a `POST /api/consultor/analyze` com um `analysis_id` fora do enum fechado de cards, quando processada, então o sistema rejeita a requisição sem acionar a IA.
 - Dado um usuário que aciona o card "Melhor Destino para Investimentos a Vencer", quando o sistema processa a requisição, então o payload enviado à IA contém apenas os ativos com vencimento em até 60 dias, a projeção de fluxo de caixa de 3 meses e os pilares Reserva/Endividamento do Score — nunca a carteira completa nem lançamentos não relacionados.
@@ -405,7 +411,7 @@ Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regr
 ## Plano de implementação
 
 > [!info] Execução
-> Esta spec está **implementada**. O código, as rotas, a UI, os testes automatizados, a validação em homologação e o versionamento do produto foram concluídos.
+> Esta spec está **implementada**. O card "Evolução do Score no Tempo" foi adicionado ao catálogo fechado do Consultor, com backend, frontend, testes automatizados e documentação sincronizada.
 
 - [x] Passo 1 — Preparar a implantação documental: revisar esta spec contra [[requisitos]], [[arquitetura]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]], [[adr/0003-sqlite-fonte-de-verdade]] e [[adr/0010-segredos-criptografados-sqlite]]; confirmar que não há decisão técnica pendente nem necessidade de novo ADR antes do código. Entregável: checklist documental validado e, se necessário, ADR criado antes da implementação.
 - [x] Passo 2 — Criar migrações idempotentes em `financeiro/database.py` para `consultor_settings`, `consultor_analyses` e `consultor_perfil_complementar`, com `user_id` isolado por usuário, `ON DELETE CASCADE` quando aplicável, índices para histórico/quota diária e `payload_enc` como único campo sensível do Perfil Complementar. Fecha: critérios de persistência, isolamento por usuário, quota diária e inspeção direta do SQLite sem dados sensíveis em texto puro.
@@ -427,6 +433,7 @@ Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regr
 - [x] Passo 18 — Atualizar documentação após a implementação: [[arquitetura]] com rotas/tabelas/fluxos, [[requisitos]] se o escopo geral mudar, [[instrucoes-app]] com uso do Consultor, esta spec com passos marcados e status adequado, e [[README]] do vault. Entregável: documentação sincronizada com código e testes.
 - [x] Passo 19 — Validar em homologação manual: IA geral ausente, IA configurada, consentimento recusado/aceito, Perfil Complementar vazio/parcial/completo, cada card do catálogo, período de `ralos_financeiros`, histórico, exclusão de histórico, desligamento de IA/Consultor e mensagens de indisponibilidade. Entregável: evidências ou checklist de homologação atualizado.
 - [x] Passo 20 — Avaliar versionamento de produto e distribuição: se o módulo for implementado, recomendar incremento **MINOR**, atualizar `financeiro/app_metadata.py` somente se solicitado/aprovado e revisar pacotes/instruções de atualização para usuários existentes. Entregável: recomendação de versão e impactos operacionais claros.
+- [x] Passo 21 — Adicionar o card `evolucao_score_tempo` ao catálogo fechado do Consultor: estender `AnalysisCard` para declarar as opções de `period_window` permitidas por card; incluir o novo card na categoria **Saúde Financeira** com prompt estrito que peça tabela markdown mês a mês dos 5 pilares e interpretação textual; implementar `build_score_evolution_context` reutilizando `calculate_financial_health_score` para cada mês da janela histórica (6 ou 12 meses); atualizar `validate_period_window` para rejeitar valores fora das opções do card; ajustar `web/modules/consultor-view.js` para renderizar o seletor de período com as opções declaradas pelo backend e manter o padrão compatível com o card selecionado; adicionar testes de domínio e API cobrindo o novo card e as opções restritas de período. Fecha: critérios de aceite do card "Evolução do Score no Tempo".
 
 ### Checklist de homologação do Passo 19
 
@@ -476,6 +483,7 @@ _Nenhuma pendência em aberto._
 
 ## Changelog
 
+- `1.7` — 2026-08-22 — Adicionado o card **Evolução do Score no Tempo** (`evolucao_score_tempo`) na Categoria Saúde Financeira, com seletor fechado de 6 ou 12 meses, contexto histórico dos 5 pilares do Score e prompt estrito que exige tabela markdown mês a mês + interpretação textual; `AnalysisCard` passa a declarar `period_window_options` por card e a validação rejeita valores fora das opções permitidas; catálogo atualizado de 8 para 9 cards.
 - `1.6` — 2026-08-22 — Layout da subaba **Análises** substitui a grade de cards por um seletor fechado das 8 análises (categoria + nome) e botão único **Gerar**; o período de `ralos_financeiros` aparece ao lado e a resposta passa a ocupar toda a largura abaixo dos controles, preservando catálogo fechado, API, histórico e ausência de texto livre.
 - `1.5` — 2026-08-16 — Card **Análise da Carteira**: o prompt deixa de pedir resposta "sem restrição de concisão" (que fazia a IA esgotar os 900 tokens de saída e truncar no meio das seções finais, bloqueando a entrega com "indisponível") e passa a orientar completude dentro do teto — encerrar todas as seções obrigatórias, encurtando justificativas da tabela/bullets se preciso, nunca deixando seção pela metade. Homologação: `max_tokens` do usuário elevado de 700 para 900 (teto da spec) e execuções reais do card validados (2 execuções completas com todas as seções).
 - `1.4` — 2026-08-15 — Correções no pós-processamento: (a) `has_section` — o quantificador `#{1,6}` dentro de f-string era interpretado como tupla `(1, 6)`, fazendo respostas com cabeçalhos markdown `### Seção` (formato comum do Gemini) falharem na validação de seções obrigatórias e derrubarem o Consultor com "indisponível"; corrigido com `#{{1,6}}` e coberto por testes de regressão (formatos `###`, `##` e `**bold**`). (b) `has_section` passa a normalizar acentos no texto (a IA alterna "Análise de Dados" e "Analise de Dados"), evitando bloqueio indevido de respostas com cabeçalhos acentuados. (c) `contains_forbidden_recommendation` — frases defensivas da IA ("não constitui recomendação de compra de ações", "sem recomendar compra de fundos") eram bloqueadas como recomendação vedada, gerando resposta de recusa indevida; o match agora exige ausência de negação/ressalva na janela anterior (janela curta para o padrão "recomendo <verbo>", preservando o bloqueio de recomendações afirmativas como "sem dúvida, recomendo comprar ações X").

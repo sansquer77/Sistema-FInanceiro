@@ -85,6 +85,10 @@ PERIOD_WINDOWS = {
     "12m": "12 meses",
     "ytd": "YTD (ano corrente)",
 }
+SCORE_EVOLUTION_WINDOWS = {
+    "6m": "6 meses",
+    "12m": "12 meses",
+}
 CONSULTOR_MAX_TOKENS = 900
 CONSULTOR_MIN_TIMEOUT_SECONDS = 20
 CONSULTOR_DAILY_QUOTA = 20
@@ -147,6 +151,7 @@ class AnalysisCard:
     strict_prompt: str
     input_scope: str
     requires_period_window: bool = False
+    period_window_options: tuple[str, ...] = ()
 
 
 ANALYSIS_CATALOG: tuple[AnalysisCard, ...] = (
@@ -167,6 +172,7 @@ ANALYSIS_CATALOG: tuple[AnalysisCard, ...] = (
             "pontuais do modulo de Tendencias e nivel de endividamento."
         ),
         requires_period_window=True,
+        period_window_options=("3m", "6m", "12m", "ytd"),
     ),
     AnalysisCard(
         analysis_id="assinaturas_recorrencias",
@@ -239,6 +245,24 @@ ANALYSIS_CATALOG: tuple[AnalysisCard, ...] = (
         ),
         input_scope="Score de Saude Financeira e seus 5 pilares.",
     ),
+    # spec: consultor/consultor v1.7 — critérios 8, 9 e 10
+    AnalysisCard(
+        analysis_id="evolucao_score_tempo",
+        title="Evolucao do Score no Tempo",
+        short_description="Veja a trajetoria dos 5 pilares do Score nos ultimos meses.",
+        category="Saude Financeira",
+        strict_prompt=(
+            "Analise a trajetoria dos 5 pilares do Score de Saude Financeira do usuario nos "
+            "ultimos {period_label} (Poupanca, Reserva, Endividamento, Limites, Concentracao). "
+            "Compare mes a mes os valores dos pilares, identifique qual pilar melhorou, qual piorou "
+            "e se as acoes do usuario estao produzindo resultado. Apresente a evolucao em uma tabela "
+            "markdown com os meses nas linhas e os cinco pilares nas colunas, e conclua com uma "
+            "interpretacao textual objetiva."
+        ),
+        input_scope="Serie historica do Score de Saude Financeira (6 ou 12 meses) com os 5 pilares por mes.",
+        requires_period_window=True,
+        period_window_options=("6m", "12m"),
+    ),
     AnalysisCard(
         analysis_id="sustentabilidade_padrao_vida",
         title="Sustentabilidade do Padrao de Vida (Paz Financeira)",
@@ -289,6 +313,7 @@ def list_analysis_cards() -> list[dict]:
             "category": card.category,
             "input_scope": card.input_scope,
             "requires_period_window": card.requires_period_window,
+            "period_window_options": list(card.period_window_options),
         }
         for card in ANALYSIS_CATALOG
     ]
@@ -309,13 +334,22 @@ def validate_analysis_id(value: object) -> str:
 
 
 def validate_period_window(value: object, *, analysis_id: str) -> str | None:
+    # spec: consultor/consultor v1.7 — critérios 9 e 10
     card = CATALOG_BY_ID[validate_analysis_id(analysis_id)]
     if not card.requires_period_window:
         return None
-    period_window = str(value or "3m").strip().lower()
-    if period_window not in PERIOD_WINDOWS:
+    allowed = card.period_window_options or tuple(PERIOD_WINDOWS.keys())
+    default = allowed[0] if allowed else "3m"
+    period_window = str(value or default).strip().lower()
+    if period_window not in allowed:
         raise ConsultorError("Periodo de analise invalido.")
     return period_window
+
+
+def _period_label(analysis_id: str, period: str | None) -> str:
+    if analysis_id == "evolucao_score_tempo":
+        return SCORE_EVOLUTION_WINDOWS.get(period or "6m", "6 meses")
+    return PERIOD_WINDOWS.get(period or "3m", PERIOD_WINDOWS["3m"])
 
 
 def build_system_prompt(
@@ -330,9 +364,10 @@ def build_system_prompt(
     period = validate_period_window(period_window, analysis_id=normalized_analysis_id)
     card = CATALOG_BY_ID[normalized_analysis_id]
     profile_label = str(INVESTOR_PROFILES[profile]["label"])
+    period_label = _period_label(card.analysis_id, period)
     prompt = card.strict_prompt.format(
         profile_label=profile_label,
-        period_label=PERIOD_WINDOWS[period] if period else PERIOD_WINDOWS["3m"],
+        period_label=period_label,
     )
     sections = "\n".join(f"- {section}" for section in RESPONSE_SECTIONS)
     if normalized_analysis_id == "analise_carteira":
@@ -764,6 +799,9 @@ def build_analysis_context(
         context = build_portfolio_analysis_context(user_id)
     elif normalized_analysis_id == "score_saude_financeira":
         context = build_score_context(user_id, month=month)
+    elif normalized_analysis_id == "evolucao_score_tempo":
+        # spec: consultor/consultor v1.7 — critério 10
+        context = build_score_evolution_context(user_id, period_window=normalized_period or "6m")
     elif normalized_analysis_id == "sustentabilidade_padrao_vida":
         context = build_lifestyle_context(user_id, month=month)
     elif normalized_analysis_id == "destino_vencimentos":
@@ -872,6 +910,45 @@ def build_score_context(user_id: int, *, month: object | None) -> dict:
         "insufficient_data": bool(score.get("dados_insuficientes")),
         "pillars": score.get("pilares") or [],
     }
+
+
+# spec: consultor/consultor v1.7 — critérios 8 e 10
+def build_score_evolution_context(user_id: int, *, period_window: str) -> dict:
+    from financeiro.financial_health import calculate_financial_health_score
+    from financeiro.financial_health import trailing_months
+
+    reference_month = calculate_financial_health_score(user_id)["month"]
+    months = trailing_months(reference_month, 12 if period_window == "12m" else 6)
+    series = []
+    for month in months:
+        score = calculate_financial_health_score(user_id, month)
+        series.append({
+            "month": month,
+            "score_total": int(score.get("score_total") or 0),
+            "level": score.get("nivel"),
+            "insufficient_data": bool(score.get("dados_insuficientes")),
+            "pillars": _compact_pillars(score.get("pilares") or []),
+        })
+    return {
+        "analysis_id": "evolucao_score_tempo",
+        "period_window": period_window,
+        "reference_month": reference_month,
+        "series": series,
+    }
+
+
+def _compact_pillars(pillars: list[dict]) -> list[dict]:
+    return [
+        {
+            "id": pillar.get("id"),
+            "label": pillar.get("label"),
+            "score": int(pillar.get("score") or 0),
+            "max_score": int(pillar.get("max_score") or 0),
+            "percentual": pillar.get("percentual"),
+            "nivel": pillar.get("nivel"),
+        }
+        for pillar in pillars
+    ]
 
 
 def build_lifestyle_context(user_id: int, *, month: object | None) -> dict:

@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.36
+versao: 3.37
 atualizado: 2026-08-22
 relacionados:
   - "[[requisitos]]"
@@ -33,7 +33,7 @@ docs/               Requisitos, arquitetura, specs e referências
 
 O servidor HTTP revalida arquivos estáticos com `ETag` e `Last-Modified`; arquivos não versionados usam `Cache-Control: no-cache` para permitir `304 Not Modified` sem cache agressivo. Respostas JSON acima de 1 KB podem ser comprimidas com gzip quando o cliente envia `Accept-Encoding: gzip`.
 
-O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Cockpit > Consultor**. Em Preferências, o usuário configura a IA geral, ativa o Consultor, aceita o consentimento de acesso aos dados e pode preencher/remover o Perfil Complementar criptografado. No Cockpit, a aba Consultor exibe os indicadores de atrasos/vencimentos, a subaba **Análises** com catálogo fechado em seletor e a subaba **Histórico** com filtro textual. O módulo não possui prompt livre: cada execução envia apenas o contexto minimizado da análise escolhida e persiste somente respostas bem-sucedidas.
+O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Cockpit > Consultor**. Em Preferências, o usuário configura a IA geral, ativa o Consultor, aceita o consentimento de acesso aos dados e pode preencher/remover o Perfil Complementar criptografado. No Cockpit, a aba Consultor exibe os indicadores de atrasos/vencimentos, a subaba **Análises** com catálogo fechado de 9 análises em seletor (incluindo o card `evolucao_score_tempo` com seletor de 6/12 meses), botão único **Gerar** e a subaba **Histórico** com filtro textual. O módulo não possui prompt livre: cada execução envia apenas o contexto minimizado da análise escolhida e persiste somente respostas bem-sucedidas.
 
 ---
 
@@ -287,7 +287,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `financial_health.py` | Núcleo analítico do Score de Saúde Financeira: cálculo atômico dos pilares, lista `pilares`, Paz Financeira e função de histórico com validação de `months` (1-36). Ver [[score-saude-financeira]]. |
 | `trends.py` | Núcleo local de Tendências e Achados: série mensal, Budget x Realizado, achados estruturados, eventos pontuais, assinaturas/serviços recorrentes, confiança e resumo determinístico. Ver [[tendencias-saude-financeira]]. |
 | `ai_summary.py` | Reescrita opcional do resumo por IA com payload minimizado, timeout curto e fallback para resumo local. Ver [[tendencias-saude-financeira]]. |
-| `consultor.py` | Domínio do Consultor: catálogo fechado de 8 análises, validações de enums, prompts estritos, persona, disclaimer, configuração por usuário, Perfil Complementar criptografado, contexto minimizado por card, metadados de cotações herdados do Portfólio, executor de IA via `user_ai_settings`, pós-processamento de respostas, quota/cooldown de resiliência e expurgo de histórico por privacidade. Ver [[specs/consultor]]. |
+| `consultor.py` | Domínio do Consultor: catálogo fechado de 9 análises, validações de enums, prompts estritos, persona, disclaimer, configuração por usuário, Perfil Complementar criptografado, contexto minimizado por card (incluindo série histórica dos 5 pilares do Score para o card `evolucao_score_tempo`), metadados de cotações herdados do Portfólio, executor de IA via `user_ai_settings`, pós-processamento de respostas, quota/cooldown de resiliência e expurgo de histórico por privacidade. Ver [[specs/consultor]]. |
 | `imports.py` | Leitura de exportações Organizze e planilhas modelo. Ver [[importacao-organizze]]. |
 | `operation_logs.py` | Auditoria funcional das operações do usuário. Ver [[historico-operacoes]]. |
 | `emailer.py` | Envio SMTP do código de recuperação de senha. Ver [[recuperacao-senha]]. |
@@ -507,6 +507,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.37` — 2026-08-22 — Consultor: catálogo ampliado para 9 análises com o card `evolucao_score_tempo` (Evolução do Score no Tempo), que envia série histórica dos 5 pilares do Score para 6 ou 12 meses; `AnalysisCard` passa a declarar `period_window_options` por card e o frontend renderiza as opções declaradas pelo backend. Ver [[specs/consultor]] v1.7.
 - `3.36` — 2026-08-22 — `consultor-view.js` passa a exibir seletor fechado de análises, botão único de geração e período condicional para ralos; a resposta ocupa a largura abaixo dos controles. Ver [[specs/consultor]] v1.6.
 - `3.35` — 2026-08-20 — Sincronizada a data do callout de status com o frontmatter; documentadas a rota `POST /api/simulations/butterfly-effect` e a responsabilidade de `financeiro/simulations.py`. Ver [[specs/efeito-borboleta]].
 - `3.34` — 2026-08-16 — Consultor: prompt do card `analise_carteira` orienta a IA a encerrar todas as seções obrigatórias dentro do teto de 900 tokens de saída (encurtando justificativas se preciso, sem deixar seção pela metade), eliminando truncamento que bloqueava a entrega da análise; `max_tokens` do usuário na homologação elevado para 900. Ver [[specs/consultor]] v1.5.

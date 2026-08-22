@@ -181,9 +181,20 @@ export function registerConsultorView({
     if (!cards.some((card) => card.analysis_id === selectedAnalysisId)) {
       selectedAnalysisId = cards[0]?.analysis_id || "";
     }
+    const initialCard = cards.find((card) => card.analysis_id === selectedAnalysisId);
+    if (initialCard?.requires_period_window) {
+      const options = getPeriodWindowOptions(initialCard);
+      const currentIsAllowed = options.some((option) => option.value === selectedPeriodWindow);
+      if (!currentIsAllowed && options.length) {
+        selectedPeriodWindow = options[0].value;
+      }
+    }
     consultorCardGrid.innerHTML = renderAnalysisSelector(cards);
     consultorCardGrid.querySelector("[data-consultor-analysis]")?.addEventListener("change", (event) => {
       selectedAnalysisId = event.target.value || "";
+      const newCard = (consultorConfig?.cards || []).find((item) => item.analysis_id === selectedAnalysisId);
+      const options = newCard?.requires_period_window ? getPeriodWindowOptions(newCard) : [];
+      selectedPeriodWindow = options.length ? options[0].value : "3m";
       renderConsultor();
     });
     consultorCardGrid.querySelector("[data-consultor-period]")?.addEventListener("change", (event) => {
@@ -228,21 +239,21 @@ export function registerConsultorView({
   }
 
   function renderAnalysisSelector(cards) {
-    // spec: consultor/consultor v1.6 — critérios 3, 5 e 14
-    // (o catálogo permanece fechado; a interface apenas concentra a escolha
-    // em um seletor e mantém o período restrito ao card de ralos)
+    // spec: consultor/consultor v1.7 — critérios 8, 9 e 14
+    // (o catálogo permanece fechado; a interface concentra a escolha em um
+    // seletor e renderiza as opções de período declaradas pelo backend para
+    // cada card que exige período — ralos usa 3/6/12/YTD; evolução do score
+    // usa apenas 6/12 meses)
     const card = cards.find((item) => item.analysis_id === selectedAnalysisId);
     if (!card) {
       return '<div class="empty-state compact">Nenhuma análise disponível.</div>';
     }
     const isRunning = runningAnalysisId === card.analysis_id;
-    const period = card.requires_period_window
+    const periodOptions = card.requires_period_window ? getPeriodWindowOptions(card) : [];
+    const period = periodOptions.length
       ? `<label class="consultor-period-select">Período
           <select data-consultor-period>
-            <option value="3m" ${selectedPeriodWindow === "3m" ? "selected" : ""}>3 meses</option>
-            <option value="6m" ${selectedPeriodWindow === "6m" ? "selected" : ""}>6 meses</option>
-            <option value="12m" ${selectedPeriodWindow === "12m" ? "selected" : ""}>12 meses</option>
-            <option value="ytd" ${selectedPeriodWindow === "ytd" ? "selected" : ""}>YTD</option>
+            ${periodOptions.map((option) => `<option value="${escapeHtml(option.value)}" ${selectedPeriodWindow === option.value ? "selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}
           </select>
         </label>`
       : "";
@@ -262,6 +273,17 @@ export function registerConsultorView({
         <p class="consultor-analysis-description">${escapeHtml(card.short_description || "")}</p>
       </section>
     `;
+  }
+
+  function getPeriodWindowOptions(card) {
+    const labels = {
+      "3m": "3 meses",
+      "6m": "6 meses",
+      "12m": "12 meses",
+      "ytd": "YTD",
+    };
+    const allowed = Array.isArray(card?.period_window_options) ? card.period_window_options : ["3m", "6m", "12m", "ytd"];
+    return allowed.map((value) => ({ value, label: labels[value] || value }));
   }
 
   async function runAnalysis() {

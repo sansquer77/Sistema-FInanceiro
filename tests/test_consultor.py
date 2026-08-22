@@ -41,13 +41,13 @@ from financeiro.secure_config import save_ai_settings
 
 
 class ConsultorDomainTest(unittest.TestCase):
-    def test_catalog_is_closed_with_eight_cards_in_four_categories(self) -> None:
+    def test_catalog_is_closed_with_nine_cards_in_four_categories(self) -> None:
         cards = list_analysis_cards()
         analysis_ids = {card["analysis_id"] for card in cards}
         categories = {card["category"] for card in cards}
 
-        self.assertEqual(len(cards), 8)
-        self.assertEqual(len(analysis_ids), 8)
+        self.assertEqual(len(cards), 9)
+        self.assertEqual(len(analysis_ids), 9)
         self.assertEqual(
             {
                 "ralos_financeiros",
@@ -56,6 +56,7 @@ class ConsultorDomainTest(unittest.TestCase):
                 "exposicao_cambial",
                 "analise_carteira",
                 "score_saude_financeira",
+                "evolucao_score_tempo",
                 "sustentabilidade_padrao_vida",
                 "destino_vencimentos",
             },
@@ -71,7 +72,9 @@ class ConsultorDomainTest(unittest.TestCase):
             categories,
         )
         self.assertTrue(all(card["short_description"] for card in cards))
-        self.assertEqual(sum(1 for card in cards if card["requires_period_window"]), 1)
+        self.assertEqual(sum(1 for card in cards if card["requires_period_window"]), 2)
+        score_evolution = next(card for card in cards if card["analysis_id"] == "evolucao_score_tempo")
+        self.assertEqual(score_evolution["period_window_options"], ["6m", "12m"])
 
     def test_validate_analysis_id_rejects_values_outside_catalog(self) -> None:
         self.assertEqual(validate_analysis_id("score_saude_financeira"), "score_saude_financeira")
@@ -79,7 +82,7 @@ class ConsultorDomainTest(unittest.TestCase):
         with self.assertRaisesRegex(ConsultorError, "Analise"):
             validate_analysis_id("chat_livre")
 
-    def test_validate_period_window_only_applies_to_ralos_card(self) -> None:
+    def test_validate_period_window_only_applies_to_cards_with_period(self) -> None:
         self.assertEqual(
             validate_period_window("12m", analysis_id="ralos_financeiros"),
             "12m",
@@ -88,10 +91,21 @@ class ConsultorDomainTest(unittest.TestCase):
             validate_period_window(None, analysis_id="ralos_financeiros"),
             "3m",
         )
+        self.assertEqual(
+            validate_period_window("12m", analysis_id="evolucao_score_tempo"),
+            "12m",
+        )
+        self.assertEqual(
+            validate_period_window(None, analysis_id="evolucao_score_tempo"),
+            "6m",
+        )
         self.assertIsNone(validate_period_window("12m", analysis_id="score_saude_financeira"))
 
         with self.assertRaisesRegex(ConsultorError, "Periodo"):
             validate_period_window("24m", analysis_id="ralos_financeiros")
+
+        with self.assertRaisesRegex(ConsultorError, "Periodo"):
+            validate_period_window("3m", analysis_id="evolucao_score_tempo")
 
     def test_validate_investor_profile_defaults_and_rejects_invalid_values(self) -> None:
         self.assertEqual(validate_investor_profile(None), "moderado")
@@ -435,6 +449,37 @@ class ConsultorContextTest(unittest.TestCase):
         self.assertEqual(context["investor_profile"], "Moderado")
         self.assertEqual(context["complementary_profile"]["idade"], 45)
         self.assertEqual(context["complementary_profile"]["horizonte_investimento_principal"], "longo_prazo")
+
+    def test_score_evolution_context_builds_six_month_series(self) -> None:
+        # spec: consultor/consultor v1.7 — critérios 8 e 10
+        score_payloads = {
+            "2026-08": score_payload(score_total=720),
+            "2026-07": score_payload(score_total=700),
+            "2026-06": score_payload(score_total=680),
+            "2026-05": score_payload(score_total=690),
+            "2026-04": score_payload(score_total=670),
+            "2026-03": score_payload(score_total=650),
+        }
+
+        def fake_score(user_id, month=None):
+            key = month or "2026-08"
+            return score_payloads.get(key, score_payload(score_total=600))
+
+        with mock.patch("financeiro.financial_health.calculate_financial_health_score", side_effect=fake_score), self.profile_context():
+            context = build_analysis_context(7, "evolucao_score_tempo", period_window="6m")
+
+        self.assertEqual(context["analysis_id"], "evolucao_score_tempo")
+        self.assertEqual(context["period_window"], "6m")
+        self.assertEqual(len(context["series"]), 6)
+        self.assertEqual(context["series"][0]["month"], "2026-03")
+        self.assertEqual(context["series"][-1]["month"], "2026-08")
+        self.assertEqual(context["series"][-1]["score_total"], 720)
+        self.assertEqual(context["series"][0]["pillars"][0]["id"], "poupanca")
+        self.assertNotIn("transactions", context)
+
+    def test_score_evolution_context_rejects_invalid_period(self) -> None:
+        with self.assertRaisesRegex(ConsultorError, "Periodo"):
+            build_analysis_context(7, "evolucao_score_tempo", period_window="3m")
 
     def test_ralos_context_compacts_trends_without_raw_transactions(self) -> None:
         with mock.patch("financeiro.trends.calculate_trends", return_value=trends_payload()), self.profile_context():
@@ -1151,8 +1196,8 @@ def json_dump(payload: dict) -> str:
     return json.dumps(payload, ensure_ascii=False)
 
 
-def score_payload() -> dict:
-    return {
+def score_payload(**overrides) -> dict:
+    payload = {
         "month": "2026-08",
         "score_total": 720,
         "nivel": "bom",
@@ -1164,9 +1209,11 @@ def score_payload() -> dict:
         "reserva_elegivel_cents": 250000,
         "meses_reserva": 0.78,
         "dividas_parcelas_mes_cents": 45000,
-        "pilares": [{"id": "poupanca", "score": 200}],
+        "pilares": [{"id": "poupanca", "label": "Poupanca", "score": 200, "max_score": 250, "percentual": 80.0, "peso_pct": 25, "nivel": "bom"}],
         "paz_financeira": {"base_receita_cents": 480000},
     }
+    payload.update(overrides)
+    return payload
 
 
 def portfolio_positions() -> list[dict]:
