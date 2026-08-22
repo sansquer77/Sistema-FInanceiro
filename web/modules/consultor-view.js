@@ -227,7 +227,7 @@ export function registerConsultorView({
 
   function renderConsultorStatus(config) {
     if (config.available) {
-      return '<div class="consultor-status-ready">Consultor ativo. Escolha uma análise abaixo.</div>';
+      return "";
     }
     const messages = {
       ai_not_configured: "Configure e ative a IA em Preferências > APIs para usar o Consultor.",
@@ -266,11 +266,11 @@ export function registerConsultorView({
             </select>
           </label>
           ${period}
-          <button class="primary" type="button" data-consultor-run ${isRunning ? "disabled" : ""}>
-            ${isRunning ? "Gerando..." : "Gerar"}
-          </button>
         </div>
         <p class="consultor-analysis-description">${escapeHtml(card.short_description || "")}</p>
+        <button class="primary consultor-run-button" type="button" data-consultor-run ${isRunning ? "disabled" : ""}>
+          ${isRunning ? "Gerando..." : "Gerar"}
+        </button>
       </section>
     `;
   }

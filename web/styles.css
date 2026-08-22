@@ -1327,11 +1327,14 @@ textarea:focus {
 
 .consultor-analysis-description {
   font-size: 0.8rem;
+  line-height: 1.5;
+  width: 100%;
+  margin: 0;
 }
 
 .consultor-analysis-selector {
   display: grid;
-  gap: 8px;
+  gap: 12px;
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -1340,9 +1343,15 @@ textarea:focus {
 
 .consultor-analysis-controls {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) minmax(132px, auto) auto;
+  grid-template-columns: minmax(260px, 1fr) minmax(132px, auto);
   align-items: end;
   gap: 10px;
+}
+
+.consultor-run-button {
+  justify-self: start;
+  min-height: 36px;
+  padding: 0 16px;
 }
 
 .consultor-analysis-select,
@@ -1362,11 +1371,6 @@ textarea:focus {
 .consultor-analysis-select select,
 .consultor-period-select select {
   min-height: 36px;
-}
-
-.consultor-analysis-controls .primary {
-  min-height: 36px;
-  padding: 0 16px;
 }
 
 .consultor-response {
@@ -1531,7 +1535,7 @@ textarea:focus {
     max-width: 180px;
   }
 
-  .consultor-analysis-controls .primary {
+  .consultor-run-button {
     justify-self: start;
   }
 }
