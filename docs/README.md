@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 11.42
-atualizado: 2026-08-20
+versao: 11.45
+atualizado: 2026-08-22
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -132,6 +132,9 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `11.45` — 2026-08-22 — Documentação de produto e ajuda sincronizada ao novo fluxo do Consultor: [[requisitos]] v2.5 e [[specs/instrucoes-app]] v1.9 registram seletor fechado de análises e botão **Gerar**.
+- `11.44` — 2026-08-22 — [[specs/consultor]] v1.6: grade de cards substituída por seletor fechado de análises e botão único **Gerar**; período condicional de ralos fica ao lado e resposta passa a usar largura integral abaixo dos controles. [[arquitetura]] v3.36 sincronizada.
+- `11.43` — 2026-08-22 — [[specs/rentabilidade-portfolio]] v1.7 e [[specs/investimentos-portfolio]] v2.31: flyover de rentabilidade ampliado para aproximadamente metade da viewport em desktop e gráfico SVG refinado, sem dependências externas.
 - `11.42` — 2026-08-20 — [[specs/lancamentos]] v3.24 e [[specs/cartoes]] v2.15: modal de escopo de série recorrente com média ativa passa a explicar que editar somente a ocorrência atual não recalcula os próximos, enquanto aplicar aos próximos recalcula pela média.
 - `11.41` — 2026-08-20 — Auditoria documental: [[arquitetura]] v3.35 passa a registrar a rota e o módulo do [[specs/efeito-borboleta]]; callouts de status sincronizados em [[specs/investimentos-portfolio]] v2.30, [[specs/relatorios]] v2.11 e [[specs/sobre-app]] v1.9.
 - `11.40` — 2026-08-17 — [[specs/lancamentos]] v3.23 e [[specs/cartoes]] v2.14: modal de escopo de edição restaurado em séries recorrentes — o modal `Apenas este lançamento` / `Este e os próximos` volta a aparecer quando a flag de média **não** é alterada (ativa ou inativa); apenas a mudança da flag (marcar em série sem marcação ou desmarcar em série marcada) continua pulando o modal e aplicando a cascata automaticamente.

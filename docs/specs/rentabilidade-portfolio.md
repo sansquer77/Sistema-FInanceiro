@@ -2,8 +2,8 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 1.6
-atualizado: 2026-08-09
+versao: 1.7
+atualizado: 2026-08-22
 relacionados:
   - "[[investimentos-portfolio]]"
   - "[[arquitetura]]"
@@ -14,7 +14,7 @@ aliases: ["Rentabilidade do Portfólio"]
 # Rentabilidade do Portfólio
 
 > [!info] Status
-> **implementado** · área: `investimentos` · atualizado em 2026-08-09 · relacionados: [[investimentos-portfolio]]
+> **implementado** · área: `investimentos` · atualizado em 2026-08-22 · relacionados: [[investimentos-portfolio]]
 
 ## Problema
 
@@ -46,7 +46,8 @@ Investidor que acompanha o Portfólio e quer uma leitura rápida de performance 
 - O gráfico é **de linhas** (não barras), baseado em **percentuais**, sem valores numéricos fixos no desenho; os valores aparecem em tooltip ao passar o mouse sobre os pontos.
 - As linhas são **suavizadas** (interpolação por curvas Catmull-Rom) e o gráfico exibe **eixos X e Y** com gridlines e rótulos percentuais no eixo vertical.
 - As linhas do gráfico devem ser finas e discretas, com pontos menores e destaque apenas no hover, para evitar aparência pesada no card de rentabilidade.
-- A área de desenho é **15% maior** que a versão anterior para legibilidade.
+- O flyover de rentabilidade ocupa aproximadamente metade da viewport em desktop, sem ultrapassar a largura disponível; em telas estreitas, ocupa a tela com as margens usuais.
+- A área de desenho é ampliada para **420px** de altura em desktop, com grid e eixo zero mais legíveis; séries da carteira usam preenchimento sutil sob a curva e benchmarks usam traço pontilhado para leitura rápida.
 - A rentabilidade é **consolidada por moeda** (carteira inteira em R$ / carteira inteira em US$), nunca por produto individual.
 - Cada moeda é calculada **na própria moeda** (valores nativos em centavos da moeda), sem efeito de câmbio na série.
 - O gráfico mostra **12 meses** fixos, ou todos os meses disponíveis quando a base tem menos de 12 meses.
@@ -84,6 +85,7 @@ Tabelas: `investment_opening_positions`, `investment_operations`, `investment_re
 - Dado o usuário sem investimentos cadastrados, quando o card é exibido, então aparece estado vazio com mensagem amigável em vez de gráfico.
 - Dado um erro ao consultar o CDI/IPCA ou ao montar o resumo, quando o drawer é aberto, então o app exibe mensagem de erro sem travar o Portfólio.
 - Dado uma posição que entrou no mês atual, quando o gráfico calcula aquele mês, então o aporte não é tratado como retorno (marca baseline).
+- Dado o usuário abrindo o gráfico em desktop, quando o flyover é exibido, então ocupa aproximadamente metade da viewport e o gráfico tem área de desenho de 420px de altura, sem prejudicar a adaptação para telas estreitas.
 
 ## Pendências
 
@@ -105,9 +107,11 @@ Tabelas: `investment_opening_positions`, `investment_operations`, `investment_re
 - [x] Passo 4 — Renderizar no drawer linhas R$/US$/CDI/IPCA com pontos e tooltip em `web/modules/portfolio-view.js`. Fecha: critérios 3, 4, 5, 6.
 - [x] Passo 5 — Ajustar estilos do gráfico em `web/styles.css` (reuso das classes existentes). Fecha: critérios 3, 4.
 - [x] Passo 6 — Escrever testes automatizados para o cálculo mensal por moeda e CDI/IPCA por mês. Fecha: critérios 2, 3, 4, 5, 6, 7, 8, 12.
+- [x] Passo 7 — Ampliar o flyover e refinar o SVG nativo com preenchimento sutil das séries da carteira e traços pontilhados para benchmarks, sem dependência externa. Fecha: critérios 2, 12.
 
 ## Changelog
 
+- `1.7` — 2026-08-22 — Flyover de rentabilidade ampliado para aproximadamente metade da viewport em desktop; área do gráfico passa a 420px e o SVG nativo diferencia carteira (preenchimento sutil) de benchmarks (traço pontilhado), sem adicionar dependências.
 - `1.6` — 2026-08-09 — Rentabilidade passa a ser carregada sob demanda no drawer e `get_portfolio_returns` aceita posições já calculadas para evitar segunda consolidação do Portfólio quando houver contexto disponível.
 - `1.5` — 2026-08-09 — Refinamento visual do gráfico de rentabilidade: linhas mais finas/discretas e pontos menores com destaque apenas no hover.
 - `1.4` — 2026-08-07 — Desempenho: o fator acumulado de indexador (CDI/IPCA) por mês é decomposto por mês-calendário e compartilhado entre todas as posições e ativos de uma mesma geração de série (`_accumulated_factor_by_month`), reduzindo chamadas ao BCB; valores observáveis não mudam.

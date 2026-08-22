@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 2.4
-atualizado: 2026-08-10
+versao: 2.5
+atualizado: 2026-08-22
 relacionados:
   - "[[arquitetura]]"
   - "[[visao-produto]]"
@@ -14,7 +14,7 @@ tags: [produto, meta]
 # Requisitos
 
 > [!info] Status
-> **implementado** (escopo vivo) · área: `meta` · atualizado em 2026-08-10 · relacionados: [[arquitetura]], [[visao-produto]]
+> **implementado** (escopo vivo) · área: `meta` · atualizado em 2026-08-22 · relacionados: [[arquitetura]], [[visao-produto]]
 
 ## Objetivo
 
@@ -46,7 +46,7 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
   - Importação de lançamentos por meio de planilhas de modelo do sistema (`.xlsx`) para contas e cartões.
   - Ver [[importacao-organizze]].
 - **Histórico de Operações**: auditoria funcional somente leitura com filtros, busca, agrupamentos e rastreio de lotes por `operation_batch_id`. Ver [[historico-operacoes]].
-- **Consultor**: análises pré-formatadas por IA na aba Consultor do Cockpit, mediante IA geral configurada, ativação explícita e consentimento de acesso aos dados financeiros do usuário. Usa catálogo fechado de cards, contexto minimizado, Perfil Complementar criptografado em SQLite, histórico por usuário e expurgo automático quando IA/Consultor/consentimento são desabilitados. Ver [[specs/consultor]].
+- **Consultor**: análises pré-formatadas por IA na aba Consultor do Cockpit, mediante IA geral configurada, ativação explícita e consentimento de acesso aos dados financeiros do usuário. Usa catálogo fechado em seletor, contexto minimizado, Perfil Complementar criptografado em SQLite, histórico por usuário e expurgo automático quando IA/Consultor/consentimento são desabilitados. Ver [[specs/consultor]].
 - **Sobre o app**: tela informativa no grupo Usuário com objetivo, funcionalidades, tecnologias, contato e infraestrutura mínima. Ver [[sobre-app]].
 - **Interface web estática**: painéis locais em `web/`, sem dependências externas de frontend. Ver [[arquitetura]] e [[adr/0001-stack-local-sem-framework]].
 - **Distribuição desktop**: pacotes macOS e Windows com instaladores, modo local e launchers opcionais para rede local confiável. Ver [[distribuição]].
@@ -121,6 +121,7 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 
 ## Changelog
 
+- `2.5` — 2026-08-22 — Fluxo do Consultor refinado: o catálogo fechado de análises passa a ser selecionado em combo com botão único **Gerar**, mantendo o período condicional para ralos e o mesmo contrato de segurança. Ver [[specs/consultor]].
 - `2.4` — 2026-08-10 — Consultor incluído no escopo implementado com ativação opt-in, catálogo fechado de análises por IA, Perfil Complementar criptografado e expurgo de histórico ao remover autorização.
 - `2.3` — 2026-08-10 — Regras de segurança alinhadas ao [[adr/0010-segredos-criptografados-sqlite]]: segredos de SMTP, IA e Mais Retorno ficam em `secure_configs.payload_enc`, chave padrão em `secure/config.key` e arquivos `.enc` legados permanecem apenas como compatibilidade de migração.
 - `2.2` — 2026-08-08 — Chave da integração opcional Mais Retorno também criptografada por usuário (mesma infraestructura de `secure_config.py`), conforme [[preferencias-abas]].

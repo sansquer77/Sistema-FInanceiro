@@ -1,4 +1,4 @@
-// spec: docs/specs/instrucoes-app.md v1.7 — conteúdo estático da central de ajuda
+// spec: docs/specs/instrucoes-app.md v1.9 — conteúdo estático da central de ajuda
 // Este módulo é puro e sem estado: o conteúdo é versionado no frontend e
 // disponível offline, sem dependência de backend ou internet.
 
@@ -479,9 +479,9 @@ export const INSTRUCTIONS_CONTENT = [
         summary: "Gere análises pré-formatadas com a IA configurada, sem digitar perguntas livres.",
         content: [
           "Antes de usar, vá em Usuário > Preferências > APIs, configure e ligue a IA, ative o Consultor, escolha seu perfil de investidor e aceite o consentimento de acesso aos dados. Sem estas três condições, a aba mostra apenas o aviso de ativação.",
-          "No Cockpit, abra a aba Consultor. A subaba Análises mostra cards prontos, como Assinaturas e Recorrências, Ralos Financeiros, Diagnóstico do Score, Alocação do Portfólio e Vencimentos. Clique em um card para gerar a leitura estruturada.",
-          "O Consultor não tem campo de pergunta livre. Cada card envia somente os dados necessários para aquela análise e retorna um texto educacional, sem recomendação direta de compra ou venda de ativo.",
-          "No card Ralos Financeiros, escolha o período de comparação (3, 6, 12 meses ou ano atual) antes de gerar. Use a subaba Histórico para rever análises anteriores ou filtrar por tema.",
+          "No Cockpit, abra a aba Consultor. Na subaba Análises, escolha a leitura desejada no seletor — por exemplo, Assinaturas e Recorrências, Ralos Financeiros, Diagnóstico do Score, Alocação do Portfólio ou Vencimentos — e clique em Gerar.",
+          "O Consultor não tem campo de pergunta livre. Cada análise selecionada envia somente os dados necessários e retorna um texto educacional, sem recomendação direta de compra ou venda de ativo.",
+          "Ao selecionar Ralos Financeiros, escolha o período de comparação (3, 6, 12 meses ou ano atual) no controle ao lado antes de gerar. Use a subaba Histórico para rever análises anteriores ou filtrar por tema.",
           "Se você desligar a IA, desativar o Consultor ou remover o consentimento, o histórico do Consultor é apagado automaticamente por privacidade.",
         ],
         searchTerms: ["consultor", "IA", "análise", "histórico", "perfil de investidor", "consentimento"],

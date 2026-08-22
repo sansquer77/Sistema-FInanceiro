@@ -32,6 +32,8 @@ export function registerConsultorView({
   let consultorHistory = [];
   let consultorLoading = false;
   let runningAnalysisId = "";
+  let selectedAnalysisId = "";
+  let selectedPeriodWindow = "3m";
   let activeConsultorTab = "analyses";
   let historyFilter = "";
   let loading = false;
@@ -175,17 +177,20 @@ export function registerConsultorView({
       renderConsultorHistory();
       return;
     }
-    const groups = groupCards(config.cards || []);
-    consultorCardGrid.innerHTML = [...groups.entries()].map(([category, cards]) => `
-      <section class="consultor-card-group">
-        <h3>${escapeHtml(category)}</h3>
-        <div class="consultor-analysis-grid">
-          ${cards.map((card) => renderAnalysisCard(card)).join("")}
-        </div>
-      </section>
-    `).join("");
+    const cards = config.cards || [];
+    if (!cards.some((card) => card.analysis_id === selectedAnalysisId)) {
+      selectedAnalysisId = cards[0]?.analysis_id || "";
+    }
+    consultorCardGrid.innerHTML = renderAnalysisSelector(cards);
+    consultorCardGrid.querySelector("[data-consultor-analysis]")?.addEventListener("change", (event) => {
+      selectedAnalysisId = event.target.value || "";
+      renderConsultor();
+    });
+    consultorCardGrid.querySelector("[data-consultor-period]")?.addEventListener("change", (event) => {
+      selectedPeriodWindow = event.target.value || "3m";
+    });
     consultorCardGrid.querySelectorAll("[data-consultor-run]").forEach((button) => {
-      button.addEventListener("click", () => runAnalysis(button.dataset.consultorRun));
+      button.addEventListener("click", () => runAnalysis());
     });
     renderConsultorHistory();
   }
@@ -222,55 +227,54 @@ export function registerConsultorView({
     return `<div class="empty-state compact">${escapeHtml(messages[config.blocked_reason] || "Consultor indisponível.")}</div>`;
   }
 
-  function groupCards(cards) {
-    const groups = new Map();
-    for (const card of cards) {
-      const category = card.category || "Análises";
-      if (!groups.has(category)) {
-        groups.set(category, []);
-      }
-      groups.get(category).push(card);
+  function renderAnalysisSelector(cards) {
+    // spec: consultor/consultor v1.6 — critérios 3, 5 e 14
+    // (o catálogo permanece fechado; a interface apenas concentra a escolha
+    // em um seletor e mantém o período restrito ao card de ralos)
+    const card = cards.find((item) => item.analysis_id === selectedAnalysisId);
+    if (!card) {
+      return '<div class="empty-state compact">Nenhuma análise disponível.</div>';
     }
-    return groups;
-  }
-
-  function renderAnalysisCard(card) {
     const isRunning = runningAnalysisId === card.analysis_id;
     const period = card.requires_period_window
       ? `<label class="consultor-period-select">Período
-          <select data-consultor-period="${escapeHtml(card.analysis_id)}">
-            <option value="3m">3 meses</option>
-            <option value="6m">6 meses</option>
-            <option value="12m">12 meses</option>
-            <option value="ytd">YTD</option>
+          <select data-consultor-period>
+            <option value="3m" ${selectedPeriodWindow === "3m" ? "selected" : ""}>3 meses</option>
+            <option value="6m" ${selectedPeriodWindow === "6m" ? "selected" : ""}>6 meses</option>
+            <option value="12m" ${selectedPeriodWindow === "12m" ? "selected" : ""}>12 meses</option>
+            <option value="ytd" ${selectedPeriodWindow === "ytd" ? "selected" : ""}>YTD</option>
           </select>
         </label>`
       : "";
     return `
-      <article class="consultor-analysis-card">
-        <div>
-          <strong>${escapeHtml(card.title || "Análise")}</strong>
-          <p>${escapeHtml(card.short_description || "")}</p>
+      <section class="consultor-analysis-selector" aria-label="Gerar análise">
+        <div class="consultor-analysis-controls">
+          <label class="consultor-analysis-select">Análise
+            <select data-consultor-analysis>
+              ${cards.map((item) => `<option value="${escapeHtml(item.analysis_id)}" ${item.analysis_id === selectedAnalysisId ? "selected" : ""}>${escapeHtml(`${item.category || "Análises"} — ${item.title || "Análise"}`)}</option>`).join("")}
+            </select>
+          </label>
+          ${period}
+          <button class="primary" type="button" data-consultor-run ${isRunning ? "disabled" : ""}>
+            ${isRunning ? "Gerando..." : "Gerar"}
+          </button>
         </div>
-        ${period}
-        <button class="primary" type="button" data-consultor-run="${escapeHtml(card.analysis_id)}" ${isRunning ? "disabled" : ""}>
-          ${isRunning ? "Gerando..." : "Gerar análise"}
-        </button>
-      </article>
+        <p class="consultor-analysis-description">${escapeHtml(card.short_description || "")}</p>
+      </section>
     `;
   }
 
-  async function runAnalysis(analysisId) {
+  async function runAnalysis() {
+    const analysisId = selectedAnalysisId;
     if (!analysisId || runningAnalysisId) {
       return;
     }
     runningAnalysisId = analysisId;
     renderConsultor();
-    const periodSelect = [...(consultorCardGrid?.querySelectorAll("[data-consultor-period]") || [])]
-      .find((select) => select.dataset.consultorPeriod === analysisId);
+    const card = (consultorConfig?.cards || []).find((item) => item.analysis_id === analysisId);
     const body = { analysis_id: analysisId };
-    if (periodSelect) {
-      body.period_window = periodSelect.value || "3m";
+    if (card?.requires_period_window) {
+      body.period_window = selectedPeriodWindow;
     }
     try {
       const result = await api("/api/consultor/analyze", { method: "POST", body });

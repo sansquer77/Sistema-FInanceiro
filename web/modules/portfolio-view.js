@@ -251,7 +251,7 @@ export function registerPortfolioView({
   function resetPortfolioAssetForm() {
     portfolioAssetForm.reset();
     portfolioAssetForm.elements.id.value = "";
-    // spec: investimentos-portfolio v2.30 — criterio 48
+    // spec: investimentos-portfolio v2.31 — criterio 48
     portfolioAssetForm.elements.exchange_rate_to_brl.value = "";
     portfolioAssetFormTitle.textContent = "Ativo em carteira";
     deletePortfolioAssetButton.hidden = true;
@@ -596,6 +596,9 @@ export function registerPortfolioView({
   }
 
   function renderPortfolioReturns() {
+    // spec: rentabilidade-portfolio v1.7 — critérios 2, 3 e 12
+    // (SVG nativo diferencia as séries da carteira dos benchmarks e mantém
+    // a escala percentual comum sem introduzir dependência de gráficos)
     const returns = state.portfolioReturns;
     if (!returns) {
       return;
@@ -626,8 +629,8 @@ export function registerPortfolioView({
 
     const entries = returns.series;
     const plotWidth = 100;
-    const plotTop = 2;
-    const plotBottom = 48;
+    const plotTop = 3;
+    const plotBottom = 61;
     const plotHeight = plotBottom - plotTop;
     const marginX = 2;
     const step = entries.length > 1 ? (plotWidth - marginX * 2) / (entries.length - 1) : 0;
@@ -665,7 +668,7 @@ export function registerPortfolioView({
       if (Math.abs(tick) < 0.0001) {
         return "";
       }
-      return `<line x1="${marginX}" y1="${y.toFixed(2)}" x2="${plotWidth - marginX}" y2="${y.toFixed(2)}" stroke="var(--line)" stroke-width="0.2" stroke-dasharray="0.9 0.9" stroke-opacity="0.5" />`;
+      return `<line x1="${marginX}" y1="${y.toFixed(2)}" x2="${plotWidth - marginX}" y2="${y.toFixed(2)}" stroke="var(--line)" stroke-width="0.22" stroke-dasharray="0.9 0.9" stroke-opacity="0.58" />`;
     }).join("");
 
     const chart = seriesConfig.map((series) => {
@@ -684,6 +687,8 @@ export function registerPortfolioView({
       }
 
       const linePath = smoothPath(points);
+      const isPortfolioSeries = series.key === "BRL_return_pct" || series.key === "USD_return_pct";
+      const gradientId = `portfolio-return-${series.key}`;
 
       const circles = points.map((point) => {
         const monthLabel = formatReturnMonthLabel(entries[point.index].month);
@@ -694,8 +699,9 @@ export function registerPortfolioView({
       }).join("");
 
       return `
-        <g class="portfolio-return-line-group">
-          <path d="${linePath}" fill="none" stroke="${series.color}" stroke-width="0.82" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.78" vector-effect="non-scaling-stroke" />
+        <g class="portfolio-return-line-group ${isPortfolioSeries ? "portfolio-series" : "benchmark-series"}">
+          ${isPortfolioSeries ? `<defs><linearGradient id="${gradientId}" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="${series.color}" stop-opacity="0.24" /><stop offset="100%" stop-color="${series.color}" stop-opacity="0.015" /></linearGradient></defs><path d="${smoothAreaPath(points, yFor(0))}" fill="url(#${gradientId})" />` : ""}
+          <path d="${linePath}" fill="none" stroke="${series.color}" stroke-width="${isPortfolioSeries ? "1.02" : "0.76"}" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="${isPortfolioSeries ? "0.92" : "0.82"}" vector-effect="non-scaling-stroke" />
           ${circles}
         </g>
       `;
@@ -703,7 +709,7 @@ export function registerPortfolioView({
 
     if (portfolioReturnChart) {
       portfolioReturnChart.innerHTML = `
-        <line x1="${marginX}" y1="${yFor(0).toFixed(2)}" x2="${plotWidth - marginX}" y2="${yFor(0).toFixed(2)}" stroke="var(--ink)" stroke-width="0.4" />
+        <line x1="${marginX}" y1="${yFor(0).toFixed(2)}" x2="${plotWidth - marginX}" y2="${yFor(0).toFixed(2)}" stroke="var(--ink)" stroke-width="0.45" stroke-opacity="0.72" />
         ${yTicksGrid}
         ${chart}
       `;
@@ -717,7 +723,7 @@ export function registerPortfolioView({
         return `${sign}${formatPercentValue(tick)}`;
       };
       portfolioReturnYAxis.innerHTML = yTicks.map((tick) => {
-        const top = (yFor(tick) / 50) * 100;
+        const top = (yFor(tick) / 64) * 100;
         return `<span style="top:${top.toFixed(1)}%">${labelFor(tick)}</span>`;
       }).join("");
     }
@@ -773,6 +779,15 @@ export function registerPortfolioView({
       d += ` C ${cp1x.toFixed(2)} ${cp1y.toFixed(2)}, ${cp2x.toFixed(2)} ${cp2y.toFixed(2)}, ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`;
     }
     return d;
+  }
+
+  function smoothAreaPath(points, baselineY) {
+    if (points.length === 0) {
+      return "";
+    }
+    const first = points[0];
+    const last = points[points.length - 1];
+    return `${smoothPath(points)} L ${last.x.toFixed(2)} ${baselineY.toFixed(2)} L ${first.x.toFixed(2)} ${baselineY.toFixed(2)} Z`;
   }
 
   function formatReturnMonthLabel(month) {

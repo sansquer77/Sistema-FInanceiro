@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.35
-atualizado: 2026-08-20
+versao: 3.36
+atualizado: 2026-08-22
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -16,7 +16,7 @@ tags: [arquitetura, meta]
 # Arquitetura
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-08-20 · relacionados: [[requisitos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
+> **implementado** · área: `meta` · atualizado em 2026-08-22 · relacionados: [[requisitos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
 
 ## Visão geral
 
@@ -33,7 +33,7 @@ docs/               Requisitos, arquitetura, specs e referências
 
 O servidor HTTP revalida arquivos estáticos com `ETag` e `Last-Modified`; arquivos não versionados usam `Cache-Control: no-cache` para permitir `304 Not Modified` sem cache agressivo. Respostas JSON acima de 1 KB podem ser comprimidas com gzip quando o cliente envia `Accept-Encoding: gzip`.
 
-O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Cockpit > Consultor**. Em Preferências, o usuário configura a IA geral, ativa o Consultor, aceita o consentimento de acesso aos dados e pode preencher/remover o Perfil Complementar criptografado. No Cockpit, a aba Consultor exibe os indicadores de atrasos/vencimentos, a subaba **Análises** com catálogo fechado de cards e a subaba **Histórico** com filtro textual. O módulo não possui prompt livre: cada execução envia apenas o contexto minimizado do card escolhido e persiste somente respostas bem-sucedidas.
+O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Cockpit > Consultor**. Em Preferências, o usuário configura a IA geral, ativa o Consultor, aceita o consentimento de acesso aos dados e pode preencher/remover o Perfil Complementar criptografado. No Cockpit, a aba Consultor exibe os indicadores de atrasos/vencimentos, a subaba **Análises** com catálogo fechado em seletor e a subaba **Histórico** com filtro textual. O módulo não possui prompt livre: cada execução envia apenas o contexto minimizado da análise escolhida e persiste somente respostas bem-sucedidas.
 
 ---
 
@@ -74,7 +74,7 @@ O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Co
 | `cockpit-view.js` | Resumo, saldos, planejamento, dívidas, portfólio e alertas; registra sub-views de Calendário, Tendências e Saúde Financeira. |
 | `financial-health-view.js` | Aba **Saúde Financeira** do Cockpit: score/gauge, pilares, Paz Financeira e consolidado do diagnóstico. |
 | `trends-view.js` | Aba **Tendências** do Cockpit: gráfico mês a mês, Budget x Realizado e achados local. |
-| `consultor-view.js` | Aba **Consultor** do Cockpit: cards de análise, execução sob demanda, histórico, vencimentos e atrasos, com renderização de tabelas markdown nas respostas. |
+| `consultor-view.js` | Aba **Consultor** do Cockpit: seletor fechado de análises, execução sob demanda, período condicional para ralos, histórico, vencimentos e atrasos, com renderização de tabelas markdown nas respostas. |
 | `accounts-view.js` | Contas: cadastro, edição, arquivamento, restauração. |
 | `cards-view.js` | Cartões: cadastro, faturas, pagamento, conciliação. |
 | `portfolio-view.js` | Ativos: posições, histórico, resgate, encerramento. |
@@ -507,6 +507,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.36` — 2026-08-22 — `consultor-view.js` passa a exibir seletor fechado de análises, botão único de geração e período condicional para ralos; a resposta ocupa a largura abaixo dos controles. Ver [[specs/consultor]] v1.6.
 - `3.35` — 2026-08-20 — Sincronizada a data do callout de status com o frontmatter; documentadas a rota `POST /api/simulations/butterfly-effect` e a responsabilidade de `financeiro/simulations.py`. Ver [[specs/efeito-borboleta]].
 - `3.34` — 2026-08-16 — Consultor: prompt do card `analise_carteira` orienta a IA a encerrar todas as seções obrigatórias dentro do teto de 900 tokens de saída (encurtando justificativas se preciso, sem deixar seção pela metade), eliminando truncamento que bloqueava a entrega da análise; `max_tokens` do usuário na homologação elevado para 900. Ver [[specs/consultor]] v1.5.
 - `3.33` — 2026-08-15 — Consultor: correções no pós-processamento em `financeiro/consultor.py` — `has_section` passa a reconhecer cabeçalhos markdown (`###`) e `contains_forbidden_recommendation` ignora negações/ressalvas na janela anterior ao match (frases defensivas da IA), mantendo bloqueio de recomendações afirmativas. Ver [[specs/consultor]] v1.4.
