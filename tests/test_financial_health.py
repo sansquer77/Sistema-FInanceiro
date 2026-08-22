@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from datetime import date
 from pathlib import Path
 from unittest import mock
 
@@ -424,11 +425,28 @@ class FinancialHealthDatabaseIntegrationTest(unittest.TestCase):
         })
 
         self.assertTrue(created["investment_operation"]["emergency_reserve_eligible"])
-        positions = current_portfolio_positions(user["id"])
-        self.assertEqual(emergency_reserve_cents_from_positions(positions), 50_000)
+        # Fixa a data para o dia do aporte, evitando que o rendimento da poupança
+        # varie conforme o dia em que o teste roda (falso-positivo).
+        fixed_date = date(2026, 7, 15)
 
-        payload = calculate_financial_health_score(user["id"], "2026-07")
-        self.assertEqual(payload["reserva_elegivel_cents"], 50_000)
+        class _FakePortfolioDate:
+            @classmethod
+            def today(cls) -> date:
+                return fixed_date
+
+            @classmethod
+            def fromisoformat(cls, raw: str) -> date:
+                return date.fromisoformat(raw)
+
+            def __call__(self, *args, **kwargs) -> date:
+                return date(*args, **kwargs)
+
+        with mock.patch("financeiro.portfolio.date", _FakePortfolioDate()):
+            positions = current_portfolio_positions(user["id"])
+            self.assertEqual(emergency_reserve_cents_from_positions(positions), 50_000)
+
+            payload = calculate_financial_health_score(user["id"], "2026-07")
+            self.assertEqual(payload["reserva_elegivel_cents"], 50_000)
 
 
 if __name__ == "__main__":
