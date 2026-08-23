@@ -2,7 +2,7 @@
 tipo: spec
 area: open-finance
 status: rascunho
-versao: 0.5
+versao: 0.6
 atualizado: 2026-08-23
 relacionados:
   - "[[contas-correntes]]"
@@ -37,10 +37,12 @@ Usuário autenticado localmente que já possui uma conta pessoal no Meu Pluggy c
 3. Inicia uma nova conexão a partir das Preferências, ou a partir da criação de uma conta corrente marcando a opção "Conectar via Open Finance"; o sistema abre o widget do Pluggy Connect autenticado com um connect token gerado pelo backend.
 4. O usuário seleciona o conector "MeuPluggy" e autoriza o acesso às contas já vinculadas no Meu Pluggy.
 5. Ao concluir, o usuário associa manualmente cada conta retornada a uma conta corrente já existente no sistema (ou à conta recém-criada, se veio do fluxo de criação com a opção marcada). Não há vínculo ou criação automática de conta.
-6. No cabeçalho superior, ao lado do botão de ocultar/mostrar valores (ver [[privacidade-valores]]), o usuário encontra um botão de sincronização do Open Finance. Ao acioná-lo, dispara manualmente a busca de transações novas para todas as suas conexões ativas — não há sincronização automática nem agendada. O saldo da conta corrente não é substituído pelo saldo da Pluggy; ele continua sendo calculado pelos lançamentos do app.
-7. As transações novas trazidas pela sincronização são inseridas diretamente em `transactions` como lançamentos normais, já marcados como **conciliados** (`reconciled_at` preenchido). O sistema sugere categoria/subcategoria automaticamente (mesma lógica local de sugestão usada em [[classificacao-assistida]]), e o usuário pode ajustar a classificação depois, como faz com qualquer lançamento manual.
-8. Transações já importadas anteriormente (mesmo `transacao_external_id`) não geram duplicatas em sincronizações futuras, independentemente de terem sido editadas pelo usuário.
-9. O usuário pode revisar as conexões ativas nas Preferências e desconectar uma conta quando quiser.
+6. O processo de importação via Open Finance vive como uma **aba dentro do menu Gestão > Importações**, ao lado das outras formas de importação do sistema (ver [[importacao-dados]]).
+7. Dentro dessa aba, o usuário seleciona a conta Pluggy de origem, a conta de destino no sistema e a data de início, depois aciona a busca manual — não há sincronização automática nem agendada.
+8. O sistema busca na Pluggy os lançamentos a partir da data definida e exibe em uma tela de importação (staging/revisão) apenas os itens ainda não analisados. Para cada lançamento, o sistema sugere categoria/subcategoria automaticamente (mesma lógica local de sugestão usada em [[classificacao-assistida]]). O usuário analisa e marca **OK** (importar) ou **NOK** (não importar). O `transacao_external_id` e o status OK/NOK são persistidos para que o item não seja reapresentado em buscas futuras.
+9. O botão **Importar** só é habilitado após todos os lançamentos exibidos terem sido marcados como OK ou NOK. Ao confirmar, os lançamentos OK são inseridos em `transactions` como lançamentos conciliados (`reconciled_at` preenchido) na conta de destino selecionada. Itens NOK não geram lançamento.
+10. O saldo da conta corrente não é substituído pelo saldo da Pluggy; ele continua sendo calculado pelos lançamentos do app.
+11. O usuário pode revisar as conexões ativas nas Preferências e desconectar uma conta quando quiser.
 
 ## Dados
 
@@ -53,12 +55,16 @@ Usuário autenticado localmente que já possui uma conta pessoal no Meu Pluggy c
 | `connector_nome` | texto | Nome da instituição/conector retornado pela Pluggy (ex.: `MeuPluggy`). |
 | `checking_account_id` | inteiro (FK) | Conta corrente do sistema vinculada a esta conexão. |
 | `status_conexao` | enum | `ativa`, `erro`, `desconectada`. |
-| `ultima_sincronizacao` | data/hora ISO | Preenchida a cada sincronização bem-sucedida. |
+| `ultima_busca` | data/hora ISO | Preenchida a cada busca bem-sucedida de transações na Pluggy. |
 | `moeda_origem` | enum | Moeda retornada pela Pluggy para a conta; deve corresponder ao enum de moeda já usado em [[contas-correntes]]. |
-| `transacao_external_id` | texto | Identificador da transação na Pluggy, usado para deduplicação. |
+| `data_inicio` | data ISO | Data inicial definida pelo usuário para buscar lançamentos na Pluggy. |
+| `conta_pluggy_id` | texto | Identificador da conta bancária na Pluggy escolhida como origem. |
+| `conta_destino_id` | inteiro (FK) | Conta corrente do sistema selecionada como destino dos lançamentos importados. |
+| `transacao_external_id` | texto | Identificador da transação na Pluggy, usado para deduplicação e para não reapresentar itens já analisados. |
+| `status_revisao` | enum | `pendente`, `ok`, `nok`. Todo lançamento trazido pela API nasce `pendente` e só é importado para `transactions` quando marcado `ok`. Itens `nok` são descartados, mas mantidos registrados para não reaparecerem. |
+| `category_id` / `subcategory_id` | inteiro (FK, opcional) | Categoria/subcategoria sugerida automaticamente pela mesma lógica local de [[classificacao-assistida]]; o usuário pode ajustar antes de marcar OK/NOK. |
 | `vincular_open_finance` | booleano | Opcional, informado na criação de uma conta corrente. Não cria a conexão por si só — apenas leva o usuário ao fluxo de conexão logo após salvar a conta, com essa conta já pré-selecionada como destino. |
-| `reconciled_at` | timestamp | Preenchido automaticamente na importação via Open Finance; o lançamento entra como conciliado. |
-| `category_id` / `subcategory_id` | inteiro (FK, opcional) | Categoria/subcategoria sugerida automaticamente pela mesma lógica local de [[classificacao-assistida]]; o usuário pode ajustar depois como em qualquer lançamento. |
+| `reconciled_at` | timestamp | Preenchido automaticamente ao importar os lançamentos OK para `transactions`; o lançamento entra como conciliado. |
 
 ## Regras
 
@@ -66,13 +72,16 @@ Usuário autenticado localmente que já possui uma conta pessoal no Meu Pluggy c
 - Uma conexão de Open Finance sempre pertence a um único usuário autenticado do sistema e a uma única conta corrente vinculada.
 - O `client_secret` nunca é exposto ao frontend; apenas o connect token de curta duração (30 minutos) é enviado ao widget.
 - O connect token é gerado sob demanda no backend e não é reutilizado entre conexões.
-- A sincronização é sempre manual, acionada pelo botão dedicado no cabeçalho superior (ver Jornada). O sistema não faz sincronização agendada nem expõe endpoint para receber webhooks da Pluggy.
-- A sincronização **não** atualiza o saldo da conta corrente diretamente pela Pluggy. O saldo do app continua sendo calculado a partir dos lançamentos existentes, mantendo o app como fonte de verdade soberana.
-- Transações novas retornadas pela Pluggy são inseridas diretamente em `transactions`, em centavos, seguindo a mesma convenção monetária do restante do sistema. Cada transação importada nasce com `reconciled_at` preenchido, ou seja, entra como conciliada.
-- Toda transação importada recebe uma sugestão automática de categoria/subcategoria (mesma lógica local usada nas outras importações, ver [[classificacao-assistida]]). O usuário pode ajustar a classificação posteriormente, como faz com qualquer lançamento manual.
-- Transações já importadas anteriormente (mesmo `transacao_external_id`) não geram duplicatas em sincronizações futuras, mesmo que o usuário tenha editado a descrição, valor ou classificação do lançamento original.
-- Uma conexão com erro de autenticação ou de comunicação com a API da Pluggy não deve travar a sincronização de outras conexões do mesmo usuário quando o botão de sincronização cobre várias conexões de uma vez.
-- Desconectar uma conexão interrompe futuras sincronizações manuais dela, sem apagar o histórico de transações já importado.
+- A importação é sempre manual, acionada dentro da aba Open Finance em **Gestão > Importações** (ver Jornada). O sistema não faz sincronização agendada nem expõe endpoint para receber webhooks da Pluggy.
+- A importação **não** atualiza o saldo da conta corrente diretamente pela Pluggy. O saldo do app continua sendo calculado a partir dos lançamentos existentes, mantendo o app como fonte de verdade soberana.
+- O usuário define a data de início e seleciona a conta Pluggy de origem e a conta de destino no sistema antes de buscar os lançamentos.
+- Transações retornadas pela Pluggy são inseridas em uma tabela de staging (`open_finance_staged_transactions`), em centavos, seguindo a mesma convenção monetária do restante do sistema. Cada item nasce com `status_revisao = pendente`.
+- Toda transação em staging recebe uma sugestão automática de categoria/subcategoria (mesma lógica local usada nas outras importações, ver [[classificacao-assistida]]). O usuário pode ajustar a classificação antes de marcar OK ou NOK.
+- O usuário marca cada lançamento em staging como `ok` (importar) ou `nok` (não importar). O botão **Importar** só é habilitado quando não houver mais itens `pendente` na tela.
+- Ao confirmar a importação, todos os itens `ok` são inseridos em `transactions` na conta de destino selecionada, com `reconciled_at` preenchido. Itens `nok` não geram lançamento, mas permanecem registrados com seu `transacao_external_id` e status para não serem reapresentados.
+- Transações já buscadas anteriormente (mesmo `transacao_external_id`) não reaparecem na tela de importação, independentemente de terem sido marcadas `ok` ou `nok`.
+- Uma conexão com erro de autenticação ou de comunicação com a API da Pluggy não deve travar a busca/importação de outras contas Pluggy do mesmo usuário.
+- Desconectar uma conexão interrompe futuras buscas manuais dela, sem apagar o histórico de transações já importado.
 - A reconexão de uma conta bancária já vinculada anteriormente deve atualizar a conexão existente em vez de criar uma conexão duplicada para a mesma conta corrente.
 - A vinculação entre uma conta retornada pelo widget e uma conta corrente do sistema é sempre manual — nunca criada ou associada automaticamente pelo sistema.
 - Ao criar uma conta corrente, o usuário pode marcar `vincular_open_finance`; isso apenas encaminha para o fluxo de conexão com a conta recém-criada pré-selecionada, sem pular a etapa de autorização no widget.
@@ -95,26 +104,33 @@ Usuário autenticado localmente que já possui uma conta pessoal no Meu Pluggy c
 | `POST` | `/api/open-finance/connect-token` — gera connect token de curta duração para o widget. |
 | `GET` | `/api/open-finance/connections` — lista conexões do usuário autenticado. |
 | `POST` | `/api/open-finance/connections` — registra uma conexão concluída no widget (`item_id`) e vincula manualmente a uma conta corrente existente. |
-| `POST` | `/api/open-finance/sync` — botão do cabeçalho: dispara sincronização manual de transações novas de todas as conexões ativas do usuário autenticado; transações importadas são inseridas diretamente em `transactions` como conciliadas. |
-| `DELETE` | `/api/open-finance/connections/{id}` — desconecta e interrompe sincronizações futuras.
+| `POST` | `/api/open-finance/fetch` — busca transações na Pluggy a partir da data de início informada e insere os itens novos em `open_finance_staged_transactions` com `status_revisao = pendente`. |
+| `GET` | `/api/open-finance/staging` — lista os lançamentos pendentes de revisão do usuário autenticado para a conta Pluggy/conta de destino selecionadas. |
+| `POST` | `/api/open-finance/staging/{id}/ok` — marca o lançamento como `ok` (importar). |
+| `POST` | `/api/open-finance/staging/{id}/nok` — marca o lançamento como `nok` (não importar). |
+| `POST` | `/api/open-finance/import` — executa a importação: insere em `transactions` todos os itens `ok` da tela atual, com `reconciled_at` preenchido, e remove (ou marca como importados) os itens processados. |
+| `DELETE` | `/api/open-finance/connections/{id}` — desconecta e interrompe buscas futuras.
 | `POST` | `/api/checking-accounts` — ganha parâmetro opcional `vincular_open_finance` (booleano); quando `true`, a resposta sinaliza ao frontend para encaminhar ao fluxo de conexão com a conta recém-criada pré-selecionada.
 
-Tabelas novas (a criar de forma idempotente em `financeiro/database.py`): `open_finance_connections`, `open_finance_sync_log`.
-Tabela afetada: `checking_accounts` (vínculo por `checking_account_id`), `transactions` (lançamentos criados diretamente na sincronização, com `reconciled_at` preenchido).
+Tabelas novas (a criar de forma idempotente em `financeiro/database.py`): `open_finance_connections`, `open_finance_sync_log`, `open_finance_staged_transactions`.
+Tabela afetada: `checking_accounts` (vínculo por `checking_account_id`), `transactions` (lançamentos criados ao confirmar a importação, com `reconciled_at` preenchido).
 
 ## Critérios de aceite
 
 - Dado credenciais válidas de `client_id`/`client_secret` configuradas, quando o usuário inicia uma conexão, então o backend gera um connect token válido sem expor o `client_secret` ao frontend.
 - Dado um connect token expirado, quando o widget tenta usá-lo, então a conexão falha e o sistema orienta o usuário a solicitar um novo token.
-- Dado uma conta conectada com sucesso pelo Conector 200 e vinculada a uma conta corrente, quando a sincronização roda, então as transações novas são inseridas diretamente em `transactions` como lançamentos conciliados, sem alterar o saldo soberano da conta de forma independente dos lançamentos.
-- Dado uma transação importada via Open Finance, quando exibida no extrato da conta, então ela aparece como conciliada (`reconciled_at` preenchido) e com categoria/subcategoria sugerida automaticamente.
-- Dado uma transação importada via Open Finance, quando o usuário edita sua categoria/subcategoria, então o lançamento existente é atualizado normalmente, sem perder a marcação de conciliado.
-- Dado uma transação já importada anteriormente (mesmo `transacao_external_id`), quando a sincronização roda novamente, então não é criada duplicata, mesmo que o usuário tenha editado o lançamento original.
-- Dado uma conexão pertencente a outro usuário, quando o usuário autenticado tenta sincronizá-la ou desconectá-la, então a operação é bloqueada.
-- Dado uma falha de comunicação com a API da Pluggy durante a sincronização, quando ela ocorre, então o erro é registrado sem detalhes internos e o usuário recebe mensagem amigável, sem afetar outras conexões.
-- Dado uma conexão desconectada pelo usuário, quando consultada, então ela não aparece mais entre as conexões ativas e não sofre novas sincronizações automáticas.
+- Dado uma conta conectada com sucesso pelo Conector 200, quando o usuário aciona a busca na aba Open Finance informando data de início, conta Pluggy e conta de destino, então as transações novas são inseridas em `open_finance_staged_transactions` com `status_revisao = pendente`, sem alterar o saldo soberano da conta.
+- Dado uma transação em staging, quando exibida na tela de importação, então o sistema apresenta categoria/subcategoria sugerida automaticamente, calculada pela mesma lógica local usada nas outras importações.
+- Dado uma transação pendente, quando o usuário marca como OK, então seu `status_revisao` passa a `ok` e ela fica elegível para importação.
+- Dado uma transação pendente, quando o usuário marca como NOK, então seu `status_revisao` passa a `nok` e ela não será importada, mas também não reaparecerá em buscas futuras.
+- Dado uma tela de importação com ao menos um lançamento pendente, quando o usuário tenta acionar o botão Importar, então o botão permanece desabilitado até que todos os itens estejam marcados como OK ou NOK.
+- Dado que todos os lançamentos exibidos foram marcados como OK ou NOK, quando o usuário confirma a importação, então os itens OK são inseridos em `transactions` como conciliados (`reconciled_at` preenchido) na conta de destino selecionada, e os itens NOK não geram lançamento.
+- Dado uma transação já buscada anteriormente (mesmo `transacao_external_id`), quando uma nova busca é acionada, então ela não reaparece na tela de importação, independentemente de ter sido marcada OK ou NOK anteriormente.
+- Dado uma conexão pertencente a outro usuário, quando o usuário autenticado tenta buscar transações ou desconectá-la, então a operação é bloqueada.
+- Dado uma falha de comunicação com a API da Pluggy durante a busca, quando ela ocorre, então o erro é registrado sem detalhes internos e o usuário recebe mensagem amigável, sem afetar outras contas Pluggy do mesmo usuário.
+- Dado uma conexão desconectada pelo usuário, quando consultada, então ela não aparece mais entre as conexões ativas e não sofre novas buscas automáticas.
 - Dado o usuário sem `client_id`/`client_secret` configurados, quando tenta iniciar uma conexão, então o sistema orienta a configuração das credenciais antes de prosseguir.
-- Dado o botão de sincronização no cabeçalho, quando acionado, então dispara a sincronização de todas as conexões ativas do usuário sem exigir seleção individual, e sem que ocorra qualquer sincronização automática fora desse acionamento.
+- Dado o usuário na aba Open Finance em **Gestão > Importações**, quando seleciona conta Pluggy, conta de destino e data de início e aciona a busca, então o sistema traz os lançamentos a partir da data definida, sem ocorrer qualquer sincronização automática fora desse acionamento.
 - Dado uma conta corrente criada com `vincular_open_finance` marcado, quando a criação é concluída, então o sistema encaminha o usuário ao fluxo de conexão com essa conta já pré-selecionada como destino, sem pular a etapa de autorização no widget.
 - Dado duas contas retornadas pelo widget na mesma sessão de conexão, quando o usuário vincula cada uma manualmente a uma conta corrente diferente, então nenhuma vinculação é criada automaticamente para a conta que ainda não foi associada.
 
@@ -137,18 +153,19 @@ Tabela afetada: `checking_accounts` (vínculo por `checking_account_id`), `trans
 
 ## Plano de implementação
 
-- [ ] Passo 1 — Resolver as Pendências de escopo e arquitetura acima, incluindo atualização de `docs/requisitos.md`. Armazenamento de `client_id`/`client_secret` confirmado como extensão do ADR-0005 via `financeiro/secure_config.py`. Fecha: critérios 1, 9.
-- [ ] Passo 2 — Migração idempotente em `financeiro/database.py` criando `open_finance_connections`, `open_finance_sync_log` e a coluna/índice necessário para rastrear `transacao_external_id` (único por usuário/conexão) em `transactions`. Fecha: critérios 2, 3, 4, 8.
-- [ ] Passo 3 — Novo módulo `financeiro/open_finance.py` com autenticação na API da Pluggy, geração de connect token, sincronização de transações novas (inserção direta em `transactions` com `reconciled_at` preenchido) e desconexão. Fecha: critérios 1, 2, 3, 7.
-- [ ] Passo 4 — Sugestão automática de categoria/subcategoria no momento da importação, reaproveitando a mesma lógica local já usada em [[classificacao-assistida]]/importação. Fecha: critério 2.
-- [ ] Passo 5 — Deduplicação por `transacao_external_id` na sincronização, garantindo que transações já importadas não sejam recriadas mesmo após edição pelo usuário. Fecha: critério 4.
-- [ ] Passo 6 — Rotas em `app.py` expondo os endpoints da tabela acima (credenciais, connect token, conexões, sincronização), validando sessão e propriedade da conexão, incluindo o parâmetro `vincular_open_finance` em `POST /api/checking-accounts`. Fecha: critérios 1, 2, 5, 6, 7, 8, 9.
-- [ ] Passo 7 — View no frontend (`web/modules/`) para configurar credenciais por usuário, iniciar o widget, listar conexões, desconectar, o botão de sincronização manual no cabeçalho (ao lado do controle de [[privacidade-valores]]), e a opção `vincular_open_finance` no formulário de criação de conta. Fecha: critérios 1, 5, 6, 7, 8, 9.
-- [ ] Passo 8 — Testes automatizados cobrindo os critérios acima, com mocks da API da Pluggy (sem chamadas reais em teste), incluindo sugestão de categoria e deduplicação.
+- [ ] Passo 1 — Resolver as Pendências de escopo e arquitetura acima, incluindo atualização de `docs/requisitos.md`. Armazenamento de `client_id`/`client_secret` confirmado como extensão do ADR-0005 via `financeiro/secure_config.py`. Fecha: critérios 1, 13.
+- [ ] Passo 2 — Migração idempotente em `financeiro/database.py` criando `open_finance_connections`, `open_finance_sync_log` e `open_finance_staged_transactions` (com `status_revisao`, `transacao_external_id` único por usuário/conexão, sugestão de categoria/subcategoria e referência à conta de destino). Fecha: critérios 3, 4, 5, 6, 7, 8, 9.
+- [ ] Passo 3 — Novo módulo `financeiro/open_finance.py` com autenticação na API da Pluggy, geração de connect token, busca de transações novas (`/api/open-finance/fetch`) e desconexão. Fecha: critérios 1, 2, 3, 11.
+- [ ] Passo 4 — Sugestão automática de categoria/subcategoria para cada transação em staging, reaproveitando a mesma lógica local já usada em [[classificacao-assistida]]/importação. Fecha: critério 4.
+- [ ] Passo 5 — Deduplicação por `transacao_external_id`, garantindo que transações já buscadas (OK ou NOK) não reapareçam em novas buscas. Fecha: critérios 6, 9.
+- [ ] Passo 6 — Rotas em `app.py` expondo os endpoints da tabela acima (credenciais, connect token, conexões, fetch, staging OK/NOK, importar), validando sessão e propriedade da conexão, incluindo o parâmetro `vincular_open_finance` em `POST /api/checking-accounts`. Fecha: critérios 1, 2, 3, 5, 6, 7, 8, 10, 12, 15, 16.
+- [ ] Passo 7 — View no frontend (`web/modules/`) para configurar credenciais por usuário, iniciar o widget, listar conexões, desconectar, a aba Open Finance dentro de **Gestão > Importações** (seleção de conta Pluggy, conta de destino, data de início, busca manual, tela de staging/revisão OK/NOK e botão Importar), e a opção `vincular_open_finance` no formulário de criação de conta. Fecha: critérios 3, 4, 5, 6, 7, 8, 14, 15.
+- [ ] Passo 8 — Testes automatizados cobrindo os critérios acima, com mocks da API da Pluggy (sem chamadas reais em teste), incluindo sugestão de categoria, marcação OK/NOK, habilitação do botão Importar e deduplicação.
 
 ## Changelog
 
-- `0.5` — 2026-08-23 — Modelo de sincronização simplificado: o saldo do app permanece soberano (não é atualizado direto pela Pluggy); transações importadas via Open Finance entram diretamente em `transactions` como conciliadas, sem tela de staging/revisão. Removidas pendências e endpoints relacionados a staging/aprovação/rejeição.
+- `0.6` — 2026-08-23 — Processo de importação Open Finance movido para uma aba dentro de **Gestão > Importações**; removida a ideia de botão no cabeçalho superior.
+- `0.5` — 2026-08-23 — Modelo de sincronização ajustado: o saldo do app permanece soberano (não é atualizado direto pela Pluggy); transações importadas via Open Finance passam por uma tela de staging/revisão onde o usuário marca cada item como OK (importar) ou NOK (não importar) antes de inserir os OK em `transactions` como conciliados.
 - `0.4` — 2026-08-23 — Pendência de armazenamento criptografado de `client_id`/`client_secret` resolvida: estende `financeiro/secure_config.py` e o ADR-0005, sem novo ADR dedicado.
 - `0.3` — 2026-08-23 — Credenciais confirmadas como opt-in por usuário (mesmo padrão de IA/Mais Retorno). Introduzida a tela de revisão: transações novas da sincronização passam a entrar em staging (`status_revisao`) com categoria/subcategoria sugerida automaticamente (mesma lógica de [[classificacao-assistida]]), e só viram lançamento em `transactions` após aprovação explícita (individual ou em lote); rejeição não gera lançamento e não reaparece em sincronizações futuras. Saldo da conta segue atualizado direto pela sincronização, independente da aprovação das transações. Pendência de categorização resolvida e removida; nova pendência aberta sobre a divergência entre saldo sincronizado e soma dos lançamentos aprovados.
 - `0.2` — 2026-08-06 — Credenciais definidas como opt-in por usuário; sincronização definida como manual via botão no cabeçalho (sem agendamento/webhook); vínculo de conta definido como sempre manual, com opção `vincular_open_finance` na criação de conta corrente. Pendências correspondentes resolvidas e removidas.
