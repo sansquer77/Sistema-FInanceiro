@@ -5,7 +5,7 @@ status: implementado
 versao: 1.0
 atualizado: 2026-06-29
 relacionados:
-  - "[[specs/importacao-organizze]]"
+  - "[[specs/importacao-dados]]"
   - "[[arquitetura]]"
 tags: [adr, importacao]
 aliases: ["ADR-0004", "Parser XLS sem dependência"]
@@ -18,7 +18,7 @@ aliases: ["ADR-0004", "Parser XLS sem dependência"]
 
 ## Contexto
 
-A importação de exportações do Organizze requer leitura de arquivos `.xls` (formato binário legado). A biblioteca `xlrd` é o pacote Python mais comum para isso, mas adiciona uma dependência externa que precisa ser instalada pelo usuário.
+A importação de arquivos externos legados requer leitura de arquivos `.xls` (formato binário legado). A biblioteca `xlrd` é o pacote Python mais comum para isso, mas adiciona uma dependência externa que precisa ser instalada pelo usuário.
 
 ## Decisão
 
@@ -28,7 +28,7 @@ Implementar um **parser `.xls` mínimo internamente** em `financeiro/imports.py`
 
 - O usuário instala e executa o app com `python app.py` sem etapa extra de `pip install`.
 - O pacote distribuível não carrega dependências que possam quebrar por mudança de versão.
-- O parser cobre apenas os campos utilizados pelo Organizze, mantendo o código pequeno.
+- O parser cobre apenas os campos tabulares necessários para importação legada, mantendo o código pequeno.
 
 ## Consequências negativas / trade-offs
 
@@ -41,10 +41,10 @@ Implementar um **parser `.xls` mínimo internamente** em `financeiro/imports.py`
 | Alternativa | Motivo da rejeição |
 |---|---|
 | `xlrd` | Dependência externa que aumenta fricção de instalação. |
-| Exigir que o usuário converta para `.csv` antes | Piora a experiência; o Organizze exporta `.xls` por padrão. |
+| Exigir que o usuário converta para `.csv` antes | Piora a experiência; algumas exportações legadas vêm em `.xls` por padrão. |
 | `openpyxl` | Não lê `.xls` (apenas `.xlsx`); não resolve o problema. |
 
 ## Relacionados
 
-- [[specs/importacao-organizze]]
+- [[specs/importacao-dados]]
 - [[arquitetura]]

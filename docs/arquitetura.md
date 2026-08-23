@@ -261,11 +261,11 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `GET` | `/api/operation-logs` |
 | `GET` | `/api/operation-logs/{id}` |
 
-#### Rotas — Importação → [[importacao-organizze]]
+#### Rotas — Importação → [[importacao-dados]]
 
 | Método | Rota |
 |---|---|
-| `POST` | `/api/import/organizze-transactions` |
+| `POST` | `/api/import/legacy-transactions` |
 | `POST` | `/api/import/system-template` |
 | `GET` | `/api/import/template` |
 
@@ -288,7 +288,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `trends.py` | Núcleo local de Tendências e Achados: série mensal, Budget x Realizado, achados estruturados, eventos pontuais, assinaturas/serviços recorrentes, confiança e resumo determinístico. Ver [[tendencias-saude-financeira]]. |
 | `ai_summary.py` | Reescrita opcional do resumo por IA com payload minimizado, timeout curto e fallback para resumo local. Ver [[tendencias-saude-financeira]]. |
 | `consultor.py` | Domínio do Consultor: catálogo fechado de 9 análises, validações de enums, prompts estritos, persona, disclaimer, configuração por usuário, Perfil Complementar criptografado, contexto minimizado por card (incluindo série histórica dos 5 pilares do Score para o card `evolucao_score_tempo`), metadados de cotações herdados do Portfólio, executor de IA via `user_ai_settings`, pós-processamento de respostas, quota/cooldown de resiliência e expurgo de histórico por privacidade. Ver [[specs/consultor]]. |
-| `imports.py` | Leitura de exportações Organizze e planilhas modelo. Ver [[importacao-organizze]]. |
+| `imports.py` | Leitura de arquivos externos legados e planilhas modelo. Ver [[importacao-dados]]. |
 | `operation_logs.py` | Auditoria funcional das operações do usuário. Ver [[historico-operacoes]]. |
 | `emailer.py` | Envio SMTP do código de recuperação de senha. Ver [[recuperacao-senha]]. |
 | `secure_config.py` | Armazenamento criptografado da configuração SMTP local, segredos de IA e chaves de integrações por usuário em `secure_configs`, com compatibilidade para arquivos `.enc` legados. Ver [[recuperacao-senha]], [[tendencias-saude-financeira]], [[specs/preferencias-abas]]. |
@@ -465,10 +465,10 @@ Ver [[relatorios]], [[limites-gastos]], [[specs/cockpit-calendario]].
 
 ### Importação de Arquivos
 
-1. Parser Organizze (`.xls`/`.csv`) em `imports.py`.
+1. Parser de arquivos externos legados (`.xls`/`.csv`) em `imports.py`.
 2. Importação estruturada via modelos `.xlsx` do próprio sistema.
 
-Ver [[importacao-organizze]].
+Ver [[importacao-dados]].
 
 ### Configuração de E-mail
 

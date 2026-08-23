@@ -91,7 +91,7 @@ Estas restrições vêm de ADRs formais. Um agente de IA **não deve sugerir nem
 | Sem framework web no backend | [ADR-0001](docs/adr/0001-stack-local-sem-framework.md) | `app.py` usa apenas a biblioteca padrão do Python. Nunca adicionar Flask, FastAPI, Django ou similares. |
 | Frontend sem build step | [ADR-0002](docs/adr/0002-modularizacao-frontend.md) | ES Modules nativos carregados via `<script type="module">`. Nunca introduzir bundler, transpiler, TypeScript compilado ou dependência de `npm run build`. |
 | SQLite como única fonte de verdade | [ADR-0003](docs/adr/0003-sqlite-fonte-de-verdade.md) | Sem servidor de banco externo. Banco em `data/finance.db`, criado por migrações idempotentes em `financeiro/database.py`. Valores monetários sempre em **centavos** (inteiro), nunca ponto flutuante. |
-| Parser `.xls` próprio | [ADR-0004](docs/adr/0004-importador-xls-sem-dependencia.md) | Não adicionar `xlrd` ou lib externa para importação Organizze; o parser mínimo vive em `financeiro/imports.py`. |
+| Parser `.xls` próprio | [ADR-0004](docs/adr/0004-importador-xls-sem-dependencia.md) | Não adicionar `xlrd` ou lib externa para importação de extratos; o parser mínimo vive em `financeiro/imports.py`. |
 | Configuração SMTP criptografada local | [ADR-0005](docs/adr/0005-smtp-criptografado-local.md), [ADR-0010](docs/adr/0010-segredos-criptografados-sqlite.md) | Credenciais nunca em texto puro, nunca versionadas, nunca em pacotes distribuíveis. Usar `financeiro/secure_config.py` e `secure_configs`. |
 | Classificação assistida local primeiro | [ADR-0006](docs/adr/0006-classificacao-assistida-local.md) | Sugestões vêm de correspondência exata indexada no SQLite do próprio usuário. IA externa é fallback opcional futuro, nunca bloqueante. |
 

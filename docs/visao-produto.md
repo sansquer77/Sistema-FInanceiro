@@ -23,7 +23,7 @@ Criar um sistema financeiro local, simples e confiável para organizar contas, m
 
 ## Inspiração
 
-O Organizze serve como referência de clareza: módulos financeiros separados, saldos fáceis de conferir, baixa fricção para cadastrar informações e relatórios por dimensões financeiras. O app deve seguir essa direção sem copiar interface, textos proprietários ou dados de contas.
+Apps de finanças pessoais servem como referência de clareza: módulos financeiros separados, saldos fáceis de conferir, baixa fricção para cadastrar informações e relatórios por dimensões financeiras. O app deve seguir essa direção sem copiar interface, textos proprietários ou dados de contas.
 
 ## Princípios de experiência
 
@@ -50,7 +50,7 @@ O Organizze serve como referência de clareza: módulos financeiros separados, s
 | Cockpit com saldos, planejamento recorrente, dívidas, maiores receitas/despesas e portfólio | [[arquitetura]] |
 | Relatórios por categoria, subcategoria, conta, tag e fluxo diário | [[relatorios]] |
 | Portfólio de investimentos com cotações integradas, indexadores do BCB, poupança e previdência privada | [[investimentos-portfolio]] |
-| Importação de lançamentos do Organizze e planilhas modelo `.xlsx` | [[importacao-organizze]] |
+| Importação de lançamentos de arquivos externos e planilhas modelo `.xlsx` | [[importacao-dados]] |
 | Recuperação de senha por e-mail SMTP com assistente para Gmail e Outlook | [[recuperacao-senha]] |
 | Modularização do frontend em ES Modules nativos | [[adr/0002-modularizacao-frontend]] |
 | Segurança: bloqueio de tentativas, headers defensivos, validação de origem | [[seguranca-autenticacao]] |

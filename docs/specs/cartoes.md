@@ -9,7 +9,7 @@ relacionados:
   - "[[lancamentos]]"
   - "[[limites-gastos]]"
   - "[[relatorios]]"
-  - "[[importacao-organizze]]"
+  - "[[importacao-dados]]"
   - "[[arquitetura]]"
 tags: [spec, "area/cartoes"]
 aliases: ["Cartões de Crédito", "Faturas"]
@@ -235,5 +235,5 @@ Tabelas: `credit_cards`, `credit_card_transactions`, `credit_card_payments`, `cr
 - [[lancamentos]]
 - [[limites-gastos]]
 - [[relatorios]]
-- [[importacao-organizze]]
+- [[importacao-dados]]
 - [[arquitetura]]

@@ -42,9 +42,9 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 - **Classificação Assistida**: sugestão local de categoria e subcategoria por correspondência exata normalizada com o histórico do próprio usuário, sem dependência de internet. Ver [[classificacao-assistida]].
 - **Cockpit e Relatórios**: resumo financeiro mensal com seletor de mês, saldos por moeda, planejamento recorrente, dívidas parceladas, portfólio por tipo, maiores receitas/despesas, relatórios por categoria, subcategoria, conta, tag e fluxo diário. Ver [[relatorios]] e [[arquitetura]].
 - **Importação de Dados**:
-  - Leitura e importação de extratos do Organizze em formato `.csv` ou `.xls`.
+  - Leitura e importação de extratos externos em formato `.csv` ou `.xls`.
   - Importação de lançamentos por meio de planilhas de modelo do sistema (`.xlsx`) para contas e cartões.
-  - Ver [[importacao-organizze]].
+  - Ver [[importacao-dados]].
 - **Histórico de Operações**: auditoria funcional somente leitura com filtros, busca, agrupamentos e rastreio de lotes por `operation_batch_id`. Ver [[historico-operacoes]].
 - **Consultor**: análises pré-formatadas por IA na aba Consultor do Cockpit, mediante IA geral configurada, ativação explícita e consentimento de acesso aos dados financeiros do usuário. Usa catálogo fechado em seletor, contexto minimizado, Perfil Complementar criptografado em SQLite, histórico por usuário e expurgo automático quando IA/Consultor/consentimento são desabilitados. Ver [[specs/consultor]].
 - **Sobre o app**: tela informativa no grupo Usuário com objetivo, funcionalidades, tecnologias, contato e infraestrutura mínima. Ver [[sobre-app]].

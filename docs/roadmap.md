@@ -43,7 +43,7 @@ Este documento organiza a evolução do Sistema Financeiro e serve de histórico
 | 7 | Relatórios avançados e Cockpit integrando contas, cartões, limites, dívidas e portfólio. | ✅ Implementado | [[relatorios]] |
 | 8 | Segurança: bloqueio de tentativas, cookie seguro, headers defensivos, validação de origem. | ✅ Implementado | [[seguranca-autenticacao]] |
 | 9 | Recuperação de senha com configuração SMTP local criptografada e assistente para Gmail/Outlook. | ✅ Implementado | [[recuperacao-senha]] |
-| 10 | Importação Organizze e planilhas modelo do sistema (`.xlsx`). | ✅ Implementado | [[importacao-organizze]] |
+| 10 | Importação de arquivos externos legados e planilhas modelo do sistema (`.xlsx`). | ✅ Implementado | [[importacao-dados]] |
 | 11 | Modularização do frontend em ES Modules nativos sem build step. | ✅ Implementado | [[adr/0002-modularizacao-frontend]] |
 | 12 | Distribuição desktop macOS/Windows, instaladores, zips limpos e launchers local/LAN. | ✅ Implementado | [[distribuição]] |
 | 13 | Conciliação automática de arquivos OFX bancários. | ❌ Descartado — OFX parece padrão, mas na prática bancos exportam com diferenças de encoding, campos ausentes, datas estranhas, sinal de valor inconsistente e descrições muito sujas. | — |

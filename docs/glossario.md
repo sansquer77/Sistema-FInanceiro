@@ -63,8 +63,8 @@ Vocabulário do Sistema Financeiro. Cada termo aponta para a spec onde a regra e
 
 ## Importação
 
-- **Importação Organizze**: leitura de exportações `.xls`/`.csv` do Organizze. Ver [[importacao-organizze]].
-- **Modelo do sistema**: planilha `.xlsx` própria do app para importação estruturada de contas/cartões. Ver [[importacao-organizze]].
+- **Importação legada**: leitura de arquivos externos `.xls`/`.csv` com colunas reconhecidas. Ver [[importacao-dados]].
+- **Modelo do sistema**: planilha `.xlsx` própria do app para importação estruturada de contas/cartões. Ver [[importacao-dados]].
 
 ## Segurança e acesso
 

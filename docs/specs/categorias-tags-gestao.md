@@ -6,7 +6,7 @@ versao: 1.1
 atualizado: 2026-06-30
 relacionados:
   - "[[lancamentos]]"
-  - "[[importacao-organizze]]"
+  - "[[importacao-dados]]"
   - "[[relatorios]]"
   - "[[limites-gastos]]"
   - "[[arquitetura]]"
@@ -17,7 +17,7 @@ aliases: ["Categorias e Tags", "Classificações"]
 # Categorias e Tags
 
 > [!info] Status
-> **implementado** · área: `classificacao` · atualizado em 2026-06-30 · relacionados: [[lancamentos]], [[importacao-organizze]], [[relatorios]], [[limites-gastos]]
+> **implementado** · área: `classificacao` · atualizado em 2026-06-30 · relacionados: [[lancamentos]], [[importacao-dados]], [[relatorios]], [[limites-gastos]]
 
 ## Problema
 
@@ -53,7 +53,7 @@ Qualquer usuário autenticado localmente que classifique seus lançamentos por n
 - Categorias, subcategorias e tags pertencem ao usuário autenticado.
 - O usuário pode listar, criar, renomear e excluir itens **não utilizados**.
 - Categorias, subcategorias e tags **em uso** em lançamentos não podem ser excluídas.
-- Importações podem criar automaticamente categorias, subcategorias e tags inexistentes para o usuário autenticado. Ver [[importacao-organizze]].
+- Importações podem criar automaticamente categorias, subcategorias e tags inexistentes para o usuário autenticado. Ver [[importacao-dados]].
 - Tags informadas em uma mesma célula devem ser separadas quando houver separadores suportados (vírgula, ponto-e-vírgula).
 - Categorias e subcategorias podem alimentar a evolução temporal dos relatórios por meio de séries mensais. Ver [[relatorios]].
 
@@ -87,7 +87,7 @@ Tabelas: `categories`, `subcategories`, `tags`, `transaction_tags`, `credit_card
 ## Relacionados
 
 - [[lancamentos]]
-- [[importacao-organizze]]
+- [[importacao-dados]]
 - [[relatorios]]
 - [[limites-gastos]]
 - [[arquitetura]]

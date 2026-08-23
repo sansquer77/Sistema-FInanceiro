@@ -95,7 +95,7 @@ from financeiro.financial_health import (
     calculate_financial_health_score,
     calculate_financial_health_score_history,
 )
-from financeiro.imports import import_organizze_transactions, import_system_template, system_import_template
+from financeiro.imports import import_legacy_transactions, import_system_template, system_import_template
 from financeiro.operation_logs import create_operation_log, get_operation_log, list_operation_logs
 from financeiro.portfolio import close_position, create_opening_position, current_portfolio_positions, delete_opening_position, fetch_fund_quote_for_user, get_portfolio, get_portfolio_returns, redeem_position, update_opening_position, update_position_value_override
 from financeiro.portfolio import PortfolioError
@@ -412,8 +412,8 @@ class AppHandler(BaseHTTPRequestHandler):
         if path == "/api/portfolio/close":
             self.handle_close_portfolio_position()
             return
-        if path == "/api/import/organizze-transactions":
-            self.handle_import_organizze_transactions()
+        if path == "/api/import/legacy-transactions":
+            self.handle_import_legacy_transactions()
             return
         if path == "/api/import/system-template":
             self.handle_import_system_template()
@@ -1348,13 +1348,13 @@ class AppHandler(BaseHTTPRequestHandler):
         self.record_operation(user["id"], "limits", "delete", "spending_limit", "Limite de gastos excluido", limit_id)
         self.send_json({"ok": True})
 
-    def handle_import_organizze_transactions(self) -> None:
+    def handle_import_legacy_transactions(self) -> None:
         user = self.require_user()
         form = self.read_multipart()
         uploaded = form["files"].get("file")
         if not uploaded:
-            raise ApiError("Envie o arquivo exportado pelo Organizze.")
-        result = import_organizze_transactions(
+            raise ApiError("Envie o arquivo para importacao.")
+        result = import_legacy_transactions(
             user["id"],
             form["fields"].get("account_id", ""),
             uploaded["content"],
@@ -1362,7 +1362,7 @@ class AppHandler(BaseHTTPRequestHandler):
         )
         self.record_operation(
             user["id"], "imports", "import", "transaction",
-            f"Importacao Organizze: {result.get('imported', 0)} lancamentos importados", None,
+            f"Importacao legada: {result.get('imported', 0)} lancamentos importados", None,
             account_id=form["fields"].get("account_id", ""),
             operation_batch_id=result.get("operation_batch_id"),
             metadata={"filename": uploaded["filename"], "imported": result.get("imported"), "skipped": result.get("skipped")},

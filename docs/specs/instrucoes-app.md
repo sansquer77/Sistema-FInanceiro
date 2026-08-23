@@ -413,9 +413,9 @@ A lista abaixo é a **versão de referência** para o conteúdo estático do mó
 
 - **ID**: `importacao-dados`
   - **Título**: Importação de dados
-  - **Resumo**: Traga lançamentos de planilhas do Organizze ou do modelo do próprio sistema.
-  - **Conteúdo**: Em **Gestão > Importação**, escolha a origem (Organizze ou modelo próprio), selecione o arquivo e a conta ou cartão de destino. Para o modelo próprio, baixe o arquivo exemplo, preencha e envie. Sempre revise o resultado antes de continuar.
-  - **Termos de busca**: importar, organizze, planilha, modelo
+  - **Resumo**: Traga lançamentos de planilhas no modelo do próprio sistema.
+  - **Conteúdo**: Em **Gestão > Importação**, escolha a conta ou cartão de destino e selecione o arquivo preenchido no modelo do sistema. Baixe o arquivo exemplo, preencha e envie. Sempre revise o resultado antes de continuar.
+  - **Termos de busca**: importar, planilha, modelo
   - **Módulo relacionado**: Importação
   - **Rota do módulo**: `imports`
   - **Tópico contextual**: `importacao-dados`
@@ -571,7 +571,7 @@ Nenhuma pendência conhecida.
 - `1.7` — 2026-08-10 — Textos de Portfólio e Investimento/Aporte expandidos em formato mais didático; novo tópico **Fundos: cotas e preço unitário** explica cotas, valor da cota, CNPJ, custo histórico editável e relação com a Mais Retorno.
 - `1.6` — 2026-08-08 — Novo tópico no grupo Portfólio: **Cotações de fundos (Mais Retorno)** — como criar conta na plataforma, gerar a chave de API e configurar em Preferências > APIs; regra correspondente adicionada.
 - `1.5` — 2026-08-08 — Tópico Preferências atualizado para refletir as abas **Geral**, **APIs** e **Perigo** e a integração opcional Mais Retorno ([[preferencias-abas]]).
-- `1.3` — 2026-08-04 — Tópico `importacao-dados` ajustado: removida menção a formatos `.xls` e `.csv` do Organizze.
+- `1.3` — 2026-08-04 — Tópico `importacao-dados` ajustado: removida menção a formatos `.xls` e `.csv` de soluções externas.
 - `1.2` — 2026-08-04 — Tópicos `acoes-fundos` e `investimentos-aportes` revisados: explicados campos de cadastro de ações, fundos, cripto e previdência, e diferenciado aporte de investimento de transferência entre contas. Tópico `posicao-movimentacao` reforça que o cadastro no Portfólio é para posição inicial já existente na carteira.
 - `1.1` — 2026-08-04 — Adicionado tópico `cadastrar-poupanca` ao grupo `portfolio`, explicando o cadastro de aniversários no formato `AAAA-MM-DD; valor` e o cálculo automático de rendimento.
 - `1.0` — 2026-08-04 — Spec implementada: módulo **Instruções** finalizado no menu Usuário, com central de ajuda local, busca, grupos colapsáveis, accordion, links internos, botões contextuais `?`, responsividade e aderência ao design system. Versão do produto elevada para `1.2.0`.

@@ -2,7 +2,7 @@
 
 Sistema financeiro pessoal **local-first**: contas correntes, cartões de crédito, investimentos, categorias/tags, limites de gastos, importação de extratos e Score de Saúde Financeira — tudo rodando no seu próprio computador, sem depender de nuvem para operar no dia a dia.
 
-Inspirado na clareza de apps como o Organizze, mas 100% seus: os dados ficam em um banco SQLite local, o backend é Python puro (sem framework web) e o frontend é HTML/JS nativo (sem build step).
+Inspirado na clareza de apps de finanças pessoais, mas 100% seus: os dados ficam em um banco SQLite local, o backend é Python puro (sem framework web) e o frontend é HTML/JS nativo (sem build step).
 
 ## Funcionalidades
 
@@ -11,7 +11,7 @@ Inspirado na clareza de apps como o Organizze, mas 100% seus: os dados ficam em 
 - Portfólio de investimentos
 - Categorias, subcategorias e tags, com classificação assistida local
 - Limites de gastos por categoria
-- Importação de extratos do Organizze e planilhas modelo
+- Importação de extratos e planilhas modelo
 - Score de Saúde Financeira e tendências
 - Modo Privacidade (ocultar valores em tela)
 - Modo local ou exposição controlada na rede local (LAN)

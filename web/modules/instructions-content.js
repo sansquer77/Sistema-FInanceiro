@@ -524,12 +524,12 @@ export const INSTRUCTIONS_CONTENT = [
       {
         id: "importacao-dados",
         title: "Importação de dados",
-        summary: "Traga lançamentos de planilhas do Organizze ou do modelo do próprio sistema.",
+        summary: "Traga lançamentos de planilhas no modelo do próprio sistema.",
         content: [
-          "Em Gestão > Importação, escolha a origem (Organizze ou modelo próprio), selecione o arquivo e a conta ou cartão de destino.",
-          "Para o modelo próprio, baixe o arquivo exemplo, preencha e envie. Sempre revise o resultado antes de continuar.",
+          "Em Gestão > Importação, escolha a conta ou cartão de destino e selecione o arquivo preenchido no modelo do sistema.",
+          "Baixe o arquivo exemplo, preencha e envie. Sempre revise o resultado antes de continuar.",
         ],
-        searchTerms: ["importar", "organizze", "planilha", "modelo"],
+        searchTerms: ["importar", "planilha", "modelo"],
         relatedModule: "Importação",
         route: "imports",
         contextualTopicId: "importacao-dados",

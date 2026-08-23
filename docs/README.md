@@ -44,7 +44,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[specs/classificacao-assistida]] | ✅ implementado | Classificação |
 | [[specs/investimentos-portfolio]] | ✅ implementado | Investimentos |
 | [[specs/relatorios]] | ✅ implementado | Relatórios |
-| [[specs/importacao-organizze]] | ✅ implementado | Importação |
+| [[specs/importacao-dados]] | ✅ implementado | Importação |
 | [[specs/historico-operacoes]] | ✅ implementado | Auditoria |
 | [[specs/recuperacao-senha]] | ✅ implementado | Segurança |
 | [[specs/seguranca-autenticacao]] | ✅ implementado | Segurança |

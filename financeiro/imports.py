@@ -196,11 +196,11 @@ def system_import_template(user_id: int, target: str) -> bytes:
     headers = SYSTEM_IMPORT_CARD_HEADERS if normalized_target == "card" else SYSTEM_IMPORT_ACCOUNT_HEADERS
     launch_rows = [headers]
     if normalized_target == "card":
-        launch_rows.append(["15.06.2026", "2026-06", "expense", "Exemplo compra no cartão", "123,45", "Alimentação", "Restaurantes / Bares / Delivery", "Organizze; Revisar", "parcelado", "3", "", "", "Linha exemplo"])
-        launch_rows.append(["2026-06-20", "2026-06", "income", "Exemplo estorno", "10,00", "Outras Receitas", "Reembolsos Corporativos", "Organizze", "", "", "", "", "Linha exemplo"])
+        launch_rows.append(["15.06.2026", "2026-06", "expense", "Exemplo compra no cartão", "123,45", "Alimentação", "Restaurantes / Bares / Delivery", "Importado; Revisar", "parcelado", "3", "", "", "Linha exemplo"])
+        launch_rows.append(["2026-06-20", "2026-06", "income", "Exemplo estorno", "10,00", "Outras Receitas", "Reembolsos Corporativos", "Importado", "", "", "", "", "Linha exemplo"])
     else:
-        launch_rows.append(["15.06.2026", "expense", "Exemplo mercado", "123,45", "Alimentação", "Supermercado / Feira / Hortifruti", "Organizze; Revisar", "parcelado", "3", "", "", "", "", "", "", "Linha exemplo"])
-        launch_rows.append(["2026-06-15", "income", "Exemplo salário", "1000,00", "Trabalho e Salário", "Salário Líquido", "Organizze", "", "", "", "", "", "", "", "", "Linha exemplo"])
+        launch_rows.append(["15.06.2026", "expense", "Exemplo mercado", "123,45", "Alimentação", "Supermercado / Feira / Hortifruti", "Importado; Revisar", "parcelado", "3", "", "", "", "", "", "", "Linha exemplo"])
+        launch_rows.append(["2026-06-15", "income", "Exemplo salário", "1000,00", "Trabalho e Salário", "Salário Líquido", "Importado", "", "", "", "", "", "", "", "", "Linha exemplo"])
         launch_rows.append(["2026-06-15", "transfer", "Exemplo transferência", "500,00", "", "", "", "", "", "", "", "2", "", "", "", "Informe conta_destino_id"])
         launch_rows.append(["2026-06-15", "exchange", "Exemplo câmbio", "1000,00", "", "", "Câmbio", "", "", "", "", "3", "197,10", "0,197100", "", "Conta destino em outra moeda"])
     category_rows = [["grupo", "categoria", "subcategoria"]]
@@ -333,7 +333,7 @@ def normalize_system_account_row(row: dict, account_id: object) -> dict:
     if payload["type"] == "transfer":
         payload["category"] = ""
         payload["subcategory"] = ""
-        # spec: importacao-organizze v1.2 — regras de repetição
+        # spec: importacao-dados v1.3 — regras de repetição
         # (transferencias e cambio sao sempre avulsos, mesmo se a linha trouxer repeticao)
         payload["series_kind"] = "single"
         payload["installment_count"] = None
@@ -359,7 +359,7 @@ def normalize_system_card_row(row: dict, card_id: object) -> dict:
 
 
 def normalize_system_series(row: dict) -> dict:
-    # spec: importacao-organizze v1.2 — regras de repetição
+    # spec: importacao-dados v1.3 — regras de repetição
     # (avulso padrao; parcelado exige parcelas 2-120; recorrente exige frequencia;
     #  media so se aplica a recorrentes)
     series_kind = SERIES_KIND_ALIASES.get(normalize_key(row.get("repeticao") or row.get("series_kind")), "single")
@@ -717,9 +717,9 @@ def xlsx_column_index(cell_ref: str) -> int:
     return index
 
 
-def import_organizze_transactions(user_id: int, account_id: object, file_bytes: bytes, filename: str) -> dict:
+def import_legacy_transactions(user_id: int, account_id: object, file_bytes: bytes, filename: str) -> dict:
     normalized_account_id = normalize_account_id(account_id)
-    raw_rows = parse_organizze_file(file_bytes, filename)
+    raw_rows = parse_legacy_file(file_bytes, filename)
     operation_batch_id = str(uuid4())
     imported = []
     skipped = []
@@ -792,7 +792,7 @@ def import_organizze_transactions(user_id: int, account_id: object, file_bytes: 
     }
 
 
-def parse_organizze_file(file_bytes: bytes, filename: str) -> list[dict]:
+def parse_legacy_file(file_bytes: bytes, filename: str) -> list[dict]:
     if not file_bytes:
         raise ImportError("Envie um arquivo para importar.")
     name = filename.lower()
@@ -801,7 +801,7 @@ def parse_organizze_file(file_bytes: bytes, filename: str) -> list[dict]:
     elif name.endswith(".csv"):
         rows = parse_csv_rows(file_bytes)
     else:
-        raise ImportError("Formato nao suportado. Envie o arquivo .xls exportado pelo Organizze.")
+        raise ImportError("Formato nao suportado. Envie um arquivo .xls ou .csv para importacao.")
     return rows_to_transactions(rows)
 
 
@@ -814,7 +814,7 @@ def rows_to_transactions(rows: list[list[object]]) -> list[dict]:
     required = {"date", "description", "category", "amount", "tag"}
     missing = sorted(required - positions.keys())
     if missing:
-        raise ImportError("Arquivo fora do modelo Organizze. Colunas obrigatorias ausentes: " + ", ".join(missing))
+        raise ImportError("Arquivo fora do modelo esperado. Colunas obrigatorias ausentes: " + ", ".join(missing))
     transactions = []
     for row_number, row in enumerate(rows[header_index + 1 :], start=header_index + 2):
         if not any(str(value or "").strip() for value in row):
@@ -1073,7 +1073,7 @@ def find_header_index(rows: list[list[object]]) -> int:
         normalized = {normalize_header(value) for value in row}
         if {"data", "valor"}.issubset(normalized) and ("descrição" in normalized or "descricao" in normalized):
             return index
-    raise ImportError("Nao encontrei o cabecalho do Organizze no arquivo.")
+    raise ImportError("Nao encontrei o cabecalho esperado no arquivo.")
 
 
 def normalize_header(value: object) -> str:

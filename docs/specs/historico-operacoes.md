@@ -11,7 +11,7 @@ relacionados:
   - "[[lancamentos]]"
   - "[[cartoes]]"
   - "[[investimentos-portfolio]]"
-  - "[[importacao-organizze]]"
+  - "[[importacao-dados]]"
 tags: [spec, "area/historico-operacoes", auditoria]
 aliases: ["Histórico de Operações", "Historico de Operacoes", "Auditoria de Operações"]
 ---
@@ -19,7 +19,7 @@ aliases: ["Histórico de Operações", "Historico de Operacoes", "Auditoria de O
 # Histórico de Operações
 
 > [!info] Status
-> **implementado** · área: `historico-operacoes` · atualizado em 2026-07-09 · relacionados: [[sdd]], [[templates/spec-template|Template de spec]], [[arquitetura]], [[lancamentos]], [[cartoes]], [[investimentos-portfolio]], [[importacao-organizze]]
+> **implementado** · área: `historico-operacoes` · atualizado em 2026-07-09 · relacionados: [[sdd]], [[templates/spec-template|Template de spec]], [[arquitetura]], [[lancamentos]], [[cartoes]], [[investimentos-portfolio]], [[importacao-dados]]
 
 ## Problema
 
@@ -203,4 +203,4 @@ O menu lateral inclui **Histórico** no grupo Gestão, com ícone de histórico/
 - [[lancamentos]]
 - [[cartoes]]
 - [[investimentos-portfolio]]
-- [[importacao-organizze]]
+- [[importacao-dados]]

@@ -2,8 +2,8 @@
 tipo: spec
 area: importacao
 status: implementado
-versao: 1.2
-atualizado: 2026-08-17
+versao: 1.3
+atualizado: 2026-08-23
 relacionados:
   - "[[contas-correntes]]"
   - "[[cartoes]]"
@@ -12,17 +12,17 @@ relacionados:
   - "[[adr/0004-importador-xls-sem-dependencia]]"
   - "[[arquitetura]]"
 tags: [spec, "area/importacao"]
-aliases: ["Importação", "Importação Organizze"]
+aliases: ["Importação", "Importação de dados"]
 ---
 
-# Importação
+# Importação de dados
 
 > [!info] Status
-> **implementado** · área: `importacao` · atualizado em 2026-08-17 · relacionados: [[contas-correntes]], [[cartoes]], [[categorias-tags-gestao]], [[adr/0004-importador-xls-sem-dependencia]]
+> **implementado** · área: `importacao` · atualizado em 2026-08-23 · relacionados: [[contas-correntes]], [[cartoes]], [[categorias-tags-gestao]], [[adr/0004-importador-xls-sem-dependencia]]
 
 ## Problema
 
-O usuário precisa importar movimentações de contas e cartões a partir de arquivos exportados do Organizze ou de planilhas modelo do próprio sistema, preservando categorias, subcategorias, tags e competência de fatura correta.
+O usuário precisa importar movimentações de contas e cartões a partir de arquivos externos ou de planilhas modelo do próprio sistema, preservando categorias, subcategorias, tags e competência de fatura correta.
 
 ## Usuário
 
@@ -31,7 +31,7 @@ Usuário que está migrando dados de outro sistema ou que deseja lançar movimen
 ## Jornada
 
 1. O usuário acessa a área de Importação.
-2. Escolhe o tipo: exportação do Organizze ou modelo do sistema.
+2. Escolhe o tipo: arquivo externo legado ou modelo do sistema.
 3. Seleciona a conta ou cartão de destino.
 4. Faz upload do arquivo (`.xls`, `.csv` ou `.xlsx`).
 5. O sistema processa e exibe o resumo: total lido, total importado, total ignorado e motivos das linhas rejeitadas.
@@ -93,14 +93,14 @@ Usuário que está migrando dados de outro sistema ou que deseja lançar movimen
 |---|---|
 | `GET` | `/api/import/template?target=account` |
 | `GET` | `/api/import/template?target=card` |
-| `POST` | `/api/import/organizze-transactions` |
+| `POST` | `/api/import/legacy-transactions` |
 | `POST` | `/api/import/system-template` |
 
 Tabelas: `transactions`, `credit_card_transactions`, `transaction_tags`, `credit_card_transaction_tags`, `categories`, `subcategories`, `tags`, `checking_accounts`, `credit_cards`.
 
 ## Critérios de aceite
 
-- Dado um arquivo `.xls` exportado pelo Organizze, quando importado, é lido sem instalação manual de pacote externo.
+- Dado um arquivo `.xls` legado de exportação externa, quando importado, é lido sem instalação manual de pacote externo.
 - Dado um arquivo `.csv` ou `.xlsx` com colunas reconhecidas, quando importado, é aceito normalmente.
 - Dado o final da importação de conta, quando consultado, os saldos refletem apenas as linhas importadas com situação `Pago`.
 - Dado o final da importação de cartão, quando consultado, os lançamentos aparecem na fatura correta.
@@ -114,6 +114,7 @@ Tabelas: `transactions`, `credit_card_transactions`, `transaction_tags`, `credit
 
 ## Changelog
 
+- `1.3` — 2026-08-23 — Removidas referências a soluções concorrentes; rota de importação legada renomeada para `/api/import/legacy-transactions`.
 - `1.2` — 2026-08-17 — Modelo próprio ganha colunas de repetição (`repeticao`, `parcelas`, `recorrencia`, `media`); datas aceitas ampliadas (`DD/MM/YYYY`, `DD-MM-YYYY`) e data inválida rejeita a linha com motivo explícito.
 - `1.1` — 2026-07-03 — Regra de importação em lote atualizada para transações curtas por linha.
 - `1.0` — 2026-06-29 — Frontmatter e critérios formalizados.
