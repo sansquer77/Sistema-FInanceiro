@@ -221,10 +221,10 @@ export function registerReportsView({
         return `
           <tr>
             <td><strong>${escapeHtml(row.tag)}</strong><span>${row.count} lançamento(s)</span></td>
-            <td class="money-cell positive-text">${formatMoneyTotals(income)}</td>
-            <td class="money-cell negative-text">${formatMoneyTotals(expense)}</td>
-            <td class="money-cell ${moneyTotalsSignalClass(balance)}">${formatMoneyTotals(balance)}</td>
-            <td class="money-cell neutral-text">${formatMoneyTotals(investment)}</td>
+          <td class="money-cell positive-text">${formatTagMoneyTotals(income)}</td>
+          <td class="money-cell negative-text">${formatTagMoneyTotals(expense)}</td>
+          <td class="money-cell ${moneyTotalsSignalClass(balance)}">${formatTagMoneyTotals(balance)}</td>
+          <td class="money-cell neutral-text">${formatTagMoneyTotals(investment)}</td>
           </tr>
         `;
       }).join("");
@@ -255,6 +255,17 @@ export function registerReportsView({
       addMoneyTotal(totals, currency, (amountCents || 0) / 100);
     }
     return totals;
+  }
+
+  function formatTagMoneyTotals(totals) {
+    const rows = [...totals.entries()].filter(([, amount]) => Number(amount) !== 0);
+    if (!rows.length) {
+      return formatMoney(0, "BRL");
+    }
+    return rows
+      .sort(([currencyA], [currencyB]) => currencyA.localeCompare(currencyB))
+      .map(([currency, amount]) => formatMoney(amount, currency))
+      .join(" · ");
   }
 
   function renderCashflowReport(items) {

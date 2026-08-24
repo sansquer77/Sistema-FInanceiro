@@ -4155,7 +4155,11 @@ padding: 8px 16px;
   margin-top: 2px;
 }
 
-.tags-report-table .money-cell {
+.tags-report-table th:not(:first-child) {
+  text-align: center;
+}
+
+.tags-report-table td:not(:first-child) {
   text-align: right;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
