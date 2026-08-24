@@ -770,10 +770,21 @@ export function registerReportsView({
   function groupReportItems(items, dimension) {
     const groups = new Map();
     for (const item of items) {
-      const key = dimension === "tag" ? item.tag : (dimension === "subcategory" ? item.subcategory : item.category) || "Sem categoria";
+      let key;
+      let label;
+      if (dimension === "tag") {
+        key = item.tag || "Sem categoria";
+        label = key;
+      } else if (dimension === "subcategory") {
+        key = `${item.category || "Sem categoria"} / ${item.subcategory || "Sem subcategoria"}`;
+        label = key;
+      } else {
+        key = item.category || "Sem categoria";
+        label = key;
+      }
       if (!groups.has(key)) {
         groups.set(key, {
-          label: dimension === "subcategory" ? `${item.category || "Sem categoria"} / ${item.subcategory || "Sem subcategoria"}` : key,
+          label,
           categoryId: item.categoryId || "",
           subcategoryId: dimension === "subcategory" ? item.subcategoryId || "" : "",
           type: dimension,
