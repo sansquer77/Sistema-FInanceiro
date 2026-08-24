@@ -1,7 +1,7 @@
 import { api } from "./api.js";
 import { formatMoney } from "./money-utils.js";
 import { escapeHtml, formData, setMessage } from "./dom-utils.js";
-import { formatShortMonthName, todayLocalDateValue } from "./date-utils.js";
+import { formatDate, formatShortMonthName, todayLocalDateValue } from "./date-utils.js";
 
 export function registerSimulationsView({
   state,
@@ -27,6 +27,7 @@ export function registerSimulationsView({
     simulationProjectedBalance,
     simulationDifference,
     simulationChart,
+    simulationWeeklyProjection,
     simulationWarnings,
     resetSimulationButton,
   } = elements;
@@ -93,6 +94,7 @@ export function registerSimulationsView({
       simulationDifference.textContent = "-";
     }
     simulationChart.innerHTML = '<p class="muted-copy">Preencha o formulário e clique em Simular.</p>';
+    simulationWeeklyProjection.innerHTML = "";
     simulationWarnings.innerHTML = "";
   }
 
@@ -122,6 +124,7 @@ export function registerSimulationsView({
     }
 
     simulationChart.innerHTML = buildSimulationBalanceHistory(response.chart_series || [], currency);
+    simulationWeeklyProjection.innerHTML = buildWeeklyProjectionTable(response.weekly_projection || [], currency);
 
     simulationWarnings.innerHTML = (response.warnings || []).map((warning) => `
       <div class="simulation-warning">${escapeHtml(warning)}</div>
@@ -172,6 +175,43 @@ export function registerSimulationsView({
       <div class="simulation-chart-legend">
         <span><i class="legend-line forecast"></i>Saldo previsto da conta</span>
         <span><i class="legend-line simulated"></i>Saldo com simulação</span>
+      </div>
+    `;
+  }
+
+  function buildWeeklyProjectionTable(projection, currency) {
+    if (!projection.length) {
+      return "";
+    }
+    const headerCells = projection.map((entry, index) => {
+      const label = index === 0 ? "Hoje" : `Sem ${index}`;
+      const dateText = formatDate(entry.date);
+      return `<th scope="col"><span class="weekly-projection-label">${escapeHtml(label)}</span><span class="weekly-projection-date">${escapeHtml(dateText)}</span></th>`;
+    }).join("");
+    const buildRow = (label, key, isDifference) => {
+      const cells = projection.map((entry) => {
+        const cents = entry[key] || 0;
+        const text = formatMoney(Math.abs(cents) / 100, currency);
+        const toneClass = cents < 0 ? "danger-text" : cents > 0 && isDifference ? "positive-text" : "";
+        return `<td class="${toneClass}">${escapeHtml(text)}</td>`;
+      }).join("");
+      return `<tr><th scope="row">${escapeHtml(label)}</th>${cells}</tr>`;
+    };
+    return `
+      <div class="weekly-projection-table-wrapper">
+        <table class="weekly-projection-table">
+          <thead>
+            <tr>
+              <th scope="col" class="weekly-projection-row-header"></th>
+              ${headerCells}
+            </tr>
+          </thead>
+          <tbody>
+            ${buildRow("Previsto", "forecast_balance_cents", false)}
+            ${buildRow("Simulado", "simulated_balance_cents", false)}
+            ${buildRow("Diferença", "difference_cents", true)}
+          </tbody>
+        </table>
       </div>
     `;
   }

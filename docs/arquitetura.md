@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.37
-atualizado: 2026-08-22
+versao: 3.39
+atualizado: 2026-08-23
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -16,7 +16,7 @@ tags: [arquitetura, meta]
 # Arquitetura
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-08-22 · relacionados: [[requisitos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
+> **implementado** · área: `meta` · atualizado em 2026-08-23 · relacionados: [[requisitos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
 
 ## Visão geral
 
@@ -216,6 +216,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 |---|---|
 | `GET` | `/api/cockpit?month=AAAA-MM` |
 | `GET` | `/api/cockpit/calendar` |
+| `GET` | `/api/reports/tags?month=AAAA-MM` |
 | `GET` | `/api/reports/category-evolution?category_id={id}&subcategory_id={id}&period={periodo}` |
 
 #### Rotas — Tendências e IA → [[tendencias-saude-financeira]]
@@ -507,6 +508,8 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.39` — 2026-08-23 — Relatórios: nova rota `GET /api/reports/tags?month=AAAA-MM` e módulo `financeiro/reports.py` responsáveis pelo agrupamento por tag com Receitas, Despesas, Saldo e Investimentos; `web/modules/reports-view.js` renderiza a tabela a partir do backend. Ver [[specs/relatorios]] v2.13.
+- `3.38` — 2026-08-23 — Efeito Borboleta: rota `POST /api/simulations/butterfly-effect` passa a retornar `weekly_projection` (saldo atual + 8 semanas, com linhas Previsto, Simulado e Diferença); `financeiro/simulations.py` e `web/modules/simulations-view.js` responsáveis pelo cálculo e renderização. Ver [[specs/efeito-borboleta]] v1.3.
 - `3.37` — 2026-08-22 — Consultor: catálogo ampliado para 9 análises com o card `evolucao_score_tempo` (Evolução do Score no Tempo), que envia série histórica dos 5 pilares do Score para 6 ou 12 meses; `AnalysisCard` passa a declarar `period_window_options` por card e o frontend renderiza as opções declaradas pelo backend. Ver [[specs/consultor]] v1.7.
 - `3.36` — 2026-08-22 — `consultor-view.js` passa a exibir seletor fechado de análises, botão único de geração e período condicional para ralos; a resposta ocupa a largura abaixo dos controles. Ver [[specs/consultor]] v1.6.
 - `3.35` — 2026-08-20 — Sincronizada a data do callout de status com o frontmatter; documentadas a rota `POST /api/simulations/butterfly-effect` e a responsabilidade de `financeiro/simulations.py`. Ver [[specs/efeito-borboleta]].

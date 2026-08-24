@@ -99,6 +99,7 @@ from financeiro.imports import import_legacy_transactions, import_system_templat
 from financeiro.operation_logs import create_operation_log, get_operation_log, list_operation_logs
 from financeiro.portfolio import close_position, create_opening_position, current_portfolio_positions, delete_opening_position, fetch_fund_quote_for_user, get_portfolio, get_portfolio_returns, redeem_position, update_opening_position, update_position_value_override
 from financeiro.portfolio import PortfolioError
+from financeiro.reports import build_tag_report
 from financeiro.secure_config import (
     SecureConfigError,
     ai_settings_status,
@@ -339,6 +340,9 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/portfolio/fund-quote":
             self.handle_portfolio_fund_quote()
+            return
+        if path == "/api/reports/tags":
+            self.handle_tag_report()
             return
         if path == "/api/reports/category-evolution":
             self.handle_category_evolution()
@@ -911,20 +915,26 @@ class AppHandler(BaseHTTPRequestHandler):
         group_type = (query.get("group") or [None])[0]
         self.send_json({"categories": list_categories(user["id"], group_type)})
 
+    def handle_tag_report(self) -> None:
+        user = self.require_user()
+        query = parse_qs(urlsplit(self.path).query)
+        month = (query.get("month") or [None])[0]
+        self.send_json(build_tag_report(user["id"], month))
+
     def handle_category_evolution(self) -> None:
         user = self.require_user()
         query = parse_qs(urlsplit(self.path).query)
         category_id_str = (query.get("category_id") or [""])[0]
         subcategory_id_str = (query.get("subcategory_id") or [""])[0]
         period = (query.get("period") or ["12m"])[0]
-        
+
         if not category_id_str.isdigit():
             self.send_error(HTTPStatus.BAD_REQUEST, "ID da categoria invalido.")
             return
-            
+
         category_id = int(category_id_str)
         subcategory_id = int(subcategory_id_str) if subcategory_id_str.isdigit() else None
-        
+
         evolution = get_category_evolution(user["id"], category_id, subcategory_id, period)
         self.send_json({"evolution": evolution})
 

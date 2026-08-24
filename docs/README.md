@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 11.45
-atualizado: 2026-08-22
+versao: 11.47
+atualizado: 2026-08-23
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -132,6 +132,8 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `11.47` — 2026-08-23 — [[specs/relatorios]] v2.13: relatório de Tags reformulado com nova rota `GET /api/reports/tags` e tabela por tag mostrando Receitas, Despesas, Saldo e Investimentos; backend centralizado em `financeiro/reports.py`. [[arquitetura]] v3.39 sincronizada.
+- `11.46` — 2026-08-23 — [[specs/efeito-borboleta]] v1.3: módulo Efeito Borboleta ganha tabela de projeção semanal abaixo do gráfico, com saldo atual + 8 semanas e linhas Previsto, Simulado e Diferença; [[arquitetura]] v3.38 sincronizada.
 - `11.45` — 2026-08-22 — Documentação de produto e ajuda sincronizada ao novo fluxo do Consultor: [[requisitos]] v2.5 e [[specs/instrucoes-app]] v1.9 registram seletor fechado de análises e botão **Gerar**.
 - `11.44` — 2026-08-22 — [[specs/consultor]] v1.6: grade de cards substituída por seletor fechado de análises e botão único **Gerar**; período condicional de ralos fica ao lado e resposta passa a usar largura integral abaixo dos controles. [[arquitetura]] v3.36 sincronizada.
 - `11.43` — 2026-08-22 — [[specs/rentabilidade-portfolio]] v1.7 e [[specs/investimentos-portfolio]] v2.31: flyover de rentabilidade ampliado para aproximadamente metade da viewport em desktop e gráfico SVG refinado, sem dependências externas.

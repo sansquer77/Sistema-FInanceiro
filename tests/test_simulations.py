@@ -395,6 +395,86 @@ class ButterflyEffectSimulationTest(unittest.TestCase):
         self.assertEqual(response["account_impact"]["simulated_month_total_cents"], 10000)
         self.assertEqual(response["chart_series"][1]["projected_balance_cents"], 120000)
 
+    def test_weekly_projection_has_nine_weeks(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta principal",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "1000,00",
+        })
+
+        response = simulate_butterfly_effect(user["id"], {
+            "type": "expense",
+            "amount": "200,00",
+            "date": "2026-01-15",
+            "account_id": str(account["id"]),
+            "series_kind": "single",
+        })
+
+        projection = response["weekly_projection"]
+        self.assertEqual(len(projection), 9)
+        self.assertEqual(projection[0]["date"], "2026-01-15")
+        self.assertEqual(projection[1]["date"], "2026-01-22")
+        self.assertEqual(projection[8]["date"], "2026-03-12")
+        self.assertIn("forecast_balance_cents", projection[0])
+        self.assertIn("simulated_balance_cents", projection[0])
+        self.assertIn("difference_cents", projection[0])
+
+    def test_weekly_projection_shows_single_impact_on_simulation_date(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta principal",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "1000,00",
+        })
+
+        response = simulate_butterfly_effect(user["id"], {
+            "type": "expense",
+            "amount": "200,00",
+            "date": "2026-01-15",
+            "account_id": str(account["id"]),
+            "series_kind": "single",
+        })
+
+        projection = response["weekly_projection"]
+        self.assertEqual(projection[0]["forecast_balance_cents"], 100000)
+        self.assertEqual(projection[0]["simulated_balance_cents"], 80000)
+        self.assertEqual(projection[0]["difference_cents"], -20000)
+        # A despesa unica reduz o saldo de forma permanente, entao a diferenca
+        # persiste em todas as semanas seguintes.
+        for index in range(1, 9):
+            self.assertEqual(projection[index]["forecast_balance_cents"], 100000)
+            self.assertEqual(projection[index]["simulated_balance_cents"], 80000)
+            self.assertEqual(projection[index]["difference_cents"], -20000)
+
+    def test_weekly_projection_accumulates_installments_gradually(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta principal",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "1000,00",
+        })
+
+        response = simulate_butterfly_effect(user["id"], {
+            "type": "expense",
+            "amount": "800,00",
+            "date": "2026-01-15",
+            "account_id": str(account["id"]),
+            "series_kind": "installment",
+            "installment_count": 4,
+        })
+
+        projection = response["weekly_projection"]
+        # Primeira parcela em 2026-01-15, segunda em 2026-02-15 (cai na semana 5),
+        # terceira em 2026-03-15 (cai na semana 9, fora das 8 semanas).
+        self.assertEqual(projection[0]["difference_cents"], -20000)
+        self.assertEqual(projection[4]["difference_cents"], -20000)  # antes de 2026-02-15
+        self.assertEqual(projection[5]["difference_cents"], -40000)  # apos 2026-02-15
+        self.assertEqual(projection[8]["difference_cents"], -40000)  # terceira parcela fora do horizonte
+
 
 if __name__ == "__main__":
     unittest.main()

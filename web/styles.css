@@ -1092,6 +1092,84 @@ textarea:focus {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
+.simulation-weekly-projection {
+  margin-bottom: 0;
+}
+
+.weekly-projection-table-wrapper {
+  overflow-x: auto;
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--panel-subtle) 0%, var(--surface-low) 100%);
+  padding: 12px 10px 14px;
+}
+
+.weekly-projection-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.weekly-projection-table th,
+.weekly-projection-table td {
+  padding: 8px 6px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.weekly-projection-table thead th {
+  color: var(--muted);
+  font-weight: 600;
+  border-bottom: 1px solid var(--line);
+}
+
+.weekly-projection-table thead th .weekly-projection-label {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent-dark);
+}
+
+.weekly-projection-table thead th .weekly-projection-date {
+  display: block;
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.weekly-projection-table tbody th {
+  text-align: left;
+  font-weight: 700;
+  color: var(--text);
+  position: sticky;
+  left: 0;
+  background: linear-gradient(135deg, var(--panel-subtle) 0%, var(--surface-low) 100%);
+  z-index: 1;
+}
+
+.weekly-projection-table tbody td {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+}
+
+.weekly-projection-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.weekly-projection-table tbody tr:last-child th {
+  border-bottom: none;
+}
+
+.weekly-projection-table .danger-text {
+  color: var(--danger-text-strong);
+}
+
+.weekly-projection-table .positive-text {
+  color: var(--success-text-strong);
+}
+
 .simulation-warnings {
   display: grid;
   gap: 8px;
@@ -4067,6 +4145,20 @@ padding: 8px 16px;
   color: var(--muted);
   font-size: 12px;
   font-weight: 800;
+}
+
+.tags-report-table td:first-child span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.tags-report-table .money-cell {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .monthly-statement {

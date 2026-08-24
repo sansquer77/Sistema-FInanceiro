@@ -2,7 +2,7 @@
 tipo: spec
 area: relatorios
 status: implementado
-versao: 2.12
+versao: 2.13
 atualizado: 2026-08-23
 relacionados:
   - "[[lancamentos]]"
@@ -44,7 +44,7 @@ Qualquer usuário autenticado localmente que queira analisar seus gastos e recei
 | Subcategorias | Por `Categoria / Subcategoria`; lançamentos sem subcategoria aparecem como `Categoria / Sem subcategoria`. |
 | Entradas × Saídas | Receita total vs. despesa total no período. |
 | Contas | Por conta-corrente. |
-| Tags | Por tag, considerando lançamentos de contas e cartões mesmo sem subcategoria. |
+| Tags | Por tag, mostrando receitas, despesas, saldo (receitas menos despesas) e investimentos vinculados à tag; considera lançamentos de contas e cartões, mesmo sem subcategoria. |
 | Evolução de categoria | Série mensal por categoria ou subcategoria, com períodos rápidos (`3m`, `6m`, `12m`, `ytd`, `all`). |
 | Demonstrativo mensal | Relatório imprimível/exportável por múltiplas contas, múltiplos cartões ou visão consolidada de contas e cartões ativos, com opção de moeda. |
 
@@ -55,6 +55,10 @@ Qualquer usuário autenticado localmente que queira analisar seus gastos e recei
 - O relatório de categorias considera lançamentos classificados apenas na categoria principal, mesmo sem subcategoria.
 - O relatório de subcategorias agrupa por `Categoria / Subcategoria`.
 - O relatório de tags considera lançamentos de contas e cartões com tag, mesmo quando não houver subcategoria.
+- O relatório de tags agrupa por tag e exibe, para cada uma, quatro totais separados por moeda: **Receitas**, **Despesas**, **Saldo** (receitas menos despesas) e **Investimentos**.
+- Um lançamento com múltiplas tags contribui com o mesmo valor para o total de cada uma das tags.
+- Investimentos e aportes aparecem na linha própria de Investimentos do relatório de tags e não são misturados com despesas.
+- Transferências, câmbio e pagamentos de fatura não entram no relatório de tags.
 - **Lançamentos de cartão entram nos relatórios pela competência da fatura (`invoice_month`), não pela data da compra.** Ver [[cartoes]].
 - O KPI **Aportes do mês** da aba Situação do mês exibe a soma dos lançamentos do tipo Investimento/Aporte do mês selecionado (compras, aplicações e aportes registrados em Lançamentos de Contas), com valores de contas em moeda estrangeira convertidos para BRL; posições iniciais cadastradas diretamente no Portfólio e transferências entre contas não entram no valor. O rótulo deve exibir o indicador `i` de ajuda explicando essa origem, no mesmo padrão do KPI Taxa de poupança.
 - Pagamentos de fatura gerados em conta-corrente reduzem o saldo da conta, mas não entram em análises de despesa, relatórios por categoria/subcategoria/tag, evolução de categoria nem totais do Cockpit, pois os lançamentos detalhados do cartão já representam o consumo.
@@ -145,6 +149,10 @@ O ponto crítico é cartão de crédito: a fatura pertence ao mês de competênc
 - Dado o relatório de categorias, quando exibido, mostra total e percentual por categoria.
 - Dado o relatório de subcategorias, quando exibido, mostra total e percentual por categoria/subcategoria.
 - Dado o relatório de tags, quando exibido, agrega lançamentos por tag, incluindo lançamentos de cartão.
+- Dado uma tag com receitas e despesas no mês, quando o relatório de tags é exibido, então a linha da tag mostra Receitas, Despesas, Saldo (receitas menos despesas) e Investimentos separados por moeda.
+- Dado um lançamento de investimento com tag, quando o relatório de tags é exibido, então o valor aparece na linha Investimentos da tag e não soma às Despesas.
+- Dado uma tag com despesas em BRL e receitas em USD, quando o relatório de tags é exibido, então cada moeda mantém seus próprios totais e o Saldo é calculado dentro de cada moeda.
+- Dado uma transferência entre contas com tag, quando o relatório de tags é exibido, então o lançamento não aparece no relatório.
 - Dado uma fatura paga no mês, quando relatórios e Cockpit somam despesas do período, então o pagamento da fatura não é somado como despesa analítica e apenas as despesas detalhadas do cartão entram no total.
 - Dado movimentações em múltiplas moedas, quando exibidas, os totais são separados por moeda.
 - Dado um planejamento mensal com lançamentos em moedas distintas, quando o Cockpit é exibido, cada seção apresenta subtotal e itens por moeda, sem rotular valores estrangeiros como reais.
@@ -173,6 +181,7 @@ O ponto crítico é cartão de crédito: a fatura pertence ao mês de competênc
 
 ## Changelog
 
+- `2.13` — 2026-08-23 — Relatório de Tags reformulado: cada tag exibe as linhas Receitas, Despesas, Saldo (receitas menos despesas) e Investimentos, separadas por moeda, facilitando o controle de projetos e bens.
 - `2.12` — 2026-08-23 — Corrigido agrupamento do relatório de subcategorias: lançamentos sem subcategoria passam a ser separados por categoria, evitando que categorias distintas como Compras e Lazer apareçam sob uma única linha `Assinaturas e Serviços / Sem subcategoria`.
 - `2.11` — 2026-08-20 — Sincronizada a data do callout de status com o frontmatter; sem alteração de comportamento.
 - `2.10` — 2026-08-07 — A linha agregada `Outros` do gráfico **Maiores despesas do mês** ganha o indicador `i` ao lado do rótulo (mesmo padrão dos KPIs de Taxa de poupança/Aportes do mês), sinalizando que a linha abre o detalhamento em pop-up; o pop-up continua acessível por clique em toda a linha e por teclado.

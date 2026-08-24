@@ -29,6 +29,7 @@ def simulate_butterfly_effect(user_id: int, data: dict) -> dict:
         month_impact = build_month_impact(conn, user_id, account, payload, virtual_items)
         limit_impact = build_limit_impact(conn, user_id, account, payload, virtual_items, category_id, subcategory_id)
         chart_series = build_chart_series(conn, user_id, account, payload, virtual_items)
+        weekly_projection = build_weekly_projection(conn, user_id, account, payload, virtual_items)
         warnings = build_warnings(account_impact, limit_impact)
     return {
         "scenario": {
@@ -48,6 +49,7 @@ def simulate_butterfly_effect(user_id: int, data: dict) -> dict:
         "month_impact": month_impact,
         "limit_impact": limit_impact,
         "chart_series": chart_series,
+        "weekly_projection": weekly_projection,
         "virtual_items": virtual_items,
         "warnings": warnings,
     }
@@ -400,6 +402,36 @@ def build_chart_series(conn, user_id: int, account: dict, payload: dict, virtual
             "projected_balance_cents": real_balance_cents + running_simulated_delta_cents,
         })
     return series
+
+
+def build_weekly_projection(conn, user_id: int, account: dict, payload: dict, virtual_items: list[dict]) -> list[dict]:
+    # spec: efeito-borboleta v1.3 — critérios 21 e 22
+    # Tabela semanal: saldo atual na data do cenario + saldo ao fim de cada uma
+    # das 8 semanas seguintes, comparando previsto e simulado.
+    start_date = date.fromisoformat(payload["date"])
+    projection = []
+    for week_index in range(9):
+        cutoff_date = (start_date + timedelta(days=7 * week_index)).isoformat()
+        if week_index == 0:
+            forecast_balance_cents = fetch_account_balance_until(
+                conn, user_id, account["id"], cutoff_date, reconciled_only=True
+            )
+        else:
+            forecast_balance_cents = account_projected_balance_until(conn, user_id, account, cutoff_date)
+        simulated_impact_cents = sum(
+            item["impact_cents"]
+            for item in virtual_items
+            if item["date"] <= cutoff_date
+        )
+        simulated_balance_cents = forecast_balance_cents + simulated_impact_cents
+        projection.append({
+            "week_index": week_index,
+            "date": cutoff_date,
+            "forecast_balance_cents": forecast_balance_cents,
+            "simulated_balance_cents": simulated_balance_cents,
+            "difference_cents": simulated_balance_cents - forecast_balance_cents,
+        })
+    return projection
 
 
 def account_projected_balance_until(conn, user_id: int, account: dict, limit_date: str) -> int:

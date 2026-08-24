@@ -481,6 +481,7 @@ const simulationCurrentBalance = document.querySelector("#simulationCurrentBalan
 const simulationProjectedBalance = document.querySelector("#simulationProjectedBalance");
 const simulationDifference = document.querySelector("#simulationDifference");
 const simulationChart = document.querySelector("#simulationChart");
+const simulationWeeklyProjection = document.querySelector("#simulationWeeklyProjection");
   const simulationWarnings = document.querySelector("#simulationWarnings");
 const resetSimulationButton = document.querySelector("#resetSimulationButton");
 const aboutAppVersion = document.querySelector("#aboutAppVersion");
@@ -1006,6 +1007,7 @@ const simulationsView = registerSimulationsView({
     simulationProjectedBalance,
     simulationDifference,
     simulationChart,
+    simulationWeeklyProjection,
     simulationWarnings,
     resetSimulationButton,
   },

@@ -2,8 +2,8 @@
 tipo: spec
 area: simulacoes
 status: implementado
-versao: 1.2
-atualizado: 2026-08-09
+versao: 1.3
+atualizado: 2026-08-23
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -18,7 +18,7 @@ aliases: ["Efeito Borboleta", "Simulador Financeiro"]
 # Efeito Borboleta
 
 > [!info] Status
-> **implementado** · área: `simulacoes` · atualizado em 2026-08-09 · relacionados: [[contas-correntes]], [[lancamentos]], [[cartoes]], [[limites-gastos]], [[relatorios]]
+> **implementado** · área: `simulacoes` · atualizado em 2026-08-23 · relacionados: [[contas-correntes]], [[lancamentos]], [[cartoes]], [[limites-gastos]], [[relatorios]]
 
 ## Problema
 
@@ -79,6 +79,11 @@ Qualquer usuário autenticado localmente que queira testar cenários financeiros
 - A série do gráfico deve usar a mesma base de saldo previsto da conta-corrente, incluindo faturas conciliadas e não pagas de cartões vinculados como conta preferencial, e aplicar apenas os itens virtuais da simulação por cima dessa base.
 - O gráfico deve comparar a linha de saldo previsto da conta com a linha de saldo com simulação, usando legenda visual e sem transformar valores simulados em lançamentos reais.
 - Valores financeiros extensos no gráfico devem se adaptar ao espaço disponível reduzindo a tipografia, sem aumentar a área do gráfico nem truncar centavos.
+- Abaixo do gráfico deve haver uma tabela de projeção semanal com 9 colunas: o saldo atual no dia da simulação e o saldo ao fim de cada uma das 8 semanas seguintes, totalizando aproximadamente 2 meses a partir da data informada.
+- A tabela semanal deve exibir três linhas por coluna: **Previsto** (saldo projetado da conta sem o cenário), **Simulado** (saldo projetado com o cenário) e **Diferença** entre os dois.
+- O ponto inicial da tabela semanal usa o saldo conciliado real da conta na data do cenário; os demais pontos usam o saldo projetado da conta até o final de cada semana subsequente.
+- A projeção semanal deve considerar o impacto acumulado dos itens virtuais cujas datas sejam iguais ou anteriores à data de corte de cada semana.
+- Quando o cenário for uma série parcelada ou recorrente, a tabela semanal deve refletir o impacto gradual de cada ocorrência virtual que caia dentro do período coberto.
 
 ## API e dados
 
@@ -99,6 +104,7 @@ Resposta esperada:
 | `month_impact` | Totais reais, totais simulados e resultado projetado do mês. |
 | `limit_impact` | Consumo real e consumo simulado quando o payload legado repassar classificação; vazio na experiência principal sem categoria. |
 | `chart_series` | Série mensal comparando situação atual e cenário simulado. |
+| `weekly_projection` | Projeção semanal de saldo (previsto, simulado e diferença) para o dia do cenário e as 8 semanas seguintes. |
 | `virtual_items` | Lista de parcelas ou ocorrências virtuais usadas para calcular a projeção. Permanência no contrato da API; não é listada na interface. |
 | `warnings` | Alertas não bloqueantes, como saldo projetado negativo ou limite ultrapassado. |
 
@@ -122,6 +128,10 @@ Resposta esperada:
 - Dado qualquer cenário válido, quando o gráfico é exibido, então ele mostra 5 meses e compara saldo previsto da conta contra saldo com simulação.
 - Dado uma simulação com valor projetado muito extenso, quando o gráfico é exibido, então os valores cabem nos cards do gráfico por ajuste responsivo de tipografia, mantendo o tamanho atual da área.
 - Dado uma simulação recorrente de 120 ocorrências, quando o card **Saldo projetado no mês** é exibido, então o valor considera apenas o impacto virtual do mês da simulação, sem somar ocorrências dos meses futuros da série.
+- Dado uma conta com saldo de R$ 1.000,00, quando o usuário simula uma despesa única de R$ 200,00 para daqui a 10 dias, então a tabela semanal mostra saldo previsto e simulado iguais até a semana anterior ao pagamento e divergentes a partir da semana em que a data cai.
+- Dado uma simulação parcelada de R$ 800,00 em 4 parcelas, quando exibida a tabela semanal, então a diferença entre previsto e simulado cresce conforme cada parcela virtual entra no corte semanal correspondente.
+- Dado uma simulação válida, quando a tabela semanal é renderizada, então ela possui 9 colunas (saldo atual + 8 semanas) e três linhas (Previsto, Simulado e Diferença).
+- Dado uma simulação com data futura, quando a tabela semanal é exibida, então o saldo previsto e o simulado permanecem iguais nas semanas anteriores à data do primeiro impacto virtual.
 
 ## Fora de escopo
 
@@ -134,6 +144,7 @@ Resposta esperada:
 
 ## Changelog
 
+- `1.3` — 2026-08-23 — Adicionada tabela de projeção semanal abaixo do gráfico: saldo atual mais 8 semanas, com linhas Previsto, Simulado e Diferença.
 - `1.2` — 2026-08-09 — Spec promovida para **implementado** na documentação do app.
 - `1.1` — 2026-08-07 — Tópico **Saúde Financeira** (comparativo nota atual vs projetada dos 5 pilares) retirado da interface e do backend por decisão de validação; permanece apenas o card **Saldo projetado no mês** com impacto do mês da simulação.
 - `1.0` — 2026-08-07 — Resultado da simulação passa a ser um comparativo de cenário: o card **Saldo projetado no mês** passa a considerar apenas o impacto virtual do mês da simulação (séries de 120 ocorrências não mais inflam o card); a lista de itens virtuais é removida da interface (campo permanece no contrato da API); novo bloco **Saúde Financeira** compara a nota atual e a nota projetada dos 5 pilares no mês do cenário, recalculando com os valores simulados apenas os pilares sensíveis a receitas/despesas mensais.

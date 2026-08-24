@@ -90,7 +90,7 @@ export function registerReportsView({
       return;
     }
     if (state.reportTab === "tags") {
-      renderTagsReport(items);
+      renderTagsReport();
       return;
     }
     if (state.reportTab === "subcategories") {
@@ -198,21 +198,63 @@ export function registerReportsView({
     )).join("");
   }
 
-  function renderTagsReport(items) {
-    const taggedItems = [];
-    for (const item of items) {
-      for (const tag of item.tags) {
-        taggedItems.push({ ...item, tag });
+  async function renderTagsReport() {
+    // spec: relatorios v2.13 — relatório de tags agrupado por tag com
+    // Receitas, Despesas, Saldo e Investimentos, separados por moeda.
+    reportContent.innerHTML = '<div class="empty-state compact">Carregando relatório de tags...</div>';
+    try {
+      const url = new URL("/api/reports/tags", window.location.origin);
+      url.searchParams.set("month", state.reportMonth);
+      const response = await api(url.pathname + url.search);
+      const rows = response.tags || [];
+      if (!rows.length) {
+        reportContent.innerHTML = '<div class="empty-state compact">Nenhum lançamento com tag neste mês.</div>';
+        return;
       }
+      const body = rows.map((row) => {
+        const income = tagCurrencyTotals(row.income_by_currency);
+        const expense = tagCurrencyTotals(row.expense_by_currency);
+        const investment = tagCurrencyTotals(row.investment_by_currency);
+        const balance = new Map();
+        mergeMoneyTotals(balance, income);
+        mergeMoneyTotals(balance, expense, -1);
+        return `
+          <tr>
+            <td><strong>${escapeHtml(row.tag)}</strong><span>${row.count} lançamento(s)</span></td>
+            <td class="money-cell positive-text">${formatMoneyTotals(income)}</td>
+            <td class="money-cell negative-text">${formatMoneyTotals(expense)}</td>
+            <td class="money-cell ${moneyTotalsSignalClass(balance)}">${formatMoneyTotals(balance)}</td>
+            <td class="money-cell neutral-text">${formatMoneyTotals(investment)}</td>
+          </tr>
+        `;
+      }).join("");
+      reportContent.innerHTML = `
+        <div class="report-table-wrap">
+          <table class="report-table tags-report-table">
+            <thead>
+              <tr>
+                <th>Tag</th>
+                <th>Receitas</th>
+                <th>Despesas</th>
+                <th>Saldo</th>
+                <th>Investimentos</th>
+              </tr>
+            </thead>
+            <tbody>${body}</tbody>
+          </table>
+        </div>
+      `;
+    } catch (error) {
+      reportContent.innerHTML = `<div class="empty-state compact">Não foi possível carregar o relatório de tags: ${escapeHtml(error.message)}</div>`;
     }
-    const sections = [
-      ["Despesas", "expense"],
-      ["Receitas", "income"],
-      ["Investimentos", "investment"],
-    ];
-    reportContent.innerHTML = sections.map(([title, type]) => (
-      reportRankedSection(title, groupReportItems(taggedItems.filter((item) => item.reportType === type), "tag"), `Nenhuma tag em ${title.toLowerCase()} neste mês.`)
-    )).join("");
+  }
+
+  function tagCurrencyTotals(byCurrency) {
+    const totals = new Map();
+    for (const [currency, amountCents] of Object.entries(byCurrency || {})) {
+      addMoneyTotal(totals, currency, (amountCents || 0) / 100);
+    }
+    return totals;
   }
 
   function renderCashflowReport(items) {
