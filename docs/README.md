@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 11.48
+versao: 11.51
 atualizado: 2026-08-28
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -73,6 +73,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | Spec | Status | Área |
 |---|---|---|
 | [[specs/open-finance]] | 📝 rascunho | Open Finance |
+| [[specs/consolidacao-familiar]] | 📝 rascunho | Consolidação Familiar |
 | [[specs/imposto-renda]] | ❌ depreciado — custo de manter regras fiscais atualizadas não compensa para uso familiar | Investimentos |
 | [[specs/exportacao-dados]] | ❌ depreciado — arquivo SQLite já acessível por leitor genérico ou agente de IA | Exportação |
 
@@ -92,6 +93,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[adr/0008-licenca-apache-2-0]] | App principal disponibilizado gratuitamente como projeto open source sob Apache License 2.0. |
 | [[adr/0009-mais-retorno-cotas-opt-in]] | Cotas de fundos via API Mais Retorno em integração opt-in. |
 | [[adr/0010-segredos-criptografados-sqlite]] | Segredos de SMTP, IA e integrações em SQLite criptografado, com chave fora de `data/`. |
+| [[adr/0011-criptografia-snapshots-familiares]] | Rascunho da criptografia transportável dos snapshots familiares com `cryptography`, `scrypt` e `AES-256-GCM`. |
 
 ---
 
@@ -132,6 +134,9 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `11.51` — 2026-08-28 — [[specs/consolidacao-familiar]] v0.3 define `cryptography`, `scrypt`, `AES-256-GCM` e senha somente em memória; criado o rascunho [[adr/0011-criptografia-snapshots-familiares]] v0.1 com gates de PyInstaller e interoperabilidade macOS/Windows/Linux.
+- `11.50` — 2026-08-28 — [[specs/consolidacao-familiar]] v0.2: snapshots importados serão persistidos em colunas analíticas normais no SQLite; a senha familiar protege o transporte e a validação ocorre em memória antes da escrita.
+- `11.49` — 2026-08-28 — Criado o rascunho [[specs/consolidacao-familiar]] v0.1: snapshots mensais criptografados entre instalações, persistência isolada, cobertura por integrante, evolução histórica e Score Familiar recalculado pelos cinco pilares.
 - `11.48` — 2026-08-28 — [[specs/relatorios]] v2.16: agrupamento e evolução de subcategorias corrigidos; linhas sem subcategoria preservam filtro nulo, faturas usam a competência e a série combina valores normalizados em BRL. A spec temporária da investigação foi consolidada na spec canônica.
 - `11.47` — 2026-08-23 — [[specs/relatorios]] v2.13: relatório de Tags reformulado com nova rota `GET /api/reports/tags` e tabela por tag mostrando Receitas, Despesas, Saldo e Investimentos; backend centralizado em `financeiro/reports.py`. [[arquitetura]] v3.39 sincronizada.
 - `11.46` — 2026-08-23 — [[specs/efeito-borboleta]] v1.3: módulo Efeito Borboleta ganha tabela de projeção semanal abaixo do gráfico, com saldo atual + 8 semanas e linhas Previsto, Simulado e Diferença; [[arquitetura]] v3.38 sincronizada.
