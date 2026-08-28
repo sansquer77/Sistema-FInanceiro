@@ -35,6 +35,12 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertFalse((REPOSITORY_ROOT / "package.json").exists())
         self.assertFalse((REPOSITORY_ROOT / "node_modules").exists())
 
+    def test_simulations_view_tolerates_mixed_static_asset_versions(self) -> None:
+        source = (MODULE_ROOT / "simulations-view.js").read_text(encoding="utf-8")
+
+        self.assertIn('document.querySelector("#simulationWeeklyProjection")', source)
+        self.assertIn("if (weeklyProjectionElement)", source)
+
 
 if __name__ == "__main__":
     unittest.main()

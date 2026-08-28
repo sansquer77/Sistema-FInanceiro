@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 11.56
+versao: 11.57
 atualizado: 2026-08-28
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -134,6 +134,7 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `11.57` — 2026-08-28 — [[specs/efeito-borboleta]] v1.4: projeção semanal tolera combinação transitória de arquivos estáticos durante atualização, evitando erro quando o contêiner ainda não foi injetado pelo `app.js` em cache.
 - `11.56` — 2026-08-28 — Auditoria código/documentação: rotas `GET` exatas, testes de contratos do frontend, timestamps UTC sem API depreciada, inventários arquiteturais e referências código↔spec sincronizados; entradas históricas duplicadas deste changelog foram consolidadas sem perda de conteúdo.
 - `11.55` — 2026-08-28 — [[adr/0011-criptografia-snapshots-familiares]] v0.4 fixa `scrypt n=2^17, r=8, p=1` para o envelope v1 e registra os alvos iniciais de validação macOS Apple Silicon e Windows x86-64 com 8 GB/i5 ou equivalente.
 - `11.54` — 2026-08-28 — [[specs/consolidacao-familiar]] v0.6 fecha o MVP funcional (`.sffamily` até 1 MB, Portfólio por classe, Score parcial com cobertura, limites recorrentes/aliases, snapshots arquiváveis e mensagens educativas); [[adr/0011-criptografia-snapshots-familiares]] v0.3 concentra as validações técnicas restantes.

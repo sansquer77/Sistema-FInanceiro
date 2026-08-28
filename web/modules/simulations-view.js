@@ -31,6 +31,8 @@ export function registerSimulationsView({
     simulationWarnings,
     resetSimulationButton,
   } = elements;
+  const weeklyProjectionElement = simulationWeeklyProjection
+    || document.querySelector("#simulationWeeklyProjection");
 
   simulationForm.addEventListener("submit", handleSubmit);
   resetSimulationButton.addEventListener("click", resetForm);
@@ -94,7 +96,9 @@ export function registerSimulationsView({
       simulationDifference.textContent = "-";
     }
     simulationChart.innerHTML = '<p class="muted-copy">Preencha o formulário e clique em Simular.</p>';
-    simulationWeeklyProjection.innerHTML = "";
+    if (weeklyProjectionElement) {
+      weeklyProjectionElement.innerHTML = "";
+    }
     simulationWarnings.innerHTML = "";
   }
 
@@ -124,7 +128,9 @@ export function registerSimulationsView({
     }
 
     simulationChart.innerHTML = buildSimulationBalanceHistory(response.chart_series || [], currency);
-    simulationWeeklyProjection.innerHTML = buildWeeklyProjectionTable(response.weekly_projection || [], currency);
+    if (weeklyProjectionElement) {
+      weeklyProjectionElement.innerHTML = buildWeeklyProjectionTable(response.weekly_projection || [], currency);
+    }
 
     simulationWarnings.innerHTML = (response.warnings || []).map((warning) => `
       <div class="simulation-warning">${escapeHtml(warning)}</div>

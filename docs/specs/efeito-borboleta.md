@@ -2,8 +2,8 @@
 tipo: spec
 area: simulacoes
 status: implementado
-versao: 1.3
-atualizado: 2026-08-23
+versao: 1.4
+atualizado: 2026-08-28
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -18,7 +18,7 @@ aliases: ["Efeito Borboleta", "Simulador Financeiro"]
 # Efeito Borboleta
 
 > [!info] Status
-> **implementado** · área: `simulacoes` · atualizado em 2026-08-23 · relacionados: [[contas-correntes]], [[lancamentos]], [[cartoes]], [[limites-gastos]], [[relatorios]]
+> **implementado** · área: `simulacoes` · atualizado em 2026-08-28 · relacionados: [[contas-correntes]], [[lancamentos]], [[cartoes]], [[limites-gastos]], [[relatorios]]
 
 ## Problema
 
@@ -84,6 +84,7 @@ Qualquer usuário autenticado localmente que queira testar cenários financeiros
 - O ponto inicial da tabela semanal usa o saldo conciliado real da conta na data do cenário; os demais pontos usam o saldo projetado da conta até o final de cada semana subsequente.
 - A projeção semanal deve considerar o impacto acumulado dos itens virtuais cujas datas sejam iguais ou anteriores à data de corte de cada semana.
 - Quando o cenário for uma série parcelada ou recorrente, a tabela semanal deve refletir o impacto gradual de cada ocorrência virtual que caia dentro do período coberto.
+- A view deve resolver o contêiner da projeção semanal por injeção e, como compatibilidade durante atualização de arquivos estáticos, tentar localizá-lo no DOM; sua ausência não pode interromper o restante da simulação.
 
 ## API e dados
 
@@ -132,6 +133,7 @@ Resposta esperada:
 - Dado uma simulação parcelada de R$ 800,00 em 4 parcelas, quando exibida a tabela semanal, então a diferença entre previsto e simulado cresce conforme cada parcela virtual entra no corte semanal correspondente.
 - Dado uma simulação válida, quando a tabela semanal é renderizada, então ela possui 9 colunas (saldo atual + 8 semanas) e três linhas (Previsto, Simulado e Diferença).
 - Dado uma simulação com data futura, quando a tabela semanal é exibida, então o saldo previsto e o simulado permanecem iguais nas semanas anteriores à data do primeiro impacto virtual.
+- Dado `simulations-view.js` atualizado com um `app.js` ou HTML anterior ainda em cache, quando o contêiner semanal não é injetado ou não existe, então a simulação continua renderizando os demais resultados sem erro de JavaScript.
 
 ## Fora de escopo
 
@@ -144,6 +146,7 @@ Resposta esperada:
 
 ## Changelog
 
+- `1.4` — 2026-08-28 — A tabela semanal ganha resolução de elemento compatível com versões transitórias dos arquivos estáticos e deixa de interromper toda a simulação quando o contêiner não foi injetado.
 - `1.3` — 2026-08-23 — Adicionada tabela de projeção semanal abaixo do gráfico: saldo atual mais 8 semanas, com linhas Previsto, Simulado e Diferença.
 - `1.2` — 2026-08-09 — Spec promovida para **implementado** na documentação do app.
 - `1.1` — 2026-08-07 — Tópico **Saúde Financeira** (comparativo nota atual vs projetada dos 5 pilares) retirado da interface e do backend por decisão de validação; permanece apenas o card **Saldo projetado no mês** com impacto do mês da simulação.

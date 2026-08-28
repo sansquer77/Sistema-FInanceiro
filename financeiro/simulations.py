@@ -76,7 +76,7 @@ def normalize_simulation_payload(data: dict) -> dict:
         recurrence_frequency = str(data.get("recurrence_frequency") or "monthly").strip().lower()
         if recurrence_frequency not in RECURRENCE_FREQUENCIES:
             raise SimulationError("Informe a frequencia da recorrencia.")
-        # spec: efeito-borboleta v1.3 — critério 16
+        # spec: efeito-borboleta v1.4 — critério 16
         # (recorrentes usam 120 ocorrencias automaticamente quando o campo nao e enviado)
         raw_count = str(data.get("recurrence_count") or "").strip()
         recurrence_count = normalize_count(raw_count, "Informe a quantidade de ocorrencias.") if raw_count else 120
@@ -219,7 +219,7 @@ def signed_impact_cents(simulation_type: str, amount_cents: int) -> int:
 def build_account_impact(conn, user_id: int, account: dict, payload: dict, virtual_items: list[dict]) -> dict:
     base_balance_cents = fetch_account_balance_until(conn, user_id, account["id"], payload["date"], reconciled_only=True)
     projected_base_cents = account_projected_balance_until(conn, user_id, account, month_end_date(payload["date"][:7]))
-    # spec: efeito-borboleta v1.3 — critério 18
+    # spec: efeito-borboleta v1.4 — critério 18
     # (o card "Saldo projetado no mês" soma apenas o impacto virtual do mês da simulação,
     # não as ocorrências de meses futuros da série)
     month = payload["date"][:7]
@@ -405,7 +405,7 @@ def build_chart_series(conn, user_id: int, account: dict, payload: dict, virtual
 
 
 def build_weekly_projection(conn, user_id: int, account: dict, payload: dict, virtual_items: list[dict]) -> list[dict]:
-    # spec: efeito-borboleta v1.3 — critérios 21 e 22
+    # spec: efeito-borboleta v1.4 — critérios 21 e 22
     # Tabela semanal: saldo atual na data do cenario + saldo ao fim de cada uma
     # das 8 semanas seguintes, comparando previsto e simulado.
     start_date = date.fromisoformat(payload["date"])
