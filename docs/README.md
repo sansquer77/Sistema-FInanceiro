@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 11.62
+versao: 11.63
 atualizado: 2026-08-28
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -134,6 +134,7 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `11.63` — 2026-08-28 — Versão do app elevada para `1.6.2` (PATCH): os nove cards do Consultor passam a receber valores monetários formatados em reais e o prompt impede conversões de centavos pela IA. Ver [[specs/consultor]] v1.9.
 - `11.62` — 2026-08-28 — [[specs/consultor]] v1.9: todos os campos monetários dos nove cards, inclusive aninhados, passam a ter valor `_display` em reais; o prompt global elimina conversões monetárias pela IA.
 - `11.61` — 2026-08-28 — [[specs/consultor]] v1.8: o card Sustentabilidade do Padrão de Vida envia valores monetários já formatados em reais e proíbe conversão dos campos em centavos pela IA, evitando respostas com escala dez vezes maior.
 - `11.60` — 2026-08-28 — [[specs/importacao-dados]] v1.5: geração UTC compatível com Python 3.9 corrige a inicialização pelo launcher oficial da homologação, sem reintroduzir `datetime.utcnow()`.
