@@ -2,7 +2,7 @@
 tipo: spec
 area: importacao
 status: implementado
-versao: 1.4
+versao: 1.5
 atualizado: 2026-08-28
 relacionados:
   - "[[contas-correntes]]"
@@ -114,6 +114,7 @@ Tabelas: `transactions`, `credit_card_transactions`, `transaction_tags`, `credit
 
 ## Changelog
 
+- `1.5` — 2026-08-28 — Timestamp UTC dos modelos XLSX passa a usar `timezone.utc`, preservando o formato W3CDTF e a compatibilidade com o Python 3.9 usado pelo launcher da homologação.
 - `1.4` — 2026-08-28 — Metadados dos modelos XLSX passam a gerar timestamp UTC com API de data consciente de fuso, preservando o formato W3CDTF terminado em `Z`.
 - `1.3` — 2026-08-23 — Removidas referências a soluções concorrentes; rota de importação legada renomeada para `/api/import/legacy-transactions`.
 - `1.2` — 2026-08-17 — Modelo próprio ganha colunas de repetição (`repeticao`, `parcelas`, `recorrencia`, `media`); datas aceitas ampliadas (`DD/MM/YYYY`, `DD-MM-YYYY`) e data inválida rejeita a linha com motivo explícito.

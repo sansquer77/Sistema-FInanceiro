@@ -4,7 +4,7 @@ import csv
 import struct
 import unicodedata
 import zipfile
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from difflib import SequenceMatcher
 from http import HTTPStatus
@@ -333,7 +333,7 @@ def normalize_system_account_row(row: dict, account_id: object) -> dict:
     if payload["type"] == "transfer":
         payload["category"] = ""
         payload["subcategory"] = ""
-        # spec: importacao-dados v1.4 — regras de repetição
+        # spec: importacao-dados v1.5 — regras de repetição
         # (transferencias e cambio sao sempre avulsos, mesmo se a linha trouxer repeticao)
         payload["series_kind"] = "single"
         payload["installment_count"] = None
@@ -359,7 +359,7 @@ def normalize_system_card_row(row: dict, card_id: object) -> dict:
 
 
 def normalize_system_series(row: dict) -> dict:
-    # spec: importacao-dados v1.4 — regras de repetição
+    # spec: importacao-dados v1.5 — regras de repetição
     # (avulso padrao; parcelado exige parcelas 2-120; recorrente exige frequencia;
     #  media so se aplica a recorrentes)
     series_kind = SERIES_KIND_ALIASES.get(normalize_key(row.get("repeticao") or row.get("series_kind")), "single")
@@ -539,7 +539,7 @@ def xlsx_styles_xml() -> str:
 
 
 def xlsx_core_props() -> str:
-    timestamp = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    timestamp = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     return f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <dc:creator>Sistema Financeiro</dc:creator>
