@@ -2,7 +2,7 @@
 tipo: spec
 area: simulacoes
 status: implementado
-versao: 1.4
+versao: 1.5
 atualizado: 2026-08-28
 relacionados:
   - "[[contas-correntes]]"
@@ -79,12 +79,14 @@ Qualquer usuário autenticado localmente que queira testar cenários financeiros
 - A série do gráfico deve usar a mesma base de saldo previsto da conta-corrente, incluindo faturas conciliadas e não pagas de cartões vinculados como conta preferencial, e aplicar apenas os itens virtuais da simulação por cima dessa base.
 - O gráfico deve comparar a linha de saldo previsto da conta com a linha de saldo com simulação, usando legenda visual e sem transformar valores simulados em lançamentos reais.
 - Valores financeiros extensos no gráfico devem se adaptar ao espaço disponível reduzindo a tipografia, sem aumentar a área do gráfico nem truncar centavos.
-- Abaixo do gráfico deve haver uma tabela de projeção semanal com 9 colunas: o saldo atual no dia da simulação e o saldo ao fim de cada uma das 8 semanas seguintes, totalizando aproximadamente 2 meses a partir da data informada.
-- A tabela semanal deve exibir três linhas por coluna: **Previsto** (saldo projetado da conta sem o cenário), **Simulado** (saldo projetado com o cenário) e **Diferença** entre os dois.
-- O ponto inicial da tabela semanal usa o saldo conciliado real da conta na data do cenário; os demais pontos usam o saldo projetado da conta até o final de cada semana subsequente.
-- A projeção semanal deve considerar o impacto acumulado dos itens virtuais cujas datas sejam iguais ou anteriores à data de corte de cada semana.
-- Quando o cenário for uma série parcelada ou recorrente, a tabela semanal deve refletir o impacto gradual de cada ocorrência virtual que caia dentro do período coberto.
-- A view deve resolver o contêiner da projeção semanal por injeção e, como compatibilidade durante atualização de arquivos estáticos, tentar localizá-lo no DOM; sua ausência não pode interromper o restante da simulação.
+- Abaixo do gráfico deve haver uma projeção diária com 15 pontos, permitindo identificar o dia exato em que o saldo previsto ou simulado fica negativo.
+- Quando a data do cenário estiver entre hoje e os próximos 14 dias, a janela diária deve cobrir hoje mais os 14 dias seguintes.
+- Quando a data do cenário estiver além dos próximos 14 dias, a janela deve cobrir os 7 dias anteriores, a data do cenário e os 7 dias posteriores.
+- Quando a data do cenário estiver no passado, a janela deve cobrir hoje mais os 14 dias seguintes e considerar o impacto virtual como já ocorrido.
+- A projeção diária deve exibir **Previsto**, **Simulado** e **Diferença**, considerando em cada corte o impacto acumulado dos itens virtuais com data igual ou anterior.
+- O resultado deve informar a primeira data negativa prevista, a primeira data negativa simulada e se o cenário **causa saldo negativo**, **evita saldo negativo** ou não altera essa condição dentro da janela.
+- Quando o cenário for uma série parcelada ou recorrente, a projeção deve refletir cada ocorrência virtual que caia dentro da janela diária.
+- A view deve resolver o contêiner da projeção diária por injeção e, como compatibilidade durante atualização de arquivos estáticos, tentar localizá-lo no DOM; sua ausência não pode interromper o restante da simulação.
 
 ## API e dados
 
@@ -105,7 +107,9 @@ Resposta esperada:
 | `month_impact` | Totais reais, totais simulados e resultado projetado do mês. |
 | `limit_impact` | Consumo real e consumo simulado quando o payload legado repassar classificação; vazio na experiência principal sem categoria. |
 | `chart_series` | Série mensal comparando situação atual e cenário simulado. |
-| `weekly_projection` | Projeção semanal de saldo (previsto, simulado e diferença) para o dia do cenário e as 8 semanas seguintes. |
+| `daily_projection` | Projeção diária com 15 pontos, contendo saldo previsto, simulado e diferença. |
+| `daily_projection_summary` | Primeiras datas negativas nas duas trajetórias e efeito do cenário sobre o risco de caixa. |
+| `weekly_projection` | Alias transitório de `daily_projection` para compatibilidade com arquivos estáticos anteriores. |
 | `virtual_items` | Lista de parcelas ou ocorrências virtuais usadas para calcular a projeção. Permanência no contrato da API; não é listada na interface. |
 | `warnings` | Alertas não bloqueantes, como saldo projetado negativo ou limite ultrapassado. |
 
@@ -129,10 +133,12 @@ Resposta esperada:
 - Dado qualquer cenário válido, quando o gráfico é exibido, então ele mostra 5 meses e compara saldo previsto da conta contra saldo com simulação.
 - Dado uma simulação com valor projetado muito extenso, quando o gráfico é exibido, então os valores cabem nos cards do gráfico por ajuste responsivo de tipografia, mantendo o tamanho atual da área.
 - Dado uma simulação recorrente de 120 ocorrências, quando o card **Saldo projetado no mês** é exibido, então o valor considera apenas o impacto virtual do mês da simulação, sem somar ocorrências dos meses futuros da série.
-- Dado uma conta com saldo de R$ 1.000,00, quando o usuário simula uma despesa única de R$ 200,00 para daqui a 10 dias, então a tabela semanal mostra saldo previsto e simulado iguais até a semana anterior ao pagamento e divergentes a partir da semana em que a data cai.
-- Dado uma simulação parcelada de R$ 800,00 em 4 parcelas, quando exibida a tabela semanal, então a diferença entre previsto e simulado cresce conforme cada parcela virtual entra no corte semanal correspondente.
-- Dado uma simulação válida, quando a tabela semanal é renderizada, então ela possui 9 colunas (saldo atual + 8 semanas) e três linhas (Previsto, Simulado e Diferença).
-- Dado uma simulação com data futura, quando a tabela semanal é exibida, então o saldo previsto e o simulado permanecem iguais nas semanas anteriores à data do primeiro impacto virtual.
+- Dado uma despesa única para daqui a 10 dias, quando a projeção diária é exibida, então previsto e simulado permanecem iguais nos 10 primeiros cortes e divergem a partir da data da despesa.
+- Dado um cenário dentro dos próximos 14 dias, quando a projeção é calculada, então ela contém hoje e cada um dos 14 dias seguintes.
+- Dado um cenário além dos próximos 14 dias, quando a projeção é calculada, então ela contém 7 dias antes e 7 dias depois da data do cenário.
+- Dado uma despesa que torna o saldo negativo, quando a projeção é exibida, então a primeira data negativa simulada é informada e o efeito é `causes_negative`.
+- Dado uma receita que evita um saldo negativo previsto, quando a projeção é exibida, então o efeito é `avoids_negative` e as duas primeiras datas negativas são informadas quando aplicável.
+- Dado uma simulação válida, quando a projeção diária é renderizada, então ela possui 15 colunas e três linhas: Previsto, Simulado e Diferença.
 - Dado `simulations-view.js` atualizado com um `app.js` ou HTML anterior ainda em cache, quando o contêiner semanal não é injetado ou não existe, então a simulação continua renderizando os demais resultados sem erro de JavaScript.
 
 ## Fora de escopo
@@ -144,8 +150,17 @@ Resposta esperada:
 - Simulações avançadas de cartão de crédito e fatura na primeira entrega.
 - Recomendações financeiras automáticas ou aconselhamento financeiro personalizado.
 
+## Plano de implementação
+
+- [x] Passo 1 — Preservar o núcleo determinístico, isolamento, moedas, validações e projeção mensal existentes. Fecha: critérios 1–18.
+- [x] Passo 2 — Substituir os cortes semanais por janela diária dinâmica e resumo de risco no backend. Fecha: critérios 19–24.
+- [x] Passo 3 — Renderizar a linha do tempo diária e mensagens de causa/prevenção de saldo negativo no frontend. Fecha: critérios 19, 22–24.
+- [x] Passo 4 — Manter fallback de arquivos estáticos e alias de payload durante atualização. Fecha: critério 25.
+- [x] Passo 5 — Cobrir janelas próxima/distante, impacto na data e classificação do risco por testes automatizados. Fecha: critérios 19–25.
+
 ## Changelog
 
+- `1.5` — 2026-08-28 — Projeção semanal substituída por linha do tempo diária de 15 pontos, com janela deslocada para cenários distantes e identificação da primeira data negativa e do efeito de causar ou evitar saldo negativo.
 - `1.4` — 2026-08-28 — A tabela semanal ganha resolução de elemento compatível com versões transitórias dos arquivos estáticos e deixa de interromper toda a simulação quando o contêiner não foi injetado.
 - `1.3` — 2026-08-23 — Adicionada tabela de projeção semanal abaixo do gráfico: saldo atual mais 8 semanas, com linhas Previsto, Simulado e Diferença.
 - `1.2` — 2026-08-09 — Spec promovida para **implementado** na documentação do app.

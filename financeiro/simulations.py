@@ -29,7 +29,8 @@ def simulate_butterfly_effect(user_id: int, data: dict) -> dict:
         month_impact = build_month_impact(conn, user_id, account, payload, virtual_items)
         limit_impact = build_limit_impact(conn, user_id, account, payload, virtual_items, category_id, subcategory_id)
         chart_series = build_chart_series(conn, user_id, account, payload, virtual_items)
-        weekly_projection = build_weekly_projection(conn, user_id, account, payload, virtual_items)
+        daily_projection = build_daily_projection(conn, user_id, account, payload, virtual_items)
+        daily_projection_summary = summarize_daily_projection(daily_projection)
         warnings = build_warnings(account_impact, limit_impact)
     return {
         "scenario": {
@@ -49,7 +50,9 @@ def simulate_butterfly_effect(user_id: int, data: dict) -> dict:
         "month_impact": month_impact,
         "limit_impact": limit_impact,
         "chart_series": chart_series,
-        "weekly_projection": weekly_projection,
+        "daily_projection": daily_projection,
+        "daily_projection_summary": daily_projection_summary,
+        "weekly_projection": daily_projection,
         "virtual_items": virtual_items,
         "warnings": warnings,
     }
@@ -76,7 +79,7 @@ def normalize_simulation_payload(data: dict) -> dict:
         recurrence_frequency = str(data.get("recurrence_frequency") or "monthly").strip().lower()
         if recurrence_frequency not in RECURRENCE_FREQUENCIES:
             raise SimulationError("Informe a frequencia da recorrencia.")
-        # spec: efeito-borboleta v1.4 — critério 16
+        # spec: efeito-borboleta v1.5 — critério 16
         # (recorrentes usam 120 ocorrencias automaticamente quando o campo nao e enviado)
         raw_count = str(data.get("recurrence_count") or "").strip()
         recurrence_count = normalize_count(raw_count, "Informe a quantidade de ocorrencias.") if raw_count else 120
@@ -219,7 +222,7 @@ def signed_impact_cents(simulation_type: str, amount_cents: int) -> int:
 def build_account_impact(conn, user_id: int, account: dict, payload: dict, virtual_items: list[dict]) -> dict:
     base_balance_cents = fetch_account_balance_until(conn, user_id, account["id"], payload["date"], reconciled_only=True)
     projected_base_cents = account_projected_balance_until(conn, user_id, account, month_end_date(payload["date"][:7]))
-    # spec: efeito-borboleta v1.4 — critério 18
+    # spec: efeito-borboleta v1.5 — critério 18
     # (o card "Saldo projetado no mês" soma apenas o impacto virtual do mês da simulação,
     # não as ocorrências de meses futuros da série)
     month = payload["date"][:7]
@@ -404,20 +407,13 @@ def build_chart_series(conn, user_id: int, account: dict, payload: dict, virtual
     return series
 
 
-def build_weekly_projection(conn, user_id: int, account: dict, payload: dict, virtual_items: list[dict]) -> list[dict]:
-    # spec: efeito-borboleta v1.4 — critérios 21 e 22
-    # Tabela semanal: saldo atual na data do cenario + saldo ao fim de cada uma
-    # das 8 semanas seguintes, comparando previsto e simulado.
-    start_date = date.fromisoformat(payload["date"])
+def build_daily_projection(conn, user_id: int, account: dict, payload: dict, virtual_items: list[dict]) -> list[dict]:
+    # spec: efeito-borboleta v1.5 — critérios 19 a 24
+    start_date = daily_projection_start_date(date.fromisoformat(payload["date"]))
     projection = []
-    for week_index in range(9):
-        cutoff_date = (start_date + timedelta(days=7 * week_index)).isoformat()
-        if week_index == 0:
-            forecast_balance_cents = fetch_account_balance_until(
-                conn, user_id, account["id"], cutoff_date, reconciled_only=True
-            )
-        else:
-            forecast_balance_cents = account_projected_balance_until(conn, user_id, account, cutoff_date)
+    for day_index in range(15):
+        cutoff_date = (start_date + timedelta(days=day_index)).isoformat()
+        forecast_balance_cents = account_projected_balance_until(conn, user_id, account, cutoff_date)
         simulated_impact_cents = sum(
             item["impact_cents"]
             for item in virtual_items
@@ -425,13 +421,47 @@ def build_weekly_projection(conn, user_id: int, account: dict, payload: dict, vi
         )
         simulated_balance_cents = forecast_balance_cents + simulated_impact_cents
         projection.append({
-            "week_index": week_index,
+            "day_index": day_index,
             "date": cutoff_date,
             "forecast_balance_cents": forecast_balance_cents,
             "simulated_balance_cents": simulated_balance_cents,
             "difference_cents": simulated_balance_cents - forecast_balance_cents,
         })
     return projection
+
+
+def daily_projection_start_date(scenario_date: date, reference_date: date | None = None) -> date:
+    today = reference_date or date.today()
+    if scenario_date > today + timedelta(days=14):
+        return scenario_date - timedelta(days=7)
+    return today
+
+
+def summarize_daily_projection(projection: list[dict]) -> dict:
+    forecast_first_negative_date = next(
+        (row["date"] for row in projection if row["forecast_balance_cents"] < 0),
+        None,
+    )
+    simulated_first_negative_date = next(
+        (row["date"] for row in projection if row["simulated_balance_cents"] < 0),
+        None,
+    )
+    effect = "unchanged"
+    if simulated_first_negative_date and (
+        forecast_first_negative_date is None
+        or simulated_first_negative_date < forecast_first_negative_date
+    ):
+        effect = "causes_negative"
+    elif forecast_first_negative_date and (
+        simulated_first_negative_date is None
+        or simulated_first_negative_date > forecast_first_negative_date
+    ):
+        effect = "avoids_negative"
+    return {
+        "forecast_first_negative_date": forecast_first_negative_date,
+        "simulated_first_negative_date": simulated_first_negative_date,
+        "effect": effect,
+    }
 
 
 def account_projected_balance_until(conn, user_id: int, account: dict, limit_date: str) -> int:

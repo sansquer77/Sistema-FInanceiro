@@ -129,7 +129,13 @@ export function registerSimulationsView({
 
     simulationChart.innerHTML = buildSimulationBalanceHistory(response.chart_series || [], currency);
     if (weeklyProjectionElement) {
-      weeklyProjectionElement.innerHTML = buildWeeklyProjectionTable(response.weekly_projection || [], currency);
+      const projection = response.daily_projection || response.weekly_projection || [];
+      weeklyProjectionElement.innerHTML = buildDailyProjectionTable(
+        projection,
+        response.daily_projection_summary || {},
+        currency,
+        response.scenario?.date,
+      );
     }
 
     simulationWarnings.innerHTML = (response.warnings || []).map((warning) => `
@@ -185,12 +191,12 @@ export function registerSimulationsView({
     `;
   }
 
-  function buildWeeklyProjectionTable(projection, currency) {
+  function buildDailyProjectionTable(projection, summary, currency, scenarioDate) {
     if (!projection.length) {
       return "";
     }
     const headerCells = projection.map((entry, index) => {
-      const label = index === 0 ? "Hoje" : `Sem ${index}`;
+      const label = entry.date === scenarioDate ? "Cenário" : index === 0 ? "Hoje" : `Dia ${index}`;
       const dateText = formatDate(entry.date);
       return `<th scope="col"><span class="weekly-projection-label">${escapeHtml(label)}</span><span class="weekly-projection-date">${escapeHtml(dateText)}</span></th>`;
     }).join("");
@@ -204,6 +210,7 @@ export function registerSimulationsView({
       return `<tr><th scope="row">${escapeHtml(label)}</th>${cells}</tr>`;
     };
     return `
+      ${buildDailyProjectionSummary(summary)}
       <div class="weekly-projection-table-wrapper">
         <table class="weekly-projection-table">
           <thead>
@@ -220,6 +227,24 @@ export function registerSimulationsView({
         </table>
       </div>
     `;
+  }
+
+  function buildDailyProjectionSummary(summary) {
+    const forecastDate = summary.forecast_first_negative_date;
+    const simulatedDate = summary.simulated_first_negative_date;
+    if (summary.effect === "causes_negative" && simulatedDate) {
+      return `<div class="simulation-cash-flow-status danger">A simulação deixa a conta negativa em <strong>${escapeHtml(formatDate(simulatedDate))}</strong>.</div>`;
+    }
+    if (summary.effect === "avoids_negative" && forecastDate) {
+      const complement = simulatedDate
+        ? ` e adia o risco para ${escapeHtml(formatDate(simulatedDate))}`
+        : " dentro desta janela";
+      return `<div class="simulation-cash-flow-status positive">A simulação evita o saldo negativo previsto para <strong>${escapeHtml(formatDate(forecastDate))}</strong>${complement}.</div>`;
+    }
+    if (simulatedDate) {
+      return `<div class="simulation-cash-flow-status danger">A conta permanece com risco de saldo negativo a partir de <strong>${escapeHtml(formatDate(simulatedDate))}</strong>.</div>`;
+    }
+    return '<div class="simulation-cash-flow-status positive">Nenhum saldo negativo projetado nos 15 dias exibidos.</div>';
   }
 
   function applyAmountTone(element, amountCents) {

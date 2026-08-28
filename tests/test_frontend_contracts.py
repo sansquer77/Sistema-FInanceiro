@@ -37,9 +37,12 @@ class FrontendModuleContractTest(unittest.TestCase):
 
     def test_simulations_view_tolerates_mixed_static_asset_versions(self) -> None:
         source = (MODULE_ROOT / "simulations-view.js").read_text(encoding="utf-8")
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
 
         self.assertIn('document.querySelector("#simulationWeeklyProjection")', source)
         self.assertIn("if (weeklyProjectionElement)", source)
+        self.assertIn("response.daily_projection || response.weekly_projection", source)
+        self.assertIn("Projeção diária de caixa", index)
 
 
 if __name__ == "__main__":

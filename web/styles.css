@@ -1096,6 +1096,26 @@ textarea:focus {
   margin-bottom: 0;
 }
 
+.simulation-cash-flow-status {
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-subtle);
+  color: var(--text-soft);
+  font-size: 0.84rem;
+}
+
+.simulation-cash-flow-status.danger {
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--line));
+  color: var(--danger);
+}
+
+.simulation-cash-flow-status.positive {
+  border-color: color-mix(in srgb, var(--positive) 35%, var(--line));
+  color: var(--positive);
+}
+
 .weekly-projection-table-wrapper {
   overflow-x: auto;
   border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);

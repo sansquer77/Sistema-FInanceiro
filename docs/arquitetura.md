@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.40
+versao: 3.41
 atualizado: 2026-08-28
 relacionados:
   - "[[requisitos]]"
@@ -513,6 +513,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.41` — 2026-08-28 — Efeito Borboleta substitui cortes semanais por `daily_projection` de 15 dias e `daily_projection_summary`, identificando a primeira data negativa e se o cenário causa ou evita o risco; `weekly_projection` permanece como alias transitório. Ver [[specs/efeito-borboleta]] v1.5.
 - `3.40` — 2026-08-28 — Inventário arquitetural sincronizado com `decision-modal.js`, `theme-utils.js`, `privacy-utils.js`, `simulations-view.js` e `financeiro/reports.py`; despacho das rotas `GET` de perfil e coleções passa a exigir caminho exato. Ver [[specs/frontend-modularizacao]] v2.9 e [[specs/seguranca-autenticacao]] v1.4.
 - `3.39` — 2026-08-23 — Relatórios: nova rota `GET /api/reports/tags?month=AAAA-MM` e módulo `financeiro/reports.py` responsáveis pelo agrupamento por tag com Receitas, Despesas, Saldo e Investimentos; `web/modules/reports-view.js` renderiza a tabela a partir do backend. Ver [[specs/relatorios]] v2.13.
 - `3.38` — 2026-08-23 — Efeito Borboleta: rota `POST /api/simulations/butterfly-effect` passa a retornar `weekly_projection` (saldo atual + 8 semanas, com linhas Previsto, Simulado e Diferença); `financeiro/simulations.py` e `web/modules/simulations-view.js` responsáveis pelo cálculo e renderização. Ver [[specs/efeito-borboleta]] v1.3.
