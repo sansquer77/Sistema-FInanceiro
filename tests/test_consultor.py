@@ -450,8 +450,48 @@ class ConsultorContextTest(unittest.TestCase):
         self.assertEqual(context["complementary_profile"]["idade"], 45)
         self.assertEqual(context["complementary_profile"]["horizonte_investimento_principal"], "longo_prazo")
 
+    def test_lifestyle_context_formats_monetary_values_for_ai(self) -> None:
+        # spec: consultor/consultor v1.9 — critério 39
+        payload = score_payload(
+            receitas_cents=2_000_000,
+            despesas_consumo_cents=1_100_000,
+            paz_financeira={
+                "base_receita_cents": 1_821_095,
+                "reserva_estimada_cents": 10_926_570,
+                "confianca": "intermediaria",
+            },
+        )
+        with mock.patch("financeiro.financial_health.calculate_financial_health_score", return_value=payload), self.profile_context():
+            context = build_analysis_context(7, "sustentabilidade_padrao_vida", month="2026-08")
+
+        self.assertEqual(context["income_display"], "R$ 20.000,00")
+        self.assertEqual(context["consumption_expenses_display"], "R$ 11.000,00")
+        self.assertEqual(context["financial_peace"]["base_receita_display"], "R$ 18.210,95")
+        self.assertEqual(context["financial_peace"]["reserva_estimada_display"], "R$ 109.265,70")
+        self.assertEqual(context["financial_peace"]["base_receita_cents"], 1_821_095)
+        prompt = build_system_prompt("sustentabilidade_padrao_vida")
+        self.assertIn("cite exclusivamente o campo correspondente com sufixo `_display`", prompt)
+        self.assertIn("nao converta nem reformate os campos `_cents`", prompt)
+
+    def test_all_context_money_fields_receive_nested_display_values(self) -> None:
+        # spec: consultor/consultor v1.9 — critério 39
+        with mock.patch("financeiro.trends.calculate_trends", return_value=trends_payload()), self.profile_context():
+            ralos = build_analysis_context(7, "ralos_financeiros", month="2026-08", period_window="3m")
+            subscriptions = build_analysis_context(7, "assinaturas_recorrencias", month="2026-08")
+
+        self.assertEqual(ralos["summary"]["income_display"], "R$ 5.000,00")
+        self.assertEqual(ralos["comparison"]["income_base_display"], "R$ 4.500,00")
+        self.assertEqual(ralos["budget_alerts"][0]["actual_display"], "R$ 1.200,00")
+        self.assertEqual(subscriptions["total_display"], "R$ 50,00")
+        self.assertEqual(subscriptions["annualized_display"], "R$ 600,00")
+        self.assertEqual(subscriptions["items"][0]["amount_display"], "R$ 20,00")
+
+        prompt = build_system_prompt("assinaturas_recorrencias")
+        self.assertIn("use exclusivamente `_display`", prompt)
+        self.assertIn("nunca converta, arredonde ou reformate `_cents` ou `_brl`", prompt)
+
     def test_score_evolution_context_builds_six_month_series(self) -> None:
-        # spec: consultor/consultor v1.7 — critérios 8 e 10
+        # spec: consultor/consultor v1.9 — critérios 8 e 10
         score_payloads = {
             "2026-08": score_payload(score_total=720),
             "2026-07": score_payload(score_total=700),

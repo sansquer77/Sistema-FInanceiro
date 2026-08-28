@@ -245,7 +245,7 @@ ANALYSIS_CATALOG: tuple[AnalysisCard, ...] = (
         ),
         input_scope="Score de Saude Financeira e seus 5 pilares.",
     ),
-    # spec: consultor/consultor v1.7 — critérios 8, 9 e 10
+    # spec: consultor/consultor v1.9 — critérios 8, 9 e 10
     AnalysisCard(
         analysis_id="evolucao_score_tempo",
         title="Evolucao do Score no Tempo",
@@ -270,7 +270,9 @@ ANALYSIS_CATALOG: tuple[AnalysisCard, ...] = (
         category="Saude Financeira",
         strict_prompt=(
             "Usando a base de receitas recorrentes do usuario, compare o padrao de vida atual (gastos e "
-            "composicao do orcamento) com referencias ideais de gastos e independencia financeira."
+            "composicao do orcamento) com referencias ideais de gastos e independencia financeira. "
+            "Para todo valor monetario, cite exclusivamente o campo correspondente com sufixo `_display`; "
+            "nao converta nem reformate os campos `_cents`."
         ),
         input_scope="Receitas recorrentes e indicadores de Paz Financeira.",
     ),
@@ -334,7 +336,7 @@ def validate_analysis_id(value: object) -> str:
 
 
 def validate_period_window(value: object, *, analysis_id: str) -> str | None:
-    # spec: consultor/consultor v1.7 — critérios 9 e 10
+    # spec: consultor/consultor v1.9 — critérios 9 e 10
     card = CATALOG_BY_ID[validate_analysis_id(analysis_id)]
     if not card.requires_period_window:
         return None
@@ -358,7 +360,7 @@ def build_system_prompt(
     investor_profile: object = "moderado",
     period_window: object = None,
 ) -> str:
-    # spec: consultor/consultor v1.7 - criterios 8, 9, 12, 14, 34 e 38
+    # spec: consultor/consultor v1.9 - criterios 8, 9, 12, 14, 34, 38 e 39
     normalized_analysis_id = validate_analysis_id(analysis_id)
     profile = validate_investor_profile(investor_profile)
     period = validate_period_window(period_window, analysis_id=normalized_analysis_id)
@@ -386,8 +388,9 @@ def build_system_prompt(
         "estritamente educacional e informativa.\n\n"
         "Regras obrigatorias:\n"
         "- Interprete apenas os dados fornecidos pelo app; nao invente dados, cotacoes ou indicadores.\n"
-        "- Campos monetarios com sufixo `_cents` estao em centavos; ao citar valores, converta para reais "
-        "dividindo por 100 ou use os campos `_brl`/`_display` ja formatados.\n"
+        "- Todo campo monetario com sufixo `_cents` possui um campo correspondente `_display` ja formatado "
+        "em reais. Ao citar valores monetarios, use exclusivamente `_display`; nunca converta, arredonde ou "
+        "reformate `_cents` ou `_brl`.\n"
         "- Diferencie fatos de opinioes e explique conceitos tecnicos em linguagem acessivel.\n"
         "- Apresente vantagens e desvantagens e impactos tributarios relevantes quando aplicavel.\n"
         "- Ao avaliar ativos ou estrategias, considere objetivo, horizonte, liquidez, volatilidade, "
@@ -433,7 +436,7 @@ def execute_consultor_analysis(
     now: datetime | None = None,
     portfolio_positions: list[dict] | None = None,
 ) -> dict:
-    # spec: consultor/consultor v1.7 - criterios 7, 8, 10, 13, 34 e 38
+    # spec: consultor/consultor v1.9 - criterios 7, 8, 10, 13, 34 e 38
     normalized_user_id = int(user_id)
     normalized_analysis_id = validate_analysis_id(analysis_id)
     current_time = now or datetime.now()
@@ -595,7 +598,7 @@ def failure_cooldown_remaining(user_id: int, analysis_id: str, current_time: dat
 
 
 def postprocess_consultor_output(output: object) -> str:
-    # spec: consultor/consultor v1.7 - criterios 11, 12, 14 e 15
+    # spec: consultor/consultor v1.9 - criterios 11, 12, 14 e 15
     text = str(output or "").strip()
     if not text:
         raise ConsultorError("O Consultor esta indisponivel no momento.")
@@ -612,7 +615,7 @@ def postprocess_consultor_output(output: object) -> str:
 
 
 def has_section(text: str, section: str) -> bool:
-    # spec: consultor/consultor v1.7 - cabeçalhos com acentos normalizados
+    # spec: consultor/consultor v1.9 - cabeçalhos com acentos normalizados
     normalized_text = normalize_text(text)
     escaped = re.escape(section)
     return bool(re.search(
@@ -623,7 +626,7 @@ def has_section(text: str, section: str) -> bool:
 
 
 def contains_forbidden_recommendation(normalized_text: str) -> bool:
-    # spec: consultor/consultor v1.7 - correcao de falso positivo
+    # spec: consultor/consultor v1.9 - correcao de falso positivo
     # Frases defensivas da IA ("nao constitui recomendacao de compra de acoes",
     # "sem recomendar compra de fundos", "evite comprar por impulso") casavam os
     # padroes vedados; o match so vale se nao houver negacao/ressalva na janela anterior.
@@ -787,7 +790,7 @@ def build_analysis_context(
     investor_profile: object | None = None,
     portfolio_positions: list[dict] | None = None,
 ) -> dict:
-    # spec: consultor/consultor v1.7 - criterios 7, 10, 27, 30, 34 e 38
+    # spec: consultor/consultor v1.9 - criterios 7, 10, 27, 30, 34 e 38
     normalized_analysis_id = validate_analysis_id(analysis_id)
     normalized_period = validate_period_window(period_window, analysis_id=normalized_analysis_id)
     # Otimização: calcula o portfólio uma única vez e repassa aos cards que o consomem,
@@ -816,7 +819,7 @@ def build_analysis_context(
     elif normalized_analysis_id == "score_saude_financeira":
         context = build_score_context(user_id, month=month, portfolio_positions=portfolio_positions)
     elif normalized_analysis_id == "evolucao_score_tempo":
-        # spec: consultor/consultor v1.7 — critério 10
+        # spec: consultor/consultor v1.9 — critério 10
         context = build_score_evolution_context(user_id, period_window=normalized_period or "6m", portfolio_positions=portfolio_positions)
     elif normalized_analysis_id == "sustentabilidade_padrao_vida":
         context = build_lifestyle_context(user_id, month=month, portfolio_positions=portfolio_positions)
@@ -824,7 +827,7 @@ def build_analysis_context(
         context = build_maturities_context(user_id, month=month, reference_date=reference_date, portfolio_positions=portfolio_positions)
     else:
         raise ConsultorError("Analise do Consultor invalida.")
-    # spec: consultor/consultor v1.7 - criterio 38
+    # spec: consultor/consultor v1.9 - criterios 38 e 39
     # Todos os cards recebem perfil de investidor e Perfil Complementar (quando preenchido)
     # para contextualizar a analise - nunca dados de outro usuario.
     if investor_profile is None:
@@ -832,7 +835,7 @@ def build_analysis_context(
     complementary = get_complementary_profile(int(user_id))
     context["investor_profile"] = INVESTOR_PROFILES[validate_investor_profile(investor_profile)]["label"]
     context["complementary_profile"] = complementary["profile"] if complementary["configured"] else {}
-    return context
+    return add_money_displays(context)
 
 
 def build_ralos_context(user_id: int, *, month: object | None, period_window: str) -> dict:
@@ -893,7 +896,7 @@ def build_currency_exposure_context(user_id: int, *, portfolio_positions: list[d
 
 
 def build_portfolio_analysis_context(user_id: int, *, portfolio_positions: list[dict] | None = None) -> dict:
-    # spec: consultor/consultor v1.7 - criterio 30
+    # spec: consultor/consultor v1.9 - criterio 30
     from financeiro.financial_health import calculate_financial_health_score
 
     positions = _load_portfolio_positions(user_id, portfolio_positions)
@@ -933,7 +936,7 @@ def build_score_context(
     }
 
 
-# spec: consultor/consultor v1.7 — critérios 8 e 10
+# spec: consultor/consultor v1.9 — critérios 8 e 10
 def build_score_evolution_context(
     user_id: int,
     *,
@@ -1141,6 +1144,20 @@ def format_brl_cents(value: object) -> str:
     return f"R$ {formatted}"
 
 
+def add_money_displays(value):
+    """Adiciona a todo campo *_cents seu equivalente *_display, inclusive aninhado."""
+    # spec: consultor/consultor v1.9 — critério 39
+    if isinstance(value, list):
+        return [add_money_displays(item) for item in value]
+    if not isinstance(value, dict):
+        return value
+    enriched = {key: add_money_displays(item) for key, item in value.items()}
+    for key, item in value.items():
+        if key.endswith("_cents"):
+            enriched[f"{key[:-6]}_display"] = format_brl_cents(item)
+    return enriched
+
+
 def safe_quote_source(value: object) -> str:
     source = str(value or "").strip()
     if not source:
@@ -1284,7 +1301,7 @@ def consultor_blocked_reason(settings: dict) -> str:
 
 
 def save_consultor_settings(user_id: int, data: dict) -> dict:
-    # spec: consultor/consultor v1.7 - criterios 1, 2, 3, 25, 26 e 32
+    # spec: consultor/consultor v1.9 - criterios 1, 2, 3, 25, 26 e 32
     normalized_user_id = int(user_id)
     current = get_consultor_settings(normalized_user_id)
     consultor_enabled = bool(data.get("consultor_enabled", current["consultor_enabled"]))
@@ -1382,7 +1399,7 @@ def get_complementary_profile(user_id: int) -> dict:
 
 
 def save_complementary_profile(user_id: int, data: dict) -> dict:
-    # spec: consultor/consultor v1.7 - criterios 22, 23, 24, 25 e 33
+    # spec: consultor/consultor v1.9 - criterios 22, 23, 24, 25 e 33
     current = get_complementary_profile(int(user_id))["profile"]
     normalized_patch = normalize_complementary_profile(data, partial=True)
     merged = {**current, **normalized_patch}

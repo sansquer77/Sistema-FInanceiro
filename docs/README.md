@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 11.60
+versao: 11.62
 atualizado: 2026-08-28
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -134,6 +134,8 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `11.62` — 2026-08-28 — [[specs/consultor]] v1.9: todos os campos monetários dos nove cards, inclusive aninhados, passam a ter valor `_display` em reais; o prompt global elimina conversões monetárias pela IA.
+- `11.61` — 2026-08-28 — [[specs/consultor]] v1.8: o card Sustentabilidade do Padrão de Vida envia valores monetários já formatados em reais e proíbe conversão dos campos em centavos pela IA, evitando respostas com escala dez vezes maior.
 - `11.60` — 2026-08-28 — [[specs/importacao-dados]] v1.5: geração UTC compatível com Python 3.9 corrige a inicialização pelo launcher oficial da homologação, sem reintroduzir `datetime.utcnow()`.
 - `11.59` — 2026-08-28 — Versão do app elevada para `1.6.1` (PATCH): corrige a implementação da projeção diária do Efeito Borboleta prevista para a `1.6.0`, sem caracterizar nova capacidade de produto. Ver [[specs/efeito-borboleta]] v1.5.
 - `11.58` — 2026-08-28 — [[specs/efeito-borboleta]] v1.5: projeção diária de 15 pontos substitui a visão semanal e passa a indicar a data exata e se o cenário causa ou evita saldo negativo; [[arquitetura]] v3.41 sincronizada.
