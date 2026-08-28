@@ -2,8 +2,8 @@
 tipo: spec
 area: relatorios
 status: implementado
-versao: 2.13
-atualizado: 2026-08-23
+versao: 2.15
+atualizado: 2026-08-26
 relacionados:
   - "[[lancamentos]]"
   - "[[cartoes]]"
@@ -17,7 +17,7 @@ aliases: ["Relatórios", "Cockpit"]
 # Relatórios
 
 > [!info] Status
-> **implementado** · área: `relatorios` · atualizado em 2026-08-23 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[limites-gastos]]
+> **implementado** · área: `relatorios` · atualizado em 2026-08-26 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[limites-gastos]]
 
 ## Problema
 
@@ -181,6 +181,8 @@ O ponto crítico é cartão de crédito: a fatura pertence ao mês de competênc
 
 ## Changelog
 
+- `2.15` — 2026-08-26 — Corrigida API de evolução de categoria (`/api/reports/category-evolution`) para suportar `subcategory_id=null|none|-1`, filtrando por `subcategory_id IS NULL` (spec [[relatorios-subcategoria-bugfix]]). O gráfico de evolução de linhas "Sem subcategoria" agora exibe apenas os lançamentos sem subcategoria, não o total da categoria.
+- `2.14` — 2026-08-26 — Corrigido regressão no agrupamento do relatório de subcategorias: a chave de agrupamento agora trata explicitamente string vazia/whitespace como "Sem subcategoria" (spec [[relatorios-subcategoria-bugfix]]), garantindo que lançamentos com subcategoria válida não caiam no bucket "Sem subcategoria". A linha `Cuidados Pessoais / Sem subcategoria` para agosto/2026 passa a exibir R$ 490,00 (apenas *Posto de Serviços* da fatura Porto) em vez do total incorreto de todas as subcategorias.
 - `2.13` — 2026-08-23 — Relatório de Tags reformulado: cada tag exibe as linhas Receitas, Despesas, Saldo (receitas menos despesas) e Investimentos, separadas por moeda, facilitando o controle de projetos e bens.
 - `2.12` — 2026-08-23 — Corrigido agrupamento do relatório de subcategorias: lançamentos sem subcategoria passam a ser separados por categoria, evitando que categorias distintas como Compras e Lazer apareçam sob uma única linha `Assinaturas e Serviços / Sem subcategoria`.
 - `2.11` — 2026-08-20 — Sincronizada a data do callout de status com o frontmatter; sem alteração de comportamento.

@@ -1035,7 +1035,14 @@ export function registerReportsView({
     if (!month || String(transaction.category_id || "") !== String(context.categoryId || "")) {
       return;
     }
-    if (context.subcategoryId && String(transaction.subcategory_id || "") !== String(context.subcategoryId)) {
+    const subId = context.subcategoryId;
+    const txSubId = transaction.subcategory_id;
+    if (subId && (subId === "null" || subId === "None" || subId === "-1")) {
+      // Filter by NULL subcategory
+      if (txSubId != null && txSubId !== "") {
+        return;
+      }
+    } else if (subId && String(txSubId || "") !== String(subId)) {
       return;
     }
     if (!totals.has(month)) {

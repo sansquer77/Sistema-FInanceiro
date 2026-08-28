@@ -933,7 +933,13 @@ class AppHandler(BaseHTTPRequestHandler):
             return
 
         category_id = int(category_id_str)
-        subcategory_id = int(subcategory_id_str) if subcategory_id_str.isdigit() else None
+        # subcategory_id: integer for specific subcategory, "null" for no subcategory (NULL), None for no filter
+        if subcategory_id_str.lower() in ("null", "none", "-1"):
+            subcategory_id = "null"
+        elif subcategory_id_str.isdigit():
+            subcategory_id = int(subcategory_id_str)
+        else:
+            subcategory_id = None
 
         evolution = get_category_evolution(user["id"], category_id, subcategory_id, period)
         self.send_json({"evolution": evolution})

@@ -811,13 +811,14 @@ def generate_month_series(period: str) -> list[str]:
             
     return months
 
-def get_category_evolution(user_id: int, category_id: int, subcategory_id: int | None = None, period: str = "12m") -> list[dict]:
+def get_category_evolution(user_id: int, category_id: int, subcategory_id: int | str | None = None, period: str = "12m") -> list[dict]:
     with get_connection() as conn:
         row = conn.execute("SELECT id FROM categories WHERE id = ? AND user_id = ?", (category_id, user_id)).fetchone()
         if not row:
             raise ClassificationError("Categoria não encontrada.", HTTPStatus.NOT_FOUND)
         
-        if subcategory_id:
+        filter_null_subcategory = subcategory_id == "null"
+        if isinstance(subcategory_id, int):
             row = conn.execute("SELECT id FROM subcategories WHERE id = ? AND user_id = ?", (subcategory_id, user_id)).fetchone()
             if not row:
                 raise ClassificationError("Subcategoria não encontrada.", HTTPStatus.NOT_FOUND)
@@ -832,14 +833,21 @@ def get_category_evolution(user_id: int, category_id: int, subcategory_id: int |
         elif period == "ytd":
             date_filter = "AND period_month >= strftime('%Y-01', 'now')"
         
-        subcat_filter_t = "AND transactions.subcategory_id = ?" if subcategory_id else ""
-        subcat_filter_c = "AND credit_card_transactions.subcategory_id = ?" if subcategory_id else ""
+        if filter_null_subcategory:
+            subcat_filter_t = "AND transactions.subcategory_id IS NULL"
+            subcat_filter_c = "AND credit_card_transactions.subcategory_id IS NULL"
+        elif isinstance(subcategory_id, int):
+            subcat_filter_t = "AND transactions.subcategory_id = ?"
+            subcat_filter_c = "AND credit_card_transactions.subcategory_id = ?"
+        else:
+            subcat_filter_t = ""
+            subcat_filter_c = ""
         
         params = [user_id, category_id]
-        if subcategory_id:
+        if isinstance(subcategory_id, int):
             params.append(subcategory_id)
         params.extend([user_id, category_id])
-        if subcategory_id:
+        if isinstance(subcategory_id, int):
             params.append(subcategory_id)
         
         query = f"""
@@ -859,7 +867,7 @@ def get_category_evolution(user_id: int, category_id: int, subcategory_id: int |
                   -- pagamento de fatura fica fora da evolucao para nao duplicar
                   -- os lancamentos detalhados do cartao.
                   AND credit_card_payments.id IS NULL
-                  
+                    
                 UNION ALL
                 
                 SELECT 
