@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 11.51
+versao: 11.55
 atualizado: 2026-08-28
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -134,6 +134,10 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `11.55` — 2026-08-28 — [[adr/0011-criptografia-snapshots-familiares]] v0.4 fixa `scrypt n=2^17, r=8, p=1` para o envelope v1 e registra os alvos iniciais de validação macOS Apple Silicon e Windows x86-64 com 8 GB/i5 ou equivalente.
+- `11.54` — 2026-08-28 — [[specs/consolidacao-familiar]] v0.6 fecha o MVP funcional (`.sffamily` até 1 MB, Portfólio por classe, Score parcial com cobertura, limites recorrentes/aliases, snapshots arquiváveis e mensagens educativas); [[adr/0011-criptografia-snapshots-familiares]] v0.3 concentra as validações técnicas restantes.
+- `11.53` — 2026-08-28 — [[specs/consolidacao-familiar]] v0.5: consolidador inclui ou atualiza seus próprios dados sob demanda usando o snapshot analítico canônico, com persistência direta no SQLite, confirmação de substituição e sem arquivo ou senha.
+- `11.52` — 2026-08-28 — [[specs/consolidacao-familiar]] v0.4 e [[adr/0011-criptografia-snapshots-familiares]] v0.2 definem senha por arquivo com 8 a 128 caracteres, ao menos uma maiúscula e um número, confirmação obrigatória, troca livre para arquivos futuros e ausência de revogação sobre cópias já distribuídas.
 - `11.51` — 2026-08-28 — [[specs/consolidacao-familiar]] v0.3 define `cryptography`, `scrypt`, `AES-256-GCM` e senha somente em memória; criado o rascunho [[adr/0011-criptografia-snapshots-familiares]] v0.1 com gates de PyInstaller e interoperabilidade macOS/Windows/Linux.
 - `11.50` — 2026-08-28 — [[specs/consolidacao-familiar]] v0.2: snapshots importados serão persistidos em colunas analíticas normais no SQLite; a senha familiar protege o transporte e a validação ocorre em memória antes da escrita.
 - `11.49` — 2026-08-28 — Criado o rascunho [[specs/consolidacao-familiar]] v0.1: snapshots mensais criptografados entre instalações, persistência isolada, cobertura por integrante, evolução histórica e Score Familiar recalculado pelos cinco pilares.

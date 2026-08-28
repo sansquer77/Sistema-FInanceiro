@@ -2,7 +2,7 @@
 tipo: adr
 area: seguranca
 status: rascunho
-versao: 0.1
+versao: 0.4
 atualizado: 2026-08-28
 relacionados:
   - "[[../specs/consolidacao-familiar]]"
@@ -39,26 +39,31 @@ Adotar a dependência `cryptography` exclusivamente para o envelope transportáv
 - JSON financeiro integralmente contido no texto cifrado;
 - autenticação completa antes de interpretar ou persistir qualquer campo.
 
-Parâmetros iniciais candidatos do `scrypt`:
+Parâmetros definidos do `scrypt` para a versão 1 do envelope:
 
 | Parâmetro | Valor candidato |
 |---|---|
 | Comprimento da chave | 32 bytes |
 | Salt | 16 bytes aleatórios |
-| `n` | `2^17` |
+| `n` | `2^17` (`131072`) |
 | `r` | `8` |
 | `p` | `1` |
 
-O nonce candidato para `AESGCM` é de 12 bytes aleatórios. Os valores finais permanecem condicionados a benchmark nos runtimes distribuídos e devem ser registrados na versão implementada deste ADR.
+O nonce para `AESGCM` é de 12 bytes aleatórios. O benchmark nos runtimes distribuídos permanece como gate de verificação da implementação, mas não como escolha aberta dos parâmetros do envelope v1. Qualquer redução futura exige nova revisão deste ADR e nova versão do contrato quando necessário.
 
 ## Senha e ciclo da operação
 
 - A senha é fornecida em cada exportação e importação.
 - A exportação exige que o usuário confirme a senha antes de gerar o arquivo.
+- A senha deve ter entre 8 e 128 caracteres e incluir ao menos uma letra maiúscula e um número; letras minúsculas e símbolos são opcionais.
+- A validação não aplica `trim`, altera capitalização nem transforma silenciosamente a senha informada.
+- A interface orienta o uso de frase-senha e pode alertar sobre senha previsível ou exatamente no comprimento mínimo, sem persistir a senha para realizar essa avaliação.
 - A senha nunca é persistida pelo app.
 - A senha existe somente em memória durante a operação e não é gravada em Preferências, SQLite, arquivos temporários, logs, respostas de API ou envelopes exportados.
 - Não existe opção **Lembrar nesta máquina**, hash de verificação persistido ou recuperação da senha.
 - A senha é compartilhada pelos integrantes por um meio externo, fora do controle do app.
+- Cada arquivo é independente e arquivos futuros podem usar outra senha sem recriptografar os anteriores.
+- Incluir ou revogar um integrante significa compartilhar ou deixar de compartilhar senhas e arquivos futuros; o app não revoga acesso a arquivos anteriormente distribuídos.
 - Senha incorreta e arquivo adulterado produzem falha integral e mensagem amigável equivalente, sem revelar detalhes do mecanismo.
 - Senha esquecida torna aquele arquivo irrecuperável pelo app.
 
@@ -85,9 +90,17 @@ O nonce candidato para `AESGCM` é de 12 bytes aleatórios. Os valores finais pe
 
 O importador aceita somente versões, algoritmos e faixas de parâmetros explicitamente suportados. Parâmetros declarados pelo arquivo não podem provocar consumo arbitrário de CPU ou memória antes da rejeição.
 
+O envelope usa obrigatoriamente a extensão `.sffamily`, possui tamanho máximo de 1 MB e é rejeitado por tamanho antes da derivação da chave. A extensão não substitui a validação do formato e da versão do envelope.
+
 ## Distribuição e compatibilidade
 
 `cryptography` publica wheels com bibliotecas vinculadas para macOS, Windows e Linux. A dependência deve ser instalada durante os workflows oficiais e incorporada ao runtime one-folder do PyInstaller gerado no sistema operacional alvo.
+
+A funcionalidade suporta exatamente as plataformas e arquiteturas produzidas pelos pacotes oficiais vigentes; ela não amplia por si só a matriz de arquiteturas da distribuição. A versão de `cryptography` deve ser fixada exatamente no workflow depois de aprovada nos três builds e atualizada de forma deliberada em correções de compatibilidade ou segurança.
+
+Para a validação inicial, o alvo macOS é Apple Silicon e o alvo Windows é x86-64 em máquina com pelo menos 8 GB de memória e processador de classe Intel Core i5 ou equivalente. Esses valores orientam o benchmark e a documentação de requisitos; o app não bloqueia a funcionalidade por marca de processador nem coleta inventário de hardware.
+
+Para reduzir acoplamento entre workflows, cada plataforma executa seu round-trip local e valida um mesmo vetor criptográfico versionado, fictício e sem dados reais. Antes da primeira distribuição, os pacotes também passam por uma validação cruzada bidirecional real.
 
 A decisão somente pode mudar para `implementado` depois de comprovar:
 
@@ -143,23 +156,27 @@ Rejeitada. A persistência facilitaria a operação, mas transformaria uma senha
 - Dado uma senha incorreta, quando o arquivo é aberto, então nenhum campo financeiro é entregue ao importador.
 - Dado um arquivo alterado, quando a autenticação é executada, então nenhum campo financeiro é entregue ao importador.
 - Dado um envelope com parâmetros fora das faixas aceitas, quando validado, então é rejeitado antes de alocar recursos excessivos.
+- Dado um envelope acima de 1 MB, quando recebido, então é rejeitado antes de executar `scrypt`.
 - Dado o fim de uma exportação ou importação, quando persistências e logs são inspecionados, então a senha não está presente.
 - Dado os runtimes oficiais das três plataformas, quando executam a matriz de interoperabilidade, então os arquivos são compatíveis entre si.
+- Dado uma senha fora da política de 8 a 128 caracteres, uma maiúscula e um número, quando a exportação é solicitada, então o arquivo não é gerado.
+- Dado uma senha e confirmação diferentes, quando a exportação é solicitada, então o arquivo não é gerado.
 
 ## Pendências
 
 > [!question] Pendências
 > Este ADR permanece em rascunho até as validações abaixo serem concluídas.
 
-- [ ] Definir comprimento mínimo e máximo da senha e a orientação de frase-senha na interface.
-- [ ] Executar benchmark de `scrypt` nos runtimes PyInstaller macOS, Windows e Linux e confirmar ou ajustar `n`, `r` e `p`.
-- [ ] Definir e fixar a faixa inicial de versões de `cryptography` compatível com Python 3.13 e com os runners oficiais.
-- [ ] Confirmar suporte de arquitetura macOS Intel e Apple Silicon, Windows x86-64 e Linux x86-64, ou reduzir explicitamente a matriz suportada.
+- [ ] Executar benchmark de `scrypt` com `n = 2^17`, `r = 8`, `p = 1` nos runtimes PyInstaller macOS, Windows e Linux e registrar tempo e pico de memória como evidência do gate.
+- [ ] Definir e fixar a versão exata inicial de `cryptography` compatível com Python 3.13 e com os três runners oficiais.
+- [ ] Identificar e registrar as arquiteturas efetivamente produzidas pelos artifacts oficiais vigentes, sem ampliar a matriz por causa desta funcionalidade.
 - [ ] Executar a matriz completa de round-trip e interoperabilidade descrita neste ADR.
-- [ ] Definir limite máximo do envelope antes da derivação e descriptografia.
 
 ## Changelog
 
+- `0.4` — 2026-08-28 — Fixados os parâmetros do envelope v1 em `scrypt n=2^17, r=8, p=1`; benchmark passa a ser gate de verificação, não escolha aberta. Validação inicial direcionada a macOS Apple Silicon e Windows x86-64 com 8 GB/i5 ou equivalente.
+- `0.3` — 2026-08-28 — Definidos extensão `.sffamily`, limite de 1 MB antes do KDF, suporte restrito à matriz de distribuição vigente, versão exata de `cryptography` após aprovação e estratégia de vetor comum mais validação cruzada real.
+- `0.2` — 2026-08-28 — Definida política da senha por arquivo: 8 a 128 caracteres, ao menos uma maiúscula e um número, confirmação obrigatória, sem persistência ou transformação silenciosa; troca vale para novos arquivos e não revoga cópias já distribuídas.
 - `0.1` — 2026-08-28 — Proposta inicial: dependência `cryptography`, derivação `scrypt`, criptografia autenticada `AES-256-GCM`, senha somente em memória e aprovação condicionada a PyInstaller e interoperabilidade entre macOS, Windows e Linux.
 
 ## Relacionados
