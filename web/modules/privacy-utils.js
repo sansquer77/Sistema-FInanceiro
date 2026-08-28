@@ -28,7 +28,7 @@ function storedPrivacyMode() {
 }
 
 export function applyPrivacyMode(mode = storedPrivacyMode()) {
-  // spec: privacidade-valores v1.0 — critérios 1, 3 e 5
+  // spec: privacidade-valores v1.1 — critérios 1, 3 e 5
   const normalizedMode = normalizePrivacyMode(mode);
   document.documentElement.dataset.privacy = normalizedMode;
   return normalizedMode;
@@ -72,7 +72,7 @@ export function updatePrivacyToggleButton(button, mode = document.documentElemen
 }
 
 function markPrivacyMoneyValues(root = document.body) {
-  // spec: privacidade-valores v1.0 — critérios 1, 4 e 7
+  // spec: privacidade-valores v1.1 — critérios 1, 4 e 7
   if (!root || document.documentElement.dataset.privacy !== PRIVACY_ENABLED) {
     return;
   }

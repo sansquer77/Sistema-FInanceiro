@@ -80,7 +80,7 @@ def list_accounts_by_status(user_id: int, archived: bool) -> list[dict]:
 
 
 def recompute_account_balance(conn, user_id: int, account_id: int) -> None:
-    # spec: contas-correntes v1.2 — criterio 3
+    # spec: contas-correntes v1.3 — criterio 3
     # (saldo atual = saldo inicial + deltas de lancamentos com data <= hoje;
     #  lancamentos futuros nao movem o saldo armazenado, mantendo o cache
     #  sempre igual ao saldo efetivo exibido pela listagem)

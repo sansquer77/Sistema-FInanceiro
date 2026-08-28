@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.39
-atualizado: 2026-08-23
+versao: 3.40
+atualizado: 2026-08-28
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -16,7 +16,7 @@ tags: [arquitetura, meta]
 # Arquitetura
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-08-23 · relacionados: [[requisitos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
+> **implementado** · área: `meta` · atualizado em 2026-08-28 · relacionados: [[requisitos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
 
 ## Visão geral
 
@@ -59,6 +59,9 @@ O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Co
 | `transaction-kind.js` | Predicados de tipo de lançamento. |
 | `labels.js` | Labels de domínio usados pela interface. |
 | `month-picker.js` | Popover reutilizável de seleção de mês. |
+| `decision-modal.js` | Modal reutilizável para decisões, confirmações explícitas e pequenos formulários. |
+| `theme-utils.js` | Persistência local e aplicação do tema visual. |
+| `privacy-utils.js` | Persistência local e aplicação do modo de ocultação de valores. |
 | `instructions-content.js` | Conteúdo estático, offline e versionado da central de ajuda. Ver [[instrucoes-app]]. |
 
 **Views funcionais já extraídas:**
@@ -80,6 +83,7 @@ O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Co
 | `portfolio-view.js` | Ativos: posições, histórico, resgate, encerramento. |
 | `transactions-view.js` | Lançamentos: formulário, recorrência, parcelas, câmbio. |
 | `operation-history-view.js` | Histórico de Operações: filtros, busca, agrupamentos e paginação. |
+| `simulations-view.js` | Efeito Borboleta: formulário e renderização das projeções calculadas pelo backend. |
 | `instructions-view.js` | Central de ajuda: busca, grupos, tópicos expansíveis, links internos e botões contextuais `?` no header. Ver [[instrucoes-app]]. |
 
 > [!tip] Regra de fronteira
@@ -296,6 +300,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `version_check.py` | Consulta a landing page oficial por nova versão, compara com a versão local e mantém cache de 1h. Ver [[alerta-nova-versao]]. |
 | `calendar.py` | Cálculo da aba **Calendário** do Cockpit: contas a receber/pagar atrasadas e vencimentos de renda fixa em 30 e 60 dias. Ver [[specs/cockpit-calendario]]. |
 | `simulations.py` | Validação e projeção comparativa, sem persistência, de cenários hipotéticos do Efeito Borboleta. Ver [[efeito-borboleta]]. |
+| `reports.py` | Agregações de relatórios por tag e por evolução de categoria/subcategoria, normalizadas em BRL quando necessário. Ver [[relatorios]]. |
 
 ---
 
@@ -508,6 +513,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.40` — 2026-08-28 — Inventário arquitetural sincronizado com `decision-modal.js`, `theme-utils.js`, `privacy-utils.js`, `simulations-view.js` e `financeiro/reports.py`; despacho das rotas `GET` de perfil e coleções passa a exigir caminho exato. Ver [[specs/frontend-modularizacao]] v2.9 e [[specs/seguranca-autenticacao]] v1.4.
 - `3.39` — 2026-08-23 — Relatórios: nova rota `GET /api/reports/tags?month=AAAA-MM` e módulo `financeiro/reports.py` responsáveis pelo agrupamento por tag com Receitas, Despesas, Saldo e Investimentos; `web/modules/reports-view.js` renderiza a tabela a partir do backend. Ver [[specs/relatorios]] v2.13.
 - `3.38` — 2026-08-23 — Efeito Borboleta: rota `POST /api/simulations/butterfly-effect` passa a retornar `weekly_projection` (saldo atual + 8 semanas, com linhas Previsto, Simulado e Diferença); `financeiro/simulations.py` e `web/modules/simulations-view.js` responsáveis pelo cálculo e renderização. Ver [[specs/efeito-borboleta]] v1.3.
 - `3.37` — 2026-08-22 — Consultor: catálogo ampliado para 9 análises com o card `evolucao_score_tempo` (Evolução do Score no Tempo), que envia série histórica dos 5 pilares do Score para 6 ou 12 meses; `AnalysisCard` passa a declarar `period_window_options` por card e o frontend renderiza as opções declaradas pelo backend. Ver [[specs/consultor]] v1.7.

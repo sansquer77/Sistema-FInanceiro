@@ -678,6 +678,46 @@ class RequestSourceProtectionTest(unittest.TestCase):
         )
 
 
+class ExactGetRouteDispatchTest(unittest.TestCase):
+    def build_handler(self, path: str) -> app.AppHandler:
+        handler = object.__new__(app.AppHandler)
+        handler.path = path
+        handler.handle_me = mock.Mock()
+        handler.handle_list_accounts = mock.Mock()
+        handler.handle_list_credit_cards = mock.Mock()
+        handler.handle_list_transactions = mock.Mock()
+        handler.serve_static = mock.Mock()
+        return handler
+
+    def test_get_collection_routes_dispatch_only_on_exact_path(self) -> None:
+        cases = (
+            ("/api/me", "handle_me"),
+            ("/api/checking-accounts?status=archived", "handle_list_accounts"),
+            ("/api/credit-cards?status=archived", "handle_list_credit_cards"),
+            ("/api/transactions?month=2026-08", "handle_list_transactions"),
+        )
+        for path, expected_handler in cases:
+            with self.subTest(path=path):
+                handler = self.build_handler(path)
+                handler.do_GET()
+                getattr(handler, expected_handler).assert_called_once_with()
+                handler.serve_static.assert_not_called()
+
+    def test_get_prefix_collisions_do_not_dispatch_collection_handlers(self) -> None:
+        cases = (
+            ("/api/me/password", "handle_me"),
+            ("/api/checking-accounts-invalid", "handle_list_accounts"),
+            ("/api/credit-cards/123", "handle_list_credit_cards"),
+            ("/api/transactions/123", "handle_list_transactions"),
+        )
+        for path, forbidden_handler in cases:
+            with self.subTest(path=path):
+                handler = self.build_handler(path)
+                handler.do_GET()
+                getattr(handler, forbidden_handler).assert_not_called()
+                handler.serve_static.assert_called_once_with()
+
+
 class FinancialHealthRouteTest(IsolatedDatabaseTest):
     def test_financial_health_score_requires_session_user(self) -> None:
         handler = object.__new__(app.AppHandler)

@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 11.55
+versao: 11.56
 atualizado: 2026-08-28
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -134,6 +134,7 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `11.56` — 2026-08-28 — Auditoria código/documentação: rotas `GET` exatas, testes de contratos do frontend, timestamps UTC sem API depreciada, inventários arquiteturais e referências código↔spec sincronizados; entradas históricas duplicadas deste changelog foram consolidadas sem perda de conteúdo.
 - `11.55` — 2026-08-28 — [[adr/0011-criptografia-snapshots-familiares]] v0.4 fixa `scrypt n=2^17, r=8, p=1` para o envelope v1 e registra os alvos iniciais de validação macOS Apple Silicon e Windows x86-64 com 8 GB/i5 ou equivalente.
 - `11.54` — 2026-08-28 — [[specs/consolidacao-familiar]] v0.6 fecha o MVP funcional (`.sffamily` até 1 MB, Portfólio por classe, Score parcial com cobertura, limites recorrentes/aliases, snapshots arquiváveis e mensagens educativas); [[adr/0011-criptografia-snapshots-familiares]] v0.3 concentra as validações técnicas restantes.
 - `11.53` — 2026-08-28 — [[specs/consolidacao-familiar]] v0.5: consolidador inclui ou atualiza seus próprios dados sob demanda usando o snapshot analítico canônico, com persistência direta no SQLite, confirmação de substituição e sem arquivo ou senha.
@@ -153,11 +154,9 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 - `11.39` — 2026-08-17 — [[specs/cartoes]] v2.13: linha de referência da média no gráfico de evolução de faturas passa a usar o token `--chart-average-line` (cinza no tema claro, branca no escuro) e exibe o valor da média formatado na moeda do cartão em texto compacto ao final (lado direito) da linha. [[design/design-system]] ganha a regra do token para linhas de referência neutras.
 - `11.38` — 2026-08-17 — [[specs/cartoes]] v2.12: gráfico de evolução de faturas ganha linha horizontal de referência com a média aritmética dos valores absolutos das 5 faturas em tela (2 anteriores, atual e 2 futuras), no mesmo estilo das linhas atuais (contínua, branca) e na mesma escala vertical.
 - `11.37` — 2026-08-17 — [[specs/lancamentos]] v3.22 e [[specs/cartoes]] v2.11: ao editar um lançamento recorrente, o checkbox de cálculo dos próximos pela média fica habilitado — ativando a flag, a edição aplica em cascata às ocorrências futuras não conciliadas (sem modal) persistindo a marcação e recalculando valores pela média; desmarcando em série que tinha a flag, a cascata segue sem recálculo e a marcação é removida no escopo.
-- `11.35` — 2026-08-13 — [[specs/frontend-modularizacao]] v2.8: modo ícones da sidebar compactado (botões 36px, gaps 4px) para todos os itens, incluindo **Sair**, ficarem visíveis sem rolagem.
-- `11.34` — 2026-08-13 — [[specs/frontend-modularizacao]] v2.7: navegação lateral com grupos colapsáveis — **Cadastro**, **Lançamentos**, **Gestão** e **Usuário** colapsam pelo rótulo (seta + `aria-expanded`), estado persistido localmente e grupo da view ativa abre automaticamente; **Cockpit** vira item de primeiro nível e o grupo **Visão geral** é removido.
 - `11.36` — 2026-08-16 — [[specs/consultor]] v1.5: prompt do card **Análise da Carteira** orienta completude dentro do teto de 900 tokens de saída (encerrar todas as seções, encurtando justificativas se preciso), corrigindo truncamento que bloqueava a análise com "indisponível"; [[arquitetura]] v3.34 sincronizada.
-- `11.35` — 2026-08-15 — [[specs/consultor]] v1.4: correções no pós-processamento — validação de seções com cabeçalhos markdown (`###`) e filtro de recomendação vedada tolerante a frases defensivas/negadas, sem afrouxar o bloqueio de recomendações afirmativas; [[arquitetura]] v3.33 sincronizada.
-- `11.34` — 2026-08-15 — Versão do app elevada para `1.5.0` (MINOR): todos os cards do Consultor passam a considerar `investor_profile` e Perfil Complementar quando preenchidos ([[specs/consultor]] v1.3, [[arquitetura]] v3.32).
+- `11.35` — 2026-08-15 — [[specs/consultor]] v1.4: correções no pós-processamento de cabeçalhos e recomendações; [[specs/frontend-modularizacao]] v2.8: modo ícones da sidebar compactado para manter todos os itens visíveis sem rolagem.
+- `11.34` — 2026-08-15 — Versão do app elevada para `1.5.0` (MINOR), com perfil aplicado a todos os cards do Consultor; [[specs/frontend-modularizacao]] v2.7: grupos colapsáveis e **Cockpit** como item de primeiro nível.
 - `11.33` — 2026-08-13 — Versão do app elevada para `1.4.2` (PATCH): [[specs/cartoes]] v2.9 pagamento parcial de fatura (registrada também na spec como v2.10).
 - `11.32` — 2026-08-13 — [[specs/cartoes]] v2.9: pagamento parcial de fatura — botões **Pagar fatura integral** / **Pagar parte da fatura** (modal com valor); no parcial, a fatura fecha como hoje e o saldo restante é lançado na próxima fatura aberta como despesa na categoria **Empréstimos**, com descrição `Saldo da fatura MM/AAAA`. [[arquitetura]] atualizada para v3.29.
 - `11.31` — 2026-08-11 — Versão do app elevada para `1.4.1` (PATCH): [[specs/tendencias-saude-financeira]] v2.21 passa a sinalizar oportunidade de revisar caixa quando o saldo previsto no fim do mês em contas de liquidez/carteira fica igual ou acima de 2x as despesas planejadas.
@@ -168,12 +167,9 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 - `11.26` — 2026-08-11 — [[specs/investimentos-portfolio]] atualizada para v2.26: formulário do Portfólio equalizado com Lançamentos — modalidade em combo com helper (?); controles segmentados/chips/presets removidos do app.
 - `11.25` — 2026-08-11 — [[specs/lancamentos]] atualizada para v3.18: modalidade de renda fixa (Pós/Pré/Híbrida) volta a ser combo ao lado do Indexador com helper (?); CSS de presets/chips removido (sem usos restantes).
 - `11.24` — 2026-08-11 — [[specs/lancamentos]] atualizada para v3.17: checkboxes de média histórica sem moldura pill (checkbox simples); layout pill de checkboxes descontinuado no app (CSS removido).
-- `11.23` — 2026-08-11 — [[specs/lancamentos]] v3.16 e [[specs/investimentos-portfolio]] v2.25: presets de renda fixa removidos; modalidade selecionada (Pós/Pré/Híbrida) destacada em cor de accent; marcador de reserva de emergência sem moldura.
-- `11.22` — 2026-08-11 — [[specs/lancamentos]] v3.15 e [[specs/investimentos-portfolio]] v2.24: renda fixa sem blocos escurecidos; modalidade (Pós/Pré/Híbrida) em lista segmentada centralizada sempre visível; presets sem a frase "Atalhos comuns:".
-- `11.21` — 2026-08-11 — [[specs/lancamentos]] atualizada para v3.14: bloco escurecido removido dos campos Fundo ou previdência (CNPJ e Cota); Renda fixa é o único bloco restante no formulário de Lançamentos.
-- `11.23` — 2026-08-15 — [[specs/consultor]] atualizada para v1.3: **todos os cards** do catálogo passam a considerar `investor_profile` e o Perfil Complementar quando preenchidos — enriquecimento centralizado em `build_analysis_context` e regra global no `system_prompt`; critério de aceite 38; [[arquitetura]] v3.32 sincronizada.
-- `11.22` — 2026-08-15 — [[specs/consultor]] atualizada para v1.2: card **Análise da Carteira** aprofundado — tabela por classe de ativo (risco + impacto macro), seção **Adequação ao Perfil Configurado** alinhada ao perfil/Perfil Complementar/Reserva cadastrados, concisão suspensa para o card e renderização de tabelas markdown na aba Consultor; [[arquitetura]] v3.31 sincronizada.
-- `11.21` — 2026-08-15 — [[specs/consultor]] atualizada para v1.1: novo card **Análise da Carteira** (`analise_carteira`) na Categoria Portfólio e Risco com impacto macroeconômico por classe/moeda/mercado via cotações do Portfólio, persona ampliada (perfil de especialização, diretrizes de alocação, análises de mercado com aviso de defasagem) e catálogo de 8 cards; [[arquitetura]] v3.30 sincronizada.
+- `11.23` — 2026-08-15 — [[specs/consultor]] v1.3 aplica perfil a todos os cards; [[specs/lancamentos]] v3.16 e [[specs/investimentos-portfolio]] v2.25 removem presets de renda fixa e refinam os controles visuais.
+- `11.22` — 2026-08-15 — [[specs/consultor]] v1.2 aprofunda a Análise da Carteira; [[specs/lancamentos]] v3.15 e [[specs/investimentos-portfolio]] v2.24 simplificam o bloco visual de renda fixa.
+- `11.21` — 2026-08-15 — [[specs/consultor]] v1.1 adiciona Análise da Carteira e amplia o catálogo; [[specs/lancamentos]] v3.14 remove o bloco escurecido de Fundo ou previdência.
 - `11.20` — 2026-08-11 — [[specs/lancamentos]] atualizada para v3.13: **Valor investido** ocupa a mesma posição do Valor (abaixo da Descrição) no tipo Investimento — mesmo altura do valor em todos os tipos de lançamento.
 - `11.19` — 2026-08-11 — [[specs/lancamentos]] atualizada para v3.12: campo Valor abaixo da Descrição em posição estável para todos os tipos; blocos escurecidos removidos também de Câmbio, Transferência e do agrupamento geral de Investimento (permanecem apenas Fundos/previdência e Renda fixa).
 - `11.18` — 2026-08-11 — [[specs/lancamentos]] atualizada para v3.11: formulário de Lançamentos mais largo (até 460px) com espaçamento lateral equilibrado — 16px entre menu e formulário, iguais aos 16px entre formulário e extrato.

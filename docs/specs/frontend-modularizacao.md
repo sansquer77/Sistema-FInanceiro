@@ -2,8 +2,8 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 2.8
-atualizado: 2026-08-13
+versao: 2.9
+atualizado: 2026-08-28
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
   - "[[arquitetura]]"
@@ -14,7 +14,7 @@ aliases: ["Modularização Frontend", "ES Modules"]
 # Modularização do Frontend
 
 > [!info] Status
-> **implementado** · área: `frontend` · atualizado em 2026-08-13 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]]
+> **implementado** · área: `frontend` · atualizado em 2026-08-28 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]]
 
 ## Problema
 
@@ -45,6 +45,7 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `decision-modal.js` | Modal reutilizável para decisões, confirmações explícitas e pequenos formulários. |
 | `theme-utils.js` | Preferência visual local e aplicação de tema no `documentElement`. |
 | `privacy-utils.js` | Preferência visual local de privacidade, aplicação de `data-privacy` e marcação visual de valores monetários. |
+| `instructions-content.js` | Conteúdo estático, offline e versionado da central de ajuda. |
 
 ## Views funcionais
 
@@ -65,6 +66,8 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `portfolio-view.js` | Ativos: posições, consolidações com escala BRL, histórico, resgate e encerramento. |
 | `transactions-view.js` | Lançamentos: formulário, recorrência, parcelas e câmbio. |
 | `operation-history-view.js` | Histórico de Operações: filtros, busca, agrupamentos e paginação incremental. |
+| `simulations-view.js` | Efeito Borboleta: formulário de cenário hipotético e projeções retornadas pelo backend. |
+| `instructions-view.js` | Central de ajuda: busca, grupos, tópicos expansíveis e navegação contextual. |
 
 Views estáticas simples, como **Sobre**, podem permanecer declaradas no HTML e roteadas por `app.js` quando não possuem estado próprio, API ou lógica funcional dedicada.
 
@@ -134,6 +137,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Dado um grupo colapsado contendo a view ativa, quando outra view do mesmo grupo é acionada, então o grupo abre automaticamente antes da navegação.
 - Dado o menu lateral com a sidebar inteira no modo ícones, quando um grupo está colapsado individualmente, então todos os itens permanecem acessíveis como ícones.
 - Dado o menu lateral, então o item **Cockpit** aparece como primeiro nível, sem o grupo **Visão geral**.
+- Dado o código do frontend versionado, quando a suíte automatizada é executada, então todos os imports locais de `app.js` resolvem e todos os módulos em `web/modules/` estão inventariados nesta spec.
 
 ## Fora de escopo
 
@@ -143,6 +147,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Changelog
 
+- `2.9` — 2026-08-28 — Inventário sincronizado com `instructions-content.js`, `instructions-view.js` e `simulations-view.js`; adicionados testes automatizados dos imports ES, do inventário documental e da ausência de artefatos de build.
 - `2.8` — 2026-08-13 — Modo ícones da sidebar compactado para caber sem rolagem em telas comuns: botões com `min-height` 36px (antes 42px), gaps reduzidos de 8px para 4px e marca com menos respiro; **Sair** e todos os itens ficam visíveis sem rolar a página.
 - `2.7` — 2026-08-13 — Navegação lateral com grupos colapsáveis: **Cadastro**, **Lançamentos**, **Gestão** e **Usuário** colapsam/expandem pelo rótulo (seta + `aria-expanded`), com preferência local persistida e abertura automática do grupo da view ativa; **Cockpit** passa a ser item de primeiro nível e o grupo **Visão geral** é removido.
 - `2.6` — 2026-08-09 — Ajustes finais de performance frontend: widget externo BMC passa a carregar com `async/defer`, transição de `grid-template-columns` removida do dashboard e logs de debug removidos de renderizações frequentes.

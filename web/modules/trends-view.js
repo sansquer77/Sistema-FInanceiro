@@ -1,4 +1,4 @@
-// spec: tendencias-saude-financeira v2.16 — critérios 1, 2, 3, 4, 5, 6, 7, 10, 12, 13, 14, 16, 17, 20, 21, 25, 26, 27, 28, 32, 33 e 34
+// spec: tendencias-saude-financeira v2.22 — critérios 1, 2, 3, 4, 5, 6, 7, 10, 12, 13, 14, 16, 17, 20, 21, 25, 26, 27, 28, 32, 33 e 34
 export function registerTrendsView({
   elements,
   api,

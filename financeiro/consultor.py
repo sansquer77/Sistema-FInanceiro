@@ -358,7 +358,7 @@ def build_system_prompt(
     investor_profile: object = "moderado",
     period_window: object = None,
 ) -> str:
-    # spec: consultor/consultor v1.3 - criterios 8, 9, 12, 14, 34 e 38
+    # spec: consultor/consultor v1.7 - criterios 8, 9, 12, 14, 34 e 38
     normalized_analysis_id = validate_analysis_id(analysis_id)
     profile = validate_investor_profile(investor_profile)
     period = validate_period_window(period_window, analysis_id=normalized_analysis_id)
@@ -433,7 +433,7 @@ def execute_consultor_analysis(
     now: datetime | None = None,
     portfolio_positions: list[dict] | None = None,
 ) -> dict:
-    # spec: consultor/consultor v1.3 - criterios 7, 8, 10, 13, 34 e 38
+    # spec: consultor/consultor v1.7 - criterios 7, 8, 10, 13, 34 e 38
     normalized_user_id = int(user_id)
     normalized_analysis_id = validate_analysis_id(analysis_id)
     current_time = now or datetime.now()
@@ -595,7 +595,7 @@ def failure_cooldown_remaining(user_id: int, analysis_id: str, current_time: dat
 
 
 def postprocess_consultor_output(output: object) -> str:
-    # spec: consultor/consultor v1.3 - criterios 11, 12, 14 e 15
+    # spec: consultor/consultor v1.7 - criterios 11, 12, 14 e 15
     text = str(output or "").strip()
     if not text:
         raise ConsultorError("O Consultor esta indisponivel no momento.")
@@ -612,7 +612,7 @@ def postprocess_consultor_output(output: object) -> str:
 
 
 def has_section(text: str, section: str) -> bool:
-    # spec: consultor/consultor v1.4 - cabeçalhos com acentos normalizados
+    # spec: consultor/consultor v1.7 - cabeçalhos com acentos normalizados
     normalized_text = normalize_text(text)
     escaped = re.escape(section)
     return bool(re.search(
@@ -623,7 +623,7 @@ def has_section(text: str, section: str) -> bool:
 
 
 def contains_forbidden_recommendation(normalized_text: str) -> bool:
-    # spec: consultor/consultor v1.4 - correcao de falso positivo
+    # spec: consultor/consultor v1.7 - correcao de falso positivo
     # Frases defensivas da IA ("nao constitui recomendacao de compra de acoes",
     # "sem recomendar compra de fundos", "evite comprar por impulso") casavam os
     # padroes vedados; o match so vale se nao houver negacao/ressalva na janela anterior.
@@ -787,7 +787,7 @@ def build_analysis_context(
     investor_profile: object | None = None,
     portfolio_positions: list[dict] | None = None,
 ) -> dict:
-    # spec: consultor/consultor v1.3 - criterios 7, 10, 27, 30, 34 e 38
+    # spec: consultor/consultor v1.7 - criterios 7, 10, 27, 30, 34 e 38
     normalized_analysis_id = validate_analysis_id(analysis_id)
     normalized_period = validate_period_window(period_window, analysis_id=normalized_analysis_id)
     # Otimização: calcula o portfólio uma única vez e repassa aos cards que o consomem,
@@ -824,7 +824,7 @@ def build_analysis_context(
         context = build_maturities_context(user_id, month=month, reference_date=reference_date, portfolio_positions=portfolio_positions)
     else:
         raise ConsultorError("Analise do Consultor invalida.")
-    # spec: consultor/consultor v1.3 - criterio 38
+    # spec: consultor/consultor v1.7 - criterio 38
     # Todos os cards recebem perfil de investidor e Perfil Complementar (quando preenchido)
     # para contextualizar a analise - nunca dados de outro usuario.
     if investor_profile is None:
@@ -893,7 +893,7 @@ def build_currency_exposure_context(user_id: int, *, portfolio_positions: list[d
 
 
 def build_portfolio_analysis_context(user_id: int, *, portfolio_positions: list[dict] | None = None) -> dict:
-    # spec: consultor/consultor v1.3 - criterio 30
+    # spec: consultor/consultor v1.7 - criterio 30
     from financeiro.financial_health import calculate_financial_health_score
 
     positions = _load_portfolio_positions(user_id, portfolio_positions)
@@ -1284,7 +1284,7 @@ def consultor_blocked_reason(settings: dict) -> str:
 
 
 def save_consultor_settings(user_id: int, data: dict) -> dict:
-    # spec: consultor/consultor v1.3 - criterios 1, 2, 3, 25, 26 e 32
+    # spec: consultor/consultor v1.7 - criterios 1, 2, 3, 25, 26 e 32
     normalized_user_id = int(user_id)
     current = get_consultor_settings(normalized_user_id)
     consultor_enabled = bool(data.get("consultor_enabled", current["consultor_enabled"]))
@@ -1382,7 +1382,7 @@ def get_complementary_profile(user_id: int) -> dict:
 
 
 def save_complementary_profile(user_id: int, data: dict) -> dict:
-    # spec: consultor/consultor v1.3 - criterios 22, 23, 24, 25 e 33
+    # spec: consultor/consultor v1.7 - criterios 22, 23, 24, 25 e 33
     current = get_complementary_profile(int(user_id))["profile"]
     normalized_patch = normalize_complementary_profile(data, partial=True)
     merged = {**current, **normalized_patch}

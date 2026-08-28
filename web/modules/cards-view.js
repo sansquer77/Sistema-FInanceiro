@@ -953,7 +953,7 @@ export function registerCardsView({
     }, 0);
   }
 
-  // spec: cartoes v2.13 — criterios 36 e 37
+  // spec: cartoes v2.15 — criterios 36 e 37
   // (linha de referencia horizontal com a media dos valores absolutos das
   //  5 faturas em tela, na mesma escala vertical do grafico, com o valor
   //  da media em texto ao final da linha)

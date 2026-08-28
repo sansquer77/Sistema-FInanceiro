@@ -2,8 +2,8 @@
 tipo: spec
 area: seguranca
 status: implementado
-versao: 1.3
-atualizado: 2026-07-10
+versao: 1.4
+atualizado: 2026-08-28
 relacionados:
   - "[[recuperacao-senha]]"
   - "[[adr/0005-smtp-criptografado-local]]"
@@ -15,7 +15,7 @@ aliases: ["Segurança", "Autenticação"]
 # Segurança de Autenticação
 
 > [!info] Status
-> **implementado** · área: `seguranca` · atualizado em 2026-07-10 · relacionados: [[recuperacao-senha]], [[arquitetura]]
+> **implementado** · área: `seguranca` · atualizado em 2026-08-28 · relacionados: [[recuperacao-senha]], [[arquitetura]]
 
 ## Problema
 
@@ -56,6 +56,7 @@ Usuários locais do Sistema Financeiro que protegem dados financeiros sensíveis
 - Cookie de sessão usa `Secure` somente quando `APP_URL` estiver em HTTPS.
 - O banco armazena somente o hash SHA-256 do token de sessão; o token original existe apenas no cookie.
 - Métodos mutáveis (`POST`, `PUT`, `DELETE`) exigem e validam `Host` e `Origin`.
+- Rotas `GET` de coleção e perfil são reconhecidas pelo caminho exato; sufixos ou colisões de prefixo não podem acionar outro handler da API.
 - A troca e a recuperação de senha revogam todas as sessões do usuário.
 - Sessões têm expiração absoluta de **30 dias**, sem renovação automática por atividade.
 - HTTP continua permitido quando o servidor escuta apenas localmente.
@@ -99,6 +100,7 @@ Rotas afetadas:
 - Dada uma sessão com mais de 30 dias, quando reutilizada, ela não autentica.
 - Dado `APP_HOST` local com HTTP, quando o app inicia, ele funciona sem alerta de exposição em rede.
 - Dado `APP_HOST` exposto à LAN e `APP_URL` HTTP, quando o app inicia, ele exibe alerta recomendando HTTPS.
+- Dado um caminho `GET` que apenas começa como uma rota válida, quando ele não corresponde ao contrato completo, então o handler da rota válida não é executado.
 
 ## Fora de escopo
 
@@ -109,6 +111,7 @@ Rotas afetadas:
 
 ## Changelog
 
+- `1.4` — 2026-08-28 — O despacho de rotas `GET` de perfil, contas, cartões e lançamentos passa a exigir caminho exato, impedindo colisões por prefixo; adicionada cobertura automatizada positiva e negativa.
 - `1.3` — 2026-07-10 — Adicionada expiração absoluta de 30 dias e alerta não bloqueante para exposição em LAN sem HTTPS; HTTP local permanece permitido.
 - `1.2` — 2026-07-10 — Tokens de sessão passam a ser armazenados com hash, `Origin` torna-se obrigatório em mutações e troca/recuperação de senha revoga todas as sessões.
 - `1.1` — 2026-07-04 — Validação de Host/Origin atualizada para documentar listas CSV de LAN e normalização de porta/esquema.

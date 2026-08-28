@@ -754,7 +754,7 @@ const cockpitView = registerCockpitView({
   portfolioMaturityAlerts: () => portfolioView.portfolioMaturityAlerts(),
   goToPortfolio: () => showModule("portfolio"),
   onNavigateToTransaction: (transactionId, accountId, date) => {
-    // spec: cockpit-calendario v0.6 — critério 17
+    // spec: cockpit-calendario v0.8 — critério 17
     state.transactionHighlightId = String(transactionId);
     if (accountId && state.accounts.some((account) => String(account.id) === String(accountId))) {
       state.selectedAccountId = String(accountId);
