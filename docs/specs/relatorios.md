@@ -2,8 +2,8 @@
 tipo: spec
 area: relatorios
 status: implementado
-versao: 2.15
-atualizado: 2026-08-26
+versao: 2.16
+atualizado: 2026-08-28
 relacionados:
   - "[[lancamentos]]"
   - "[[cartoes]]"
@@ -17,7 +17,7 @@ aliases: ["Relatórios", "Cockpit"]
 # Relatórios
 
 > [!info] Status
-> **implementado** · área: `relatorios` · atualizado em 2026-08-26 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[limites-gastos]]
+> **implementado** · área: `relatorios` · atualizado em 2026-08-28 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[limites-gastos]]
 
 ## Problema
 
@@ -157,6 +157,7 @@ O ponto crítico é cartão de crédito: a fatura pertence ao mês de competênc
 - Dado movimentações em múltiplas moedas, quando exibidas, os totais são separados por moeda.
 - Dado um planejamento mensal com lançamentos em moedas distintas, quando o Cockpit é exibido, cada seção apresenta subtotal e itens por moeda, sem rotular valores estrangeiros como reais.
 - Dado uma categoria com histórico, quando o usuário abre a evolução, o sistema retorna a série mensal do período selecionado.
+- Dado uma linha `Categoria / Sem subcategoria`, quando o usuário abre sua evolução, então a série considera somente lançamentos com `subcategory_id IS NULL`, preserva a competência da fatura para cartões e apresenta valores normalizados em BRL.
 - Dado o usuário abrindo Demonstrativos, quando escolhe contas, cartões ou visão consolidada e opcionalmente uma moeda, então o relatório mostra apenas despesas daquele escopo no mês, com cabeçalho, KPIs, gráficos, composição, detalhamento e ação de imprimir/exportar.
 - Dado o usuário gerando um demonstrativo consolidado com todas as moedas, quando houver despesas em mais de uma moeda, então o documento separa o conteúdo em uma seção por moeda, cada uma com seus próprios KPIs, gráficos e tabelas.
 - Dado o demonstrativo exibido, quando há despesas de conta e cartão, então o resumo e a composição distinguem as duas origens e o detalhamento mostra a conta ou cartão de cada lançamento.
@@ -181,8 +182,9 @@ O ponto crítico é cartão de crédito: a fatura pertence ao mês de competênc
 
 ## Changelog
 
-- `2.15` — 2026-08-26 — Corrigida API de evolução de categoria (`/api/reports/category-evolution`) para suportar `subcategory_id=null|none|-1`, filtrando por `subcategory_id IS NULL` (spec [[relatorios-subcategoria-bugfix]]). O gráfico de evolução de linhas "Sem subcategoria" agora exibe apenas os lançamentos sem subcategoria, não o total da categoria.
-- `2.14` — 2026-08-26 — Corrigido regressão no agrupamento do relatório de subcategorias: a chave de agrupamento agora trata explicitamente string vazia/whitespace como "Sem subcategoria" (spec [[relatorios-subcategoria-bugfix]]), garantindo que lançamentos com subcategoria válida não caiam no bucket "Sem subcategoria". A linha `Cuidados Pessoais / Sem subcategoria` para agosto/2026 passa a exibir R$ 490,00 (apenas *Posto de Serviços* da fatura Porto) em vez do total incorreto de todas as subcategorias.
+- `2.16` — 2026-08-28 — Consolidada a correção do relatório de subcategorias: nomes são normalizados antes do agrupamento, linhas sem subcategoria preservam o sentinela `null` até a API, a evolução filtra `subcategory_id IS NULL` e contas/cartões são somados pelos valores normalizados em BRL. Adicionados testes de regressão do filtro nulo, competência de fatura e conversão monetária.
+- `2.15` — 2026-08-26 — API de evolução de categoria (`/api/reports/category-evolution`) passou a aceitar `subcategory_id=null|none|-1` para filtrar por `subcategory_id IS NULL`.
+- `2.14` — 2026-08-26 — Registrada a investigação da regressão no agrupamento do relatório de subcategorias, consolidada e validada na versão 2.16.
 - `2.13` — 2026-08-23 — Relatório de Tags reformulado: cada tag exibe as linhas Receitas, Despesas, Saldo (receitas menos despesas) e Investimentos, separadas por moeda, facilitando o controle de projetos e bens.
 - `2.12` — 2026-08-23 — Corrigido agrupamento do relatório de subcategorias: lançamentos sem subcategoria passam a ser separados por categoria, evitando que categorias distintas como Compras e Lazer apareçam sob uma única linha `Assinaturas e Serviços / Sem subcategoria`.
 - `2.11` — 2026-08-20 — Sincronizada a data do callout de status com o frontmatter; sem alteração de comportamento.

@@ -852,9 +852,12 @@ def get_category_evolution(user_id: int, category_id: int, subcategory_id: int |
         
         query = f"""
             WITH combined AS (
-                SELECT 
+                SELECT
                     strftime('%Y-%m', date) AS period_month,
-                    transactions.amount_cents
+                    -- spec: relatorios/relatorios v2.16 — criterio 14
+                    -- A evolucao combina contas/cartoes em BRL para nao somar centavos
+                    -- nominais de moedas diferentes e rotular o resultado como reais.
+                    transactions.amount_brl_cents AS amount_cents
                 FROM transactions
                 LEFT JOIN credit_card_payments
                     ON credit_card_payments.transaction_id = transactions.id
@@ -863,16 +866,16 @@ def get_category_evolution(user_id: int, category_id: int, subcategory_id: int |
                   AND transactions.category_id = ?
                   {subcat_filter_t}
                   AND transactions.archived_at IS NULL
-                  -- spec: relatorios/relatorios v2.6 — criterio 6
+                  -- spec: relatorios/relatorios v2.16 — criterio 6
                   -- pagamento de fatura fica fora da evolucao para nao duplicar
                   -- os lancamentos detalhados do cartao.
                   AND credit_card_payments.id IS NULL
-                    
+
                 UNION ALL
-                
-                SELECT 
+
+                SELECT
                     invoice_month AS period_month,
-                    amount_cents
+                    amount_brl_cents AS amount_cents
                 FROM credit_card_transactions
                 WHERE credit_card_transactions.user_id = ?
                   AND credit_card_transactions.category_id = ?

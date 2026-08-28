@@ -7,7 +7,7 @@ from financeiro.transactions import list_transactions
 
 
 def build_tag_report(user_id: int, month: str | None = None) -> dict:
-    # spec: relatorios v2.13 — relatório de tags agrupado por tag com
+    # spec: relatorios/relatorios v2.16 — relatório de tags agrupado por tag com
     # Receitas, Despesas, Saldo e Investimentos, separados por moeda.
     transactions = list_transactions(user_id, month=month)
     card_transactions = list_credit_card_transactions(user_id, invoice_month=month)

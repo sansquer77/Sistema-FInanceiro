@@ -7,7 +7,7 @@ from pathlib import Path
 from financeiro import database
 from financeiro.accounts import create_checking_account
 from financeiro.auth import create_user
-from financeiro.categories import create_category
+from financeiro.categories import create_category, get_category_evolution
 from financeiro.credit_cards import (
     create_credit_card,
     create_credit_card_transaction,
@@ -201,6 +201,77 @@ class TagReportTest(unittest.TestCase):
         tags = {row["tag"]: row for row in response["tags"]}
         self.assertEqual(tags["Casa"]["expense_cents"], 100000)
         self.assertEqual(tags["Reforma"]["expense_cents"], 100000)
+
+
+class CategoryEvolutionReportTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.original_data_dir = database.DATA_DIR
+        self.original_db_path = database.DB_PATH
+        database.DATA_DIR = Path(self.tempdir.name)
+        database.DB_PATH = database.DATA_DIR / "test-finance.db"
+        initialize_database()
+
+    def tearDown(self) -> None:
+        database.DATA_DIR = self.original_data_dir
+        database.DB_PATH = self.original_db_path
+        self.tempdir.cleanup()
+
+    def test_null_subcategory_uses_invoice_month_and_normalized_brl_amounts(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta BRL",
+            "bank_name": "Banco",
+            "currency": "BRL",
+            "initial_balance": "0,00",
+        })
+        usd_account = create_checking_account(user["id"], {
+            "name": "Conta USD",
+            "bank_name": "Banco",
+            "currency": "USD",
+            "initial_balance": "0,00",
+        })
+        card = create_credit_card(user["id"], {
+            "name": "Cartao USD",
+            "issuer": "Banco",
+            "currency": "USD",
+            "limit": "5000,00",
+            "closing_day": "25",
+            "due_day": "10",
+            "preferred_payment_account_id": str(usd_account["id"]),
+        })
+        category = create_category(user["id"], "Cuidados de Teste", "expense")
+        create_transaction(user["id"], {
+            "type": "expense",
+            "description": "Sem subcategoria",
+            "amount": "100,00",
+            "date": "2026-01-10",
+            "account_id": str(account["id"]),
+            "category": category["name"],
+        })
+        create_transaction(user["id"], {
+            "type": "expense",
+            "description": "Com subcategoria",
+            "amount": "900,00",
+            "date": "2026-01-10",
+            "account_id": str(account["id"]),
+            "category": category["name"],
+            "subcategory": "Vestuário",
+        })
+        create_credit_card_transaction(user["id"], {
+            "credit_card_id": str(card["id"]),
+            "type": "expense",
+            "description": "Compra em dólar",
+            "amount": "10,00",
+            "exchange_rate": "5,00",
+            "date": "2026-01-12",
+            "invoice_month": "2026-01",
+            "category": category["name"],
+        })
+
+        evolution = get_category_evolution(user["id"], category["id"], "null", "all")
+
+        self.assertEqual(evolution, [{"month": "2026-01", "total_cents": 15000}])
 
 
 if __name__ == "__main__":

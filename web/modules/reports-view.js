@@ -199,7 +199,7 @@ export function registerReportsView({
   }
 
   async function renderTagsReport() {
-    // spec: relatorios v2.13 — relatório de tags agrupado por tag com
+    // spec: relatorios/relatorios v2.16 — relatório de tags agrupado por tag com
     // Receitas, Despesas, Saldo e Investimentos, separados por moeda.
     reportContent.innerHTML = '<div class="empty-state compact">Carregando relatório de tags...</div>';
     try {
@@ -437,11 +437,11 @@ export function registerReportsView({
       currency: transaction.account_currency || "BRL",
       description: transaction.description || "",
       category: transaction.category_name || "Sem categoria",
-      subcategory: transaction.subcategory_name || "",
+      subcategory: String(transaction.subcategory_name || "").trim(),
       tag: "",
       tags: Array.isArray(transaction.tags) ? transaction.tags : transaction.tag_name ? [transaction.tag_name] : [],
       categoryId: transaction.category_id || "",
-      subcategoryId: transaction.subcategory_id || "",
+      subcategoryId: transaction.subcategory_id == null ? "null" : transaction.subcategory_id,
       accountId: transaction.account_id,
       accountName: transaction.account_name,
       source: "Conta",
@@ -459,11 +459,11 @@ export function registerReportsView({
       currency: transaction.card_currency || "BRL",
       description: transaction.description || "",
       category: transaction.category_name || "Sem categoria",
-      subcategory: transaction.subcategory_name || "",
+      subcategory: String(transaction.subcategory_name || "").trim(),
       tag: "",
       tags: Array.isArray(transaction.tags) ? transaction.tags : transaction.tag_name ? [transaction.tag_name] : [],
       categoryId: transaction.category_id || "",
-      subcategoryId: transaction.subcategory_id || "",
+      subcategoryId: transaction.subcategory_id == null ? "null" : transaction.subcategory_id,
       accountId: "",
       cardId: transaction.credit_card_id || "",
       accountName: transaction.credit_card_name || "Cartão",
@@ -829,7 +829,8 @@ export function registerReportsView({
         key = item.tag || "Sem categoria";
         label = key;
       } else if (dimension === "subcategory") {
-        key = `${item.category || "Sem categoria"} / ${item.subcategory || "Sem subcategoria"}`;
+        const subcategory = String(item.subcategory || "").trim() || "Sem subcategoria";
+        key = `${item.category || "Sem categoria"} / ${subcategory}`;
         label = key;
       } else {
         key = item.category || "Sem categoria";
@@ -839,7 +840,9 @@ export function registerReportsView({
         groups.set(key, {
           label,
           categoryId: item.categoryId || "",
-          subcategoryId: dimension === "subcategory" ? item.subcategoryId || "" : "",
+          subcategoryId: dimension === "subcategory"
+            ? (item.subcategoryId == null || item.subcategoryId === "" ? "null" : item.subcategoryId)
+            : "",
           type: dimension,
           count: 0,
           totals: new Map(),
@@ -1052,7 +1055,9 @@ export function registerReportsView({
         return;
       }
     }
-    totals.set(month, (totals.get(month) || 0) + moneyToCents(transaction.amount));
+    // spec: relatorios/relatorios v2.16 — critério 14
+    // A API de evolução usa BRL normalizado; o fallback local deve manter a mesma unidade.
+    totals.set(month, (totals.get(month) || 0) + moneyToCents(transaction.amount_brl ?? transaction.amount));
   }
 
   function isCreditCardPaymentTransaction(transaction) {
