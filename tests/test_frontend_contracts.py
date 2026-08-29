@@ -44,6 +44,36 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("response.daily_projection || response.weekly_projection", source)
         self.assertIn("Projeção diária de caixa", index)
 
+    def test_cockpit_uses_progressive_fluid_interactions(self) -> None:
+        app_source = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+        cockpit_source = (MODULE_ROOT / "cockpit-view.js").read_text(encoding="utf-8")
+        tab_utils = (MODULE_ROOT / "tab-utils.js").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+
+        self.assertIn('id="cockpitView" aria-busy="false"', index)
+        self.assertIn("cockpitView.setLoading(true)", app_source)
+        self.assertIn("cockpitView.setLoading(false)", app_source)
+        self.assertIn("transitionView(updateActivePanel)", cockpit_source)
+        self.assertIn('event.key === "ArrowRight"', tab_utils)
+        self.assertIn('event.key === "ArrowLeft"', tab_utils)
+        self.assertIn("prefers-reduced-motion: reduce", tab_utils)
+        self.assertIn("view-transition-name: cockpit-active-panel", styles)
+        self.assertIn("#cockpitView.is-refreshing", styles)
+
+    def test_all_analytical_tabsets_share_keyboard_and_transition_helpers(self) -> None:
+        modules = {
+            name: (MODULE_ROOT / name).read_text(encoding="utf-8")
+            for name in ("cockpit-view.js", "portfolio-view.js", "reports-view.js", "consultor-view.js", "user-admin-view.js")
+        }
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+
+        for name, source in modules.items():
+            self.assertIn("bindRovingTablist", source, name)
+            self.assertIn("syncRovingTabState", source, name)
+        for tab_name in ("report-tab", "portfolio-tab", "consultor-subtab", "user-pref-tab"):
+            self.assertRegex(index, rf'class="[^"]*{tab_name}[^"]*"[^>]+role="tab"')
+
 
 if __name__ == "__main__":
     unittest.main()

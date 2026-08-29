@@ -208,16 +208,16 @@ export function registerConsultorView({
   }
 
   function setConsultorTab(tab) {
-    activeConsultorTab = tab === "history" ? "history" : "analyses";
-    renderConsultorTabs();
+    const nextTab = tab === "history" ? "history" : "analyses";
+    if (nextTab === activeConsultorTab) return;
+    transitionView(() => {
+      activeConsultorTab = nextTab;
+      renderConsultorTabs();
+    });
   }
 
   function renderConsultorTabs() {
-    consultorTabs?.forEach((button) => {
-      const isActive = button.dataset.consultorTab === activeConsultorTab;
-      button.classList.toggle("active", isActive);
-      button.setAttribute("aria-selected", String(isActive));
-    });
+    syncRovingTabState(consultorTabs, activeConsultorTab, (button) => button.dataset.consultorTab);
     if (consultorAnalysesPanel) {
       consultorAnalysesPanel.hidden = activeConsultorTab !== "analyses";
     }
@@ -548,8 +548,9 @@ export function registerConsultorView({
   if (consultorHistoryRefreshButton) {
     consultorHistoryRefreshButton.addEventListener("click", loadConsultor);
   }
-  consultorTabs?.forEach((button) => {
-    button.addEventListener("click", () => setConsultorTab(button.dataset.consultorTab));
+  bindRovingTablist(consultorTabs, {
+    valueFor: (button) => button.dataset.consultorTab,
+    onSelect: setConsultorTab,
   });
   consultorHistoryFilter?.addEventListener("input", () => {
     historyFilter = consultorHistoryFilter.value || "";
@@ -566,3 +567,4 @@ export function registerConsultorView({
     invalidateCalendar,
   };
 }
+import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";

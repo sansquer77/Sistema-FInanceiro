@@ -1,3 +1,5 @@
+import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";
+
 export function registerPortfolioView({
   state,
   elements,
@@ -75,22 +77,23 @@ export function registerPortfolioView({
     analysis: document.querySelector("#portfolioAnalysisPanel"),
     history: document.querySelector("#portfolioHistoryPanel"),
   };
+  const portfolioRoot = document.querySelector("#portfolioView");
   const showPortfolioTab = (name) => {
-    state.portfolioTab = name || "position";
-    const panel = portfolioTabPanels[name];
+    const nextTab = portfolioTabPanels[name] ? name : "position";
+    const panel = portfolioTabPanels[nextTab];
     if (!panel) return;
-    portfolioTabButtons.forEach((button) => {
-      const active = button.dataset.portfolioTab === name;
-      button.classList.toggle("active", active);
-      button.setAttribute("aria-selected", active ? "true" : "false");
-    });
-    Object.entries(portfolioTabPanels).forEach(([key, currentPanel]) => {
-      currentPanel.hidden = key !== name;
+    transitionView(() => {
+      state.portfolioTab = nextTab;
+      syncRovingTabState(portfolioTabButtons, nextTab, (button) => button.dataset.portfolioTab);
+      Object.entries(portfolioTabPanels).forEach(([key, currentPanel]) => {
+        currentPanel.hidden = key !== nextTab;
+      });
     });
     renderActivePortfolioTab();
   };
-  portfolioTabButtons.forEach((button) => {
-    button.addEventListener("click", () => showPortfolioTab(button.dataset.portfolioTab));
+  bindRovingTablist(portfolioTabButtons, {
+    valueFor: (button) => button.dataset.portfolioTab,
+    onSelect: showPortfolioTab,
   });
   const portfolioEmergencyReserveFields = portfolioAssetForm.querySelector("#portfolioEmergencyReserveFields");
   const portfolioAssetName = portfolioAssetForm.elements.asset_name;
@@ -161,6 +164,8 @@ export function registerPortfolioView({
       return;
     }
     state.portfolioLoading = true;
+    portfolioRoot?.setAttribute("aria-busy", "true");
+    portfolioRoot?.classList.add("is-refreshing");
     state.portfolioError = "";
     if (options.refreshMessage) {
       setMessage(portfolioMessage, "Atualizando cotações...");
@@ -189,6 +194,8 @@ export function registerPortfolioView({
     }
 
     state.portfolioLoading = false;
+    portfolioRoot?.setAttribute("aria-busy", "false");
+    portfolioRoot?.classList.remove("is-refreshing");
     renderPortfolio();
     onPortfolioChanged();
   }

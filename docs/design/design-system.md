@@ -2,8 +2,8 @@
 tipo: design
 area: meta
 status: implementado
-versao: 2.8
-atualizado: 2026-08-09
+versao: 3.0
+atualizado: 2026-08-28
 relacionados:
   - "[[arquitetura]]"
   - "[[specs/frontend-modularizacao]]"
@@ -14,7 +14,7 @@ aliases: ["Design System", "Tokens Visuais", "Precisão Institucional"]
 # Design System — Precisão Institucional
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-08-09 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]]
+> **implementado** · área: `meta` · atualizado em 2026-08-28 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]]
 
 ## Personalidade da marca
 
@@ -273,6 +273,9 @@ Padrão único em toda a aplicação, conforme o modelo usado no menu **Preferê
 - Use View Transitions API como melhoria progressiva para navegação entre módulos, preservando fallback instantâneo quando indisponível.
 - Respeite `prefers-reduced-motion: reduce`: nesse caso, a navegação não deve aplicar animação.
 - A duração recomendada para transições globais de visão é de aproximadamente `160ms`, com easing suave (`ease-out`), evitando efeitos decorativos longos.
+- Trocas entre subtabs de um mesmo módulo podem usar a mesma duração de aproximadamente `160ms`, combinando apenas opacidade e pequeno deslocamento vertical; estados de atualização preservam o conteúdo anterior com atenuação discreta e `aria-busy`, sem bloquear a navegação.
+- Todos os conjuntos de abas funcionais devem adotar foco roving: somente a aba ativa participa da ordem Tab; setas movem entre vizinhas, Home/End alcançam extremos e a seleção acompanha o foco.
+- Regiões que aguardam dados devem usar `aria-busy` e atenuação moderada apenas no conteúdo afetado, mantendo navegação, cabeçalhos e controles disponíveis.
 
 ### Diagnóstico visual e disclosure progressivo
 
@@ -323,6 +326,8 @@ Padrão único em toda a aplicação, conforme o modelo usado no menu **Preferê
 
 ## Changelog
 
+- `3.0` — 2026-08-28 — Padrão de fluidez ampliado a todos os conjuntos de abas analíticas, com foco roving acessível e estados ocupados localizados que preservam controles e contexto.
+- `2.9` — 2026-08-28 — Movimento interno do Cockpit padronizado: subtabs com transição curta de opacidade/deslocamento, atualização localizada com conteúdo preservado e respeito obrigatório à redução de movimento.
 - `2.8` — 2026-08-09 — Modo Privacidade passa a usar máscara textual leve no lugar de `filter: blur()` em massa, mantendo revelação em hover/foco e preservando alinhamento.
 - `2.7` — 2026-08-08 — Fundo da página torna-se branco no tema claro (e escuro sólido no escuro) com separação de seções pelos cards (borda 1px); padronizado o componente de **Abas** como pílulas com borda `--outline`, ativo em `--accent-container` + `--accent` (modelo do menu Preferências), sem trilho nem sombras no estado ativo.
 - `2.6` — 2026-08-02 — Documentado padrão do Modo Privacidade com botão global, valores `.money-value`/`.privacy-mask`, Glass Blur e revelação em hover/foco.

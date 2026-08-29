@@ -26,7 +26,7 @@
         }
       })();
     </script>
-    <link rel="stylesheet" href="/styles.css?v=134">
+    <link rel="stylesheet" href="/styles.css?v=136">
   </head>
   <body>
     <main class="app-shell">
@@ -219,13 +219,13 @@
             <button class="privacy-toggle-button" id="privacyToggleButton" type="button" aria-label="Ocultar valores" aria-pressed="false" title="Ocultar valores (P)">👁️</button>
           </header>
 
-        <section class="module-view" id="cockpitView">
+        <section class="module-view" id="cockpitView" aria-busy="false">
           <div class="cockpit-toolbar">
             <div class="cockpit-tabs" role="tablist" aria-label="Visões do cockpit">
               <button class="cockpit-tab active" type="button" role="tab" aria-selected="true" aria-controls="cockpitSummaryPanel" data-cockpit-tab="summary">Situação</button>
-              <button class="cockpit-tab" type="button" role="tab" aria-selected="false" aria-controls="cockpitCalendarPanel" data-cockpit-tab="calendar">Consultor</button>
-              <button class="cockpit-tab" type="button" role="tab" aria-selected="false" aria-controls="trendsPanel" data-cockpit-tab="trends">Tendências</button>
-              <button class="cockpit-tab" type="button" role="tab" aria-selected="false" aria-controls="financialHealthPanel" data-cockpit-tab="health">Saúde</button>
+              <button class="cockpit-tab" type="button" role="tab" aria-selected="false" aria-controls="cockpitCalendarPanel" data-cockpit-tab="calendar" tabindex="-1">Consultor</button>
+              <button class="cockpit-tab" type="button" role="tab" aria-selected="false" aria-controls="trendsPanel" data-cockpit-tab="trends" tabindex="-1">Tendências</button>
+              <button class="cockpit-tab" type="button" role="tab" aria-selected="false" aria-controls="financialHealthPanel" data-cockpit-tab="health" tabindex="-1">Saúde</button>
             </div>
             <div class="month-navigator cockpit-month">
               <button class="ghost small-button month-icon-button" type="button" id="previousCockpitMonthButton" aria-label="Mês anterior" title="Mês anterior">‹</button>
@@ -366,7 +366,7 @@
             <div class="consultor-workspace">
               <div class="consultor-subtabs" role="tablist" aria-label="Consultor">
                 <button class="consultor-subtab active" type="button" role="tab" aria-selected="true" aria-controls="consultorAnalysesPanel" data-consultor-tab="analyses">Análises</button>
-                <button class="consultor-subtab" type="button" role="tab" aria-selected="false" aria-controls="consultorHistoryPanel" data-consultor-tab="history">Histórico</button>
+                <button class="consultor-subtab" type="button" role="tab" aria-selected="false" aria-controls="consultorHistoryPanel" data-consultor-tab="history" tabindex="-1">Histórico</button>
               </div>
               <section class="consultor-tab-panel" id="consultorAnalysesPanel" role="tabpanel">
                 <div class="consultor-status" id="consultorStatus"></div>
@@ -943,11 +943,11 @@
           </div>
         </section>
 
-        <section class="module-view" id="portfolioView" hidden>
+        <section class="module-view" id="portfolioView" aria-busy="false" hidden>
           <div class="portfolio-tabs" role="tablist" aria-label="Visão do Portfólio">
             <button class="portfolio-tab active" type="button" role="tab" aria-selected="true" aria-controls="portfolioPositionPanel" data-portfolio-tab="position">Posição</button>
-            <button class="portfolio-tab" type="button" role="tab" aria-selected="false" aria-controls="portfolioAnalysisPanel" data-portfolio-tab="analysis">Análise</button>
-            <button class="portfolio-tab" type="button" role="tab" aria-selected="false" aria-controls="portfolioHistoryPanel" data-portfolio-tab="history">Histórico</button>
+            <button class="portfolio-tab" type="button" role="tab" aria-selected="false" aria-controls="portfolioAnalysisPanel" data-portfolio-tab="analysis" tabindex="-1">Análise</button>
+            <button class="portfolio-tab" type="button" role="tab" aria-selected="false" aria-controls="portfolioHistoryPanel" data-portfolio-tab="history" tabindex="-1">Histórico</button>
           </div>
 
           <section class="portfolio-tab-panel" id="portfolioPositionPanel" role="tabpanel" data-portfolio-panel="position">
@@ -1393,12 +1393,12 @@
             </div>
 
             <div class="report-tabs" role="tablist" aria-label="Relatórios financeiros">
-              <button class="report-tab active" type="button" data-report-tab="categories">Categorias</button>
-              <button class="report-tab" type="button" data-report-tab="subcategories">Subcategorias</button>
-              <button class="report-tab" type="button" data-report-tab="cashflow">Entradas x Saídas</button>
-              <button class="report-tab" type="button" data-report-tab="accounts">Contas</button>
-              <button class="report-tab" type="button" data-report-tab="tags">Tags</button>
-              <button class="report-tab" type="button" data-report-tab="statement">Demonstrativos</button>
+              <button class="report-tab active" type="button" role="tab" aria-selected="true" aria-controls="reportContent" data-report-tab="categories">Categorias</button>
+              <button class="report-tab" type="button" role="tab" aria-selected="false" aria-controls="reportContent" data-report-tab="subcategories" tabindex="-1">Subcategorias</button>
+              <button class="report-tab" type="button" role="tab" aria-selected="false" aria-controls="reportContent" data-report-tab="cashflow" tabindex="-1">Entradas x Saídas</button>
+              <button class="report-tab" type="button" role="tab" aria-selected="false" aria-controls="reportContent" data-report-tab="accounts" tabindex="-1">Contas</button>
+              <button class="report-tab" type="button" role="tab" aria-selected="false" aria-controls="reportContent" data-report-tab="tags" tabindex="-1">Tags</button>
+              <button class="report-tab" type="button" role="tab" aria-selected="false" aria-controls="reportContent" data-report-tab="statement" tabindex="-1">Demonstrativos</button>
             </div>
 
             <div class="report-summary">
@@ -1445,7 +1445,7 @@
           </section>
 
           <section class="panel report-content-panel">
-            <div id="reportContent" class="report-content"></div>
+            <div id="reportContent" class="report-content" role="tabpanel"></div>
           </section>
         </section>
 
@@ -1597,8 +1597,8 @@
         <section class="module-view" id="userView" hidden>
           <div class="user-pref-tabs" role="tablist" aria-label="Preferências">
             <button class="user-pref-tab active" type="button" role="tab" aria-selected="true" aria-controls="userGeneralPanel" data-user-tab="geral">Geral</button>
-            <button class="user-pref-tab" type="button" role="tab" aria-selected="false" aria-controls="userApisPanel" data-user-tab="apis">APIs</button>
-            <button class="user-pref-tab" type="button" role="tab" aria-selected="false" aria-controls="userDangerPanel" data-user-tab="perigo">Perigo</button>
+            <button class="user-pref-tab" type="button" role="tab" aria-selected="false" aria-controls="userApisPanel" data-user-tab="apis" tabindex="-1">APIs</button>
+            <button class="user-pref-tab" type="button" role="tab" aria-selected="false" aria-controls="userDangerPanel" data-user-tab="perigo" tabindex="-1">Perigo</button>
           </div>
 
           <section class="user-pref-panel" id="userGeneralPanel" role="tabpanel">
@@ -2058,7 +2058,7 @@
         </div>
       </aside>
     </main>
-    <script type="module" src="/app.js?v=136"></script>
+    <script type="module" src="/app.js?v=138"></script>
     <script async defer data-name="BMC-Widget" data-cfasync="false" src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js" data-id="sansquerh" data-description="Support me on Buy me a coffee!" data-message="Tks pelo café!" data-color="#5F7FFF" data-position="Right" data-x_margin="18" data-y_margin="18" data-container="bmc-btn-container"></script>
   </body>
 </html>

@@ -61,6 +61,7 @@ export function registerFinancialHealthView({
   async function loadFinancialHealth(month) {
     const requestId = ++financialHealthRequestId;
     loading = true;
+    financialHealthContent.setAttribute("aria-busy", "true");
     error = "";
     renderFinancialHealth(month);
     try {
@@ -78,6 +79,7 @@ export function registerFinancialHealthView({
       loading = false;
       error = err.message || "Não foi possível carregar o score de saúde financeira.";
     }
+    if (requestId === financialHealthRequestId) financialHealthContent.setAttribute("aria-busy", "false");
     renderFinancialHealth(month);
   }
 
@@ -87,6 +89,7 @@ export function registerFinancialHealthView({
     currentData = null;
     loading = false;
     error = "";
+    financialHealthContent.setAttribute("aria-busy", "false");
   }
 
   function financialHealthGauge(data) {

@@ -2,7 +2,7 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 2.9
+versao: 3.1
 atualizado: 2026-08-28
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
@@ -45,6 +45,7 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `decision-modal.js` | Modal reutilizável para decisões, confirmações explícitas e pequenos formulários. |
 | `theme-utils.js` | Preferência visual local e aplicação de tema no `documentElement`. |
 | `privacy-utils.js` | Preferência visual local de privacidade, aplicação de `data-privacy` e marcação visual de valores monetários. |
+| `tab-utils.js` | Transição progressiva e navegação roving por teclado compartilhadas por conjuntos de abas. |
 | `instructions-content.js` | Conteúdo estático, offline e versionado da central de ajuda. |
 
 ## Views funcionais
@@ -103,6 +104,11 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Os títulos de página controlados por `app.js` devem acompanhar os rótulos desambiguados da navegação para reforçar a intenção da tela ativa.
 - A troca entre módulos do dashboard deve usar `document.startViewTransition()` quando disponível, como melhoria progressiva, preservando fallback instantâneo em navegadores sem suporte.
 - A transição de visão deve respeitar `prefers-reduced-motion: reduce` e nunca aguardar chamadas de API, carregamentos remotos ou cálculos de tela para iniciar a navegação.
+- As subtabs do Cockpit devem usar View Transitions API como melhoria progressiva, com troca instantânea quando indisponível ou quando `prefers-reduced-motion: reduce` estiver ativo.
+- Durante a atualização mensal do Cockpit, a região deve anunciar `aria-busy="true"` e manter a estrutura já renderizada suavemente atenuada até a resposta mais recente, sem substituir o conteúdo por uma tela vazia.
+- As subtabs do Cockpit devem permitir navegação por teclado com setas esquerda/direita e teclas Home/End, movendo foco e seleção em conjunto.
+- Cockpit, Portfólio, Relatórios, Consultor e Preferências devem compartilhar o mesmo controlador nativo de abas para clique, setas, Home/End, `aria-selected`, `tabIndex` e transição progressiva.
+- Carregamentos assíncronos localizados devem expor `aria-busy`, preservar conteúdo útil sempre que possível e ignorar respostas obsoletas quando mês, filtro ou aba mudar antes da conclusão.
 
 ## API e dados
 
@@ -138,6 +144,11 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Dado o menu lateral com a sidebar inteira no modo ícones, quando um grupo está colapsado individualmente, então todos os itens permanecem acessíveis como ícones.
 - Dado o menu lateral, então o item **Cockpit** aparece como primeiro nível, sem o grupo **Visão geral**.
 - Dado o código do frontend versionado, quando a suíte automatizada é executada, então todos os imports locais de `app.js` resolvem e todos os módulos em `web/modules/` estão inventariados nesta spec.
+- Dado um usuário alternando Situação, Consultor, Tendências e Saúde, quando o navegador suporta View Transitions e não há preferência de redução de movimento, então o painel ativo troca com transição curta; nos demais navegadores, a troca permanece instantânea e funcional.
+- Dado uma atualização de mês em andamento no Cockpit, quando as APIs ainda não responderam, então `#cockpitView` expõe `aria-busy="true"`, preserva o painel atual com atenuação discreta e remove o estado ocupado ao concluir ou falhar a requisição mais recente.
+- Dado foco em uma subtab do Cockpit, quando o usuário pressiona seta esquerda/direita ou Home/End, então foco, `aria-selected`, `tabIndex` e painel visível são atualizados de forma coerente.
+- Dado foco em qualquer conjunto analítico de abas do Cockpit, Portfólio, Relatórios, Consultor ou Preferências, quando o usuário navega por teclado, então todos seguem o mesmo comportamento roving e respeitam redução de movimento.
+- Dado uma consulta assíncrona de Tags, Tendências, Saúde Financeira ou Portfólio, quando uma seleção posterior torna a resposta anterior obsoleta, então o resultado antigo não substitui a visão atual e o estado `aria-busy` termina de forma coerente.
 
 ## Fora de escopo
 
@@ -147,6 +158,8 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Changelog
 
+- `3.1` — 2026-08-28 — Fluidez generalizada: novo `tab-utils.js` padroniza transição e teclado em Cockpit, Portfólio, Relatórios, Consultor e Preferências; carregamentos de Portfólio, Tags, Tendências e Saúde passam a anunciar estado ocupado, com proteção adicional contra resposta obsoleta em Tags.
+- `3.0` — 2026-08-28 — Primeira etapa de fluidez do Cockpit: transição progressiva entre subtabs, estado localizado `aria-busy` durante atualização mensal, preservação visual do painel existente, redução de movimento e navegação completa por teclado.
 - `2.9` — 2026-08-28 — Inventário sincronizado com `instructions-content.js`, `instructions-view.js` e `simulations-view.js`; adicionados testes automatizados dos imports ES, do inventário documental e da ausência de artefatos de build.
 - `2.8` — 2026-08-13 — Modo ícones da sidebar compactado para caber sem rolagem em telas comuns: botões com `min-height` 36px (antes 42px), gaps reduzidos de 8px para 4px e marca com menos respiro; **Sair** e todos os itens ficam visíveis sem rolar a página.
 - `2.7` — 2026-08-13 — Navegação lateral com grupos colapsáveis: **Cadastro**, **Lançamentos**, **Gestão** e **Usuário** colapsam/expandem pelo rótulo (seta + `aria-expanded`), com preferência local persistida e abertura automática do grupo da view ativa; **Cockpit** passa a ser item de primeiro nível e o grupo **Visão geral** é removido.

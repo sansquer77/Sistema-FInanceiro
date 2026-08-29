@@ -1,6 +1,7 @@
 import { registerTrendsView } from "./trends-view.js";
 import { registerConsultorView } from "./consultor-view.js";
 import { registerFinancialHealthView } from "./financial-health-view.js";
+import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";
 
 export function registerCockpitView({
   state,
@@ -36,6 +37,7 @@ export function registerCockpitView({
     monthExpense,
     monthInvestment,
     savingsRate,
+    cockpitRoot,
     cockpitTabs,
     cockpitSummaryPanel,
     cockpitMonthLabel,
@@ -122,8 +124,9 @@ export function registerCockpitView({
     escapeHtml,
   });
 
-  cockpitTabs?.forEach((button) => {
-    button.addEventListener("click", () => setCockpitTab(button.dataset.cockpitTab || "summary"));
+  bindRovingTablist(cockpitTabs, {
+    valueFor: (button) => button.dataset.cockpitTab || "summary",
+    onSelect: setCockpitTab,
   });
   previousCockpitMonthButton?.addEventListener("click", () => setCockpitMonth(shiftMonth(cockpitMonthValue(), -1)));
   todayCockpitMonthButton?.addEventListener("click", () => setCockpitMonth(currentMonthValue()));
@@ -186,8 +189,11 @@ export function registerCockpitView({
     if (state.cockpitTab === nextTab) {
       return;
     }
-    state.cockpitTab = nextTab;
-    renderCockpitTabs();
+    const updateActivePanel = () => {
+      state.cockpitTab = nextTab;
+      renderCockpitTabs();
+    };
+    transitionView(updateActivePanel);
     if (nextTab === "calendar") {
       consultorView.renderCalendar();
     }
@@ -199,6 +205,14 @@ export function registerCockpitView({
     }
   }
 
+  function setLoading(isLoading) {
+    if (!cockpitRoot) {
+      return;
+    }
+    cockpitRoot.setAttribute("aria-busy", isLoading ? "true" : "false");
+    cockpitRoot.classList.toggle("is-refreshing", Boolean(isLoading));
+  }
+
   function activeCockpitTab() {
     const allowedTabs = new Set(["summary", "calendar", "trends", "health"]);
     return allowedTabs.has(state.cockpitTab) ? state.cockpitTab : "summary";
@@ -206,12 +220,7 @@ export function registerCockpitView({
 
   function renderCockpitTabs() {
     const activeTab = activeCockpitTab();
-    cockpitTabs?.forEach((button) => {
-      const isActive = button.dataset.cockpitTab === activeTab;
-      button.classList.toggle("active", isActive);
-      button.setAttribute("aria-selected", isActive ? "true" : "false");
-      button.tabIndex = isActive ? 0 : -1;
-    });
+    syncRovingTabState(cockpitTabs, activeTab, (button) => button.dataset.cockpitTab || "summary");
     if (cockpitSummaryPanel) {
       cockpitSummaryPanel.hidden = activeTab !== "summary";
     }
@@ -810,6 +819,7 @@ export function registerCockpitView({
     renderLimitAlerts,
     renderPortfolioMaturityAlerts,
     renderCockpitPortfolioByType,
+    setLoading,
     invalidateFinancialHealth: () => financialHealthView.invalidateFinancialHealth(),
     invalidateCalendar: () => consultorView.invalidateCalendar(),
   };

@@ -1,3 +1,5 @@
+import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";
+
 export function registerUserAdminView(context) {
   const {
     api,
@@ -19,28 +21,17 @@ export function registerUserAdminView(context) {
     if (!elements.userPrefTabs) {
       return;
     }
-    elements.userPrefTabs.querySelectorAll(".user-pref-tab").forEach((button) => {
-      const active = button.dataset.userTab === tabName;
-      button.classList.toggle("active", active);
-      button.setAttribute("aria-selected", String(active));
-    });
+    const buttons = elements.userPrefTabs.querySelectorAll(".user-pref-tab");
+    syncRovingTabState(buttons, tabName, (button) => button.dataset.userTab);
     const tabButton = elements.userPrefTabs.querySelector(`[data-user-tab="${tabName}"]`);
     const panelId = tabButton ? tabButton.getAttribute("aria-controls") : "";
-    document.querySelectorAll(".user-pref-panel").forEach((panel) => {
-      panel.hidden = true;
+    transitionView(() => {
+      document.querySelectorAll(".user-pref-panel").forEach((panel) => {
+        panel.hidden = true;
+      });
+      const panel = document.getElementById(panelId);
+      if (panel) panel.hidden = false;
     });
-    const panel = document.getElementById(panelId);
-    if (panel) {
-      panel.hidden = false;
-    }
-  }
-
-  function handleTabClick(event) {
-    const button = event.target.closest("[data-user-tab]");
-    if (!button) {
-      return;
-    }
-    switchUserTab(button.dataset.userTab);
   }
 
   function syncThemePreference() {
@@ -599,7 +590,10 @@ export function registerUserAdminView(context) {
     syncThemePreference();
   }
   if (elements.userPrefTabs) {
-    elements.userPrefTabs.addEventListener("click", handleTabClick);
+    bindRovingTablist(elements.userPrefTabs.querySelectorAll(".user-pref-tab"), {
+      valueFor: (button) => button.dataset.userTab,
+      onSelect: switchUserTab,
+    });
   }
   if (elements.maisRetornoConfigForm) {
     elements.maisRetornoConfigForm.addEventListener("submit", handleMaisRetornoConfigSubmit);

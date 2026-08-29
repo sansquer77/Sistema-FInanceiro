@@ -1273,6 +1273,65 @@ textarea:focus {
   display: none;
 }
 
+.cockpit-tab-panel:not([hidden]) {
+  view-transition-name: cockpit-active-panel;
+}
+
+#cockpitView .cockpit-tab-panel {
+  transition: opacity 160ms ease-out, transform 160ms ease-out;
+}
+
+#cockpitView.is-refreshing .cockpit-tab-panel:not([hidden]) {
+  opacity: 0.58;
+  transform: translateY(2px);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(cockpit-active-panel) {
+    animation: cockpit-panel-out 100ms ease-in both;
+  }
+
+  ::view-transition-new(cockpit-active-panel) {
+    animation: cockpit-panel-in 160ms ease-out both;
+  }
+
+  @keyframes cockpit-panel-out {
+    to { opacity: 0; transform: translateY(-3px); }
+  }
+
+  @keyframes cockpit-panel-in {
+    from { opacity: 0; transform: translateY(4px); }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #cockpitView .cockpit-tab-panel {
+    transition: none;
+  }
+}
+
+.portfolio-tab-panel:not([hidden]) { view-transition-name: portfolio-active-panel; }
+.consultor-tab-panel:not([hidden]) { view-transition-name: consultor-active-panel; }
+.user-pref-panel:not([hidden]) { view-transition-name: preferences-active-panel; }
+#reportContent { view-transition-name: report-active-panel; }
+
+.module-view.is-refreshing > :not(.portfolio-tabs),
+.report-content.is-refreshing,
+[aria-busy="true"].trends-content,
+[aria-busy="true"].financial-health-content {
+  opacity: 0.62;
+  transition: opacity 160ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .module-view.is-refreshing > :not(.portfolio-tabs),
+  .report-content.is-refreshing,
+  [aria-busy="true"].trends-content,
+  [aria-busy="true"].financial-health-content {
+    transition: none;
+  }
+}
+
 .cockpit-stack {
   display: grid;
   gap: 18px;

@@ -44,6 +44,7 @@ export function registerTrendsView({
   async function loadTrends(month) {
     const requestId = ++trendsRequestId;
     loading = true;
+    trendsContent.setAttribute("aria-busy", "true");
     error = "";
     render();
     try {
@@ -67,6 +68,7 @@ export function registerTrendsView({
       loading = false;
       error = err.message || "Não foi possível carregar as tendências.";
     }
+    if (requestId === trendsRequestId) trendsContent.setAttribute("aria-busy", "false");
     render();
   }
 

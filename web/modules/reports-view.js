@@ -1,4 +1,5 @@
 import { api } from "./api.js";
+import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";
 
 export function registerReportsView({
   state,
@@ -14,6 +15,7 @@ export function registerReportsView({
   isInstallmentTransaction,
   chartColor,
 }) {
+  let tagsRequestId = 0;
   const {
     reportMonthLabel,
     previousReportMonthButton,
@@ -36,7 +38,10 @@ export function registerReportsView({
 
   previousReportMonthButton.addEventListener("click", () => shiftReportMonth(-1));
   nextReportMonthButton.addEventListener("click", () => shiftReportMonth(1));
-  reportTabs.forEach((button) => button.addEventListener("click", () => switchReportTab(button.dataset.reportTab)));
+  bindRovingTablist(reportTabs, {
+    valueFor: (button) => button.dataset.reportTab,
+    onSelect: switchReportTab,
+  });
   reportAccountSelect.addEventListener("change", () => {
     state.reportAccountId = reportAccountSelect.value;
     renderReports();
@@ -62,8 +67,9 @@ export function registerReportsView({
   reportContent.addEventListener("click", handleReportContentClick);
 
   function renderReports() {
+    if (state.reportTab !== "tags") tagsRequestId += 1;
     reportMonthLabel.textContent = formatMonthShortLabel(state.reportMonth);
-    reportTabs.forEach((button) => button.classList.toggle("active", button.dataset.reportTab === state.reportTab));
+    syncRovingTabState(reportTabs, state.reportTab, (button) => button.dataset.reportTab);
     renderReportAccountOptions();
     const items = reportItemsForMonth(state.reportMonth);
     const totals = reportTotals(items);
@@ -201,11 +207,16 @@ export function registerReportsView({
   async function renderTagsReport() {
     // spec: relatorios/relatorios v2.16 — relatório de tags agrupado por tag com
     // Receitas, Despesas, Saldo e Investimentos, separados por moeda.
+    const requestId = ++tagsRequestId;
+    const requestedMonth = state.reportMonth;
+    reportContent.setAttribute("aria-busy", "true");
+    reportContent.classList.add("is-refreshing");
     reportContent.innerHTML = '<div class="empty-state compact">Carregando relatório de tags...</div>';
     try {
       const url = new URL("/api/reports/tags", window.location.origin);
       url.searchParams.set("month", state.reportMonth);
       const response = await api(url.pathname + url.search);
+      if (requestId !== tagsRequestId || state.reportTab !== "tags" || state.reportMonth !== requestedMonth) return;
       const rows = response.tags || [];
       if (!rows.length) {
         reportContent.innerHTML = '<div class="empty-state compact">Nenhum lançamento com tag neste mês.</div>';
@@ -245,7 +256,13 @@ export function registerReportsView({
         </div>
       `;
     } catch (error) {
+      if (requestId !== tagsRequestId) return;
       reportContent.innerHTML = `<div class="empty-state compact">Não foi possível carregar o relatório de tags: ${escapeHtml(error.message)}</div>`;
+    } finally {
+      if (requestId === tagsRequestId) {
+        reportContent.setAttribute("aria-busy", "false");
+        reportContent.classList.remove("is-refreshing");
+      }
     }
   }
 
@@ -1298,8 +1315,11 @@ export function registerReportsView({
   }
 
   function switchReportTab(tab) {
-    state.reportTab = tab;
-    renderReports();
+    if (!tab || tab === state.reportTab) return;
+    transitionView(() => {
+      state.reportTab = tab;
+      renderReports();
+    });
   }
 
   function handleReportContentClick(event) {

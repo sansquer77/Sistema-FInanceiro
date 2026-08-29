@@ -420,6 +420,7 @@ const monthIncome = document.querySelector("#monthIncome");
 const monthExpense = document.querySelector("#monthExpense");
 const monthInvestment = document.querySelector("#monthInvestment");
 const savingsRate = document.querySelector("#savingsRate");
+const cockpitRoot = document.querySelector("#cockpitView");
 const cockpitTabs = document.querySelectorAll("[data-cockpit-tab]");
 const cockpitSummaryPanel = document.querySelector("#cockpitSummaryPanel");
 const cockpitMonthLabel = document.querySelector("#cockpitMonthLabel");
@@ -693,6 +694,7 @@ const cockpitView = registerCockpitView({
     monthExpense,
     monthInvestment,
     savingsRate,
+    cockpitRoot,
     cockpitTabs,
     cockpitSummaryPanel,
     cockpitMonthLabel,
@@ -1434,39 +1436,47 @@ async function refreshCockpitData() {
   const requestId = ++state.cockpitRefreshRequestId;
   const month = cockpitMonthValue();
   if (state.cockpit && state.cockpitLoadedMonth === month) {
+    cockpitView.setLoading(false);
     renderCockpit();
     return;
   }
-  const [
-    accountsResponse,
-    transactionsResponse,
-    cardTransactionsResponse,
-    cardPaymentsResponse,
-    cockpitResponse,
-    spendingLimitsResponse,
-  ] = await Promise.all([
-    api("/api/checking-accounts"),
-    fetchAllListed("/api/transactions", "transactions"),
-    fetchAllListed("/api/credit-card-transactions", "transactions"),
-    fetchAllListed("/api/credit-card-payments", "payments"),
-    api(`/api/cockpit?month=${encodeURIComponent(month)}`),
-    api(`/api/spending-limits?month=${encodeURIComponent(month)}`),
-  ]);
-  if (requestId !== state.cockpitRefreshRequestId) {
-    return;
-  }
-  state.accounts = accountsResponse.accounts || [];
-  ensureSelectedAccount();
-  state.transactions = transactionsResponse || [];
-  state.cardTransactions = cardTransactionsResponse || [];
-  state.cardPayments = cardPaymentsResponse || [];
-  state.cockpit = cockpitResponse;
-  state.cockpitLoadedMonth = month;
-  state.currentSpendingLimits = spendingLimitsResponse.limits || [];
-  invalidateFinancialHealth();
-  renderBaseViews();
-  if (state.view === "cockpit") {
-    renderCockpit();
+  cockpitView.setLoading(true);
+  try {
+    const [
+      accountsResponse,
+      transactionsResponse,
+      cardTransactionsResponse,
+      cardPaymentsResponse,
+      cockpitResponse,
+      spendingLimitsResponse,
+    ] = await Promise.all([
+      api("/api/checking-accounts"),
+      fetchAllListed("/api/transactions", "transactions"),
+      fetchAllListed("/api/credit-card-transactions", "transactions"),
+      fetchAllListed("/api/credit-card-payments", "payments"),
+      api(`/api/cockpit?month=${encodeURIComponent(month)}`),
+      api(`/api/spending-limits?month=${encodeURIComponent(month)}`),
+    ]);
+    if (requestId !== state.cockpitRefreshRequestId) {
+      return;
+    }
+    state.accounts = accountsResponse.accounts || [];
+    ensureSelectedAccount();
+    state.transactions = transactionsResponse || [];
+    state.cardTransactions = cardTransactionsResponse || [];
+    state.cardPayments = cardPaymentsResponse || [];
+    state.cockpit = cockpitResponse;
+    state.cockpitLoadedMonth = month;
+    state.currentSpendingLimits = spendingLimitsResponse.limits || [];
+    invalidateFinancialHealth();
+    renderBaseViews();
+    if (state.view === "cockpit") {
+      renderCockpit();
+    }
+  } finally {
+    if (requestId === state.cockpitRefreshRequestId) {
+      cockpitView.setLoading(false);
+    }
   }
 }
 
