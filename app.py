@@ -97,7 +97,7 @@ from financeiro.financial_health import (
 )
 from financeiro.imports import import_legacy_transactions, import_system_template, system_import_template
 from financeiro.operation_logs import create_operation_log, get_operation_log, list_operation_logs
-from financeiro.portfolio import close_position, create_opening_position, current_portfolio_positions, delete_opening_position, fetch_fund_quote_for_user, get_portfolio, get_portfolio_returns, redeem_position, update_opening_position, update_position_value_override
+from financeiro.portfolio import close_position, create_opening_position, current_portfolio_positions, delete_opening_position, delete_position_value_override, fetch_fund_quote_for_user, get_portfolio, get_portfolio_returns, redeem_position, update_opening_position, update_position_value_override
 from financeiro.portfolio import PortfolioError
 from financeiro.reports import build_tag_report
 from financeiro.secure_config import (
@@ -523,6 +523,9 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path.startswith("/api/portfolio/positions/"):
             self.handle_delete_portfolio_position()
+            return
+        if path == "/api/portfolio/value":
+            self.handle_delete_portfolio_value_override()
             return
         if path.startswith("/api/checking-accounts/"):
             self.handle_archive_account()
@@ -1063,6 +1066,17 @@ class AppHandler(BaseHTTPRequestHandler):
             "Valor de portfolio atualizado", None,
             account_id=data.get("account_id"),
             metadata={"asset_type": data.get("asset_type"), "quote_date": data.get("quote_date")},
+        )
+        self.send_json(result)
+
+    def handle_delete_portfolio_value_override(self) -> None:
+        user = self.require_user()
+        data = self.read_json()
+        result = delete_position_value_override(user["id"], data)
+        self.record_operation(
+            user["id"], "portfolio", "update", "portfolio_position",
+            "Cotacao automatica de portfolio restaurada", None,
+            account_id=data.get("account_id"), metadata={"asset_type": data.get("asset_type")},
         )
         self.send_json(result)
 

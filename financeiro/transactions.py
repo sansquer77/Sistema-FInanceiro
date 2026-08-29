@@ -16,7 +16,8 @@ from financeiro.classification_suggestions import normalize_description
 from financeiro.database import begin_immediate, get_connection, row_to_dict
 
 TRANSACTION_TYPES = {"income", "expense", "transfer", "investment"}
-INVESTMENT_ASSET_TYPES = {"stock", "crypto", "fund", "fixed_income", "private_pension", "savings", "other"}
+INVESTMENT_ASSET_TYPES = {"stock", "crypto", "stablecoin", "fund", "fixed_income", "private_pension", "savings", "other"}
+STABLECOIN_ASSETS = {"USDC", "USDT", "DAI", "FDUSD", "PYUSD", "TUSD", "USDP", "USDE"}
 FIXED_INCOME_MODES = {"pre", "post", "hybrid"}
 SERIES_KINDS = {"single", "installment", "recurring"}
 RECURRENCE_FREQUENCIES = {"weekly", "monthly", "quarterly", "semiannual", "annual"}
@@ -742,7 +743,8 @@ def normalize_investment_operation(data: dict, amount_cents: int, transaction_ty
     elif category == "Renda Variável":
         asset_type = "stock"
     elif category == "Criptoativos":
-        asset_type = "crypto"
+        identifier = str(data.get("investment_asset_identifier") or "").strip().upper().replace("/", "-").split("-", 1)[0]
+        asset_type = "stablecoin" if identifier in STABLECOIN_ASSETS else "crypto"
     elif category == "Fundos de Investimentos":
         asset_type = "fund"
     elif category == "Renda Fixa":
@@ -788,7 +790,7 @@ def normalize_investment_asset_hint(category: str, subcategory: str, asset_ident
 
 
 def normalize_investment_emergency_reserve_eligible(data: dict, asset_type: str) -> int:
-    # spec: investimentos/investimentos-portfolio v2.31 — critérios 21 e 23
+    # spec: investimentos/investimentos-portfolio v2.36 — critérios 21 e 23
     if asset_type not in {"fixed_income", "savings"}:
         return 0
     return 1 if str(data.get("investment_emergency_reserve_eligible") or "").strip().lower() in {"1", "true", "on", "yes"} else 0

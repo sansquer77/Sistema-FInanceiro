@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 11.74
-atualizado: 2026-08-28
+versao: 11.83
+atualizado: 2026-08-29
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -134,6 +134,15 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `11.83` — 2026-08-29 — [[specs/investimentos-portfolio]] v2.36 revalida o Portfólio ao retornar à tela, sem exigir recarga manual nem forçar atualização externa de cotações.
+- `11.82` — 2026-08-29 — [[specs/investimentos-portfolio]] v2.35 torna visível o processamento e a conclusão do retorno à cotação automática.
+- `11.81` — 2026-08-29 — [[specs/investimentos-portfolio]] v2.34 e [[arquitetura]] v3.44 corrigem a restauração automática de VWRA com o símbolo Yahoo `VWRA.L`.
+- `11.80` — 2026-08-29 — [[specs/investimentos-portfolio]] v2.33 e [[arquitetura]] v3.43 adicionam retorno explícito de valor manual para cotação automática.
+- `11.79` — 2026-08-29 — Versão `1.7.1`: [[specs/investimentos-portfolio]] v2.32 adiciona Stablecoin como classe própria, com cotação pela moeda da carteira e compatibilidade legada; [[requisitos]] v2.6 e [[arquitetura]] v3.42 sincronizados.
+- `11.78` — 2026-08-29 — [[specs/frontend-modularizacao]] v4.2 mantém o resumo pré-salvamento recolhido em lançamentos à vista e o expande em operações repetidas.
+- `11.77` — 2026-08-29 — [[specs/frontend-modularizacao]] v4.1 corrige o resumo pré-salvamento para ignorar estado inicial e campos condicionais ocultos.
+- `11.76` — 2026-08-29 — [[specs/frontend-modularizacao]] v4.0 e [[design/design-system]] v3.9 consolidam os seis padrões finais de UX.
+- `11.75` — 2026-08-29 — [[specs/frontend-modularizacao]] v3.9 e [[design/design-system]] v3.8 padronizam estados loading, erro, vazio e informação em toda a interface.
 - `11.74` — 2026-08-28 — [[specs/frontend-modularizacao]] v3.8 e [[design/design-system]] v3.7 adicionam densidade visual configurável e persistida localmente.
 - `11.73` — 2026-08-28 — [[specs/frontend-modularizacao]] v3.7 e [[design/design-system]] v3.6 adicionam busca global local e preservação de contexto por módulo.
 - `11.72` — 2026-08-28 — [[specs/frontend-modularizacao]] v3.6 e [[design/design-system]] v3.5 mantêm abas de Portfólio/Preferências visíveis e alinham offsets sticky ao cabeçalho global.

@@ -1,4 +1,5 @@
 import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";
+import { setLastUpdated, stateMarkup } from "./dom-utils.js";
 
 export function registerPortfolioView({
   state,
@@ -26,6 +27,7 @@ export function registerPortfolioView({
   const {
     addPortfolioAssetButton,
     refreshPortfolioButton,
+    portfolioLastUpdated,
     portfolioAssetFormPanel,
     portfolioAssetForm,
     portfolioAssetFormTitle,
@@ -156,7 +158,7 @@ export function registerPortfolioView({
   }
 
   async function loadPortfolio(options = {}) {
-    if (state.portfolio && !state.portfolioDirty && !options.force && !options.refreshMessage) {
+    if (state.portfolio && !state.portfolioDirty && !options.force && !options.refreshMessage && !options.revalidate) {
       renderPortfolio();
       onPortfolioChanged();
       return;
@@ -180,6 +182,7 @@ export function registerPortfolioView({
     if (portfolioResult.status === "fulfilled") {
       state.portfolio = portfolioResult.value;
       state.portfolioDirty = false;
+      setLastUpdated(portfolioLastUpdated);
       if (options.refreshMessage) {
         setMessage(portfolioMessage, "Portfólio atualizado.", "success");
       }
@@ -256,7 +259,7 @@ export function registerPortfolioView({
   function resetPortfolioAssetForm() {
     portfolioAssetForm.reset();
     portfolioAssetForm.elements.id.value = "";
-    // spec: investimentos-portfolio v2.31 — criterio 48
+    // spec: investimentos-portfolio v2.36 — criterio 48
     portfolioAssetForm.elements.exchange_rate_to_brl.value = "";
     portfolioAssetFormTitle.textContent = "Ativo em carteira";
     deletePortfolioAssetButton.hidden = true;
@@ -538,8 +541,8 @@ export function registerPortfolioView({
       portfolioIndexerList.innerHTML = "";
       portfolioCurrencyList.innerHTML = "";
       portfolioAccountList.innerHTML = "";
-      portfolioPositions.innerHTML = '<div class="empty-state">Nenhuma posição de investimento encontrada.</div>';
-      portfolioHistory.innerHTML = '<div class="empty-state compact">Nenhuma posição encerrada.</div>';
+      portfolioPositions.innerHTML = stateMarkup("Adicione um ativo ou registre um aporte para formar a carteira.", { kind: "empty", compact: false });
+      portfolioHistory.innerHTML = stateMarkup("Posições encerradas aparecerão aqui após um resgate total.", { kind: "empty" });
       return;
     }
     renderPortfolioSummary(portfolio.summary);
@@ -852,7 +855,7 @@ export function registerPortfolioView({
 
   function renderPortfolioGroupList(container, rows) {
     if (!rows || rows.length === 0) {
-      container.innerHTML = '<div class="empty-state compact">Sem dados para consolidar.</div>';
+      container.innerHTML = stateMarkup("Carregue ou cadastre posições para visualizar esta consolidação.", { kind: "empty" });
       return;
     }
     const chartTotal = portfolioGroupChartTotal(rows);
@@ -893,7 +896,7 @@ export function registerPortfolioView({
 
   function renderPortfolioPositions(positions) {
     if (positions.length === 0) {
-      portfolioPositions.innerHTML = '<div class="empty-state">Lance uma compra de investimento para formar o portfólio.</div>';
+      portfolioPositions.innerHTML = stateMarkup("Lance uma compra de investimento ou adicione uma posição inicial.", { kind: "empty", compact: false });
       return;
     }
     const grouped = groupPortfolioPositions(positions);
@@ -980,6 +983,11 @@ export function registerPortfolioView({
       editPortfolioCurrentValue(JSON.parse(editValueButton.dataset.editPortfolioValuePayload));
       return;
     }
+    const automaticQuoteButton = event.target.closest("[data-restore-automatic-quote-payload]");
+    if (automaticQuoteButton) {
+      restoreAutomaticQuote(JSON.parse(automaticQuoteButton.dataset.restoreAutomaticQuotePayload), automaticQuoteButton);
+      return;
+    }
     const redeemButton = event.target.closest("[data-redeem-portfolio-payload]");
     if (redeemButton) {
       redeemPortfolioPosition(JSON.parse(redeemButton.dataset.redeemPortfolioPayload));
@@ -1036,7 +1044,7 @@ export function registerPortfolioView({
 
   function renderPortfolioHistory(history) {
     if (!history.length) {
-      portfolioHistory.innerHTML = '<div class="empty-state compact">Nenhuma posição encerrada.</div>';
+      portfolioHistory.innerHTML = stateMarkup("Posições encerradas aparecerão aqui após um resgate total.", { kind: "empty" });
       return;
     }
     portfolioHistory.innerHTML = `
@@ -1242,6 +1250,9 @@ export function registerPortfolioView({
     const quoteStatus = position.quote_status === "ok" ? position.quote_source : position.quote_status;
     const quoteText = portfolioQuoteText(position);
     const quoteStatusLabel = quoteStatus || "Pendente";
+    const automaticQuoteAction = position.manual_value_override
+      ? `<button class="portfolio-automatic-quote-button" type="button" data-restore-automatic-quote-payload="${escapeHtml(JSON.stringify(portfolioValuePayload(position)))}">Voltar à automática</button>`
+      : "";
     const maturityAlert = portfolioMaturityAlert(position);
     const identifier = position.asset_identifier || position.asset_name || "Sem codigo";
     const assetName = position.asset_name || identifier;
@@ -1297,7 +1308,7 @@ export function registerPortfolioView({
         <td class="money-cell">${formatDecimal(position.quantity, 6)}</td>
         <td class="money-cell">${formatMoney(position.average_price, position.currency)}</td>
         <td class="money-cell">${formatMoney(position.total_cost, position.currency)}${portfolioSecondaryMoney(position.total_cost, position.total_cost_brl, position.currency)}</td>
-        <td class="money-cell portfolio-quote-cell"><span class="portfolio-primary">${quoteText}</span><span title="${escapeHtml(quoteStatusLabel)}">${escapeHtml(quoteStatusLabel)}</span></td>
+        <td class="money-cell portfolio-quote-cell"><span class="portfolio-primary">${quoteText}</span><span title="${escapeHtml(quoteStatusLabel)}">${escapeHtml(quoteStatusLabel)}</span>${automaticQuoteAction}</td>
         <td class="money-cell">${formatMoney(position.current_value_cents / 100, position.currency)}${valueDetail}</td>
         <td class="money-cell ${dayResult < 0 ? "danger-text" : "positive-text"}">${formatMoney(dayResult, position.currency)}<span>${formatPercent(dayPercent)}</span></td>
         <td class="money-cell ${result < 0 ? "danger-text" : "positive-text"}">${formatMoney(result, position.currency)}<span>${formatPercent(resultPercent)}</span></td>
@@ -1324,7 +1335,7 @@ export function registerPortfolioView({
     `;
   }
 
-  // spec: investimentos-portfolio v2.31 — criterio 47
+  // spec: investimentos-portfolio v2.36 — criterio 47
   function portfolioEmergencyShieldIcon() {
     return '<svg class="portfolio-emergency-shield" viewBox="0 0 24 24" width="12" height="12" role="img" aria-label="Reserva de emergência" title="Reserva de emergência" fill="currentColor"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5l8-3z"/></svg>';
   }
@@ -1535,6 +1546,43 @@ export function registerPortfolioView({
       onPortfolioChanged();
       setMessage(portfolioMessage, "Valor atual do portfólio atualizado.", "success");
     } catch (error) {
+      setMessage(portfolioMessage, error.message, "error");
+    }
+  }
+
+  async function restoreAutomaticQuote(position, triggerButton) {
+    const decision = await decisionModal.choose({
+      title: "Voltar à cotação automática",
+      message: "O valor manual será removido e a posição voltará a usar a fonte automática disponível.",
+      actions: [
+        { value: "restore", label: "Usar cotação automática", variant: "primary" },
+        { value: null, label: "Voltar", variant: "ghost" },
+      ],
+    });
+    if (decision !== "restore") return;
+    const quoteCell = triggerButton.closest(".portfolio-quote-cell");
+    triggerButton.disabled = true;
+    triggerButton.textContent = "Atualizando...";
+    quoteCell?.setAttribute("aria-busy", "true");
+    quoteCell?.classList.add("is-refreshing");
+    setMessage(portfolioMessage, "Restaurando cotação automática...");
+    try {
+      const response = await api("/api/portfolio/value", {
+        method: "DELETE",
+        body: portfolioValuePayload(position),
+      });
+      state.portfolio = response;
+      state.portfolioDirty = false;
+      state.portfolioReturns = null;
+      renderPortfolio();
+      setLastUpdated(portfolioLastUpdated);
+      onPortfolioChanged();
+      setMessage(portfolioMessage, "Cotação automática restaurada.", "success");
+    } catch (error) {
+      triggerButton.disabled = false;
+      triggerButton.textContent = "Voltar à automática";
+      quoteCell?.removeAttribute("aria-busy");
+      quoteCell?.classList.remove("is-refreshing");
       setMessage(portfolioMessage, error.message, "error");
     }
   }

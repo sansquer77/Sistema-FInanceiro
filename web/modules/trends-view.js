@@ -1,4 +1,5 @@
 // spec: tendencias-saude-financeira v2.22 — critérios 1, 2, 3, 4, 5, 6, 7, 10, 12, 13, 14, 16, 17, 20, 21, 25, 26, 27, 28, 32, 33 e 34
+import { stateMarkup } from "./dom-utils.js";
 export function registerTrendsView({
   elements,
   api,
@@ -102,15 +103,15 @@ export function registerTrendsView({
     }
     renderMeta();
     if (loading && !currentData) {
-      trendsContent.innerHTML = '<div class="empty-state compact">Carregando tendências...</div>';
+      trendsContent.innerHTML = stateMarkup("Analisando receitas, despesas e limites do período.", { kind: "loading" });
       return;
     }
     if (error && !currentData) {
-      trendsContent.innerHTML = `<div class="empty-state compact">${escapeHtml(error)}</div>`;
+      trendsContent.innerHTML = stateMarkup(error, { kind: "error" });
       return;
     }
     if (!currentData) {
-      trendsContent.innerHTML = '<div class="empty-state compact">Selecione um mês para ver as tendências.</div>';
+      trendsContent.innerHTML = stateMarkup("Selecione um mês para visualizar tendências e comparações.", { kind: "info" });
       return;
     }
     trendsContent.innerHTML = `
@@ -408,7 +409,7 @@ export function registerTrendsView({
       return `
         <section class="trends-budget-section">
           <h3>Budget x Realizado</h3>
-          <div class="empty-state compact">Nenhum limite de gasto configurado para este mês.</div>
+          ${stateMarkup("Cadastre limites de gasto para comparar orçamento e realizado.", { kind: "empty" })}
         </section>
       `;
     }
@@ -458,7 +459,7 @@ export function registerTrendsView({
       return `
         <section class="trends-findings-section">
           <h3>Tendências e achados</h3>
-          <div class="empty-state compact">Nenhum achado para o mês selecionado.</div>
+          ${stateMarkup("Selecione outro mês ou aguarde novos dados para gerar achados.", { kind: "empty" })}
         </section>
       `;
     }

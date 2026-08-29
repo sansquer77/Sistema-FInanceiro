@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.41
-atualizado: 2026-08-28
+versao: 3.44
+atualizado: 2026-08-29
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -213,6 +213,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `POST` | `/api/portfolio/redeem` |
 | `POST` | `/api/portfolio/close` |
 | `PUT` | `/api/portfolio/value` |
+| `DELETE` | `/api/portfolio/value` |
 
 #### Rotas — Cockpit e Relatórios → [[relatorios]]
 
@@ -444,7 +445,7 @@ Ver [[cartoes]].
 ### Portfólio de Investimentos
 
 1. Carteira consolidada unindo posições iniciais e operações em contas de investimento.
-2. Cotações de Renda Variável e Cripto buscadas de APIs externas (Yahoo Finance / CoinGecko) e cacheadas em `quote_cache`, com cache em memória limitado e limpeza de expirados.
+2. Cotações de Renda Variável, Cripto e Stablecoin são buscadas de APIs externas (Yahoo Finance / CoinGecko) e cacheadas em `quote_cache`; Stablecoins constituem classe própria, mas usam o par definido pela moeda da conta e posições legadas conhecidas são reclassificadas em leitura. Tickers internacionais que exigem código de bolsa usam aliases explícitos e testados, como `VWRA`/USD → `VWRA.L`.
 3. Rendimentos de Renda Fixa pós-fixados/híbridos indexados via SGS/BCB, com fallback local.
 4. Valor líquido projetado aplicando tributação regressiva de IOF e IR baseada no tempo de aquisição.
 5. Poupança tratada como ativo próprio com aniversários; Previdência Privada como `private_pension`.
@@ -513,6 +514,9 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.44` — 2026-08-29 — Resolvedor do Yahoo passa a aceitar alias explícito de bolsa para VWRA em USD (`VWRA.L`).
+- `3.43` — 2026-08-29 — `DELETE /api/portfolio/value` remove o override manual de uma posição e recarrega sua cotação automática.
+- `3.42` — 2026-08-29 — Portfólio passa a distinguir Stablecoins de criptoativos voláteis, preservando cotação pela moeda da conta e compatibilidade de posições legadas.
 - `3.41` — 2026-08-28 — Efeito Borboleta substitui cortes semanais por `daily_projection` de 15 dias e `daily_projection_summary`, identificando a primeira data negativa e se o cenário causa ou evita o risco; `weekly_projection` permanece como alias transitório. Ver [[specs/efeito-borboleta]] v1.5.
 - `3.40` — 2026-08-28 — Inventário arquitetural sincronizado com `decision-modal.js`, `theme-utils.js`, `privacy-utils.js`, `simulations-view.js` e `financeiro/reports.py`; despacho das rotas `GET` de perfil e coleções passa a exigir caminho exato. Ver [[specs/frontend-modularizacao]] v2.9 e [[specs/seguranca-autenticacao]] v1.4.
 - `3.39` — 2026-08-23 — Relatórios: nova rota `GET /api/reports/tags?month=AAAA-MM` e módulo `financeiro/reports.py` responsáveis pelo agrupamento por tag com Receitas, Despesas, Saldo e Investimentos; `web/modules/reports-view.js` renderiza a tabela a partir do backend. Ver [[specs/relatorios]] v2.13.

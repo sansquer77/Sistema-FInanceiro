@@ -87,6 +87,17 @@ export function createDecisionModal() {
       if (event.key === "Escape") {
         event.preventDefault();
         finish(null);
+      } else if (event.key === "Tab") {
+        const focusable = [...modal.querySelectorAll("button, input, select, textarea")].filter((element) => !element.disabled);
+        const first = focusable[0];
+        const last = focusable.at(-1);
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first?.focus();
+        }
       }
     }
 

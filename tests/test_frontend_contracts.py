@@ -190,6 +190,65 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("min-height: 36px", styles)
         self.assertNotIn(':root[data-density="compact"] {\n  font-size:', styles)
 
+    def test_async_and_empty_states_share_semantic_component(self) -> None:
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+        dom_utils = (MODULE_ROOT / "dom-utils.js").read_text(encoding="utf-8")
+
+        self.assertIn('loading: { title: "Carregando"', dom_utils)
+        self.assertIn('error: { title: "Não foi possível concluir"', dom_utils)
+        self.assertIn('empty: { title: "Nada por aqui ainda"', dom_utils)
+        self.assertIn('role: "alert", live: "assertive"', dom_utils)
+        self.assertIn('aria-busy="true"', dom_utils)
+        self.assertIn('class="ui-state empty-state state-loading compact"', index)
+        self.assertIn(".state-error", styles)
+        self.assertIn("@keyframes ui-state-spin", styles)
+        self.assertIn("@media (prefers-reduced-motion: reduce)", styles)
+        raw_states = []
+        for path in MODULE_ROOT.glob("*.js"):
+            source = path.read_text(encoding="utf-8")
+            if '<div class="empty-state' in source:
+                raw_states.append(path.name)
+        self.assertEqual(raw_states, [], f"Estados HTML fora do helper compartilhado: {raw_states}")
+
+    def test_final_ux_contracts_are_shared_and_accessible(self) -> None:
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        app_source = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+        dom_utils = (MODULE_ROOT / "dom-utils.js").read_text(encoding="utf-8")
+        overlay_utils = (MODULE_ROOT / "overlay-utils.js").read_text(encoding="utf-8")
+        data_ux = (MODULE_ROOT / "data-ux.js").read_text(encoding="utf-8")
+
+        self.assertIn("initializeOverlayUX();", app_source)
+        self.assertIn("initializeDataUX();", app_source)
+        self.assertIn('event.key === "Escape"', overlay_utils)
+        self.assertIn('event.key !== "Tab"', overlay_utils)
+        self.assertIn('overlay.setAttribute("aria-modal", "true")', overlay_utils)
+        self.assertIn("showToast(text)", dom_utils)
+        self.assertIn("form-operation-summary", dom_utils)
+        self.assertIn("let interacted = false", dom_utils)
+        self.assertIn('document.createElement("details")', dom_utils)
+        self.assertIn('seriesKind === "single"', dom_utils)
+        self.assertIn("summary.open = !isSimple", dom_utils)
+        self.assertIn("queueMicrotask(update)", dom_utils)
+        self.assertIn("!control.disabled", dom_utils)
+        self.assertIn('!control.closest("[hidden]")', dom_utils)
+        self.assertIn('aria-sort', data_ux)
+        self.assertIn("active-filter-chip", data_ux)
+        self.assertIn('id="cockpitLastUpdated"', index)
+        self.assertIn('id="portfolioLastUpdated"', index)
+        self.assertIn('data-progressive-form data-operation-summary', index)
+        self.assertIn(".report-table td:first-child", styles)
+        self.assertIn(".toast-region", styles)
+        portfolio = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
+        self.assertIn("data-restore-automatic-quote-payload", portfolio)
+        self.assertIn('method: "DELETE"', portfolio)
+        self.assertIn('triggerButton.textContent = "Atualizando..."', portfolio)
+        self.assertIn('quoteCell?.setAttribute("aria-busy", "true")', portfolio)
+        self.assertIn("!options.revalidate", portfolio)
+        self.assertIn("loadPortfolio({ revalidate: true })", app_source)
+        self.assertIn("portfolio-automatic-quote-button", styles)
+
 
 if __name__ == "__main__":
     unittest.main()

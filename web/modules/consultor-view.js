@@ -1,5 +1,6 @@
 // spec: cockpit-calendario v0.8 — critérios 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17 e 18
 // spec: consultor/consultor v1.7 — view de análises, histórico e integração com o calendário
+import { stateMarkup } from "./dom-utils.js";
 export function registerConsultorView({
   elements,
   api,
@@ -67,7 +68,7 @@ export function registerConsultorView({
       consultorConfig = { available: false, blocked_reason: "load_error", cards: [] };
       consultorHistory = [];
       if (consultorStatus) {
-        consultorStatus.innerHTML = `<div class="empty-state compact">${escapeHtml(err.message || "Falha ao carregar Consultor.")}</div>`;
+        consultorStatus.innerHTML = stateMarkup(err.message || "Falha ao carregar o Consultor.", { kind: "error" });
       }
     } finally {
       consultorLoading = false;
@@ -108,7 +109,7 @@ export function registerConsultorView({
         setAllContainers(emptyState(error, true));
         return;
       }
-      setAllContainers(emptyState("Carregando dados do calendário...", true));
+      setAllContainers(emptyState("Consultando vencimentos e contas em atraso.", true, "loading"));
       return;
     }
     const cards = [
@@ -162,7 +163,7 @@ export function registerConsultorView({
       return;
     }
     if (consultorLoading && !consultorConfig) {
-      consultorStatus.innerHTML = '<div class="empty-state compact">Carregando Consultor...</div>';
+      consultorStatus.innerHTML = stateMarkup("Preparando análises e calendário financeiro.", { kind: "loading" });
       consultorCardGrid.innerHTML = "";
       renderConsultorHistory();
       return;
@@ -236,7 +237,7 @@ export function registerConsultorView({
       consent_required: "Aceite o consentimento de dados em Preferências > APIs para usar o Consultor.",
       load_error: "Não foi possível carregar o Consultor agora.",
     };
-    return `<div class="empty-state compact">${escapeHtml(messages[config.blocked_reason] || "Consultor indisponível.")}</div>`;
+    return stateMarkup(messages[config.blocked_reason] || "Consultor indisponível.", { kind: "info" });
   }
 
   function renderAnalysisSelector(cards) {
@@ -247,7 +248,7 @@ export function registerConsultorView({
     // usa apenas 6/12 meses)
     const card = cards.find((item) => item.analysis_id === selectedAnalysisId);
     if (!card) {
-      return '<div class="empty-state compact">Nenhuma análise disponível.</div>';
+      return stateMarkup("Ative ou configure o Consultor para disponibilizar análises.", { kind: "empty" });
     }
     const isRunning = runningAnalysisId === card.analysis_id;
     const periodOptions = card.requires_period_window ? getPeriodWindowOptions(card) : [];
@@ -306,7 +307,7 @@ export function registerConsultorView({
     } catch (err) {
       if (consultorOutput) {
         consultorOutput.hidden = false;
-        consultorOutput.innerHTML = `<div class="empty-state compact">${escapeHtml(err.message || "O Consultor está indisponível no momento.")}</div>`;
+        consultorOutput.innerHTML = stateMarkup(err.message || "O Consultor está indisponível no momento.", { kind: "error" });
       }
     } finally {
       runningAnalysisId = "";
@@ -334,11 +335,11 @@ export function registerConsultorView({
     }
     const filteredHistory = filteredConsultorHistory();
     if (!consultorHistory.length) {
-      consultorHistoryList.innerHTML = '<div class="empty-state compact">Nenhuma análise gerada ainda.</div>';
+      consultorHistoryList.innerHTML = stateMarkup("Escolha uma análise para iniciar o histórico do Consultor.", { kind: "empty" });
       return;
     }
     if (!filteredHistory.length) {
-      consultorHistoryList.innerHTML = '<div class="empty-state compact">Nenhuma análise encontrada para o filtro.</div>';
+      consultorHistoryList.innerHTML = stateMarkup("Remova ou altere o filtro para visualizar outras análises.", { kind: "empty" });
       return;
     }
     consultorHistoryList.innerHTML = filteredHistory.map((item) => `

@@ -32,7 +32,7 @@
         }
       })();
     </script>
-    <link rel="stylesheet" href="/styles.css?v=142">
+    <link rel="stylesheet" href="/styles.css?v=147">
   </head>
   <body>
     <main class="app-shell">
@@ -244,6 +244,7 @@
               <button class="ghost small-button month-icon-button" type="button" id="todayCockpitMonthButton" aria-label="Mês atual" title="Mês atual">●</button>
               <button class="ghost small-button month-icon-button" type="button" id="nextCockpitMonthButton" aria-label="Próximo mês" title="Próximo mês">›</button>
             </div>
+            <time class="last-updated" id="cockpitLastUpdated"></time>
           </div>
 
           <div class="cockpit-tab-panel" id="cockpitSummaryPanel" role="tabpanel">
@@ -399,7 +400,10 @@
               <div class="trends-meta" id="trendsMeta"></div>
             </div>
             <div class="trends-content" id="trendsContent">
-              <div class="empty-state compact">Carregando tendências...</div>
+              <div class="ui-state empty-state state-loading compact" role="status" aria-live="polite" aria-busy="true">
+                <span class="ui-state-icon" aria-hidden="true">↻</span>
+                <span class="ui-state-copy"><strong>Carregando</strong><span>Analisando receitas, despesas e limites do período.</span></span>
+              </div>
             </div>
           </section>
 
@@ -411,7 +415,10 @@
               </div>
             </div>
             <div class="financial-health-content" id="financialHealthContent">
-              <div class="empty-state compact">Carregando score de saúde financeira...</div>
+              <div class="ui-state empty-state state-loading compact" role="status" aria-live="polite" aria-busy="true">
+                <span class="ui-state-icon" aria-hidden="true">↻</span>
+                <span class="ui-state-copy"><strong>Carregando</strong><span>Calculando os indicadores de saúde financeira.</span></span>
+              </div>
             </div>
           </section>
         </section>
@@ -619,7 +626,7 @@
           <div class="workspace card-transaction-workspace">
             <section class="panel launch-form-sticky">
               <h2 id="cardTransactionFormTitle">Novo lançamento no cartão</h2>
-              <form id="cardTransactionForm" class="form">
+              <form id="cardTransactionForm" class="form" data-progressive-form data-operation-summary>
                 <input type="hidden" name="id">
                 <input type="hidden" name="credit_card_id">
                 <input type="hidden" name="invoice_month">
@@ -716,7 +723,7 @@
           <div class="workspace">
             <section class="transaction-form-panel launch-form-sticky">
               <h2 id="transactionFormTitle">Novo lançamento</h2>
-              <form id="transactionForm" class="form">
+              <form id="transactionForm" class="form" data-progressive-form data-operation-summary>
                 <input type="hidden" name="id">
                 <label>Conta
                   <select name="account_id" id="transactionAccount" required></select>
@@ -959,6 +966,7 @@
             <div class="section-heading">
               <h2>Resumo da carteira</h2>
               <div class="card-actions">
+                <time class="last-updated" id="portfolioLastUpdated"></time>
                 <button class="ghost small-button" type="button" id="addPortfolioAssetButton">Adicionar ativo</button>
                 <button class="ghost small-button" type="button" id="refreshPortfolioButton">Atualizar cotações</button>
               </div>
@@ -997,7 +1005,7 @@
           </section>
 
           <!-- Portfolio Return Drawer -->
-          <aside id="portfolioReturnDrawer" class="drawer portfolio-return-drawer" hidden aria-hidden="true">
+          <aside id="portfolioReturnDrawer" class="drawer portfolio-return-drawer" hidden aria-hidden="true" aria-labelledby="portfolioReturnDrawerTitle">
             <div class="drawer-overlay" id="portfolioReturnDrawerOverlay"></div>
             <div class="drawer-content">
               <header class="drawer-header">
@@ -1029,7 +1037,7 @@
             <div class="section-heading">
               <h2 id="portfolioAssetFormTitle">Ativo em carteira</h2>
             </div>
-            <form id="portfolioAssetForm" class="form">
+            <form id="portfolioAssetForm" class="form" data-progressive-form data-operation-summary>
               <input type="hidden" name="id">
               <div class="field-row">
                 <label>Carteira
@@ -1044,6 +1052,7 @@
                   <select name="asset_type" id="portfolioAssetType">
                     <option value="stock">Ações / ETFs / BDRs</option>
                     <option value="crypto">Cripto</option>
+                    <option value="stablecoin">Stablecoin</option>
                     <option value="fund">Fundo de investimento</option>
                     <option value="fixed_income">Renda fixa</option>
                     <option value="private_pension">Previdência privada</option>
@@ -1534,58 +1543,58 @@
               <label>De
                 <input id="operationHistoryDateFrom" name="date_from" type="date">
               </label>
-              <label>Ate
+              <label>Até
                 <input id="operationHistoryDateTo" name="date_to" type="date">
               </label>
-              <label>Modulo
+              <label>Módulo
                 <select id="operationHistoryModule" name="module">
                   <option value="">Todos</option>
                   <option value="accounts">Contas</option>
-                  <option value="transactions">Lancamentos</option>
-                  <option value="cards">Cartoes</option>
-                  <option value="portfolio">Portfolio</option>
-                  <option value="imports">Importacao</option>
+                  <option value="transactions">Lançamentos</option>
+                  <option value="cards">Cartões</option>
+                  <option value="portfolio">Portfólio</option>
+                  <option value="imports">Importação</option>
                   <option value="classifications">Categorias</option>
                   <option value="limits">Limites</option>
-                  <option value="user_admin">Usuario</option>
+                  <option value="user_admin">Usuário</option>
                 </select>
               </label>
               <label>Tipo
                 <select id="operationHistoryType" name="operation_type">
                   <option value="">Todos</option>
-                  <option value="create">Criacao</option>
-                  <option value="update">Atualizacao</option>
-                  <option value="delete">Exclusao</option>
+                  <option value="create">Criação</option>
+                  <option value="update">Atualização</option>
+                  <option value="delete">Exclusão</option>
                   <option value="archive">Arquivamento</option>
-                  <option value="restore">Restauracao</option>
-                  <option value="reconcile">Conciliacao</option>
-                  <option value="unreconcile">Desconciliacao</option>
+                  <option value="restore">Restauração</option>
+                  <option value="reconcile">Conciliação</option>
+                  <option value="unreconcile">Desconciliação</option>
                   <option value="move">Movimento</option>
                   <option value="pay">Pagamento</option>
-                  <option value="import">Importacao</option>
+                  <option value="import">Importação</option>
                   <option value="redeem">Resgate</option>
                   <option value="close">Encerramento</option>
-                  <option value="value_update">Atualizacao de valor</option>
+                  <option value="value_update">Atualização de valor</option>
                   <option value="clear">Limpeza</option>
                 </select>
               </label>
               <label>Conta
                 <select id="operationHistoryAccount" name="account_id"></select>
               </label>
-              <label>Cartao
+              <label>Cartão
                 <select id="operationHistoryCard" name="credit_card_id"></select>
               </label>
               <label>Agrupar por
                 <select id="operationHistoryGroupBy" name="group_by">
                   <option value="date">Data</option>
-                  <option value="module">Modulo</option>
+                  <option value="module">Módulo</option>
                   <option value="type">Tipo</option>
                   <option value="account">Conta</option>
-                  <option value="card">Cartao</option>
+                  <option value="card">Cartão</option>
                 </select>
               </label>
               <label>Busca
-                <input name="q" type="search" placeholder="Descricao, lote, entidade">
+                <input name="q" type="search" placeholder="Descrição, lote, entidade">
               </label>
               <button class="primary" type="submit">Filtrar</button>
             </form>
@@ -1593,6 +1602,7 @@
           </section>
 
           <section class="panel operation-history-panel">
+            <p class="data-table-count" id="operationHistoryCount" aria-live="polite"></p>
             <div id="operationHistoryList" class="operation-history-list"></div>
             <button class="ghost" id="operationHistoryLoadMoreButton" type="button" hidden>Carregar mais</button>
           </section>
@@ -1993,7 +2003,7 @@
       </section>
 
       <!-- Cockpit Forecast Drawer -->
-      <aside id="forecastDrawer" class="drawer" hidden aria-hidden="true">
+      <aside id="forecastDrawer" class="drawer" hidden aria-hidden="true" aria-labelledby="forecastDrawerTitle">
         <div class="drawer-overlay" id="forecastDrawerCloseOverlay"></div>
         <div class="drawer-content">
           <header class="drawer-header">
@@ -2027,7 +2037,7 @@
       </aside>
 
       <!-- Category Evolution Drawer -->
-      <aside id="evolutionDrawer" class="drawer" hidden aria-hidden="true">
+      <aside id="evolutionDrawer" class="drawer" hidden aria-hidden="true" aria-labelledby="evolutionDrawerTitle">
         <div class="drawer-overlay" id="evolutionDrawerCloseOverlay"></div>
         <div class="drawer-content">
           <header class="drawer-header">
@@ -2082,7 +2092,7 @@
       </label>
       <div class="global-search-results" id="globalSearchResults" role="listbox" aria-label="Resultados da busca"></div>
     </dialog>
-    <script type="module" src="/app.js?v=143"></script>
+    <script type="module" src="/app.js?v=151"></script>
     <script async defer data-name="BMC-Widget" data-cfasync="false" src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js" data-id="sansquerh" data-description="Support me on Buy me a coffee!" data-message="Tks pelo café!" data-color="#5F7FFF" data-position="Right" data-x_margin="18" data-y_margin="18" data-container="bmc-btn-container"></script>
   </body>
 </html>

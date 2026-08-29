@@ -2,6 +2,7 @@ import { registerTrendsView } from "./trends-view.js";
 import { registerConsultorView } from "./consultor-view.js";
 import { registerFinancialHealthView } from "./financial-health-view.js";
 import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";
+import { stateMarkup } from "./dom-utils.js";
 
 const COCKPIT_DISCLOSURE_KEY = "sf-cockpit-disclosures-v1";
 
@@ -480,7 +481,7 @@ export function registerCockpitView({
 
   function planningCurrencyGroups(rows) {
     if (!rows.length) {
-      return '<div class="empty-state compact">Nada previsto neste mês.</div>';
+      return stateMarkup("Cadastre lançamentos previstos ou selecione outro mês.", { kind: "empty" });
     }
     const currencies = new Map();
     for (const item of rows) {
@@ -544,7 +545,7 @@ export function registerCockpitView({
             <h3>Total em aberto desde ${escapeHtml(formatMonthLabel(currentMonth))}</h3>
             <strong class="danger-text">${formatMoney(0, "BRL")}</strong>
           </div>
-          <div class="empty-state compact">Nenhuma compra parcelada em aberto.</div>
+          ${stateMarkup("Compras parceladas em aberto aparecerão nesta seção.", { kind: "empty" })}
         </section>
       `;
       return;
@@ -801,16 +802,16 @@ export function registerCockpitView({
       return;
     }
     if (!state.portfolio && state.portfolioDirty) {
-      cockpitPortfolioByType.innerHTML = '<div class="empty-state compact">Atualizando portfólio...</div>';
+      cockpitPortfolioByType.innerHTML = stateMarkup("Atualizando posições e cotações do portfólio.", { kind: "loading" });
       loadPortfolio();
       return;
     }
     if (state.portfolioLoading) {
-      cockpitPortfolioByType.innerHTML = '<div class="empty-state compact">Atualizando portfólio...</div>';
+      cockpitPortfolioByType.innerHTML = stateMarkup("Atualizando posições e cotações do portfólio.", { kind: "loading" });
       return;
     }
     if (state.portfolioError) {
-      cockpitPortfolioByType.innerHTML = `<div class="empty-state compact">${escapeHtml(state.portfolioError)}</div>`;
+      cockpitPortfolioByType.innerHTML = stateMarkup(state.portfolioError, { kind: "error" });
       return;
     }
     if (state.portfolio && state.portfolioDirty && !state.portfolioLoading) {
@@ -818,7 +819,7 @@ export function registerCockpitView({
     }
     const rows = state.portfolio && state.portfolio.summary ? state.portfolio.summary.by_type || [] : [];
     if (rows.length === 0) {
-      cockpitPortfolioByType.innerHTML = '<div class="empty-state compact">Nenhum investimento em carteira.</div>';
+      cockpitPortfolioByType.innerHTML = stateMarkup("Adicione uma posição ou registre um aporte para acompanhar o portfólio.", { kind: "empty" });
       return;
     }
     const totalsByCurrency = portfolioTotalsByCurrency(rows);

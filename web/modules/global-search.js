@@ -1,3 +1,5 @@
+import { stateMarkup } from "./dom-utils.js";
+
 export function registerGlobalSearch({ state, elements, viewTitles, normalizeSearch, escapeHtml, onNavigate }) {
   const { trigger, dialog, input, results, closeButton } = elements;
   let visibleItems = [];
@@ -40,7 +42,7 @@ export function registerGlobalSearch({ state, elements, viewTitles, normalizeSea
             <em>${escapeHtml(item.section)}</em>
           </button>
         `).join("")
-      : '<div class="empty-state compact">Nenhum resultado nos dados carregados.</div>';
+      : stateMarkup("Revise o termo ou carregue o módulo que contém o dado procurado.", { kind: "empty" });
   }
 
   function handleInputKeydown(event) {

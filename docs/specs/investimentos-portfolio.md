@@ -2,8 +2,8 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.31
-atualizado: 2026-08-22
+versao: 2.36
+atualizado: 2026-08-29
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -16,7 +16,7 @@ aliases: ["Investimentos", "Portfólio"]
 # Investimentos e Portfólio
 
 > [!info] Status
-> **implementado** · área: `investimentos` · atualizado em 2026-08-22 · relacionados: [[contas-correntes]], [[lancamentos]], [[relatorios]]
+> **implementado** · área: `investimentos` · atualizado em 2026-08-29 · relacionados: [[contas-correntes]], [[lancamentos]], [[relatorios]]
 
 ## Problema
 
@@ -40,6 +40,7 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 |---|---|
 | Ações / ETFs / BDRs | `stock` |
 | Criptoativos | `crypto` |
+| Stablecoins | `stablecoin` |
 | Fundos | `fund` |
 | Renda Fixa | `fixed_income` |
 | Previdência Privada | `private_pension` |
@@ -93,6 +94,9 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 **Renda Variável / Criptos:**
 - Cotações via Yahoo Finance (ações/fundos) e CoinGecko/Yahoo (criptoativos).
 - Criptos usam pares de cotação na moeda do ativo/carteira (ex.: BTC/BRL ou BTC/USD).
+- Stablecoins usam classe própria (`stablecoin`), separada de criptoativos voláteis, mas reutilizam as mesmas fontes de cotação. A moeda contábil e o par de cotação continuam definidos pela conta/carteira: uma posição em carteira BRL usa USDC/BRL; em carteira USD usa USDC/USD.
+- USDC, USDT, DAI, FDUSD, PYUSD, TUSD, USDP e USDE cadastrados anteriormente como `crypto` são classificados como Stablecoin na leitura, sem migração destrutiva; novas posições e aportes conhecidos persistem como `stablecoin`.
+- Ativos internacionais cujo ticker operacional precisa de sufixo de bolsa podem usar alias explícito do provedor; `VWRA` em carteira USD resolve para `VWRA.L` (London Stock Exchange, listagem USD) no Yahoo Finance.
 - A quantidade exibida em posições, origens e posições encerradas é normalizada com **até 2 casas decimais** (arredondamento `half-up`), independentemente da precisão cadastrada ou retornada pela cotação, para preservar o layout das tabelas.
 
 **Fundos (`fund`):**
@@ -133,6 +137,7 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 | `POST` | `/api/portfolio/redeem` |
 | `POST` | `/api/portfolio/close` |
 | `PUT` | `/api/portfolio/value` |
+| `DELETE` | `/api/portfolio/value` |
 
 Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emergency_reserve_eligible` para posições/aportes elegíveis), `investment_redemptions`, `investment_closed_positions`, `investment_value_overrides`, `transactions`, `checking_accounts`, `quote_cache`. A configuração da integração Mais Retorno vive em `secure_configs` (ver [[preferencias-abas]]).
 
@@ -199,9 +204,21 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado o usuário cadastrando posição inicial no Portfólio, quando seleciona **Previdência Privada**, então o campo CNPJ opcional aparece com o mesmo comportamento dos Fundos de investimento e o valor preenchido é persistido na posição.
 - Dado uma posição marcada como reserva de emergência, quando a aba **Posição** é exibida, então a coluna **Tipo** mostra um ícone pequeno de escudo ao lado do tipo do ativo, com tooltip "Reserva de emergência", sem alterar a largura nem a área da tabela.
 - Dado uma posição inicial em moeda estrangeira sem cotação manual, quando criada, então a taxa de conversão é a última PTAX de venda disponível até a data de aquisição (comportamento igual a Lançamentos), sem gravar taxa fixa `1,0`; o formulário de posição não envia mais o valor padrão `1,0`.
+- Dado USDC, USDT ou outra stablecoin reconhecida em uma conta BRL ou USD, quando o Portfólio é carregado, então a posição aparece na classe Stablecoin e usa o par de cotação da moeda da conta, mantendo a consolidação secundária em BRL.
+- Dado uma posição legada de stablecoin persistida como `crypto`, quando ela é lida, então o sistema a reclassifica de forma compatível como `stablecoin`, sem alterar BTC, ETH ou outros criptoativos voláteis.
+- Dado uma posição com ajuste manual, quando exibida, então a célula de cotação oferece uma ação contextual pequena para voltar à fonte automática; após confirmação, o override é removido e a cotação disponível é consultada novamente.
+- Dado uma posição sem ajuste manual, quando exibida, então a ação de voltar à cotação automática não ocupa espaço na tabela.
+- Dado VWRA em uma carteira USD, quando a cotação automática é consultada ou restaurada, então o resolvedor usa `VWRA.L` e preserva USD como moeda contábil da posição.
+- Dado o usuário confirmando o retorno à cotação automática, enquanto a consulta é processada, então o botão muda para `Atualizando...`, fica desabilitado e a célula anuncia estado ocupado; ao concluir, o botão desaparece e um toast confirma a restauração sem recarregar a página inteira.
+- Dado o usuário saindo do Portfólio e retornando à tela, quando o módulo é reaberto, então o app revalida os dados persistidos no backend sem forçar nova consulta externa de cotações, mantendo removido o botão de retorno automático após a restauração.
 
 ## Changelog
 
+- `2.36` — 2026-08-29 — Entrada no Portfólio passa a revalidar o estado persistido sem atualizar forçadamente as fontes externas, eliminando dados antigos após navegar para outro módulo e voltar.
+- `2.35` — 2026-08-29 — Restauração da cotação automática ganha feedback localizado durante a consulta, atualização do horário e confirmação por toast sem perder o contexto da rolagem.
+- `2.34` — 2026-08-29 — Correção do retorno automático de VWRA: ticker em carteira USD passa a resolver para a listagem `VWRA.L` da London Stock Exchange no Yahoo Finance.
+- `2.33` — 2026-08-29 — Posições com valor manual ganham ação contextual na célula de cotação para remover o override e restaurar imediatamente a fonte automática.
+- `2.32` — 2026-08-29 — Stablecoins ganham classe própria no Portfólio, herdam a moeda de cotação da carteira e posições legadas conhecidas são reclassificadas em leitura sem migração destrutiva.
 - `2.31` — 2026-08-22 — Flyover de rentabilidade mensal ampliado e refinado visualmente em SVG nativo; ver [[rentabilidade-portfolio]] v1.7.
 - `2.30` — 2026-08-20 — Sincronizada a data do callout de status com o frontmatter; sem alteração de comportamento.
 - `2.29` — 2026-08-11 — Posição inicial em moeda estrangeira sem cotação manual passa a usar a última PTAX de venda até a data de aquisição (antes gravava taxa fixa `1,0`, distorcendo valores em BRL do Portfólio); formulário de posição deixa de enviar `1,0` como padrão.

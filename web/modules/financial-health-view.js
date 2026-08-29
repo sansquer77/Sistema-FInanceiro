@@ -1,4 +1,5 @@
 // spec: score-saude-financeira v3.6 — critérios 15, 16, 17, 22, 23, 24, 25, 26, 27, 28, 29, 30 e 31
+import { stateMarkup } from "./dom-utils.js";
 export function registerFinancialHealthView({
   elements,
   api,
@@ -30,7 +31,9 @@ export function registerFinancialHealthView({
       if (!loading && !error) {
         loadFinancialHealth(month);
       }
-      financialHealthContent.innerHTML = `<div class="empty-state compact">${escapeHtml(error || "Carregando score de saúde financeira...")}</div>`;
+      financialHealthContent.innerHTML = error
+        ? stateMarkup(error, { kind: "error" })
+        : stateMarkup("Calculando os indicadores de saúde financeira.", { kind: "loading" });
       return;
     }
     const data = currentData;

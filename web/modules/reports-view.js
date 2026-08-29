@@ -1,4 +1,5 @@
 import { api } from "./api.js";
+import { stateMarkup } from "./dom-utils.js";
 import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";
 
 export function registerReportsView({
@@ -211,7 +212,7 @@ export function registerReportsView({
     const requestedMonth = state.reportMonth;
     reportContent.setAttribute("aria-busy", "true");
     reportContent.classList.add("is-refreshing");
-    reportContent.innerHTML = '<div class="empty-state compact">Carregando relatório de tags...</div>';
+    reportContent.innerHTML = stateMarkup("Consolidando os lançamentos classificados com tags.", { kind: "loading" });
     try {
       const url = new URL("/api/reports/tags", window.location.origin);
       url.searchParams.set("month", state.reportMonth);
@@ -219,7 +220,7 @@ export function registerReportsView({
       if (requestId !== tagsRequestId || state.reportTab !== "tags" || state.reportMonth !== requestedMonth) return;
       const rows = response.tags || [];
       if (!rows.length) {
-        reportContent.innerHTML = '<div class="empty-state compact">Nenhum lançamento com tag neste mês.</div>';
+        reportContent.innerHTML = stateMarkup("Adicione tags aos lançamentos ou selecione outro mês.", { kind: "empty" });
         return;
       }
       const body = rows.map((row) => {
@@ -257,7 +258,7 @@ export function registerReportsView({
       `;
     } catch (error) {
       if (requestId !== tagsRequestId) return;
-      reportContent.innerHTML = `<div class="empty-state compact">Não foi possível carregar o relatório de tags: ${escapeHtml(error.message)}</div>`;
+      reportContent.innerHTML = stateMarkup(`Não foi possível carregar o relatório de tags: ${error.message}`, { kind: "error" });
     } finally {
       if (requestId === tagsRequestId) {
         reportContent.setAttribute("aria-busy", "false");
@@ -342,7 +343,7 @@ export function registerReportsView({
   function renderAccountsReport() {
     const account = state.accounts.find((entry) => String(entry.id) === String(state.reportAccountId));
     if (!account) {
-      reportContent.innerHTML = '<div class="empty-state">Cadastre uma conta para visualizar este relatório.</div>';
+      reportContent.innerHTML = stateMarkup("Cadastre uma conta para visualizar este relatório.", { kind: "empty", compact: false });
       return;
     }
     const items = state.transactions
@@ -410,7 +411,7 @@ export function registerReportsView({
           <div class="report-detail" data-report-detail hidden>${reportItemDetails(row.items)}</div>
         </article>
       `;
-    }).join("") : `<div class="empty-state compact">${emptyText}</div>`;
+    }).join("") : stateMarkup(emptyText, { kind: "empty" });
     return `
       <section class="report-section">
         <div class="section-heading">
@@ -495,7 +496,7 @@ export function registerReportsView({
       reportContent.innerHTML = `
         <article class="monthly-statement">
           ${statementHeader(statementScopeInfo(), "BRL", new Date())}
-          <div class="empty-state compact">Sem despesas no período para o escopo selecionado.</div>
+          ${stateMarkup("Selecione outro período ou amplie o escopo de contas e cartões.", { kind: "empty" })}
         </article>
       `;
       return;
@@ -655,10 +656,10 @@ export function registerReportsView({
 
   function statementDonutChart(rows, total, currencyInfo) {
     if (!rows.length || total <= 0) {
-      return '<div class="empty-state compact">Sem despesas no período.</div>';
+      return stateMarkup("Selecione outro período ou escopo para compor o gráfico.", { kind: "empty" });
     }
     if (!currencyInfo.single) {
-      return '<div class="empty-state compact">Gráfico disponível quando o escopo usa uma única moeda.</div>';
+      return stateMarkup("Selecione uma única moeda para visualizar este gráfico.", { kind: "info" });
     }
     const topRows = rows.slice(0, 5);
     const topTotal = topRows.reduce((sum, row) => sum + singleCurrencyTotal(row.totals), 0);
@@ -696,7 +697,7 @@ export function registerReportsView({
 
   function statementDailyBars(items, currencyInfo) {
     if (!currencyInfo.single) {
-      return '<div class="empty-state compact">Histograma disponível quando o escopo usa uma única moeda.</div>';
+      return stateMarkup("Selecione uma única moeda para visualizar o histograma.", { kind: "info" });
     }
     const days = monthDayRows(state.reportMonth);
     const totals = new Map(days.map((day) => [day, 0]));
@@ -738,7 +739,7 @@ export function registerReportsView({
 
   function statementCompositionTable(rows, totalMap) {
     if (!rows.length) {
-      return '<div class="empty-state compact">Sem composição para o período.</div>';
+      return stateMarkup("Não há composição de despesas no período selecionado.", { kind: "empty" });
     }
     return `
       <div class="report-table-wrap">
@@ -757,7 +758,7 @@ export function registerReportsView({
 
   function statementDetailTable(items) {
     if (!items.length) {
-      return '<div class="empty-state compact">Sem lançamentos no período.</div>';
+      return stateMarkup("Selecione outro período ou registre lançamentos para gerar o demonstrativo.", { kind: "empty" });
     }
     const rows = items.slice().sort((a, b) => a.date.localeCompare(b.date) || b.amount - a.amount).map((item) => `
       <tr>

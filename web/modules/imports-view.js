@@ -1,3 +1,5 @@
+import { stateMarkup } from "./dom-utils.js";
+
 export function registerImportsView({
   state,
   elements,
@@ -95,7 +97,7 @@ export function registerImportsView({
             </article>
           `).join("")}
         </div>
-      ` : '<div class="empty-state compact">Nenhuma linha ignorada.</div>'}
+      ` : stateMarkup("Todas as linhas válidas foram processadas sem descarte.", { kind: "info", title: "Importação concluída" })}
     `;
   }
 

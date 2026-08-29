@@ -1,3 +1,5 @@
+import { stateMarkup } from "./dom-utils.js";
+
 export function registerTransactionsView({
   state,
   elements,
@@ -702,7 +704,7 @@ export function registerTransactionsView({
     }
     const account = state.accounts.find((entry) => String(entry.id) === String(state.selectedAccountId));
     if (!account) {
-      transactionBalanceHistoryChart.innerHTML = '<div class="empty-state compact">Selecione uma conta para ver a projeção de saldo.</div>';
+      transactionBalanceHistoryChart.innerHTML = stateMarkup("Selecione uma conta para visualizar a projeção de saldo.", { kind: "info" });
       return;
     }
     const transactions = selectedAccountTransactions(state.transactions.length ? state.transactions : state.accountTransactions);

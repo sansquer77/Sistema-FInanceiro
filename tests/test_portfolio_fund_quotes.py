@@ -10,16 +10,23 @@ from urllib.request import Request
 from unittest import mock
 
 from financeiro import database
-from financeiro.database import initialize_database
+from financeiro.accounts import create_checking_account
+from financeiro.auth import create_user
+from financeiro.database import get_connection, initialize_database
 from financeiro.portfolio import (
     QUOTE_MEMORY_CACHE,
     PortfolioError,
     apply_fund_quote,
+    apply_market_quote,
+    delete_position_value_override,
+    effective_asset_type,
     fetch_fund_quote_for_user,
     fetch_mais_retorno_quote,
     mais_retorno_fund_identifier,
+    normalize_asset_identifier,
     quote_positions,
     seconds_until_end_of_day,
+    yahoo_symbol,
 )
 
 
@@ -69,6 +76,62 @@ class IsolatedDatabaseMixin(unittest.TestCase):
 
 
 class FundQuoteApplicationTest(IsolatedDatabaseMixin):
+    def test_vwra_usd_resolves_to_london_yahoo_symbol(self) -> None:
+        # spec: investimentos/investimentos-portfolio v2.36 — critério 53
+        self.assertEqual(yahoo_symbol({
+            "asset_type": "stock", "asset_identifier": "VWRA", "currency": "USD",
+        }), "VWRA.L")
+
+    def test_manual_override_can_return_to_automatic_even_after_legacy_reclassification(self) -> None:
+        # spec: investimentos/investimentos-portfolio v2.36 — critérios 51 e 52
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Coinbase", "bank_name": "Coinbase", "account_type": "investment", "currency": "BRL",
+        })
+        with get_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO investment_value_overrides (
+                    user_id, account_id, asset_type, asset_identifier, asset_name, cnpj,
+                    fixed_income_indexer, fixed_income_maturity_date, current_value_cents, quote_date
+                ) VALUES (?, ?, 'crypto', 'USDC', 'USD Coin', '', '', '', 10000, '2026-08-29')
+                """,
+                (user["id"], account["id"]),
+            )
+
+        delete_position_value_override(user["id"], {
+            "account_id": account["id"], "asset_type": "stablecoin", "asset_identifier": "USDC",
+            "asset_name": "USD Coin", "cnpj": "", "fixed_income_indexer": "",
+            "fixed_income_maturity_date": "", "quote_date": "2026-08-29",
+        })
+
+        with get_connection() as conn:
+            remaining = conn.execute("SELECT COUNT(*) FROM investment_value_overrides WHERE user_id = ?", (user["id"],)).fetchone()[0]
+        self.assertEqual(remaining, 0)
+
+    def test_stablecoins_have_own_class_and_keep_account_quote_currency(self) -> None:
+        # spec: investimentos/investimentos-portfolio v2.36 — critérios 49 e 50
+        self.assertEqual(effective_asset_type("crypto", "USDC-BRL"), "stablecoin")
+        self.assertEqual(effective_asset_type("crypto", "BTC-BRL"), "crypto")
+        self.assertEqual(normalize_asset_identifier("USDT-USD", "stablecoin"), "USDT")
+        position = {
+            **fund_position(currency="USD"),
+            "asset_type": "stablecoin",
+            "asset_identifier": "USDC",
+            "quantity": Decimal("10"),
+        }
+        with (
+            mock.patch(
+                "financeiro.portfolio.fetch_crypto_quote",
+                return_value={"price_cents": 100, "day_change_cents": 0, "date": "2026-08-29", "source": "teste"},
+            ) as fetch_quote,
+            mock.patch("financeiro.portfolio.value_to_brl", side_effect=lambda value, _currency: value),
+        ):
+            apply_market_quote(position)
+
+        fetch_quote.assert_called_once_with("USDC", "USD", force_refresh=False)
+        self.assertEqual(position["current_value_cents"], 1000)
+
 
     def test_fund_with_cnpj_brl_and_key_uses_mais_retorno_quote(self) -> None:
         # spec: preferencias-abas v0.5 — critério 9

@@ -38,6 +38,7 @@ FX_MEMORY_CACHE_MAX_ENTRIES = 128
 ASSET_TYPE_LABELS = {
     "stock": "Renda variável",
     "crypto": "Cripto",
+    "stablecoin": "Stablecoin",
     "fund": "Fundos",
     "fixed_income": "Renda fixa",
     "private_pension": "Previdência privada",
@@ -64,6 +65,7 @@ INDEXER_FALLBACK_ANNUAL_RATES = {
     "TR": Decimal("0.0100"),
 }
 CRYPTO_ASSETS = {"BTC", "ETH", "SOL", "USDC", "USDT"}
+STABLECOIN_ASSETS = {"USDC", "USDT", "DAI", "FDUSD", "PYUSD", "TUSD", "USDP", "USDE"}
 CRYPTO_ALIASES = {
     "BITCOIN": "BTC",
     "ETHEREUM": "ETH",
@@ -95,6 +97,9 @@ CRYPTO_QUOTE_SYMBOLS = {
     },
 }
 CRYPTO_QUOTE_SUFFIXES = ("BRL", "USD", "USDT", "USDC")
+YAHOO_SYMBOL_ALIASES = {
+    ("VWRA", "USD"): "VWRA.L",
+}
 
 
 class PortfolioError(Exception):
@@ -402,6 +407,21 @@ def update_position_value_override(user_id: int, data: dict) -> dict:
     return get_portfolio(user_id)
 
 
+def delete_position_value_override(user_id: int, data: dict) -> dict:
+    selector = normalize_position_value_override_payload({**data, "current_value": "0"})
+    selector_key = portfolio_override_key(selector)
+    with get_connection() as conn:
+        rows = conn.execute("SELECT * FROM investment_value_overrides WHERE user_id = ?", (user_id,)).fetchall()
+        matching_ids = [row["id"] for row in rows if portfolio_override_key(row_to_dict(row)) == selector_key]
+        if not matching_ids:
+            raise PortfolioError("Ajuste manual nao encontrado.", HTTPStatus.NOT_FOUND)
+        conn.executemany(
+            "DELETE FROM investment_value_overrides WHERE id = ? AND user_id = ?",
+            [(override_id, user_id) for override_id in matching_ids],
+        )
+    return get_portfolio(user_id, force_refresh=True)
+
+
 def delete_opening_position(user_id: int, position_id: object) -> dict:
     normalized_id = normalize_id(position_id, "Posicao nao encontrada.")
     with get_connection() as conn:
@@ -418,7 +438,7 @@ def delete_opening_position(user_id: int, position_id: object) -> dict:
 
 
 def redeem_position(user_id: int, data: dict) -> dict:
-    # spec: investimentos-portfolio v2.31 — criterio 9
+    # spec: investimentos-portfolio v2.36 — criterio 9
     # (em posicao com multiplas origens, o consumo do resgate segue FIFO pela
     #  data da primeira operacao — candidates.sort abaixo garante essa ordem)
     selector = normalize_redemption_selector(data)
@@ -680,7 +700,7 @@ def close_position(user_id: int, data: dict) -> dict:
 
 
 def should_register_closing_credit(data: dict) -> bool:
-    # spec: investimentos-portfolio v2.31 — criterios 10-11
+    # spec: investimentos-portfolio v2.36 — criterios 10-11
     # (a opcao de credito e opt-in explicito e vem desmarcada por padrao no
     #  formulario, justamente para evitar duplicidade com resgates ja lancados)
     return str(data.get("register_credit") or "").strip().lower() in {"1", "true", "on", "yes", "sim"}
@@ -883,14 +903,15 @@ def common_value(positions: list[dict], key: str) -> str:
 
 
 def format_closed_position(row: dict) -> dict:
+    asset_type = effective_asset_type(row["asset_type"], row["asset_identifier"])
     result_percent = Decimal(int(row["result_percent_micros"] or 0)) / Decimal("10000")
     return {
         "id": row["id"],
         "account_id": row["account_id"],
         "account_name": row.get("account_name") or "",
         "currency": row["currency"],
-        "asset_type": row["asset_type"],
-        "asset_type_label": ASSET_TYPE_LABELS.get(row["asset_type"], "Outros"),
+        "asset_type": asset_type,
+        "asset_type_label": ASSET_TYPE_LABELS.get(asset_type, "Outros"),
         "asset_identifier": row["asset_identifier"],
         "asset_name": row["asset_name"],
         "cnpj": row["cnpj"],
@@ -943,6 +964,8 @@ def normalize_opening_position_payload(data: dict) -> dict:
     asset_type = str(data.get("asset_type") or "other").strip().lower()
     if asset_type not in ASSET_TYPE_LABELS:
         raise PortfolioError("Tipo de investimento invalido.")
+    asset_identifier = empty_to_none(data.get("asset_identifier"))
+    asset_type = effective_asset_type(asset_type, asset_identifier)
     acquisition_date = normalize_date(data.get("acquisition_date"))
     quantity = decimal_to_micros(data.get("quantity"))
     unit_price_cents = money_to_cents(data.get("unit_price", "0")) if str(data.get("unit_price") or "").strip() else 0
@@ -963,10 +986,11 @@ def normalize_opening_position_payload(data: dict) -> dict:
             total_cost_cents = anniversary_total_cents
         if not empty_to_none(data.get("asset_identifier")):
             data["asset_identifier"] = "POUPANCA"
+            asset_identifier = "POUPANCA"
     return {
         "account_id": account_id,
         "asset_type": asset_type,
-        "asset_identifier": empty_to_none(data.get("asset_identifier")),
+        "asset_identifier": asset_identifier,
         "asset_name": empty_to_none(data.get("asset_name")),
         "cnpj": empty_to_none(data.get("cnpj")),
         "acquisition_date": acquisition_date,
@@ -986,7 +1010,7 @@ def normalize_opening_position_payload(data: dict) -> dict:
 
 
 def normalize_emergency_reserve_eligible(data: dict, asset_type: str) -> int:
-    # spec: investimentos/investimentos-portfolio v2.31 — critérios 20 e 21
+    # spec: investimentos/investimentos-portfolio v2.36 — critérios 20 e 21
     if asset_type not in {"fixed_income", "savings"}:
         return 0
     return 1 if str(data.get("emergency_reserve_eligible") or "").strip().lower() in {"1", "true", "on", "yes"} else 0
@@ -1074,7 +1098,7 @@ def parse_savings_anniversaries(value: object, fallback_date: object, fallback_a
 
 
 def consume_savings_anniversaries_fifo(entries: list[dict], redeemed_cost_cents: int) -> list[dict]:
-    # spec: investimentos-portfolio v2.31 — criterio poupanca-resgate-fifo
+    # spec: investimentos-portfolio v2.36 — criterio poupanca-resgate-fifo
     # (resgates de poupanca consomem primeiro os aniversarios mais antigos para
     # manter a base de rentabilidade alinhada ao saldo remanescente por lote)
     remaining_redeemed = max(int(redeemed_cost_cents or 0), 0)
@@ -1150,10 +1174,11 @@ def apply_value_overrides(user_id: int, positions: list[dict]) -> None:
 
 
 def portfolio_override_key(row: dict) -> tuple:
+    asset_type = effective_asset_type(row.get("asset_type"), row.get("asset_identifier"))
     return (
         int(row["account_id"]),
-        str(row.get("asset_type") or "other").strip().lower(),
-        normalize_asset_identifier(row.get("asset_identifier"), row.get("asset_type")),
+        asset_type,
+        normalize_asset_identifier(row.get("asset_identifier"), asset_type),
         str(row.get("asset_name") or "").strip(),
         str(row.get("cnpj") or "").strip(),
         normalize_indexer(row.get("fixed_income_indexer")),
@@ -1166,7 +1191,7 @@ def resolve_position_exchange_rate(currency: str, acquisition_date: str, raw_rat
         return rate_to_micros(Decimal("1"))
     if str(raw_rate or "").strip():
         return rate_to_micros(parse_exchange_rate(raw_rate))
-    # spec: investimentos-portfolio v2.31 — criterio 48
+    # spec: investimentos-portfolio v2.36 — criterio 48
     # (sem cotacao manual, consulta a ultima PTAX de venda disponivel
     #  ate a data de aquisicao, como em Lancamentos)
     return rate_to_micros(get_exchange_rate_to_brl(currency, acquisition_date))
@@ -1208,7 +1233,7 @@ def optional_key(value: object) -> str | None:
 def build_positions(rows) -> list[dict]:
     grouped: dict[tuple, dict] = {}
     for row in rows:
-        asset_type = row["asset_type"] or "other"
+        asset_type = effective_asset_type(row["asset_type"], row["asset_identifier"])
         identifier = normalize_asset_identifier(row["asset_identifier"], asset_type)
         key = portfolio_position_key(row, asset_type, identifier)
         original_quantity_micros = int(row["quantity_micros"] or 0)
@@ -1368,7 +1393,7 @@ def quote_positions(positions: list[dict], user_id: int | None = None, force_ref
 
 
 def quote_position(position: dict, user_id: int | None = None, force_refresh: bool = False) -> None:
-    if position["asset_type"] in {"stock", "crypto"}:
+    if position["asset_type"] in {"stock", "crypto", "stablecoin"}:
         apply_market_quote(position, force_refresh=force_refresh)
     elif position["asset_type"] in {"fund", "private_pension"}:
         apply_fund_quote(position, user_id=user_id, force_refresh=force_refresh)
@@ -1386,7 +1411,7 @@ def apply_market_quote(position: dict, force_refresh: bool = False) -> None:
         apply_cost_value(position, "Ativo sem codigo")
         return
     try:
-        if position["asset_type"] == "crypto":
+        if position["asset_type"] in {"crypto", "stablecoin"}:
             quote = fetch_crypto_quote(position["asset_identifier"], position["currency"], force_refresh=force_refresh)
         else:
             quote = fetch_yahoo_quote(symbol, force_refresh=force_refresh)
@@ -1403,7 +1428,7 @@ def apply_market_quote(position: dict, force_refresh: bool = False) -> None:
 
 
 def apply_fund_quote(position: dict, user_id: int | None = None, force_refresh: bool = False) -> None:
-    # spec: investimentos/investimentos-portfolio v2.31 — criterios 27 e 28
+    # spec: investimentos/investimentos-portfolio v2.36 — criterios 27 e 28
     # (cotas de fundos via API Mais Retorno: opt-in configurado nas Preferencias,
     #  posicao com CNPJ e carteira em BRL; sem isso a posicao mantem valor de
     #  custo com status "Cotacao manual pendente")
@@ -1446,7 +1471,7 @@ def fetch_fund_quote_for_user(user_id: int, cnpj: str, force_refresh: bool = Fal
 
 
 def mais_retorno_fund_identifier(position: dict) -> str:
-    # spec: investimentos/investimentos-portfolio v2.31 — criterio fundos-mais-retorno
+    # spec: investimentos/investimentos-portfolio v2.36 — criterio fundos-mais-retorno
     # (API exige CNPJ somente com digitos, sem pontos/barra, mais sufixo ":fi")
     return mais_retorno_identifier_from_cnpj(position.get("cnpj"))
 
@@ -1464,7 +1489,7 @@ def mais_retorno_quotes_for_range(
     force_refresh: bool = False,
     cache_suffix: str = "",
 ) -> list:
-    # spec: investimentos/investimentos-portfolio v2.31 — criterios 27 e 28:
+    # spec: investimentos/investimentos-portfolio v2.36 — criterios 27 e 28:
     # range de datas questionado junto com a data atual; cache diario (ate o
     # fim do dia) para evitar re-consumo da API ao entrar na tela no mesmo dia
     url = MAIS_RETORNO_QUOTES_URL.format(symbol=quote(identifier), start=start, end=end)
@@ -1485,7 +1510,7 @@ def mais_retorno_quotes_for_range(
 
 def fetch_mais_retorno_quote(identifier: str, api_key: str, force_refresh: bool = False) -> dict:
     today = date.today().isoformat()
-    # spec: investimentos/investimentos-portfolio v2.31 — criterios 27 e 28:
+    # spec: investimentos/investimentos-portfolio v2.36 — criterios 27 e 28:
     # 1a tentativa sempre com a data atual; em dias sem cota publicada (fim de
     # semana/feriado) a API retorna lista vazia, entao re-consulta com janela
     # retroativa de 7 dias e usa a ultima cota publicada
@@ -1501,7 +1526,7 @@ def fetch_mais_retorno_quote(identifier: str, api_key: str, force_refresh: bool 
         latest = max(quotes, key=lambda item: str(item["d"]))
         earlier = [item for item in quotes if str(item["d"]) < str(latest["d"])]
         previous = max(earlier, key=lambda item: str(item["d"])) if earlier else latest
-        # spec: investimentos/investimentos-portfolio v2.31 — criterios 27 e 28:
+        # spec: investimentos/investimentos-portfolio v2.36 — criterios 27 e 28:
         # a API usa "." como separador decimal (JSON); normaliza virgula por
         # seguranca antes de converter para Decimal
         price = Decimal(str(latest["c"]).replace(",", "."))
@@ -1558,7 +1583,7 @@ def day_variation_cents(
     force_refresh: bool = False,
     factor_cache: dict[str, Decimal] | None = None,
 ) -> int:
-    # spec: investimentos/investimentos-portfolio v2.31 — criterios 43 a 45
+    # spec: investimentos/investimentos-portfolio v2.36 — criterios 43 a 45
     # (variacao do dia = valor hoje menos valor no dia anterior, com a base de
     #  comparacao limitada a data de aquisicao: no dia da aquisicao a variacao
     #  exibida e zero. Para pos-fixados, dias sem taxa publicada (fim de
@@ -1991,7 +2016,7 @@ def savings_additional_monthly_rate(force_refresh: bool = False) -> Decimal:
 
 
 def savings_additional_monthly_rate_from_selic(selic_annual: Decimal) -> Decimal:
-    # spec: investimentos-portfolio v2.31 — secao "Regras > Poupanca"
+    # spec: investimentos-portfolio v2.36 — secao "Regras > Poupanca"
     # (TR + 0,5% a.m. quando Selic > 8,5% a.a.; TR + 70% da Selic equivalente
     #  mensal quando Selic <= 8,5% a.a. — limiar e formula nao sao obvios)
     if selic_annual > Decimal("0.085"):
@@ -2040,7 +2065,7 @@ def fallback_indexer_annual_rate(indexer: str) -> Decimal:
 
 
 def fixed_income_income_tax_cents(gross_profit_cents: int, days: int) -> int:
-    # spec: investimentos-portfolio v2.31 — criterio 3 (secao "Regras > Renda Fixa":
+    # spec: investimentos-portfolio v2.36 — criterio 3 (secao "Regras > Renda Fixa":
     # tabela regressiva de IR, 22,5% a 15% conforme dias corridos desde a aquisicao)
     if gross_profit_cents <= 0:
         return 0
@@ -2056,7 +2081,7 @@ def fixed_income_income_tax_cents(gross_profit_cents: int, days: int) -> int:
 
 
 def fixed_income_custody_fee_cents(position: dict, gross_cents: int, days: int) -> int:
-    # spec: investimentos/investimentos-portfolio v2.31 — critério 25
+    # spec: investimentos/investimentos-portfolio v2.36 — critério 25
     # Tesouro Direto tem taxa B3 de custodia provisionada diariamente. O app
     # estima a taxa na curva, sem tentar reproduzir marcacao a mercado oficial.
     if gross_cents <= 0 or days <= 0 or not is_treasury_direct_position(position):
@@ -2085,7 +2110,7 @@ def treasury_position_name(position: dict) -> str:
 
 
 def fixed_income_iof_tax_cents(gross_profit_cents: int, days: int) -> int:
-    # spec: investimentos-portfolio v2.31 — criterio 3 (secao "Regras > Renda Fixa":
+    # spec: investimentos-portfolio v2.36 — criterio 3 (secao "Regras > Renda Fixa":
     # IOF regressivo so incide ate 30 dias corridos desde a aquisicao)
     if gross_profit_cents <= 0 or days >= 30:
         return 0
@@ -2303,7 +2328,7 @@ def bcb_range_ttl_seconds(end_date: date) -> int:
 
 
 def seconds_until_end_of_day() -> int:
-    # spec: investimentos/investimentos-portfolio v2.31 — criterios 27 e 28
+    # spec: investimentos/investimentos-portfolio v2.36 — criterios 27 e 28
     # (cache de cotacao de fundos vale ate o fim do dia corrente)
     now = datetime.now()
     end = datetime(now.year, now.month, now.day) + timedelta(days=1)
@@ -2443,8 +2468,13 @@ def yahoo_symbol(position: dict) -> str:
     identifier = position["asset_identifier"]
     if not identifier:
         return ""
-    if position["asset_type"] == "crypto":
+    if position["asset_type"] in {"crypto", "stablecoin"}:
         return crypto_yahoo_symbol(identifier, position["currency"])
+    normalized_identifier = str(identifier).strip().upper()
+    normalized_currency = str(position["currency"] or "BRL").strip().upper()
+    aliased_symbol = YAHOO_SYMBOL_ALIASES.get((normalized_identifier, normalized_currency))
+    if aliased_symbol:
+        return aliased_symbol
     if "." in identifier or position["currency"] != "BRL":
         return identifier
     return f"{identifier}.SA"
@@ -2622,7 +2652,7 @@ def indexer_catalog() -> list[dict]:
 
 def normalize_asset_identifier(value: object, asset_type: str) -> str:
     identifier = str(value or "").strip().upper()
-    if asset_type == "crypto":
+    if asset_type in {"crypto", "stablecoin"}:
         identifier = CRYPTO_ALIASES.get(identifier, identifier)
         compact = identifier.replace("/", "-")
         if "-" in compact:
@@ -2636,6 +2666,14 @@ def normalize_asset_identifier(value: object, asset_type: str) -> str:
             if identifier.endswith(suffix) and len(identifier) > len(suffix):
                 return identifier[:-len(suffix)]
     return identifier
+
+
+def effective_asset_type(asset_type: object, identifier: object) -> str:
+    normalized_type = str(asset_type or "other").strip().lower()
+    normalized_identifier = normalize_asset_identifier(identifier, "crypto")
+    if normalized_type in {"crypto", "stablecoin"} and normalized_identifier in STABLECOIN_ASSETS:
+        return "stablecoin"
+    return normalized_type
 
 
 def normalize_indexer(value: object) -> str:
@@ -2687,7 +2725,7 @@ def cents_to_decimal(cents: int) -> Decimal:
 
 
 def decimal_to_string(value: Decimal) -> str:
-    # spec: investimentos/investimentos-portfolio v2.31 — critério normalização de quantidade
+    # spec: investimentos/investimentos-portfolio v2.36 — critério normalização de quantidade
     # com até 2 casas decimais (half-up) para não estourar o layout das tabelas.
     if not value:
         return "0"

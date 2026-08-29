@@ -1,3 +1,5 @@
+import { stateMarkup } from "./dom-utils.js";
+
 export function registerCardsView({
   state,
   elements,
@@ -872,7 +874,7 @@ export function registerCardsView({
       return;
     }
     if (!card) {
-      cardInvoiceHistoryChart.innerHTML = '<div class="empty-state compact">Selecione um cartão para ver o histórico das faturas.</div>';
+      cardInvoiceHistoryChart.innerHTML = stateMarkup("Selecione um cartão para visualizar o histórico das faturas.", { kind: "info" });
       return;
     }
     const rows = invoiceHistoryRows(card);

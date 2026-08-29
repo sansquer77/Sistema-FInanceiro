@@ -1,6 +1,6 @@
 import { api } from "./api.js";
 import { formatMoney } from "./money-utils.js";
-import { escapeHtml, formData, setFormBusy, setMessage } from "./dom-utils.js";
+import { escapeHtml, formData, setFormBusy, setMessage, stateMarkup } from "./dom-utils.js";
 import { formatDate, formatShortMonthName, todayLocalDateValue } from "./date-utils.js";
 
 export function registerSimulationsView({
@@ -149,7 +149,7 @@ export function registerSimulationsView({
   function buildSimulationBalanceHistory(series, currency) {
     const rows = simulationBalanceHistoryRows(series, currency);
     if (!rows.length) {
-      return '<div class="empty-state compact">Sem dados para exibir no gráfico.</div>';
+      return stateMarkup("Preencha o cenário e execute a simulação para gerar o gráfico.", { kind: "empty" });
     }
     const forecastPath = balanceHistoryPath(rows, "forecastY");
     const simulatedPath = balanceHistoryPath(rows, "simulatedY");

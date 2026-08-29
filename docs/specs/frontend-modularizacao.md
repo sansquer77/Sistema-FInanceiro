@@ -2,8 +2,8 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 3.8
-atualizado: 2026-08-28
+versao: 4.2
+atualizado: 2026-08-29
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
   - "[[arquitetura]]"
@@ -14,7 +14,7 @@ aliases: ["Modularização Frontend", "ES Modules"]
 # Modularização do Frontend
 
 > [!info] Status
-> **implementado** · área: `frontend` · atualizado em 2026-08-28 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]]
+> **implementado** · área: `frontend` · atualizado em 2026-08-29 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]]
 
 ## Problema
 
@@ -48,6 +48,8 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `tab-utils.js` | Transição progressiva e navegação roving por teclado compartilhadas por conjuntos de abas. |
 | `global-search.js` | Busca local transversal em módulos e dados já carregados, com navegação contextual. |
 | `density-utils.js` | Preferência visual local de densidade e aplicação de `data-density` no documento. |
+| `overlay-utils.js` | Semântica, foco e teclado compartilhados por drawers e overlays persistentes. |
+| `data-ux.js` | Ordenação local, contagem de linhas e chips removíveis para tabelas e filtros. |
 | `instructions-content.js` | Conteúdo estático, offline e versionado da central de ajuda. |
 
 ## Views funcionais
@@ -127,6 +129,23 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Resultados de lançamentos, faturas e posições preparam conta/cartão, período ou destaque correspondente antes de navegar, sem abrir automaticamente formulários de edição.
 - A densidade visual oferece os modos **Confortável** (padrão) e **Compacto**, aplica `data-density` no elemento raiz e persiste somente em `localStorage`.
 - O modo compacto reduz espaços, paddings e altura de linhas em superfícies densas, preservando fonte legível, foco, contraste e alvos interativos com pelo menos 34px.
+- Estados localizados usam o helper compartilhado de `dom-utils.js` com quatro tipos explícitos: `loading`, `error`, `empty` e `info`; carregamento anuncia `aria-busy`, erro usa `role="alert"` e vazio oferece orientação contextual sempre que houver próxima ação conhecida.
+- Nenhum módulo deve representar falha ou carregamento apenas por texto neutro em `.empty-state`; ícone, título, mensagem e semântica acessível vêm do mesmo componente.
+- Overlays compartilham foco inicial, confinamento de Tab, fechamento por Escape, restauração de foco e atributos `role="dialog"`/`aria-modal`.
+- Sucessos operacionais usam toast não bloqueante; erros permanecem junto à operação que falhou.
+- Cabeçalhos de cards usam ações agrupadas e podem anunciar a última atualização com horário local.
+- Tabelas de dados oferecem ordenação local por coluna, primeira coluna sticky, contagem de linhas e filtros ativos removíveis quando os controles pertencem a `.filter-toolbar`.
+- Formulários extensos marcados como progressivos agrupam campos opcionais e exibem, somente após interação, um resumo expansível dos valores visíveis e habilitados antes das ações; valores padrão de campos condicionais ocultos não entram no resumo. Em lançamentos à vista o resumo inicia recolhido; ao alternar para parcelamento ou recorrência ele abre automaticamente.
+- Textos de interface usam português brasileiro acentuado e consistente.
+
+## Plano de implementação
+
+- [x] Unificar semântica e teclado de modais, dialogs e drawers.
+- [x] Centralizar toasts de sucesso e manter erros inline.
+- [x] Padronizar cabeçalhos de cards e última atualização.
+- [x] Enriquecer tabelas, filtros e paginação incremental.
+- [x] Adicionar progressão e resumo aos formulários extensos.
+- [x] Revisar microcopy do Histórico de Operações.
 
 ## API e dados
 
@@ -184,6 +203,15 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Dado o usuário alternando entre duas views, quando retorna à anterior na mesma sessão, então posição de rolagem, filtros, período e aba continuam no contexto deixado.
 - Dado o usuário em Preferências, quando seleciona densidade **Compacta** ou **Confortável**, então a interface muda imediatamente e mantém a escolha após recarregar a página.
 - Dado o modo compacto ativo, quando navega por cards, formulários, listas, tabelas e toolbars, então o conteúdo ocupa menos espaço sem cortar texto, valores, foco ou controles.
+- Dado uma região assíncrona, quando carrega, falha ou não possui dados, então exibe o mesmo componente de estado com título, mensagem, ícone não dependente apenas de cor e atributos ARIA adequados ao tipo.
+- Dado um estado vazio com próxima ação conhecida, quando exibido, então a mensagem orienta cadastro, seleção, mudança de filtro ou lançamento necessário em vez de apresentar somente “Nenhum dado”.
+- Dado qualquer overlay aberto, quando o usuário usa Tab, Shift+Tab ou Escape, então o foco permanece no overlay, o fechamento ocorre de forma previsível e o foco retorna ao acionador.
+- Dado uma operação concluída com sucesso, quando a resposta chega, então um toast discreto anuncia o resultado sem reservar espaço no formulário.
+- Dado uma tabela de dados, quando o usuário aciona um cabeçalho, então as linhas são ordenadas e `aria-sort` reflete a direção; a primeira coluna permanece visível na rolagem horizontal.
+- Dado filtros preenchidos, quando a listagem é exibida, então chips mostram os filtros ativos e permitem removê-los individualmente.
+- Dado um formulário extenso, quando campos opcionais existem, então ficam em seção progressiva e um resumo dos valores preenchidos aparece antes de salvar.
+- Dado um formulário novo ainda sem interação ou um campo condicional oculto/desabilitado, quando o resumo é calculado, então ele permanece vazio ou ignora esse campo, mesmo que o controle tenha valor padrão.
+- Dado um lançamento simples à vista, quando o usuário preenche o formulário, então o resumo fica disponível recolhido; ao mudar a repetição para parcelada ou recorrente, ele se expande automaticamente.
 
 ## Fora de escopo
 
@@ -193,6 +221,10 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Changelog
 
+- `4.2` — 2026-08-29 — Resumo pré-salvamento torna-se expansível, recolhido em lançamentos à vista e aberto automaticamente nos modos parcelado e recorrente.
+- `4.1` — 2026-08-29 — Resumo pré-salvamento passa a iniciar vazio e ignorar controles condicionais ocultos ou desabilitados.
+- `4.0` — 2026-08-29 — Consolidação final de overlays, toasts, cabeçalhos/atualização, tabelas/filtros, formulários progressivos e microcopy.
+- `3.9` — 2026-08-29 — Estados loading/erro/vazio/info centralizados em componente acessível, com semântica, tom, ícone e orientação contextual consistentes.
 - `3.8` — 2026-08-28 — Densidade configurável adicionada com modos Confortável/Compacto, persistência local e compactação segura das principais superfícies de dados.
 - `3.7` — 2026-08-28 — Busca global local adicionada com atalho `/`, navegação contextual e preservação da posição de rolagem por módulo durante a sessão.
 - `3.6` — 2026-08-28 — Abas de Portfólio e Preferências passam a permanecer sticky como no Cockpit; offsets de formulários e barras internas são alinhados ao cabeçalho global.

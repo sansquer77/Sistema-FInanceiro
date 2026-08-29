@@ -2,8 +2,8 @@
 tipo: design
 area: meta
 status: implementado
-versao: 3.7
-atualizado: 2026-08-28
+versao: 3.9
+atualizado: 2026-08-29
 relacionados:
   - "[[arquitetura]]"
   - "[[specs/frontend-modularizacao]]"
@@ -14,7 +14,7 @@ aliases: ["Design System", "Tokens Visuais", "Precisão Institucional"]
 # Design System — Precisão Institucional
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-08-28 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]]
+> **implementado** · área: `meta` · atualizado em 2026-08-29 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]]
 
 ## Personalidade da marca
 
@@ -235,6 +235,23 @@ Grade de linha de base: **4px** (todos os valores são múltiplos de 4px).
 - A preferência é local ao navegador (`sistemaFinanceiro.density`) e deve ser aplicada antes do CSS para evitar salto de layout.
 - A compactação prioriza painéis, grids, formulários, listas, toolbars e tabelas; modais destrutivos e mensagens de erro preservam o respiro necessário.
 
+### Estados loading, erro, vazio e informação
+
+- Todo estado localizado usa `.ui-state` com ícone, título curto e mensagem; `.empty-state` permanece como alias compatível durante a migração.
+- `loading`: indicador animado, título **Carregando**, `role="status"`, `aria-live="polite"` e `aria-busy="true"`.
+- `error`: ícone de alerta, título **Não foi possível concluir**, `role="alert"` e borda/texto de erro; nunca depender apenas do vermelho.
+- `empty`: ícone neutro, título **Nada por aqui ainda** e orientação sobre cadastrar, selecionar ou ajustar filtros quando aplicável.
+- `info`: ícone informativo e mensagem neutra para indisponibilidade contextual que não representa falha.
+- Estados não deslocam controles globais, preservam o tamanho da região quando `compact` e respeitam `prefers-reduced-motion` no indicador de carregamento.
+
+### Overlays, feedback e superfícies operacionais
+
+- Modais, dialogs e drawers compartilham `aria-modal`, foco confinado, Escape, restauração de foco, cabeçalho e botão de fechar.
+- Sucesso usa toast temporário no canto inferior; erro continua inline e persistente.
+- Cabeçalhos de cards agrupam ações e exibem última atualização em texto auxiliar quando houver recarga explícita.
+- Tabelas ordenáveis exibem indicador no cabeçalho, primeira coluna sticky e contagem; filtros ativos usam chips removíveis.
+- Formulários extensos recolhem detalhes opcionais e mostram resumo não financeiro dos campos preenchidos antes do submit.
+
 ### Abas (tabs)
 
 Padrão único em toda a aplicação, conforme o modelo usado no menu **Preferências**:
@@ -363,6 +380,8 @@ Padrão único em toda a aplicação, conforme o modelo usado no menu **Preferê
 
 ## Changelog
 
+- `3.9` — 2026-08-29 — Contratos unificados para overlays, toast, cabeçalhos/atualização, tabelas/filtros e formulários progressivos.
+- `3.8` — 2026-08-29 — Estados loading/erro/vazio/info padronizados com estrutura, semântica ARIA, tons e orientação contextual compartilhados.
 - `3.7` — 2026-08-28 — Densidade configurável documentada com modos Confortável/Compacto, persistência local e limites mínimos de legibilidade/interação.
 - `3.6` — 2026-08-28 — Busca global e preservação de contexto definidas com diálogo nativo, atalho `/`, resultados tipados e restauração de rolagem por módulo.
 - `3.5` — 2026-08-28 — Abas de Portfólio e Preferências tornam-se sticky; offsets dos elementos sticky internos passam a respeitar o cabeçalho global.

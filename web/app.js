@@ -27,6 +27,7 @@ import {
   initializeFormUX,
   normalizeSearch,
   setFormBusy,
+  setLastUpdated,
   setMessage,
 } from "./modules/dom-utils.js";
 import {
@@ -70,11 +71,15 @@ import { registerSimulationsView } from "./modules/simulations-view.js";
 import { registerOperationHistoryView } from "./modules/operation-history-view.js";
 import { registerInstructionsView } from "./modules/instructions-view.js";
 import { registerGlobalSearch } from "./modules/global-search.js";
+import { initializeOverlayUX } from "./modules/overlay-utils.js";
+import { initializeDataUX } from "./modules/data-ux.js";
 
 applyTheme();
 applyDensity();
 applyPrivacyMode();
 initializeFormUX();
+initializeOverlayUX();
+initializeDataUX();
 
 const decisionModal = createDecisionModal();
 
@@ -247,6 +252,7 @@ const printStatementButton = document.querySelector("#printStatementButton");
 const reportContent = document.querySelector("#reportContent");
 const addPortfolioAssetButton = document.querySelector("#addPortfolioAssetButton");
 const refreshPortfolioButton = document.querySelector("#refreshPortfolioButton");
+const portfolioLastUpdated = document.querySelector("#portfolioLastUpdated");
 const portfolioAssetFormPanel = document.querySelector("#portfolioAssetFormPanel");
 const portfolioAssetForm = document.querySelector("#portfolioAssetForm");
 const portfolioAssetFormTitle = document.querySelector("#portfolioAssetFormTitle");
@@ -311,8 +317,10 @@ const operationHistoryAccount = document.querySelector("#operationHistoryAccount
 const operationHistoryCard = document.querySelector("#operationHistoryCard");
 const operationHistoryGroupBy = document.querySelector("#operationHistoryGroupBy");
 const operationHistoryList = document.querySelector("#operationHistoryList");
+const operationHistoryCount = document.querySelector("#operationHistoryCount");
 const operationHistoryMessage = document.querySelector("#operationHistoryMessage");
 const operationHistoryLoadMoreButton = document.querySelector("#operationHistoryLoadMoreButton");
+const cockpitLastUpdated = document.querySelector("#cockpitLastUpdated");
 const instructionsSearch = document.querySelector("#instructionsSearch");
 const instructionsClearSearch = document.querySelector("#instructionsClearSearch");
 const instructionsGroups = document.querySelector("#instructionsGroups");
@@ -697,6 +705,7 @@ const operationHistoryView = registerOperationHistoryView({
     operationHistoryCard,
     operationHistoryGroupBy,
     operationHistoryList,
+    operationHistoryCount,
     operationHistoryMessage,
     operationHistoryLoadMoreButton,
   },
@@ -1052,6 +1061,7 @@ const portfolioView = registerPortfolioView({
   elements: {
     addPortfolioAssetButton,
     refreshPortfolioButton,
+    portfolioLastUpdated,
     portfolioAssetFormPanel,
     portfolioAssetForm,
     portfolioAssetFormTitle,
@@ -1475,6 +1485,7 @@ async function refreshCockpitData() {
   if (state.cockpit && state.cockpitLoadedMonth === month) {
     cockpitView.setLoading(false);
     renderCockpit();
+    setLastUpdated(cockpitLastUpdated);
     return;
   }
   cockpitView.setLoading(true);
@@ -1509,6 +1520,7 @@ async function refreshCockpitData() {
     renderBaseViews();
     if (state.view === "cockpit") {
       renderCockpit();
+      setLastUpdated(cockpitLastUpdated);
     }
   } finally {
     if (requestId === state.cockpitRefreshRequestId) {
@@ -1638,7 +1650,7 @@ function showModule(view) {
   }
   if (view === "portfolio") {
     renderPortfolio();
-    loadPortfolio();
+    loadPortfolio({ revalidate: true });
   }
   if (view === "creditCards") {
     renderCreditCards();

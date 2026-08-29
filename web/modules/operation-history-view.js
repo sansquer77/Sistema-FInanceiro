@@ -1,31 +1,31 @@
 import { api } from "./api.js";
-import { escapeHtml, formData, setMessage } from "./dom-utils.js";
+import { escapeHtml, formData, setMessage, stateMarkup } from "./dom-utils.js";
 
 const MODULE_LABELS = {
   accounts: "Contas",
-  transactions: "Lancamentos",
-  cards: "Cartoes",
-  portfolio: "Portfolio",
-  imports: "Importacao",
+  transactions: "Lançamentos",
+  cards: "Cartões",
+  portfolio: "Portfólio",
+  imports: "Importação",
   classifications: "Categorias",
   limits: "Limites",
-  user_admin: "Usuario",
+  user_admin: "Usuário",
 };
 
 const TYPE_LABELS = {
-  create: "Criacao",
-  update: "Atualizacao",
-  delete: "Exclusao",
+  create: "Criação",
+  update: "Atualização",
+  delete: "Exclusão",
   archive: "Arquivamento",
-  restore: "Restauracao",
-  reconcile: "Conciliacao",
-  unreconcile: "Desconciliacao",
+  restore: "Restauração",
+  reconcile: "Conciliação",
+  unreconcile: "Desconciliação",
   move: "Movimento",
   pay: "Pagamento",
-  import: "Importacao",
+  import: "Importação",
   redeem: "Resgate",
   close: "Encerramento",
-  value_update: "Atualizacao de valor",
+  value_update: "Atualização de valor",
   clear: "Limpeza",
 };
 
@@ -40,6 +40,7 @@ export function registerOperationHistoryView({ state, elements, formatDate }) {
     operationHistoryCard,
     operationHistoryGroupBy,
     operationHistoryList,
+    operationHistoryCount,
     operationHistoryMessage,
     operationHistoryLoadMoreButton,
   } = elements;
@@ -108,8 +109,9 @@ export function registerOperationHistoryView({ state, elements, formatDate }) {
   }
 
   function renderLogs() {
+    operationHistoryCount.textContent = `Exibindo ${currentLogs.length} ${currentLogs.length === 1 ? "operação" : "operações"}${hasMore ? "; há mais resultados" : ""}.`;
     if (!currentLogs.length) {
-      operationHistoryList.innerHTML = '<div class="empty-state compact">Nenhuma operacao encontrada.</div>';
+      operationHistoryList.innerHTML = stateMarkup("Ajuste os filtros ou realize uma operação para iniciar o histórico.", { kind: "empty" });
       return;
     }
     const grouped = groupLogs(currentLogs, operationHistoryGroupBy.value);
@@ -126,11 +128,11 @@ export function registerOperationHistoryView({ state, elements, formatDate }) {
   function renderLog(log) {
     const metadata = log.metadata || {};
     const chips = [
-      log.user_name ? `Usuario: ${log.user_name}` : "",
+      log.user_name ? `Usuário: ${log.user_name}` : "",
       moduleLabel(log.module),
       typeLabel(log.operation_type),
       log.account_name ? `Conta: ${log.account_name}` : "",
-      log.credit_card_name ? `Cartao: ${log.credit_card_name}` : "",
+      log.credit_card_name ? `Cartão: ${log.credit_card_name}` : "",
       log.operation_batch_id ? `Lote: ${log.operation_batch_id}` : "",
     ].filter(Boolean);
     return `
@@ -143,7 +145,7 @@ export function registerOperationHistoryView({ state, elements, formatDate }) {
         <details>
           <summary>Detalhes</summary>
           <dl>
-            <div><dt>Usuario</dt><dd>${escapeHtml(userLabel(log))}</dd></div>
+            <div><dt>Usuário</dt><dd>${escapeHtml(userLabel(log))}</dd></div>
             <div><dt>Entidade</dt><dd>${escapeHtml(log.entity_type)} ${escapeHtml(log.entity_id || "")}</dd></div>
             ${Object.entries(metadata).map(([key, value]) => `
               <div><dt>${escapeHtml(metadataLabel(key))}</dt><dd>${escapeHtml(metadataValue(key, value))}</dd></div>
@@ -177,7 +179,7 @@ export function registerOperationHistoryView({ state, elements, formatDate }) {
       return log.account_name || "Sem conta";
     }
     if (groupBy === "card") {
-      return log.credit_card_name || "Sem cartao";
+      return log.credit_card_name || "Sem cartão";
     }
     return formatDate(log.created_at?.slice(0, 10) || "");
   }
@@ -216,9 +218,9 @@ function metadataLabel(key) {
     date: "Data",
     type: "Tipo",
     invoice_month: "Fatura",
-    series_kind: "Serie",
+    series_kind: "Série",
     changed_fields: "Campos alterados",
-    changes: "Alteracoes",
+    changes: "Alterações",
   };
   return labels[key] || key;
 }
@@ -226,7 +228,7 @@ function metadataLabel(key) {
 function metadataValue(key, value) {
   if (key === "changes" && Array.isArray(value)) {
     if (!value.length) {
-      return "Nenhuma diferenca relevante identificada.";
+      return "Nenhuma diferença relevante identificada.";
     }
     return value.map((change) => (
       `${change.label || change.field}: ${emptyAuditValue(change.before)} -> ${emptyAuditValue(change.after)}`
