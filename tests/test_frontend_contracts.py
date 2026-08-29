@@ -247,6 +247,10 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn('quoteCell?.setAttribute("aria-busy", "true")', portfolio)
         self.assertIn("!options.revalidate", portfolio)
         self.assertIn("loadPortfolio({ revalidate: true })", app_source)
+        self.assertLess(
+            portfolio.index("const data = formData(portfolioAssetForm);"),
+            portfolio.index("setFormBusy(portfolioAssetForm, true);"),
+        )
         self.assertIn("portfolio-automatic-quote-button", styles)
 
 

@@ -2,7 +2,7 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.36
+versao: 2.37
 atualizado: 2026-08-29
 relacionados:
   - "[[contas-correntes]]"
@@ -211,9 +211,11 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado VWRA em uma carteira USD, quando a cotação automática é consultada ou restaurada, então o resolvedor usa `VWRA.L` e preserva USD como moeda contábil da posição.
 - Dado o usuário confirmando o retorno à cotação automática, enquanto a consulta é processada, então o botão muda para `Atualizando...`, fica desabilitado e a célula anuncia estado ocupado; ao concluir, o botão desaparece e um toast confirma a restauração sem recarregar a página inteira.
 - Dado o usuário saindo do Portfólio e retornando à tela, quando o módulo é reaberto, então o app revalida os dados persistidos no backend sem forçar nova consulta externa de cotações, mantendo removido o botão de retorno automático após a restauração.
+- Dado uma carteira válida selecionada no formulário de posição inicial, quando o usuário salva um ativo de qualquer categoria, inclusive Stablecoin, então o identificador da carteira é enviado antes de os controles entrarem em estado ocupado e a posição é cadastrada sem falso erro de carteira ausente.
 
 ## Changelog
 
+- `2.37` — 2026-08-29 — Formulário de posição inicial captura o payload antes de desabilitar os controles durante o salvamento, preservando a carteira selecionada para Stablecoins e demais categorias.
 - `2.36` — 2026-08-29 — Entrada no Portfólio passa a revalidar o estado persistido sem atualizar forçadamente as fontes externas, eliminando dados antigos após navegar para outro módulo e voltar.
 - `2.35` — 2026-08-29 — Restauração da cotação automática ganha feedback localizado durante a consulta, atualização do horário e confirmação por toast sem perder o contexto da rolagem.
 - `2.34` — 2026-08-29 — Correção do retorno automático de VWRA: ticker em carteira USD passa a resolver para a listagem `VWRA.L` da London Stock Exchange no Yahoo Finance.

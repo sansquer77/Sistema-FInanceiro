@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 11.83
+versao: 11.84
 atualizado: 2026-08-29
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -134,6 +134,7 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `11.84` — 2026-08-29 — [[specs/investimentos-portfolio]] v2.37 corrige o falso erro de carteira ausente ao salvar posições iniciais, inclusive Stablecoins.
 - `11.83` — 2026-08-29 — [[specs/investimentos-portfolio]] v2.36 revalida o Portfólio ao retornar à tela, sem exigir recarga manual nem forçar atualização externa de cotações.
 - `11.82` — 2026-08-29 — [[specs/investimentos-portfolio]] v2.35 torna visível o processamento e a conclusão do retorno à cotação automática.
 - `11.81` — 2026-08-29 — [[specs/investimentos-portfolio]] v2.34 e [[arquitetura]] v3.44 corrigem a restauração automática de VWRA com o símbolo Yahoo `VWRA.L`.
