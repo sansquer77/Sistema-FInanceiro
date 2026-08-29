@@ -669,12 +669,20 @@ textarea:focus {
 }
 
 .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
   display: flex;
   justify-content: space-between;
   gap: 16px;
   align-items: center;
-  min-height: 58px;
+  min-height: 74px;
   margin-bottom: 14px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+  box-shadow: 0 8px 0 var(--bg);
+  isolation: isolate;
 }
 
 .eyebrow {
@@ -711,6 +719,146 @@ textarea:focus {
 .privacy-toggle-button[aria-pressed="true"] {
   border-color: var(--accent);
   background: var(--soft);
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.global-search-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: min(280px, 32vw);
+  min-height: 38px;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.global-search-trigger:hover,
+.global-search-trigger:focus-visible {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+
+.global-search-trigger kbd {
+  min-width: 24px;
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface-low);
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  text-align: center;
+}
+
+.global-search-dialog {
+  width: min(680px, calc(100vw - 32px));
+  max-height: min(720px, calc(100vh - 48px));
+  margin: auto;
+  padding: 16px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+.global-search-dialog::backdrop {
+  background: var(--modal-overlay);
+  backdrop-filter: blur(2px);
+}
+
+.global-search-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.global-search-heading h2 {
+  margin: 0;
+}
+
+.global-search-field {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.global-search-field input {
+  min-height: 44px;
+  font-size: 15px;
+}
+
+.global-search-results {
+  display: grid;
+  gap: 4px;
+  max-height: min(520px, calc(100vh - 210px));
+  margin-top: 12px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.global-search-result {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.global-search-result:hover,
+.global-search-result:focus-visible {
+  border-color: var(--line);
+  background: var(--surface-container);
+  outline: none;
+}
+
+.global-search-result span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.global-search-result strong,
+.global-search-result small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.global-search-result small,
+.global-search-result em {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.global-search-result em {
+  font-style: normal;
+  font-weight: 800;
 }
 
 :root[data-privacy="true"] .money-value,
@@ -1221,6 +1369,37 @@ textarea:focus {
   margin-bottom: 16px;
 }
 
+.dashboard-main:has(#cockpitView:not([hidden])) > .topbar {
+  margin-bottom: 0;
+}
+
+#cockpitView .cockpit-toolbar {
+  position: sticky;
+  top: 74px;
+  z-index: 29;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  box-shadow: 0 8px 0 var(--bg), 0 9px 0 var(--line);
+  isolation: isolate;
+}
+
+.cockpit-priority-alerts:empty,
+.cockpit-priority-alerts:not(:has(.cockpit-alert:not([hidden]))) {
+  display: none;
+}
+
+.executive-summary-strip > div {
+  min-height: 58px;
+  padding: 9px 11px;
+}
+
+.executive-summary-strip strong {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
 .cockpit-toolbar .cockpit-tabs {
   flex: 1 1 auto;
   min-width: 0;
@@ -1346,6 +1525,53 @@ textarea:focus {
 
 .cockpit-grid .currency-panel {
   margin-bottom: 0;
+}
+
+.cockpit-disclosure {
+  min-width: 0;
+}
+
+.cockpit-disclosure > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 900;
+  list-style: none;
+}
+
+.cockpit-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.cockpit-disclosure > summary::after {
+  content: "⌄";
+  color: var(--muted);
+  font-size: 1rem;
+  transition: transform 160ms ease-out;
+}
+
+.cockpit-disclosure:not([open]) > summary::after {
+  transform: rotate(-90deg);
+}
+
+.cockpit-disclosure[open] > summary {
+  margin-bottom: 14px;
+}
+
+.cockpit-disclosure > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cockpit-disclosure > summary::after {
+    transition: none;
+  }
 }
 
 .cockpit-calendar-header {
@@ -2972,8 +3198,8 @@ textarea:focus {
 
 .launch-form-sticky {
   position: sticky;
-  top: 24px;
-  max-height: calc(100vh - 48px);
+  top: 88px;
+  max-height: calc(100vh - 104px);
   overflow: auto;
   align-self: start;
   overscroll-behavior: contain;
@@ -2984,10 +3210,19 @@ textarea:focus {
 }
 
 .user-pref-tabs {
+  position: sticky;
+  top: 74px;
+  z-index: 29;
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
   margin-bottom: 18px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  box-shadow: 0 8px 0 var(--bg), 0 9px 0 var(--line);
+  isolation: isolate;
 }
 
 .user-pref-tab {
@@ -3030,6 +3265,126 @@ padding: 8px 16px;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+}
+
+.density-preference-row {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+:root[data-density="compact"] .dashboard {
+  gap: 16px;
+  padding: 16px 16px 32px;
+}
+
+:root[data-density="compact"] .app-sidebar {
+  gap: 12px;
+  padding: 12px;
+}
+
+:root[data-density="compact"] .workspace,
+:root[data-density="compact"] .portfolio-grid,
+:root[data-density="compact"] .user-settings-grid,
+:root[data-density="compact"] .cockpit-grid,
+:root[data-density="compact"] .classification-grid {
+  gap: 12px;
+}
+
+:root[data-density="compact"] .accounts-panel,
+:root[data-density="compact"] .cards-panel,
+:root[data-density="compact"] .panel,
+:root[data-density="compact"] .account-form-panel,
+:root[data-density="compact"] .card-form-panel,
+:root[data-density="compact"] .transaction-form-panel {
+  padding: 12px;
+}
+
+:root[data-density="compact"] .form {
+  gap: 9px;
+}
+
+:root[data-density="compact"] .field-row {
+  gap: 8px;
+}
+
+:root[data-density="compact"] input,
+:root[data-density="compact"] select,
+:root[data-density="compact"] textarea,
+:root[data-density="compact"] .primary,
+:root[data-density="compact"] .ghost,
+:root[data-density="compact"] .danger {
+  min-height: 36px;
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
+:root[data-density="compact"] .topbar {
+  min-height: 66px;
+  padding: 4px 0;
+}
+
+:root[data-density="compact"] #cockpitView .cockpit-toolbar,
+:root[data-density="compact"] .portfolio-tabs,
+:root[data-density="compact"] .user-pref-tabs {
+  top: 66px;
+  padding: 6px;
+  margin-bottom: 12px;
+}
+
+:root[data-density="compact"] .launch-form-sticky {
+  top: 78px;
+  max-height: calc(100vh - 90px);
+}
+
+:root[data-density="compact"] .instructions-toolbar,
+:root[data-density="compact"] .transaction-day-heading {
+  top: 74px;
+}
+
+:root[data-density="compact"] .summary-strip,
+:root[data-density="compact"] .month-balance-summary,
+:root[data-density="compact"] .limit-summary,
+:root[data-density="compact"] .report-summary,
+:root[data-density="compact"] .portfolio-summary {
+  gap: 8px;
+}
+
+:root[data-density="compact"] .account-list,
+:root[data-density="compact"] .credit-card-list,
+:root[data-density="compact"] .card-invoice-list,
+:root[data-density="compact"] .transaction-list,
+:root[data-density="compact"] .operation-history-list,
+:root[data-density="compact"] .operation-log-list {
+  gap: 6px;
+}
+
+:root[data-density="compact"] .account-card,
+:root[data-density="compact"] .credit-card-item,
+:root[data-density="compact"] .card-invoice-row,
+:root[data-density="compact"] .card-invoice-payment,
+:root[data-density="compact"] .transaction-row,
+:root[data-density="compact"] .operation-log-item,
+:root[data-density="compact"] .spending-limit-item {
+  gap: 8px;
+  padding: 9px 10px;
+}
+
+:root[data-density="compact"] .report-table th,
+:root[data-density="compact"] .report-table td,
+:root[data-density="compact"] .weekly-projection-table th,
+:root[data-density="compact"] .weekly-projection-table td {
+  padding: 7px 8px;
+}
+
+:root[data-density="compact"] .filter-toolbar,
+:root[data-density="compact"] .transaction-ledger-panel .transaction-list-toolbar {
+  padding: 7px 8px;
+}
+
+:root[data-density="compact"] .section-heading {
+  gap: 10px;
+  margin-bottom: 9px;
 }
 
 .theme-preference-row > div:first-child {
@@ -3206,8 +3561,8 @@ padding: 8px 16px;
 
 .instructions-toolbar {
   position: sticky;
-  top: 0;
-  z-index: 10;
+  top: 82px;
+  z-index: 20;
   padding: 14px 0;
   background: var(--surface);
 }
@@ -3832,12 +4187,63 @@ padding: 8px 16px;
   color: var(--ink);
 }
 
-.actions {
+.actions,
+.form-actions {
   display: flex;
+  align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  justify-content: flex-start;
   padding-top: 2px;
+}
+
+.form-actions .primary {
+  order: 1;
+}
+
+.form-actions .ghost {
+  order: 2;
+}
+
+.form-actions .danger {
+  order: 3;
+  margin-inline-start: auto;
+}
+
+.field-validation {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  color: var(--danger);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+input[aria-invalid="true"],
+select[aria-invalid="true"],
+textarea[aria-invalid="true"] {
+  border-color: var(--danger);
+  outline-color: var(--danger);
+}
+
+form[aria-busy="true"] {
+  cursor: progress;
+}
+
+form[aria-busy="true"] .form-actions {
+  opacity: 0.78;
+}
+
+@media (max-width: 560px) {
+  .form-actions > button {
+    flex: 1 1 100%;
+  }
+
+  .form-actions .danger {
+    margin-inline-start: 0;
+    margin-top: 8px;
+  }
 }
 
 .simulation-form-panel .form {
@@ -4189,6 +4595,9 @@ padding: 8px 16px;
 .report-table-wrap {
   overflow: auto;
   border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  scrollbar-gutter: stable;
 }
 
 .report-table {
@@ -4205,9 +4614,27 @@ padding: 8px 16px;
 }
 
 .report-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--surface-low);
   color: var(--muted);
   font-size: 12px;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
+}
+
+.report-table tbody tr {
+  transition: background-color 0.16s ease;
+}
+
+.report-table tbody tr:hover {
+  background: var(--surface-container);
+}
+
+.report-table th:not(:first-child),
+.report-table td:not(:first-child) {
+  font-variant-numeric: tabular-nums;
 }
 
 .report-detail {
@@ -4744,6 +5171,9 @@ padding: 8px 16px;
 }
 
 @media (max-width: 860px) {
+  #cockpitView .cockpit-toolbar {
+    top: 74px;
+  }
   .portfolio-return-drawer .drawer-content {
     width: 100%;
     max-width: 100%;
@@ -4773,10 +5203,19 @@ padding: 8px 16px;
 }
 
 .portfolio-tabs {
+  position: sticky;
+  top: 74px;
+  z-index: 29;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 18px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  box-shadow: 0 8px 0 var(--bg), 0 9px 0 var(--line);
+  isolation: isolate;
 }
 
 .portfolio-tab {
@@ -6086,7 +6525,7 @@ padding: 8px 16px;
 
 .transaction-day-heading {
   position: sticky;
-  top: 6px;
+  top: 82px;
   z-index: 8;
   padding: 1px 0;
   background: var(--panel);
@@ -6925,6 +7364,81 @@ padding: 8px 16px;
 .operation-history-filters {
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   align-items: end;
+}
+
+.filter-toolbar {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-low);
+}
+
+.filter-toolbar label {
+  margin: 0;
+}
+
+.weekly-projection-table-wrapper {
+  scrollbar-gutter: stable;
+}
+
+.weekly-projection-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--surface-low);
+}
+
+.weekly-projection-table tbody tr,
+.consultor-table tbody tr {
+  transition: background-color 0.16s ease;
+}
+
+.weekly-projection-table tbody tr:hover,
+.consultor-table tbody tr:hover,
+.statement-table tbody tr:hover {
+  background: var(--surface-container);
+}
+
+.trends-budget-table {
+  overflow-x: auto;
+  scrollbar-gutter: stable;
+}
+
+.trends-budget-head,
+.trends-budget-row {
+  min-width: 680px;
+}
+
+@media (max-width: 860px) {
+  .topbar {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .global-search-trigger {
+    min-width: 42px;
+    width: 42px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .global-search-trigger span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .global-search-trigger kbd {
+    border: 0;
+    background: transparent;
+    font-size: 15px;
+  }
+
+  .filter-toolbar {
+    width: 100%;
+  }
 }
 
 .operation-history-panel {

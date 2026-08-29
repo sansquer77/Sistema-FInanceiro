@@ -10,6 +10,7 @@ export function registerUserAdminView(context) {
     setMessage,
     decisionModal,
     theme,
+    density,
     state,
     onShowAuth,
   } = context;
@@ -53,6 +54,27 @@ export function registerUserAdminView(context) {
     }
     theme.setTheme(button.dataset.themeOption);
     syncThemePreference();
+  }
+
+  function syncDensityPreference() {
+    if (!elements.densityPreference || !density) {
+      return;
+    }
+    const currentDensity = density.storedDensity();
+    elements.densityPreference.querySelectorAll("[data-density-option]").forEach((button) => {
+      const isActive = button.dataset.densityOption === currentDensity;
+      button.classList.toggle("active", isActive);
+      button.setAttribute("aria-pressed", String(isActive));
+    });
+  }
+
+  function handleDensityPreferenceClick(event) {
+    const button = event.target.closest("[data-density-option]");
+    if (!button || !elements.densityPreference?.contains(button) || !density) {
+      return;
+    }
+    density.setDensity(button.dataset.densityOption);
+    syncDensityPreference();
   }
 
   async function loadEmailConfigStatus() {
@@ -589,6 +611,10 @@ export function registerUserAdminView(context) {
     elements.themePreference.addEventListener("click", handleThemePreferenceClick);
     syncThemePreference();
   }
+  if (elements.densityPreference) {
+    elements.densityPreference.addEventListener("click", handleDensityPreferenceClick);
+    syncDensityPreference();
+  }
   if (elements.userPrefTabs) {
     bindRovingTablist(elements.userPrefTabs.querySelectorAll(".user-pref-tab"), {
       valueFor: (button) => button.dataset.userTab,
@@ -608,5 +634,6 @@ export function registerUserAdminView(context) {
     loadConsultorProfile,
     loadMaisRetornoConfigStatus,
     syncThemePreference,
+    syncDensityPreference,
   };
 }

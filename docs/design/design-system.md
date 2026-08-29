@@ -2,7 +2,7 @@
 tipo: design
 area: meta
 status: implementado
-versao: 3.0
+versao: 3.7
 atualizado: 2026-08-28
 relacionados:
   - "[[arquitetura]]"
@@ -200,6 +200,41 @@ Grade de linha de base: **4px** (todos os valores são múltiplos de 4px).
 | Primário | `--primary` | `--on-primary` (`#ffffff`) |
 | Secundário | transparente | `--on-surface` com borda `--outline` |
 
+### Ações e validação em formulários
+
+- O rodapé usa `.form-actions`: ação primária primeiro, ações secundárias em seguida e ação destrutiva isolada no extremo oposto.
+- Em telas estreitas, as ações ocupam a largura disponível; a destrutiva recebe separação vertical, preservando a ordem de leitura.
+- A ação primária descreve o resultado (`Salvar conta`, `Importar lançamentos`), evitando rótulos vagos como `OK`.
+- Durante o envio, o formulário usa `aria-busy="true"`, desabilita temporariamente seus controles e mostra `Aguarde...` no submit sem perder estados condicionais anteriores.
+- Erros de restrição HTML aparecem imediatamente abaixo do campo, usam o token de erro e são vinculados por `aria-describedby`; corrigir o valor remove o erro sem reiniciar o formulário.
+
+### Cabeçalho global, filtros e tabelas
+
+- O `.topbar` é sticky em todos os módulos autenticados, usa fundo sólido `--bg`, linha inferior e `isolation: isolate`; conteúdo nunca aparece por transparência atrás dele.
+- Toolbars de busca e filtro usam `.filter-toolbar`, com fundo de superfície baixa, borda `--outline-variant`, raio padrão e espaçamento de 8–12px.
+- Filtros empilham em uma coluna abaixo de 860px; controles segmentados dividem a largura disponível quando isso melhora a leitura.
+- Tabelas ficam em um wrapper com `overflow: auto`, borda e fundo de painel. Não reduza artificialmente colunas monetárias para caber no mobile: preserve `min-width` e permita rolagem horizontal.
+- Cabeçalhos de coluna permanecem sticky dentro do wrapper, usam fundo opaco, caixa alta e contraste secundário. Linhas recebem hover discreto sem alterar cores financeiras.
+- Valores monetários e numéricos ficam alinhados à direita e usam figuras tabulares; a primeira coluna textual permanece alinhada à esquerda.
+- Abas principais que trocam painéis longos — Cockpit, Portfólio e Preferências — permanecem sticky logo abaixo do `.topbar`, com superfície opaca, borda e continuidade visual.
+- Elementos sticky internos usam o offset estrutural do cabeçalho (`74px`, acrescido do respiro necessário), nunca `top: 0` quando disputam a mesma coluna de conteúdo.
+
+### Busca global e preservação de contexto
+
+- O cabeçalho oferece um acionador compacto de busca global; em desktop exibe rótulo e atalho `/`, e em telas menores reduz-se ao atalho sem competir com o título.
+- A busca abre em `<dialog>` nativo, com campo rotulado, resultados navegáveis por teclado e indicação do tipo de resultado.
+- O resultado sempre informa título, contexto secundário e domínio (`Módulo`, `Conta`, `Cartão`, `Lançamento`, `Fatura`, `Portfólio` ou `Classificação`).
+- A busca é local aos dados já carregados e não promete cobertura de períodos ainda não consultados.
+- Trocas de módulo preservam filtros, abas, períodos e posição de rolagem durante a sessão; uma busca contextual pode preparar o período e a entidade do resultado selecionado.
+
+### Densidade configurável
+
+- **Confortável** é o padrão e mantém os espaçamentos-base do design system.
+- **Compacto** usa `data-density="compact"` e reduz apenas espaçamentos, paddings, gaps e altura de linhas; não reduz a fonte-base nem altera cores semânticas.
+- Controles compactos mantêm altura mínima de 34px, foco visível e espaço suficiente para toque deliberado.
+- A preferência é local ao navegador (`sistemaFinanceiro.density`) e deve ser aplicada antes do CSS para evitar salto de layout.
+- A compactação prioriza painéis, grids, formulários, listas, toolbars e tabelas; modais destrutivos e mensagens de erro preservam o respiro necessário.
+
 ### Abas (tabs)
 
 Padrão único em toda a aplicação, conforme o modelo usado no menu **Preferências**:
@@ -276,6 +311,8 @@ Padrão único em toda a aplicação, conforme o modelo usado no menu **Preferê
 - Trocas entre subtabs de um mesmo módulo podem usar a mesma duração de aproximadamente `160ms`, combinando apenas opacidade e pequeno deslocamento vertical; estados de atualização preservam o conteúdo anterior com atenuação discreta e `aria-busy`, sem bloquear a navegação.
 - Todos os conjuntos de abas funcionais devem adotar foco roving: somente a aba ativa participa da ordem Tab; setas movem entre vizinhas, Home/End alcançam extremos e a seleção acompanha o foco.
 - Regiões que aguardam dados devem usar `aria-busy` e atenuação moderada apenas no conteúdo afetado, mantendo navegação, cabeçalhos e controles disponíveis.
+- No Cockpit, a hierarquia executiva posiciona alertas antes dos KPIs, mantém Saldos/Portfólio expandidos e usa `details/summary` para conteúdo secundário; título e controles sticky devem usar superfícies/tokens existentes, sem sombra ou cor decorativa nova.
+- Cabeçalhos sticky que cobrem dados financeiros devem usar superfície opaca (`--bg` ou `--panel`), nunca `--panel-translucent` ou desfoque; blocos sticky empilhados devem ser visualmente contíguos para impedir vazamento do conteúdo rolado pelos intervalos.
 
 ### Diagnóstico visual e disclosure progressivo
 
@@ -326,6 +363,13 @@ Padrão único em toda a aplicação, conforme o modelo usado no menu **Preferê
 
 ## Changelog
 
+- `3.7` — 2026-08-28 — Densidade configurável documentada com modos Confortável/Compacto, persistência local e limites mínimos de legibilidade/interação.
+- `3.6` — 2026-08-28 — Busca global e preservação de contexto definidas com diálogo nativo, atalho `/`, resultados tipados e restauração de rolagem por módulo.
+- `3.5` — 2026-08-28 — Abas de Portfólio e Preferências tornam-se sticky; offsets dos elementos sticky internos passam a respeitar o cabeçalho global.
+- `3.4` — 2026-08-28 — Cabeçalho sticky vira padrão global; adicionados contratos unificados para toolbars de filtro e tabelas responsivas com cabeçalho sticky.
+- `3.3` — 2026-08-28 — Definida hierarquia de ações e formulários: primária primeiro, destrutiva separada, feedback inválido contextual e envio ocupado sem perda de estado.
+- `3.2` — 2026-08-28 — Cabeçalhos sticky sobre dados passam a exigir fundo opaco e continuidade visual; corrigida a mistura do conteúdo rolado sob título/abas do Cockpit.
+- `3.1` — 2026-08-28 — Layout executivo do Cockpit padronizado com alertas prioritários, KPIs compactos, cabeçalhos sticky e disclosure progressivo persistente para seções secundárias.
 - `3.0` — 2026-08-28 — Padrão de fluidez ampliado a todos os conjuntos de abas analíticas, com foco roving acessível e estados ocupados localizados que preservam controles e contexto.
 - `2.9` — 2026-08-28 — Movimento interno do Cockpit padronizado: subtabs com transição curta de opacidade/deslocamento, atualização localizada com conteúdo preservado e respeito obrigatório à redução de movimento.
 - `2.8` — 2026-08-09 — Modo Privacidade passa a usar máscara textual leve no lugar de `filter: blur()` em massa, mantendo revelação em hover/foco e preservando alinhamento.

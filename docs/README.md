@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 11.66
+versao: 11.74
 atualizado: 2026-08-28
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -134,6 +134,14 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `11.74` — 2026-08-28 — [[specs/frontend-modularizacao]] v3.8 e [[design/design-system]] v3.7 adicionam densidade visual configurável e persistida localmente.
+- `11.73` — 2026-08-28 — [[specs/frontend-modularizacao]] v3.7 e [[design/design-system]] v3.6 adicionam busca global local e preservação de contexto por módulo.
+- `11.72` — 2026-08-28 — [[specs/frontend-modularizacao]] v3.6 e [[design/design-system]] v3.5 mantêm abas de Portfólio/Preferências visíveis e alinham offsets sticky ao cabeçalho global.
+- `11.71` — 2026-08-28 — [[specs/frontend-modularizacao]] v3.5 e [[design/design-system]] v3.4 promovem cabeçalho sticky a padrão global e unificam filtros e tabelas.
+- `11.70` — 2026-08-28 — [[specs/frontend-modularizacao]] v3.4 e [[design/design-system]] v3.3 padronizam hierarquia, validação contextual e estado ocupado dos formulários.
+- `11.69` — 2026-08-28 — [[specs/frontend-modularizacao]] v3.3 e [[design/design-system]] v3.2: cabeçalho e abas sticky do Cockpit passam a usar superfícies opacas e contíguas, eliminando mistura visual durante a rolagem.
+- `11.68` — 2026-08-28 — Versão do app elevada para `1.7.0` (MINOR): consolida a modernização da experiência com fluidez compartilhada entre módulos e o novo layout executivo/sticky do Cockpit. Ver [[specs/frontend-modularizacao]] v3.2.
+- `11.67` — 2026-08-28 — [[specs/frontend-modularizacao]] v3.2 e [[design/design-system]] v3.1: Cockpit reorganizado como painel executivo, com alertas prioritários, KPIs compactos, título/controles sticky e seções secundárias recolhíveis.
 - `11.66` — 2026-08-28 — Versão do app elevada para `1.6.3` (PATCH): conclui o pacote de fluidez e acessibilidade da interface, com padrão compartilhado de abas, transições progressivas, estados ocupados localizados e proteção contra respostas obsoletas.
 - `11.65` — 2026-08-28 — [[specs/frontend-modularizacao]] v3.1 e [[design/design-system]] v3.0: transições, teclado roving e estados ocupados localizados padronizados em Cockpit, Portfólio, Relatórios, Consultor e Preferências.
 - `11.64` — 2026-08-28 — [[specs/frontend-modularizacao]] v3.0 e [[design/design-system]] v2.9: Cockpit inicia modernização fluida com transições progressivas entre subtabs, atualização mensal localizada e navegação por teclado.

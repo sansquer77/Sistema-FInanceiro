@@ -3,6 +3,7 @@ export function registerAccountsView({
   elements,
   api,
   formData,
+  setFormBusy,
   setMessage,
   emptyState,
   escapeHtml,
@@ -48,6 +49,7 @@ export function registerAccountsView({
     setMessage(accountMessage, "");
     const data = formData(accountForm);
     const isEditing = Boolean(data.id);
+    setFormBusy(accountForm, true);
     try {
       await api(isEditing ? `/api/checking-accounts/${data.id}` : "/api/checking-accounts", {
         method: isEditing ? "PUT" : "POST",
@@ -58,6 +60,8 @@ export function registerAccountsView({
       setMessage(accountMessage, "Conta salva.", "success");
     } catch (error) {
       setMessage(accountMessage, error.message, "error");
+    } finally {
+      setFormBusy(accountForm, false);
     }
   }
 

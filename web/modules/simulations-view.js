@@ -1,6 +1,6 @@
 import { api } from "./api.js";
 import { formatMoney } from "./money-utils.js";
-import { escapeHtml, formData, setMessage } from "./dom-utils.js";
+import { escapeHtml, formData, setFormBusy, setMessage } from "./dom-utils.js";
 import { formatDate, formatShortMonthName, todayLocalDateValue } from "./date-utils.js";
 
 export function registerSimulationsView({
@@ -106,12 +106,15 @@ export function registerSimulationsView({
     event.preventDefault();
     setMessage(simulationMessage, "", "");
     const payload = formData(simulationForm);
+    setFormBusy(simulationForm, true);
     try {
       const response = await api("/api/simulations/butterfly-effect", { method: "POST", body: payload });
       renderSimulation(response);
       setMessage(simulationMessage, "Simulação pronta.", "success");
     } catch (error) {
       setMessage(simulationMessage, error.message, "error");
+    } finally {
+      setFormBusy(simulationForm, false);
     }
   }
 

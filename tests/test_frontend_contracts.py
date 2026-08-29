@@ -74,6 +74,122 @@ class FrontendModuleContractTest(unittest.TestCase):
         for tab_name in ("report-tab", "portfolio-tab", "consultor-subtab", "user-pref-tab"):
             self.assertRegex(index, rf'class="[^"]*{tab_name}[^"]*"[^>]+role="tab"')
 
+    def test_cockpit_has_executive_sticky_and_persistent_disclosure_layout(self) -> None:
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+        cockpit = (MODULE_ROOT / "cockpit-view.js").read_text(encoding="utf-8")
+
+        self.assertIn('class="summary-strip executive-summary-strip"', index)
+        self.assertIn('class="cockpit-priority-alerts"', index)
+        self.assertLess(index.index('id="cockpitLimitAlert"'), index.index('class="summary-strip executive-summary-strip"'))
+        for section in ("planning", "debts", "top-expenses", "top-income"):
+            self.assertIn(f'data-cockpit-section="{section}"', index)
+        self.assertIn(".dashboard-main:has(#cockpitView:not([hidden])) > .topbar", styles)
+        self.assertIn("#cockpitView .cockpit-toolbar", styles)
+        self.assertIn("background: var(--bg);", styles)
+        self.assertNotIn("#cockpitView .cockpit-toolbar {\n  position: sticky;\n  top: 72px", styles)
+        self.assertIn("box-shadow: 0 8px 0 var(--bg)", styles)
+        self.assertIn("COCKPIT_DISCLOSURE_KEY", cockpit)
+        self.assertIn("localStorage.setItem(COCKPIT_DISCLOSURE_KEY", cockpit)
+
+    def test_forms_share_action_validation_and_busy_state_contracts(self) -> None:
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+        app_source = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+        dom_utils = (MODULE_ROOT / "dom-utils.js").read_text(encoding="utf-8")
+
+        for form_id in (
+            "accountForm",
+            "creditCardForm",
+            "cardTransactionForm",
+            "transactionForm",
+            "portfolioAssetForm",
+            "limitForm",
+            "simulationForm",
+        ):
+            form_markup = index[index.index(f'id="{form_id}"'):]
+            self.assertIn('class="form-actions"', form_markup.split("</form>", 1)[0], form_id)
+        self.assertIn('class="danger" id="consultorProfileDeleteButton"', index)
+        self.assertIn("initializeFormUX();", app_source)
+        self.assertIn('form.setAttribute("aria-busy", "true")', dom_utils)
+        self.assertIn('control.setAttribute("aria-invalid", "true")', dom_utils)
+        self.assertIn('control.setAttribute("aria-describedby"', dom_utils)
+        self.assertIn(".form-actions .danger", styles)
+        self.assertIn("margin-inline-start: auto", styles)
+
+    def test_header_tables_and_filters_share_global_layout_contracts(self) -> None:
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+        consultor = (MODULE_ROOT / "consultor-view.js").read_text(encoding="utf-8")
+
+        topbar_rule = styles[styles.index(".topbar {"):styles.index(".eyebrow {")]
+        self.assertIn("position: sticky", topbar_rule)
+        self.assertIn("background: var(--bg)", topbar_rule)
+        self.assertIn("border-bottom: 1px solid var(--line)", topbar_rule)
+        self.assertNotIn("position: sticky", styles[styles.index(".dashboard-main:has(#cockpitView"):styles.index("#cockpitView .cockpit-toolbar")])
+        for toolbar in (
+            "invoice-list-toolbar filter-toolbar",
+            "transaction-list-toolbar filter-toolbar",
+            "operation-history-filters filter-toolbar",
+            "instructions-toolbar filter-toolbar",
+        ):
+            self.assertIn(toolbar, index)
+        self.assertIn(".report-table th {\n  position: sticky", styles)
+        self.assertIn("scrollbar-gutter: stable", styles)
+        self.assertIn('class="report-table-wrap"><table class="report-table consultor-table"', consultor)
+
+    def test_portfolio_and_preferences_tabs_stay_below_global_header(self) -> None:
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+        for selector in (".portfolio-tabs {", ".user-pref-tabs {"):
+            start = styles.index(selector)
+            rule = styles[start:styles.index("}", start)]
+            self.assertIn("position: sticky", rule)
+            self.assertIn("top: 74px", rule)
+            self.assertIn("background: var(--bg)", rule)
+            self.assertIn("isolation: isolate", rule)
+        self.assertIn(".launch-form-sticky {\n  position: sticky;\n  top: 88px", styles)
+        self.assertIn(".instructions-toolbar {\n  position: sticky;\n  top: 82px", styles)
+        self.assertIn(".transaction-day-heading {\n  position: sticky;\n  top: 82px", styles)
+
+    def test_global_search_is_local_keyboard_accessible_and_preserves_view_context(self) -> None:
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        app_source = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+        search_source = (MODULE_ROOT / "global-search.js").read_text(encoding="utf-8")
+
+        self.assertIn('id="globalSearchDialog"', index)
+        self.assertIn('id="globalSearchInput" type="search"', index)
+        self.assertIn('role="listbox"', index)
+        self.assertIn('event.key === "/"', search_source)
+        self.assertIn('!trigger.closest("[hidden]")', search_source)
+        self.assertIn("state.transactions || []", search_source)
+        self.assertIn("state.cardTransactions || []", search_source)
+        self.assertIn("state.portfolio?.positions || []", search_source)
+        self.assertNotIn("fetch(", search_source)
+        self.assertNotIn("api(", search_source)
+        self.assertIn("const viewScrollPositions = new Map()", app_source)
+        self.assertIn("viewScrollPositions.set(previousView, window.scrollY)", app_source)
+        self.assertIn("window.scrollTo({ top: viewScrollPositions.get(view) || 0", app_source)
+
+    def test_density_preference_is_local_persistent_and_layout_safe(self) -> None:
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        app_source = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+        density_utils = (MODULE_ROOT / "density-utils.js").read_text(encoding="utf-8")
+        user_admin = (MODULE_ROOT / "user-admin-view.js").read_text(encoding="utf-8")
+
+        self.assertIn('localStorage.getItem("sistemaFinanceiro.density")', index)
+        self.assertIn('id="densityPreference"', index)
+        self.assertIn('data-density-option="comfortable"', index)
+        self.assertIn('data-density-option="compact"', index)
+        self.assertIn("applyDensity();", app_source)
+        self.assertIn('localStorage.setItem(DENSITY_STORAGE_KEY', density_utils)
+        self.assertNotIn("fetch(", density_utils)
+        self.assertIn("syncDensityPreference", user_admin)
+        self.assertIn(':root[data-density="compact"] .dashboard', styles)
+        self.assertIn("min-height: 36px", styles)
+        self.assertNotIn(':root[data-density="compact"] {\n  font-size:', styles)
+
 
 if __name__ == "__main__":
     unittest.main()

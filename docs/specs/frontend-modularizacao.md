@@ -2,7 +2,7 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 3.1
+versao: 3.8
 atualizado: 2026-08-28
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
@@ -46,6 +46,8 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `theme-utils.js` | Preferência visual local e aplicação de tema no `documentElement`. |
 | `privacy-utils.js` | Preferência visual local de privacidade, aplicação de `data-privacy` e marcação visual de valores monetários. |
 | `tab-utils.js` | Transição progressiva e navegação roving por teclado compartilhadas por conjuntos de abas. |
+| `global-search.js` | Busca local transversal em módulos e dados já carregados, com navegação contextual. |
+| `density-utils.js` | Preferência visual local de densidade e aplicação de `data-density` no documento. |
 | `instructions-content.js` | Conteúdo estático, offline e versionado da central de ajuda. |
 
 ## Views funcionais
@@ -109,6 +111,22 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - As subtabs do Cockpit devem permitir navegação por teclado com setas esquerda/direita e teclas Home/End, movendo foco e seleção em conjunto.
 - Cockpit, Portfólio, Relatórios, Consultor e Preferências devem compartilhar o mesmo controlador nativo de abas para clique, setas, Home/End, `aria-selected`, `tabIndex` e transição progressiva.
 - Carregamentos assíncronos localizados devem expor `aria-busy`, preservar conteúdo útil sempre que possível e ignorar respostas obsoletas quando mês, filtro ou aba mudar antes da conclusão.
+- O Cockpit deve priorizar leitura executiva: alertas visíveis aparecem antes dos quatro KPIs; Saldos e Portfólio permanecem expandidos; Planejamento, Dívidas e gráficos de maiores receitas/despesas usam disclosure nativo recolhível com preferência local persistida.
+- Enquanto o Cockpit estiver visível, título do módulo e barra de abas/mês permanecem sticky, sem ocultar conteúdo ou bloquear navegação em telas intermediárias e móveis.
+- As duas superfícies sticky do Cockpit devem ser totalmente opacas com `--bg`, contíguas e separadas do conteúdo por linha sólida; conteúdo rolado nunca pode permanecer visível ou misturado por transparência/desfoque atrás delas.
+- Formulários devem expor uma hierarquia previsível: ação primária primeiro, ações secundárias com menor peso e ações destrutivas visualmente separadas no extremo oposto do rodapé.
+- Campos inválidos devem receber mensagem contextual junto ao próprio campo, `aria-invalid` e `aria-describedby`; a mensagem desaparece quando o valor volta a ser válido, sem limpar os demais dados preenchidos.
+- Durante um envio assíncrono, o formulário anuncia `aria-busy`, impede novo envio e restaura exatamente os estados desabilitados e o rótulo original dos controles ao concluir ou falhar.
+- O cabeçalho global do módulo deve permanecer sticky e opaco em todas as views autenticadas; barras internas sticky usam o offset desse cabeçalho sem sobreposição.
+- Filtros de listas e relatórios compartilham uma superfície de toolbar com borda, espaçamento e comportamento responsivo coerentes.
+- Tabelas de dados usam contêiner com overflow horizontal, cabeçalho sticky, rótulos de coluna consistentes e realce discreto da linha, preservando a largura necessária para dados financeiros no mobile.
+- Conjuntos principais de abas do Cockpit, Portfólio e Preferências permanecem sticky e opacos abaixo do cabeçalho global, com o mesmo offset e sem cobrir o painel ativo.
+- Formulários laterais, busca de Instruções e cabeçalhos diários sticky respeitam a altura do cabeçalho global em vez de se posicionarem atrás dele.
+- A busca global usa diálogo HTML nativo, abre pelo cabeçalho ou atalho `/`, pesquisa somente dados já carregados da sessão e nunca envia o termo a serviço externo.
+- Alternar módulos preserva a posição de rolagem de cada view; filtros, mês e aba permanecem no estado mantido pelos respectivos módulos durante a sessão.
+- Resultados de lançamentos, faturas e posições preparam conta/cartão, período ou destaque correspondente antes de navegar, sem abrir automaticamente formulários de edição.
+- A densidade visual oferece os modos **Confortável** (padrão) e **Compacto**, aplica `data-density` no elemento raiz e persiste somente em `localStorage`.
+- O modo compacto reduz espaços, paddings e altura de linhas em superfícies densas, preservando fonte legível, foco, contraste e alvos interativos com pelo menos 34px.
 
 ## API e dados
 
@@ -149,6 +167,23 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Dado foco em uma subtab do Cockpit, quando o usuário pressiona seta esquerda/direita ou Home/End, então foco, `aria-selected`, `tabIndex` e painel visível são atualizados de forma coerente.
 - Dado foco em qualquer conjunto analítico de abas do Cockpit, Portfólio, Relatórios, Consultor ou Preferências, quando o usuário navega por teclado, então todos seguem o mesmo comportamento roving e respeitam redução de movimento.
 - Dado uma consulta assíncrona de Tags, Tendências, Saúde Financeira ou Portfólio, quando uma seleção posterior torna a resposta anterior obsoleta, então o resultado antigo não substitui a visão atual e o estado `aria-busy` termina de forma coerente.
+- Dado o Cockpit na aba Situação, quando existem alertas de versão, limites ou vencimentos, então eles aparecem antes dos KPIs; quando não existem, o contêiner de alertas não ocupa espaço.
+- Dado Planejamento, Dívidas ou os gráficos executivos, quando o usuário recolhe ou expande uma seção, então o estado persiste localmente após recarregar a página e o conteúdo financeiro não é recalculado por essa preferência visual.
+- Dado o usuário rolando o Cockpit, quando o título e os controles alcançam o topo, então permanecem visíveis; em viewport de até 860px o offset é reduzido para preservar área útil.
+- Dado conteúdo passando sob o cabeçalho sticky do Cockpit, quando o usuário continua a rolagem, então nenhuma linha, card ou texto fica visível através do cabeçalho ou da barra de abas.
+- Dado um formulário com ações primária, secundária e destrutiva, quando exibido em desktop ou mobile, então a ação primária aparece primeiro, a secundária mantém peso neutro e a destrutiva fica separada das demais sem mudar sua semântica.
+- Dado um campo obrigatório ou com restrição inválida, quando o usuário tenta enviar o formulário, então o primeiro erro recebe foco e uma mensagem contextual acessível aparece junto ao campo; ao corrigi-lo, o erro desaparece sem apagar os outros valores.
+- Dado um formulário em envio, quando a operação assíncrona ainda não terminou, então um segundo envio fica bloqueado, `aria-busy` permanece verdadeiro e, ao final, os controles recuperam o mesmo estado anterior ao envio.
+- Dado qualquer módulo autenticado, quando o usuário rola a página, então o cabeçalho do módulo permanece visível, opaco e sem misturar o conteúdo rolado; barras sticky internas não ficam sob ele.
+- Dado uma listagem com busca ou filtros, quando exibida em desktop ou mobile, então seus controles usam o mesmo contêiner visual e se reorganizam sem overflow indevido.
+- Dado uma tabela maior que a largura disponível, quando exibida em viewport estreito, então o contêiner oferece rolagem horizontal, mantém a coluna legível e o cabeçalho visível durante a rolagem vertical da tabela.
+- Dado o usuário no Portfólio ou em Preferências, quando rola um painel longo, então as abas permanecem visíveis abaixo do cabeçalho global com fundo opaco e navegação por teclado preservada.
+- Dado um formulário lateral ou uma barra interna sticky, quando alcança o topo durante a rolagem, então para abaixo do cabeçalho global e não fica encoberto por ele.
+- Dado o usuário autenticado, quando aciona **Buscar em todo o app** ou pressiona `/` fora de um campo editável, então abre um diálogo acessível com módulos e dados locais já carregados.
+- Dado um termo correspondente a conta, cartão, lançamento, ativo, categoria ou módulo, quando seleciona o resultado, então navega à view adequada e prepara seu contexto sem transmitir o termo para fora do app.
+- Dado o usuário alternando entre duas views, quando retorna à anterior na mesma sessão, então posição de rolagem, filtros, período e aba continuam no contexto deixado.
+- Dado o usuário em Preferências, quando seleciona densidade **Compacta** ou **Confortável**, então a interface muda imediatamente e mantém a escolha após recarregar a página.
+- Dado o modo compacto ativo, quando navega por cards, formulários, listas, tabelas e toolbars, então o conteúdo ocupa menos espaço sem cortar texto, valores, foco ou controles.
 
 ## Fora de escopo
 
@@ -158,6 +193,13 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Changelog
 
+- `3.8` — 2026-08-28 — Densidade configurável adicionada com modos Confortável/Compacto, persistência local e compactação segura das principais superfícies de dados.
+- `3.7` — 2026-08-28 — Busca global local adicionada com atalho `/`, navegação contextual e preservação da posição de rolagem por módulo durante a sessão.
+- `3.6` — 2026-08-28 — Abas de Portfólio e Preferências passam a permanecer sticky como no Cockpit; offsets de formulários e barras internas são alinhados ao cabeçalho global.
+- `3.5` — 2026-08-28 — Cabeçalho sticky opaco promovido a padrão global; filtros e tabelas recebem toolbar, overflow, cabeçalho e estados de interação unificados.
+- `3.4` — 2026-08-28 — Hierarquia de formulários padronizada com ação primária primeiro, destrutiva separada, validação contextual acessível e estado de envio que preserva os controles condicionais.
+- `3.3` — 2026-08-28 — Superfícies sticky do Cockpit tornam-se opacas e contíguas, removendo translucidez/backdrop que misturava o conteúdo rolado com título e abas.
+- `3.2` — 2026-08-28 — Cockpit ganha layout executivo: alertas prioritários antes dos KPIs compactos, título e controles sticky, núcleo de Saldos/Portfólio sempre visível e quatro seções secundárias recolhíveis com estado persistido em `localStorage`.
 - `3.1` — 2026-08-28 — Fluidez generalizada: novo `tab-utils.js` padroniza transição e teclado em Cockpit, Portfólio, Relatórios, Consultor e Preferências; carregamentos de Portfólio, Tags, Tendências e Saúde passam a anunciar estado ocupado, com proteção adicional contra resposta obsoleta em Tags.
 - `3.0` — 2026-08-28 — Primeira etapa de fluidez do Cockpit: transição progressiva entre subtabs, estado localizado `aria-busy` durante atualização mensal, preservação visual do painel existente, redução de movimento e navegação completa por teclado.
 - `2.9` — 2026-08-28 — Inventário sincronizado com `instructions-content.js`, `instructions-view.js` e `simulations-view.js`; adicionados testes automatizados dos imports ES, do inventário documental e da ausência de artefatos de build.

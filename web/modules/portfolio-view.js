@@ -5,6 +5,7 @@ export function registerPortfolioView({
   elements,
   api,
   formData,
+  setFormBusy,
   setMessage,
   escapeHtml,
   formatMoney,
@@ -211,11 +212,8 @@ export function registerPortfolioView({
       return;
     }
     setMessage(portfolioMessage, "");
-    const submitButton = portfolioAssetForm.querySelector('button[type="submit"]');
-    const originalButtonText = submitButton.textContent;
     state.portfolioAssetSaving = true;
-    submitButton.disabled = true;
-    submitButton.textContent = "Salvando...";
+    setFormBusy(portfolioAssetForm, true);
     try {
       syncPortfolioFixedIncomeSubtype();
       syncPortfolioPensionSubtype();
@@ -237,7 +235,7 @@ export function registerPortfolioView({
       setMessage(portfolioMessage, error.message, "error");
     } finally {
       state.portfolioAssetSaving = false;
-      submitButton.textContent = originalButtonText;
+      setFormBusy(portfolioAssetForm, false);
       updatePortfolioAssetSubmitState();
     }
   }

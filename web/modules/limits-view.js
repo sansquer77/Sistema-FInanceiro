@@ -10,6 +10,7 @@ export function registerLimitsView({
   formatMoney,
   formatPercent,
   formData,
+  setFormBusy,
   setMessage,
   emptyState,
   escapeHtml,
@@ -56,6 +57,7 @@ export function registerLimitsView({
     const data = formData(limitForm);
     data.month = state.limitMonth;
     const isEditing = Boolean(data.id);
+    setFormBusy(limitForm, true);
     try {
       await api(isEditing ? `/api/spending-limits/${data.id}` : "/api/spending-limits", {
         method: isEditing ? "PUT" : "POST",
@@ -69,6 +71,9 @@ export function registerLimitsView({
       setMessage(limitMessage, "Limite salvo.", "success");
     } catch (error) {
       setMessage(limitMessage, error.message, "error");
+    } finally {
+      setFormBusy(limitForm, false);
+      renderLimitCategories();
     }
   }
 

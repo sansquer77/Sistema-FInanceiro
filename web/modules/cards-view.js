@@ -245,6 +245,7 @@ export function registerCardsView({
     setMessage(creditCardMessage, "");
     const data = formData(creditCardForm);
     const isEditing = Boolean(data.id);
+    setFormBusy(creditCardForm, true);
     try {
       await api(isEditing ? `/api/credit-cards/${data.id}` : "/api/credit-cards", {
         method: isEditing ? "PUT" : "POST",
@@ -256,6 +257,8 @@ export function registerCardsView({
       setMessage(creditCardMessage, "Cartão salvo.", "success");
     } catch (error) {
       setMessage(creditCardMessage, error.message, "error");
+    } finally {
+      setFormBusy(creditCardForm, false);
     }
   }
 
@@ -328,12 +331,15 @@ export function registerCardsView({
     const data = formData(cardInvoicePaymentForm);
     data.credit_card_id = state.selectedCreditCardId;
     data.invoice_month = state.cardInvoiceMonth;
+    setFormBusy(cardInvoicePaymentForm, true);
     try {
       await api("/api/credit-card-invoice/pay", { method: "POST", body: data });
       await onInvoicePaid();
       setMessage(cardInvoiceMessage, "Fatura paga e débito lançado na conta.", "success");
     } catch (error) {
       setMessage(cardInvoiceMessage, error.message, "error");
+    } finally {
+      setFormBusy(cardInvoicePaymentForm, false);
     }
   }
 

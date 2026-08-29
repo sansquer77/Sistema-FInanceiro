@@ -24,9 +24,15 @@
         } catch (error) {
           document.documentElement.dataset.privacy = "false";
         }
+        try {
+          const density = localStorage.getItem("sistemaFinanceiro.density");
+          document.documentElement.dataset.density = density === "compact" ? "compact" : "comfortable";
+        } catch (error) {
+          document.documentElement.dataset.density = "comfortable";
+        }
       })();
     </script>
-    <link rel="stylesheet" href="/styles.css?v=136">
+    <link rel="stylesheet" href="/styles.css?v=142">
   </head>
   <body>
     <main class="app-shell">
@@ -216,7 +222,12 @@
                 <button class="inline-help-icon contextual-help-button" id="contextualHelpButton" type="button" data-contextual-topic="" data-tooltip="Ajuda sobre esta tela" aria-label="Ajuda sobre esta tela" title="Ajuda sobre esta tela">?</button>
               </div>
             </div>
-            <button class="privacy-toggle-button" id="privacyToggleButton" type="button" aria-label="Ocultar valores" aria-pressed="false" title="Ocultar valores (P)">👁️</button>
+            <div class="topbar-actions">
+              <button class="global-search-trigger" id="globalSearchTrigger" type="button" aria-haspopup="dialog" aria-controls="globalSearchDialog">
+                <span>Buscar em todo o app</span><kbd>/</kbd>
+              </button>
+              <button class="privacy-toggle-button" id="privacyToggleButton" type="button" aria-label="Ocultar valores" aria-pressed="false" title="Ocultar valores (P)">👁️</button>
+            </div>
           </header>
 
         <section class="module-view" id="cockpitView" aria-busy="false">
@@ -236,6 +247,7 @@
           </div>
 
           <div class="cockpit-tab-panel" id="cockpitSummaryPanel" role="tabpanel">
+            <div class="cockpit-priority-alerts" aria-label="Alertas prioritários">
             <section class="cockpit-alert version-alert" id="cockpitVersionAlert" hidden>
               <a class="cockpit-alert-card version-alert-card" href="https://sistemafinanceiropage.vercel.app/#downloads" target="_blank" rel="noreferrer">
                 <span class="cockpit-alert-beacon" aria-hidden="true"></span>
@@ -247,8 +259,11 @@
               </a>
               <button class="version-alert-dismiss" type="button" id="cockpitVersionAlertDismiss" aria-label="Dispensar alerta de nova versão">×</button>
             </section>
+            <section class="cockpit-alert limit-alert" id="cockpitLimitAlert" hidden></section>
+            <section class="cockpit-alert portfolio-maturity-alert" id="cockpitPortfolioMaturityAlert" hidden></section>
+            </div>
 
-            <section class="summary-strip">
+            <section class="summary-strip executive-summary-strip" aria-label="Indicadores executivos do mês">
               <div class="kpi-income">
                 <span>Receitas do mês</span>
                 <strong id="monthIncome">R$ 0,00</strong>
@@ -273,9 +288,6 @@
               </div>
             </section>
 
-            <section class="cockpit-alert limit-alert" id="cockpitLimitAlert" hidden></section>
-            <section class="cockpit-alert portfolio-maturity-alert" id="cockpitPortfolioMaturityAlert" hidden></section>
-
             <div class="cockpit-stack">
               <section class="currency-panel">
                 <div class="section-heading">
@@ -289,36 +301,28 @@
               </section>
 
               <div class="cockpit-grid planning-debt-grid">
-              <section class="panel">
-                <div class="section-heading">
-                  <h2>Planejamento do mês</h2>
-                </div>
+              <details class="panel cockpit-disclosure" data-cockpit-section="planning" open>
+                <summary>Planejamento do mês</summary>
                 <div class="planning-list" id="monthlyPlanningList"></div>
-              </section>
+              </details>
 
-              <section class="panel">
-                <div class="section-heading">
-                  <h2>Dívidas</h2>
-                </div>
+              <details class="panel cockpit-disclosure" data-cockpit-section="debts" open>
+                <summary>Dívidas</summary>
                 <div class="planning-list" id="installmentDebtList"></div>
-              </section>
+              </details>
               </div>
             </div>
 
             <div class="cockpit-grid analytics-grid">
-              <section class="panel">
-                <div class="section-heading">
-                  <h2>Maiores despesas do mês</h2>
-                </div>
+              <details class="panel cockpit-disclosure" data-cockpit-section="top-expenses" open>
+                <summary>Maiores despesas do mês</summary>
                 <div class="chart-panel" id="topExpensesChart"></div>
-              </section>
+              </details>
 
-              <section class="panel">
-                <div class="section-heading">
-                  <h2>Maiores receitas do mês</h2>
-                </div>
+              <details class="panel cockpit-disclosure" data-cockpit-section="top-income" open>
+                <summary>Maiores receitas do mês</summary>
                 <div class="chart-panel" id="cashDistributionChart"></div>
-              </section>
+              </details>
             </div>
           </div>
 
@@ -455,7 +459,7 @@
                 <label>Observações
                   <textarea name="notes" rows="3"></textarea>
                 </label>
-                <div class="actions">
+                <div class="form-actions">
                   <button class="primary" type="submit">Salvar conta</button>
                   <button class="ghost" id="cancelEditButton" type="button" hidden>Cancelar</button>
                 </div>
@@ -532,7 +536,7 @@
                 <label>Observações
                   <textarea name="notes" rows="3"></textarea>
                 </label>
-                <div class="actions">
+                <div class="form-actions">
                   <button class="primary" type="submit">Salvar cartão</button>
                   <button class="ghost" id="cancelCreditCardEditButton" type="button" hidden>Cancelar</button>
                 </div>
@@ -604,7 +608,7 @@
                   <input name="payment_date" id="cardPaymentDate" type="date" required>
                 </label>
               </div>
-              <div class="field-row">
+              <div class="form-actions">
                 <button class="primary" type="submit" id="payCardInvoiceButton">Pagar fatura integral</button>
                 <button class="ghost" type="button" id="payPartialCardInvoiceButton">Pagar parte da fatura</button>
               </div>
@@ -682,7 +686,7 @@
                 <label>Observações
                   <textarea name="notes" rows="3"></textarea>
                 </label>
-                <div class="actions">
+                <div class="form-actions">
                   <button class="primary" type="submit">Salvar lançamento</button>
                   <button class="ghost small-button" id="cancelCardTransactionEditButton" type="button">Cancelar</button>
                 </div>
@@ -693,7 +697,7 @@
               <div class="section-heading">
                 <h2>Lançamentos da fatura <span class="invoice-open-count ok" id="cardInvoiceOpenCount">0 não conciliados</span></h2>
               </div>
-              <div class="invoice-list-toolbar">
+              <div class="invoice-list-toolbar filter-toolbar">
                 <label class="transaction-search">Buscar lançamento
                   <input id="cardInvoiceSearch" type="search" placeholder="Descrição, categoria, tag, valor...">
                 </label>
@@ -895,7 +899,7 @@
                 <label>Observações
                   <textarea name="notes" rows="3"></textarea>
                 </label>
-                <div class="actions">
+                <div class="form-actions">
                   <button class="primary" type="submit">Salvar lançamento</button>
                   <button class="ghost small-button" id="cancelTransactionEditButton" type="button">Cancelar</button>
                 </div>
@@ -924,7 +928,7 @@
                   <strong id="forecastBalanceSummary">R$ 0,00</strong>
                 </div>
               </div>
-              <div class="transaction-list-toolbar">
+              <div class="transaction-list-toolbar filter-toolbar">
                 <label class="transaction-search">Buscar lançamento
                   <span class="search-input-wrap">
                     <input id="transactionSearch" type="search" placeholder="Descrição, conta, categoria, tag...">
@@ -1157,10 +1161,10 @@
               <label>Observações
                 <textarea name="notes" rows="3"></textarea>
               </label>
-              <div class="actions">
+              <div class="form-actions">
                 <button class="primary" type="submit">Salvar ativo</button>
-                <button class="danger" id="deletePortfolioAssetButton" type="button" hidden>Excluir ativo</button>
                 <button class="ghost" id="cancelPortfolioAssetButton" type="button">Cancelar</button>
+                <button class="danger" id="deletePortfolioAssetButton" type="button" hidden>Excluir ativo</button>
               </div>
             </form>
           </section>
@@ -1269,7 +1273,7 @@
                 <label>Observações
                   <textarea name="notes" rows="3"></textarea>
                 </label>
-                <div class="actions">
+                <div class="form-actions">
                   <button class="primary" type="submit">Salvar limite</button>
                   <button class="ghost" id="cancelLimitEditButton" type="button" hidden>Cancelar</button>
                 </div>
@@ -1338,7 +1342,7 @@
                       </select>
                     </label>
                   </div>
-                  <div class="actions">
+                  <div class="form-actions">
                     <button class="ghost" id="resetSimulationButton" type="button">Limpar</button>
                     <button class="primary" type="submit">Simular</button>
                   </div>
@@ -1420,11 +1424,11 @@
               </div>
             </div>
 
-            <label class="report-account-filter" id="reportAccountFilter" hidden>Conta
+            <label class="report-account-filter filter-toolbar" id="reportAccountFilter" hidden>Conta
               <select id="reportAccountSelect"></select>
             </label>
 
-            <div class="statement-controls" id="statementControls" hidden>
+            <div class="statement-controls filter-toolbar" id="statementControls" hidden>
               <label>Escopo
                 <select id="statementScopeSelect">
                   <option value="consolidated">Consolidado — contas e cartões ativos</option>
@@ -1526,7 +1530,7 @@
             <div class="section-heading">
               <h2>Auditoria</h2>
             </div>
-            <form id="operationHistoryForm" class="form operation-history-filters">
+            <form id="operationHistoryForm" class="form operation-history-filters filter-toolbar">
               <label>De
                 <input id="operationHistoryDateFrom" name="date_from" type="date">
               </label>
@@ -1613,6 +1617,16 @@
                   <div class="segmented-control theme-segmented-control" id="themePreference" role="group" aria-label="Tema do app">
                     <button type="button" data-theme-option="light">Claro</button>
                     <button type="button" data-theme-option="dark">Escuro</button>
+                  </div>
+                </div>
+                <div class="theme-preference-row density-preference-row">
+                  <div>
+                    <strong>Densidade da interface</strong>
+                    <span>Ajusta o espaço entre cards, listas, formulários e tabelas.</span>
+                  </div>
+                  <div class="segmented-control theme-segmented-control" id="densityPreference" role="group" aria-label="Densidade da interface">
+                    <button type="button" data-density-option="comfortable">Confortável</button>
+                    <button type="button" data-density-option="compact">Compacta</button>
                   </div>
                 </div>
               </section>
@@ -1820,7 +1834,7 @@
                   </label>
                   <div class="form-actions">
                     <button class="primary" type="submit">Salvar perfil</button>
-                    <button class="ghost" id="consultorProfileDeleteButton" type="button">Excluir perfil</button>
+                    <button class="danger" id="consultorProfileDeleteButton" type="button">Excluir perfil</button>
                   </div>
                 </form>
                 <p class="message" id="consultorProfileMessage" role="alert"></p>
@@ -1883,7 +1897,7 @@
 
         <section class="module-view" id="instructionsView" hidden>
           <div class="instructions-container">
-            <div class="instructions-toolbar">
+            <div class="instructions-toolbar filter-toolbar">
               <div class="search-field">
                 <input type="search" id="instructionsSearch" placeholder="Buscar por tema, tópico ou palavra-chave..." autocomplete="off" aria-label="Buscar na central de ajuda">
                 <button type="button" id="instructionsClearSearch" class="ghost small-button" hidden>Limpar</button>
@@ -2058,7 +2072,17 @@
         </div>
       </aside>
     </main>
-    <script type="module" src="/app.js?v=138"></script>
+    <dialog class="global-search-dialog" id="globalSearchDialog" aria-labelledby="globalSearchTitle">
+      <div class="global-search-heading">
+        <div><p class="eyebrow">Busca global</p><h2 id="globalSearchTitle">Localizar no Sistema Financeiro</h2></div>
+        <button class="ghost small-button" id="globalSearchClose" type="button" aria-label="Fechar busca">Fechar</button>
+      </div>
+      <label class="global-search-field">Buscar módulos, contas, cartões, lançamentos, ativos ou categorias
+        <input id="globalSearchInput" type="search" autocomplete="off" placeholder="Digite para buscar nos dados carregados…">
+      </label>
+      <div class="global-search-results" id="globalSearchResults" role="listbox" aria-label="Resultados da busca"></div>
+    </dialog>
+    <script type="module" src="/app.js?v=143"></script>
     <script async defer data-name="BMC-Widget" data-cfasync="false" src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js" data-id="sansquerh" data-description="Support me on Buy me a coffee!" data-message="Tks pelo café!" data-color="#5F7FFF" data-position="Right" data-x_margin="18" data-y_margin="18" data-container="bmc-btn-container"></script>
   </body>
 </html>

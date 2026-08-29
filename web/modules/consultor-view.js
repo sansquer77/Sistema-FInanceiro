@@ -401,12 +401,12 @@ export function registerConsultorView({
       if (!tableRows.length) {
         return;
       }
-      html += `<table class="consultor-table">${tableRows
+      html += `<div class="report-table-wrap"><table class="report-table consultor-table">${tableRows
         .map((cells, index) => {
           const tag = index === 0 ? "th" : "td";
           return `<tr>${cells.map((cell) => `<${tag}>${cell}</${tag}>`).join("")}</tr>`;
         })
-        .join("")}</table>`;
+        .join("")}</table></div>`;
       tableRows = [];
     };
     for (const line of lines) {

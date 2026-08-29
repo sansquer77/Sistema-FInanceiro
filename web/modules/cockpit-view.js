@@ -3,6 +3,8 @@ import { registerConsultorView } from "./consultor-view.js";
 import { registerFinancialHealthView } from "./financial-health-view.js";
 import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";
 
+const COCKPIT_DISCLOSURE_KEY = "sf-cockpit-disclosures-v1";
+
 export function registerCockpitView({
   state,
   elements,
@@ -77,6 +79,7 @@ export function registerCockpitView({
   } = elements;
   let versionAlertDismissed = false;
   let activeChartBreakdownClose = null;
+  const cockpitDisclosures = Array.from(document.querySelectorAll("[data-cockpit-section]"));
 
   const trendsView = registerTrendsView({
     elements: { trendsPanel, trendsContent, trendsMeta },
@@ -138,6 +141,32 @@ export function registerCockpitView({
     versionAlertDismissed = true;
     renderVersionAlert();
   });
+  initializeCockpitDisclosures();
+
+  function initializeCockpitDisclosures() {
+    let stored = {};
+    try {
+      stored = JSON.parse(localStorage.getItem(COCKPIT_DISCLOSURE_KEY) || "{}");
+    } catch (_error) {
+      stored = {};
+    }
+    cockpitDisclosures.forEach((disclosure) => {
+      const key = disclosure.dataset.cockpitSection;
+      if (typeof stored[key] === "boolean") disclosure.open = stored[key];
+      disclosure.addEventListener("toggle", persistCockpitDisclosures);
+    });
+  }
+
+  function persistCockpitDisclosures() {
+    const stateBySection = Object.fromEntries(
+      cockpitDisclosures.map((disclosure) => [disclosure.dataset.cockpitSection, disclosure.open]),
+    );
+    try {
+      localStorage.setItem(COCKPIT_DISCLOSURE_KEY, JSON.stringify(stateBySection));
+    } catch (_error) {
+      // Preferência visual opcional: falhas de storage não bloqueiam o Cockpit.
+    }
+  }
 
   function renderCockpit() {
     renderCockpitTabs();

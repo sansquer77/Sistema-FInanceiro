@@ -24,6 +24,7 @@ import {
   emptyState,
   escapeHtml,
   formData,
+  initializeFormUX,
   normalizeSearch,
   setFormBusy,
   setMessage,
@@ -53,6 +54,7 @@ import {
   updatePrivacyToggleButton,
 } from "./modules/privacy-utils.js";
 import { applyTheme, setTheme, storedTheme } from "./modules/theme-utils.js";
+import { applyDensity, setDensity, storedDensity } from "./modules/density-utils.js";
 import { registerAuthView } from "./modules/auth-view.js";
 import { registerUserAdminView } from "./modules/user-admin-view.js";
 import { registerClassificationsView } from "./modules/classifications-view.js";
@@ -67,9 +69,12 @@ import { registerTransactionsView } from "./modules/transactions-view.js";
 import { registerSimulationsView } from "./modules/simulations-view.js";
 import { registerOperationHistoryView } from "./modules/operation-history-view.js";
 import { registerInstructionsView } from "./modules/instructions-view.js";
+import { registerGlobalSearch } from "./modules/global-search.js";
 
 applyTheme();
+applyDensity();
 applyPrivacyMode();
+initializeFormUX();
 
 const decisionModal = createDecisionModal();
 
@@ -321,6 +326,7 @@ const emailConfigPreset = document.querySelector("#emailConfigPreset");
 const clearLaunchesForm = document.querySelector("#clearLaunchesForm");
 const deleteUserForm = document.querySelector("#deleteUserForm");
 const themePreference = document.querySelector("#themePreference");
+const densityPreference = document.querySelector("#densityPreference");
 const emailMessage = document.querySelector("#emailMessage");
 const passwordMessage = document.querySelector("#passwordMessage");
 const emailConfigMessage = document.querySelector("#emailConfigMessage");
@@ -486,6 +492,11 @@ const simulationWeeklyProjection = document.querySelector("#simulationWeeklyProj
   const simulationWarnings = document.querySelector("#simulationWarnings");
 const resetSimulationButton = document.querySelector("#resetSimulationButton");
 const aboutAppVersion = document.querySelector("#aboutAppVersion");
+const globalSearchTrigger = document.querySelector("#globalSearchTrigger");
+const globalSearchDialog = document.querySelector("#globalSearchDialog");
+const globalSearchInput = document.querySelector("#globalSearchInput");
+const globalSearchResults = document.querySelector("#globalSearchResults");
+const globalSearchClose = document.querySelector("#globalSearchClose");
 const navButtons = document.querySelectorAll("[data-view]");
 const moduleViews = {
   cockpit: document.querySelector("#cockpitView"),
@@ -541,6 +552,22 @@ const CONTEXTUAL_HELP_TOPICS = {
 
 const SIDEBAR_COLLAPSED_KEY = "financeiro.sidebar.collapsed";
 const NAV_GROUPS_COLLAPSED_KEY = "financeiro.sidebar.navGroupsCollapsed";
+const viewScrollPositions = new Map();
+
+registerGlobalSearch({
+  state,
+  elements: {
+    trigger: globalSearchTrigger,
+    dialog: globalSearchDialog,
+    input: globalSearchInput,
+    results: globalSearchResults,
+    closeButton: globalSearchClose,
+  },
+  viewTitles,
+  normalizeSearch,
+  escapeHtml,
+  onNavigate: showModule,
+});
 
 const classificationsView = registerClassificationsView({
   state,
@@ -557,6 +584,7 @@ const classificationsView = registerClassificationsView({
   },
   api,
   formData,
+  setFormBusy,
   setMessage,
   emptyState,
   escapeHtml,
@@ -596,6 +624,7 @@ const limitsView = registerLimitsView({
   formatMoney,
   formatPercent,
   formData,
+  setFormBusy,
   setMessage,
   emptyState,
   escapeHtml,
@@ -792,6 +821,7 @@ const accountsView = registerAccountsView({
   },
   api,
   formData,
+  setFormBusy,
   setMessage,
   emptyState,
   escapeHtml,
@@ -1014,6 +1044,7 @@ const simulationsView = registerSimulationsView({
     resetSimulationButton,
   },
   formatMoney,
+  setFormBusy,
 });
 
 const portfolioView = registerPortfolioView({
@@ -1070,6 +1101,7 @@ const portfolioView = registerPortfolioView({
   },
   api,
   formData,
+  setFormBusy,
   setMessage,
   escapeHtml,
   formatMoney,
@@ -1197,6 +1229,7 @@ const userAdminViewController = registerUserAdminView({
     clearLaunchesForm,
     deleteUserForm,
     themePreference,
+    densityPreference,
     userPrefTabs,
     maisRetornoConfigForm,
     maisRetornoEnabled,
@@ -1218,6 +1251,10 @@ const userAdminViewController = registerUserAdminView({
   theme: {
     setTheme,
     storedTheme,
+  },
+  density: {
+    setDensity,
+    storedDensity,
   },
   state,
   onShowAuth: showAuth,
@@ -1549,6 +1586,9 @@ function ensureSelectedAccount() {
 
 function showModule(view) {
   const previousView = state.view;
+  if (previousView && previousView !== view) {
+    viewScrollPositions.set(previousView, window.scrollY);
+  }
   state.view = view;
   const updateVisibleModule = () => {
     for (const [name, element] of Object.entries(moduleViews)) {
@@ -1563,6 +1603,9 @@ function showModule(view) {
     document.startViewTransition(updateVisibleModule);
   } else {
     updateVisibleModule();
+  }
+  if (previousView !== view) {
+    requestAnimationFrame(() => window.scrollTo({ top: viewScrollPositions.get(view) || 0, behavior: "auto" }));
   }
   if (contextualHelpButton) {
     const contextualTopic = CONTEXTUAL_HELP_TOPICS[view];
@@ -1616,6 +1659,7 @@ function showModule(view) {
   if (view === "user" && state.user) {
     emailForm.elements.email.value = state.user.email;
     userAdminViewController.syncThemePreference();
+    userAdminViewController.syncDensityPreference();
     userAdminViewController.loadEmailConfigStatus();
     userAdminViewController.loadAIConfigStatus();
     userAdminViewController.loadConsultorConfigStatus();
