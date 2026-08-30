@@ -2,7 +2,7 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.37
+versao: 2.39
 atualizado: 2026-08-29
 relacionados:
   - "[[contas-correntes]]"
@@ -153,6 +153,10 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - [x] Explicitar que pós-fixado usa percentual do indexador, com vazio/zero representando 100%, enquanto híbrido usa taxa adicional.
 - [x] Incluir exemplos de pré-fixada, pós-fixada e híbrida no helper contextual.
 - [x] Reduzir ruído visual dos formulários de renda fixa com chips, microcopy dinâmica, presets e preview.
+- [x] Reutilizar ativos existentes por autocomplete nos formulários de Portfólio e Lançamentos, preservando digitação livre.
+- [x] Adicionar resgate por quantidade com cotação, valor bruto, taxas, crédito líquido e saldo remanescente sincronizados.
+- [x] Consumir quantidade e custo dos lotes por FIFO e manter compatibilidade com ativos sem quantidade.
+- [x] Cobrir baixa quantitativa, custo FIFO e crédito líquido com teste automatizado.
 
 ## Critérios de aceite
 
@@ -212,9 +216,16 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado o usuário confirmando o retorno à cotação automática, enquanto a consulta é processada, então o botão muda para `Atualizando...`, fica desabilitado e a célula anuncia estado ocupado; ao concluir, o botão desaparece e um toast confirma a restauração sem recarregar a página inteira.
 - Dado o usuário saindo do Portfólio e retornando à tela, quando o módulo é reaberto, então o app revalida os dados persistidos no backend sem forçar nova consulta externa de cotações, mantendo removido o botão de retorno automático após a restauração.
 - Dado uma carteira válida selecionada no formulário de posição inicial, quando o usuário salva um ativo de qualquer categoria, inclusive Stablecoin, então o identificador da carteira é enviado antes de os controles entrarem em estado ocupado e a posição é cadastrada sem falso erro de carteira ausente.
+- Dado ativos existentes no Portfólio, quando o usuário digita o código no cadastro de posição inicial ou em um lançamento de investimento, então recebe sugestões, pode selecionar um ativo para preencher seu nome e continua podendo informar um código novo livremente.
+- Dado um ativo com quantidade positiva, quando o usuário abre **Resgatar**, então o formulário mostra quantidade disponível/a resgatar, cotação unitária, valor bruto, taxas, crédito líquido e quantidade remanescente.
+- Dado o usuário alterando quantidade, cotação ou taxas no resgate quantitativo, quando o formulário é atualizado, então valor bruto, saldo líquido e quantidade remanescente são recalculados antes da confirmação.
+- Dado uma posição formada por múltiplos aportes, quando ocorre um resgate quantitativo parcial, então os lotes mais antigos são consumidos primeiro (FIFO), preservando quantidade e custo dos lotes restantes.
+- Dado um resgate quantitativo com taxas, quando confirmado, então a baixa registra o valor bruto realizado e a conta recebe somente o saldo líquido; quantidades acima do disponível e taxas acima do bruto são rejeitadas.
 
 ## Changelog
 
+- `2.39` — 2026-08-29 — Botão Resgatar preserva a quantidade da posição no payload do modal, ativando os campos quantitativos para ativos como AOM, ETH e ISAE4.
+- `2.38` — 2026-08-29 — Autocomplete reutiliza ativos existentes nos cadastros e resgate quantitativo sincroniza quantidade, cotação, bruto, taxas, líquido e remanescente com baixa FIFO por lote.
 - `2.37` — 2026-08-29 — Formulário de posição inicial captura o payload antes de desabilitar os controles durante o salvamento, preservando a carteira selecionada para Stablecoins e demais categorias.
 - `2.36` — 2026-08-29 — Entrada no Portfólio passa a revalidar o estado persistido sem atualizar forçadamente as fontes externas, eliminando dados antigos após navegar para outro módulo e voltar.
 - `2.35` — 2026-08-29 — Restauração da cotação automática ganha feedback localizado durante a consulta, atualização do horário e confirmação por toast sem perder o contexto da rolagem.

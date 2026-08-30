@@ -1121,6 +1121,7 @@ const portfolioView = registerPortfolioView({
   formatMonthShortLabel,
   formatDecimal,
   moneyInputValue,
+  parseDecimalInput,
   portfolioQuoteText,
   todayLocalDateValue,
   chartColor,

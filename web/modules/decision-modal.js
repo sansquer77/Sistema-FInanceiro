@@ -17,6 +17,7 @@ export function createDecisionModal() {
     primaryLabel,
     primaryVariant = "primary",
     secondaryLabel = "Voltar",
+    onChange,
   }) {
     return openModal({
       title,
@@ -27,10 +28,11 @@ export function createDecisionModal() {
         { value: null, label: secondaryLabel, variant: "ghost" },
       ],
       onSubmit: (formElement) => collectFormValues(formElement, fields),
+      onChange,
     });
   }
 
-  function openModal({ title, message, renderBody, actions, onSubmit }) {
+  function openModal({ title, message, renderBody, actions, onSubmit, onChange }) {
     closeActiveModal();
     let resolveModal;
     const pending = new Promise((resolve) => {
@@ -126,6 +128,11 @@ export function createDecisionModal() {
         finish(values);
       }
     });
+    if (onChange) {
+      modal.addEventListener("input", () => onChange(modal));
+      modal.addEventListener("change", () => onChange(modal));
+      onChange(modal);
+    }
     document.addEventListener("keydown", handleKeydown);
 
     requestAnimationFrame(() => {
@@ -160,6 +167,7 @@ export function createDecisionModal() {
       input.name = field.name;
       input.type = field.type || "text";
       input.required = Boolean(field.required);
+      input.readOnly = Boolean(field.readOnly);
       if (field.inputMode) {
         input.inputMode = field.inputMode;
       }

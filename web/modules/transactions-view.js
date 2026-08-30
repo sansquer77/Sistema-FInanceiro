@@ -1,4 +1,5 @@
 import { stateMarkup } from "./dom-utils.js";
+import { createAssetAutocomplete } from "./asset-autocomplete.js";
 
 export function registerTransactionsView({
   state,
@@ -111,6 +112,23 @@ export function registerTransactionsView({
   let classificationSuggestionRequestId = 0;
   let classificationSelectionTouched = false;
   const expandedTransactionDays = new Map();
+  const investmentAssetIdentifier = transactionForm.elements.investment_asset_identifier;
+  const investmentAssetAutocomplete = createAssetAutocomplete({
+    input: investmentAssetIdentifier,
+    nameInput: transactionForm.elements.investment_asset_name,
+    getPositions: () => state.portfolio?.positions || [],
+  });
+  investmentAssetIdentifier.addEventListener("focus", async () => {
+    if (!state.portfolio || state.portfolioDirty) {
+      try {
+        state.portfolio = await api("/api/portfolio");
+        state.portfolioDirty = false;
+        investmentAssetAutocomplete.refresh();
+      } catch {
+        // A digitação livre continua disponível mesmo se o catálogo não carregar.
+      }
+    }
+  });
 
   transactionForm.addEventListener("submit", handleTransactionSubmit);
   transactionType.addEventListener("change", () => {
@@ -306,18 +324,18 @@ export function registerTransactionsView({
           && Boolean(editingTransaction.use_average) !== useAverage.checked,
       );
       if (editingTransaction && editingTransaction.series_kind === "recurring" && useAverage) {
-        // spec: lancamentos v3.24 — critério 55
+        // spec: lancamentos v3.25 — critério 55
         // (ao editar recorrente, o estado do checkbox de média é enviado explicitamente)
         data.use_average = useAverage.checked ? "1" : "0";
       }
       if (isEditing && shouldAskFutureReplication(data.id)) {
         if (averageChanged) {
-          // spec: lancamentos v3.24 — critérios 56, 57 e 60
+          // spec: lancamentos v3.25 — critérios 56, 57 e 60
           // (flag de média alterada — marcada em série sem a marcação ou desmarcada
           //  em série que a tinha — não exibe modal e aplica em cascata)
           data.apply_to_future = true;
         } else {
-          // spec: lancamentos v3.24 — critérios 46 e 58
+          // spec: lancamentos v3.25 — critérios 46 e 58
           // (flag inalterada — ativa ou inativa — mantém o modal de escopo)
           const scope = await chooseSeriesEditScope("conta", Boolean(editingTransaction.use_average));
           if (!scope) {
@@ -1315,7 +1333,7 @@ export function registerTransactionsView({
       recurrenceAverageFields.hidden = !isRecurring;
     }
     if (useAverage) {
-      // spec: lancamentos v3.24 — criterio 52
+      // spec: lancamentos v3.25 — criterio 52
       // (na edicao de um recorrente o checkbox de media fica habilitado;
       //  so a repeticao/frequencia permanecem travadas na serie)
       useAverage.disabled = !isRecurring;

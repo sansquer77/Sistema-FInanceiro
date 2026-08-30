@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.44
+versao: 3.45
 atualizado: 2026-08-29
 relacionados:
   - "[[requisitos]]"
@@ -59,6 +59,7 @@ O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Co
 | `transaction-kind.js` | Predicados de tipo de lançamento. |
 | `labels.js` | Labels de domínio usados pela interface. |
 | `month-picker.js` | Popover reutilizável de seleção de mês. |
+| `asset-autocomplete.js` | Catálogo local derivado das posições do usuário para sugerir e reutilizar ativos sem impedir digitação livre. |
 | `decision-modal.js` | Modal reutilizável para decisões, confirmações explícitas e pequenos formulários. |
 | `theme-utils.js` | Persistência local e aplicação do tema visual. |
 | `privacy-utils.js` | Persistência local e aplicação do modo de ocultação de valores. |
@@ -514,6 +515,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.45` — 2026-08-29 — Portfólio documenta catálogo local compartilhado de ativos e resgate quantitativo persistido em `investment_redemptions`, com baixa FIFO e crédito líquido em `transactions`.
 - `3.44` — 2026-08-29 — Resolvedor do Yahoo passa a aceitar alias explícito de bolsa para VWRA em USD (`VWRA.L`).
 - `3.43` — 2026-08-29 — `DELETE /api/portfolio/value` remove o override manual de uma posição e recarrega sua cotação automática.
 - `3.42` — 2026-08-29 — Portfólio passa a distinguir Stablecoins de criptoativos voláteis, preservando cotação pela moeda da conta e compatibilidade de posições legadas.

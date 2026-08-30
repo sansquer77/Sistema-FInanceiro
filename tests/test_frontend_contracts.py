@@ -241,6 +241,8 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn(".report-table td:first-child", styles)
         self.assertIn(".toast-region", styles)
         portfolio = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
+        transactions = (MODULE_ROOT / "transactions-view.js").read_text(encoding="utf-8")
+        asset_autocomplete = (MODULE_ROOT / "asset-autocomplete.js").read_text(encoding="utf-8")
         self.assertIn("data-restore-automatic-quote-payload", portfolio)
         self.assertIn('method: "DELETE"', portfolio)
         self.assertIn('triggerButton.textContent = "Atualizando..."', portfolio)
@@ -252,6 +254,12 @@ class FrontendModuleContractTest(unittest.TestCase):
             portfolio.index("setFormBusy(portfolioAssetForm, true);"),
         )
         self.assertIn("portfolio-automatic-quote-button", styles)
+        self.assertIn("createAssetAutocomplete", portfolio)
+        self.assertIn("createAssetAutocomplete", transactions)
+        self.assertIn('document.createElement("datalist")', asset_autocomplete)
+        self.assertIn("updateQuantityRedemptionPreview", portfolio)
+        self.assertIn('name: "remaining_quantity"', portfolio)
+        self.assertIn("quantity: position.quantity || 0", portfolio)
 
 
 if __name__ == "__main__":

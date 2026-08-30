@@ -77,13 +77,13 @@ class IsolatedDatabaseMixin(unittest.TestCase):
 
 class FundQuoteApplicationTest(IsolatedDatabaseMixin):
     def test_vwra_usd_resolves_to_london_yahoo_symbol(self) -> None:
-        # spec: investimentos/investimentos-portfolio v2.37 — critério 53
+        # spec: investimentos/investimentos-portfolio v2.39 — critério 53
         self.assertEqual(yahoo_symbol({
             "asset_type": "stock", "asset_identifier": "VWRA", "currency": "USD",
         }), "VWRA.L")
 
     def test_manual_override_can_return_to_automatic_even_after_legacy_reclassification(self) -> None:
-        # spec: investimentos/investimentos-portfolio v2.37 — critérios 51 e 52
+        # spec: investimentos/investimentos-portfolio v2.39 — critérios 51 e 52
         user = create_user("Alice", "alice@example.com", "correct-password")
         account = create_checking_account(user["id"], {
             "name": "Coinbase", "bank_name": "Coinbase", "account_type": "investment", "currency": "BRL",
@@ -110,7 +110,7 @@ class FundQuoteApplicationTest(IsolatedDatabaseMixin):
         self.assertEqual(remaining, 0)
 
     def test_stablecoins_have_own_class_and_keep_account_quote_currency(self) -> None:
-        # spec: investimentos/investimentos-portfolio v2.37 — critérios 49 e 50
+        # spec: investimentos/investimentos-portfolio v2.39 — critérios 49 e 50
         self.assertEqual(effective_asset_type("crypto", "USDC-BRL"), "stablecoin")
         self.assertEqual(effective_asset_type("crypto", "BTC-BRL"), "crypto")
         self.assertEqual(normalize_asset_identifier("USDT-USD", "stablecoin"), "USDT")

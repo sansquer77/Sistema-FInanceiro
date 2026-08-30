@@ -1,5 +1,6 @@
 import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";
 import { setLastUpdated, stateMarkup } from "./dom-utils.js";
+import { createAssetAutocomplete } from "./asset-autocomplete.js";
 
 export function registerPortfolioView({
   state,
@@ -16,6 +17,7 @@ export function registerPortfolioView({
   formatMonthShortLabel,
   formatDecimal,
   moneyInputValue,
+  parseDecimalInput,
   portfolioQuoteText,
   todayLocalDateValue,
   chartColor,
@@ -100,6 +102,18 @@ export function registerPortfolioView({
   });
   const portfolioEmergencyReserveFields = portfolioAssetForm.querySelector("#portfolioEmergencyReserveFields");
   const portfolioAssetName = portfolioAssetForm.elements.asset_name;
+  const portfolioAssetAutocomplete = createAssetAutocomplete({
+    input: portfolioAssetIdentifier,
+    nameInput: portfolioAssetName,
+    getPositions: () => state.portfolio?.positions || [],
+    onSelect: (asset) => {
+      portfolioAssetType.value = asset.asset_type || "other";
+      portfolioAssetForm.elements.cnpj.value = asset.cnpj || "";
+      portfolioAssetForm.elements.fixed_income_indexer.value = asset.fixed_income_indexer || "";
+      portfolioAssetForm.elements.fixed_income_maturity_date.value = asset.fixed_income_maturity_date || "";
+      updatePortfolioAssetTypeState();
+    },
+  });
 
   addPortfolioAssetButton.addEventListener("click", showPortfolioAssetForm);
   refreshPortfolioButton.addEventListener("click", () => loadPortfolio({ refreshMessage: true }));
@@ -183,6 +197,7 @@ export function registerPortfolioView({
       state.portfolio = portfolioResult.value;
       state.portfolioDirty = false;
       setLastUpdated(portfolioLastUpdated);
+      portfolioAssetAutocomplete.refresh();
       if (options.refreshMessage) {
         setMessage(portfolioMessage, "Portfólio atualizado.", "success");
       }
@@ -258,7 +273,7 @@ export function registerPortfolioView({
   function resetPortfolioAssetForm() {
     portfolioAssetForm.reset();
     portfolioAssetForm.elements.id.value = "";
-    // spec: investimentos-portfolio v2.37 — criterio 48
+    // spec: investimentos-portfolio v2.39 — criterio 48
     portfolioAssetForm.elements.exchange_rate_to_brl.value = "";
     portfolioAssetFormTitle.textContent = "Ativo em carteira";
     deletePortfolioAssetButton.hidden = true;
@@ -329,28 +344,58 @@ export function registerPortfolioView({
   }
 
   async function redeemPortfolioPosition(position) {
+    const availableQuantity = Number(position.quantity || 0);
+    const usesQuantity = availableQuantity > 0;
+    const estimatedUnitPrice = usesQuantity ? Number(position.current_value || 0) / availableQuantity : 0;
+    const fields = [
+      {
+        name: "date",
+        label: "Data do resgate",
+        type: "date",
+        value: todayLocalDateValue(),
+        required: true,
+      },
+    ];
+    if (usesQuantity) {
+      fields.push(
+        {
+          name: "quantity",
+          label: `Quantidade a resgatar (disponível: ${formatDecimal(availableQuantity, 6)})`,
+          type: "text",
+          inputMode: "decimal",
+          value: decimalInputValue(availableQuantity),
+          required: true,
+        },
+        {
+          name: "unit_price",
+          label: `Cotação unitária (${position.currency || "BRL"})`,
+          type: "text",
+          inputMode: "decimal",
+          value: moneyInputValue(estimatedUnitPrice),
+          required: true,
+        },
+        { name: "gross_amount", label: `Valor bruto (${position.currency || "BRL"})`, type: "text", readOnly: true },
+        { name: "fees", label: `Taxas/custos (${position.currency || "BRL"})`, type: "text", inputMode: "decimal", value: "0,00" },
+        { name: "amount", label: `Saldo líquido na conta (${position.currency || "BRL"})`, type: "text", readOnly: true },
+        { name: "remaining_quantity", label: "Quantidade remanescente", type: "text", readOnly: true },
+      );
+    } else {
+      fields.push({
+        name: "amount",
+        label: `Valor do resgate (${position.currency || "BRL"})`,
+        type: "text",
+        inputMode: "decimal",
+        value: moneyInputValue(position.current_value),
+        required: true,
+        help: "Informe o valor que retornará para a conta da carteira.",
+      });
+    }
     const result = await decisionModal.form({
       title: "Resgatar posição",
       message: `${position.asset_name || position.asset_identifier || "Ativo"} · ${position.account_name || "Carteira"} (${position.currency || "BRL"})`,
-      fields: [
-        {
-          name: "date",
-          label: "Data do resgate",
-          type: "date",
-          value: todayLocalDateValue(),
-          required: true,
-        },
-        {
-          name: "amount",
-          label: `Valor do resgate (${position.currency || "BRL"})`,
-          type: "text",
-          inputMode: "decimal",
-          value: moneyInputValue(position.current_value),
-          required: true,
-          help: "Informe o valor que retornará para a conta da carteira.",
-        },
-      ],
+      fields,
       primaryLabel: "Registrar resgate",
+      onChange: usesQuantity ? (form) => updateQuantityRedemptionPreview(form, availableQuantity) : undefined,
     });
     if (!result) {
       return;
@@ -367,6 +412,10 @@ export function registerPortfolioView({
           asset_name: position.asset_name || "",
           cnpj: position.cnpj || "",
           amount: result.amount,
+          quantity: result.quantity,
+          unit_price: result.unit_price,
+          gross_amount: result.gross_amount,
+          fees: result.fees,
           date: result.date,
         },
       });
@@ -381,6 +430,19 @@ export function registerPortfolioView({
     } catch (error) {
       setMessage(portfolioMessage, error.message, "error");
     }
+  }
+
+  function updateQuantityRedemptionPreview(form, availableQuantity) {
+    const quantity = Math.max(parseDecimalInput(form.elements.quantity?.value), 0);
+    const unitPrice = Math.max(parseDecimalInput(form.elements.unit_price?.value), 0);
+    const fees = Math.max(parseDecimalInput(form.elements.fees?.value), 0);
+    const gross = quantity * unitPrice;
+    const net = Math.max(gross - fees, 0);
+    form.elements.gross_amount.value = moneyInputValue(gross);
+    form.elements.amount.value = moneyInputValue(net);
+    form.elements.remaining_quantity.value = decimalInputValue(Math.max(availableQuantity - quantity, 0));
+    form.elements.quantity.setCustomValidity(quantity > availableQuantity ? "A quantidade excede o saldo disponível." : "");
+    form.elements.fees.setCustomValidity(fees > gross ? "As taxas não podem superar o valor bruto." : "");
   }
 
   function updatePortfolioAssetTypeState() {
@@ -1334,7 +1396,7 @@ export function registerPortfolioView({
     `;
   }
 
-  // spec: investimentos-portfolio v2.37 — criterio 47
+  // spec: investimentos-portfolio v2.39 — criterio 47
   function portfolioEmergencyShieldIcon() {
     return '<svg class="portfolio-emergency-shield" viewBox="0 0 24 24" width="12" height="12" role="img" aria-label="Reserva de emergência" title="Reserva de emergência" fill="currentColor"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5l8-3z"/></svg>';
   }
@@ -1594,6 +1656,7 @@ export function registerPortfolioView({
       asset_identifier: position.asset_identifier || "",
       asset_name: position.asset_name || "",
       cnpj: position.cnpj || "",
+      quantity: position.quantity || 0,
       current_value: position.current_value,
     };
   }

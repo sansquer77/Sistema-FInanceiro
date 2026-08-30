@@ -438,13 +438,24 @@ def delete_opening_position(user_id: int, position_id: object) -> dict:
 
 
 def redeem_position(user_id: int, data: dict) -> dict:
-    # spec: investimentos-portfolio v2.37 — criterio 9
+    # spec: investimentos-portfolio v2.39 — criterios 9, 55-58
     # (em posicao com multiplas origens, o consumo do resgate segue FIFO pela
     #  data da primeira operacao — candidates.sort abaixo garante essa ordem)
     selector = normalize_redemption_selector(data)
-    redemption_value_cents = money_to_cents(data.get("amount", "0"))
-    if redemption_value_cents <= 0:
-        raise PortfolioError("Informe o valor do resgate.")
+    requested_quantity_micros = decimal_to_micros(data.get("quantity"))
+    quantity_mode = requested_quantity_micros > 0
+    gross_value_cents = money_to_cents(data.get("gross_amount", data.get("amount", "0")))
+    unit_price_cents = money_to_cents(data.get("unit_price", "0")) if str(data.get("unit_price") or "").strip() else 0
+    if quantity_mode and gross_value_cents <= 0 and unit_price_cents > 0:
+        gross_value_cents = int((Decimal(requested_quantity_micros) * Decimal(unit_price_cents) / MICRO_SCALE).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    fees_cents = money_to_cents(data.get("fees", "0")) if str(data.get("fees") or "").strip() else 0
+    redemption_value_cents = money_to_cents(data.get("amount", "0")) if str(data.get("amount") or "").strip() else gross_value_cents - fees_cents
+    if gross_value_cents <= 0 or redemption_value_cents <= 0:
+        raise PortfolioError("Informe um valor de resgate valido.")
+    if fees_cents < 0 or redemption_value_cents > gross_value_cents:
+        raise PortfolioError("O saldo liquido deve ser menor ou igual ao valor bruto.")
+    if redemption_value_cents != gross_value_cents - fees_cents:
+        raise PortfolioError("O saldo liquido deve corresponder ao valor bruto menos as taxas.")
     redemption_date = normalize_date(data.get("date") or date.today().isoformat())
     with get_connection() as conn:
         account = conn.execute(
@@ -467,15 +478,19 @@ def redeem_position(user_id: int, data: dict) -> dict:
         # state (no TOCTOU between an out-of-lock read and the inserts below).
         positions = current_portfolio_positions(user_id)
         candidates = [
-            position for position in positions
+            candidate
+            for position in positions
             if matches_redemption_selector(position, selector)
-            and position["source_type"] in {"operation", "opening"}
-            and int(position["current_value_cents"] or 0) > 0
-            and int(position["total_cost_cents"] or 0) > 0
+            for candidate in expand_redemption_candidates(position)
+            if (quantity_mode or int(candidate["current_value_cents"] or 0) > 0)
+            and int(candidate["total_cost_cents"] or 0) > 0
         ]
         candidates.sort(key=lambda position: (position["first_operation_date"], 0 if position["source_type"] == "operation" else 1, position["source_id"] or 0))
         available_cents = sum(int(position["current_value_cents"] or 0) for position in candidates)
-        if redemption_value_cents > available_cents:
+        available_quantity_micros = sum(decimal_to_micros_value(position["quantity"]) for position in candidates)
+        if quantity_mode and requested_quantity_micros > available_quantity_micros:
+            raise PortfolioError("Quantidade de resgate maior que a quantidade disponivel para este ativo.")
+        if not quantity_mode and redemption_value_cents > available_cents:
             raise PortfolioError("Valor de resgate maior que o valor disponivel para este ativo.")
         account = conn.execute(
             """
@@ -510,16 +525,26 @@ def redeem_position(user_id: int, data: dict) -> dict:
             ),
         )
         recompute_account_balance(conn, user_id, account["id"])
-        remaining_cents = redemption_value_cents
+        remaining_cents = gross_value_cents
+        remaining_quantity_micros = requested_quantity_micros
         redemptions = []
         for position in candidates:
-            if remaining_cents <= 0:
+            if (quantity_mode and remaining_quantity_micros <= 0) or (not quantity_mode and remaining_cents <= 0):
                 break
             current_cents = int(position["current_value_cents"] or 0)
-            take_cents = min(remaining_cents, current_cents)
-            ratio = Decimal(take_cents) / Decimal(current_cents)
+            position_quantity_micros = decimal_to_micros_value(position["quantity"])
+            if quantity_mode:
+                take_quantity_micros = min(remaining_quantity_micros, position_quantity_micros)
+                ratio = Decimal(take_quantity_micros) / Decimal(position_quantity_micros)
+                take_cents = remaining_cents if take_quantity_micros == remaining_quantity_micros else min(
+                    remaining_cents,
+                    int((Decimal(gross_value_cents) * Decimal(take_quantity_micros) / Decimal(requested_quantity_micros)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
+                )
+            else:
+                take_cents = min(remaining_cents, current_cents)
+                ratio = Decimal(take_cents) / Decimal(current_cents)
+                take_quantity_micros = int((Decimal(position_quantity_micros) * ratio).quantize(Decimal("1"), rounding=ROUND_HALF_UP)) if position_quantity_micros > 0 else 0
             cost_cents = int((Decimal(position["total_cost_cents"]) * ratio).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
-            quantity_micros = int((Decimal(str(position["quantity"])) * MICRO_SCALE * ratio).quantize(Decimal("1"), rounding=ROUND_HALF_UP)) if Decimal(str(position["quantity"] or "0")) > 0 else 0
             redemptions.append((
                 user_id,
                 account["id"],
@@ -528,11 +553,12 @@ def redeem_position(user_id: int, data: dict) -> dict:
                 position["source_id"],
                 take_cents,
                 cost_cents,
-                quantity_micros,
+                take_quantity_micros,
                 redemption_date,
                 empty_to_none(data.get("notes")),
             ))
             remaining_cents -= take_cents
+            remaining_quantity_micros -= take_quantity_micros
         conn.executemany(
             """
             INSERT INTO investment_redemptions (
@@ -544,6 +570,43 @@ def redeem_position(user_id: int, data: dict) -> dict:
             redemptions,
         )
     return get_portfolio(user_id)
+
+
+def expand_redemption_candidates(position: dict) -> list[dict]:
+    sources = position.get("sources") or []
+    if not sources:
+        return [position] if position.get("source_type") in {"operation", "opening"} else []
+    total_quantity = Decimal(str(position.get("quantity") or "0"))
+    total_cost_cents = int(position.get("total_cost_cents") or 0)
+    candidates = []
+    allocated_current_cents = 0
+    for index, source in enumerate(sources):
+        source_quantity = Decimal(str(source.get("quantity") or "0"))
+        source_cost_cents = int(source.get("total_cost_cents") or 0)
+        if total_quantity > 0:
+            ratio = source_quantity / total_quantity
+        elif total_cost_cents > 0:
+            ratio = Decimal(source_cost_cents) / Decimal(total_cost_cents)
+        else:
+            ratio = Decimal("0")
+        current_value_cents = (
+            int(position.get("current_value_cents") or 0) - allocated_current_cents
+            if index == len(sources) - 1
+            else int((Decimal(int(position.get("current_value_cents") or 0)) * ratio).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+        )
+        allocated_current_cents += current_value_cents
+        candidates.append({
+            **position,
+            "source_type": source["source_type"],
+            "source_id": source["source_id"],
+            "source_transaction_id": source.get("source_transaction_id"),
+            "first_operation_date": source["date"],
+            "last_operation_date": source["date"],
+            "quantity": source_quantity,
+            "total_cost_cents": source_cost_cents,
+            "current_value_cents": current_value_cents,
+        })
+    return candidates
 
 
 def close_position(user_id: int, data: dict) -> dict:
@@ -700,7 +763,7 @@ def close_position(user_id: int, data: dict) -> dict:
 
 
 def should_register_closing_credit(data: dict) -> bool:
-    # spec: investimentos-portfolio v2.37 — criterios 10-11
+    # spec: investimentos-portfolio v2.39 — criterios 10-11
     # (a opcao de credito e opt-in explicito e vem desmarcada por padrao no
     #  formulario, justamente para evitar duplicidade com resgates ja lancados)
     return str(data.get("register_credit") or "").strip().lower() in {"1", "true", "on", "yes", "sim"}
@@ -1010,7 +1073,7 @@ def normalize_opening_position_payload(data: dict) -> dict:
 
 
 def normalize_emergency_reserve_eligible(data: dict, asset_type: str) -> int:
-    # spec: investimentos/investimentos-portfolio v2.37 — critérios 20 e 21
+    # spec: investimentos/investimentos-portfolio v2.39 — critérios 20 e 21
     if asset_type not in {"fixed_income", "savings"}:
         return 0
     return 1 if str(data.get("emergency_reserve_eligible") or "").strip().lower() in {"1", "true", "on", "yes"} else 0
@@ -1098,7 +1161,7 @@ def parse_savings_anniversaries(value: object, fallback_date: object, fallback_a
 
 
 def consume_savings_anniversaries_fifo(entries: list[dict], redeemed_cost_cents: int) -> list[dict]:
-    # spec: investimentos-portfolio v2.37 — criterio poupanca-resgate-fifo
+    # spec: investimentos-portfolio v2.39 — criterio poupanca-resgate-fifo
     # (resgates de poupanca consomem primeiro os aniversarios mais antigos para
     # manter a base de rentabilidade alinhada ao saldo remanescente por lote)
     remaining_redeemed = max(int(redeemed_cost_cents or 0), 0)
@@ -1191,7 +1254,7 @@ def resolve_position_exchange_rate(currency: str, acquisition_date: str, raw_rat
         return rate_to_micros(Decimal("1"))
     if str(raw_rate or "").strip():
         return rate_to_micros(parse_exchange_rate(raw_rate))
-    # spec: investimentos-portfolio v2.37 — criterio 48
+    # spec: investimentos-portfolio v2.39 — criterio 48
     # (sem cotacao manual, consulta a ultima PTAX de venda disponivel
     #  ate a data de aquisicao, como em Lancamentos)
     return rate_to_micros(get_exchange_rate_to_brl(currency, acquisition_date))
@@ -1428,7 +1491,7 @@ def apply_market_quote(position: dict, force_refresh: bool = False) -> None:
 
 
 def apply_fund_quote(position: dict, user_id: int | None = None, force_refresh: bool = False) -> None:
-    # spec: investimentos/investimentos-portfolio v2.37 — criterios 27 e 28
+    # spec: investimentos/investimentos-portfolio v2.39 — criterios 27 e 28
     # (cotas de fundos via API Mais Retorno: opt-in configurado nas Preferencias,
     #  posicao com CNPJ e carteira em BRL; sem isso a posicao mantem valor de
     #  custo com status "Cotacao manual pendente")
@@ -1452,7 +1515,7 @@ def apply_fund_quote(position: dict, user_id: int | None = None, force_refresh: 
 
 
 def fetch_fund_quote_for_user(user_id: int, cnpj: str, force_refresh: bool = False) -> dict:
-    # spec: lancamentos v3.24 — criterio cota-fundo-lancamento
+    # spec: lancamentos v3.25 — criterio cota-fundo-lancamento
     # (busca assistida de cota de fundo no formulario de aporte; o preco segue editavel)
     identifier = mais_retorno_identifier_from_cnpj(cnpj)
     if not identifier:
@@ -1471,7 +1534,7 @@ def fetch_fund_quote_for_user(user_id: int, cnpj: str, force_refresh: bool = Fal
 
 
 def mais_retorno_fund_identifier(position: dict) -> str:
-    # spec: investimentos/investimentos-portfolio v2.37 — criterio fundos-mais-retorno
+    # spec: investimentos/investimentos-portfolio v2.39 — criterio fundos-mais-retorno
     # (API exige CNPJ somente com digitos, sem pontos/barra, mais sufixo ":fi")
     return mais_retorno_identifier_from_cnpj(position.get("cnpj"))
 
@@ -1489,7 +1552,7 @@ def mais_retorno_quotes_for_range(
     force_refresh: bool = False,
     cache_suffix: str = "",
 ) -> list:
-    # spec: investimentos/investimentos-portfolio v2.37 — criterios 27 e 28:
+    # spec: investimentos/investimentos-portfolio v2.39 — criterios 27 e 28:
     # range de datas questionado junto com a data atual; cache diario (ate o
     # fim do dia) para evitar re-consumo da API ao entrar na tela no mesmo dia
     url = MAIS_RETORNO_QUOTES_URL.format(symbol=quote(identifier), start=start, end=end)
@@ -1510,7 +1573,7 @@ def mais_retorno_quotes_for_range(
 
 def fetch_mais_retorno_quote(identifier: str, api_key: str, force_refresh: bool = False) -> dict:
     today = date.today().isoformat()
-    # spec: investimentos/investimentos-portfolio v2.37 — criterios 27 e 28:
+    # spec: investimentos/investimentos-portfolio v2.39 — criterios 27 e 28:
     # 1a tentativa sempre com a data atual; em dias sem cota publicada (fim de
     # semana/feriado) a API retorna lista vazia, entao re-consulta com janela
     # retroativa de 7 dias e usa a ultima cota publicada
@@ -1526,7 +1589,7 @@ def fetch_mais_retorno_quote(identifier: str, api_key: str, force_refresh: bool 
         latest = max(quotes, key=lambda item: str(item["d"]))
         earlier = [item for item in quotes if str(item["d"]) < str(latest["d"])]
         previous = max(earlier, key=lambda item: str(item["d"])) if earlier else latest
-        # spec: investimentos/investimentos-portfolio v2.37 — criterios 27 e 28:
+        # spec: investimentos/investimentos-portfolio v2.39 — criterios 27 e 28:
         # a API usa "." como separador decimal (JSON); normaliza virgula por
         # seguranca antes de converter para Decimal
         price = Decimal(str(latest["c"]).replace(",", "."))
@@ -1583,7 +1646,7 @@ def day_variation_cents(
     force_refresh: bool = False,
     factor_cache: dict[str, Decimal] | None = None,
 ) -> int:
-    # spec: investimentos/investimentos-portfolio v2.37 — criterios 43 a 45
+    # spec: investimentos/investimentos-portfolio v2.39 — criterios 43 a 45
     # (variacao do dia = valor hoje menos valor no dia anterior, com a base de
     #  comparacao limitada a data de aquisicao: no dia da aquisicao a variacao
     #  exibida e zero. Para pos-fixados, dias sem taxa publicada (fim de
@@ -2016,7 +2079,7 @@ def savings_additional_monthly_rate(force_refresh: bool = False) -> Decimal:
 
 
 def savings_additional_monthly_rate_from_selic(selic_annual: Decimal) -> Decimal:
-    # spec: investimentos-portfolio v2.37 — secao "Regras > Poupanca"
+    # spec: investimentos-portfolio v2.39 — secao "Regras > Poupanca"
     # (TR + 0,5% a.m. quando Selic > 8,5% a.a.; TR + 70% da Selic equivalente
     #  mensal quando Selic <= 8,5% a.a. — limiar e formula nao sao obvios)
     if selic_annual > Decimal("0.085"):
@@ -2065,7 +2128,7 @@ def fallback_indexer_annual_rate(indexer: str) -> Decimal:
 
 
 def fixed_income_income_tax_cents(gross_profit_cents: int, days: int) -> int:
-    # spec: investimentos-portfolio v2.37 — criterio 3 (secao "Regras > Renda Fixa":
+    # spec: investimentos-portfolio v2.39 — criterio 3 (secao "Regras > Renda Fixa":
     # tabela regressiva de IR, 22,5% a 15% conforme dias corridos desde a aquisicao)
     if gross_profit_cents <= 0:
         return 0
@@ -2081,7 +2144,7 @@ def fixed_income_income_tax_cents(gross_profit_cents: int, days: int) -> int:
 
 
 def fixed_income_custody_fee_cents(position: dict, gross_cents: int, days: int) -> int:
-    # spec: investimentos/investimentos-portfolio v2.37 — critério 25
+    # spec: investimentos/investimentos-portfolio v2.39 — critério 25
     # Tesouro Direto tem taxa B3 de custodia provisionada diariamente. O app
     # estima a taxa na curva, sem tentar reproduzir marcacao a mercado oficial.
     if gross_cents <= 0 or days <= 0 or not is_treasury_direct_position(position):
@@ -2110,7 +2173,7 @@ def treasury_position_name(position: dict) -> str:
 
 
 def fixed_income_iof_tax_cents(gross_profit_cents: int, days: int) -> int:
-    # spec: investimentos-portfolio v2.37 — criterio 3 (secao "Regras > Renda Fixa":
+    # spec: investimentos-portfolio v2.39 — criterio 3 (secao "Regras > Renda Fixa":
     # IOF regressivo so incide ate 30 dias corridos desde a aquisicao)
     if gross_profit_cents <= 0 or days >= 30:
         return 0
@@ -2328,7 +2391,7 @@ def bcb_range_ttl_seconds(end_date: date) -> int:
 
 
 def seconds_until_end_of_day() -> int:
-    # spec: investimentos/investimentos-portfolio v2.37 — criterios 27 e 28
+    # spec: investimentos/investimentos-portfolio v2.39 — criterios 27 e 28
     # (cache de cotacao de fundos vale ate o fim do dia corrente)
     now = datetime.now()
     end = datetime(now.year, now.month, now.day) + timedelta(days=1)
@@ -2725,7 +2788,7 @@ def cents_to_decimal(cents: int) -> Decimal:
 
 
 def decimal_to_string(value: Decimal) -> str:
-    # spec: investimentos/investimentos-portfolio v2.37 — critério normalização de quantidade
+    # spec: investimentos/investimentos-portfolio v2.39 — critério normalização de quantidade
     # com até 2 casas decimais (half-up) para não estourar o layout das tabelas.
     if not value:
         return "0"

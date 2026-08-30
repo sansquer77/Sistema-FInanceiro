@@ -2,7 +2,7 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 4.2
+versao: 4.3
 atualizado: 2026-08-29
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
@@ -50,6 +50,7 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `density-utils.js` | Preferência visual local de densidade e aplicação de `data-density` no documento. |
 | `overlay-utils.js` | Semântica, foco e teclado compartilhados por drawers e overlays persistentes. |
 | `data-ux.js` | Ordenação local, contagem de linhas e chips removíveis para tabelas e filtros. |
+| `asset-autocomplete.js` | Sugestões de ativos existentes por `datalist`, preenchimento de metadados e preservação da digitação livre. |
 | `instructions-content.js` | Conteúdo estático, offline e versionado da central de ajuda. |
 
 ## Views funcionais
@@ -221,6 +222,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Changelog
 
+- `4.3` — 2026-08-29 — Autocomplete de ativos compartilhado entre Portfólio e Lançamentos; modal de decisão passa a aceitar atualização derivada de campos durante a digitação.
 - `4.2` — 2026-08-29 — Resumo pré-salvamento torna-se expansível, recolhido em lançamentos à vista e aberto automaticamente nos modos parcelado e recorrente.
 - `4.1` — 2026-08-29 — Resumo pré-salvamento passa a iniciar vazio e ignorar controles condicionais ocultos ou desabilitados.
 - `4.0` — 2026-08-29 — Consolidação final de overlays, toasts, cabeçalhos/atualização, tabelas/filtros, formulários progressivos e microcopy.
