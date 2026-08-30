@@ -267,6 +267,11 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("/api/portfolio/allocation-goals", portfolio)
         self.assertIn('data-portfolio-tab="goals"', index)
         self.assertIn('id="portfolioGoalsForm"', index)
+        self.assertGreater(
+            index.index('id="portfolioReturnDrawer"'),
+            index.index('id="aboutView"'),
+        )
+        self.assertLess(index.index('id="portfolioReturnDrawer"'), index.index('id="forecastDrawer"'))
         self.assertIn('portfolio-view.js?v=157', app_source)
         transition_start = portfolio.index("transitionView(() => {")
         transition_end = portfolio.index("  };", transition_start)

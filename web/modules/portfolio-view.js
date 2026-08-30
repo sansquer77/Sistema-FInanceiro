@@ -693,7 +693,7 @@ export function registerPortfolioView({
   }
 
   function renderPortfolioReturns() {
-    // spec: rentabilidade-portfolio v1.7 — critérios 2, 3 e 12
+    // spec: rentabilidade-portfolio v1.8 — critérios 2, 3 e 12
     // (SVG nativo diferencia as séries da carteira dos benchmarks e mantém
     // a escala percentual comum sem introduzir dependência de gráficos)
     const returns = state.portfolioReturns;

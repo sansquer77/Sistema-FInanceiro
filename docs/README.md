@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 11.94
-atualizado: 2026-08-29
+versao: 11.95
+atualizado: 2026-08-30
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -134,6 +134,7 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `11.95` — 2026-08-30 — [[specs/rentabilidade-portfolio]] v1.8 mantém o drawer do gráfico acima do cabeçalho sticky por meio do nível global de overlays.
 - `11.94` — 2026-08-29 — Versão `1.8.2`: corrige a auditoria do salvamento de Metas e integra a comparação definida/real/referência do perfil ao Consultor.
 - `11.93` — 2026-08-29 — [[arquitetura]] v3.48 documenta a integração das Metas com o Consultor e a entidade de auditoria correspondente.
 - `11.92` — 2026-08-29 — [[specs/investimentos-portfolio]] v2.43 corrige a auditoria das Metas; [[specs/consultor]] v2.0 compara alocação definida, real e faixa de referência do perfil.

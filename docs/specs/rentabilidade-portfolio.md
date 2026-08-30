@@ -2,8 +2,8 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 1.7
-atualizado: 2026-08-22
+versao: 1.8
+atualizado: 2026-08-30
 relacionados:
   - "[[investimentos-portfolio]]"
   - "[[arquitetura]]"
@@ -14,7 +14,7 @@ aliases: ["Rentabilidade do Portfólio"]
 # Rentabilidade do Portfólio
 
 > [!info] Status
-> **implementado** · área: `investimentos` · atualizado em 2026-08-22 · relacionados: [[investimentos-portfolio]]
+> **implementado** · área: `investimentos` · atualizado em 2026-08-30 · relacionados: [[investimentos-portfolio]]
 
 ## Problema
 
@@ -86,6 +86,7 @@ Tabelas: `investment_opening_positions`, `investment_operations`, `investment_re
 - Dado um erro ao consultar o CDI/IPCA ou ao montar o resumo, quando o drawer é aberto, então o app exibe mensagem de erro sem travar o Portfólio.
 - Dado uma posição que entrou no mês atual, quando o gráfico calcula aquele mês, então o aporte não é tratado como retorno (marca baseline).
 - Dado o usuário abrindo o gráfico em desktop, quando o flyover é exibido, então ocupa aproximadamente metade da viewport e o gráfico tem área de desenho de 420px de altura, sem prejudicar a adaptação para telas estreitas.
+- Dado o cabeçalho global fixo, quando o drawer de rentabilidade é aberto, então overlay, cabeçalho e gráfico permanecem integralmente acima do conteúdo e do cabeçalho da aplicação.
 
 ## Pendências
 
@@ -108,9 +109,11 @@ Tabelas: `investment_opening_positions`, `investment_operations`, `investment_re
 - [x] Passo 5 — Ajustar estilos do gráfico em `web/styles.css` (reuso das classes existentes). Fecha: critérios 3, 4.
 - [x] Passo 6 — Escrever testes automatizados para o cálculo mensal por moeda e CDI/IPCA por mês. Fecha: critérios 2, 3, 4, 5, 6, 7, 8, 12.
 - [x] Passo 7 — Ampliar o flyover e refinar o SVG nativo com preenchimento sutil das séries da carteira e traços pontilhados para benchmarks, sem dependência externa. Fecha: critérios 2, 12.
+- [x] Passo 8 — Hospedar o drawer no nível global de overlays para que seu contexto de empilhamento permaneça acima do cabeçalho sticky. Fecha: critério 13.
 
 ## Changelog
 
+- `1.8` — 2026-08-30 — Drawer de rentabilidade movido para o nível global de overlays, impedindo que o cabeçalho sticky encubra o gráfico.
 - `1.7` — 2026-08-22 — Flyover de rentabilidade ampliado para aproximadamente metade da viewport em desktop; área do gráfico passa a 420px e o SVG nativo diferencia carteira (preenchimento sutil) de benchmarks (traço pontilhado), sem adicionar dependências.
 - `1.6` — 2026-08-09 — Rentabilidade passa a ser carregada sob demanda no drawer e `get_portfolio_returns` aceita posições já calculadas para evitar segunda consolidação do Portfólio quando houver contexto disponível.
 - `1.5` — 2026-08-09 — Refinamento visual do gráfico de rentabilidade: linhas mais finas/discretas e pontos menores com destaque apenas no hover.
