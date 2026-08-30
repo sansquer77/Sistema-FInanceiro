@@ -4,12 +4,23 @@ import os
 import hashlib
 import sqlite3
 import sys
+from contextlib import closing
+from datetime import datetime, timedelta
 from pathlib import Path
 
 ROOT = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parents[1]
 DATA_DIR = Path(os.environ.get("SISTEMA_FINANCEIRO_DATA_DIR", ROOT / "data"))
 DB_PATH = DATA_DIR / "finance.db"
 SQLITE_BUSY_TIMEOUT_MS = 5000
+V2_SCHEMA_VERSION = 20000
+LEGACY_BACKUP_NAME = "finance-v1.bkp"
+MIGRATION_WORK_NAME = ".finance-v2-migration-work.db"
+MIGRATION_CANDIDATE_NAME = ".finance-v2-migration-candidate.db"
+QUOTE_CACHE_STALE_RETENTION_DAYS = 30
+QUOTE_CACHE_MAX_ENTRIES = 1500
+QUOTE_CACHE_MAX_ENTRIES_PER_PROVIDER = 1000
+QUOTE_CACHE_VACUUM_MIN_FREE_BYTES = 1024 * 1024
+QUOTE_CACHE_VACUUM_MIN_FREE_RATIO = 0.20
 PERFORMANCE_INDEXES = (
     "CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions (user_id, date)",
     "CREATE INDEX IF NOT EXISTS idx_transactions_account ON transactions (account_id)",
@@ -123,9 +134,14 @@ class ManagedConnection(sqlite3.Connection):
             self.close()
 
 
-def get_connection() -> sqlite3.Connection:
-    DATA_DIR.mkdir(exist_ok=True)
-    conn = sqlite3.connect(DB_PATH, timeout=SQLITE_BUSY_TIMEOUT_MS / 1000, factory=ManagedConnection)
+class DatabaseMigrationError(RuntimeError):
+    pass
+
+
+def get_connection(db_path: Path | None = None) -> sqlite3.Connection:
+    path = Path(db_path) if db_path is not None else DB_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(path, timeout=SQLITE_BUSY_TIMEOUT_MS / 1000, factory=ManagedConnection)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode = WAL")
     conn.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS}")
@@ -139,7 +155,122 @@ def begin_immediate(conn: sqlite3.Connection) -> None:
 
 
 def initialize_database() -> None:
-    with get_connection() as conn:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    if not DB_PATH.exists():
+        _initialize_schema(DB_PATH)
+        _set_schema_version(DB_PATH, V2_SCHEMA_VERSION)
+        maintain_quote_cache(DB_PATH)
+        return
+
+    schema_version = _read_schema_version(DB_PATH)
+    if schema_version == V2_SCHEMA_VERSION:
+        maintain_quote_cache(DB_PATH)
+        return
+    if schema_version != 0:
+        raise DatabaseMigrationError(
+            f"Versao de banco nao suportada: {schema_version}. "
+            f"Esta versao do app aceita o schema legado 1.x ou {V2_SCHEMA_VERSION}."
+        )
+    _migrate_legacy_database()
+    maintain_quote_cache(DB_PATH)
+
+
+def maintain_quote_cache(db_path: Path | None = None, now: datetime | None = None) -> dict:
+    """Prune regenerable quote payloads without touching financial records."""
+    path = Path(db_path) if db_path is not None else DB_PATH
+    reference_time = now or datetime.now()
+    stale_cutoff = reference_time - timedelta(days=QUOTE_CACHE_STALE_RETENTION_DAYS)
+    result = {"deleted": 0, "vacuumed": False, "free_bytes": 0, "free_ratio": 0.0}
+    try:
+        with get_connection(path) as conn:
+            table_exists = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'quote_cache'"
+            ).fetchone()
+            if not table_exists:
+                return result
+            before = int(conn.execute("SELECT COUNT(*) FROM quote_cache").fetchone()[0])
+            conn.execute(
+                "DELETE FROM quote_cache WHERE datetime(expires_at) < datetime(?)",
+                (stale_cutoff.isoformat(),),
+            )
+            _trim_quote_cache_per_provider(conn, reference_time)
+            _trim_quote_cache_total(conn, reference_time)
+            after = int(conn.execute("SELECT COUNT(*) FROM quote_cache").fetchone()[0])
+            result["deleted"] = before - after
+
+        if result["deleted"] <= 0:
+            return result
+
+        with closing(sqlite3.connect(path, timeout=SQLITE_BUSY_TIMEOUT_MS / 1000)) as conn:
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            page_size = int(conn.execute("PRAGMA page_size").fetchone()[0])
+            page_count = int(conn.execute("PRAGMA page_count").fetchone()[0])
+            free_pages = int(conn.execute("PRAGMA freelist_count").fetchone()[0])
+        result["free_bytes"] = free_pages * page_size
+        result["free_ratio"] = free_pages / page_count if page_count else 0.0
+        if (
+            result["free_bytes"] >= QUOTE_CACHE_VACUUM_MIN_FREE_BYTES
+            and result["free_ratio"] >= QUOTE_CACHE_VACUUM_MIN_FREE_RATIO
+        ):
+            with closing(sqlite3.connect(path, timeout=SQLITE_BUSY_TIMEOUT_MS / 1000)) as conn:
+                conn.execute("VACUUM")
+            result["vacuumed"] = True
+    except sqlite3.DatabaseError:
+        # spec: persistencia/manutencao-cache-cotacoes v1.0 — critério 8
+        # Cache é regenerável e sua manutenção nunca bloqueia a abertura do app.
+        return result
+    return result
+
+
+def _trim_quote_cache_per_provider(conn: sqlite3.Connection, now: datetime) -> None:
+    conn.execute(
+        """
+        DELETE FROM quote_cache
+        WHERE cache_key IN (
+            SELECT cache_key
+            FROM (
+                SELECT
+                    cache_key,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY CASE
+                            WHEN instr(cache_key, ':') > 0
+                                THEN substr(cache_key, 1, instr(cache_key, ':') - 1)
+                            ELSE cache_key
+                        END
+                        ORDER BY
+                            CASE WHEN datetime(expires_at) > datetime(?) THEN 0 ELSE 1 END,
+                            datetime(updated_at) DESC,
+                            cache_key DESC
+                    ) AS position
+                FROM quote_cache
+            )
+            WHERE position > ?
+        )
+        """,
+        (now.isoformat(), QUOTE_CACHE_MAX_ENTRIES_PER_PROVIDER),
+    )
+
+
+def _trim_quote_cache_total(conn: sqlite3.Connection, now: datetime) -> None:
+    conn.execute(
+        """
+        DELETE FROM quote_cache
+        WHERE cache_key IN (
+            SELECT cache_key
+            FROM quote_cache
+            ORDER BY
+                CASE WHEN datetime(expires_at) > datetime(?) THEN 0 ELSE 1 END,
+                datetime(updated_at) DESC,
+                cache_key DESC
+            LIMIT -1 OFFSET ?
+        )
+        """,
+        (now.isoformat(), QUOTE_CACHE_MAX_ENTRIES),
+    )
+
+
+def _initialize_schema(db_path: Path) -> None:
+    with get_connection(db_path) as conn:
         conn.executescript(
             """
             CREATE TABLE IF NOT EXISTS users (
@@ -672,6 +803,143 @@ def initialize_database() -> None:
         migrate_transaction_brl_values(conn)
         backfill_normalized_descriptions(conn)
         ensure_performance_indexes(conn)
+
+
+def _read_schema_version(db_path: Path) -> int:
+    try:
+        # spec: migracao-dados/migracao-banco-v2 v1.1 — critério 12
+        # A URI mode=ro falha em algumas combinações do SQLite do macOS quando
+        # o caminho contém espaços. A conexão normal é aberta sem executar
+        # escrita e também consegue consultar bancos configurados em WAL.
+        with closing(sqlite3.connect(db_path, timeout=SQLITE_BUSY_TIMEOUT_MS / 1000)) as conn:
+            return int(conn.execute("PRAGMA user_version").fetchone()[0])
+    except sqlite3.DatabaseError as exc:
+        raise DatabaseMigrationError("Nao foi possivel identificar a versao do banco de dados.") from exc
+
+
+def _set_schema_version(db_path: Path, version: int) -> None:
+    with get_connection(db_path) as conn:
+        conn.execute(f"PRAGMA user_version = {int(version)}")
+
+
+def _migrate_legacy_database() -> None:
+    # spec: migracao-dados/migracao-banco-v2 v1.1 — critérios 3, 4, 7, 8 e 11
+    backup_path = DB_PATH.with_name(LEGACY_BACKUP_NAME)
+    work_path = DB_PATH.with_name(MIGRATION_WORK_NAME)
+    candidate_path = DB_PATH.with_name(MIGRATION_CANDIDATE_NAME)
+    if backup_path.exists():
+        raise DatabaseMigrationError(
+            f"A migracao foi bloqueada porque {backup_path.name} ja existe. "
+            "O backup legado nunca e sobrescrito automaticamente."
+        )
+
+    _remove_migration_artifacts(work_path, candidate_path)
+    promoted_legacy = False
+    try:
+        _checkpoint_database(DB_PATH)
+        _copy_database(DB_PATH, work_path)
+        _initialize_schema(work_path)
+        _set_schema_version(work_path, V2_SCHEMA_VERSION)
+        _validate_database(work_path)
+        _vacuum_into(work_path, candidate_path)
+        _validate_database(candidate_path)
+        _validate_table_counts(work_path, candidate_path)
+
+        os.replace(DB_PATH, backup_path)
+        promoted_legacy = True
+        try:
+            os.replace(candidate_path, DB_PATH)
+        except OSError:
+            os.replace(backup_path, DB_PATH)
+            promoted_legacy = False
+            raise
+    except (OSError, sqlite3.DatabaseError, DatabaseMigrationError) as exc:
+        if promoted_legacy and backup_path.exists() and not DB_PATH.exists():
+            os.replace(backup_path, DB_PATH)
+        if isinstance(exc, DatabaseMigrationError):
+            raise
+        raise DatabaseMigrationError(
+            "Nao foi possivel migrar o banco legado. O arquivo original foi preservado."
+        ) from exc
+    finally:
+        _remove_migration_artifacts(work_path, candidate_path)
+
+
+def _checkpoint_database(db_path: Path) -> None:
+    with closing(sqlite3.connect(db_path, timeout=SQLITE_BUSY_TIMEOUT_MS / 1000)) as conn:
+        result = conn.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
+        if result and int(result[0]) != 0:
+            raise DatabaseMigrationError("O banco esta ocupado e nao pode ser migrado agora.")
+
+
+def _copy_database(source_path: Path, destination_path: Path) -> None:
+    source_uri = source_path.resolve().as_uri() + "?mode=ro"
+    with closing(sqlite3.connect(source_uri, uri=True, timeout=SQLITE_BUSY_TIMEOUT_MS / 1000)) as source:
+        with closing(sqlite3.connect(destination_path, timeout=SQLITE_BUSY_TIMEOUT_MS / 1000)) as destination:
+            source.backup(destination)
+
+
+def _vacuum_into(source_path: Path, destination_path: Path) -> None:
+    escaped_path = str(destination_path).replace("'", "''")
+    with closing(sqlite3.connect(source_path, timeout=SQLITE_BUSY_TIMEOUT_MS / 1000)) as conn:
+        conn.execute(f"VACUUM INTO '{escaped_path}'")
+
+
+def _validate_database(db_path: Path) -> None:
+    uri = db_path.resolve().as_uri() + "?mode=ro"
+    with closing(sqlite3.connect(uri, uri=True, timeout=SQLITE_BUSY_TIMEOUT_MS / 1000)) as conn:
+        integrity_rows = [row[0] for row in conn.execute("PRAGMA integrity_check")]
+        if integrity_rows != ["ok"]:
+            raise DatabaseMigrationError("A verificacao de integridade do banco candidato falhou.")
+        foreign_key_rows = conn.execute("PRAGMA foreign_key_check").fetchall()
+        if foreign_key_rows:
+            raise DatabaseMigrationError("O banco candidato possui referencias invalidas.")
+        schema_version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+        if schema_version != V2_SCHEMA_VERSION:
+            raise DatabaseMigrationError("O banco candidato nao possui a versao de schema esperada.")
+
+
+def _validate_table_counts(source_path: Path, destination_path: Path) -> None:
+    source_uri = source_path.resolve().as_uri() + "?mode=ro"
+    destination_uri = destination_path.resolve().as_uri() + "?mode=ro"
+    with closing(sqlite3.connect(source_uri, uri=True)) as source, closing(
+        sqlite3.connect(destination_uri, uri=True)
+    ) as destination:
+        source_tables = _user_table_names(source)
+        destination_tables = _user_table_names(destination)
+        if source_tables != destination_tables:
+            raise DatabaseMigrationError("As tabelas do banco candidato divergem da origem normalizada.")
+        for table_name in source_tables:
+            quoted_name = table_name.replace('"', '""')
+            source_count = source.execute(f'SELECT COUNT(*) FROM "{quoted_name}"').fetchone()[0]
+            destination_count = destination.execute(f'SELECT COUNT(*) FROM "{quoted_name}"').fetchone()[0]
+            if source_count != destination_count:
+                raise DatabaseMigrationError(
+                    f"A contagem da tabela {table_name} diverge no banco candidato."
+                )
+
+
+def _user_table_names(conn: sqlite3.Connection) -> tuple[str, ...]:
+    return tuple(
+        row[0]
+        for row in conn.execute(
+            """
+            SELECT name
+            FROM sqlite_master
+            WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+            ORDER BY name
+            """
+        )
+    )
+
+
+def _remove_migration_artifacts(*paths: Path) -> None:
+    for path in paths:
+        for candidate in (path, Path(f"{path}-wal"), Path(f"{path}-shm")):
+            try:
+                candidate.unlink()
+            except FileNotFoundError:
+                pass
 
 
 def ensure_performance_indexes(conn: sqlite3.Connection) -> None:

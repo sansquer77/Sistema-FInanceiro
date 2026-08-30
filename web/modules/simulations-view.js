@@ -2,6 +2,7 @@ import { api } from "./api.js";
 import { formatMoney } from "./money-utils.js";
 import { escapeHtml, formData, setFormBusy, setMessage, stateMarkup } from "./dom-utils.js";
 import { formatDate, formatShortMonthName, todayLocalDateValue } from "./date-utils.js";
+import { chartToken, renderChart } from "./chart-adapter.js";
 
 export function registerSimulationsView({
   state,
@@ -130,7 +131,7 @@ export function registerSimulationsView({
       simulationDifference.textContent = formatMoney((accountImpact.difference_cents || 0) / 100, currency);
     }
 
-    simulationChart.innerHTML = buildSimulationBalanceHistory(response.chart_series || [], currency);
+    renderSimulationBalanceHistory(response.chart_series || [], currency);
     if (weeklyProjectionElement) {
       const projection = response.daily_projection || response.weekly_projection || [];
       weeklyProjectionElement.innerHTML = buildDailyProjectionTable(
@@ -146,35 +147,15 @@ export function registerSimulationsView({
     `).join("");
   }
 
-  function buildSimulationBalanceHistory(series, currency) {
+  function renderSimulationBalanceHistory(series, currency) {
     const rows = simulationBalanceHistoryRows(series, currency);
     if (!rows.length) {
-      return stateMarkup("Preencha o cenário e execute a simulação para gerar o gráfico.", { kind: "empty" });
+      simulationChart.innerHTML = stateMarkup("Preencha o cenário e execute a simulação para gerar o gráfico.", { kind: "empty" });
+      return;
     }
-    const forecastPath = balanceHistoryPath(rows, "forecastY");
-    const simulatedPath = balanceHistoryPath(rows, "simulatedY");
-    const areaPath = balanceHistoryAreaPath(rows, "simulatedY");
-    const forecastPoints = rows.map((row) => `
-      <span class="invoice-history-point simulation-point forecast" style="left: ${row.x}%; top: ${row.forecastY}%"></span>
-    `).join("");
-    const simulatedPoints = rows.map((row) => `
-      <span class="invoice-history-point simulation-point ${row.index === 0 ? "current" : "future"}" style="left: ${row.x}%; top: ${row.simulatedY}%"></span>
-    `).join("");
-    return `
+    simulationChart.innerHTML = `
       <div class="invoice-history-rail" role="list">
-        <svg class="invoice-history-svg" viewBox="0 0 100 100" aria-hidden="true" preserveAspectRatio="none">
-          <defs>
-            <linearGradient id="simulationBalanceHistoryAreaGradient" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.18"></stop>
-              <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"></stop>
-            </linearGradient>
-          </defs>
-          <path class="invoice-history-area account-balance-history-area" d="${areaPath}"></path>
-          <path class="invoice-history-line simulation-forecast-line" d="${forecastPath}"></path>
-          <path class="invoice-history-line future" d="${simulatedPath}"></path>
-        </svg>
-        ${forecastPoints}
-        ${simulatedPoints}
+        <div class="invoice-history-apex"></div>
         ${rows.map((row) => {
           const simulatedText = formatMoney(Math.abs(row.simulatedAmount), currency);
           const forecastText = formatMoney(Math.abs(row.forecastAmount), currency);
@@ -192,6 +173,18 @@ export function registerSimulationsView({
         <span><i class="legend-line simulated"></i>Saldo com simulação</span>
       </div>
     `;
+    renderChart(simulationChart.querySelector(".invoice-history-apex"), {
+      chart: { type: "area", height: 170, sparkline: { enabled: true } },
+      series: [
+        { name: "Saldo previsto", data: rows.map((row) => row.forecastAmount) },
+        { name: "Saldo com simulação", data: rows.map((row) => row.simulatedAmount) },
+      ],
+      colors: [chartToken("--muted", "#6b7280"), chartToken("--accent", "#5f7fff")],
+      stroke: { curve: "smooth", width: [2, 3], dashArray: [5, 0] },
+      fill: { type: "gradient", gradient: { opacityFrom: 0.18, opacityTo: 0.01 } },
+      markers: { size: 3 },
+      tooltip: { y: { formatter: (value) => formatMoney(value, currency) } },
+    });
   }
 
   function buildDailyProjectionTable(projection, summary, currency, scenarioDate) {

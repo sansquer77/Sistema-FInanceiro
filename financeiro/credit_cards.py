@@ -1,16 +1,20 @@
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 from http import HTTPStatus
-import re
 import sqlite3
 from uuid import uuid4
 
 from financeiro.accounts import SUPPORTED_CURRENCIES, cents_to_money, empty_to_none, money_to_cents
 from financeiro.categories import get_or_create_category, get_or_create_subcategory, get_or_create_tag, normalize_name
 from financeiro.classification_suggestions import normalize_description
+from financeiro.calendar_rules import add_months, normalize_iso_date, normalize_iso_month, shift_month
 from financeiro.database import begin_immediate, get_connection, row_to_dict
+from financeiro.identifiers import positive_int_id
 from financeiro.operation_logs import create_operation_log_with_conn
+from financeiro.recurrence import RECURRENCE_FREQUENCIES as CARD_RECURRENCE_FREQUENCIES
+from financeiro.recurrence import SERIES_KINDS as CARD_SERIES_KINDS
+from financeiro.recurrence import add_recurrence
 from financeiro.transactions import (
     average_amount_for_recurring_description,
     convert_to_brl_cents,
@@ -23,10 +27,6 @@ from financeiro.transactions import (
 )
 
 CARD_TRANSACTION_TYPES = {"income", "expense"}
-CARD_SERIES_KINDS = {"single", "installment", "recurring"}
-CARD_RECURRENCE_FREQUENCIES = {"weekly", "monthly", "quarterly", "semiannual", "annual"}
-MONTH_PATTERN = re.compile(r"^\d{4}-\d{2}$")
-
 class CreditCardError(Exception):
     def __init__(self, message: str, status: HTTPStatus = HTTPStatus.BAD_REQUEST) -> None:
         self.message = message
@@ -676,7 +676,7 @@ def pay_credit_card_invoice(user_id: int, data: dict) -> dict:
                     ),
                 },
             )
-            # spec: relatorios/relatorios v2.16 — criterio 6
+            # spec: relatorios/relatorios v2.17 — criterio 6
             # (o retorno imediato tambem precisa identificar o pagamento agregado;
             #  o vinculo persistente sera gravado logo abaixo em credit_card_payments)
             payment_transaction["is_credit_card_payment"] = True
@@ -1010,24 +1010,6 @@ def build_card_transaction_occurrences(transaction: dict) -> list[dict]:
     ]
 
 
-def add_recurrence(start_date: date, frequency: str, index: int) -> date:
-    if frequency == "weekly":
-        return start_date + timedelta(days=7 * index)
-    months = {
-        "monthly": 1,
-        "quarterly": 3,
-        "semiannual": 6,
-        "annual": 12,
-    }[frequency]
-    return add_months(start_date, months * index)
-
-
-def shift_month(value: str, delta: int) -> str:
-    year, month = value.split("-")
-    shifted = add_months(date(int(year), int(month), 1), delta)
-    return f"{shifted.year}-{shifted.month:02d}"
-
-
 def invoice_month_for_transaction_date(card, transaction_date: str) -> str:
     # spec: cartoes v2.15 — secao "Regras": fatura calculada pela data do
     # lancamento e pelo dia de fechamento (apos o fechamento, entra na proxima)
@@ -1055,20 +1037,6 @@ def first_open_invoice_month(conn, user_id: int, card_id: int, invoice_month: st
     raise CreditCardError("Nao foi encontrada uma fatura aberta para este cartao.", HTTPStatus.CONFLICT)
 
 
-def add_months(start_date: date, months: int) -> date:
-    target_month = start_date.month - 1 + months
-    year = start_date.year + target_month // 12
-    month = target_month % 12 + 1
-    day = min(start_date.day, days_in_month(year, month))
-    return date(year, month, day)
-
-
-def days_in_month(year: int, month: int) -> int:
-    if month == 12:
-        return 31
-    return (date(year, month + 1, 1) - date.resolution).day
-
-
 def normalize_day(value: object, message: str) -> int:
     try:
         day = int(str(value or "").strip())
@@ -1080,21 +1048,19 @@ def normalize_day(value: object, message: str) -> int:
 
 
 def normalize_date(value: object) -> str:
-    raw = str(value or "").strip()
     try:
-        return date.fromisoformat(raw).isoformat()
+        return normalize_iso_date(value)
     except ValueError as exc:
         raise CreditCardError("Data invalida.") from exc
 
 
 def normalize_month(value: object) -> str:
     raw = str(value or "").strip()
-    if not MONTH_PATTERN.match(raw):
-        raise CreditCardError("Informe a fatura no formato AAAA-MM.")
-    month = int(raw[-2:])
-    if month < 1 or month > 12:
-        raise CreditCardError("Informe uma fatura valida.")
-    return raw
+    try:
+        return normalize_iso_month(raw)
+    except ValueError as exc:
+        message = "Informe a fatura no formato AAAA-MM." if len(raw) != 7 else "Informe uma fatura valida."
+        raise CreditCardError(message) from exc
 
 
 def normalize_optional_name(value: object) -> str | None:
@@ -1106,12 +1072,9 @@ def normalize_optional_name(value: object) -> str | None:
 
 def normalize_card_id(value: object) -> int:
     try:
-        normalized = int(str(value or "").strip())
+        return positive_int_id(value)
     except ValueError as exc:
         raise CreditCardError("Cartao nao encontrado.", HTTPStatus.NOT_FOUND) from exc
-    if normalized <= 0:
-        raise CreditCardError("Cartao nao encontrado.", HTTPStatus.NOT_FOUND)
-    return normalized
 
 
 def normalize_optional_card_id(value: object) -> int | None:

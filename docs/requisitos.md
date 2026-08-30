@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 2.9
-atualizado: 2026-08-29
+versao: 3.1
+atualizado: 2026-08-30
 relacionados:
   - "[[arquitetura]]"
   - "[[visao-produto]]"
@@ -14,7 +14,7 @@ tags: [produto, meta]
 # Requisitos
 
 > [!info] Status
-> **implementado** (escopo vivo) · área: `meta` · atualizado em 2026-08-22 · relacionados: [[arquitetura]], [[visao-produto]]
+> **implementado** (escopo vivo) · área: `meta` · atualizado em 2026-08-30 · relacionados: [[arquitetura]], [[visao-produto]]
 
 ## Objetivo
 
@@ -48,7 +48,7 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 - **Histórico de Operações**: auditoria funcional somente leitura com filtros, busca, agrupamentos e rastreio de lotes por `operation_batch_id`. Ver [[historico-operacoes]].
 - **Consultor**: análises pré-formatadas por IA na aba Consultor do Cockpit, mediante IA geral configurada, ativação explícita e consentimento de acesso aos dados financeiros do usuário. Usa catálogo fechado em seletor, contexto minimizado, Perfil Complementar criptografado em SQLite, histórico por usuário e expurgo automático quando IA/Consultor/consentimento são desabilitados. Ver [[specs/consultor]].
 - **Sobre o app**: tela informativa no grupo Usuário com objetivo, funcionalidades, tecnologias, contato e infraestrutura mínima. Ver [[sobre-app]].
-- **Interface web estática**: painéis locais em `web/`, sem dependências externas de frontend. Ver [[arquitetura]] e [[adr/0001-stack-local-sem-framework]].
+- **Interface web estática**: painéis locais em `web/`, sem framework ou build step; dependências browser aprovadas são fixadas, auditadas e distribuídas localmente para manter operação offline. Ver [[arquitetura]], [[adr/0002-modularizacao-frontend]] e [[adr/0013-dependencias-frontend-v2]].
 - **Distribuição desktop**: pacotes macOS e Windows com instaladores, modo local e launchers opcionais para rede local confiável. Ver [[distribuição]].
 - **Licenciamento open source**: código-fonte e distribuição pública sob Apache License 2.0. Ver [[adr/0008-licenca-apache-2-0]].
 
@@ -57,6 +57,14 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 - Open Finance, sincronização em nuvem ou integrações bancárias automáticas diretas.
 - Multiusuário concorrente em rede; o modo LAN é apenas exposição local controlada para redes confiáveis, sem transformar o app em serviço multiusuário.
 - Suporte formal, SLA, consultoria, garantia de funcionamento ou compromisso de atendimento a usuários.
+
+## Escopo planejado da fundação v2
+
+- **Gráficos compartilhados**: migrar progressivamente os gráficos para um adaptador ApexCharts local, preservando tokens, acessibilidade, tabelas alternativas e semântica financeira.
+- **Máscaras de entrada**: IMask local para dinheiro e datas adequadas, sem substituir validação do backend nem alterar contratos monetários.
+- **Command Palette**: lançador nativo por `Cmd+K`/`Ctrl+K`, com experiência equivalente ao padrão cmdk e sem introduzir React.
+- **Virtualização**: listas extensas renderizam apenas a janela visível e overscan, mantendo altura total por espaçadores e preservando filtros, ordenação, foco e acessibilidade.
+- Ver [[specs/frontend-fundacao-v2]] e [[adr/0013-dependencias-frontend-v2]].
 
 ## Regras funcionais
 
@@ -104,6 +112,9 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 - O app deve rodar localmente em macOS com Python 3 e bibliotecas padrão (ou extensões mínimas offline).
 - Pacotes distribuídos devem oferecer modo local por padrão e modo rede/LAN apenas por launcher explícito.
 - O frontend deve continuar simples, responsivo e sem build step.
+- Dependências browser devem ser vendorizadas em versão exata, acompanhadas de licença, origem e hash, sem download por CDN em runtime.
+- Listas extensas devem evitar crescimento ilimitado do DOM quando a virtualização for aplicável.
+- Respostas regeneráveis de provedores de mercado devem ter retenção e limites explícitos, sem crescimento ilimitado do `quote_cache`; compactação física não pode ocorrer indiscriminadamente em toda abertura.
 - Valores monetários devem ser persistidos em centavos.
 - O banco SQLite deve ser criado automaticamente em `data/finance.db`.
 - O SQLite deve operar com WAL e espera curta por locks para tolerar uso local compartilhado leve, sem transformar o app em sistema multiusuário em rede.
@@ -121,6 +132,8 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 
 ## Changelog
 
+- `3.1` — 2026-08-30 — Cache persistente de cotações passa a exigir retenção, limites e compactação física condicionada. Ver [[specs/manutencao-cache-cotacoes]].
+- `3.0` — 2026-08-30 — Fundação planejada da v2 passa a incluir ApexCharts local, IMask, Command Palette nativa por `Cmd/Ctrl+K` e virtualização de listas longas; dependências browser deixam de ser proibidas de forma absoluta e passam a exigir versão, licença, hash e operação offline.
 - `2.9` — 2026-08-29 — Portfólio passa a permitir metas percentuais por classe e comparação da alocação planejada versus atual.
 - `2.8` — 2026-08-29 — Histórico do Portfólio passa a preservar ganho/perda realizado, custo FIFO e posição remanescente de cada resgate.
 - `2.7` — 2026-08-29 — Portfólio passa a incluir reutilização assistida de ativos e resgate quantitativo com baixa FIFO e crédito líquido.

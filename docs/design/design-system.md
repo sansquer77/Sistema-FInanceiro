@@ -2,11 +2,12 @@
 tipo: design
 area: meta
 status: implementado
-versao: 4.0
-atualizado: 2026-08-29
+versao: 4.1
+atualizado: 2026-08-30
 relacionados:
   - "[[arquitetura]]"
   - "[[specs/frontend-modularizacao]]"
+  - "[[specs/frontend-fundacao-v2]]"
 tags: [design, meta]
 aliases: ["Design System", "Tokens Visuais", "Precisão Institucional"]
 ---
@@ -14,7 +15,7 @@ aliases: ["Design System", "Tokens Visuais", "Precisão Institucional"]
 # Design System — Precisão Institucional
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-08-29 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]]
+> **implementado** · área: `meta` · atualizado em 2026-08-30 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]], [[specs/frontend-fundacao-v2]]
 
 ## Personalidade da marca
 
@@ -359,6 +360,31 @@ Padrão único em toda a aplicação, conforme o modelo usado no menu **Preferê
 - Quando o formulário for maior que a altura disponível, a rolagem deve acontecer dentro do próprio painel para manter cabeçalho e ações acessíveis sem ocultar a lista.
 - Em mobile, o formulário volta ao fluxo normal da página para preservar área útil e evitar sobreposição com listas e controles.
 
+### Gráficos compartilhados da v2
+
+- ApexCharts deve receber cores resolvidas dos tokens `--chart-*` e dos tokens semânticos; configurações de view não criam paletas próprias.
+- Eixos, grid, tooltip, legenda, labels e estados de foco devem ter contraste nos temas claro e escuro.
+- Valores monetários usam algarismos tabulares e formatador da moeda da série; a biblioteca nunca converte centavos por conta própria.
+- Receita, despesa, saldo negativo, benchmark e valor simulado preservam a mesma semântica em todos os módulos.
+- Gráficos não substituem a informação textual essencial: KPIs, tabelas ou descrições acessíveis permanecem disponíveis.
+- Tooltips não podem ser o único meio de descobrir um valor importante; teclado e alternativa textual devem cobrir o mesmo dado.
+- Animações respeitam `prefers-reduced-motion` e evitam movimento decorativo em atualizações frequentes.
+
+### Command Palette
+
+- A palette aberta por `Cmd+K`/`Ctrl+K` usa superfície de overlay existente, largura limitada, busca no topo, grupos nomeados e opção ativa claramente destacada.
+- O atalho deve aparecer no botão visível do cabeçalho e na Central de Ajuda; não se presume que o usuário conheça `Cmd+K`.
+- Resultados usam ícone de interface, rótulo e, quando útil, contexto/atalho à direita; cores financeiras não decoram comandos.
+- Estado vazio informa que nenhum comando foi encontrado sem sugerir busca externa.
+- Foco visível, seleção por setas e restauração de foco seguem o contrato global de overlays.
+
+### Listas virtualizadas
+
+- Espaçadores de virtualização são invisíveis e não recebem foco, hover, zebra ou borda de linha.
+- Linhas renderizadas preservam alturas definidas pelos modos Confortável e Compacto; conteúdo não pode expandir silenciosamente a altura fixa.
+- Cabeçalho sticky, primeira coluna sticky e estados de seleção continuam alinhados à janela renderizada.
+- O scrollbar representa a coleção completa, não apenas o fragmento presente no DOM.
+
 ---
 
 ## QA de tema
@@ -381,6 +407,7 @@ Padrão único em toda a aplicação, conforme o modelo usado no menu **Preferê
 
 ## Changelog
 
+- `4.1` — 2026-08-30 — Definidos contratos visuais da fundação v2 para gráficos ApexCharts, Command Palette e listas virtualizadas, preservando tokens, acessibilidade, densidade e semântica financeira.
 - `4.0` — 2026-08-29 — Define marcador e cores não financeiras para comparação de alocação atual versus meta.
 - `3.9` — 2026-08-29 — Contratos unificados para overlays, toast, cabeçalhos/atualização, tabelas/filtros e formulários progressivos.
 - `3.8` — 2026-08-29 — Estados loading/erro/vazio/info padronizados com estrutura, semântica ARIA, tons e orientação contextual compartilhados.

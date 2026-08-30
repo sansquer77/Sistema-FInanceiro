@@ -1,6 +1,7 @@
 import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";
 import { setLastUpdated, stateMarkup } from "./dom-utils.js";
 import { createAssetAutocomplete } from "./asset-autocomplete.js";
+import { chartToken, renderChart } from "./chart-adapter.js";
 
 export function registerPortfolioView({
   state,
@@ -88,6 +89,11 @@ export function registerPortfolioView({
     history: document.querySelector("#portfolioHistoryPanel"),
   };
   const portfolioRoot = document.querySelector("#portfolioView");
+  // O drawer precisa ser filho direto do body para não herdar o contexto de
+  // empilhamento criado pelos painéis sticky do Portfólio.
+  if (portfolioReturnDrawer && portfolioReturnDrawer.parentElement !== document.body) {
+    document.body.append(portfolioReturnDrawer);
+  }
   const showPortfolioTab = (name) => {
     const nextTab = portfolioTabPanels[name] ? name : "position";
     const panel = portfolioTabPanels[nextTab];
@@ -805,11 +811,27 @@ export function registerPortfolioView({
     }).join("");
 
     if (portfolioReturnChart) {
-      portfolioReturnChart.innerHTML = `
-        <line x1="${marginX}" y1="${yFor(0).toFixed(2)}" x2="${plotWidth - marginX}" y2="${yFor(0).toFixed(2)}" stroke="var(--ink)" stroke-width="0.45" stroke-opacity="0.72" />
-        ${yTicksGrid}
-        ${chart}
-      `;
+      renderChart(portfolioReturnChart, {
+        chart: { type: "area", height: 310 },
+        series: seriesConfig.map((series) => ({
+          name: series.label,
+          data: entries.map((entry) => entry[series.key] == null ? null : Number(entry[series.key])),
+        })),
+        colors: [
+          chartToken("--chart-1", "#5f7fff"),
+          chartToken("--chart-2", "#36b37e"),
+          chartToken("--muted", "#6b7280"),
+          chartToken("--accent", "#ffab00"),
+        ],
+        stroke: { curve: "smooth", width: [3, 3, 2, 2], dashArray: [0, 0, 5, 5] },
+        fill: { type: "gradient", gradient: { opacityFrom: 0.16, opacityTo: 0.01 } },
+        markers: { size: 3 },
+        xaxis: { categories: entries.map((entry) => formatReturnMonthShortLabel(entry.month)) },
+        yaxis: { labels: { formatter: (value) => `${value > 0 ? "+" : ""}${formatPercentValue(value)}` } },
+        tooltip: { y: { formatter: (value) => `${value > 0 ? "+" : ""}${formatPercentValue(value)}` } },
+        legend: { show: false },
+        annotations: { yaxis: [{ y: 0, borderColor: chartToken("--ink", "#111827") }] },
+      });
     }
     if (portfolioReturnYAxis) {
       const labelFor = (tick) => {

@@ -65,7 +65,7 @@ import { registerImportsView } from "./modules/imports-view.js";
 import { registerCockpitView } from "./modules/cockpit-view.js";
 import { registerAccountsView } from "./modules/accounts-view.js";
 import { registerCardsView } from "./modules/cards-view.js";
-import { registerPortfolioView } from "./modules/portfolio-view.js?v=157";
+import { registerPortfolioView } from "./modules/portfolio-view.js?v=158";
 import { registerTransactionsView } from "./modules/transactions-view.js";
 import { registerSimulationsView } from "./modules/simulations-view.js";
 import { registerOperationHistoryView } from "./modules/operation-history-view.js";
@@ -1961,7 +1961,12 @@ function getCurrencyTotals() {
     const row = currencyTotalRow(totals, card.currency);
     const openAmount = cardInvoiceCompetenceBalance(card.id, cockpitMonth);
     const reservedAmount = preferredCardForecastAmount(card, cockpitLimitDate);
-    const signedAmount = -Math.max(openAmount - reservedAmount, 0);
+    // spec: relatorios/relatorios v2.17 — critério 36
+    // O pagamento ja reduziu a conta pagadora; a linha do cartao so cobre
+    // faturas abertas que ainda nao foram reservadas na conta preferencial.
+    const signedAmount = isCardInvoicePaid(card.id, cockpitMonth)
+      ? 0
+      : -Math.max(openAmount - reservedAmount, 0);
     const displayedAmount = -Math.max(openAmount, 0);
     row.current += signedAmount;
     row.cards.push({

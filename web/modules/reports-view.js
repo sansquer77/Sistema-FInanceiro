@@ -1,6 +1,7 @@
 import { api } from "./api.js";
 import { stateMarkup } from "./dom-utils.js";
 import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";
+import { renderChart } from "./chart-adapter.js";
 
 export function registerReportsView({
   state,
@@ -206,7 +207,7 @@ export function registerReportsView({
   }
 
   async function renderTagsReport() {
-    // spec: relatorios/relatorios v2.16 — relatório de tags agrupado por tag com
+    // spec: relatorios/relatorios v2.17 — relatório de tags agrupado por tag com
     // Receitas, Despesas, Saldo e Investimentos, separados por moeda.
     const requestId = ++tagsRequestId;
     const requestedMonth = state.reportMonth;
@@ -939,6 +940,7 @@ export function registerReportsView({
   let currentEvolutionContext = null;
   let currentEvolutionData = [];
   let currentEvolutionColor = "";
+  let evolutionRequestId = 0;
 
   if (drawerOverlay && drawerCloseBtn) {
     drawerOverlay.addEventListener("click", closeEvolutionDrawer);
@@ -996,6 +998,7 @@ export function registerReportsView({
     }
     drawer.hidden = true;
     drawer.setAttribute("aria-hidden", "true");
+    evolutionRequestId += 1;
   }
 
   async function loadEvolutionChart(context, period) {
@@ -1006,6 +1009,7 @@ export function registerReportsView({
     xLabelsEl.innerHTML = "";
     chartTotal.textContent = "Carregando...";
     chartTrend.textContent = "";
+    const requestId = ++evolutionRequestId;
 
     try {
       const url = new URL("/api/reports/category-evolution", window.location.origin);
@@ -1014,8 +1018,14 @@ export function registerReportsView({
       url.searchParams.set("period", period);
       
       const res = await api(url.pathname + url.search);
+      if (requestId !== evolutionRequestId || context !== currentEvolutionContext) {
+        return;
+      }
       drawEvolutionChart(res.evolution || [], context.color);
     } catch (err) {
+      if (requestId !== evolutionRequestId || context !== currentEvolutionContext) {
+        return;
+      }
       const fallback = localCategoryEvolution(context, period);
       if (fallback.length) {
         drawEvolutionChart(fallback, context.color);
@@ -1073,7 +1083,7 @@ export function registerReportsView({
         return;
       }
     }
-    // spec: relatorios/relatorios v2.16 — critério 14
+    // spec: relatorios/relatorios v2.17 — critério 14
     // A API de evolução usa BRL normalizado; o fallback local deve manter a mesma unidade.
     totals.set(month, (totals.get(month) || 0) + moneyToCents(transaction.amount_brl ?? transaction.amount));
   }
@@ -1142,53 +1152,25 @@ export function registerReportsView({
     if (forecast.length) {
       chartTrend.textContent = [chartTrend.textContent, `SMA projetando ${forecastMonths} meses`].filter(Boolean).join(" · ");
     }
-    const allValues = [...data, ...forecast].map((entry) => Number(entry.total_cents || 0));
-    const w = 100;
-    const h = 50;
-    const maxVal = Math.max(...allValues, 1);
-    const minVal = Math.min(0, ...allValues);
-    const range = Math.max(maxVal - minVal, 1);
-    const denominator = Math.max(data.length + forecast.length - 1, 1);
-
-    const points = data.map((d, i) => pointForEvolutionValue(d.total_cents, i, denominator, minVal, range, w, h));
-    const forecastPoints = forecast.map((d, i) => pointForEvolutionValue(d.total_cents, data.length + i, denominator, minVal, range, w, h));
-
-    const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(" ");
-    const areaD = `${pathD} L ${w},${h} L 0,${h} Z`;
-    const gradientId = "grad" + Math.random().toString(36).substring(2);
-    const forecastPath = forecastPoints.length && points.length
-      ? [points[points.length - 1], ...forecastPoints].map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(" ")
-      : "";
-    
-    const pointMarkup = [
-      ...points.map((p, i) => {
-        const valueCents = data[i].total_cents;
-        return [
-          `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="1.5" fill="${color}" />`,
-          `<text x="${p.x.toFixed(2)}" y="${(p.y - 4).toFixed(2)}" class="evolution-value-label">${formatChartValue(valueCents)}</text>`,
-        ].join("");
-      }),
-      ...forecastPoints.map((p, i) => {
-        const valueCents = forecast[i].total_cents;
-        return [
-          `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="1.2" fill="var(--panel)" stroke="${color}" stroke-width="0.8" />`,
-          `<text x="${p.x.toFixed(2)}" y="${(p.y + 4).toFixed(2)}" class="evolution-value-label forecast">${formatChartValue(valueCents)}</text>`,
-        ].join("");
-      }),
-    ].join("");
-
-    svgEl.innerHTML = `
-      <defs>
-        <linearGradient id="${gradientId}" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stop-color="${color}" stop-opacity="0.3" />
-          <stop offset="100%" stop-color="${color}" stop-opacity="0.0" />
-        </linearGradient>
-      </defs>
-      <path d="${areaD}" fill="url(#${gradientId})" />
-      <path d="${pathD}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-      ${forecastPath ? `<path d="${forecastPath}" class="evolution-sma-line" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />` : ""}
-      ${pointMarkup}
-    `;
+    const categories = [...data.map((entry) => entry.month), ...forecast.map((entry) => entry.month)];
+    renderChart(svgEl, {
+      chart: { type: "area", height: 300 },
+      series: [
+        { name: "Realizado", data: [...data.map((entry) => Number(entry.total_cents || 0)), ...forecast.map(() => null)] },
+        { name: "Projeção SMA", data: [
+          ...data.map((entry, index) => index === data.length - 1 ? Number(entry.total_cents || 0) : null),
+          ...forecast.map((entry) => Number(entry.total_cents || 0)),
+        ] },
+      ],
+      colors: [color, color],
+      stroke: { curve: "smooth", width: [3, 2], dashArray: [0, 6] },
+      fill: { type: "gradient", gradient: { opacityFrom: 0.28, opacityTo: 0.01 } },
+      markers: { size: [4, 3] },
+      xaxis: { categories, labels: { formatter: (month) => formatMonthShortLabel(month) } },
+      yaxis: { labels: { formatter: formatChartValue } },
+      tooltip: { y: { formatter: (value) => formatMoney(value / 100, "BRL") } },
+      legend: { show: false },
+    });
 
     if (data.length > 0) {
       const formatMonth = (m) => {
@@ -1218,12 +1200,6 @@ export function registerReportsView({
       return;
     }
     drawEvolutionChart(currentEvolutionData, currentEvolutionColor);
-  }
-
-  function pointForEvolutionValue(value, index, denominator, minVal, range, width, height) {
-    const x = (index / denominator) * width;
-    const y = height - ((Number(value || 0) - minVal) / range) * (height * 0.9);
-    return { x, y };
   }
 
   function smaForecast(data, months) {

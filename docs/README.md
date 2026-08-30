@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 11.94
-atualizado: 2026-08-29
+versao: 12.1
+atualizado: 2026-08-30
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -63,6 +63,9 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[specs/Update Server]] | ✅ implementado | Distribuição |
 | [[distribuição]] | ✅ implementado | Distribuição |
 | [[specs/landing-page]] | ✅ implementado | Institucional |
+| [[specs/migracao-banco-v2]] | ✅ implementado | Migração de dados |
+| [[specs/manutencao-cache-cotacoes]] | ✅ implementado | Persistência |
+| [[specs/utilitarios-dominio]] | ✅ implementado | Arquitetura |
 
 ---
 
@@ -72,6 +75,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 
 | Spec | Status | Área |
 |---|---|---|
+| [[specs/frontend-fundacao-v2]] | 🚧 em implementação | Frontend v2 |
 | [[specs/open-finance]] | 📝 rascunho | Open Finance |
 | [[specs/consolidacao-familiar]] | 📝 rascunho | Consolidação Familiar |
 | [[specs/imposto-renda]] | ❌ depreciado — custo de manter regras fiscais atualizadas não compensa para uso familiar | Investimentos |
@@ -94,6 +98,8 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[adr/0009-mais-retorno-cotas-opt-in]] | Cotas de fundos via API Mais Retorno em integração opt-in. |
 | [[adr/0010-segredos-criptografados-sqlite]] | Segredos de SMTP, IA e integrações em SQLite criptografado, com chave fora de `data/`. |
 | [[adr/0011-criptografia-snapshots-familiares]] | Rascunho da criptografia transportável dos snapshots familiares com `cryptography`, `scrypt` e `AES-256-GCM`. |
+| [[adr/0012-fundacao-v2-contrato-e-migracao-de-dados]] | Fundação da linha 2.x com contrato congelado, schema-base canônico e migração controlada do banco 1.x para um novo banco 2.x. |
+| [[adr/0013-dependencias-frontend-v2]] | ApexCharts 4.7.0 e IMask vendorizados, Command Palette nativa no padrão cmdk e virtualização compartilhada sem framework. |
 
 ---
 
@@ -134,6 +140,13 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `12.1` — 2026-08-30 — Extraídos utilitários conceituais compartilhados de dinheiro, calendário, identificadores e recorrência. Ver [[specs/utilitarios-dominio]].
+- `12.0` — 2026-08-30 — Implementada [[specs/manutencao-cache-cotacoes]] com retenção de 30 dias, limites e compactação controlada do cache regenerável de mercado.
+- `11.99` — 2026-08-30 — Fundação frontend v2 iniciada com ApexCharts 4.7.0 local, adaptador compartilhado e migração dos gráficos existentes sem mudança de dados ou finalidade.
+- `11.98` — 2026-08-30 — Criada [[specs/frontend-fundacao-v2]] v0.1 e [[adr/0013-dependencias-frontend-v2]] v1.0 para gráficos com ApexCharts MIT vendorizado, máscaras IMask, Command Palette nativa por `Cmd/Ctrl+K` e virtualização de listas extensas.
+- `11.97` — 2026-08-30 — Implementada [[specs/migracao-banco-v2]] v1.0; [[arquitetura]] v3.49 e [[adr/0012-fundacao-v2-contrato-e-migracao-de-dados]] v0.2 documentam o baseline `20000`, o backup `finance-v1.bkp` e a promoção validada do novo `finance.db`.
+- `11.96` — 2026-08-30 — Criada [[specs/migracao-banco-v2]] v0.1 para a migração automática e recuperável do banco 1.x ao baseline v2, preservando `finance-v1.bkp` e mantendo `finance.db` como nome do banco ativo.
+- `11.95` — 2026-08-30 — [[adr/0012-fundacao-v2-contrato-e-migracao-de-dados]] define o congelamento do contrato atual, a modernização incremental e a migração controlada para um banco canônico da linha 2.x, como fundação para Open Finance e Consolidação Familiar sem antecipar automaticamente a versão `2.0.0`.
 - `11.94` — 2026-08-29 — Versão `1.8.2`: corrige a auditoria do salvamento de Metas e integra a comparação definida/real/referência do perfil ao Consultor.
 - `11.93` — 2026-08-29 — [[arquitetura]] v3.48 documenta a integração das Metas com o Consultor e a entidade de auditoria correspondente.
 - `11.92` — 2026-08-29 — [[specs/investimentos-portfolio]] v2.43 corrige a auditoria das Metas; [[specs/consultor]] v2.0 compara alocação definida, real e faixa de referência do perfil.

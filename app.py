@@ -1826,7 +1826,7 @@ def money_value_to_cents(value: object) -> int:
 
 
 def is_credit_card_payment_transaction(transaction: dict) -> bool:
-    # spec: relatorios/relatorios v2.16 — critério 6
+    # spec: relatorios/relatorios v2.17 — critério 6
     # (pagamento de fatura fica fora das analises mensais; a despesa detalhada
     #  ja esta nos lancamentos do cartao pela competencia da fatura)
     return bool(transaction.get("is_credit_card_payment"))
@@ -1887,7 +1887,7 @@ def ranked_cockpit_rows(groups: dict, limit: int | None = None) -> list[dict]:
         other_total_cents = sum(row["total_cents"] for row in other_rows)
         other_count = sum(row["count"] for row in other_rows)
         if other_total_cents > 0:
-            # spec: relatorios/relatorios v2.16 — critério 28
+            # spec: relatorios/relatorios v2.17 — critério 28
             visible.append({
                 "label": "Outros",
                 "total": cents_to_value(other_total_cents),

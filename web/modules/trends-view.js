@@ -1,5 +1,6 @@
 // spec: tendencias-saude-financeira v2.22 — critérios 1, 2, 3, 4, 5, 6, 7, 10, 12, 13, 14, 16, 17, 20, 21, 25, 26, 27, 28, 32, 33 e 34
 import { stateMarkup } from "./dom-utils.js";
+import { chartToken, renderChart } from "./chart-adapter.js";
 export function registerTrendsView({
   elements,
   api,
@@ -121,6 +122,37 @@ export function registerTrendsView({
       ${renderBudgetActualTable()}
       ${renderConfidenceNotes()}
     `;
+    renderTrendsApexChart();
+  }
+
+  function renderTrendsApexChart() {
+    const legacySvg = trendsContent.querySelector(".trends-chart svg");
+    if (!legacySvg) return;
+    const chartElement = document.createElement("div");
+    chartElement.className = "trends-apex-chart";
+    chartElement.setAttribute("role", "img");
+    chartElement.setAttribute("aria-label", "Gráfico de evolução de receitas, despesas e saldo");
+    legacySvg.replaceWith(chartElement);
+    const rows = filterMonthlySeries(currentData.serie_mensal || []);
+    renderChart(chartElement, {
+      chart: { type: "line", height: 260, stacked: false },
+      series: [
+        { name: "Receitas", type: "column", data: rows.map((row) => Number(row.income_cents || 0)) },
+        { name: "Despesas", type: "column", data: rows.map((row) => Number(row.expense_cents || 0)) },
+        { name: "Saldo líquido", type: "line", data: rows.map((row) => Number(row.balance_cents || 0)) },
+      ],
+      colors: [
+        chartToken("--positive", "#36b37e"),
+        chartToken("--danger", "#ff7452"),
+        chartToken("--accent", "#5f7fff"),
+      ],
+      stroke: { width: [0, 0, 3], curve: "smooth" },
+      plotOptions: { bar: { borderRadius: 4, columnWidth: "52%" } },
+      xaxis: { categories: rows.map((row) => row.month.slice(5, 7) + "/" + row.month.slice(2, 4)) },
+      yaxis: { labels: { formatter: formatCompactSignedMoney } },
+      tooltip: { y: { formatter: formatCompactSignedMoney } },
+      legend: { show: false },
+    });
   }
 
   function renderMeta() {

@@ -165,7 +165,7 @@ def build_monthly_series(conn, user_id: int, month: str) -> dict[str, dict[str, 
     start_date = f"{months_window[0]}-01"
     end_date = month_bounds(months_window[-1])[1]
 
-    # spec: relatorios/relatorios v2.16 — critério 6
+    # spec: relatorios/relatorios v2.17 — critério 6
     # (pagamento de fatura em conta-corrente fica fora das despesas analíticas)
     account_rows = conn.execute(
         """

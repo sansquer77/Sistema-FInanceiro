@@ -1,5 +1,11 @@
 import { stateMarkup } from "./dom-utils.js";
 import { createAssetAutocomplete } from "./asset-autocomplete.js";
+import {
+  centeredMonthlyAxis,
+  centeredMonthlyPoints,
+  chartToken,
+  renderChart,
+} from "./chart-adapter.js";
 
 export function registerTransactionsView({
   state,
@@ -727,12 +733,6 @@ export function registerTransactionsView({
     }
     const transactions = selectedAccountTransactions(state.transactions.length ? state.transactions : state.accountTransactions);
     const rows = balanceHistoryRows(account, transactions);
-    const path = balanceHistoryPath(rows, "past");
-    const futurePath = balanceHistoryPath(rows, "future");
-    const areaPath = balanceHistoryAreaPath(rows);
-    const points = rows.map((row) => `
-      <span class="invoice-history-point ${row.isCurrent ? "current" : ""} ${row.offset > 0 ? "future" : ""}" style="left: ${row.x}%; top: ${row.y}%"></span>
-    `).join("");
     transactionBalanceHistoryChart.innerHTML = `
       <div class="invoice-history-rail" role="list">
         ${rows.map((row) => {
@@ -745,21 +745,23 @@ export function registerTransactionsView({
         `;
         }).join("")}
         <div class="invoice-history-plot" aria-hidden="true">
-          <svg class="invoice-history-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="accountBalanceHistoryAreaGradient" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.18"></stop>
-                <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"></stop>
-              </linearGradient>
-            </defs>
-            <path class="invoice-history-area account-balance-history-area" d="${areaPath}"></path>
-            <path class="invoice-history-line" d="${path}"></path>
-            <path class="invoice-history-line future" d="${futurePath}"></path>
-          </svg>
-          ${points}
+          <div class="invoice-history-apex"></div>
         </div>
       </div>
     `;
+    renderChart(transactionBalanceHistoryChart.querySelector(".invoice-history-apex"), {
+      chart: { type: "area", height: 92, sparkline: { enabled: true } },
+      series: [
+        { name: "Conciliado", data: centeredMonthlyPoints(rows, (row) => row.offset <= 0 ? row.amount : null) },
+        { name: "Previsto", data: centeredMonthlyPoints(rows, (row) => row.offset >= 0 ? row.amount : null) },
+      ],
+      colors: [chartToken("--accent", "#5f7fff"), chartToken("--muted", "#6b7280")],
+      stroke: { curve: "smooth", width: [3, 2], dashArray: [0, 5] },
+      fill: { type: "gradient", gradient: { opacityFrom: 0.2, opacityTo: 0.02 } },
+      markers: { size: 4 },
+      xaxis: centeredMonthlyAxis(rows),
+      tooltip: { enabled: false },
+    });
   }
 
   function chartAmountSizeClass(text) {

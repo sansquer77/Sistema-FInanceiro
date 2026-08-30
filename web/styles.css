@@ -2189,14 +2189,9 @@ textarea:focus {
   min-height: 210px;
 }
 
-.donut-chart svg {
+.apex-donut-chart {
   width: min(210px, 70vw);
-  height: auto;
-  transform: rotate(-90deg);
-}
-
-.donut-chart circle {
-  transition: stroke-dasharray 0.2s ease;
+  height: 184px;
 }
 
 .donut-center {
@@ -5094,7 +5089,7 @@ form[aria-busy="true"] .form-actions {
   flex: 1 1 auto;
   min-width: 0;
   height: 100%;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .portfolio-return-line-group.benchmark-series path[fill="none"] {
@@ -5813,9 +5808,19 @@ form[aria-busy="true"] .form-actions {
   position: relative;
   grid-column: 1 / -1;
   grid-row: 2;
-  height: 100%;
+  height: 92px;
   min-height: 92px;
   margin: 0 8px;
+  overflow: hidden;
+}
+
+.invoice-history-apex {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
 }
 
 .invoice-history-card span {
@@ -8013,10 +8018,11 @@ form[aria-busy="true"] .form-actions {
   overflow: auto;
 }
 
-.trends-chart svg {
+.trends-chart svg,
+.trends-apex-chart {
   width: 100%;
   min-width: 520px;
-  height: auto;
+  min-height: 260px;
   color: var(--text);
 }
 

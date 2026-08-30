@@ -3,6 +3,7 @@ import { registerConsultorView } from "./consultor-view.js";
 import { registerFinancialHealthView } from "./financial-health-view.js";
 import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";
 import { stateMarkup } from "./dom-utils.js";
+import { renderChart } from "./chart-adapter.js";
 
 const COCKPIT_DISCLOSURE_KEY = "sf-cockpit-disclosures-v1";
 
@@ -689,7 +690,7 @@ export function registerCockpitView({
     const chart = document.createElement("div");
     chart.className = "donut-chart";
     chart.innerHTML = `
-      ${donutSvg(items, total)}
+      <div class="apex-donut-chart" role="img" aria-label="Gráfico de distribuição"></div>
       <div class="donut-center">
         <span>${escapeHtml(options.totalLabel)}</span>
         <strong>${formatMoney(total, "BRL")}</strong>
@@ -723,6 +724,16 @@ export function registerCockpitView({
       button.addEventListener("click", () => openChartBreakdownModal(item, total, options.totalLabel));
     });
     container.append(chart, list);
+    renderChart(chart.querySelector(".apex-donut-chart"), {
+      chart: { type: "donut", height: 184 },
+      series: items.map((item) => Number(item.total || 0)),
+      labels: items.map((item) => item.label),
+      colors: items.map((_, index) => chartColor(index)),
+      legend: { show: false },
+      stroke: { width: 0 },
+      tooltip: { y: { formatter: (value) => formatMoney(value, "BRL") } },
+      plotOptions: { pie: { donut: { size: "72%", labels: { show: false } } } },
+    });
   }
 
   function openChartBreakdownModal(item, chartTotal, totalLabel) {
@@ -778,23 +789,6 @@ export function registerCockpitView({
     if (activeChartBreakdownClose) {
       activeChartBreakdownClose();
     }
-  }
-
-  function donutSvg(items, total) {
-    const radius = 44;
-    const circumference = 2 * Math.PI * radius;
-    let offset = 0;
-    const circles = items.map((item, index) => {
-      const length = total ? (item.total / total) * circumference : 0;
-      const circle = `
-        <circle cx="60" cy="60" r="${radius}" fill="transparent" stroke="${chartColor(index)}"
-          stroke-width="18" stroke-dasharray="${length} ${circumference - length}"
-          stroke-dashoffset="${-offset}" />
-      `;
-      offset += length;
-      return circle;
-    }).join("");
-    return `<svg viewBox="0 0 120 120" role="img" aria-label="Gráfico de distribuição">${circles}</svg>`;
   }
 
   function renderCockpitPortfolioByType() {

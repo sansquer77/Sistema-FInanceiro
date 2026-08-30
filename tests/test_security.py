@@ -571,6 +571,7 @@ class SessionSecurityTest(IsolatedDatabaseTest):
                 "INSERT INTO sessions (token, user_id, created_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
                 (token, user["id"]),
             )
+            conn.execute("PRAGMA user_version = 0")
         initialize_database()
         self.assertIsNotNone(get_current_user(token))
         with database.get_connection() as conn:

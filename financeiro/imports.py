@@ -17,6 +17,7 @@ from financeiro.accounts import recompute_account_balance
 from financeiro.categories import ClassificationError, get_or_create_category, get_or_create_subcategory, get_or_create_tag, normalize_name
 from financeiro.classification_suggestions import normalize_description
 from financeiro.credit_cards import create_credit_card_transaction_with_conn
+from financeiro.money import decimal_to_cents
 from financeiro.transactions import (
     convert_to_brl_cents,
     create_transaction_with_conn,
@@ -1065,7 +1066,7 @@ def normalize_amount(value: object) -> Decimal:
 
 
 def money_decimal_to_cents(value: Decimal) -> int:
-    return int((value * Decimal(100)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    return decimal_to_cents(value)
 
 
 def find_header_index(rows: list[list[object]]) -> int:

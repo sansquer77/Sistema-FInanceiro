@@ -2,8 +2,8 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 4.3
-atualizado: 2026-08-29
+versao: 4.4
+atualizado: 2026-08-30
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
   - "[[arquitetura]]"
@@ -39,6 +39,7 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `date-utils.js` | Datas locais, meses e exibição. |
 | `money-utils.js` | Formatação e parsing numérico/monetário. |
 | `dom-utils.js` | Helpers de formulário, mensagens e empty state. |
+| `chart-adapter.js` | Ciclo de vida, tokens, movimento reduzido e fallback dos gráficos ApexCharts locais. |
 | `transaction-kind.js` | Predicados de tipo de lançamento. |
 | `labels.js` | Labels de domínio usados pela interface. |
 | `month-picker.js` | Popover reutilizável de seleção de mês. |
@@ -222,6 +223,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Changelog
 
+- `4.4` — 2026-08-30 — Registrado `chart-adapter.js` como fronteira compartilhada entre as views e o ApexCharts 4.7.0 vendorizado.
 - `4.3` — 2026-08-29 — Autocomplete de ativos compartilhado entre Portfólio e Lançamentos; modal de decisão passa a aceitar atualização derivada de campos durante a digitação.
 - `4.2` — 2026-08-29 — Resumo pré-salvamento torna-se expansível, recolhido em lançamentos à vista e aberto automaticamente nos modos parcelado e recorrente.
 - `4.1` — 2026-08-29 — Resumo pré-salvamento passa a iniciar vazio e ignorar controles condicionais ocultos ou desabilitados.

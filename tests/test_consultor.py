@@ -437,7 +437,7 @@ class ConsultorContextTest(unittest.TestCase):
         return stack
 
     def test_score_context_uses_only_score_aggregate(self) -> None:
-        with mock.patch("financeiro.financial_health.calculate_financial_health_score", return_value=score_payload()), self.profile_context():
+        with mock.patch("financeiro.portfolio.current_portfolio_positions", return_value=[]), mock.patch("financeiro.financial_health.calculate_financial_health_score", return_value=score_payload()), self.profile_context():
             context = build_analysis_context(7, "score_saude_financeira", month="2026-08")
 
         self.assertEqual(context["analysis_id"], "score_saude_financeira")
@@ -446,7 +446,7 @@ class ConsultorContextTest(unittest.TestCase):
         self.assertNotIn("transactions", context)
 
     def test_score_context_includes_investor_and_complementary_profile(self) -> None:
-        with mock.patch("financeiro.financial_health.calculate_financial_health_score", return_value=score_payload()), self.profile_context(complementary={"idade": 45, "horizonte_investimento_principal": "longo_prazo"}):
+        with mock.patch("financeiro.portfolio.current_portfolio_positions", return_value=[]), mock.patch("financeiro.financial_health.calculate_financial_health_score", return_value=score_payload()), self.profile_context(complementary={"idade": 45, "horizonte_investimento_principal": "longo_prazo"}):
             context = build_analysis_context(7, "score_saude_financeira", month="2026-08")
 
         self.assertEqual(context["investor_profile"], "Moderado")
@@ -464,7 +464,7 @@ class ConsultorContextTest(unittest.TestCase):
                 "confianca": "intermediaria",
             },
         )
-        with mock.patch("financeiro.financial_health.calculate_financial_health_score", return_value=payload), self.profile_context():
+        with mock.patch("financeiro.portfolio.current_portfolio_positions", return_value=[]), mock.patch("financeiro.financial_health.calculate_financial_health_score", return_value=payload), self.profile_context():
             context = build_analysis_context(7, "sustentabilidade_padrao_vida", month="2026-08")
 
         self.assertEqual(context["income_display"], "R$ 20.000,00")
@@ -657,7 +657,7 @@ class ConsultorContextTest(unittest.TestCase):
         self.assertIn("tolerancia a perdas", prompt)
 
     def test_maturities_context_uses_calendar_maturities_not_full_portfolio(self) -> None:
-        with mock.patch("financeiro.calendar.get_cockpit_calendar", return_value=calendar_payload()), mock.patch("financeiro.trends.calculate_trends", return_value=trends_payload()), mock.patch("financeiro.financial_health.calculate_financial_health_score", return_value=score_payload()), self.profile_context():
+        with mock.patch("financeiro.portfolio.current_portfolio_positions", return_value=[]), mock.patch("financeiro.calendar.get_cockpit_calendar", return_value=calendar_payload()), mock.patch("financeiro.trends.calculate_trends", return_value=trends_payload()), mock.patch("financeiro.financial_health.calculate_financial_health_score", return_value=score_payload()), self.profile_context():
             context = build_analysis_context(7, "destino_vencimentos")
 
         self.assertEqual(len(context["maturity_assets"]), 2)

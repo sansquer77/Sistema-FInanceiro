@@ -2,8 +2,8 @@
 tipo: spec
 area: relatorios
 status: implementado
-versao: 2.16
-atualizado: 2026-08-28
+versao: 2.17
+atualizado: 2026-08-30
 relacionados:
   - "[[lancamentos]]"
   - "[[cartoes]]"
@@ -17,7 +17,7 @@ aliases: ["Relatórios", "Cockpit"]
 # Relatórios
 
 > [!info] Status
-> **implementado** · área: `relatorios` · atualizado em 2026-08-28 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[limites-gastos]]
+> **implementado** · área: `relatorios` · atualizado em 2026-08-30 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[limites-gastos]]
 
 ## Problema
 
@@ -77,6 +77,7 @@ Qualquer usuário autenticado localmente que queira analisar seus gastos e recei
 - Faturas de cartão devem impactar o Cockpit pela competência da fatura (`invoice_month`) do mês selecionado, preservando o valor da fatura daquele mês tanto em leituras previstas quanto conciliadas quando aplicável.
 - Faturas pagas devem continuar aparecendo nos totais analíticos do mês de competência por meio dos lançamentos detalhados do cartão; o pagamento agregado gerado na conta permanece excluído das despesas analíticas para evitar duplicidade.
 - O status de pagamento da fatura afeta o saldo operacional da conta de pagamento na data do pagamento, mas não altera retroativamente o consumo analítico do mês da fatura.
+- No saldo operacional previsto por moeda do Cockpit, uma fatura paga não produz impacto adicional na linha do cartão: seu pagamento já está refletido no lançamento da conta pagadora. Faturas ainda não pagas continuam reservadas uma única vez, pela conta preferencial quando compatível ou diretamente pelo cartão nos demais casos.
 - Os rótulos do Cockpit devem deixar claro quando os valores representam o mês selecionado, usando textos como `Saldo previsto em Julho/2026`, `Saldo conciliado em Julho/2026` ou equivalente, para reduzir ambiguidade com o saldo atual.
 - Quando o usuário selecionar mês futuro, o Cockpit deve priorizar planejamento, recorrências, parcelas futuras e faturas previstas; dados realizados inexistentes devem aparecer como zero ou estado vazio, sem simular lançamentos não existentes fora das regras já cadastradas.
 - Quando o gráfico **Maiores despesas do mês** exibir a linha agregada `Outros`, essa linha deve permitir abrir um detalhamento com as categorias/subcategorias ocultas no agrupamento e seus respectivos valores. A linha deve exibir, ao lado do rótulo, o indicador `i` discreto (mesmo padrão dos KPIs Taxa de poupança/Aportes do mês) sinalizando que a linha abre o detalhamento em pop-up.
@@ -179,9 +180,11 @@ O ponto crítico é cartão de crédito: a fatura pertence ao mês de competênc
 - Dado o usuário visualizando **Maiores despesas do mês** com a linha `Outros`, quando clica nessa linha, então um pop-up mostra as categorias/subcategorias que compõem `Outros`, com valor de cada item e total agregado, sem alterar os totais do Cockpit.
 - Dado o usuário abrindo o gráfico de evolução de uma categoria/subcategoria, quando o drawer é exibido, então a área do gráfico é aproximadamente 20% maior que o tamanho anterior.
 - Dado o gráfico de evolução exibido, quando há pontos de dados históricos ou projeção SMA, então cada ponto exibe o respectivo valor formatado, mesmo quando a linha de tendência está ativada.
+- Dado uma fatura paga por uma conta em BRL, quando o Cockpit calcula o saldo previsto após a data do pagamento, então considera somente o débito registrado na conta e não subtrai novamente a mesma fatura pela linha do cartão.
 
 ## Changelog
 
+- `2.17` — 2026-08-30 — Corrigida a composição do saldo previsto do Cockpit para que faturas já pagas não sejam novamente subtraídas pela linha do cartão após o débito ter sido registrado na conta pagadora.
 - `2.16` — 2026-08-28 — Consolidada a correção do relatório de subcategorias: nomes são normalizados antes do agrupamento, linhas sem subcategoria preservam o sentinela `null` até a API, a evolução filtra `subcategory_id IS NULL` e contas/cartões são somados pelos valores normalizados em BRL. Adicionados testes de regressão do filtro nulo, competência de fatura e conversão monetária.
 - `2.15` — 2026-08-26 — API de evolução de categoria (`/api/reports/category-evolution`) passou a aceitar `subcategory_id=null|none|-1` para filtrar por `subcategory_id IS NULL`.
 - `2.14` — 2026-08-26 — Registrada a investigação da regressão no agrupamento do relatório de subcategorias, consolidada e validada na versão 2.16.

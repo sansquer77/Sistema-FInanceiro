@@ -13,14 +13,16 @@ from urllib.request import Request, urlopen
 from financeiro.accounts import cents_to_money, empty_to_none, money_to_cents, recompute_account_balance
 from financeiro.categories import ClassificationError, get_or_create_category, get_or_create_subcategory, get_or_create_tag, normalize_name
 from financeiro.classification_suggestions import normalize_description
+from financeiro.calendar_rules import add_months, normalize_iso_date
 from financeiro.database import begin_immediate, get_connection, row_to_dict
+from financeiro.identifiers import positive_int_id
+from financeiro.money import split_cents, split_optional_cents
+from financeiro.recurrence import RECURRENCE_FREQUENCIES, SERIES_KINDS, add_recurrence
 
 TRANSACTION_TYPES = {"income", "expense", "transfer", "investment"}
 INVESTMENT_ASSET_TYPES = {"stock", "crypto", "stablecoin", "fund", "fixed_income", "private_pension", "savings", "other"}
 STABLECOIN_ASSETS = {"USDC", "USDT", "DAI", "FDUSD", "PYUSD", "TUSD", "USDP", "USDE"}
 FIXED_INCOME_MODES = {"pre", "post", "hybrid"}
-SERIES_KINDS = {"single", "installment", "recurring"}
-RECURRENCE_FREQUENCIES = {"weekly", "monthly", "quarterly", "semiannual", "annual"}
 EXCHANGE_RATE_SCALE = Decimal("1000000")
 PTAX_RATE_URL = (
     "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/"
@@ -933,57 +935,16 @@ def build_transaction_occurrences(transaction: dict) -> list[dict]:
     }]
 
 
-def split_cents(total_cents: int, count: int) -> list[int]:
-    base, remainder = divmod(total_cents, count)
-    return [base + (1 if index < remainder else 0) for index in range(count)]
-
-
-def split_optional_cents(total_cents: int | None, count: int) -> list[int | None]:
-    if total_cents is None:
-        return [None for _ in range(count)]
-    return split_cents(total_cents, count)
-
-
-def add_recurrence(start_date: date, frequency: str, index: int) -> date:
-    if frequency == "weekly":
-        return start_date + timedelta(days=7 * index)
-    months = {
-        "monthly": 1,
-        "quarterly": 3,
-        "semiannual": 6,
-        "annual": 12,
-    }[frequency]
-    return add_months(start_date, months * index)
-
-
-def add_months(start_date: date, months: int) -> date:
-    target_month = start_date.month - 1 + months
-    year = start_date.year + target_month // 12
-    month = target_month % 12 + 1
-    day = min(start_date.day, days_in_month(year, month))
-    return date(year, month, day)
-
-
-def days_in_month(year: int, month: int) -> int:
-    if month == 12:
-        return 31
-    return (date(year, month + 1, 1) - timedelta(days=1)).day
-
-
 def normalize_id(value: object, message: str) -> int:
     try:
-        normalized = int(str(value or "").strip())
+        return positive_int_id(value)
     except ValueError as exc:
         raise TransactionError(message) from exc
-    if normalized <= 0:
-        raise TransactionError(message)
-    return normalized
 
 
 def normalize_date(value: object) -> str:
-    raw = str(value or "").strip()
     try:
-        return date.fromisoformat(raw).isoformat()
+        return normalize_iso_date(value)
     except ValueError as exc:
         raise TransactionError("Informe uma data valida.") from exc
 
@@ -993,7 +954,7 @@ def normalize_optional_date(value: object) -> str | None:
     if not raw:
         return None
     try:
-        return date.fromisoformat(raw).isoformat()
+        return normalize_iso_date(raw)
     except ValueError as exc:
         raise TransactionError("Informe uma data valida.") from exc
 
@@ -1264,7 +1225,7 @@ def fetch_transaction(conn, user_id: int, transaction_id: int) -> dict:
 
 def format_transaction(transaction: dict) -> dict:
     investment_operation = extract_investment_operation(transaction)
-    # spec: relatorios/relatorios v2.16 — criterio 6
+    # spec: relatorios/relatorios v2.17 — criterio 6
     # (pagamento de fatura reduz saldo, mas fica fora de analises de despesa
     #  para nao duplicar os lancamentos detalhados do cartao)
     transaction["is_credit_card_payment"] = bool(transaction.pop("credit_card_payment_id", None))

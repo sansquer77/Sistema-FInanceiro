@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import hashlib
 import unittest
 from pathlib import Path
 
@@ -11,6 +12,65 @@ MODULE_ROOT = WEB_ROOT / "modules"
 
 
 class FrontendModuleContractTest(unittest.TestCase):
+    def test_apexcharts_is_pinned_local_and_used_through_shared_adapter(self) -> None:
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        adapter = (MODULE_ROOT / "chart-adapter.js").read_text(encoding="utf-8")
+        artifact = WEB_ROOT / "vendor/apexcharts/4.7.0/apexcharts.min.js"
+        license_file = WEB_ROOT / "vendor/apexcharts/4.7.0/LICENSE"
+        chart_views = (
+            "cockpit-view.js",
+            "trends-view.js",
+            "cards-view.js",
+            "transactions-view.js",
+            "simulations-view.js",
+            "portfolio-view.js",
+            "reports-view.js",
+        )
+
+        self.assertIn('src="/vendor/apexcharts/4.7.0/apexcharts.min.js?v=4.7.0"', index)
+        self.assertNotRegex(index, r'<script[^>]+src=["\']https?://[^"\']*apexcharts')
+        self.assertTrue(artifact.is_file())
+        self.assertTrue(license_file.is_file())
+        self.assertEqual(
+            hashlib.sha256(artifact.read_bytes()).hexdigest(),
+            "c46de876c375aab3fbc23d82418f7d77251403335808983d2b832d4a38481948",
+        )
+        self.assertIn("new globalThis.ApexCharts", adapter)
+        self.assertIn("prefers-reduced-motion: reduce", adapter)
+        self.assertIn("instance.destroy()", adapter)
+        for name in chart_views:
+            source = (MODULE_ROOT / name).read_text(encoding="utf-8")
+            self.assertIn('from "./chart-adapter.js"', source, name)
+            self.assertNotIn("new ApexCharts", source, name)
+
+    def test_apexcharts_overlays_races_and_history_bounds_are_guarded(self) -> None:
+        portfolio = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
+        reports = (MODULE_ROOT / "reports-view.js").read_text(encoding="utf-8")
+        adapter = (MODULE_ROOT / "chart-adapter.js").read_text(encoding="utf-8")
+        cards = (MODULE_ROOT / "cards-view.js").read_text(encoding="utf-8")
+        transactions = (MODULE_ROOT / "transactions-view.js").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn("document.body.append(portfolioReturnDrawer)", portfolio)
+        self.assertIn("const requestId = ++evolutionRequestId", reports)
+        self.assertIn("requestId !== evolutionRequestId || context !== currentEvolutionContext", reports)
+        self.assertIn('height: 92, sparkline: { enabled: true }', cards)
+        self.assertIn('height: 92, sparkline: { enabled: true }', transactions)
+        self.assertIn("centeredMonthlyPoints(rows", cards)
+        self.assertIn("centeredMonthlyPoints(rows", transactions)
+        self.assertIn("centeredMonthlyAxis(rows)", cards)
+        self.assertIn("centeredMonthlyAxis(rows)", transactions)
+        self.assertIn("tooltip: { enabled: false }", cards)
+        self.assertIn("tooltip: { enabled: false }", transactions)
+        self.assertIn("min: -0.5", adapter)
+        self.assertIn("rows.length - 0.5", adapter)
+        self.assertNotIn("centeredValueTooltip", adapter)
+        plot_rule = styles[styles.index(".invoice-history-chart .invoice-history-plot {"):]
+        plot_rule = plot_rule[:plot_rule.index("}")]
+        self.assertIn("height: 92px", plot_rule)
+        self.assertIn("overflow: hidden", plot_rule)
+        self.assertNotIn(".invoice-history-apex .apexcharts-tooltip", styles)
+
     def test_app_module_imports_resolve_to_local_files(self) -> None:
         source = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
         imports = re.findall(r'from\s+["\'](\./[^"\']+)["\']', source)
@@ -60,6 +120,15 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("prefers-reduced-motion: reduce", tab_utils)
         self.assertIn("view-transition-name: cockpit-active-panel", styles)
         self.assertIn("#cockpitView.is-refreshing", styles)
+
+    def test_paid_card_invoice_is_not_subtracted_twice_from_cockpit_forecast(self) -> None:
+        app_source = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn("isCardInvoicePaid(card.id, cockpitMonth)", app_source)
+        self.assertRegex(
+            app_source,
+            r"const signedAmount = isCardInvoicePaid\(card\.id, cockpitMonth\)\s*\? 0\s*: -Math\.max\(openAmount - reservedAmount, 0\)",
+        )
 
     def test_all_analytical_tabsets_share_keyboard_and_transition_helpers(self) -> None:
         modules = {
@@ -267,7 +336,7 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("/api/portfolio/allocation-goals", portfolio)
         self.assertIn('data-portfolio-tab="goals"', index)
         self.assertIn('id="portfolioGoalsForm"', index)
-        self.assertIn('portfolio-view.js?v=157', app_source)
+        self.assertIn('portfolio-view.js?v=158', app_source)
         transition_start = portfolio.index("transitionView(() => {")
         transition_end = portfolio.index("  };", transition_start)
         self.assertIn("renderActivePortfolioTab();", portfolio[transition_start:transition_end])

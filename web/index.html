@@ -32,7 +32,7 @@
         }
       })();
     </script>
-    <link rel="stylesheet" href="/styles.css?v=148">
+    <link rel="stylesheet" href="/styles.css?v=151">
   </head>
   <body>
     <main class="app-shell">
@@ -1022,7 +1022,7 @@
                 <div class="portfolio-return-chart-wrap">
                   <div class="portfolio-return-chart-row">
                     <div class="portfolio-return-y-axis" id="portfolioReturnYAxis" aria-hidden="true"></div>
-                    <svg id="portfolioReturnChart" class="portfolio-return-chart" viewBox="0 0 100 64" preserveAspectRatio="none" role="img" aria-label="Gráfico de rentabilidade mensal da carteira e benchmarks"></svg>
+                    <div id="portfolioReturnChart" class="portfolio-return-chart" role="img" aria-label="Gráfico de rentabilidade mensal da carteira e benchmarks"></div>
                   </div>
                   <div id="portfolioReturnXLabels" class="portfolio-return-x-labels"></div>
                 </div>
@@ -2046,7 +2046,7 @@
               <div class="evolution-chart-header">
                 <span class="trend-text">Projeção de saldo</span>
               </div>
-              <svg id="forecastSvg" class="evolution-svg" viewBox="0 0 100 50" preserveAspectRatio="none"></svg>
+              <div id="forecastSvg" class="evolution-svg" role="img" aria-label="Gráfico de previsão"></div>
               <div id="forecastXLabels" class="evolution-x-labels"></div>
             </div>
           </div>
@@ -2092,7 +2092,7 @@
                 <span id="evolutionChartTrend" class="trend-text"></span>
                 <strong id="evolutionChartTotal" class="total-text"></strong>
               </div>
-              <svg id="evolutionSvg" class="evolution-svg" viewBox="0 0 100 50" preserveAspectRatio="none"></svg>
+              <div id="evolutionSvg" class="evolution-svg" role="img" aria-label="Gráfico de evolução"></div>
               <div id="evolutionXLabels" class="evolution-x-labels"></div>
             </div>
           </div>
@@ -2109,7 +2109,8 @@
       </label>
       <div class="global-search-results" id="globalSearchResults" role="listbox" aria-label="Resultados da busca"></div>
     </dialog>
-    <script type="module" src="/app.js?v=158"></script>
+    <script src="/vendor/apexcharts/4.7.0/apexcharts.min.js?v=4.7.0"></script>
+    <script type="module" src="/app.js?v=163"></script>
     <script async defer data-name="BMC-Widget" data-cfasync="false" src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js" data-id="sansquerh" data-description="Support me on Buy me a coffee!" data-message="Tks pelo café!" data-color="#5F7FFF" data-position="Right" data-x_margin="18" data-y_margin="18" data-container="bmc-btn-container"></script>
   </body>
 </html>

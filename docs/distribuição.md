@@ -2,8 +2,8 @@
 tipo: spec
 area: distribuicao
 status: implementado
-versao: 2.3
-atualizado: 2026-08-09
+versao: 2.4
+atualizado: 2026-08-30
 relacionados:
   - "[[sdd]]"
   - "[[templates/spec-template|Template de spec]]"
@@ -16,7 +16,7 @@ aliases: ["Distribuicao", "Pacotes de Distribuicao", "Instalador macOS", "Instal
 # Distribuicao
 
 > [!info] Status
-> **implementado** · área: `distribuicao` · atualizado em 2026-08-09 · relacionados: [[sdd]], [[templates/spec-template|Template de spec]], [[arquitetura]], [[requisitos]]
+> **implementado** · área: `distribuicao` · atualizado em 2026-08-30 · relacionados: [[sdd]], [[templates/spec-template|Template de spec]], [[arquitetura]], [[requisitos]]
 
 ## Problema
 
@@ -70,6 +70,9 @@ Usuario final que vai instalar o Sistema Financeiro em outro computador e manten
 - O pacote nao deve conter nenhum arquivo ou subdiretorio de `data/`.
 - O pacote nao deve conter nenhum arquivo ou subdiretorio de `secure/`.
 - O pacote nao deve conter nenhum arquivo ou subdiretorio de `tests/`.
+- Dependências browser aprovadas da v2 devem ser incluídas como assets vendorizados locais, nunca buscadas por CDN durante a execução.
+- Cada asset de terceiro incluído deve ter versão exata, origem, hash SHA-256 e licença registrados em inventário distribuível; o texto de licença exigido acompanha o pacote.
+- `node_modules`, lockfiles e ferramentas de build não entram no pacote final; somente os artefatos browser aprovados e seus avisos de licença.
 - O pacote final nao deve conter a pasta `docs/`; a documentacao tecnica fica apenas no repositorio de desenvolvimento.
 - O pacote final nao deve conter arquivos, assets, dependencias ou configuracoes da Landing Page institucional; ela vive em repositório separado (`/Users/sansquer/Documents/GitHub/sistemafinanceiropage`) e nao faz parte do app instalavel.
 - O pacote final nao deve conter zips antigos de distribuicao embutidos dentro da propria pasta da plataforma.
@@ -167,6 +170,7 @@ Arquivos e diretorios afetados:
 
 ## Changelog
 
+- `2.4` — 2026-08-30 — Pacotes futuros da v2 passam a exigir dependências browser locais, inventário com versão/origem/SHA-256/licença e ausência de CDN, `node_modules` e ferramentas de build. Ver [[adr/0013-dependencias-frontend-v2]].
 - `2.3` — 2026-08-09 — Pacotes e instaladores passam a tratar `secure/` como runtime local sensível, fora dos zips, preservado em atualizações junto com `data/`; documentada migração compatível de segredos para `secure_configs`.
 - `2.2` — 2026-08-04 — Pasta `Sistema Financeiro - Distribuicao/` passa a ser tratada como template enxuto versionado, removendo runtimes PyInstaller, zips, staging Linux, `.DS_Store` e árvore fonte antiga dos pacotes.
 - `2.1` — 2026-08-04 — Workflows de pacotes passam a nomear zips e artifacts como `SO - versão do app` e publicar os assets em GitHub Releases para consumo pela Landing Page.

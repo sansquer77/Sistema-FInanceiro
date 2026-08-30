@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.48
-atualizado: 2026-08-29
+versao: 3.53
+atualizado: 2026-08-30
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -16,7 +16,7 @@ tags: [arquitetura, meta]
 # Arquitetura
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-08-28 · relacionados: [[requisitos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
+> **implementado** · área: `meta` · atualizado em 2026-08-30 · relacionados: [[requisitos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
 
 ## Visão geral
 
@@ -56,6 +56,7 @@ O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Co
 | `date-utils.js` | Datas locais, meses e exibição de datas. |
 | `money-utils.js` | Formatação e parsing numérico/monetário. |
 | `dom-utils.js` | Helpers de formulário, mensagens, empty state e escaping. |
+| `chart-adapter.js` | Fronteira única para instâncias ApexCharts, tokens do tema, movimento reduzido, descarte e fallback. |
 | `transaction-kind.js` | Predicados de tipo de lançamento. |
 | `labels.js` | Labels de domínio usados pela interface. |
 | `month-picker.js` | Popover reutilizável de seleção de mês. |
@@ -64,6 +65,8 @@ O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Co
 | `theme-utils.js` | Persistência local e aplicação do tema visual. |
 | `privacy-utils.js` | Persistência local e aplicação do modo de ocultação de valores. |
 | `instructions-content.js` | Conteúdo estático, offline e versionado da central de ajuda. Ver [[instrucoes-app]]. |
+
+**Fundação da v2 em implementação:** os gráficos existentes já usam ApexCharts 4.7.0 vendorizado por meio de `chart-adapter.js`; [[specs/frontend-fundacao-v2]] mantém planejados o adaptador IMask, uma Command Palette em ES Modules com experiência equivalente ao padrão cmdk e um virtualizador compartilhado de listas de altura fixa. O pacote React `cmdk` não integra a arquitetura; o frontend continua sem framework, bundler ou download de CDN. Ver [[adr/0013-dependencias-frontend-v2]].
 
 **Views funcionais já extraídas:**
 
@@ -281,6 +284,8 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 
 ### Núcleo da aplicação (`financeiro/`)
 
+Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py` trata centavos e arredondamento; `calendar_rules.py`, datas e meses; `identifiers.py`, IDs positivos; e `recurrence.py`, frequências e avanço de ocorrências. Eles não acessam SQLite nem conhecem erros dos módulos consumidores. Ver [[specs/utilitarios-dominio]].
+
 | Módulo | Responsabilidade |
 |---|---|
 | `database.py` | Conexão SQLite, schema e migrações idempotentes. |
@@ -311,7 +316,13 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 
 Banco local em `data/finance.db`, criado automaticamente na inicialização. Arquivos de `data/` são runtime local e **não devem ser versionados**.
 
+O cache regenerável `quote_cache` recebe manutenção na inicialização: respostas expiradas há mais de 30 dias são removidas, com limites de 1.000 entradas por provedor e 1.500 no total. Se a limpeza liberar ao menos 1 MiB e 20% das páginas, o banco executa `VACUUM`; abaixo disso, o SQLite apenas reutiliza as páginas livres. Falhas nessa manutenção não bloqueiam a abertura e nenhuma tabela financeira é afetada. Ver [[specs/manutencao-cache-cotacoes]].
+
 Conexões SQLite são abertas com `journal_mode=WAL`, `busy_timeout` curto e `foreign_keys=ON`. Escritas que dependem de leituras prévias de saldo/fatura usam transações imediatas para serializar a janela crítica; operações potencialmente demoradas, como envio SMTP, cotação externa, consolidação de portfólio e importações em lote, não devem manter uma conexão aberta além do trecho estritamente necessário de leitura ou gravação.
+
+### Baseline e migração para a linha v2
+
+O baseline inicial da v2 usa `PRAGMA user_version = 20000`. Banco ausente é criado e marcado diretamente; banco já marcado abre sem percorrer as compatibilizações da linha 1.x. Um `finance.db` com `user_version = 0` é tratado como legado: na abertura, o app normaliza uma cópia de trabalho, gera um candidato compacto por `VACUUM INTO`, valida integridade, chaves estrangeiras, versão e contagens por tabela e somente então promove os arquivos. O original passa a `data/finance-v1.bkp`, que nunca é sobrescrito, enquanto o candidato mantém o nome ativo `data/finance.db`. Falhas anteriores à promoção preservam o nome original; falha na segunda renomeação tenta restaurá-lo. Ver [[specs/migracao-banco-v2]] e [[adr/0012-fundacao-v2-contrato-e-migracao-de-dados]].
 
 ### Tabelas
 
@@ -516,6 +527,11 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.53` — 2026-08-30 — Documentados os utilitários puros de dinheiro, calendário, identificadores e recorrência compartilhados pelo núcleo. Ver [[specs/utilitarios-dominio]].
+- `3.52` — 2026-08-30 — Documentada manutenção automática do `quote_cache` com retenção stale, limites e `VACUUM` condicionado. Ver [[specs/manutencao-cache-cotacoes]].
+- `3.51` — 2026-08-30 — ApexCharts 4.7.0 incorporado localmente e isolado por `chart-adapter.js`; gráficos atuais migrados sem alterar contratos de dados.
+- `3.50` — 2026-08-30 — Documentada a fundação planejada do frontend v2: ApexCharts 4.7.0/IMask locais, Command Palette nativa por `Cmd/Ctrl+K` e virtualização compartilhada, mantendo ES Modules sem build step. Ver [[specs/frontend-fundacao-v2]] e [[adr/0013-dependencias-frontend-v2]].
+- `3.49` — 2026-08-30 — Persistência passa a usar baseline v2 `user_version = 20000` e migração automática, validada e recuperável do legado, preservando `finance-v1.bkp` e mantendo `finance.db` como banco ativo. Ver [[specs/migracao-banco-v2]].
 - `3.48` — 2026-08-29 — Metas de alocação passam a integrar o contexto minimizado dos cards `alocacao_perfil` e `analise_carteira`; auditoria aceita a entidade `portfolio_allocation_goals`.
 - `3.47` — 2026-08-29 — Adicionada persistência `portfolio_allocation_goals` e rota `PUT /api/portfolio/allocation-goals`; consolidação por classe usa valores normalizados em BRL para atual versus meta.
 - `3.46` — 2026-08-29 — Adicionada `investment_redemption_summaries` para preservar o snapshot financeiro de cada resgate e alimentar a aba Histórico sem recálculo retroativo.

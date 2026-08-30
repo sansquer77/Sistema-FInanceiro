@@ -1,4 +1,10 @@
 import { stateMarkup } from "./dom-utils.js";
+import {
+  centeredMonthlyAxis,
+  centeredMonthlyPoints,
+  chartToken,
+  renderChart,
+} from "./chart-adapter.js";
 
 export function registerCardsView({
   state,
@@ -878,14 +884,8 @@ export function registerCardsView({
       return;
     }
     const rows = invoiceHistoryRows(card);
-    const path = invoiceHistoryPath(rows, "past");
-    const futurePath = invoiceHistoryPath(rows, "future");
-    const areaPath = invoiceHistoryAreaPath(rows);
     const average = invoiceHistoryAverage(rows);
     const averageLabel = formatMoney(average.amount, card.currency);
-    const points = rows.map((row) => `
-      <span class="invoice-history-point ${row.isCurrent ? "current" : ""} ${row.offset > 0 ? "future" : ""}" style="left: ${row.x}%; top: ${row.y}%"></span>
-    `).join("");
     cardInvoiceHistoryChart.innerHTML = `
       <div class="invoice-history-rail" role="list">
         ${rows.map((row) => {
@@ -898,23 +898,24 @@ export function registerCardsView({
         `;
         }).join("")}
         <div class="invoice-history-plot" aria-hidden="true">
-          <svg class="invoice-history-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="invoiceHistoryAreaGradient" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.18"></stop>
-                <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"></stop>
-              </linearGradient>
-            </defs>
-            <path class="invoice-history-area" d="${areaPath}"></path>
-            <path class="invoice-history-line" d="${path}"></path>
-            <path class="invoice-history-line future" d="${futurePath}"></path>
-            <path class="invoice-history-line average" d="M 10 ${average.y} L 90 ${average.y}"></path>
-          </svg>
-          <span class="invoice-history-average-label" style="left: calc(90% + 12px); top: ${average.y}%">${escapeHtml(averageLabel)}</span>
-          ${points}
+          <div class="invoice-history-apex"></div>
         </div>
       </div>
     `;
+    renderChart(cardInvoiceHistoryChart.querySelector(".invoice-history-apex"), {
+      chart: { type: "area", height: 92, sparkline: { enabled: true } },
+      series: [
+        { name: "Faturas", data: centeredMonthlyPoints(rows, (row) => row.offset <= 0 ? row.amount : null) },
+        { name: "Previsão", data: centeredMonthlyPoints(rows, (row) => row.offset >= 0 ? row.amount : null) },
+      ],
+      colors: [chartToken("--accent", "#5f7fff"), chartToken("--muted", "#6b7280")],
+      stroke: { curve: "smooth", width: [3, 2], dashArray: [0, 5] },
+      fill: { type: "gradient", gradient: { opacityFrom: 0.2, opacityTo: 0.02 } },
+      markers: { size: 4 },
+      annotations: { yaxis: [{ y: average.amount, label: { text: `Média ${averageLabel}` } }] },
+      xaxis: centeredMonthlyAxis(rows),
+      tooltip: { enabled: false },
+    });
   }
 
   function chartAmountSizeClass(text) {
