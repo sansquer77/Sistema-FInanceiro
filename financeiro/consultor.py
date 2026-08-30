@@ -927,12 +927,12 @@ def build_portfolio_analysis_context(user_id: int, *, portfolio_positions: list[
 
 
 def build_allocation_goals_context(user_id: int, positions: list[dict]) -> list[dict]:
-    from financeiro.portfolio import get_allocation_goals
+    from financeiro.portfolio import allocation_goal_key, get_allocation_goals
 
     total_cents = sum(int(position.get("current_value_brl_cents") or 0) for position in positions)
     current_by_type: dict[str, int] = {}
     for position in positions:
-        asset_type = str(position.get("asset_type") or "other")
+        asset_type = allocation_goal_key(position)
         current_by_type[asset_type] = current_by_type.get(asset_type, 0) + int(position.get("current_value_brl_cents") or 0)
     context = []
     for goal in get_allocation_goals(user_id):

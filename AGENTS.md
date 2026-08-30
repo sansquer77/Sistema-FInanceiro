@@ -113,7 +113,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 Cada módulo tem responsabilidade única — não misture domínios entre módulos:
 
-`database.py` (schema/migrações) · `money.py` (centavos/arredondamento) · `calendar_rules.py` (datas/meses) · `identifiers.py` (IDs positivos) · `recurrence.py` (séries/frequências) · `auth.py` (usuários/sessões) · `accounts.py` (contas-correntes) · `transactions.py` (lançamentos) · `categories.py` (categorias/tags) · `classification_suggestions.py` (sugestão local) · `credit_cards.py` (cartões/faturas) · `spending_limits.py` (limites) · `portfolio.py` (investimentos) · `imports.py` (importação) · `operation_logs.py` (auditoria) · `emailer.py` (envio SMTP) · `secure_config.py` (config criptografada).
+`database.py` (schema/migrações) · `money.py` (centavos/arredondamento) · `calendar_rules.py` (datas/meses) · `identifiers.py` (IDs positivos) · `recurrence.py` (séries/frequências) · `auth.py` (usuários/sessões) · `accounts.py` (contas-correntes) · `transactions.py` (lançamentos) · `categories.py` (categorias/tags) · `classification_suggestions.py` (sugestão local) · `credit_cards.py` (cartões/faturas) · `spending_limits.py` (limites) · `portfolio.py` (fachada de investimentos) · `portfolio_positions.py` (posições/lotes) · `portfolio_quotes.py` (cotações/cache) · `portfolio_calculations.py` (cálculos/agregações) · `cockpit.py` (agregações do Cockpit) · `http_routes.py` (resolução de rotas) · `imports.py` (importação) · `operation_logs.py` (auditoria) · `emailer.py` (envio SMTP) · `secure_config.py` (config criptografada).
 
 Veja o mapeamento completo de rotas e tabelas em [`docs/arquitetura.md`](docs/arquitetura.md) antes de adicionar qualquer endpoint.
 

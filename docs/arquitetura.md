@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.53
+versao: 3.54
 atualizado: 2026-08-30
 relacionados:
   - "[[requisitos]]"
@@ -23,7 +23,7 @@ tags: [arquitetura, meta]
 O Sistema Financeiro é um app local composto por servidor HTTP em Python, banco SQLite e interface web estática. Roda em macOS sem dependências externas para operação financeira básica.
 
 ```text
-app.py              Servidor HTTP, roteamento da API e arquivos estáticos
+app.py              Adaptador HTTP, autenticação e arquivos estáticos
 financeiro/         Regras de domínio, persistência e integrações locais
 web/                Interface do usuário em HTML, CSS e JavaScript
 data/               Arquivos de runtime criados localmente (não versionados)
@@ -300,7 +300,12 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | `classification_suggestions.py` | Normalização de descrições e sugestão local por histórico exato indexado. Ver [[classificacao-assistida]]. |
 | `credit_cards.py` | Cartões, faturas mensais, transações e pagamentos. Ver [[cartoes]]. |
 | `spending_limits.py` | Metas e orçamentos mensais. Ver [[limites-gastos]]. |
-| `portfolio.py` | Consolidação de investimentos, precificação, impostos e metadado de reserva de emergência. Ver [[investimentos-portfolio]]. |
+| `http_routes.py` | Tabela declarativa e resolução de rotas, independente do transporte HTTP. Ver [[specs/desconcentracao-arquitetura-v2]]. |
+| `cockpit.py` | Agregações de domínio do resumo mensal do Cockpit, fora do adaptador HTTP. |
+| `portfolio.py` | Fachada pública e orquestração compatível do Portfólio. Ver [[investimentos-portfolio]]. |
+| `portfolio_positions.py` | Regras internas de identidade, lotes e persistência lógica das posições. |
+| `portfolio_quotes.py` | Helpers de integrações externas e limites de cache de cotações. |
+| `portfolio_calculations.py` | Agregações, normalizações e cálculos puros do Portfólio. |
 | `financial_health.py` | Núcleo analítico do Score de Saúde Financeira: cálculo atômico dos pilares, lista `pilares`, Paz Financeira e função de histórico com validação de `months` (1-36). Ver [[score-saude-financeira]]. |
 | `trends.py` | Núcleo local de Tendências e Achados: série mensal, Budget x Realizado, achados estruturados, eventos pontuais, assinaturas/serviços recorrentes, confiança e resumo determinístico. Ver [[tendencias-saude-financeira]]. |
 | `ai_summary.py` | Reescrita opcional do resumo por IA com payload minimizado, timeout curto e fallback para resumo local. Ver [[tendencias-saude-financeira]]. |
@@ -528,9 +533,11 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 - [[adr/0004-importador-xls-sem-dependencia]] — Parser `.xls` implementado sem pacote externo para reduzir requisitos de instalação.
 - [[adr/0005-smtp-criptografado-local]] — Configuração SMTP criptografada no próprio ambiente; pacotes distribuíveis nunca incluem credenciais.
 - [[adr/0006-classificacao-assistida-local]] — Correspondência exata normalizada como MVP local; ML local reservado para V2.
+- [[adr/0014-desconcentracao-fachadas-e-roteamento]] — Fachadas compatíveis, roteamento declarativo e módulos internos menores para a fundação v2.
 
 ## Changelog
 
+- `3.54` — 2026-08-30 — Roteamento declarativo e fronteiras internas de Portfólio/Cockpit reduzem concentração sem alterar contratos públicos. Ver [[specs/desconcentracao-arquitetura-v2]] e [[adr/0014-desconcentracao-fachadas-e-roteamento]].
 - `3.53` — 2026-08-30 — Documentados os utilitários puros de dinheiro, calendário, identificadores e recorrência compartilhados pelo núcleo. Ver [[specs/utilitarios-dominio]].
 - `3.52` — 2026-08-30 — Documentada manutenção automática do `quote_cache` com retenção stale, limites e `VACUUM` condicionado. Ver [[specs/manutencao-cache-cotacoes]].
 - `3.51` — 2026-08-30 — ApexCharts 4.7.0 incorporado localmente e isolado por `chart-adapter.js`; gráficos atuais migrados sem alterar contratos de dados.

@@ -739,7 +739,7 @@ export function registerPortfolioView({
           ${matches.map((position) => {
             const name = position.asset_name || position.asset_identifier || "Ativo sem nome";
             const value = Number(position.current_value_brl || position.current_value || position.current_value_cents / 100 || 0);
-            const percent = total > 0 ? (value / total) * 100 : 0;
+            const percent = total > 0 ? value / total : 0;
             const lineValue = position.current_value_brl ? formatMoney(position.current_value_brl, "BRL") : formatMoney(position.current_value || position.current_value_cents / 100, position.currency || "BRL");
             return `
               <article class="portfolio-group-drawer-item" role="listitem">
@@ -767,17 +767,25 @@ export function registerPortfolioView({
     }
     portfolioGroupDrawer.hidden = true;
     portfolioGroupDrawer.setAttribute("aria-hidden", "true");
+    portfolioGroupDrawerList?.replaceChildren();
   }
 
   function portfolioAllocationRows(rows, goals) {
     const byLabel = new Map(rows.map((row) => [`${row.label}::${row.currency || "BRL"}`, row]));
     for (const goal of goals) {
       if (Number(goal.target_percent || 0) > 0) {
-        const hasGoalClassRow = [...byLabel.keys()].some((key) => key.startsWith(`${goal.label}::`));
+        const isUsdVariableIncomeGoal = goal.asset_type === "stock_usd";
+        const hasGoalClassRow = isUsdVariableIncomeGoal
+          ? byLabel.has("Renda variável::USD")
+          : goal.asset_type === "stock"
+            ? byLabel.has("Renda variável::BRL")
+            : [...byLabel.keys()].some((key) => key.startsWith(`${goal.label}::`));
         if (!hasGoalClassRow) {
-          byLabel.set(`${goal.label}::BRL`, {
-            label: goal.label,
-            currency: "BRL",
+          const label = isUsdVariableIncomeGoal ? "Renda variável" : goal.label;
+          const currency = isUsdVariableIncomeGoal ? "USD" : "BRL";
+          byLabel.set(`${label}::${currency}`, {
+            label,
+            currency,
             count: 0,
             current_brl: "0.00",
             chart_current_brl: "0.00",
@@ -1079,14 +1087,14 @@ export function registerPortfolioView({
       return;
     }
     const chartTotal = portfolioGroupChartTotal(rows);
-    const goals = new Map((options.goals || []).map((goal) => [goal.label, Number(goal.target_percent || 0)]));
+    const goals = new Map((options.goals || []).map((goal) => [goal.asset_type, Number(goal.target_percent || 0)]));
     container.innerHTML = rows.map((row, index) => {
       const chartValue = Number(row.chart_current_brl || row.current_brl || 0);
       const currentValue = Number(row.current_brl || 0);
       const result = Number(row.result_brl || 0);
       const currency = row.currency || "BRL";
       const percent = chartTotal > 0 ? chartValue / chartTotal : 0;
-      const targetPercent = goals.get(row.label) || 0;
+      const targetPercent = goals.get(portfolioAllocationGoalKey(row)) || 0;
       const actualPercent = percent * 100;
       const deviation = actualPercent - targetPercent;
       const targetValue = chartTotal * targetPercent / 100;
@@ -1123,6 +1131,23 @@ export function registerPortfolioView({
       </label>
     `).join("");
     updatePortfolioGoalsTotal();
+  }
+
+  function portfolioAllocationGoalKey(row) {
+    if (row.label === "Renda variável" && row.currency === "USD") {
+      return "stock_usd";
+    }
+    const labels = {
+      "Renda variável": "stock",
+      Cripto: "crypto",
+      Stablecoin: "stablecoin",
+      Fundos: "fund",
+      "Renda fixa": "fixed_income",
+      "Previdência privada": "private_pension",
+      Poupança: "savings",
+      Outros: "other",
+    };
+    return labels[row.label] || row.label;
   }
 
   function updatePortfolioGoalsTotal() {

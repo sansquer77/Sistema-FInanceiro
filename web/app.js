@@ -65,7 +65,7 @@ import { registerImportsView } from "./modules/imports-view.js";
 import { registerCockpitView } from "./modules/cockpit-view.js";
 import { registerAccountsView } from "./modules/accounts-view.js";
 import { registerCardsView } from "./modules/cards-view.js";
-import { registerPortfolioView } from "./modules/portfolio-view.js?v=160";
+import { registerPortfolioView } from "./modules/portfolio-view.js?v=162";
 import { registerTransactionsView } from "./modules/transactions-view.js";
 import { registerSimulationsView } from "./modules/simulations-view.js";
 import { registerOperationHistoryView } from "./modules/operation-history-view.js";
@@ -799,7 +799,7 @@ const cockpitView = registerCockpitView({
   renderLimitAlerts: () => limitsView.renderLimitAlerts(cockpitMonthValue()),
   onCockpitMonthChanged: refreshCockpitData,
   loadPortfolio,
-  portfolioTotalsByCurrency,
+  portfolioTotalsByCurrency: (rows) => portfolioView.portfolioTotalsByCurrency(rows),
   portfolioMaturityAlerts: () => portfolioView.portfolioMaturityAlerts(),
   goToPortfolio: () => showModule("portfolio"),
   onNavigateToTransaction: (transactionId, accountId, date) => {
@@ -922,7 +922,7 @@ const cardsView = registerCardsView({
   cardTransactionTypeLabel,
   transactionSeriesLabel,
   cardCategoryPath,
-  launchActionButton,
+  launchActionButton: (...args) => transactionsView.launchActionButton(...args),
   decisionModal,
   deleteSeriesScope,
   openMonthPicker,
@@ -932,7 +932,7 @@ const cardsView = registerCardsView({
     renderFinanceViews();
   },
   onCardTransactionsChanged: () => {
-    renderLimits();
+    limitsView.renderLimits();
     renderCockpit();
   },
   onInvoicePaid: loadTransactionsAndAccounts,
@@ -1036,7 +1036,7 @@ const transactionsView = registerTransactionsView({
   markPortfolioDirty,
   renderBaseViews,
   renderFinanceViews,
-  renderPortfolio,
+  renderPortfolio: () => portfolioView.renderPortfolio(),
   renderImportTargets,
 });
 
@@ -1310,14 +1310,14 @@ async function loadAppInfo() {
   try {
     state.appInfo = await api("/api/app-info");
   } catch (error) {
-    state.appInfo = { version: "1.0.50" };
+    state.appInfo = { version: "2.0.0" };
   }
   renderAppInfo();
 }
 
 function renderAppInfo() {
   if (aboutAppVersion) {
-    aboutAppVersion.textContent = state.appInfo?.version || "1.0.50";
+    aboutAppVersion.textContent = state.appInfo?.version || "2.0.0";
   }
 }
 
@@ -1652,23 +1652,23 @@ function showModule(view) {
   if (view === "transactions") {
     ensureSelectedAccount();
     renderTransactionAccounts();
-    updateTransactionTypeState();
+    transactionsView.updateTransactionTypeState();
     loadTransactionSlice().then(() => {
       renderTransactions();
       transactionsView.highlightSavedTransaction();
     }).catch((error) => setMessage(transactionMessage, error.message, "error"));
   }
   if (view === "limits") {
-    renderLimits();
+    limitsView.renderLimits();
   }
   if (view === "simulations") {
     simulationsView.loadSimulationFormData().catch((error) => setMessage(simulationMessage, error.message, "error"));
   }
   if (view === "reports") {
-    renderReports();
+    reportsView.renderReports();
   }
   if (view === "portfolio") {
-    renderPortfolio();
+    portfolioView.renderPortfolio();
     loadPortfolio({ revalidate: true });
   }
   if (view === "creditCards") {
@@ -1819,13 +1819,13 @@ function renderBaseViews() {
 function renderFinanceViews() {
   renderCockpit();
   renderTransactions();
-  renderLimits();
-  renderReports();
+  limitsView.renderLimits();
+  reportsView.renderReports();
 }
 
 function renderManagementViews() {
-  renderClassifications();
-  renderPortfolio();
+  classificationsView.renderClassifications();
+  portfolioView.renderPortfolio();
 }
 
 function renderCockpit() {
@@ -1901,54 +1901,6 @@ function renderTransactions() {
 
 function selectedAccountTransactions(transactions = state.accountTransactions) {
   return transactionsView.selectedAccountTransactions(transactions);
-}
-
-function renderClassifications() {
-  classificationsView.renderClassifications();
-}
-
-function renderLimits() {
-  limitsView.renderLimits();
-}
-
-function renderReports() {
-  reportsView.renderReports();
-}
-
-function renderPortfolio() {
-  portfolioView.renderPortfolio();
-}
-
-function portfolioTotalsByCurrency(rows) {
-  return portfolioView.portfolioTotalsByCurrency(rows);
-}
-
-function renderTransactionCollection(container, transactions, compact, balanceTransactions = transactions) {
-  transactionsView.renderTransactionCollection(container, transactions, compact, balanceTransactions);
-}
-
-function launchActionButton(icon, label, attributes, extraClass = "") {
-  return transactionsView.launchActionButton(icon, label, attributes, extraClass);
-}
-
-function updateTransactionTypeState() {
-  transactionsView.updateTransactionTypeState();
-}
-
-function shiftTransactionMonth(delta) {
-  transactionsView.shiftTransactionMonth(delta);
-}
-
-async function setTransactionMonth(month) {
-  await transactionsView.setTransactionMonth(month);
-}
-
-async function shiftCardInvoiceMonth(delta) {
-  await cardsView.shiftCardInvoiceMonth(delta);
-}
-
-async function setCardInvoiceMonth(month) {
-  await cardsView.setCardInvoiceMonth(month);
 }
 
 function getCurrencyTotals() {

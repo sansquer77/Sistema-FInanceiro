@@ -38,6 +38,11 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("new globalThis.ApexCharts", adapter)
         self.assertIn("prefers-reduced-motion: reduce", adapter)
         self.assertIn("instance.destroy()", adapter)
+        self.assertIn("const chartInstances = new Map()", adapter)
+        self.assertIn("new MutationObserver(scheduleDisconnectedChartCleanup)", adapter)
+        self.assertIn("if (!element.isConnected) destroyChartInstance", adapter)
+        self.assertIn("destroyDisconnectedCharts();", adapter)
+        self.assertNotIn("const chartInstances = new WeakMap()", adapter)
         for name in chart_views:
             source = (MODULE_ROOT / name).read_text(encoding="utf-8")
             self.assertIn('from "./chart-adapter.js"', source, name)
@@ -47,6 +52,27 @@ class FrontendModuleContractTest(unittest.TestCase):
         portfolio = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
 
         self.assertIn('new Map(rows.map((row) => [`${row.label}::${row.currency || "BRL"}`, row]))', portfolio)
+
+    def test_portfolio_goals_separate_usd_variable_income(self) -> None:
+        portfolio = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
+        backend = (REPOSITORY_ROOT / "financeiro/portfolio.py").read_text(encoding="utf-8")
+
+        self.assertIn('goal.asset_type === "stock_usd"', portfolio)
+        self.assertIn('return "stock_usd"', portfolio)
+        self.assertIn('"stock_usd": "Renda variável - USD"', backend)
+
+    def test_portfolio_analysis_flyout_avoids_persistent_webkit_layers(self) -> None:
+        portfolio = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn("portfolioGroupDrawerList?.replaceChildren()", portfolio)
+        hidden_rule = styles[styles.index(".portfolio-group-drawer[hidden] {"):]
+        hidden_rule = hidden_rule[:hidden_rule.index("}")]
+        self.assertIn("display: none !important", hidden_rule)
+        overlay_rule = styles[styles.index(".portfolio-group-drawer .drawer-overlay {"):]
+        overlay_rule = overlay_rule[:overlay_rule.index("}")]
+        self.assertIn("-webkit-backdrop-filter: none", overlay_rule)
+        self.assertIn("backdrop-filter: none", overlay_rule)
 
     def test_apexcharts_overlays_races_and_history_bounds_are_guarded(self) -> None:
         portfolio = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
@@ -341,7 +367,7 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("/api/portfolio/allocation-goals", portfolio)
         self.assertIn('data-portfolio-tab="goals"', index)
         self.assertIn('id="portfolioGoalsForm"', index)
-        self.assertIn('portfolio-view.js?v=158', app_source)
+        self.assertIn('portfolio-view.js?v=162', app_source)
         transition_start = portfolio.index("transitionView(() => {")
         transition_end = portfolio.index("  };", transition_start)
         self.assertIn("renderActivePortfolioTab();", portfolio[transition_start:transition_end])

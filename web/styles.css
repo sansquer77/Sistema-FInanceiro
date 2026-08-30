@@ -7337,6 +7337,9 @@ form[aria-busy="true"] .form-actions {
   transition: visibility 0s linear 0.3s;
   display: flex !important; /* Override generic [hidden] display:none to allow animation */
 }
+.portfolio-group-drawer[hidden] {
+  display: none !important;
+}
 .drawer-overlay {
   position: absolute;
   inset: 0;
@@ -7344,6 +7347,11 @@ form[aria-busy="true"] .form-actions {
   backdrop-filter: blur(2px);
   opacity: 1;
   transition: opacity 0.3s ease;
+}
+.portfolio-group-drawer .drawer-overlay {
+  background: var(--drawer-overlay);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 .drawer[hidden] .drawer-overlay {
   opacity: 0;

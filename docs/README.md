@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 12.1
+versao: 12.2
 atualizado: 2026-08-30
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -66,6 +66,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[specs/migracao-banco-v2]] | ✅ implementado | Migração de dados |
 | [[specs/manutencao-cache-cotacoes]] | ✅ implementado | Persistência |
 | [[specs/utilitarios-dominio]] | ✅ implementado | Arquitetura |
+| [[specs/desconcentracao-arquitetura-v2]] | ✅ implementado | Arquitetura v2 |
 
 ---
 
@@ -100,6 +101,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[adr/0011-criptografia-snapshots-familiares]] | Rascunho da criptografia transportável dos snapshots familiares com `cryptography`, `scrypt` e `AES-256-GCM`. |
 | [[adr/0012-fundacao-v2-contrato-e-migracao-de-dados]] | Fundação da linha 2.x com contrato congelado, schema-base canônico e migração controlada do banco 1.x para um novo banco 2.x. |
 | [[adr/0013-dependencias-frontend-v2]] | ApexCharts 4.7.0 e IMask vendorizados, Command Palette nativa no padrão cmdk e virtualização compartilhada sem framework. |
+| [[adr/0014-desconcentracao-fachadas-e-roteamento]] | Fachadas compatíveis, roteamento declarativo e responsabilidades internas menores na fundação v2. |
 
 ---
 
@@ -140,6 +142,7 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `12.2` — 2026-08-30 — Implementada a desconcentração inicial da arquitetura v2, com roteamento declarativo e módulos internos de Portfólio/Cockpit. Ver [[specs/desconcentracao-arquitetura-v2]] e [[adr/0014-desconcentracao-fachadas-e-roteamento]].
 - `12.1` — 2026-08-30 — Extraídos utilitários conceituais compartilhados de dinheiro, calendário, identificadores e recorrência. Ver [[specs/utilitarios-dominio]].
 - `12.0` — 2026-08-30 — Implementada [[specs/manutencao-cache-cotacoes]] com retenção de 30 dias, limites e compactação controlada do cache regenerável de mercado.
 - `11.99` — 2026-08-30 — Fundação frontend v2 iniciada com ApexCharts 4.7.0 local, adaptador compartilhado e migração dos gráficos existentes sem mudança de dados ou finalidade.

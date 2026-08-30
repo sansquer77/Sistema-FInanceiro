@@ -2,8 +2,8 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.43
-atualizado: 2026-08-29
+versao: 2.45
+atualizado: 2026-08-30
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -48,6 +48,8 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 | Outros | `other` |
 
 ## Regras
+
+- O flyout de composição da aba Análise deve sair completamente da árvore de renderização quando fechado e não pode usar `backdrop-filter` sobre a página do Portfólio, evitando superfícies de composição persistentes no WebKit/Safari.
 
 **Geral:**
 - Cada ativo é mantido e exibido na moeda da conta/carteira onde está custodiado.
@@ -161,6 +163,8 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - [x] Exibir resgates parciais e posições encerradas em seções próprias da aba Histórico.
 - [x] Persistir metas percentuais por classe com soma obrigatória de 100%.
 - [x] Criar a aba Metas e comparar atual versus planejado no gráfico Por Classe.
+- [x] Separar a meta de Renda Variável em BRL e USD, preservando metas existentes.
+- [x] Usar a meta específica de Renda Variável em USD na comparação da Análise e no Consultor.
 
 ## Critérios de aceite
 
@@ -230,12 +234,19 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado a aba Histórico aberta, quando há resgates parciais e/ou posições encerradas, então eles aparecem em seções distintas e o estado vazio orienta que ambos os eventos serão registrados ali.
 - Dado o usuário configurando metas por classe na aba Metas, quando salva, então os percentuais entre 0% e 100% são persistidos somente se a soma for exatamente 100%.
 - Dado metas salvas, quando a aba Análise é aberta, então o gráfico Por Classe compara participação atual e meta usando o valor atual normalizado em BRL.
+- Dado o usuário configurando metas, quando a aba Metas é exibida, então existe um campo `Renda variável - USD` separado de `Renda variável`.
+- Dado uma meta `Renda variável - USD` salva, quando a Análise é exibida, então a linha de Renda variável em USD usa essa meta e a linha em BRL usa a meta de Renda variável.
+- Dado metas antigas sem `Renda variável - USD`, quando são carregadas, então o novo campo aparece com 0% e a soma das metas existentes permanece válida.
+- Dado o flyout de composição da aba Análise fechado, quando o Safari processa a página, então o overlay e seu conteúdo não permanecem em uma camada fixa renderizada fora da tela.
+- Dado o flyout de composição aberto, quando o overlay cobre a página do Portfólio, então usa fundo sem filtro de desfoque para não criar uma superfície gráfica do tamanho da página subjacente.
 - Dado uma classe acima ou abaixo da meta, quando exibida no gráfico, então mostra o desvio em pontos percentuais e o valor absoluto correspondente em BRL.
 - Dado uma classe com meta positiva e nenhuma posição atual, quando a análise é exibida, então a classe permanece visível com participação atual de 0%.
 - Dado a carteira com ativos em moedas distintas, quando a alocação atual é calculada, então todas as classes usam `chart_current_brl` como base comparável, sem somar moedas nominais incompatíveis.
 
 ## Changelog
 
+- `2.45` — 2026-08-30 — Reduzido o uso de memória gráfica do flyout de composição: o componente fechado sai da renderização, libera o conteúdo e o overlay aberto não usa blur no Safari/WebKit.
+- `2.44` — 2026-08-30 — Em implementação: separa a meta de Renda Variável em USD e aplica a meta específica à linha USD da Análise.
 - `2.43` — 2026-08-29 — Corrige auditoria do salvamento de Metas e disponibiliza metas/participação/desvio para os cards Alocação vs. Perfil e Análise da Carteira do Consultor.
 - `2.42` — 2026-08-29 — Aba Metas passa a renderizar os campos dentro da transição de abas, após a ativação do painel, eliminando o painel vazio em navegadores com View Transitions API.
 - `2.41` — 2026-08-29 — Aba Metas permite planejar percentuais por classe; Análise > Por Classe compara atual versus planejado, desvio percentual e valor em BRL.

@@ -1,0 +1,32 @@
+from __future__ import annotations
+
+import unittest
+
+from financeiro.http_routes import dispatch_route, resolve_route
+
+
+class _Target:
+    called = ""
+
+    def handle_update_transaction(self) -> None:
+        self.called = "transaction"
+
+
+class HttpRoutesTest(unittest.TestCase):
+    def test_exact_route_is_resolved(self) -> None:
+        self.assertEqual(resolve_route("GET", "/api/portfolio"), "handle_portfolio")
+
+    def test_more_specific_pattern_wins(self) -> None:
+        self.assertEqual(resolve_route("PUT", "/api/transactions/42/reconciliation"), "handle_reconcile_transaction")
+
+    def test_dispatch_invokes_handler_and_reports_match(self) -> None:
+        target = _Target()
+        self.assertTrue(dispatch_route(target, "PUT", "/api/transactions/42"))
+        self.assertEqual(target.called, "transaction")
+
+    def test_unknown_route_is_not_dispatched(self) -> None:
+        self.assertIsNone(resolve_route("GET", "/api/unknown"))
+
+
+if __name__ == "__main__":
+    unittest.main()

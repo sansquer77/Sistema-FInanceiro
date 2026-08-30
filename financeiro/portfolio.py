@@ -19,6 +19,9 @@ from financeiro.calendar_rules import add_months, normalize_iso_date
 from financeiro.database import begin_immediate, get_connection, row_to_dict
 from financeiro.identifiers import positive_int_id
 from financeiro.money import MONEY_SCALE, cents_to_decimal, decimal_to_cents
+from financeiro import portfolio_calculations as calculations
+from financeiro import portfolio_positions as positions_store
+from financeiro import portfolio_quotes as quotes
 from financeiro.secure_config import load_mais_retorno_api_key
 from financeiro.transactions import convert_to_brl_cents, get_exchange_rate_to_brl, parse_exchange_rate, rate_to_micros
 
@@ -46,6 +49,10 @@ ASSET_TYPE_LABELS = {
     "private_pension": "Previdência privada",
     "savings": "Poupança",
     "other": "Outros",
+}
+ALLOCATION_GOAL_LABELS = {
+    **ASSET_TYPE_LABELS,
+    "stock_usd": "Renda variável - USD",
 }
 PORTFOLIO_ACCOUNT_TYPES = {"liquidity", "investment"}
 
@@ -270,7 +277,7 @@ def get_allocation_goals(user_id: int) -> list[dict]:
             "label": label,
             "target_percent": decimal_to_string(Decimal(goals.get(asset_type, 0)) / MICRO_SCALE),
         }
-        for asset_type, label in ASSET_TYPE_LABELS.items()
+        for asset_type, label in ALLOCATION_GOAL_LABELS.items()
     ]
 
 
@@ -284,7 +291,7 @@ def save_allocation_goals(user_id: int, data: dict) -> dict:
         if not isinstance(item, dict):
             raise PortfolioError("Meta de alocacao invalida.")
         asset_type = str(item.get("asset_type") or "").strip().lower()
-        if asset_type not in ASSET_TYPE_LABELS or asset_type in normalized:
+        if asset_type not in ALLOCATION_GOAL_LABELS or asset_type in normalized:
             raise PortfolioError("Classe de ativo invalida ou duplicada.")
         target_micros = decimal_to_micros(item.get("target_percent"))
         if target_micros < 0 or target_micros > int(Decimal("100") * MICRO_SCALE):
@@ -303,6 +310,10 @@ def save_allocation_goals(user_id: int, data: dict) -> dict:
             [(user_id, asset_type, target) for asset_type, target in normalized.items() if target > 0],
         )
     return get_portfolio(user_id)
+
+
+def allocation_goal_key(position: dict) -> str:
+    return positions_store.allocation_goal_key(position)
 
 
 def portfolio_row_with_redemptions(row: dict, redemption_totals: dict[tuple, dict]) -> dict:
@@ -1053,7 +1064,7 @@ def aggregate_backend_positions(positions: list[dict]) -> dict:
 
 
 def decimal_to_micros_value(value: Decimal) -> int:
-    return int((Decimal(value or 0) * MICRO_SCALE).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    return positions_store.decimal_to_micros_value(Decimal(value or 0))
 
 
 def common_value(positions: list[dict], key: str) -> str:
@@ -1284,20 +1295,7 @@ def consume_savings_anniversaries_fifo(entries: list[dict], redeemed_cost_cents:
     # spec: investimentos-portfolio v2.43 — criterio poupanca-resgate-fifo
     # (resgates de poupanca consomem primeiro os aniversarios mais antigos para
     # manter a base de rentabilidade alinhada ao saldo remanescente por lote)
-    remaining_redeemed = max(int(redeemed_cost_cents or 0), 0)
-    adjusted = []
-    for entry in sorted(entries, key=lambda item: str(item.get("date") or "")):
-        amount_cents = int(entry.get("amount_cents") or 0)
-        if amount_cents <= 0:
-            continue
-        if remaining_redeemed >= amount_cents:
-            remaining_redeemed -= amount_cents
-            continue
-        if remaining_redeemed > 0:
-            amount_cents -= remaining_redeemed
-            remaining_redeemed = 0
-        adjusted.append({"date": str(entry.get("date") or ""), "amount_cents": amount_cents})
-    return adjusted
+    return positions_store.consume_savings_anniversaries_fifo(entries, redeemed_cost_cents)
 
 
 def normalize_position_value_override_payload(data: dict) -> dict:
@@ -2167,17 +2165,7 @@ def savings_factor_for_anniversary(
 
 
 def aggregate_savings_anniversaries(entries: list[dict]) -> list[dict]:
-    totals: dict[str, int] = {}
-    for entry in entries:
-        anniversary_date = str(entry.get("date") or "").strip()
-        if not parse_optional_iso_date(anniversary_date):
-            continue
-        totals[anniversary_date] = totals.get(anniversary_date, 0) + int(entry.get("amount_cents") or 0)
-    return [
-        {"date": anniversary_date, "amount_cents": amount_cents}
-        for anniversary_date, amount_cents in sorted(totals.items())
-        if amount_cents > 0
-    ]
+    return positions_store.aggregate_savings_anniversaries(entries)
 
 
 def completed_savings_anniversaries(start_date: date, end_date: date) -> int:
@@ -2602,8 +2590,7 @@ def prune_quote_memory_cache_locked(now: datetime) -> None:
 
 
 def _trim_cache_to_limit(cache: OrderedDict, max_entries: int) -> None:
-    while len(cache) > max_entries:
-        cache.popitem(last=False)
+    quotes.trim_cache_to_limit(cache, max_entries)
 
 
 def read_json_url(url: str, message: str, headers: dict | None = None) -> dict | list:
@@ -2635,14 +2622,7 @@ def yahoo_symbol(position: dict) -> str:
         return ""
     if position["asset_type"] in {"crypto", "stablecoin"}:
         return crypto_yahoo_symbol(identifier, position["currency"])
-    normalized_identifier = str(identifier).strip().upper()
-    normalized_currency = str(position["currency"] or "BRL").strip().upper()
-    aliased_symbol = YAHOO_SYMBOL_ALIASES.get((normalized_identifier, normalized_currency))
-    if aliased_symbol:
-        return aliased_symbol
-    if "." in identifier or position["currency"] != "BRL":
-        return identifier
-    return f"{identifier}.SA"
+    return quotes.yahoo_symbol(position, YAHOO_SYMBOL_ALIASES)
 
 
 def crypto_yahoo_symbol(identifier: str, currency: str) -> str:
@@ -2657,26 +2637,7 @@ def crypto_yahoo_symbol(identifier: str, currency: str) -> str:
 
 
 def summarize_positions(positions: list[dict]) -> dict:
-    total_cost = sum(position["total_cost_brl_cents"] for position in positions)
-    current_value = sum(position["current_value_brl_cents"] for position in positions)
-    day_result = sum(position["day_result_brl_cents"] for position in positions)
-    by_type = group_positions(positions, "asset_type_label")
-    by_indexer = group_positions(positions, "fixed_income_indexer")
-    by_currency = group_positions(positions, "currency")
-    by_account = group_positions(positions, "account_name")
-    return {
-        "total_cost_brl": cents_to_money(total_cost),
-        "current_value_brl": cents_to_money(current_value),
-        "result_brl": cents_to_money(current_value - total_cost),
-        "result_percent": percent(current_value - total_cost, total_cost),
-        "day_result_brl": cents_to_money(day_result),
-        "day_result_percent": percent(day_result, current_value - day_result),
-        "position_count": len(positions),
-        "by_type": by_type,
-        "by_indexer": by_indexer,
-        "by_currency": by_currency,
-        "by_account": by_account,
-    }
+    return calculations.summarize_positions(positions)
 
 
 def format_quoted_position(position: dict) -> dict:
@@ -2697,54 +2658,11 @@ def format_quoted_position(position: dict) -> dict:
 
 
 def group_positions(positions: list[dict], key: str) -> list[dict]:
-    totals = defaultdict(lambda: {
-        "label": "",
-        "currency": "BRL",
-        "cost_cents": 0,
-        "current_cents": 0,
-        "day_result_cents": 0,
-        "cost_brl_cents": 0,
-        "current_brl_cents": 0,
-        "day_result_brl_cents": 0,
-        "count": 0,
-    })
-    for position in positions:
-        label = portfolio_group_label(position, key)
-        currency = position.get("currency") or "BRL"
-        row = totals[(label, currency)]
-        row["label"] = label
-        row["currency"] = currency
-        row["cost_cents"] += position["total_cost_cents"]
-        row["current_cents"] += position["current_value_cents"]
-        row["day_result_cents"] += position["day_result_cents"]
-        row["cost_brl_cents"] += position["total_cost_brl_cents"]
-        row["current_brl_cents"] += position["current_value_brl_cents"]
-        row["day_result_brl_cents"] += position["day_result_brl_cents"]
-        row["count"] += 1
-    return [
-        {
-            "label": row["label"],
-            "cost_brl": cents_to_money(row["cost_cents"]),
-            "current_brl": cents_to_money(row["current_cents"]),
-            "result_brl": cents_to_money(row["current_cents"] - row["cost_cents"]),
-            "result_percent": percent(row["current_cents"] - row["cost_cents"], row["cost_cents"]),
-            "day_result_brl": cents_to_money(row["day_result_cents"]),
-            "day_result_percent": percent(row["day_result_cents"], row["current_cents"] - row["day_result_cents"]),
-            "chart_current_brl": cents_to_money(row["current_brl_cents"]),
-            "count": row["count"],
-            "currency": row["currency"],
-        }
-        for row in sorted(totals.values(), key=lambda item: item["current_brl_cents"], reverse=True)
-    ]
+    return calculations.group_positions(positions, key)
 
 
 def portfolio_group_label(position: dict, key: str) -> str:
-    label = position.get(key)
-    if key == "fixed_income_indexer" and position.get("asset_type") == "savings":
-        return "Poupança"
-    if key == "fixed_income_indexer" and not label and position.get("currency") != "BRL":
-        return position.get("currency") or "Nao informado"
-    return label or "Nao informado"
+    return calculations.portfolio_group_label(position, key)
 
 
 def format_position(position: dict) -> dict:
@@ -2816,54 +2734,26 @@ def indexer_catalog() -> list[dict]:
 
 
 def normalize_asset_identifier(value: object, asset_type: str) -> str:
-    identifier = str(value or "").strip().upper()
-    if asset_type in {"crypto", "stablecoin"}:
-        identifier = CRYPTO_ALIASES.get(identifier, identifier)
-        compact = identifier.replace("/", "-")
-        if "-" in compact:
-            base, quote_currency = compact.split("-", 1)
-            if base and quote_currency in CRYPTO_QUOTE_SUFFIXES:
-                return base
-            return compact
-        if identifier in CRYPTO_ASSETS:
-            return identifier
-        for suffix in CRYPTO_QUOTE_SUFFIXES:
-            if identifier.endswith(suffix) and len(identifier) > len(suffix):
-                return identifier[:-len(suffix)]
-    return identifier
+    return calculations.normalize_asset_identifier(value, asset_type)
 
 
 def effective_asset_type(asset_type: object, identifier: object) -> str:
-    normalized_type = str(asset_type or "other").strip().lower()
-    normalized_identifier = normalize_asset_identifier(identifier, "crypto")
-    if normalized_type in {"crypto", "stablecoin"} and normalized_identifier in STABLECOIN_ASSETS:
-        return "stablecoin"
-    return normalized_type
+    return calculations.effective_asset_type(asset_type, identifier)
 
 
 def normalize_indexer(value: object) -> str:
-    return str(value or "").strip().upper().replace("Í", "I")
+    return calculations.normalize_indexer(value)
 
 
 def micros_to_decimal(micros: int) -> Decimal:
-    return Decimal(int(micros or 0)) / MICRO_SCALE
+    return calculations.micros_to_decimal(micros)
 
 
 def parse_rate_decimal(value: object) -> Decimal:
     # spec: rentabilidade-portfolio v1.7 — critério 4
     # get_portfolio retorna a taxa ja formatada (ex.: "4,27"); aceita Decimal ou
     # string com ponto/virgula para nao quebrar o calculo de valor por data.
-    if isinstance(value, Decimal):
-        return value
-    raw = str(value or "").strip()
-    if not raw:
-        return Decimal("0")
-    if "," in raw:
-        raw = raw.replace(".", "").replace(",", ".")
-    try:
-        return Decimal(raw)
-    except InvalidOperation:
-        return Decimal("0")
+    return calculations.parse_rate_decimal(value)
 
 
 def decimal_to_micros(value: object) -> int:
@@ -2884,16 +2774,11 @@ def decimal_to_micros(value: object) -> int:
 def decimal_to_string(value: Decimal) -> str:
     # spec: investimentos/investimentos-portfolio v2.43 — critério normalização de quantidade
     # com até 2 casas decimais (half-up) para não estourar o layout das tabelas.
-    if not value:
-        return "0"
-    rounded = value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    return f"{rounded.normalize():f}"
+    return calculations.decimal_to_string(value)
 
 
 def format_decimal_percent(value: Decimal) -> str:
-    rounded = value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    text = f"{rounded.normalize():f}"
-    return text.replace(".", ",")
+    return calculations.format_decimal_percent(value)
 
 
 def value_to_brl(amount_cents: int, currency: str) -> int:
@@ -2920,14 +2805,8 @@ def portfolio_exchange_rate_micros(currency: str) -> int:
 
 
 def previous_business_day(reference_date: date) -> date:
-    day = reference_date - timedelta(days=1)
-    while day.weekday() >= 5:
-        day -= timedelta(days=1)
-    return day
+    return quotes.previous_business_day(reference_date)
 
 
 def percent(delta: int, base: int) -> str:
-    if not base:
-        return "0.00"
-    value = Decimal(delta) / Decimal(base) * Decimal("100")
-    return f"{value.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP):.2f}"
+    return calculations.percent(delta, base)

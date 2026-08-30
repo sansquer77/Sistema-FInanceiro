@@ -1,4 +1,42 @@
-const chartInstances = new WeakMap();
+const chartInstances = new Map();
+let cleanupObserver = null;
+let cleanupScheduled = false;
+
+function destroyChartInstance(element, { clear = true } = {}) {
+  const instance = element ? chartInstances.get(element) : null;
+  if (instance) {
+    try {
+      instance.destroy();
+    } catch {
+      // A remoção do DOM pode ocorrer enquanto o ApexCharts finaliza o render.
+      // Remover o registro ainda impede que uma instância inválida seja reutilizada.
+    } finally {
+      chartInstances.delete(element);
+    }
+  }
+  if (clear && element) element.replaceChildren();
+}
+
+export function destroyDisconnectedCharts() {
+  for (const element of chartInstances.keys()) {
+    if (!element.isConnected) destroyChartInstance(element, { clear: false });
+  }
+}
+
+function scheduleDisconnectedChartCleanup() {
+  if (cleanupScheduled) return;
+  cleanupScheduled = true;
+  queueMicrotask(() => {
+    cleanupScheduled = false;
+    destroyDisconnectedCharts();
+  });
+}
+
+function ensureChartCleanupObserver() {
+  if (cleanupObserver || !globalThis.MutationObserver || !document.documentElement) return;
+  cleanupObserver = new MutationObserver(scheduleDisconnectedChartCleanup);
+  cleanupObserver.observe(document.documentElement, { childList: true, subtree: true });
+}
 
 function cssToken(name, fallback) {
   const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -36,16 +74,13 @@ export function centeredMonthlyAxis(rows) {
 }
 
 export function destroyChart(element) {
-  const instance = element ? chartInstances.get(element) : null;
-  if (instance) {
-    instance.destroy();
-    chartInstances.delete(element);
-  }
-  if (element) element.replaceChildren();
+  destroyChartInstance(element);
 }
 
 export function renderChart(element, options, { emptyMessage = "Sem dados para exibir." } = {}) {
   if (!element) return null;
+  ensureChartCleanupObserver();
+  destroyDisconnectedCharts();
   destroyChart(element);
   if (!globalThis.ApexCharts) {
     element.innerHTML = `<p class="muted-copy" role="status">${emptyMessage}</p>`;
@@ -76,7 +111,7 @@ export function renderChart(element, options, { emptyMessage = "Sem dados para e
   chartInstances.set(element, instance);
   instance.render().catch(() => {
     if (chartInstances.get(element) !== instance) return;
-    chartInstances.delete(element);
+    destroyChartInstance(element, { clear: false });
     element.innerHTML = `<p class="muted-copy" role="status">${emptyMessage}</p>`;
   });
   return instance;

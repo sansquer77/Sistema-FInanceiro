@@ -2,7 +2,7 @@
 tipo: spec
 area: frontend-v2
 status: em-implementacao
-versao: 0.5
+versao: 0.6
 atualizado: 2026-08-30
 relacionados:
   - "[[frontend-modularizacao]]"
@@ -118,6 +118,7 @@ Usuário que acompanha muitos lançamentos, faturas, operações ou posições e
 - Todo gráfico oferece alternativa textual ou tabular equivalente aos valores essenciais.
 - Animações respeitam `prefers-reduced-motion`; resize não recria instâncias em loop.
 - Instâncias são destruídas ao substituir contêiner ou desmontar view.
+- O adaptador mantém um único observador de remoções do DOM e destrói instâncias associadas a elementos desconectados, inclusive quando uma view substitui o contêiner com `innerHTML` antes da próxima renderização.
 - Impressão/exportação mantém os demonstrativos atuais; não depende de recurso premium do ApexCharts.
 
 ### Máscaras
@@ -180,6 +181,7 @@ Usuário que acompanha muitos lançamentos, faturas, operações ou posições e
 21. Dado histórico de conta ou cartão, quando o gráfico Apex renderiza, então permanece contido na área de 92 px reservada ao plot.
 22. Dado histórico mensal de conta ou cartão, quando o gráfico renderiza, então cada marcador fica horizontalmente centralizado com o card do mês correspondente.
 23. Dado histórico mensal de conta ou cartão, quando o usuário aponta um marcador, então nenhum tooltip redundante é exibido, pois o card mensal correspondente já apresenta o valor e seu contexto.
+24. Dado um gráfico ApexCharts cujo elemento é removido ou substituído no DOM, quando o ciclo de mutações termina, então sua instância é destruída e deixa de reter listeners, observadores ou estruturas internas da biblioteca.
 
 ## Pendências
 
@@ -206,6 +208,7 @@ Usuário que acompanha muitos lançamentos, faturas, operações ou posições e
 
 ## Changelog
 
+- `0.6` — 2026-08-30 — Corrigido o ciclo de vida do ApexCharts com descarte automático de instâncias ligadas a elementos removidos do DOM, evitando crescimento contínuo de memória no Safari.
 - `0.5` — 2026-08-30 — Removidos os tooltips redundantes dos históricos mensais de contas e cartões; os valores permanecem disponíveis nos cards correspondentes.
 - `0.4` — 2026-08-30 — Alinhados os marcadores aos centros dos cards mensais e adotado tooltip compacto, sem cabeçalho e centralizado no plot dos históricos de contas e cartões.
 - `0.3` — 2026-08-30 — Corrigidos o empilhamento global do drawer de rentabilidade, a corrida entre categorias em Relatórios e os limites dos gráficos de históricos de contas/cartões.
