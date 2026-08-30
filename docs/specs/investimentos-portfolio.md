@@ -2,7 +2,7 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.39
+versao: 2.40
 atualizado: 2026-08-29
 relacionados:
   - "[[contas-correntes]]"
@@ -139,7 +139,7 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 | `PUT` | `/api/portfolio/value` |
 | `DELETE` | `/api/portfolio/value` |
 
-Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emergency_reserve_eligible` para posições/aportes elegíveis), `investment_redemptions`, `investment_closed_positions`, `investment_value_overrides`, `transactions`, `checking_accounts`, `quote_cache`. A configuração da integração Mais Retorno vive em `secure_configs` (ver [[preferencias-abas]]).
+Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emergency_reserve_eligible` para posições/aportes elegíveis), `investment_redemptions`, `investment_redemption_summaries` (snapshot por resgate com bruto, líquido, taxas, custo FIFO, resultado realizado e posição remanescente), `investment_closed_positions`, `investment_value_overrides`, `transactions`, `checking_accounts`, `quote_cache`. A configuração da integração Mais Retorno vive em `secure_configs` (ver [[preferencias-abas]]).
 
 ## Plano de implementação
 
@@ -157,6 +157,8 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - [x] Adicionar resgate por quantidade com cotação, valor bruto, taxas, crédito líquido e saldo remanescente sincronizados.
 - [x] Consumir quantidade e custo dos lotes por FIFO e manter compatibilidade com ativos sem quantidade.
 - [x] Cobrir baixa quantitativa, custo FIFO e crédito líquido com teste automatizado.
+- [x] Persistir snapshot imutável do resultado realizado e da posição remanescente por resgate.
+- [x] Exibir resgates parciais e posições encerradas em seções próprias da aba Histórico.
 
 ## Critérios de aceite
 
@@ -221,9 +223,13 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado o usuário alterando quantidade, cotação ou taxas no resgate quantitativo, quando o formulário é atualizado, então valor bruto, saldo líquido e quantidade remanescente são recalculados antes da confirmação.
 - Dado uma posição formada por múltiplos aportes, quando ocorre um resgate quantitativo parcial, então os lotes mais antigos são consumidos primeiro (FIFO), preservando quantidade e custo dos lotes restantes.
 - Dado um resgate quantitativo com taxas, quando confirmado, então a baixa registra o valor bruto realizado e a conta recebe somente o saldo líquido; quantidades acima do disponível e taxas acima do bruto são rejeitadas.
+- Dado um resgate confirmado, quando consultado posteriormente na aba Histórico, então exibe quantidade baixada, valor bruto, taxas, valor líquido, custo FIFO, ganho/perda realizado e quantidade/custo remanescentes conforme o snapshot do momento da operação.
+- Dado operações posteriores sobre o mesmo ativo, quando um resgate antigo é consultado, então seus valores realizados e remanescentes históricos não são recalculados nem alterados retroativamente.
+- Dado a aba Histórico aberta, quando há resgates parciais e/ou posições encerradas, então eles aparecem em seções distintas e o estado vazio orienta que ambos os eventos serão registrados ali.
 
 ## Changelog
 
+- `2.40` — 2026-08-29 — Aba Histórico passa a exibir resgates com ganho/perda realizado, custo FIFO consumido e quantidade/custo remanescentes em snapshot imutável.
 - `2.39` — 2026-08-29 — Botão Resgatar preserva a quantidade da posição no payload do modal, ativando os campos quantitativos para ativos como AOM, ETH e ISAE4.
 - `2.38` — 2026-08-29 — Autocomplete reutiliza ativos existentes nos cadastros e resgate quantitativo sincroniza quantidade, cotação, bruto, taxas, líquido e remanescente com baixa FIFO por lote.
 - `2.37` — 2026-08-29 — Formulário de posição inicial captura o payload antes de desabilitar os controles durante o salvamento, preservando a carteira selecionada para Stablecoins e demais categorias.

@@ -790,7 +790,7 @@ def normalize_investment_asset_hint(category: str, subcategory: str, asset_ident
 
 
 def normalize_investment_emergency_reserve_eligible(data: dict, asset_type: str) -> int:
-    # spec: investimentos/investimentos-portfolio v2.39 — critérios 21 e 23
+    # spec: investimentos/investimentos-portfolio v2.40 — critérios 21 e 23
     if asset_type not in {"fixed_income", "savings"}:
         return 0
     return 1 if str(data.get("investment_emergency_reserve_eligible") or "").strip().lower() in {"1", "true", "on", "yes"} else 0

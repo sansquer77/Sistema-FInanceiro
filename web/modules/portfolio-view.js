@@ -273,7 +273,7 @@ export function registerPortfolioView({
   function resetPortfolioAssetForm() {
     portfolioAssetForm.reset();
     portfolioAssetForm.elements.id.value = "";
-    // spec: investimentos-portfolio v2.39 — criterio 48
+    // spec: investimentos-portfolio v2.40 — criterio 48
     portfolioAssetForm.elements.exchange_rate_to_brl.value = "";
     portfolioAssetFormTitle.textContent = "Ativo em carteira";
     deletePortfolioAssetButton.hidden = true;
@@ -633,7 +633,7 @@ export function registerPortfolioView({
     if (activeTab === "analysis") {
       renderPortfolioAnalysis(portfolio.summary);
     } else if (activeTab === "history") {
-      renderPortfolioHistory(portfolio.history || []);
+      renderPortfolioHistory(portfolio.history || [], portfolio.redemption_history || []);
     } else {
       renderPortfolioPositions(portfolio.positions || []);
       renderHighlightedPortfolioPosition();
@@ -1103,12 +1103,27 @@ export function registerPortfolioView({
     return currencies.size === 1 ? [...currencies][0] : "BRL";
   }
 
-  function renderPortfolioHistory(history) {
-    if (!history.length) {
-      portfolioHistory.innerHTML = stateMarkup("Posições encerradas aparecerão aqui após um resgate total.", { kind: "empty" });
+  function renderPortfolioHistory(history, redemptions) {
+    if (!history.length && !redemptions.length) {
+      portfolioHistory.innerHTML = stateMarkup("Resgates e posições encerradas aparecerão aqui.", { kind: "empty" });
       return;
     }
-    portfolioHistory.innerHTML = `
+    const redemptionTable = redemptions.length ? `
+      <h3>Resgates realizados</h3>
+      <div class="report-table-wrap">
+        <table class="report-table portfolio-table portfolio-redemption-history-table">
+          <thead>
+            <tr>
+              <th>Ativo</th><th>Data</th><th>Quantidade</th><th>Valor líquido</th>
+              <th>Custo FIFO</th><th>Ganho/perda</th><th>Posição remanescente</th>
+            </tr>
+          </thead>
+          <tbody>${redemptions.map(portfolioRedemptionHistoryRow).join("")}</tbody>
+        </table>
+      </div>
+    ` : "";
+    const closedTable = history.length ? `
+      <h3>Posições encerradas</h3>
       <div class="report-table-wrap">
         <table class="report-table portfolio-table portfolio-history-table">
           <thead>
@@ -1127,6 +1142,24 @@ export function registerPortfolioView({
           </tbody>
         </table>
       </div>
+    ` : "";
+    portfolioHistory.innerHTML = `${redemptionTable}${closedTable}`;
+  }
+
+  function portfolioRedemptionHistoryRow(redemption) {
+    const result = Number(redemption.realized_result || 0);
+    const quantity = Number(redemption.redeemed_quantity || 0);
+    const remainingQuantity = Number(redemption.remaining_quantity || 0);
+    return `
+      <tr>
+        <td><strong>${escapeHtml(redemption.asset_name || redemption.asset_identifier || "Investimento")}</strong><span>${escapeHtml(redemption.asset_identifier || redemption.asset_type_label || "")}</span></td>
+        <td>${formatDate(redemption.date)}<span>${escapeHtml(redemption.account_name || "")}</span></td>
+        <td>${quantity > 0 ? formatDecimal(quantity, 6) : "—"}<span>${escapeHtml(redemption.currency || "")}</span></td>
+        <td class="money-cell">${formatMoney(redemption.net_value, redemption.currency)}<span>Bruto ${formatMoney(redemption.gross_value, redemption.currency)} · taxas ${formatMoney(redemption.fees, redemption.currency)}</span></td>
+        <td class="money-cell">${formatMoney(redemption.redeemed_cost, redemption.currency)}<span>Baixa FIFO</span></td>
+        <td class="money-cell ${result < 0 ? "danger-text" : "positive-text"}">${formatMoney(result, redemption.currency)}<span>Realizado</span></td>
+        <td>${remainingQuantity > 0 ? formatDecimal(remainingQuantity, 6) : "0"}<span>Custo ${formatMoney(redemption.remaining_cost, redemption.currency)}</span></td>
+      </tr>
     `;
   }
 
@@ -1396,7 +1429,7 @@ export function registerPortfolioView({
     `;
   }
 
-  // spec: investimentos-portfolio v2.39 — criterio 47
+  // spec: investimentos-portfolio v2.40 — criterio 47
   function portfolioEmergencyShieldIcon() {
     return '<svg class="portfolio-emergency-shield" viewBox="0 0 24 24" width="12" height="12" role="img" aria-label="Reserva de emergência" title="Reserva de emergência" fill="currentColor"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5l8-3z"/></svg>';
   }

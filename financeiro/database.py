@@ -60,6 +60,10 @@ PERFORMANCE_INDEXES = (
         "ON investment_redemptions (user_id, source_type, source_id)"
     ),
     (
+        "CREATE INDEX IF NOT EXISTS idx_investment_redemption_summaries_user_date "
+        "ON investment_redemption_summaries (user_id, date DESC, id DESC)"
+    ),
+    (
         "CREATE INDEX IF NOT EXISTS idx_investment_value_overrides_user "
         "ON investment_value_overrides (user_id, account_id, asset_type)"
     ),
@@ -366,6 +370,28 @@ def initialize_database() -> None:
                 redeemed_cost_cents INTEGER NOT NULL CHECK (redeemed_cost_cents >= 0),
                 redeemed_quantity_micros INTEGER NOT NULL DEFAULT 0 CHECK (redeemed_quantity_micros >= 0),
                 date TEXT NOT NULL,
+                notes TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS investment_redemption_summaries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                transaction_id INTEGER NOT NULL UNIQUE REFERENCES transactions(id) ON DELETE CASCADE,
+                account_id INTEGER NOT NULL REFERENCES checking_accounts(id) ON DELETE CASCADE,
+                currency TEXT NOT NULL,
+                asset_type TEXT NOT NULL,
+                asset_identifier TEXT,
+                asset_name TEXT,
+                date TEXT NOT NULL,
+                redeemed_quantity_micros INTEGER NOT NULL DEFAULT 0 CHECK (redeemed_quantity_micros >= 0),
+                gross_value_cents INTEGER NOT NULL CHECK (gross_value_cents > 0),
+                fees_cents INTEGER NOT NULL DEFAULT 0 CHECK (fees_cents >= 0),
+                net_value_cents INTEGER NOT NULL CHECK (net_value_cents > 0),
+                redeemed_cost_cents INTEGER NOT NULL DEFAULT 0 CHECK (redeemed_cost_cents >= 0),
+                realized_result_cents INTEGER NOT NULL DEFAULT 0,
+                remaining_quantity_micros INTEGER NOT NULL DEFAULT 0 CHECK (remaining_quantity_micros >= 0),
+                remaining_cost_cents INTEGER NOT NULL DEFAULT 0 CHECK (remaining_cost_cents >= 0),
                 notes TEXT,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );

@@ -39,7 +39,7 @@ class PortfolioQuantityRedemptionTest(unittest.TestCase):
         })
 
     def test_quantity_redemption_consumes_oldest_lot_and_credits_net_amount(self) -> None:
-        # spec: investimentos/investimentos-portfolio v2.39 — critérios 55-58
+        # spec: investimentos/investimentos-portfolio v2.40 — critérios 55-58
         self.add_lot("2026-01-10", "100", "500,00")
         self.add_lot("2026-02-10", "100", "600,00")
 
@@ -53,6 +53,15 @@ class PortfolioQuantityRedemptionTest(unittest.TestCase):
         position = next(item for item in result["positions"] if item["asset_identifier"] == "USDC")
         self.assertEqual(position["quantity"], "80")
         self.assertEqual(position["total_cost"], "480.00")
+        history = result["redemption_history"][0]
+        self.assertEqual(history["redeemed_quantity"], "120")
+        self.assertEqual(history["gross_value"], "660.00")
+        self.assertEqual(history["fees"], "10.00")
+        self.assertEqual(history["net_value"], "650.00")
+        self.assertEqual(history["redeemed_cost"], "620.00")
+        self.assertEqual(history["realized_result"], "30.00")
+        self.assertEqual(history["remaining_quantity"], "80")
+        self.assertEqual(history["remaining_cost"], "480.00")
         with get_connection() as conn:
             redemptions = conn.execute(
                 "SELECT redeemed_quantity_micros, redeemed_cost_cents FROM investment_redemptions ORDER BY id"

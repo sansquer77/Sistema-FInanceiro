@@ -260,6 +260,9 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("updateQuantityRedemptionPreview", portfolio)
         self.assertIn('name: "remaining_quantity"', portfolio)
         self.assertIn("quantity: position.quantity || 0", portfolio)
+        self.assertIn("portfolio.redemption_history || []", portfolio)
+        self.assertIn("Ganho/perda", portfolio)
+        self.assertIn("Custo FIFO", portfolio)
 
 
 if __name__ == "__main__":

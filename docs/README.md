@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 11.87
+versao: 11.88
 atualizado: 2026-08-29
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -134,6 +134,7 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `11.88` — 2026-08-29 — [[specs/investimentos-portfolio]] v2.40 adiciona histórico imutável de ganho/perda realizado e custo remanescente; [[requisitos]] v2.8 e [[arquitetura]] v3.46 sincronizados.
 - `11.87` — 2026-08-29 — [[specs/investimentos-portfolio]] v2.39 corrige a abertura do resgate quantitativo ao transportar a quantidade da posição até o modal.
 - `11.86` — 2026-08-29 — [[specs/frontend-modularizacao]] v4.3 inventaria o autocomplete compartilhado de ativos e o cálculo reativo em modais.
 - `11.85` — 2026-08-29 — Versão `1.8.0`: [[specs/investimentos-portfolio]] v2.38 e [[specs/lancamentos]] v3.25 adicionam autocomplete de ativos e resgate quantitativo FIFO com crédito líquido; [[requisitos]] v2.7 e [[arquitetura]] v3.45 sincronizados.

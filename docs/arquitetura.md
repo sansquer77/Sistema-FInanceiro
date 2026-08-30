@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.45
+versao: 3.46
 atualizado: 2026-08-29
 relacionados:
   - "[[requisitos]]"
@@ -515,6 +515,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.46` — 2026-08-29 — Adicionada `investment_redemption_summaries` para preservar o snapshot financeiro de cada resgate e alimentar a aba Histórico sem recálculo retroativo.
 - `3.45` — 2026-08-29 — Portfólio documenta catálogo local compartilhado de ativos e resgate quantitativo persistido em `investment_redemptions`, com baixa FIFO e crédito líquido em `transactions`.
 - `3.44` — 2026-08-29 — Resolvedor do Yahoo passa a aceitar alias explícito de bolsa para VWRA em USD (`VWRA.L`).
 - `3.43` — 2026-08-29 — `DELETE /api/portfolio/value` remove o override manual de uma posição e recarrega sua cotação automática.
