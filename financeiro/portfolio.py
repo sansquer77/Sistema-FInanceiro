@@ -15,11 +15,13 @@ from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 from financeiro.accounts import cents_to_money, empty_to_none, money_to_cents, recompute_account_balance
+from financeiro.calendar_rules import add_months, normalize_iso_date
 from financeiro.database import begin_immediate, get_connection, row_to_dict
+from financeiro.identifiers import positive_int_id
+from financeiro.money import MONEY_SCALE, cents_to_decimal, decimal_to_cents
 from financeiro.secure_config import load_mais_retorno_api_key
 from financeiro.transactions import convert_to_brl_cents, get_exchange_rate_to_brl, parse_exchange_rate, rate_to_micros
 
-MONEY_SCALE = Decimal("100")
 MICRO_SCALE = Decimal("1000000")
 YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=5d&interval=1d"
 COINGECKO_SIMPLE_PRICE_URL = "https://api.coingecko.com/api/v3/simple/price?ids={ids}&vs_currencies={currency}&include_24hr_change=true"
@@ -1380,18 +1382,14 @@ def resolve_position_exchange_rate(currency: str, acquisition_date: str, raw_rat
 
 def normalize_id(value: object, message: str) -> int:
     try:
-        normalized = int(str(value or "").strip())
+        return positive_int_id(value)
     except ValueError as exc:
         raise PortfolioError(message) from exc
-    if normalized <= 0:
-        raise PortfolioError(message)
-    return normalized
 
 
 def normalize_date(value: object) -> str:
-    raw = str(value or "").strip()
     try:
-        return date.fromisoformat(raw).isoformat()
+        return normalize_iso_date(value)
     except ValueError as exc:
         raise PortfolioError("Informe uma data valida.") from exc
 
@@ -1401,7 +1399,7 @@ def normalize_optional_date(value: object) -> str | None:
     if not raw:
         return None
     try:
-        return date.fromisoformat(raw).isoformat()
+        return normalize_iso_date(raw)
     except ValueError as exc:
         raise PortfolioError("Informe uma data valida.") from exc
 
@@ -2484,20 +2482,6 @@ def monthly_overlap_weight(reference_date: date, start_date: date, end_date: dat
     return Decimal(overlap_days) / Decimal(month_days)
 
 
-def add_months(start_date: date, months: int) -> date:
-    target_month = start_date.month - 1 + months
-    year = start_date.year + target_month // 12
-    month = target_month % 12 + 1
-    day = min(start_date.day, days_in_month(year, month))
-    return date(year, month, day)
-
-
-def days_in_month(year: int, month: int) -> int:
-    if month == 12:
-        return 31
-    return (date(year, month + 1, 1) - timedelta(days=1)).day
-
-
 def format_bcb_date(value: date) -> str:
     return value.strftime("%d/%m/%Y")
 
@@ -2895,14 +2879,6 @@ def decimal_to_micros(value: object) -> int:
     if decimal_value < 0:
         raise PortfolioError("Informe valores positivos na posicao inicial.")
     return int((decimal_value * MICRO_SCALE).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
-
-
-def decimal_to_cents(value: Decimal) -> int:
-    return int((value * MONEY_SCALE).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
-
-
-def cents_to_decimal(cents: int) -> Decimal:
-    return Decimal(cents) / MONEY_SCALE
 
 
 def decimal_to_string(value: Decimal) -> str:

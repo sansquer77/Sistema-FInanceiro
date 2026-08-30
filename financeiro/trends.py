@@ -7,7 +7,7 @@ from http import HTTPStatus
 
 from financeiro.database import get_connection
 from financeiro.simulations import account_projected_balance_until, month_end_date
-from financeiro.transactions import days_in_month
+from financeiro.calendar_rules import days_in_month
 
 MONTH_PATTERN = re.compile(r"^\d{4}-\d{2}$")
 

@@ -17,6 +17,7 @@ from financeiro.accounts import recompute_account_balance
 from financeiro.categories import ClassificationError, get_or_create_category, get_or_create_subcategory, get_or_create_tag, normalize_name
 from financeiro.classification_suggestions import normalize_description
 from financeiro.credit_cards import create_credit_card_transaction_with_conn
+from financeiro.identifiers import positive_int_id
 from financeiro.money import decimal_to_cents
 from financeiro.transactions import (
     convert_to_brl_cents,
@@ -1019,12 +1020,9 @@ def normalize_category_parts(category_value: object, subcategory_value: object) 
 
 def normalize_account_id(value: object) -> int:
     try:
-        account_id = int(str(value or "").strip())
+        return positive_int_id(value)
     except ValueError as exc:
         raise ImportError("Informe a conta que recebera a importacao.") from exc
-    if account_id <= 0:
-        raise ImportError("Informe a conta que recebera a importacao.")
-    return account_id
 
 
 def normalize_import_date(value: object) -> str:

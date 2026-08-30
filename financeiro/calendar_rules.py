@@ -27,6 +27,12 @@ def shift_month(value: str, delta: int) -> str:
     return shifted.strftime("%Y-%m")
 
 
+def month_end_date(month: str) -> str:
+    normalized = normalize_iso_month(month)
+    year, month_number = map(int, normalized.split("-"))
+    return date(year, month_number, days_in_month(year, month_number)).isoformat()
+
+
 def normalize_iso_date(value: object) -> str:
     return date.fromisoformat(str(value or "").strip()).isoformat()
 

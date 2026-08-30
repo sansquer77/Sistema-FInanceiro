@@ -289,6 +289,10 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | Módulo | Responsabilidade |
 |---|---|
 | `database.py` | Conexão SQLite, schema e migrações idempotentes. |
+| `money.py` | Conversões monetárias puras, escala de centavos, arredondamento e divisão exata de parcelas. Ver [[specs/utilitarios-dominio]]. |
+| `calendar_rules.py` | Normalização ISO e aritmética pura de datas, meses e fins de mês. Ver [[specs/utilitarios-dominio]]. |
+| `identifiers.py` | Parsing puro de identificadores inteiros positivos obrigatórios e opcionais. Ver [[specs/utilitarios-dominio]]. |
+| `recurrence.py` | Vocabulário compartilhado de séries/frequências e cálculo das ocorrências. Ver [[specs/utilitarios-dominio]]. |
 | `auth.py` | Usuários, hashes, sessões, recuperação de senha. Ver [[seguranca-autenticacao]], [[recuperacao-senha]]. |
 | `accounts.py` | Contas-correntes, saldos e arquivamento. Ver [[contas-correntes]]. |
 | `transactions.py` | Lançamentos, transferências, tags, câmbio, recorrência/parcelamento e conciliação. Ver [[lancamentos]]. |

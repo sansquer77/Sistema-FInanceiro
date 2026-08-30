@@ -65,7 +65,7 @@ import { registerImportsView } from "./modules/imports-view.js";
 import { registerCockpitView } from "./modules/cockpit-view.js";
 import { registerAccountsView } from "./modules/accounts-view.js";
 import { registerCardsView } from "./modules/cards-view.js";
-import { registerPortfolioView } from "./modules/portfolio-view.js?v=158";
+import { registerPortfolioView } from "./modules/portfolio-view.js?v=160";
 import { registerTransactionsView } from "./modules/transactions-view.js";
 import { registerSimulationsView } from "./modules/simulations-view.js";
 import { registerOperationHistoryView } from "./modules/operation-history-view.js";
@@ -284,6 +284,11 @@ const portfolioReturnDrawer = document.querySelector("#portfolioReturnDrawer");
 const portfolioReturnDrawerOverlay = document.querySelector("#portfolioReturnDrawerOverlay");
 const portfolioReturnDrawerCloseBtn = document.querySelector("#portfolioReturnDrawerCloseBtn");
 const portfolioReturnDrawerTitle = document.querySelector("#portfolioReturnDrawerTitle");
+const portfolioGroupDrawer = document.querySelector("#portfolioGroupDrawer");
+const portfolioGroupDrawerOverlay = document.querySelector("#portfolioGroupDrawerOverlay");
+const portfolioGroupDrawerCloseBtn = document.querySelector("#portfolioGroupDrawerCloseBtn");
+const portfolioGroupDrawerTitle = document.querySelector("#portfolioGroupDrawerTitle");
+const portfolioGroupDrawerList = document.querySelector("#portfolioGroupDrawerList");
 const portfolioReturnChart = document.querySelector("#portfolioReturnChart");
 const portfolioReturnXLabels = document.querySelector("#portfolioReturnXLabels");
 const portfolioReturnYAxis = document.querySelector("#portfolioReturnYAxis");
@@ -1097,6 +1102,11 @@ const portfolioView = registerPortfolioView({
     portfolioReturnDrawerOverlay,
     portfolioReturnDrawerCloseBtn,
     portfolioReturnDrawerTitle,
+    portfolioGroupDrawer,
+    portfolioGroupDrawerOverlay,
+    portfolioGroupDrawerCloseBtn,
+    portfolioGroupDrawerTitle,
+    portfolioGroupDrawerList,
     portfolioReturnChart,
     portfolioReturnXLabels,
     portfolioReturnYAxis,

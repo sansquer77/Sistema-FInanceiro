@@ -97,6 +97,7 @@ from financeiro.financial_health import (
 )
 from financeiro.imports import import_legacy_transactions, import_system_template, system_import_template
 from financeiro.operation_logs import create_operation_log, get_operation_log, list_operation_logs
+from financeiro.money import cents_to_decimal, decimal_to_cents
 from financeiro.portfolio import close_position, create_opening_position, current_portfolio_positions, delete_opening_position, delete_position_value_override, fetch_fund_quote_for_user, get_portfolio, get_portfolio_returns, redeem_position, save_allocation_goals, update_opening_position, update_position_value_override
 from financeiro.portfolio import PortfolioError
 from financeiro.reports import build_tag_report
@@ -1813,7 +1814,7 @@ def cockpit_payload(transactions: list[dict]) -> dict:
 
 
 def cents_to_value(cents: int) -> float:
-    return float(Decimal(cents) / Decimal(100))
+    return float(cents_to_decimal(cents))
 
 
 def money_value_to_cents(value: object) -> int:
@@ -1822,7 +1823,7 @@ def money_value_to_cents(value: object) -> int:
         decimal = Decimal(raw).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     except InvalidOperation:
         return 0
-    return int(decimal * Decimal(100))
+    return decimal_to_cents(decimal)
 
 
 def is_credit_card_payment_transaction(transaction: dict) -> bool:

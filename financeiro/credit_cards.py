@@ -8,9 +8,10 @@ from uuid import uuid4
 from financeiro.accounts import SUPPORTED_CURRENCIES, cents_to_money, empty_to_none, money_to_cents
 from financeiro.categories import get_or_create_category, get_or_create_subcategory, get_or_create_tag, normalize_name
 from financeiro.classification_suggestions import normalize_description
-from financeiro.calendar_rules import add_months, normalize_iso_date, normalize_iso_month, shift_month
+from financeiro.calendar_rules import add_months, days_in_month, normalize_iso_date, normalize_iso_month, shift_month
 from financeiro.database import begin_immediate, get_connection, row_to_dict
 from financeiro.identifiers import positive_int_id
+from financeiro.money import split_cents
 from financeiro.operation_logs import create_operation_log_with_conn
 from financeiro.recurrence import RECURRENCE_FREQUENCIES as CARD_RECURRENCE_FREQUENCIES
 from financeiro.recurrence import SERIES_KINDS as CARD_SERIES_KINDS
@@ -23,7 +24,6 @@ from financeiro.transactions import (
     normalize_flag,
     normalize_optional_tags,
     resolve_exchange_rate_micros,
-    split_cents,
 )
 
 CARD_TRANSACTION_TYPES = {"income", "expense"}

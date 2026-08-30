@@ -13,7 +13,7 @@ from urllib.request import Request, urlopen
 from financeiro.accounts import cents_to_money, empty_to_none, money_to_cents, recompute_account_balance
 from financeiro.categories import ClassificationError, get_or_create_category, get_or_create_subcategory, get_or_create_tag, normalize_name
 from financeiro.classification_suggestions import normalize_description
-from financeiro.calendar_rules import add_months, normalize_iso_date
+from financeiro.calendar_rules import add_months, month_end_date, normalize_iso_date
 from financeiro.database import begin_immediate, get_connection, row_to_dict
 from financeiro.identifiers import positive_int_id
 from financeiro.money import split_cents, split_optional_cents
@@ -139,11 +139,6 @@ def normalize_month_filter(value: str) -> str:
     except ValueError as exc:
         raise TransactionError("Informe um mes valido.") from exc
     return parsed.strftime("%Y-%m")
-
-
-def month_end_date(month: str) -> str:
-    year, month_number = map(int, month.split("-"))
-    return date(year, month_number, days_in_month(year, month_number)).isoformat()
 
 
 MAX_LIST_LIMIT = 5000

@@ -62,6 +62,11 @@ export function registerPortfolioView({
     portfolioReturnDrawerOverlay,
     portfolioReturnDrawerCloseBtn,
     portfolioReturnDrawerTitle,
+    portfolioGroupDrawer,
+    portfolioGroupDrawerOverlay,
+    portfolioGroupDrawerCloseBtn,
+    portfolioGroupDrawerTitle,
+    portfolioGroupDrawerList,
     portfolioReturnChart,
     portfolioReturnXLabels,
     portfolioReturnYAxis,
@@ -94,6 +99,9 @@ export function registerPortfolioView({
   if (portfolioReturnDrawer && portfolioReturnDrawer.parentElement !== document.body) {
     document.body.append(portfolioReturnDrawer);
   }
+  if (portfolioGroupDrawer && portfolioGroupDrawer.parentElement !== document.body) {
+    document.body.append(portfolioGroupDrawer);
+  }
   const showPortfolioTab = (name) => {
     const nextTab = portfolioTabPanels[name] ? name : "position";
     const panel = portfolioTabPanels[nextTab];
@@ -111,6 +119,11 @@ export function registerPortfolioView({
     valueFor: (button) => button.dataset.portfolioTab,
     onSelect: showPortfolioTab,
   });
+  portfolioTypeList?.addEventListener("click", handlePortfolioGroupRowClick);
+  portfolioIndexerList?.addEventListener("click", handlePortfolioGroupRowClick);
+  portfolioCurrencyList?.addEventListener("click", handlePortfolioGroupRowClick);
+  portfolioAccountList?.addEventListener("click", handlePortfolioGroupRowClick);
+
   const portfolioEmergencyReserveFields = portfolioAssetForm.querySelector("#portfolioEmergencyReserveFields");
   const portfolioAssetName = portfolioAssetForm.elements.asset_name;
   const portfolioAssetAutocomplete = createAssetAutocomplete({
@@ -159,6 +172,8 @@ export function registerPortfolioView({
   portfolioReturnChartBtn?.addEventListener("click", openPortfolioReturnDrawer);
   portfolioReturnDrawerOverlay?.addEventListener("click", closePortfolioReturnDrawer);
   portfolioReturnDrawerCloseBtn?.addEventListener("click", closePortfolioReturnDrawer);
+  portfolioGroupDrawerOverlay?.addEventListener("click", closePortfolioGroupDrawer);
+  portfolioGroupDrawerCloseBtn?.addEventListener("click", closePortfolioGroupDrawer);
 
   async function openPortfolioReturnDrawer() {
     if (!portfolioReturnDrawer) {
@@ -657,25 +672,119 @@ export function registerPortfolioView({
 
   function renderPortfolioAnalysis(summary) {
     const allocationGoals = state.portfolio?.allocation_goals || [];
-    renderPortfolioGroupList(portfolioTypeList, portfolioAllocationRows(summary.by_type || [], allocationGoals), { goals: allocationGoals });
-    renderPortfolioGroupList(portfolioIndexerList, summary.by_indexer);
-    renderPortfolioGroupList(portfolioCurrencyList, summary.by_currency);
-    renderPortfolioGroupList(portfolioAccountList, summary.by_account);
+    renderPortfolioGroupList(portfolioTypeList, portfolioAllocationRows(summary.by_type || [], allocationGoals), { goals: allocationGoals, groupKey: "asset_type_label" });
+    renderPortfolioGroupList(portfolioIndexerList, summary.by_indexer, { groupKey: "fixed_income_indexer" });
+    renderPortfolioGroupList(portfolioCurrencyList, summary.by_currency, { groupKey: "currency" });
+    renderPortfolioGroupList(portfolioAccountList, summary.by_account, { groupKey: "account_name" });
+  }
+
+  function handlePortfolioGroupRowClick(event) {
+    const row = event.target.closest("[data-portfolio-group-key]");
+    if (!row || !state.portfolio?.positions) {
+      return;
+    }
+    const groupKey = row.dataset.portfolioGroupKey;
+    const label = row.dataset.portfolioGroupLabel || "";
+    const currency = row.dataset.portfolioGroupCurrency || "BRL";
+    const matches = (state.portfolio.positions || []).filter((position) => {
+      if (groupKey === "asset_type_label") {
+        return (position.asset_type_label || "") === label && (position.currency || "BRL") === currency;
+      }
+      if (groupKey === "fixed_income_indexer") {
+        const positionIndexerLabel = position.asset_type === "savings"
+          ? "Poupança"
+          : position.fixed_income_indexer || ((position.currency || "BRL") !== "BRL" ? position.currency : "Nao informado");
+        return positionIndexerLabel === label && (position.currency || "BRL") === currency;
+      }
+      if (groupKey === "currency") {
+        return (position.currency || "BRL") === label;
+      }
+      if (groupKey === "account_name") {
+        return (position.account_name || "") === label && (position.currency || "BRL") === currency;
+      }
+      return false;
+    });
+    if (!matches.length) {
+      return;
+    }
+    openPortfolioGroupDrawer({ groupKey, label, currency, matches });
+  }
+
+  function openPortfolioGroupDrawer({ groupKey, label, currency, matches }) {
+    if (!portfolioGroupDrawer || !portfolioGroupDrawerTitle || !portfolioGroupDrawerList) {
+      return;
+    }
+    const kindLabels = {
+      asset_type_label: "Classe",
+      fixed_income_indexer: "Indexador",
+      currency: "Moeda",
+      account_name: "Carteira",
+    };
+    const total = matches.reduce((sum, position) => {
+      const positionValue = Number(position.current_value_brl || position.current_value || position.current_value_cents / 100 || 0);
+      return sum + (Number.isFinite(positionValue) ? positionValue : 0);
+    }, 0);
+    const totalLabel = matches.some((position) => Number(position.current_value_brl || 0) > 0)
+      ? formatMoney(total, "BRL")
+      : formatMoney(total, currency || "BRL");
+    portfolioGroupDrawerTitle.textContent = `${kindLabels[groupKey] || "Composição"}: ${label}`;
+    portfolioGroupDrawerList.innerHTML = matches.length
+      ? `
+        <div class="portfolio-group-drawer-summary">
+          <span>Total da linha</span>
+          <strong>${totalLabel}</strong>
+          <small>${matches.length} ativo(s) · ${currency || "BRL"}</small>
+        </div>
+        <div class="portfolio-group-drawer-table" role="list">
+          ${matches.map((position) => {
+            const name = position.asset_name || position.asset_identifier || "Ativo sem nome";
+            const value = Number(position.current_value_brl || position.current_value || position.current_value_cents / 100 || 0);
+            const percent = total > 0 ? (value / total) * 100 : 0;
+            const lineValue = position.current_value_brl ? formatMoney(position.current_value_brl, "BRL") : formatMoney(position.current_value || position.current_value_cents / 100, position.currency || "BRL");
+            return `
+              <article class="portfolio-group-drawer-item" role="listitem">
+                <div>
+                  <strong>${escapeHtml(name)}</strong>
+                  <span>${escapeHtml(position.asset_identifier || position.account_name || "Sem código")}</span>
+                </div>
+                <div class="portfolio-group-drawer-metrics">
+                  <strong>${lineValue}</strong>
+                  <span>${formatPercent(percent)} · ${escapeHtml(position.currency || "BRL")}</span>
+                </div>
+              </article>
+            `;
+          }).join("")}
+        </div>
+      `
+      : stateMarkup("Nenhum ativo encontrado nesta linha.", { kind: "empty" });
+    portfolioGroupDrawer.hidden = false;
+    portfolioGroupDrawer.setAttribute("aria-hidden", "false");
+  }
+
+  function closePortfolioGroupDrawer() {
+    if (!portfolioGroupDrawer) {
+      return;
+    }
+    portfolioGroupDrawer.hidden = true;
+    portfolioGroupDrawer.setAttribute("aria-hidden", "true");
   }
 
   function portfolioAllocationRows(rows, goals) {
-    const byLabel = new Map(rows.map((row) => [row.label, row]));
+    const byLabel = new Map(rows.map((row) => [`${row.label}::${row.currency || "BRL"}`, row]));
     for (const goal of goals) {
-      if (Number(goal.target_percent || 0) > 0 && !byLabel.has(goal.label)) {
-        byLabel.set(goal.label, {
-          label: goal.label,
-          currency: "BRL",
-          count: 0,
-          current_brl: "0.00",
-          chart_current_brl: "0.00",
-          result_brl: "0.00",
-          result_percent: "0.00",
-        });
+      if (Number(goal.target_percent || 0) > 0) {
+        const hasGoalClassRow = [...byLabel.keys()].some((key) => key.startsWith(`${goal.label}::`));
+        if (!hasGoalClassRow) {
+          byLabel.set(`${goal.label}::BRL`, {
+            label: goal.label,
+            currency: "BRL",
+            count: 0,
+            current_brl: "0.00",
+            chart_current_brl: "0.00",
+            result_brl: "0.00",
+            result_percent: "0.00",
+          });
+        }
       }
     }
     return [...byLabel.values()];
@@ -991,7 +1100,7 @@ export function registerPortfolioView({
         ? `<i class="allocation-target-marker" style="left:${Math.min(targetPercent, 100)}%" title="Meta ${formatPortfolioPercent(targetPercent)}"></i>`
         : "";
       return `
-        <article class="portfolio-group-row">
+        <article class="portfolio-group-row${options.groupKey ? " portfolio-group-row-clickable" : ""}" data-portfolio-group-key="${escapeHtml(options.groupKey || "")}" data-portfolio-group-label="${escapeHtml(row.label)}" data-portfolio-group-currency="${escapeHtml(currency)}">
           <div>
             <strong><i style="background:${chartColor(index)}"></i>${escapeHtml(row.label)}</strong>
             <span>${row.count} posição(ões)</span>

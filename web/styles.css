@@ -5165,6 +5165,72 @@ form[aria-busy="true"] .form-actions {
   max-width: calc(100% - 32px);
 }
 
+.portfolio-group-drawer .drawer-content {
+  width: min(42vw, 720px);
+  max-width: calc(100% - 32px);
+}
+
+.portfolio-group-drawer-list {
+  display: grid;
+  gap: 14px;
+}
+
+.portfolio-group-drawer-summary {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--panel), var(--panel-alt));
+}
+
+.portfolio-group-drawer-summary span,
+.portfolio-group-drawer-summary small {
+  color: var(--muted);
+}
+
+.portfolio-group-drawer-summary strong {
+  font-size: 1.2rem;
+}
+
+.portfolio-group-drawer-table {
+  display: grid;
+  gap: 12px;
+}
+
+.portfolio-group-drawer-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.portfolio-group-drawer-item strong,
+.portfolio-group-drawer-item span {
+  display: block;
+}
+
+.portfolio-group-drawer-item span {
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.portfolio-group-drawer-metrics {
+  text-align: right;
+}
+
+.portfolio-group-row-clickable {
+  cursor: pointer;
+}
+
+.portfolio-group-row-clickable:hover {
+  background: var(--panel-alt);
+}
+
 @media (max-width: 860px) {
   #cockpitView .cockpit-toolbar {
     top: 74px;

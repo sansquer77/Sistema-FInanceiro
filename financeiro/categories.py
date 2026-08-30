@@ -4,6 +4,7 @@ from http import HTTPStatus
 
 from financeiro.database import get_connection
 from financeiro.database import row_to_dict
+from financeiro.identifiers import positive_int_id
 
 GROUP_TYPES = {"income", "expense", "investment"}
 GROUP_ALIASES = {
@@ -573,12 +574,9 @@ def normalize_group_type(value: object, required: bool = True) -> str | None:
 
 def normalize_item_id(value: object, message: str) -> int:
     try:
-        normalized = int(str(value or "").strip())
+        return positive_int_id(value)
     except ValueError as exc:
         raise ClassificationError(message) from exc
-    if normalized <= 0:
-        raise ClassificationError(message)
-    return normalized
 
 
 def ensure_allowed_table(table: str) -> None:

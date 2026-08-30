@@ -43,6 +43,11 @@ class FrontendModuleContractTest(unittest.TestCase):
             self.assertIn('from "./chart-adapter.js"', source, name)
             self.assertNotIn("new ApexCharts", source, name)
 
+    def test_portfolio_analysis_keeps_class_rows_distinct_by_currency(self) -> None:
+        portfolio = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
+
+        self.assertIn('new Map(rows.map((row) => [`${row.label}::${row.currency || "BRL"}`, row]))', portfolio)
+
     def test_apexcharts_overlays_races_and_history_bounds_are_guarded(self) -> None:
         portfolio = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
         reports = (MODULE_ROOT / "reports-view.js").read_text(encoding="utf-8")
