@@ -2,7 +2,7 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.40
+versao: 2.43
 atualizado: 2026-08-29
 relacionados:
   - "[[contas-correntes]]"
@@ -139,7 +139,7 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 | `PUT` | `/api/portfolio/value` |
 | `DELETE` | `/api/portfolio/value` |
 
-Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emergency_reserve_eligible` para posições/aportes elegíveis), `investment_redemptions`, `investment_redemption_summaries` (snapshot por resgate com bruto, líquido, taxas, custo FIFO, resultado realizado e posição remanescente), `investment_closed_positions`, `investment_value_overrides`, `transactions`, `checking_accounts`, `quote_cache`. A configuração da integração Mais Retorno vive em `secure_configs` (ver [[preferencias-abas]]).
+Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emergency_reserve_eligible` para posições/aportes elegíveis), `investment_redemptions`, `investment_redemption_summaries` (snapshot por resgate com bruto, líquido, taxas, custo FIFO, resultado realizado e posição remanescente), `portfolio_allocation_goals`, `investment_closed_positions`, `investment_value_overrides`, `transactions`, `checking_accounts`, `quote_cache`. A configuração da integração Mais Retorno vive em `secure_configs` (ver [[preferencias-abas]]).
 
 ## Plano de implementação
 
@@ -159,6 +159,8 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - [x] Cobrir baixa quantitativa, custo FIFO e crédito líquido com teste automatizado.
 - [x] Persistir snapshot imutável do resultado realizado e da posição remanescente por resgate.
 - [x] Exibir resgates parciais e posições encerradas em seções próprias da aba Histórico.
+- [x] Persistir metas percentuais por classe com soma obrigatória de 100%.
+- [x] Criar a aba Metas e comparar atual versus planejado no gráfico Por Classe.
 
 ## Critérios de aceite
 
@@ -226,9 +228,17 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado um resgate confirmado, quando consultado posteriormente na aba Histórico, então exibe quantidade baixada, valor bruto, taxas, valor líquido, custo FIFO, ganho/perda realizado e quantidade/custo remanescentes conforme o snapshot do momento da operação.
 - Dado operações posteriores sobre o mesmo ativo, quando um resgate antigo é consultado, então seus valores realizados e remanescentes históricos não são recalculados nem alterados retroativamente.
 - Dado a aba Histórico aberta, quando há resgates parciais e/ou posições encerradas, então eles aparecem em seções distintas e o estado vazio orienta que ambos os eventos serão registrados ali.
+- Dado o usuário configurando metas por classe na aba Metas, quando salva, então os percentuais entre 0% e 100% são persistidos somente se a soma for exatamente 100%.
+- Dado metas salvas, quando a aba Análise é aberta, então o gráfico Por Classe compara participação atual e meta usando o valor atual normalizado em BRL.
+- Dado uma classe acima ou abaixo da meta, quando exibida no gráfico, então mostra o desvio em pontos percentuais e o valor absoluto correspondente em BRL.
+- Dado uma classe com meta positiva e nenhuma posição atual, quando a análise é exibida, então a classe permanece visível com participação atual de 0%.
+- Dado a carteira com ativos em moedas distintas, quando a alocação atual é calculada, então todas as classes usam `chart_current_brl` como base comparável, sem somar moedas nominais incompatíveis.
 
 ## Changelog
 
+- `2.43` — 2026-08-29 — Corrige auditoria do salvamento de Metas e disponibiliza metas/participação/desvio para os cards Alocação vs. Perfil e Análise da Carteira do Consultor.
+- `2.42` — 2026-08-29 — Aba Metas passa a renderizar os campos dentro da transição de abas, após a ativação do painel, eliminando o painel vazio em navegadores com View Transitions API.
+- `2.41` — 2026-08-29 — Aba Metas permite planejar percentuais por classe; Análise > Por Classe compara atual versus planejado, desvio percentual e valor em BRL.
 - `2.40` — 2026-08-29 — Aba Histórico passa a exibir resgates com ganho/perda realizado, custo FIFO consumido e quantidade/custo remanescentes em snapshot imutável.
 - `2.39` — 2026-08-29 — Botão Resgatar preserva a quantidade da posição no payload do modal, ativando os campos quantitativos para ativos como AOM, ETH e ISAE4.
 - `2.38` — 2026-08-29 — Autocomplete reutiliza ativos existentes nos cadastros e resgate quantitativo sincroniza quantidade, cotação, bruto, taxas, líquido e remanescente com baixa FIFO por lote.

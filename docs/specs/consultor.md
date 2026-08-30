@@ -2,8 +2,8 @@
 tipo: spec
 area: consultor
 status: implementado
-versao: 1.9
-atualizado: 2026-08-28
+versao: 2.0
+atualizado: 2026-08-29
 relacionados:
   - "[[instrucoes-app]]"
   - "[[investimentos-portfolio]]"
@@ -185,7 +185,7 @@ A aba **Consultor** exibe um seletor fechado com as 9 análises; cada opção in
 
 | `analysis_id` | Card | Prompt estrito (backend) | Dados de entrada |
 |---|---|---|---|
-| `alocacao_perfil` | **Avaliação de Alocação vs. Perfil** | "Cruze a carteira de investimentos atual do usuário com as faixas de referência do perfil de investidor configurado ([Conservador/Moderado/Arrojado]). Aponte desvios relevantes por classe de ativo." | Carteira do Portfólio, `investor_profile`. |
+| `alocacao_perfil` | **Avaliação de Alocação vs. Perfil** | Compare por classe a alocação definida pelo usuário, a alocação real e a faixa educacional de referência do perfil configurado, distinguindo preferência pessoal de orientação do perfil. | Carteira do Portfólio, metas de alocação, `investor_profile`. |
 | `exposicao_cambial` | **Exposição Cambial e Internacional** | "Avalie a diversificação do patrimônio entre ativos em BRL e ativos dolarizados/internacionais consolidados no Portfólio, e o efeito dessa exposição na mitigação de risco da carteira." | Portfólio segmentado por moeda/geografia. |
 | `analise_carteira` | **Análise da Carteira** | "Avalie o portfólio atual do usuário frente ao cenário macroeconômico atual (juros, inflação e câmbio) e o impacto potencial nas posições, por classe de ativo e moeda. Na seção **Análise de Dados**, apresente uma **tabela** com três colunas — Classe de Ativo, Nível de Risco (Baixo/Médio/Alto) e Impacto do Cenário Macro (Positivo/Neutro/Negativo com justificativa curta) — citando apenas as classes presentes na carteira. Inclua a seção **Adequação ao Perfil Configurado**, alinhada ao perfil de investidor registrado no app ([Conservador/Moderado/Arrojado]) e aos dados complementares do usuário (idade, dependentes, objetivo, tolerância a perdas) e à reserva de emergência em meses, comparando a carteira com as faixas de referência do perfil. Diferencie fatos, probabilidades e especulações, aponte riscos e oportunidades e conclua com recomendações educacionais — sem recomendar compra ou venda de ativo, produto, ticker ou fundo específico. Eventos macroeconômicos não cobertos pelas cotações/cache do app devem ser apresentados como estimativa com aviso explícito de defasagem." | Carteira consolidada do Portfólio (posições por classe de ativo, moeda e mercado), `investor_profile`, Perfil Complementar (idade, dependentes, objetivo, tolerância a perdas), pilar Reserva do Score em meses e cotações das mesmas fontes do Portfólio via `quote_cache`. |
 
@@ -370,6 +370,8 @@ Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regr
 - Dado uma requisição a `POST /api/consultor/analyze` com um `analysis_id` fora do enum fechado de cards, quando processada, então o sistema rejeita a requisição sem acionar a IA.
 - Dado um usuário que aciona o card "Melhor Destino para Investimentos a Vencer", quando o sistema processa a requisição, então o payload enviado à IA contém apenas os ativos com vencimento em até 60 dias, a projeção de fluxo de caixa de 3 meses e os pilares Reserva/Endividamento do Score — nunca a carteira completa nem lançamentos não relacionados.
 - Dado um usuário que aciona o card "Análise da Carteira", quando o sistema processa a requisição, então o endpoint `POST /api/consultor/analyze` é acionado com `analysis_id: "analise_carteira"` e o payload contém a carteira consolidada por classe de ativo, moeda e mercado, o perfil de investidor configurado, o Perfil Complementar e o pilar Reserva do Score, com as cotações das mesmas fontes do Portfólio via `quote_cache`, sem nomes ou identificadores de ativos.
+- Dado metas de alocação configuradas no Portfólio, quando o usuário executa **Avaliação de Alocação vs. Perfil** ou **Análise da Carteira**, então o contexto minimizado inclui por classe a meta definida pelo usuário, a participação real, o desvio em pontos percentuais e o valor atual em BRL.
+- Dado o Consultor comparando alocações, quando apresenta a avaliação, então distingue **Alocação Definida**, **Alocação Real** e **Faixa de Referência do Perfil**, sem tratar a meta pessoal como recomendação da IA nem recomendar ativos específicos.
 - Dado um usuário com perfil **Conservador** e Perfil Complementar preenchido, quando aciona o card "Análise da Carteira", então a seção **Adequação ao Perfil Configurado** da resposta usa o perfil cadastrado no app (faixas de 70% a 90% em renda fixa) e os dados complementares, nunca um perfil fixo.
 - Dado uma resposta do card "Melhor Destino para Investimentos a Vencer" que, apesar do prompt estrito, mencione um produto, ticker ou ativo específico para compra, quando o pós-processamento valida a saída, então a resposta é substituída pela mensagem de recusa padrão das "Limitações obrigatórias" antes de ser exibida.
 - Dado um usuário que seleciona "Detecção de Anomalias e 'Ralos' Financeiros", quando visualiza os controles antes de acionar a análise, então encontra ao lado do seletor de análises um seletor com as opções fechadas 3, 6, 12 meses e YTD, pré-selecionado em 3 meses, sem campo de texto ou data livre.
@@ -484,6 +486,7 @@ _Nenhuma pendência em aberto._
 
 ## Changelog
 
+- `2.0` — 2026-08-29 — Cards Alocação vs. Perfil e Análise da Carteira passam a comparar alocação definida, real e faixa educacional do perfil usando as metas persistidas no Portfólio.
 - `1.9` — 2026-08-28 — Proteção monetária generalizada para todos os cards: cada campo `_cents`, inclusive aninhado, recebe automaticamente o correspondente `_display`; o prompt global obriga o uso do valor formatado e proíbe converter, arredondar ou reformatar `_cents`/`_brl`.
 - `1.8` — 2026-08-28 — Card **Sustentabilidade do Padrão de Vida** passa a fornecer receitas, despesas e indicadores de Paz Financeira já formatados em BRL (`_display`); o prompt estrito proíbe a IA de converter ou reformatar os campos em centavos, corrigindo respostas com escala monetária incorreta.
 - `1.7` — 2026-08-22 — Adicionado o card **Evolução do Score no Tempo** (`evolucao_score_tempo`) na Categoria Saúde Financeira, com seletor fechado de 6 ou 12 meses, contexto histórico dos 5 pilares do Score e prompt estrito que exige tabela markdown mês a mês + interpretação textual; `AnalysisCard` passa a declarar `period_window_options` por card e a validação rejeita valores fora das opções permitidas; catálogo atualizado de 8 para 9 cards.

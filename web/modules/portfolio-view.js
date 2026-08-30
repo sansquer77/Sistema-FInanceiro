@@ -74,12 +74,17 @@ export function registerPortfolioView({
     portfolioAccountList,
     portfolioPositions,
     portfolioHistory,
+    portfolioGoalsForm,
+    portfolioGoalsFields,
+    portfolioGoalsTotal,
+    portfolioGoalsMessage,
     portfolioGroupFilter,
     portfolioTabButtons,
   } = elements;
   const portfolioTabPanels = {
     position: document.querySelector("#portfolioPositionPanel"),
     analysis: document.querySelector("#portfolioAnalysisPanel"),
+    goals: document.querySelector("#portfolioGoalsPanel"),
     history: document.querySelector("#portfolioHistoryPanel"),
   };
   const portfolioRoot = document.querySelector("#portfolioView");
@@ -93,8 +98,8 @@ export function registerPortfolioView({
       Object.entries(portfolioTabPanels).forEach(([key, currentPanel]) => {
         currentPanel.hidden = key !== nextTab;
       });
+      renderActivePortfolioTab();
     });
-    renderActivePortfolioTab();
   };
   bindRovingTablist(portfolioTabButtons, {
     valueFor: (button) => button.dataset.portfolioTab,
@@ -142,6 +147,8 @@ export function registerPortfolioView({
     renderPortfolioPositions(state.portfolio?.positions || []);
     renderHighlightedPortfolioPosition();
   });
+  portfolioGoalsForm.addEventListener("submit", savePortfolioGoals);
+  portfolioGoalsFields.addEventListener("input", updatePortfolioGoalsTotal);
   portfolioPositions.addEventListener("click", handlePortfolioPositionsClick);
   portfolioReturnChartBtn?.addEventListener("click", openPortfolioReturnDrawer);
   portfolioReturnDrawerOverlay?.addEventListener("click", closePortfolioReturnDrawer);
@@ -273,7 +280,7 @@ export function registerPortfolioView({
   function resetPortfolioAssetForm() {
     portfolioAssetForm.reset();
     portfolioAssetForm.elements.id.value = "";
-    // spec: investimentos-portfolio v2.40 — criterio 48
+    // spec: investimentos-portfolio v2.43 — criterio 48
     portfolioAssetForm.elements.exchange_rate_to_brl.value = "";
     portfolioAssetFormTitle.textContent = "Ativo em carteira";
     deletePortfolioAssetButton.hidden = true;
@@ -634,6 +641,8 @@ export function registerPortfolioView({
       renderPortfolioAnalysis(portfolio.summary);
     } else if (activeTab === "history") {
       renderPortfolioHistory(portfolio.history || [], portfolio.redemption_history || []);
+    } else if (activeTab === "goals") {
+      renderPortfolioGoals(portfolio.allocation_goals || []);
     } else {
       renderPortfolioPositions(portfolio.positions || []);
       renderHighlightedPortfolioPosition();
@@ -641,10 +650,29 @@ export function registerPortfolioView({
   }
 
   function renderPortfolioAnalysis(summary) {
-    renderPortfolioGroupList(portfolioTypeList, summary.by_type);
+    const allocationGoals = state.portfolio?.allocation_goals || [];
+    renderPortfolioGroupList(portfolioTypeList, portfolioAllocationRows(summary.by_type || [], allocationGoals), { goals: allocationGoals });
     renderPortfolioGroupList(portfolioIndexerList, summary.by_indexer);
     renderPortfolioGroupList(portfolioCurrencyList, summary.by_currency);
     renderPortfolioGroupList(portfolioAccountList, summary.by_account);
+  }
+
+  function portfolioAllocationRows(rows, goals) {
+    const byLabel = new Map(rows.map((row) => [row.label, row]));
+    for (const goal of goals) {
+      if (Number(goal.target_percent || 0) > 0 && !byLabel.has(goal.label)) {
+        byLabel.set(goal.label, {
+          label: goal.label,
+          currency: "BRL",
+          count: 0,
+          current_brl: "0.00",
+          chart_current_brl: "0.00",
+          result_brl: "0.00",
+          result_percent: "0.00",
+        });
+      }
+    }
+    return [...byLabel.values()];
   }
 
   function renderHighlightedPortfolioPosition() {
@@ -914,18 +942,32 @@ export function registerPortfolioView({
     return `${Number(value || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
   }
 
-  function renderPortfolioGroupList(container, rows) {
+  function renderPortfolioGroupList(container, rows, options = {}) {
     if (!rows || rows.length === 0) {
       container.innerHTML = stateMarkup("Carregue ou cadastre posições para visualizar esta consolidação.", { kind: "empty" });
       return;
     }
     const chartTotal = portfolioGroupChartTotal(rows);
+    const goals = new Map((options.goals || []).map((goal) => [goal.label, Number(goal.target_percent || 0)]));
     container.innerHTML = rows.map((row, index) => {
       const chartValue = Number(row.chart_current_brl || row.current_brl || 0);
       const currentValue = Number(row.current_brl || 0);
       const result = Number(row.result_brl || 0);
       const currency = row.currency || "BRL";
       const percent = chartTotal > 0 ? chartValue / chartTotal : 0;
+      const targetPercent = goals.get(row.label) || 0;
+      const actualPercent = percent * 100;
+      const deviation = actualPercent - targetPercent;
+      const targetValue = chartTotal * targetPercent / 100;
+      const allocationComparison = options.goals ? `
+        <div class="portfolio-allocation-comparison">
+          <span>Atual ${formatPortfolioPercent(actualPercent)} · Meta ${formatPortfolioPercent(targetPercent)}</span>
+          <span class="allocation-deviation ${deviation > 0.005 ? "allocation-over" : deviation < -0.005 ? "allocation-under" : ""}">${deviation >= 0 ? "+" : ""}${formatPortfolioPercent(deviation)} · ${formatMoney(Math.abs(chartValue - targetValue), "BRL")}</span>
+        </div>
+      ` : "";
+      const targetMarker = options.goals && targetPercent > 0
+        ? `<i class="allocation-target-marker" style="left:${Math.min(targetPercent, 100)}%" title="Meta ${formatPortfolioPercent(targetPercent)}"></i>`
+        : "";
       return `
         <article class="portfolio-group-row">
           <div>
@@ -936,10 +978,47 @@ export function registerPortfolioView({
             <strong>${formatMoney(currentValue, currency)}</strong>
             <span class="${result < 0 ? "danger-text" : "positive-text"}">${formatMoney(row.result_brl, currency)} · ${Number(row.result_percent).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%</span>
           </div>
-          <div class="report-bar"><span style="width:${Math.max(percent * 100, 2)}%; background:${chartColor(index)}"></span></div>
+          ${allocationComparison}
+          <div class="report-bar ${options.goals ? "allocation-bar" : ""}"><span style="width:${Math.max(percent * 100, 2)}%; background:${chartColor(index)}"></span>${targetMarker}</div>
         </article>
       `;
     }).join("");
+  }
+
+  function renderPortfolioGoals(goals) {
+    portfolioGoalsFields.innerHTML = goals.map((goal) => `
+      <label>${escapeHtml(goal.label)}
+        <input type="text" inputmode="decimal" data-allocation-asset-type="${escapeHtml(goal.asset_type)}" value="${escapeHtml(decimalInputValue(goal.target_percent))}" placeholder="0,00">
+      </label>
+    `).join("");
+    updatePortfolioGoalsTotal();
+  }
+
+  function updatePortfolioGoalsTotal() {
+    const total = [...portfolioGoalsFields.querySelectorAll("[data-allocation-asset-type]")]
+      .reduce((sum, input) => sum + Math.max(parseDecimalInput(input.value), 0), 0);
+    portfolioGoalsTotal.textContent = formatPortfolioPercent(total);
+    portfolioGoalsTotal.classList.toggle("danger-text", Math.abs(total - 100) > 0.005);
+  }
+
+  async function savePortfolioGoals(event) {
+    event.preventDefault();
+    const goals = [...portfolioGoalsFields.querySelectorAll("[data-allocation-asset-type]")].map((input) => ({
+      asset_type: input.dataset.allocationAssetType,
+      target_percent: input.value,
+    }));
+    setFormBusy(portfolioGoalsForm, true);
+    setMessage(portfolioGoalsMessage, "Salvando metas...");
+    try {
+      state.portfolio = await api("/api/portfolio/allocation-goals", { method: "PUT", body: { goals } });
+      state.portfolioDirty = false;
+      renderPortfolioGoals(state.portfolio.allocation_goals || []);
+      setMessage(portfolioGoalsMessage, "Metas de alocação salvas.", "success");
+    } catch (error) {
+      setMessage(portfolioGoalsMessage, error.message, "error");
+    } finally {
+      setFormBusy(portfolioGoalsForm, false);
+    }
   }
 
   function portfolioGroupChartTotal(rows) {
@@ -1429,7 +1508,7 @@ export function registerPortfolioView({
     `;
   }
 
-  // spec: investimentos-portfolio v2.40 — criterio 47
+  // spec: investimentos-portfolio v2.43 — criterio 47
   function portfolioEmergencyShieldIcon() {
     return '<svg class="portfolio-emergency-shield" viewBox="0 0 24 24" width="12" height="12" role="img" aria-label="Reserva de emergência" title="Reserva de emergência" fill="currentColor"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5l8-3z"/></svg>';
   }

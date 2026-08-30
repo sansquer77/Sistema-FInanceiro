@@ -40,6 +40,7 @@ ENTITY_TYPES = {
     "credit_card_payment",
     "portfolio_position",
     "portfolio_redemption",
+    "portfolio_allocation_goals",
     "category",
     "subcategory",
     "tag",

@@ -2,7 +2,7 @@
 tipo: design
 area: meta
 status: implementado
-versao: 3.9
+versao: 4.0
 atualizado: 2026-08-29
 relacionados:
   - "[[arquitetura]]"
@@ -100,6 +100,7 @@ Regras de aplicação:
 - Cores de UI devem ser aplicadas por tokens CSS, nunca como literais espalhados em componentes.
 - Gráficos e barras de distribuição devem consumir tokens de paleta (`--chart-*`) para permitir troca de tema sem alterar módulos funcionais.
 - Linhas de referência neutras em gráficos (ex.: média) usam o token `--chart-average-line` (cinza `#9aa3b8` no claro, branco `#ffffff` no escuro) e nunca `--secondary`/`--secondary-container`.
+- Gráficos de alocação usam marcador fino sobre a barra para a meta; desvios acima da meta usam o texto de advertência e desvios abaixo usam `--accent-dark`, sem representar excesso/insuficiência como ganho ou perda financeira em vermelho/verde.
 - Logos e cores institucionais de bancos podem permanecer literais quando representam marca ou ativo visual externo.
 - Novos componentes devem reutilizar tokens existentes antes de criar novos aliases.
 - A primeira etapa de implantação de tema escuro deve preservar o modo claro sem mudança visual perceptível.
@@ -380,6 +381,7 @@ Padrão único em toda a aplicação, conforme o modelo usado no menu **Preferê
 
 ## Changelog
 
+- `4.0` — 2026-08-29 — Define marcador e cores não financeiras para comparação de alocação atual versus meta.
 - `3.9` — 2026-08-29 — Contratos unificados para overlays, toast, cabeçalhos/atualização, tabelas/filtros e formulários progressivos.
 - `3.8` — 2026-08-29 — Estados loading/erro/vazio/info padronizados com estrutura, semântica ARIA, tons e orientação contextual compartilhados.
 - `3.7` — 2026-08-28 — Densidade configurável documentada com modos Confortável/Compacto, persistência local e limites mínimos de legibilidade/interação.

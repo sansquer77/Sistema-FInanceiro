@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 2.8
+versao: 2.9
 atualizado: 2026-08-29
 relacionados:
   - "[[arquitetura]]"
@@ -32,7 +32,7 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 - **Recorrência e Parcelamento**: suporte a séries de lançamentos periódicos ou parcelados com acompanhamento de índice de parcelas e conciliação bancária (`reconciled_at`). Ver [[lancamentos]].
 - **Cartões de Crédito**: cadastro de cartões com limite, emissor, bandeira, fechamento, vencimento e conta preferencial de pagamento. Lançamentos de despesas e receitas no cartão por fatura mensal (formato `AAAA-MM`), conciliação de lançamentos, compras parceladas/recorrentes, movimentação entre faturas e fluxo de pagamento de fatura (integral ou parcial, com saldo residual lançado na fatura seguinte) integrado às contas-correntes. Ver [[cartoes]].
 - **Limites de Gastos (Metas/Budgets)**: estabelecimento de limites de despesas mensais por categoria e subcategoria. Ver [[limites-gastos]].
-- **Portfólio de Investimentos**: posições iniciais (`opening positions`) e operações de investimento, autocomplete de ativos já utilizados, resgates por quantidade com baixa FIFO, custos, valor bruto e crédito líquido, além de histórico imutável de ganho/perda realizado e posição remanescente. Suporte a ações/ETFs/BDRs (`stock`), cripto volátil (`crypto`), stablecoins (`stablecoin`), fundos (`fund`), renda fixa (`fixed_income`), previdência privada (`private_pension`), poupança (`savings`) e outros (`other`). Ver [[investimentos-portfolio]].
+- **Portfólio de Investimentos**: posições iniciais (`opening positions`) e operações de investimento, autocomplete de ativos já utilizados, resgates por quantidade com baixa FIFO, histórico imutável de resultado realizado e metas percentuais por classe comparadas à alocação atual normalizada em BRL. Suporte a ações/ETFs/BDRs (`stock`), cripto volátil (`crypto`), stablecoins (`stablecoin`), fundos (`fund`), renda fixa (`fixed_income`), previdência privada (`private_pension`), poupança (`savings`) e outros (`other`). Ver [[investimentos-portfolio]].
 - **Precificação e Validação de Ativos**:
   - Integração com Yahoo Finance (ações e fundos) e CoinGecko/Yahoo (criptoativos) para cotações automáticas.
   - Integração com o Sistema Gerenciador de Séries Temporais (SGS) do Banco Central para obter CDI, SELIC, IPCA, IGP-M e TR para o cálculo do rendimento acumulado de renda fixa (com fallback local seguro).
@@ -121,6 +121,7 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 
 ## Changelog
 
+- `2.9` — 2026-08-29 — Portfólio passa a permitir metas percentuais por classe e comparação da alocação planejada versus atual.
 - `2.8` — 2026-08-29 — Histórico do Portfólio passa a preservar ganho/perda realizado, custo FIFO e posição remanescente de cada resgate.
 - `2.7` — 2026-08-29 — Portfólio passa a incluir reutilização assistida de ativos e resgate quantitativo com baixa FIFO e crédito líquido.
 - `2.6` — 2026-08-29 — Stablecoins passam a ser classe própria do Portfólio, preservando a moeda contábil definida pela conta/carteira.

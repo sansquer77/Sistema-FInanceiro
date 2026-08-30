@@ -5253,6 +5253,55 @@ form[aria-busy="true"] .form-actions {
   margin: 14px 0;
 }
 
+.portfolio-goals-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 14px;
+}
+
+.portfolio-goals-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.portfolio-allocation-comparison {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.portfolio-allocation-comparison .allocation-deviation {
+  font-weight: 800;
+}
+
+.portfolio-allocation-comparison .allocation-over {
+  color: var(--warning-pill-text);
+}
+
+.portfolio-allocation-comparison .allocation-under {
+  color: var(--accent-dark);
+}
+
+.report-bar.allocation-bar {
+  position: relative;
+}
+
+.report-bar .allocation-target-marker {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--text);
+  box-shadow: 0 0 0 1px var(--panel);
+}
+
 .portfolio-group-list {
   display: grid;
   gap: 8px;

@@ -417,6 +417,15 @@ def initialize_database() -> None:
                 )
             );
 
+            CREATE TABLE IF NOT EXISTS portfolio_allocation_goals (
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                asset_type TEXT NOT NULL,
+                target_percent_micros INTEGER NOT NULL CHECK (target_percent_micros >= 0 AND target_percent_micros <= 100000000),
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, asset_type)
+            );
+
             CREATE TABLE IF NOT EXISTS investment_closed_positions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -765,7 +774,7 @@ def ensure_secure_configs(conn: sqlite3.Connection) -> None:
 
 
 def ensure_consultor_schema(conn: sqlite3.Connection) -> None:
-    # spec: consultor/consultor v1.9 - criterio 23
+    # spec: consultor/consultor v2.0 - criterio 23
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS consultor_settings (

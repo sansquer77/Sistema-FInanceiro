@@ -97,7 +97,7 @@ from financeiro.financial_health import (
 )
 from financeiro.imports import import_legacy_transactions, import_system_template, system_import_template
 from financeiro.operation_logs import create_operation_log, get_operation_log, list_operation_logs
-from financeiro.portfolio import close_position, create_opening_position, current_portfolio_positions, delete_opening_position, delete_position_value_override, fetch_fund_quote_for_user, get_portfolio, get_portfolio_returns, redeem_position, update_opening_position, update_position_value_override
+from financeiro.portfolio import close_position, create_opening_position, current_portfolio_positions, delete_opening_position, delete_position_value_override, fetch_fund_quote_for_user, get_portfolio, get_portfolio_returns, redeem_position, save_allocation_goals, update_opening_position, update_position_value_override
 from financeiro.portfolio import PortfolioError
 from financeiro.reports import build_tag_report
 from financeiro.secure_config import (
@@ -475,6 +475,9 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/portfolio/value":
             self.handle_update_portfolio_value()
+            return
+        if path == "/api/portfolio/allocation-goals":
+            self.handle_save_portfolio_allocation_goals()
             return
         if path.startswith("/api/checking-accounts/"):
             self.handle_update_account()
@@ -1066,6 +1069,17 @@ class AppHandler(BaseHTTPRequestHandler):
             "Valor de portfolio atualizado", None,
             account_id=data.get("account_id"),
             metadata={"asset_type": data.get("asset_type"), "quote_date": data.get("quote_date")},
+        )
+        self.send_json(result)
+
+    def handle_save_portfolio_allocation_goals(self) -> None:
+        user = self.require_user()
+        data = self.read_json()
+        result = save_allocation_goals(user["id"], data)
+        self.record_operation(
+            user["id"], "portfolio", "update", "portfolio_allocation_goals",
+            "Metas de alocacao do portfolio atualizadas", None,
+            metadata={"goal_count": len(data.get("goals") or [])},
         )
         self.send_json(result)
 

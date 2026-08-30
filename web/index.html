@@ -32,7 +32,7 @@
         }
       })();
     </script>
-    <link rel="stylesheet" href="/styles.css?v=147">
+    <link rel="stylesheet" href="/styles.css?v=148">
   </head>
   <body>
     <main class="app-shell">
@@ -958,6 +958,7 @@
           <div class="portfolio-tabs" role="tablist" aria-label="Visão do Portfólio">
             <button class="portfolio-tab active" type="button" role="tab" aria-selected="true" aria-controls="portfolioPositionPanel" data-portfolio-tab="position">Posição</button>
             <button class="portfolio-tab" type="button" role="tab" aria-selected="false" aria-controls="portfolioAnalysisPanel" data-portfolio-tab="analysis" tabindex="-1">Análise</button>
+            <button class="portfolio-tab" type="button" role="tab" aria-selected="false" aria-controls="portfolioGoalsPanel" data-portfolio-tab="goals" tabindex="-1">Metas</button>
             <button class="portfolio-tab" type="button" role="tab" aria-selected="false" aria-controls="portfolioHistoryPanel" data-portfolio-tab="history" tabindex="-1">Histórico</button>
           </div>
 
@@ -1225,6 +1226,22 @@
               <div class="portfolio-group-list" id="portfolioAccountList"></div>
             </section>
           </div>
+          </section>
+
+          <section class="portfolio-tab-panel" id="portfolioGoalsPanel" role="tabpanel" data-portfolio-panel="goals" hidden>
+            <section class="panel portfolio-goals-panel">
+              <div class="section-heading">
+                <div><h2>Metas de alocação</h2><p class="muted-copy">Defina a proporção desejada por classe. A soma deve ser 100%.</p></div>
+              </div>
+              <form id="portfolioGoalsForm" class="form portfolio-goals-form">
+                <div id="portfolioGoalsFields" class="portfolio-goals-grid"></div>
+                <div class="portfolio-goals-footer">
+                  <span>Total planejado <strong id="portfolioGoalsTotal">0,00%</strong></span>
+                  <button class="primary" type="submit">Salvar metas</button>
+                </div>
+              </form>
+              <p class="message" id="portfolioGoalsMessage" role="alert"></p>
+            </section>
           </section>
 
           <section class="portfolio-tab-panel" id="portfolioHistoryPanel" role="tabpanel" data-portfolio-panel="history" hidden>
@@ -2092,7 +2109,7 @@
       </label>
       <div class="global-search-results" id="globalSearchResults" role="listbox" aria-label="Resultados da busca"></div>
     </dialog>
-    <script type="module" src="/app.js?v=155"></script>
+    <script type="module" src="/app.js?v=158"></script>
     <script async defer data-name="BMC-Widget" data-cfasync="false" src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js" data-id="sansquerh" data-description="Support me on Buy me a coffee!" data-message="Tks pelo café!" data-color="#5F7FFF" data-position="Right" data-x_margin="18" data-y_margin="18" data-container="bmc-btn-container"></script>
   </body>
 </html>

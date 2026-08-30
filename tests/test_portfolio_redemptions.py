@@ -39,7 +39,7 @@ class PortfolioQuantityRedemptionTest(unittest.TestCase):
         })
 
     def test_quantity_redemption_consumes_oldest_lot_and_credits_net_amount(self) -> None:
-        # spec: investimentos/investimentos-portfolio v2.40 — critérios 55-58
+        # spec: investimentos/investimentos-portfolio v2.43 — critérios 55-58
         self.add_lot("2026-01-10", "100", "500,00")
         self.add_lot("2026-02-10", "100", "600,00")
 

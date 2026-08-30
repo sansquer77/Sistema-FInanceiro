@@ -16,7 +16,7 @@ class FrontendModuleContractTest(unittest.TestCase):
         imports = re.findall(r'from\s+["\'](\./[^"\']+)["\']', source)
 
         self.assertTrue(imports, "app.js deve importar módulos ES locais")
-        missing = [relative for relative in imports if not (WEB_ROOT / relative).resolve().is_file()]
+        missing = [relative for relative in imports if not (WEB_ROOT / relative.split("?", 1)[0]).resolve().is_file()]
         self.assertEqual(missing, [], f"Imports ES sem arquivo correspondente: {missing}")
 
     def test_all_frontend_modules_are_documented_in_the_frontend_spec(self) -> None:
@@ -263,6 +263,14 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("portfolio.redemption_history || []", portfolio)
         self.assertIn("Ganho/perda", portfolio)
         self.assertIn("Custo FIFO", portfolio)
+        self.assertIn("portfolioAllocationRows", portfolio)
+        self.assertIn("/api/portfolio/allocation-goals", portfolio)
+        self.assertIn('data-portfolio-tab="goals"', index)
+        self.assertIn('id="portfolioGoalsForm"', index)
+        self.assertIn('portfolio-view.js?v=157', app_source)
+        transition_start = portfolio.index("transitionView(() => {")
+        transition_end = portfolio.index("  };", transition_start)
+        self.assertIn("renderActivePortfolioTab();", portfolio[transition_start:transition_end])
 
 
 if __name__ == "__main__":

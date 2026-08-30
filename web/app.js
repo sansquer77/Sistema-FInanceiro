@@ -65,7 +65,7 @@ import { registerImportsView } from "./modules/imports-view.js";
 import { registerCockpitView } from "./modules/cockpit-view.js";
 import { registerAccountsView } from "./modules/accounts-view.js";
 import { registerCardsView } from "./modules/cards-view.js";
-import { registerPortfolioView } from "./modules/portfolio-view.js";
+import { registerPortfolioView } from "./modules/portfolio-view.js?v=157";
 import { registerTransactionsView } from "./modules/transactions-view.js";
 import { registerSimulationsView } from "./modules/simulations-view.js";
 import { registerOperationHistoryView } from "./modules/operation-history-view.js";
@@ -297,6 +297,10 @@ const portfolioCurrencyList = document.querySelector("#portfolioCurrencyList");
 const portfolioAccountList = document.querySelector("#portfolioAccountList");
 const portfolioPositions = document.querySelector("#portfolioPositions");
 const portfolioHistory = document.querySelector("#portfolioHistory");
+const portfolioGoalsForm = document.querySelector("#portfolioGoalsForm");
+const portfolioGoalsFields = document.querySelector("#portfolioGoalsFields");
+const portfolioGoalsTotal = document.querySelector("#portfolioGoalsTotal");
+const portfolioGoalsMessage = document.querySelector("#portfolioGoalsMessage");
 const portfolioGroupFilter = document.querySelector("#portfolioGroupFilter");
 const portfolioTabButtons = document.querySelectorAll("[data-portfolio-tab]");
 const importForm = document.querySelector("#importForm");
@@ -1106,6 +1110,10 @@ const portfolioView = registerPortfolioView({
     portfolioAccountList,
     portfolioPositions,
     portfolioHistory,
+    portfolioGoalsForm,
+    portfolioGoalsFields,
+    portfolioGoalsTotal,
+    portfolioGoalsMessage,
     portfolioGroupFilter,
     portfolioTabButtons,
   },

@@ -87,6 +87,17 @@ class OperationLogsTest(unittest.TestCase):
         with self.assertRaises(Exception):
             get_operation_log(other["id"], log["id"])
 
+    def test_portfolio_allocation_goals_is_a_valid_audit_entity(self) -> None:
+        owner = create_user("Alice", "alice@example.com", "correct-password")
+        log = create_operation_log(
+            owner["id"],
+            module="portfolio",
+            operation_type="update",
+            entity_type="portfolio_allocation_goals",
+            description="Metas de alocacao atualizadas",
+        )
+        self.assertEqual(log["entity_type"], "portfolio_allocation_goals")
+
     def test_operation_log_preserves_structured_changes_without_secrets(self) -> None:
         owner = create_user("Alice", "alice@example.com", "correct-password")
 

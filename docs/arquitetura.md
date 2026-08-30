@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.46
+versao: 3.48
 atualizado: 2026-08-29
 relacionados:
   - "[[requisitos]]"
@@ -215,6 +215,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `POST` | `/api/portfolio/close` |
 | `PUT` | `/api/portfolio/value` |
 | `DELETE` | `/api/portfolio/value` |
+| `PUT` | `/api/portfolio/allocation-goals` |
 
 #### Rotas — Cockpit e Relatórios → [[relatorios]]
 
@@ -515,6 +516,8 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.48` — 2026-08-29 — Metas de alocação passam a integrar o contexto minimizado dos cards `alocacao_perfil` e `analise_carteira`; auditoria aceita a entidade `portfolio_allocation_goals`.
+- `3.47` — 2026-08-29 — Adicionada persistência `portfolio_allocation_goals` e rota `PUT /api/portfolio/allocation-goals`; consolidação por classe usa valores normalizados em BRL para atual versus meta.
 - `3.46` — 2026-08-29 — Adicionada `investment_redemption_summaries` para preservar o snapshot financeiro de cada resgate e alimentar a aba Histórico sem recálculo retroativo.
 - `3.45` — 2026-08-29 — Portfólio documenta catálogo local compartilhado de ativos e resgate quantitativo persistido em `investment_redemptions`, com baixa FIFO e crédito líquido em `transactions`.
 - `3.44` — 2026-08-29 — Resolvedor do Yahoo passa a aceitar alias explícito de bolsa para VWRA em USD (`VWRA.L`).

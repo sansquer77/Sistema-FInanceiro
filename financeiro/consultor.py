@@ -193,7 +193,11 @@ ANALYSIS_CATALOG: tuple[AnalysisCard, ...] = (
         category="Portfolio e Risco",
         strict_prompt=(
             "Cruze a carteira de investimentos atual do usuario com as faixas de referencia do perfil "
-            "de investidor configurado ({profile_label}). Aponte desvios relevantes por classe de ativo."
+            "de investidor configurado ({profile_label}) e com as metas de alocacao definidas pelo proprio "
+            "usuario no Portfolio. Aponte desvios relevantes por classe de ativo, distinguindo meta pessoal "
+            "de faixa educacional do perfil. Apresente uma tabela por classe com Alocacao Definida, Alocacao "
+            "Real, Faixa de Referencia do Perfil e leitura do desvio; a meta do usuario e uma preferencia "
+            "informada, nao uma recomendacao da IA."
         ),
         input_scope="Carteira do Portfolio e perfil de investidor.",
     ),
@@ -222,6 +226,9 @@ ANALYSIS_CATALOG: tuple[AnalysisCard, ...] = (
             "Configurado, alinhada ao perfil de investidor registrado no app ({profile_label}) e aos "
             "dados complementares do usuario (idade, dependentes, objetivo, tolerancia a perdas) e a "
             "reserva de emergencia em meses, comparando a carteira com as faixas de referencia do perfil. "
+            "Quando houver metas de alocacao definidas no Portfolio, compare tambem participacao atual, meta "
+            "pessoal e desvio por classe em uma tabela com Alocacao Definida, Alocacao Real e Faixa de "
+            "Referencia do Perfil, sem substituir a avaliacao de adequacao ao perfil. "
             "Diferencie fatos, probabilidades e especulacoes, aponte riscos e oportunidades e conclua "
             "com recomendacoes educacionais - sem recomendar compra ou venda de ativo, produto, ticker "
             "ou fundo especifico. Eventos macroeconomicos nao cobertos pelas cotacoes/cache do app devem "
@@ -245,7 +252,7 @@ ANALYSIS_CATALOG: tuple[AnalysisCard, ...] = (
         ),
         input_scope="Score de Saude Financeira e seus 5 pilares.",
     ),
-    # spec: consultor/consultor v1.9 — critérios 8, 9 e 10
+    # spec: consultor/consultor v2.0 — critérios 8, 9 e 10
     AnalysisCard(
         analysis_id="evolucao_score_tempo",
         title="Evolucao do Score no Tempo",
@@ -336,7 +343,7 @@ def validate_analysis_id(value: object) -> str:
 
 
 def validate_period_window(value: object, *, analysis_id: str) -> str | None:
-    # spec: consultor/consultor v1.9 — critérios 9 e 10
+    # spec: consultor/consultor v2.0 — critérios 9 e 10
     card = CATALOG_BY_ID[validate_analysis_id(analysis_id)]
     if not card.requires_period_window:
         return None
@@ -360,7 +367,7 @@ def build_system_prompt(
     investor_profile: object = "moderado",
     period_window: object = None,
 ) -> str:
-    # spec: consultor/consultor v1.9 - criterios 8, 9, 12, 14, 34, 38 e 39
+    # spec: consultor/consultor v2.0 - criterios 8, 9, 12, 14, 34, 38 e 39
     normalized_analysis_id = validate_analysis_id(analysis_id)
     profile = validate_investor_profile(investor_profile)
     period = validate_period_window(period_window, analysis_id=normalized_analysis_id)
@@ -436,7 +443,7 @@ def execute_consultor_analysis(
     now: datetime | None = None,
     portfolio_positions: list[dict] | None = None,
 ) -> dict:
-    # spec: consultor/consultor v1.9 - criterios 7, 8, 10, 13, 34 e 38
+    # spec: consultor/consultor v2.0 - criterios 7, 8, 10, 13, 34 e 38
     normalized_user_id = int(user_id)
     normalized_analysis_id = validate_analysis_id(analysis_id)
     current_time = now or datetime.now()
@@ -598,7 +605,7 @@ def failure_cooldown_remaining(user_id: int, analysis_id: str, current_time: dat
 
 
 def postprocess_consultor_output(output: object) -> str:
-    # spec: consultor/consultor v1.9 - criterios 11, 12, 14 e 15
+    # spec: consultor/consultor v2.0 - criterios 11, 12, 14 e 15
     text = str(output or "").strip()
     if not text:
         raise ConsultorError("O Consultor esta indisponivel no momento.")
@@ -615,7 +622,7 @@ def postprocess_consultor_output(output: object) -> str:
 
 
 def has_section(text: str, section: str) -> bool:
-    # spec: consultor/consultor v1.9 - cabeçalhos com acentos normalizados
+    # spec: consultor/consultor v2.0 - cabeçalhos com acentos normalizados
     normalized_text = normalize_text(text)
     escaped = re.escape(section)
     return bool(re.search(
@@ -626,7 +633,7 @@ def has_section(text: str, section: str) -> bool:
 
 
 def contains_forbidden_recommendation(normalized_text: str) -> bool:
-    # spec: consultor/consultor v1.9 - correcao de falso positivo
+    # spec: consultor/consultor v2.0 - correcao de falso positivo
     # Frases defensivas da IA ("nao constitui recomendacao de compra de acoes",
     # "sem recomendar compra de fundos", "evite comprar por impulso") casavam os
     # padroes vedados; o match so vale se nao houver negacao/ressalva na janela anterior.
@@ -790,7 +797,7 @@ def build_analysis_context(
     investor_profile: object | None = None,
     portfolio_positions: list[dict] | None = None,
 ) -> dict:
-    # spec: consultor/consultor v1.9 - criterios 7, 10, 27, 30, 34 e 38
+    # spec: consultor/consultor v2.0 - criterios 7, 10, 27, 30, 34 e 38
     normalized_analysis_id = validate_analysis_id(analysis_id)
     normalized_period = validate_period_window(period_window, analysis_id=normalized_analysis_id)
     # Otimização: calcula o portfólio uma única vez e repassa aos cards que o consomem,
@@ -819,7 +826,7 @@ def build_analysis_context(
     elif normalized_analysis_id == "score_saude_financeira":
         context = build_score_context(user_id, month=month, portfolio_positions=portfolio_positions)
     elif normalized_analysis_id == "evolucao_score_tempo":
-        # spec: consultor/consultor v1.9 — critério 10
+        # spec: consultor/consultor v2.0 — critério 10
         context = build_score_evolution_context(user_id, period_window=normalized_period or "6m", portfolio_positions=portfolio_positions)
     elif normalized_analysis_id == "sustentabilidade_padrao_vida":
         context = build_lifestyle_context(user_id, month=month, portfolio_positions=portfolio_positions)
@@ -827,7 +834,7 @@ def build_analysis_context(
         context = build_maturities_context(user_id, month=month, reference_date=reference_date, portfolio_positions=portfolio_positions)
     else:
         raise ConsultorError("Analise do Consultor invalida.")
-    # spec: consultor/consultor v1.9 - criterios 38 e 39
+    # spec: consultor/consultor v2.0 - criterios 38 e 39
     # Todos os cards recebem perfil de investidor e Perfil Complementar (quando preenchido)
     # para contextualizar a analise - nunca dados de outro usuario.
     if investor_profile is None:
@@ -878,6 +885,7 @@ def build_allocation_context(user_id: int, *, portfolio_positions: list[dict] | 
     return {
         "analysis_id": "alocacao_perfil",
         "portfolio": summarize_portfolio(positions),
+        "allocation_goals": build_allocation_goals_context(user_id, positions),
         "market_data": market_data_context(positions),
     }
 
@@ -896,7 +904,7 @@ def build_currency_exposure_context(user_id: int, *, portfolio_positions: list[d
 
 
 def build_portfolio_analysis_context(user_id: int, *, portfolio_positions: list[dict] | None = None) -> dict:
-    # spec: consultor/consultor v1.9 - criterio 30
+    # spec: consultor/consultor v2.0 - criterio 30
     from financeiro.financial_health import calculate_financial_health_score
 
     positions = _load_portfolio_positions(user_id, portfolio_positions)
@@ -904,6 +912,7 @@ def build_portfolio_analysis_context(user_id: int, *, portfolio_positions: list[
     return {
         "analysis_id": "analise_carteira",
         "portfolio": summarize_portfolio(positions),
+        "allocation_goals": build_allocation_goals_context(user_id, positions),
         "by_currency": group_positions_by(positions, "currency"),
         "by_market": group_positions_by(positions, "market_label"),
         "score": {
@@ -915,6 +924,33 @@ def build_portfolio_analysis_context(user_id: int, *, portfolio_positions: list[
         },
         "market_data": market_data_context(positions),
     }
+
+
+def build_allocation_goals_context(user_id: int, positions: list[dict]) -> list[dict]:
+    from financeiro.portfolio import get_allocation_goals
+
+    total_cents = sum(int(position.get("current_value_brl_cents") or 0) for position in positions)
+    current_by_type: dict[str, int] = {}
+    for position in positions:
+        asset_type = str(position.get("asset_type") or "other")
+        current_by_type[asset_type] = current_by_type.get(asset_type, 0) + int(position.get("current_value_brl_cents") or 0)
+    context = []
+    for goal in get_allocation_goals(user_id):
+        target_percent = float(goal.get("target_percent") or 0)
+        current_cents = current_by_type.get(goal["asset_type"], 0)
+        current_percent = (current_cents * 100 / total_cents) if total_cents > 0 else 0.0
+        if target_percent <= 0 and current_cents <= 0:
+            continue
+        context.append({
+            "asset_type": goal["asset_type"],
+            "label": goal["label"],
+            "target_percent": round(target_percent, 4),
+            "current_percent": round(current_percent, 4),
+            "deviation_percentage_points": round(current_percent - target_percent, 4),
+            "current_value_brl_cents": current_cents,
+            "target_defined_by_user": True,
+        })
+    return context
 
 
 def build_score_context(
@@ -936,7 +972,7 @@ def build_score_context(
     }
 
 
-# spec: consultor/consultor v1.9 — critérios 8 e 10
+# spec: consultor/consultor v2.0 — critérios 8 e 10
 def build_score_evolution_context(
     user_id: int,
     *,
@@ -1146,7 +1182,7 @@ def format_brl_cents(value: object) -> str:
 
 def add_money_displays(value):
     """Adiciona a todo campo *_cents seu equivalente *_display, inclusive aninhado."""
-    # spec: consultor/consultor v1.9 — critério 39
+    # spec: consultor/consultor v2.0 — critério 39
     if isinstance(value, list):
         return [add_money_displays(item) for item in value]
     if not isinstance(value, dict):
@@ -1301,7 +1337,7 @@ def consultor_blocked_reason(settings: dict) -> str:
 
 
 def save_consultor_settings(user_id: int, data: dict) -> dict:
-    # spec: consultor/consultor v1.9 - criterios 1, 2, 3, 25, 26 e 32
+    # spec: consultor/consultor v2.0 - criterios 1, 2, 3, 25, 26 e 32
     normalized_user_id = int(user_id)
     current = get_consultor_settings(normalized_user_id)
     consultor_enabled = bool(data.get("consultor_enabled", current["consultor_enabled"]))
@@ -1399,7 +1435,7 @@ def get_complementary_profile(user_id: int) -> dict:
 
 
 def save_complementary_profile(user_id: int, data: dict) -> dict:
-    # spec: consultor/consultor v1.9 - criterios 22, 23, 24, 25 e 33
+    # spec: consultor/consultor v2.0 - criterios 22, 23, 24, 25 e 33
     current = get_complementary_profile(int(user_id))["profile"]
     normalized_patch = normalize_complementary_profile(data, partial=True)
     merged = {**current, **normalized_patch}
