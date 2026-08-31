@@ -2,8 +2,8 @@
 tipo: spec
 area: simulacoes
 status: implementado
-versao: 1.7
-atualizado: 2026-08-28
+versao: 1.8
+atualizado: 2026-08-31
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -18,7 +18,7 @@ aliases: ["Efeito Borboleta", "Simulador Financeiro"]
 # Efeito Borboleta
 
 > [!info] Status
-> **implementado** · área: `simulacoes` · atualizado em 2026-08-28 · relacionados: [[contas-correntes]], [[lancamentos]], [[cartoes]], [[limites-gastos]], [[relatorios]]
+> **implementado** · área: `simulacoes` · atualizado em 2026-08-31 · relacionados: [[contas-correntes]], [[lancamentos]], [[cartoes]], [[limites-gastos]], [[relatorios]]
 
 ## Problema
 
@@ -72,14 +72,15 @@ Qualquer usuário autenticado localmente que queira testar cenários financeiros
 - No formulário de simulação, o modo **Recorrente** não exibe campo de quantidade de ocorrências — a série assume 120 ocorrências automaticamente (mesma regra dos lançamentos reais); a contagem de repetições do formulário fica exclusiva do modo **Parcelada**, expressa como campo *Parcelas*.
 - A primeira entrega aceita apenas recorrência mensal (`monthly`); outras frequências devem ser rejeitadas até serem implementadas explicitamente.
 - Cada parcela ou ocorrência recorrente deve ser tratada como um item virtual independente na projeção.
-- Os itens virtuais (parcelas e ocorrências) permanecem no contrato da API (`virtual_items`), mas **não devem ser listados na interface**: abaixo do gráfico o usuário vê apenas os alertas.
+- Os itens virtuais (parcelas e ocorrências) permanecem no contrato da API (`virtual_items`), mas **não devem ser listados na interface**: abaixo do gráfico o usuário vê a projeção diária e os alertas.
 - O impacto de limites de gastos só deve ser calculado quando o payload legado informar categoria; a experiência principal sem classificação deve omitir alertas de limite.
 - Gráficos e totais devem mostrar o efeito acumulado ao longo dos meses afetados pela série simulada.
 - O horizonte do gráfico deve ser sempre de 5 meses, sendo o mês atual da simulação mais 4 meses projetados.
 - A série do gráfico deve usar a mesma base de saldo previsto da conta-corrente, incluindo faturas conciliadas e não pagas de cartões vinculados como conta preferencial, e aplicar apenas os itens virtuais da simulação por cima dessa base.
 - O gráfico deve comparar a linha de saldo previsto da conta com a linha de saldo com simulação, usando legenda visual e sem transformar valores simulados em lançamentos reais.
-- Valores financeiros extensos no gráfico devem se adaptar ao espaço disponível reduzindo a tipografia, sem aumentar a área do gráfico nem truncar centavos.
+- Valores financeiros extensos no gráfico devem se adaptar ao espaço disponível reduzindo a tipografia, sem ampliar os cards nem truncar centavos.
 - Abaixo do gráfico deve haver uma projeção diária com 15 pontos, permitindo identificar o dia exato em que o saldo previsto ou simulado fica negativo.
+- Os cards mensais ocupam uma faixa acima do gráfico, sem sobreposição. A área cresce verticalmente para acomodar cards, gráfico, legenda e tabela diária nesta ordem. Em larguras menores, a comparação mensal permite rolagem horizontal interna.
 - Quando a data do cenário estiver entre hoje e os próximos 14 dias, a janela diária deve cobrir hoje mais os 14 dias seguintes.
 - Quando a data do cenário estiver além dos próximos 14 dias, a janela deve cobrir os 7 dias anteriores, a data do cenário e os 7 dias posteriores.
 - Quando a data do cenário estiver no passado, a janela deve cobrir hoje mais os 14 dias seguintes e considerar o impacto virtual como já ocorrido.
@@ -131,7 +132,7 @@ Resposta esperada:
 - Dado uma conta preferencial de pagamento com fatura de cartão conciliada e não paga, quando o usuário simula um cenário nessa conta, então o gráfico parte do saldo previsto da conta com a fatura abatida e adiciona somente os valores simulados.
 - Dado qualquer cenário válido, quando o resultado é exibido, então o saldo atual permanece igual ao saldo conciliado real da conta.
 - Dado qualquer cenário válido, quando o gráfico é exibido, então ele mostra 5 meses e compara saldo previsto da conta contra saldo com simulação.
-- Dado uma simulação com valor projetado muito extenso, quando o gráfico é exibido, então os valores cabem nos cards do gráfico por ajuste responsivo de tipografia, mantendo o tamanho atual da área.
+- Dado uma simulação com valor projetado muito extenso, quando o gráfico é exibido, então os valores cabem nos cards do gráfico por ajuste responsivo de tipografia, mantendo o tamanho dos cards.
 - Dado uma simulação recorrente de 120 ocorrências, quando o card **Saldo projetado no mês** é exibido, então o valor considera apenas o impacto virtual do mês da simulação, sem somar ocorrências dos meses futuros da série.
 - Dado uma despesa única para daqui a 10 dias, quando a projeção diária é exibida, então previsto e simulado permanecem iguais nos 10 primeiros cortes e divergem a partir da data da despesa.
 - Dado um cenário dentro dos próximos 14 dias, quando a projeção é calculada, então ela contém hoje e cada um dos 14 dias seguintes.
@@ -140,6 +141,8 @@ Resposta esperada:
 - Dado uma receita que evita um saldo negativo previsto, quando a projeção é exibida, então o efeito é `avoids_negative` e as duas primeiras datas negativas são informadas quando aplicável.
 - Dado uma simulação válida, quando a projeção diária é renderizada, então ela possui 15 colunas e três linhas: Previsto, Simulado e Diferença.
 - Dado `simulations-view.js` atualizado com um `app.js` ou HTML anterior ainda em cache, quando o contêiner semanal não é injetado ou não existe, então a simulação continua renderizando os demais resultados sem erro de JavaScript.
+
+- Dado um cenário exibido, quando o comparativo é renderizado, então os cards mensais ficam acima da área exclusiva do gráfico e a tabela diária permanece abaixo da legenda, sem sobreposição (estrutura automatizada; aparência em Safari requer validação manual).
 
 ## Fora de escopo
 
@@ -152,6 +155,7 @@ Resposta esperada:
 
 ## Plano de implementação
 
+- [x] Passo 6 — Separar cards e plot em linhas de layout, manter tabela no fluxo e verificar o contrato de apresentação. Fecha: critério 26. Teste estrutural automatizado aprovado; validação visual no Safari pendente.
 - [x] Passo 1 — Preservar o núcleo determinístico, isolamento, moedas, validações e projeção mensal existentes. Fecha: critérios 1–18.
 - [x] Passo 2 — Substituir os cortes semanais por janela diária dinâmica e resumo de risco no backend. Fecha: critérios 19–24.
 - [x] Passo 3 — Renderizar a linha do tempo diária e mensagens de causa/prevenção de saldo negativo no frontend. Fecha: critérios 19, 22–24.
@@ -160,6 +164,7 @@ Resposta esperada:
 
 ## Changelog
 
+- `1.8` — 2026-08-31 — Comparativo mensal com cards acima do gráfico e tabela diária abaixo; rolagem horizontal interna em áreas estreitas. Corrigida descrição antiga que omitia a tabela abaixo do gráfico.
 - `1.7` — 2026-08-30 — Dados auxiliares de contas passam a usar cache curto, in-flight compartilhado, invalidação após mutações e reset entre sessões.
 - `1.6` — 2026-08-30 — Iniciado reaproveitamento dos dados auxiliares do formulário com invalidação após mutações.
 - `1.5` — 2026-08-28 — Projeção semanal substituída por linha do tempo diária de 15 pontos, com janela deslocada para cenários distantes e identificação da primeira data negativa e do efeito de causar ou evitar saldo negativo.

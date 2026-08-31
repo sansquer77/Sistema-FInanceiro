@@ -17,21 +17,51 @@ def build_balance_projection(
     account_id: int | None = None,
 ) -> dict:
     selected_accounts = [account for account in accounts if account_id is None or int(account["id"]) == account_id]
+    # spec: lancamentos/lancamentos v3.32 — projeção limitada à conta selecionada
+    # Mantém transferências recebidas; não recalcula outras contas a cada troca.
+    if account_id is not None:
+        transactions = [
+            row for row in transactions
+            if optional_int(row.get("account_id")) == account_id
+            or optional_int(row.get("destination_account_id")) == account_id
+        ]
+        cards = [card for card in cards if optional_int(card.get("preferred_payment_account_id")) == account_id]
+        card_ids = {int(card["id"]) for card in cards}
+        card_transactions = [row for row in card_transactions if optional_int(row.get("credit_card_id")) in card_ids]
+        card_payments = [row for row in card_payments if optional_int(row.get("credit_card_id")) in card_ids]
     dates = {str(transaction.get("date")) for transaction in transactions if transaction.get("date")}
     dates.add(date.today().isoformat())
     reference = date.fromisoformat(f"{month}-01")
     for offset in range(-1, 4):
         dates.add(month_end_date(add_months(reference, offset).strftime("%Y-%m")))
 
+    # spec: lancamentos/lancamentos v3.32 — projeções preservam os saldos sem
+    # reprocessar todo o histórico para cada data solicitada.
+    ordered = sorted(transactions, key=lambda row: str(row.get("date") or ""))
+    zero_accounts = [{**account, "initial_balance": 0} for account in selected_accounts]
+    reconciled = account_totals_until(selected_accounts, [], "", reconciled_only=True)
+    running = dict(reconciled)
+    reservation_events = card_reservation_events(selected_accounts, cards, card_transactions, card_payments)
+    reservations = {}
+    transaction_index = reservation_index = 0
     balances = {}
     forecast_accounts: dict[str, bool] = {}
     for limit_date in sorted(dates):
-        reconciled = account_totals_until(selected_accounts, transactions, limit_date, reconciled_only=True)
-        projected = account_totals_until(selected_accounts, transactions, limit_date, reconciled_only=False)
+        start = transaction_index
+        while transaction_index < len(ordered) and str(ordered[transaction_index].get("date") or "") <= limit_date:
+            transaction_index += 1
+        batch = ordered[start:transaction_index]
+        if batch:
+            for target, only_reconciled in ((reconciled, True), (running, False)):
+                for currency, delta in account_totals_until(zero_accounts, batch, limit_date, reconciled_only=only_reconciled).items():
+                    target[currency] = target.get(currency, 0) + delta
+        while reservation_index < len(reservation_events) and reservation_events[reservation_index][0] <= limit_date:
+            _, owner, amount = reservation_events[reservation_index]
+            reservations[owner] = reservations.get(owner, 0) + amount
+            reservation_index += 1
+        projected = dict(running)
         for account in selected_accounts:
-            reserved = preferred_card_forecast_for_account(
-                account, cards, card_transactions, card_payments, limit_date
-            )
+            reserved = reservations.get(int(account["id"]), 0)
             currency = normalized_currency(account.get("currency"))
             projected[currency] = projected.get(currency, 0) - reserved
             if reserved > 0:
@@ -48,6 +78,28 @@ def build_balance_projection(
             accounts, transactions, cards, card_transactions, card_payments, month
         ) if account_id is None else [],
     }
+
+
+def card_reservation_events(accounts, cards, transactions, payments) -> list[tuple[str, int, int]]:
+    """Aggregate reconciled, unpaid invoices once; reserve at their due date."""
+    owners = {int(account["id"]): normalized_currency(account.get("currency")) for account in accounts}
+    eligible = {
+        int(card["id"]): card for card in cards
+        if optional_int(card.get("preferred_payment_account_id")) in owners
+        and normalized_currency(card.get("currency")) == owners[optional_int(card.get("preferred_payment_account_id"))]
+    }
+    paid = {(optional_int(row.get("credit_card_id")), row.get("invoice_month")) for row in payments}
+    invoices = {}
+    for row in transactions:
+        key = (optional_int(row.get("credit_card_id")), str(row.get("invoice_month") or ""))
+        if key[0] not in eligible or not key[1] or not row.get("reconciled_at") or key in paid:
+            continue
+        invoices[key] = invoices.get(key, 0) + card_transaction_delta_cents(row)
+    return sorted(
+        (card_invoice_date(month, eligible[card_id].get("due_day")),
+         int(eligible[card_id]["preferred_payment_account_id"]), max(amount, 0))
+        for (card_id, month), amount in invoices.items()
+    )
 
 
 def account_totals_until(accounts: list[dict], transactions: list[dict], limit_date: str, *, reconciled_only: bool) -> dict[str, int]:

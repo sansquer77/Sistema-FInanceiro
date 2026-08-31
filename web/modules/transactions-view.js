@@ -1,6 +1,8 @@
 import { renderVirtualList } from "./virtual-list.js";
 import { createAssetAutocomplete } from "./asset-autocomplete.js";
 import { createTransactionSliceLoader } from "./transaction-slice-loader.js";
+import { createTransactionReconciliation } from "./transaction-reconciliation.js";
+import { createTransactionRefresh } from "./transaction-refresh.js";
 import { createClassificationSuggestion } from "./classification-suggestion.js";
 import { createTransactionBalanceChart } from "./transaction-balance-chart.js";
 import { createTransactionList } from "./transaction-list.js";
@@ -40,11 +42,9 @@ export function registerTransactionsView({
   openMonthPicker,
   decisionModal,
   ensureSelectedAccount,
-  loadCockpit,
   markPortfolioDirty,
   renderBaseViews,
   renderFinanceViews,
-  renderPortfolio,
   renderImportTargets,
 }) {
   const transactionSliceLoader = createTransactionSliceLoader({ state, api, fetchAllListed, ensureSelectedAccount });
@@ -108,6 +108,11 @@ export function registerTransactionsView({
     transactionStatusFilterButtons,
     transactionContextCount,
   } = elements;
+  const reconciliation = createTransactionReconciliation({
+    state, api, markDirty: transactionSliceLoader.markDirty,
+    loadSlice: transactionSliceLoader.load, render: renderTransactions, markPortfolioDirty,
+    reportError: (message) => setMessage(transactionMessage, message, "error"),
+  });
   const expandedTransactionDays = new Map();
   const investmentAssetIdentifier = transactionForm.elements.investment_asset_identifier;
   const investmentAssetAutocomplete = createAssetAutocomplete({
@@ -222,6 +227,13 @@ export function registerTransactionsView({
     matchesSearch: matchesTransactionSearch,
   });
 
+  const refreshAfterTransactionChange = createTransactionRefresh({
+    state, api, fetchAllListed, loader: transactionSliceLoader,
+    render: renderTransactions, markPortfolioDirty,
+    renderAuxiliary: () => { renderBaseViews(); renderFinanceViews(); },
+    reportError: message => setMessage(transactionMessage, message, "error"),
+  });
+
   async function handleTransactionSubmit(event) {
     event.preventDefault();
     setMessage(transactionMessage, "");
@@ -255,18 +267,18 @@ export function registerTransactionsView({
           && Boolean(editingTransaction.use_average) !== useAverage.checked,
       );
       if (editingTransaction && editingTransaction.series_kind === "recurring" && useAverage) {
-        // spec: lancamentos v3.29 — critério 55
+        // spec: lancamentos v3.32 — critério 55
         // (ao editar recorrente, o estado do checkbox de média é enviado explicitamente)
         data.use_average = useAverage.checked ? "1" : "0";
       }
       if (isEditing && shouldAskFutureReplication(data.id)) {
         if (averageChanged) {
-          // spec: lancamentos v3.29 — critérios 56, 57 e 60
+          // spec: lancamentos v3.32 — critérios 56, 57 e 60
           // (flag de média alterada — marcada em série sem a marcação ou desmarcada
           //  em série que a tinha — não exibe modal e aplica em cascata)
           data.apply_to_future = true;
         } else {
-          // spec: lancamentos v3.29 — critérios 46 e 58
+          // spec: lancamentos v3.32 — critérios 46 e 58
           // (flag inalterada — ativa ou inativa — mantém o modal de escopo)
           const scope = await chooseSeriesEditScope("conta", Boolean(editingTransaction.use_average));
           if (!scope) {
@@ -281,9 +293,9 @@ export function registerTransactionsView({
       });
       state.transactionHighlightId = String(response.transaction?.id || data.id || "");
       resetTransactionForm();
-      await refreshAfterTransactionChange();
-      highlightSavedTransaction();
       setMessage(transactionMessage, isEditing ? "Lançamento atualizado." : "Lançamento salvo.", "success");
+      await refreshAfterTransactionChange({ transaction: response.transaction });
+      highlightSavedTransaction();
     } catch (error) {
       setMessage(transactionMessage, error.message, "error");
     } finally {
@@ -305,8 +317,8 @@ export function registerTransactionsView({
         return;
       }
       await api(`/api/transactions/${id}${scope}`, { method: "DELETE" });
-      await refreshAfterTransactionChange();
       setMessage(transactionMessage, "Lançamento excluído.", "success");
+      await refreshAfterTransactionChange({ deletedId: id });
     } catch (error) {
       setMessage(transactionMessage, error.message, "error");
     }
@@ -355,31 +367,7 @@ export function registerTransactionsView({
   }
 
   async function toggleTransactionReconciliation(id, reconciled) {
-    try {
-      await api(`/api/transactions/${id}/reconciliation`, {
-        method: "PUT",
-        body: { reconciled },
-      });
-      await refreshAfterTransactionChange();
-    } catch (error) {
-      setMessage(transactionMessage, error.message, "error");
-    }
-  }
-
-  async function refreshAfterTransactionChange() {
-    const [, accountsResponse, transactionsResponse] = await Promise.all([
-      loadTransactionSlice({ force: true }),
-      api("/api/checking-accounts"),
-      fetchAllListed("/api/transactions", "transactions"),
-      loadCockpit(),
-    ]);
-    state.accounts = accountsResponse.accounts || [];
-    ensureSelectedAccount();
-    state.transactions = transactionsResponse || [];
-    markPortfolioDirty();
-    renderBaseViews();
-    renderFinanceViews();
-    renderPortfolio();
+    await reconciliation.toggle(id, reconciled);
   }
 
   function resetTransactionForm() {
@@ -621,11 +609,11 @@ export function registerTransactionsView({
       subtotalSection.innerHTML = `
         <div class="subtotal-row">
           <span>Saldo atual (Conciliado)</span>
-          <strong>${formatCurrencySummary(reconciledBalance)}</strong>
+          <strong>${state.balanceProjection ? formatCurrencySummary(reconciledBalance) : "—"}</strong>
         </div>
         <div class="subtotal-row">
           <span>Saldo previsto (Todos os lançamentos)</span>
-          <strong>${formatCurrencySummary(forecastBalance)}</strong>
+          <strong>${state.balanceProjection ? formatCurrencySummary(forecastBalance) : "—"}</strong>
         </div>
       `;
       container.append(subtotalSection);
@@ -720,7 +708,7 @@ export function registerTransactionsView({
           ${compact ? "" : `
             <div class="transaction-actions">
               ${launchActionButton("edit", "Editar lançamento", `data-edit-transaction-id="${transaction.id}"`)}
-              ${launchActionButton("check", isReconciled ? "Desmarcar conciliação" : "Marcar como conciliado", `data-reconcile-id="${transaction.id}" data-reconciled="${isReconciled}"`, `reconcile-button ${isReconciled ? "active" : ""}`)}
+              ${launchActionButton("check", isReconciled ? "Desmarcar conciliação" : "Marcar como conciliado", `data-reconcile-id="${transaction.id}" data-reconciled="${isReconciled}" ${reconciliation.isPending(transaction.id) ? 'disabled aria-busy="true"' : ""}`, `reconcile-button ${isReconciled ? "active" : ""}`)}
               ${launchActionButton("trash", "Excluir lançamento", `data-transaction-id="${transaction.id}"`, "danger-action")}
             </div>
           `}
@@ -768,7 +756,7 @@ export function registerTransactionsView({
     return `
       <div class="daily-balance-line">
         <span><span class="balance-kind-badge ${isReconciled ? "reconciled" : "forecast"}"><span aria-hidden="true">${isReconciled ? "✓" : "○"}</span> ${isReconciled ? "Conciliado" : "Previsto"}</span></span>
-        <strong class="${balanceClass}">${formatCurrencySummary(balance)}</strong>
+        <strong class="${balanceClass}">${state.balanceProjection ? formatCurrencySummary(balance) : "—"}</strong>
       </div>
     `;
   }
@@ -846,11 +834,10 @@ export function registerTransactionsView({
     if (account) {
       state.selectedAccountId = account.id;
     }
-    await loadTransactionSlice();
     applyWalletAccountDefault();
     applyWalletAccountRestrictions();
     updateTransactionTypeState();
-    renderTransactions();
+    await loadSelectedTransactionSlice();
   }
 
   function applyWalletAccountDefault() {
@@ -904,7 +891,7 @@ export function registerTransactionsView({
       recurrenceAverageFields.hidden = !isRecurring;
     }
     if (useAverage) {
-      // spec: lancamentos v3.29 — criterio 52
+      // spec: lancamentos v3.32 — criterio 52
       // (na edicao de um recorrente o checkbox de media fica habilitado;
       //  so a repeticao/frequencia permanecem travadas na serie)
       useAverage.disabled = !isRecurring;
@@ -929,7 +916,17 @@ export function registerTransactionsView({
       return;
     }
     state.transactionMonth = month;
-    await loadTransactionSlice();
+    await loadSelectedTransactionSlice();
+  }
+
+  async function loadSelectedTransactionSlice() {
+    const request = loadTransactionSlice();
+    renderTransactions();
+    try {
+      await request;
+    } catch (error) {
+      setMessage(transactionMessage, error.message, "error");
+    }
     renderTransactions();
   }
 

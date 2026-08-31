@@ -2,7 +2,7 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 4.18
+versao: 4.20
 atualizado: 2026-08-31
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
@@ -81,7 +81,9 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `app-state.js` | Fábrica do estado inicial e reset puro dos dados de sessão, sem DOM, API ou views. |
 | `app-data-loader.js` | Coordenação dos carregamentos compartilhados, com serviços, views e ações recebidos explicitamente. |
 | `load-policy.js` | Política compartilhada de snapshot recente, invalidação e promessa em andamento. |
-| `transaction-slice-loader.js` | Carregamento coordenado da fatia conta+mês e da projeção de saldo do Extrato. |
+| `transaction-slice-loader.js` | Cache limitado por conta+mês, requisições concorrentes por chave, invalidação e proteção contra respostas antigas no Extrato. |
+| `transaction-reconciliation.js` | Estado ocupado, aplicação imediata da resposta confirmada e atualização independente dos saldos após conciliar. |
+| `transaction-refresh.js` | Aplica confirmação de edição/criação/exclusão, revalida a fatia e atualiza dados auxiliares sem bloquear a tela; descarta respostas de revisões/sessões anteriores. |
 | `transaction-balance-chart.js` | Apresentação e ciclo de vida do gráfico mensal de saldos do Extrato. |
 | `classification-suggestion.js` | Classificação assistida reutilizável pelos formulários de Contas e Cartões. |
 | `transaction-list.js` | Busca, filtros, agrupamento diário e renderização da lista do Extrato. |
@@ -255,6 +257,9 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Alterar regras financeiras, endpoints ou banco.
 
 ## Changelog
+
+- `4.20` — 2026-08-31 — Documentada a coordenação de atualização após salvar lançamentos, separada de recargas auxiliares.
+- `4.19` — 2026-08-31 — Fatias do Extrato ganham cache limitado e concorrência por chave; conciliação isolada atualiza a linha antes das recargas secundárias.
 
 - `4.18` — 2026-08-31 — Concluída a decomposição de Lançamentos; a fachada preserva o contrato público e Cartões reutiliza a classificação assistida compartilhada.
 - `4.17` — 2026-08-31 — Iniciada a decomposição de `transactions-view.js` em gráfico, classificação compartilhada, lista e formulários especializados, preservando a fachada pública atual.

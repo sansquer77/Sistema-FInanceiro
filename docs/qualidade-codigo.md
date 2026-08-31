@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 1.12
+versao: 1.13
 atualizado: 2026-08-31
 relacionados:
   - "[[arquitetura]]"
@@ -17,7 +17,7 @@ aliases: ["Qualidade de Código", "Padrões de Qualidade", "Convenções de Cód
 # Qualidade de Código
 
 > [!info] Status
-> **implementado** · área: `meta` · versão: `1.10` · atualizado em 2026-08-31 · relacionados: [[arquitetura]], [[sdd]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]], [[adr/0003-sqlite-fonte-de-verdade]]
+> **implementado** · área: `meta` · versão: `1.13` · atualizado em 2026-08-31 · relacionados: [[arquitetura]], [[sdd]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]], [[adr/0003-sqlite-fonte-de-verdade]]
 
 ## Objetivo
 
@@ -57,7 +57,7 @@ Não cobre estilo de formatação (indentação, aspas, ordenação de imports) 
 
 Tamanho de arquivo não é uma regra rígida — é um sinal para revisar se há mistura de responsabilidades. Como referência do que já foi observado neste projeto:
 
-- Módulo de domínio em `financeiro/` ou módulo de view em `web/modules/` acima de **~1.200 linhas**: revisar se há mais de uma sub-responsabilidade misturada antes de simplesmente aceitar o crescimento. (`cards-view.js`, com 1.209 linhas, é hoje o maior módulo de view "saudável" — usado aqui como referência, não como teto absoluto.)
+- Módulo de domínio em `financeiro/` ou módulo de view em `web/modules/` acima de **~1.200 linhas**: revisar se há mais de uma sub-responsabilidade misturada antes de simplesmente aceitar o crescimento. (`cards-view.js` está com 1.149 linhas e não precisa mais de exceção no gate; 1.200 é um sinal de revisão, não um teto absoluto.)
 - Qualquer função ou bloco de nível de módulo em `app.py` ou `app.js` que faça conta sobre valor monetário (soma, proporção, `Math.*`, `reduce` sobre `amount`/`valor`/`cents`) é um sinal de lógica de domínio fora de lugar, independentemente do tamanho do arquivo.
 - Uma classe `AppHandler` (ou equivalente) crescendo por adição de novos `handle_*` é esperado; crescendo por adição de lógica dentro de um `handle_*` existente não é.
 
@@ -82,6 +82,8 @@ Os limites numéricos da seção "Sinais de alerta" são verificados pelo teste 
 - Cobertura de teste em si (tratada por [[sdd]], seção "Fluxo", passo 7).
 
 ## Changelog
+
+- `1.13` — 2026-08-31 — Sincronizados callout e versão; corrigida referência de tamanho de Cartões e removida sua exceção no gate. Portfólio revisado em 2.759 linhas após isolamento da leitura transacional.
 
 - `1.12` — 2026-08-31 — Fachada do Consultor reduzida a 398 linhas após extração de configurações (275) e catálogo (336); gate impede SQL na fachada e dependência de persistência/transporte no catálogo.
 

@@ -18,7 +18,8 @@ export function createAppState({ currentMonth }) {
     transactionMonth: currentMonth, limitMonth: currentMonth, cardInvoiceMonth: currentMonth,
     reportMonth: currentMonth, reportTab: "categories", reportAccountId: "",
     statementScope: "consolidated", statementCurrency: "all", statementAccountIds: [], statementCardIds: [],
-    transactionSliceRequestId: 0, cardInvoiceRequestId: 0,
+    transactionSliceRequestId: 0, transactionSliceKey: "", transactionSliceLoading: false,
+    transactionSliceError: "", cardInvoiceRequestId: 0,
   };
 }
 
@@ -35,6 +36,7 @@ export function resetSessionData(state, { currentMonth }) {
     portfolio: null, portfolioReturns: null, portfolioDirty: true, portfolioLoading: false, portfolioLoadedAt: 0,
     portfolioError: "", portfolioExpandedGroups: new Set(), portfolioCollapsedGroups: new Set(),
     portfolioAssetSaving: false, portfolioHighlightId: "", portfolioTab: "position",
-    cockpitRefreshRequestId: 0, transactionSliceRequestId: 0, cardInvoiceRequestId: 0,
+    cockpitRefreshRequestId: 0, transactionSliceRequestId: 0, transactionSliceKey: "",
+    transactionSliceLoading: false, transactionSliceError: "", cardInvoiceRequestId: 0,
   });
 }

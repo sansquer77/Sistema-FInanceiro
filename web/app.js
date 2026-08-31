@@ -1433,10 +1433,15 @@ function showModule(view) {
     ensureSelectedAccount();
     renderTransactionAccounts();
     transactionsView.updateTransactionTypeState();
-    loadTransactionSlice().then(() => {
+    const transactionLoad = loadTransactionSlice();
+    renderTransactions();
+    transactionLoad.then(() => {
       renderTransactions();
       transactionsView.highlightSavedTransaction();
-    }).catch((error) => setMessage(transactionMessage, error.message, "error"));
+    }).catch((error) => {
+      renderTransactions();
+      setMessage(transactionMessage, error.message, "error");
+    });
   }
   if (view === "limits") {
     limitsView.renderLimits();

@@ -2,7 +2,7 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 3.29
+versao: 3.32
 atualizado: 2026-08-31
 relacionados:
   - "[[contas-correntes]]"
@@ -204,7 +204,31 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dado uma série recorrente com `use_average` ativo, quando o usuário edita uma ocorrência sem alterar a flag de média e escolhe `Este e os próximos`, então a alteração é aplicada às ocorrências futuras não conciliadas e seus valores são recalculados pela média.
 - Dado uma série recorrente sendo editada com a flag de média alterada (marcada ou desmarcada), quando o usuário salva, então o sistema não exibe o modal de escopo e aplica a alteração automaticamente às ocorrências futuras não conciliadas — ao marcar, persiste a marcação e recalcula pela média; ao desmarcar, mantém o valor informado sem recálculo e remove a marcação.
 
+- Dada uma conciliação confirmada, quando a resposta chega, então status, contadores e filtro são atualizados sem sair da tela.
+- Dada uma carga anterior em andamento, quando há mutação ou troca de conta, então a resposta anterior não substitui dados atuais nem bloqueia a nova seleção.
+- Dada uma conta recentemente visitada, quando selecionada novamente sem mutações, então a fatia é restaurada do cache limitado; logout e mutações invalidam o reaproveitamento.
+- Dada falha de gravação ou carregamento, quando ocorre, então há mensagem amigável e nenhum sucesso ou saldo é inventado.
+- Dada uma edição confirmada, quando a resposta de gravação chega, então o valor devolvido aparece na lista antes de concluir as recargas.
+- Dada uma gravação confirmada, quando uma recarga posterior falha, então a mensagem informa que a operação foi salva e a atualização falhou.
+- Dada uma edição/exclusão de série, quando a fatia é revalidada, então a lista apresenta as ocorrências devolvidas pelo backend sem depender da recarga global.
+- Dada uma recarga auxiliar em andamento, quando há nova mutação ou troca de sessão, então sua resposta antiga não substitui os dados atuais.
+- Dado o mesmo histórico financeiro, quando a projeção otimizada é calculada, então todos os saldos e indicadores de reserva correspondem ao cálculo de referência, inclusive em transferências e faturas pagas.
+- Dado um mês recente em cache, quando o usuário retorna a ele, então o app reaproveita a fatia válida; uma resposta de outro mês não substitui o selecionado.
+
+## Plano de implementação desta correção
+
+- [x] Exibir a ocorrência confirmada após salvar, sem aguardar recargas globais; distinguir falha de gravação de falha de atualização após sucesso.
+- [x] Revalidar a fatia para refletir séries/exclusões e atualizar dados auxiliares sem bloquear o formulário, descartando respostas obsoletas.
+- [x] Reduzir percursos repetidos na projeção de saldos e faturas; testar equivalência com os cálculos anteriores e custo por volume.
+- [x] Implementar os comportamentos descritos sem alterar regras financeiras.
+- [x] Testar sucesso, falha, concorrência e contratos de apresentação aplicáveis.
+
 ## Changelog
+
+- `3.32` — 2026-08-31 — Complemento implementado: edição com resposta imediata, atualização auxiliar desacoplada e projeções sem releitura integral a cada data. Testes automatizados de apresentação, concorrência e equivalência financeira; percepção de fluidez no Safari ainda requer validação no ambiente do usuário.
+- `3.31` — 2026-08-31 — Correções concluídas: conciliação aplica resposta confirmada sem recarga global, troca de conta independente por chave e cache limitado. Projeção filtra dados da conta no backend. Validados por testes de concorrência, apresentação e projeção.
+
+- `3.30` — 2026-08-31 — Especificadas correções de resposta visual, carregamento e escopo do apoio, conforme regras acima.
 
 - `3.29` — 2026-08-31 — Prévia cambial concluída no backend com precisão decimal e cobertura para cotação cruzada e manual; o frontend apenas apresenta o resultado.
 - `3.28` — 2026-08-31 — Iniciada a transferência da prévia cambial residual do formulário para o backend, mantendo cotação e valor de destino editáveis.

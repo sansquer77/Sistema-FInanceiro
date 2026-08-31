@@ -12,6 +12,30 @@ MODULE_ROOT = WEB_ROOT / "modules"
 
 
 class FrontendModuleContractTest(unittest.TestCase):
+    def test_support_link_is_local_to_about_without_global_widget(self) -> None:
+        from html.parser import HTMLParser
+        class Links(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.sections = []
+                self.support_sections = []
+            def handle_starttag(self, tag, attrs):
+                attrs = dict(attrs)
+                if tag == "section":
+                    self.sections.append(attrs)
+                if tag == "a" and "buymeacoffee.com" in attrs.get("href", ""):
+                    self.support_sections.append(list(self.sections))
+            def handle_endtag(self, tag):
+                if tag == "section" and self.sections:
+                    self.sections.pop()
+        html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        parser = Links()
+        parser.feed(html)
+        self.assertEqual(len(parser.support_sections), 1)
+        self.assertTrue(any("about" in str(section).lower() for section in parser.support_sections[0]))
+        self.assertNotIn("widget.prod.min.js", html)
+        self.assertNotIn("BMC-Widget", html)
+
     def test_transactions_view_composes_extracted_responsibilities(self) -> None:
         transactions = (MODULE_ROOT / "transactions-view.js").read_text(encoding="utf-8")
         cards = (MODULE_ROOT / "cards-view.js").read_text(encoding="utf-8")
@@ -205,6 +229,21 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertFalse((REPOSITORY_ROOT / "package.json").exists())
         self.assertFalse((REPOSITORY_ROOT / "node_modules").exists())
 
+    def test_simulation_plot_has_its_own_row_below_month_cards(self) -> None:
+        source = (MODULE_ROOT / "simulations-view.js").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+        html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        self.assertLess(source.index('class="invoice-history-card'), source.index('class="invoice-history-plot"'))
+        self.assertIn('<div class="invoice-history-plot" role="presentation">\n          <div class="invoice-history-apex"></div>', source)
+        rule = styles.split(".simulation-chart .invoice-history-plot {", 1)[1].split("}", 1)[0]
+        for declaration in ("position: relative", "grid-row: 2", "grid-column: 1 / -1", "height: 170px"):
+            self.assertIn(declaration, rule)
+        rail = styles.split(".simulation-chart .invoice-history-rail {", 1)[1].split("}", 1)[0]
+        self.assertIn("grid-template-rows: auto 170px", rail)
+        container = styles.split(".simulation-chart {", 1)[1].split("}", 1)[0]
+        self.assertIn("overflow-x: auto", container)
+        self.assertLess(html.index('id="simulationChart"'), html.index('id="simulationWeeklyProjection"'))
+
     def test_simulations_view_tolerates_mixed_static_asset_versions(self) -> None:
         source = (MODULE_ROOT / "simulations-view.js").read_text(encoding="utf-8")
         index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
@@ -269,7 +308,11 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("markDirty: loadPolicy.markDirty", history)
         self.assertIn("loadPreferences", preferences)
         self.assertIn("markPreferencesDirty", preferences)
-        self.assertIn('key: `${accountId}:${month}`', transactions)
+        self.assertIn('const key = `${accountId}:${month}`', transactions)
+        self.assertIn("const snapshots = new Map()", transactions)
+        self.assertIn("const requests = new Map()", transactions)
+        self.assertIn("while (snapshots.size > maxEntries)", transactions)
+        self.assertIn("revision === loadRevision", transactions)
         self.assertIn("markFormDataDirty", simulations)
         self.assertIn("resetPreferencesCache", app)
         self.assertIn("resetTransactionSliceCache", app)

@@ -11,10 +11,9 @@ REVIEWED_OVERSIZED_MODULES = {
     "financeiro/credit_cards.py": 1258,
     "financeiro/database.py": 1310,
     "financeiro/imports.py": 1236,
-    "financeiro/portfolio.py": 2812,
+    "financeiro/portfolio.py": 2759,
     "financeiro/transactions.py": 1334,
     "financeiro/trends.py": 1237,
-    "web/modules/cards-view.js": 1209,
     "web/modules/portfolio-view.js": 1663,
     "web/modules/reports-view.js": 1336,
 }

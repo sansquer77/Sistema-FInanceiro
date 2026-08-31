@@ -24,6 +24,7 @@ export function createTransactionList({
     forecastBalanceLabel,
     forecastBalanceSummary,
     transactionList,
+    transactionBalanceHistoryChart,
   } = elements;
   let searchDebounceTimer = null;
 
@@ -55,14 +56,24 @@ export function createTransactionList({
     transactionSearch.value = state.transactionSearch || "";
     clearTransactionSearchButton.hidden = !state.transactionSearch;
     renderStatusFilters();
+    const unavailable = state.transactionSliceLoading || state.transactionSliceError;
+    if (transactionBalanceHistoryChart) transactionBalanceHistoryChart.hidden = Boolean(unavailable || !state.balanceProjection);
+    transactionList.setAttribute("aria-busy", String(Boolean(state.transactionSliceLoading)));
+    if (unavailable) {
+      currentBalanceSummary.textContent = "—";
+      forecastBalanceSummary.textContent = "—";
+      transactionContextCount.textContent = state.transactionSliceLoading ? "Carregando lançamentos…" : "Não foi possível carregar os lançamentos.";
+      transactionList.textContent = state.transactionSliceLoading ? "Carregando a conta selecionada…" : state.transactionSliceError;
+      return;
+    }
     const monthTransactions = selectedAccountTransactions(accountTransactions)
       .filter((transaction) => transaction.date.startsWith(state.transactionMonth));
     const searchedTransactions = monthTransactions.filter(matchesSearch);
     renderContextCount(searchedTransactions);
     const visibleTransactions = searchedTransactions.filter(matchesStatusFilter);
-    currentBalanceSummary.textContent = formatCurrencySummary(getBalanceUntil(todayLocalDateValue(), accountTransactions, true));
+    currentBalanceSummary.textContent = state.balanceProjection ? formatCurrencySummary(getBalanceUntil(todayLocalDateValue(), accountTransactions, true)) : "—";
     const forecastLimitDate = monthEndDate(state.transactionMonth);
-    forecastBalanceSummary.textContent = formatCurrencySummary(getBalanceUntil(forecastLimitDate, accountTransactions, false));
+    forecastBalanceSummary.textContent = state.balanceProjection ? formatCurrencySummary(getBalanceUntil(forecastLimitDate, accountTransactions, false)) : "—";
     if (forecastBalanceLabel) {
       const account = state.accounts.find((entry) => String(entry.id) === String(state.selectedAccountId));
       const detail = accountHasPreferredCardForecast(account, forecastLimitDate)
@@ -70,7 +81,7 @@ export function createTransactionList({
         : " Saldo do fim do mês";
       forecastBalanceLabel.innerHTML = `<span class="balance-kind-badge forecast"><span aria-hidden="true">○</span> Previsto</span>${detail}`;
     }
-    balanceChart.render();
+    if (state.balanceProjection) balanceChart.render();
     renderCollection(transactionList, visibleTransactions, false, accountTransactions);
   }
 

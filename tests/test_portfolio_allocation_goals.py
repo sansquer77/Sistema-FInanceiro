@@ -26,7 +26,7 @@ class PortfolioAllocationGoalsTest(unittest.TestCase):
         self.tempdir.cleanup()
 
     def test_saves_goals_that_total_one_hundred_percent(self) -> None:
-        # spec: investimentos/investimentos-portfolio v2.43 — critérios 62-66
+        # spec: investimentos/investimentos-portfolio v2.49 — critérios 62-66
         result = save_allocation_goals(self.user["id"], {"goals": [
             {"asset_type": "fixed_income", "target_percent": "60"},
             {"asset_type": "stock", "target_percent": "30"},

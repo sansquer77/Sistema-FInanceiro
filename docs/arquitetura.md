@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.65
+versao: 3.68
 atualizado: 2026-08-31
 relacionados:
   - "[[requisitos]]"
@@ -104,7 +104,9 @@ Os assets normalizados do catálogo ficam em `web/assets/banks/` e `web/assets/b
 | `operation-history-view.js` | Histórico de Operações: filtros, busca, agrupamentos e paginação. |
 | `simulations-view.js` | Efeito Borboleta: formulário e renderização das projeções calculadas pelo backend. |
 | `load-policy.js` | Política compartilhada de cache curto, invalidação, chave contextual e deduplicação de requisições em andamento. |
-| `transaction-slice-loader.js` | Coordena lançamentos e projeção do Extrato por conta e mês, fora da view. |
+| `transaction-slice-loader.js` | Coordena lançamentos/projeção por conta+mês com até quatro snapshots recentes e requisições independentes por chave; revisão invalida respostas anteriores a mutações/logout. |
+| `transaction-reconciliation.js` | Aplica a resposta confirmada à lista imediatamente, protege clique duplicado e recarrega saldos sem aguardar Cockpit ou histórico global. |
+| `transaction-refresh.js` | Confirmação imediata de salvar/excluir, recarga prioritária da fatia e atualização auxiliar de contas/histórico protegida por revisão e sessão. Cockpit é invalidado para a próxima entrada. |
 | `instructions-view.js` | Central de ajuda: busca, grupos, tópicos expansíveis, links internos e botões contextuais `?` no header. Ver [[instrucoes-app]]. |
 
 > [!tip] Regra de fronteira
@@ -321,8 +323,8 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | `http_routes.py` | Tabela declarativa e resolução de rotas, independente do transporte HTTP. Ver [[specs/desconcentracao-arquitetura-v2]]. |
 | `cockpit.py` | Agregações de domínio do resumo mensal do Cockpit, fora do adaptador HTTP. |
 | `balance_projections.py` | Saldos conciliados/projetados, reservas de faturas e consolidação por moeda; autoridade backend consumida por Cockpit e Extrato. |
-| `portfolio.py` | Fachada pública e orquestração compatível do Portfólio. Ver [[investimentos-portfolio]]. |
-| `portfolio_positions.py` | Regras internas de identidade, lotes e persistência lógica das posições. |
+| `portfolio.py` | API pública do Portfólio; ainda concentra CRUD, valorização, rentabilidade e transporte/cache. Resgates e encerramentos preparam posições fora da escrita e revalidam entradas locais na transação, sem recotação. Ver [[investimentos-portfolio]]. |
+| `portfolio_positions.py` | Identidade, auxiliares de lotes/FIFO e leitura consistente das entradas locais pela conexão recebida. Não contém o CRUD completo de posições nem consultas externas. |
 | `portfolio_quotes.py` | Helpers de integrações externas e limites de cache de cotações. |
 | `portfolio_calculations.py` | Agregações, normalizações e cálculos puros do Portfólio. |
 | `financial_health.py` | Núcleo analítico do Score de Saúde Financeira: cálculo atômico dos pilares, lista `pilares`, Paz Financeira e função de histórico com validação de `months` (1-36). Ver [[score-saude-financeira]]. |
@@ -561,6 +563,11 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 - [[adr/0014-desconcentracao-fachadas-e-roteamento]] — Fachadas compatíveis, roteamento declarativo e módulos internos menores para a fundação v2.
 
 ## Changelog
+
+- `3.68` — 2026-08-31 — Salvamento de lançamentos não aguarda recargas globais para mostrar a resposta confirmada. Projeções acumulam lotes cronológicos e eventos de vencimento de faturas, sem percorrer integralmente o histórico a cada data. Nenhuma rota ou tabela nova.
+- `3.67` — 2026-08-31 — Conciliação com atualização imediata; cache limitado e concorrência por seleção no Extrato; projeção por conta filtra lançamentos/cartões irrelevantes antes de calcular. Apoio restrito a link local na tela Sobre, sem widget global.
+
+- `3.66` — 2026-08-31 — Documentada confirmação sem rede com comparação otimista das entradas locais; mudanças concorrentes retornam 409 sem escrita financeira. Corrigida descrição das responsabilidades ainda concentradas no Portfólio.
 
 - `3.65` — 2026-08-31 — Concluída separação de configurações e catálogo do Consultor; exceção compartilhada em módulo mínimo e API pública preservada por reexports. Fachada sem SQL, com execução e pós-processamento mantidos.
 

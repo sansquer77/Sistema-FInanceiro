@@ -2,8 +2,8 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.47
-atualizado: 2026-08-30
+versao: 2.49
+atualizado: 2026-08-31
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -16,7 +16,7 @@ aliases: ["Investimentos", "Portfólio"]
 # Investimentos e Portfólio
 
 > [!info] Status
-> **implementado** · área: `investimentos` · atualizado em 2026-08-30 · relacionados: [[contas-correntes]], [[lancamentos]], [[relatorios]]
+> **implementado** · área: `investimentos` · atualizado em 2026-08-31 · relacionados: [[contas-correntes]], [[lancamentos]], [[relatorios]]
 
 ## Problema
 
@@ -244,8 +244,21 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado uma classe acima ou abaixo da meta, quando exibida no gráfico, então mostra o desvio em pontos percentuais e o valor absoluto correspondente em BRL.
 - Dado uma classe com meta positiva e nenhuma posição atual, quando a análise é exibida, então a classe permanece visível com participação atual de 0%.
 - Dado a carteira com ativos em moedas distintas, quando a alocação atual é calculada, então todas as classes usam `chart_current_brl` como base comparável, sem somar moedas nominais incompatíveis.
+- Dado um resgate ou encerramento, quando a transação de escrita está aberta, então nenhuma consulta externa de cotação, indexador ou câmbio é executada.
+- Dado que os dados locais da carteira mudaram durante a obtenção das cotações, quando a escrita é iniciada, então a operação retorna conflito HTTP 409 sem gravar resgate, encerramento ou crédito e orienta tentar novamente.
+- Dado que os dados locais não mudaram, quando a operação é confirmada, então FIFO, custos, valores e crédito opt-in mantêm o comportamento atual, mesmo que o cache expire durante a confirmação.
+
+## Plano de implementação — transações sem rede
+
+- [x] Ler entradas locais consistentes e obter cotações antes da escrita. Fecha: critério 77.
+- [x] Revalidar entradas pela conexão da transação; reutilizar posições preparadas ou cancelar por conflito. Fecha: critérios 78 e 79.
+- [x] Testar resgate/encerramento, alteração concorrente, rollback e ausência de rede/cache durante escrita. Fecha: critérios 77 a 79.
 
 ## Changelog
+
+- `2.49` — 2026-08-31 — Confirmação sem rede implementada com snapshots locais e conflito 409 antes de qualquer escrita financeira. Sete testes de fronteira adicionados; suíte completa com 426 testes aprovada. Mantidos FIFO e crédito opt-in, sem alteração de schema.
+
+- `2.48` — 2026-08-31 — Especificada confirmação de resgate/encerramento sem rede, com revalidação otimista dos dados locais antes da gravação.
 
 - `2.47` — 2026-08-30 — Implementado ciclo de saída/entrada que libera gráfico, overlays e DOM dinâmico, preserva o estado e evita revalidação redundante por 30 segundos ou durante requisição em andamento.
 - `2.46` — 2026-08-30 — Especificado ciclo de vida seletivo e reaproveitamento temporário do snapshot para reduzir memória e chamadas redundantes.

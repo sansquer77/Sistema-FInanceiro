@@ -155,7 +155,6 @@ export function registerSimulationsView({
     }
     simulationChart.innerHTML = `
       <div class="invoice-history-rail" role="list">
-        <div class="invoice-history-apex"></div>
         ${rows.map((row) => {
           const simulatedText = formatMoney(Math.abs(row.simulatedAmount), currency);
           const forecastText = formatMoney(Math.abs(row.forecastAmount), currency);
@@ -167,6 +166,9 @@ export function registerSimulationsView({
           </button>
         `;
         }).join("")}
+        <div class="invoice-history-plot" role="presentation">
+          <div class="invoice-history-apex"></div>
+        </div>
       </div>
       <div class="simulation-chart-legend">
         <span><i class="legend-line forecast"></i>Saldo previsto da conta</span>

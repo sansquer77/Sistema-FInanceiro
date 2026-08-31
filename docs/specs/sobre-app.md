@@ -2,8 +2,8 @@
 tipo: spec
 area: usuario
 status: implementado
-versao: 1.9
-atualizado: 2026-08-20
+versao: 1.11
+atualizado: 2026-08-31
 relacionados:
   - "[[frontend-modularizacao]]"
   - "[[../arquitetura|Arquitetura]]"
@@ -16,7 +16,7 @@ aliases: ["Sobre o App", "Sobre"]
 # Sobre o App
 
 > [!info] Status
-> **implementado** · área: `usuario` · atualizado em 2026-08-20 · relacionados: [[frontend-modularizacao]], [[../arquitetura|Arquitetura]], [[../distribuição|Distribuicao]], [[../requisitos|Requisitos]]
+> **implementado** · área: `usuario` · atualizado em 2026-08-31 · relacionados: [[frontend-modularizacao]], [[../arquitetura|Arquitetura]], [[../distribuição|Distribuicao]], [[../requisitos|Requisitos]]
 
 ## Problema
 
@@ -45,6 +45,8 @@ Usuários finais e mantenedores que usam o Sistema Financeiro localmente, instal
 
 ## Regras
 
+- O apoio via Buy Me a Coffee aparece exclusivamente na tela Sobre como link local para `https://www.buymeacoffee.com/sansquerh`, aberto em nova aba somente após clique. Não carregar script, iframe ou botão flutuante global de terceiros.
+
 - A tela **Sobre** deve ficar no grupo **Usuário** do menu lateral.
 - A tela deve ser somente leitura e não deve criar tabelas, arquivos de dados ou chamadas externas.
 - O conteúdo deve mencionar o objetivo principal: controle financeiro local, privado e simples.
@@ -65,7 +67,6 @@ Usuários finais e mantenedores que usam o Sistema Financeiro localmente, instal
 - A tela deve respeitar o design system existente, sem introduzir nova identidade visual.
 - O painel principal não deve repetir o rótulo **Sobre** acima de **Sistema Financeiro**, pois o módulo já informa esse contexto no cabeçalho da página.
 - O texto descritivo do painel principal deve aproveitar a largura disponível do card antes de quebrar linha, evitando sensação de coluna estreita em telas largas.
-- A seção **Contato** pode exibir o widget opcional do **Buy Me a Coffee** ao lado do e-mail. O widget carrega recurso externo da CDN quando há conexão; sem internet ou com bloqueio de terceiros, ele simplesmente não renderiza e o restante da tela permanece íntegro (conteúdo local).
 - O texto de **Tecnologias** deve refletir a stack vigente: Python 3 + servidor HTTP da biblioteca padrão, SQLite, HTML/CSS/JS com ES Modules sem build step, PyInstaller, criptografia local de segredos, SMTP local, fontes de cotações (Yahoo Finance, CoinGecko, Banco Central SGS, Mais Retorno) e IA externa opcional.
 
 ## API e dados
@@ -83,6 +84,9 @@ Usuários finais e mantenedores que usam o Sistema Financeiro localmente, instal
 - Dado o app em tema claro ou escuro, quando a tela **Sobre** é aberta, então usa os tokens visuais existentes e mantém contraste legível.
 - Dada uma viewport larga, quando a tela **Sobre** é aberta, então a descrição do app no painel principal ocupa a largura disponível do card sem quebra prematura.
 
+- Dada qualquer tela diferente de Sobre, quando exibida, então nenhum botão flutuante de apoio aparece.
+- Dada a tela Sobre, quando aberta, então o link de apoio está disponível sem carregar recursos de terceiros; somente o clique abre a página externa.
+
 ## Fora de escopo
 
 - Tela de changelog/versionamento automático.
@@ -90,7 +94,16 @@ Usuários finais e mantenedores que usam o Sistema Financeiro localmente, instal
 - Formulário de contato, envio de e-mail ou abertura de cliente externo.
 - Diagnóstico automático da máquina ou da rede.
 
+## Plano de implementação desta correção
+
+- [x] Implementar os comportamentos descritos sem alterar regras financeiras.
+- [x] Testar sucesso, falha, concorrência e contratos de apresentação aplicáveis.
+
 ## Changelog
+
+- `1.11` — 2026-08-31 — Widget global removido; apoio disponível somente pelo link local na seção Contato da tela Sobre. Contrato HTML verifica localização e ausência do script externo.
+
+- `1.10` — 2026-08-31 — Especificadas correções de resposta visual, carregamento e escopo do apoio, conforme regras acima.
 
 - `1.9` — 2026-08-20 — Sincronizada a data do callout de status com o frontmatter; sem alteração de comportamento.
 - `1.8` — 2026-08-10 — Dados de desenvolvimento atualizados na tela Sobre: desenvolvedor passa a ser **Sansquer** e contato `darksansquer@gmail.com`.

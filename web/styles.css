@@ -1125,6 +1125,7 @@ textarea:focus {
 
 .simulation-form-panel,
 .simulation-results-panel {
+  min-width: 0;
   padding: 18px;
 }
 
@@ -1226,6 +1227,7 @@ textarea:focus {
 }
 
 .simulation-chart {
+  overflow-x: auto;
   min-height: 230px;
   border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
   border-radius: 12px;
@@ -3524,12 +3526,6 @@ padding: 8px 16px;
 .about-bmc-embed {
   display: inline-flex;
   align-items: center;
-}
-
-.about-bmc-embed img,
-.about-bmc-embed .bmc-btn {
-  width: auto;
-  height: 40px;
 }
 
 .about-infrastructure-grid {
@@ -6156,8 +6152,18 @@ form[aria-busy="true"] .form-actions {
 }
 
 .simulation-chart .invoice-history-rail {
-  min-width: 620px;
-  min-height: 150px;
+  min-width: 660px;
+  grid-template-rows: auto 170px;
+  row-gap: 14px;
+}
+
+/* Cards and plot occupy separate rows; the daily table follows in normal flow. */
+.simulation-chart .invoice-history-plot {
+  position: relative;
+  grid-column: 1 / -1;
+  grid-row: 2;
+  height: 170px;
+  min-width: 0;
 }
 
 .simulation-chart .invoice-history-card {
