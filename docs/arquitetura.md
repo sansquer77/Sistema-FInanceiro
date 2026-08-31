@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.62
+versao: 3.65
 atualizado: 2026-08-31
 relacionados:
   - "[[requisitos]]"
@@ -328,7 +328,12 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | `financial_health.py` | Núcleo analítico do Score de Saúde Financeira: cálculo atômico dos pilares, lista `pilares`, Paz Financeira e função de histórico com validação de `months` (1-36). Ver [[score-saude-financeira]]. |
 | `trends.py` | Núcleo local de Tendências e Achados: série mensal, Budget x Realizado, achados estruturados, eventos pontuais, assinaturas/serviços recorrentes, confiança e resumo determinístico. Ver [[tendencias-saude-financeira]]. |
 | `ai_summary.py` | Reescrita opcional do resumo por IA com payload minimizado, timeout curto e fallback para resumo local. Ver [[tendencias-saude-financeira]]. |
-| `consultor.py` | Fachada pública e orquestração do Consultor: catálogo, contexto, execução, configurações e reexportação compatível das operações de histórico. Ver [[specs/consultor]]. |
+| `consultor.py` | Fachada pública, composição dos contextos, execução e pós-processamento das respostas; reexports compatíveis de catálogo, configurações, contexto e histórico. Ver [[specs/consultor]]. |
+| `consultor_settings.py` | Configuração, consentimento, sincronização com IA geral e perfil complementar criptografado por usuário; delega expurgo ao histórico. |
+| `consultor_catalog.py` | Catálogo fechado, perfis educacionais, períodos, validações de seleção, prompts e estrutura de resposta; sem persistência ou transporte. |
+| `consultor_errors.py` | Definição única de `ConsultorError`, reexportada pela fachada e compartilhada por catálogo/configurações sem importações circulares. |
+| `consultor_provider.py` | Mensagens minimizadas, payloads dos provedores e transporte HTTP; dependências injetáveis e erros traduzidos pela fachada. Sem acesso ao SQLite. |
+| `consultor_context.py` | Builders dos nove contextos, agregação e compactação dos dados e formatação monetária de borda; reutiliza serviços de domínio e posições recebidas. Não acessa configuração, histórico ou transporte de IA. A fachada valida a seleção via catálogo e enriquece o contexto com perfis via configurações; reexporta os builders. |
 | `consultor_history.py` | Persistência/listagem/expurgo das análises, quota diária e cooldown de falhas, isolados do executor e da configuração. Ver [[specs/consultor]]. |
 | `imports.py` | Leitura de arquivos externos legados e planilhas modelo. Ver [[importacao-dados]]. |
 | `operation_logs.py` | Auditoria funcional das operações do usuário. Ver [[historico-operacoes]]. |
@@ -556,6 +561,12 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 - [[adr/0014-desconcentracao-fachadas-e-roteamento]] — Fachadas compatíveis, roteamento declarativo e módulos internos menores para a fundação v2.
 
 ## Changelog
+
+- `3.65` — 2026-08-31 — Concluída separação de configurações e catálogo do Consultor; exceção compartilhada em módulo mínimo e API pública preservada por reexports. Fachada sem SQL, com execução e pós-processamento mantidos.
+
+- `3.64` — 2026-08-31 — Extraídos os builders e helpers de contexto para `consultor_context.py`, sem dependência circular nem alteração dos payloads; composição dos perfis preservada na fachada.
+
+- `3.63` — 2026-08-31 — Extraído o adaptador `consultor_provider.py`, preservando funções públicas e mocks do transporte em `consultor.py`.
 
 - `3.62` — 2026-08-31 — Histórico, quota diária e cooldown do Consultor extraídos para `consultor_history.py`; `consultor.py` preserva sua API pública por wrappers explícitos.
 - `3.61` — 2026-08-31 — `transactions-view.js` torna-se fachada compatível sobre módulos de gráfico, lista, formulário base/investimento e classificação compartilhada; a prévia cambial passa a `financeiro/exchange_rates.py`.

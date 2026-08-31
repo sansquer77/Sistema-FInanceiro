@@ -2,7 +2,7 @@
 tipo: spec
 area: arquitetura-v2
 status: implementado
-versao: 1.4
+versao: 2.0
 atualizado: 2026-08-31
 relacionados:
   - "[[../arquitetura]]"
@@ -52,6 +52,10 @@ Usuários da v2 que precisam manter os fluxos e dados atuais estáveis enquanto 
 - Rotas existentes preservadas e novo endpoint de leitura `GET /api/balance-projection` para retirar projeções financeiras do frontend.
 - Novos módulos: `financeiro/http_routes.py`, `financeiro/cockpit.py`, `financeiro/portfolio_positions.py`, `financeiro/portfolio_quotes.py` e `financeiro/portfolio_calculations.py`.
 
+- `financeiro/consultor_history.py` e `financeiro/consultor_provider.py` encapsulam histórico e transporte externo, com compatibilidade pela fachada `consultor.py`.
+- `financeiro/consultor_context.py` reúne builders e compactação; a fachada coordena validação, seleção e enriquecimento por perfis.
+- `financeiro/consultor_settings.py` concentra configurações e perfil criptografado; `financeiro/consultor_catalog.py` concentra catálogo, validações e prompts. `consultor_errors.py` compartilha a exceção pública sem ciclos de importação.
+
 ## Critérios de aceite
 
 1. Dado qualquer endpoint existente, quando sua rota é resolvida, então o mesmo handler é executado.
@@ -62,6 +66,13 @@ Usuários da v2 que precisam manter os fluxos e dados atuais estáveis enquanto 
 6. Dado o Cockpit, quando agrega lançamentos, então o cálculo não reside no servidor HTTP.
 7. Dado o frontend, quando inicializa as views, então `app.js` atua como composição e não recebe novas regras financeiras.
 
+8. Dado um consumidor do Consultor, quando chama a fachada ou injeta/moca seu provedor, então mensagens, payloads, timeout e erros públicos permanecem compatíveis, sem dependência circular nem SQL no adaptador.
+
+9. Dada uma análise do Consultor, quando o contexto é montado após a extração, então payloads, limites de compactação, perfis por usuário e reutilização das posições permanecem equivalentes, sem expor identificadores adicionais.
+
+10. Dado um usuário do Consultor, quando altera configurações ou perfil, então consentimento, criptografia, expurgo de histórico e isolamento por usuário continuam iguais.
+11. Dado um consumidor do catálogo, quando lista análises ou monta prompts, então IDs, ordem, períodos, textos e exceção pública permanecem compatíveis.
+
 ## Fora de escopo
 
 - Alterar contratos públicos, schema SQLite ou comportamento financeiro.
@@ -69,13 +80,23 @@ Usuários da v2 que precisam manter os fluxos e dados atuais estáveis enquanto 
 
 ## Candidatos auditados para as próximas extrações
 
-- `consultor.py`: separar montagem de contexto, execução do provedor e persistência do histórico.
+- `consultor.py`: extrações de histórico, provedor, contexto, configurações e catálogo concluídas. A fachada mantém composição, execução e pós-processamento; não há nova divisão prevista nesta etapa.
 - `database.py`: separar conexão/manutenção, baseline do schema e catálogo de migrações.
 - `imports.py`: separar parsers de formato, normalização e orquestração transacional.
 - `transactions.py` e `credit_cards.py`: avaliar se partes internas do serviço de projeções devem ser aproximadas desses domínios sem duplicar cálculos.
 - `web/app.js`: wrappers de views e o bloco legado de projeção financeira foram removidos; o arquivo permanece como composição do contrato backend.
 
 ## Plano de implementação
+
+- [x] Passo 12 — extrair configurações, consentimento e perfil criptografado para `consultor_settings.py`; preservar expurgo e isolamento por usuário.
+- [x] Passo 13 — extrair catálogo, perfis educacionais, validação de seleção e prompts para `consultor_catalog.py`; compartilhar `ConsultorError` por módulo mínimo de erros, sem importar a fachada.
+- [x] Passo 14 — manter reexports públicos, verificar contratos e executar a suíte completa. Fecha: critérios 10 e 11.
+
+- [x] Passo 10 — extrair builders e compactação para `consultor_context.py`; manter validação, seleção e perfis na fachada, sem dependência circular.
+- [x] Passo 11 — verificar payloads, minimização, reutilização de posições e imports compatíveis com testes isolados e suíte completa.
+
+- [x] Passo 8 — extrair mensagens, payloads e transporte para `consultor_provider.py`, sem importar a fachada e preservando erros, injeção e mocks públicos.
+- [x] Passo 9 — validar contratos dos provedores, falhas, fachada e suíte completa sem chamadas externas reais.
 
 - [x] Passo 6 — extrair persistência do histórico, quota diária e cooldown para `consultor_history.py`, preservando imports públicos e exceções de `consultor.py`.
 - [x] Passo 7 — adicionar contratos contra regressão e executar testes do Consultor e suíte completa.
@@ -87,6 +108,18 @@ Usuários da v2 que precisam manter os fluxos e dados atuais estáveis enquanto 
 - [x] Passo 5 — executar testes de contratos, domínio e suíte completa. Fecha: critérios 1 a 7.
 
 ## Changelog
+
+- `2.0` — 2026-08-31 — Extrações concluídas e documentação sincronizada: catálogo e prompts idênticos ao snapshot anterior, configurações e exceção pública preservadas; 419 testes aprovados. Fachada reduzida de 967 para 398 linhas, sem incremento da versão do produto.
+
+- `1.9` — 2026-08-31 — Iniciada extração de configurações e catálogo, mantendo prompts, consentimento, criptografia e exceção pública.
+
+- `1.8` — 2026-08-31 — Extração concluída: fachada com 967 linhas, contexto com 458; 412 testes aprovados na suíte completa, incluindo contratos de compactação, reexports e reutilização de posições. Sem alteração de versão do produto.
+
+- `1.7` — 2026-08-31 — Planejada a extração dos contextos, preservando os contratos e a montagem central dos perfis na fachada.
+
+- `1.6` — 2026-08-31 — Adaptador de provedores concluído com dependências tardias e tradução de erros na fachada; 75 testes focados e 406 testes da suíte completa aprovados, sem chamadas reais ao provedor nesta validação.
+
+- `1.5` — 2026-08-31 — Iniciada extração do adaptador de provedores do Consultor, preservando mensagens, autenticação, timeout e compatibilidade.
 
 - `1.4` — 2026-08-31 — Extração de `consultor_history.py` concluída e protegida por wrappers compatíveis, testes do Consultor e gate de qualidade.
 - `1.3` — 2026-08-31 — Iniciada a desconcentração do Consultor pela extração isolada de histórico, quota e cooldown, mantendo `consultor.py` como fachada pública.

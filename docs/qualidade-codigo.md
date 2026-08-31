@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 1.9
+versao: 1.12
 atualizado: 2026-08-31
 relacionados:
   - "[[arquitetura]]"
@@ -17,7 +17,7 @@ aliases: ["Qualidade de Código", "Padrões de Qualidade", "Convenções de Cód
 # Qualidade de Código
 
 > [!info] Status
-> **implementado** · área: `meta` · versão: `1.9` · atualizado em 2026-08-31 · relacionados: [[arquitetura]], [[sdd]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]], [[adr/0003-sqlite-fonte-de-verdade]]
+> **implementado** · área: `meta` · versão: `1.10` · atualizado em 2026-08-31 · relacionados: [[arquitetura]], [[sdd]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]], [[adr/0003-sqlite-fonte-de-verdade]]
 
 ## Objetivo
 
@@ -82,6 +82,12 @@ Os limites numéricos da seção "Sinais de alerta" são verificados pelo teste 
 - Cobertura de teste em si (tratada por [[sdd]], seção "Fluxo", passo 7).
 
 ## Changelog
+
+- `1.12` — 2026-08-31 — Fachada do Consultor reduzida a 398 linhas após extração de configurações (275) e catálogo (336); gate impede SQL na fachada e dependência de persistência/transporte no catálogo.
+
+- `1.11` — 2026-08-31 — `consultor.py` reduzido a 967 linhas após extração de contextos (458 linhas), removido da lista de módulos superdimensionados; gate protege a fronteira do novo módulo.
+
+- `1.10` — 2026-08-31 — Linha-base de `consultor.py` reduzida para 1.387 linhas após extração do provedor; contrato impede retorno do transporte à fachada e dependência circular.
 
 - `1.9` — 2026-08-31 — Linha-base revisada de `consultor.py` reduzida de 1.511 para 1.454 linhas após extração de histórico, quota e cooldown.
 - `1.8` — 2026-08-31 — `transactions-view.js` reduzido abaixo do limiar de módulos superdimensionados por extrações de gráfico, lista, formulário e classificação compartilhada.

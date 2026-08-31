@@ -14,7 +14,6 @@ REVIEWED_OVERSIZED_MODULES = {
     "financeiro/portfolio.py": 2812,
     "financeiro/transactions.py": 1334,
     "financeiro/trends.py": 1237,
-    "financeiro/consultor.py": 1454,
     "web/modules/cards-view.js": 1209,
     "web/modules/portfolio-view.js": 1663,
     "web/modules/reports-view.js": 1336,
@@ -27,6 +26,42 @@ def line_count(path: Path) -> int:
 
 
 class CodeQualityContractTest(unittest.TestCase):
+    def test_consultor_settings_and_catalog_boundaries(self) -> None:
+        facade = (REPOSITORY_ROOT / "financeiro/consultor.py").read_text(encoding="utf-8")
+        settings = (REPOSITORY_ROOT / "financeiro/consultor_settings.py").read_text(encoding="utf-8")
+        catalog = (REPOSITORY_ROOT / "financeiro/consultor_catalog.py").read_text(encoding="utf-8")
+        self.assertNotIn("get_connection", facade)
+        self.assertNotIn("strict_prompt=", facade)
+        self.assertIn("INSERT INTO consultor_settings", settings)
+        self.assertIn("encrypt_json_for_storage", settings)
+        self.assertIn("history_store.delete_history", settings)
+        for source in (settings, catalog):
+            self.assertNotIn("from financeiro.consultor import", source)
+            self.assertNotIn("consultor_provider", source)
+            self.assertNotIn("urlopen", source)
+        for forbidden in ("get_connection", "secure_config", "consultor_settings", "consultor_history"):
+            self.assertNotIn(forbidden, catalog)
+
+    def test_consultor_context_has_no_facade_config_or_transport_dependency(self) -> None:
+        facade = (REPOSITORY_ROOT / "financeiro/consultor.py").read_text(encoding="utf-8")
+        context = (REPOSITORY_ROOT / "financeiro/consultor_context.py").read_text(encoding="utf-8")
+        self.assertNotIn("def compact_positions(", facade)
+        self.assertNotIn("def summarize_portfolio(", facade)
+        self.assertIn("def build_analysis_context(", facade)
+        for forbidden in ("from financeiro.consultor import", "get_connection", "urlopen",
+                          "secure_config", "consultor_provider", "consultor_history"):
+            self.assertNotIn(forbidden, context)
+
+    def test_consultor_provider_has_no_persistence_or_facade_dependency(self) -> None:
+        facade = (REPOSITORY_ROOT / "financeiro/consultor.py").read_text(encoding="utf-8")
+        provider = (REPOSITORY_ROOT / "financeiro/consultor_provider.py").read_text(encoding="utf-8")
+        self.assertNotIn("request = Request(", facade)
+        self.assertNotIn("/chat/completions", facade)
+        self.assertIn("request = Request(", provider)
+        self.assertNotIn("from financeiro.consultor import", provider)
+        self.assertNotIn("get_connection", provider)
+        self.assertIn("opener=urlopen", facade)
+
     def test_consultor_history_is_extracted_behind_compatible_facade(self) -> None:
         facade = (REPOSITORY_ROOT / "financeiro/consultor.py").read_text(encoding="utf-8")
         history = (REPOSITORY_ROOT / "financeiro/consultor_history.py").read_text(encoding="utf-8")
