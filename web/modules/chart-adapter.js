@@ -1,4 +1,5 @@
 const chartInstances = new Map();
+const chartDefinitions = new Map();
 let cleanupObserver = null;
 let cleanupScheduled = false;
 
@@ -18,9 +19,29 @@ function destroyChartInstance(element, { clear = true } = {}) {
 }
 
 export function destroyDisconnectedCharts() {
-  for (const element of chartInstances.keys()) {
-    if (!element.isConnected) destroyChartInstance(element, { clear: false });
+  for (const element of chartDefinitions.keys()) {
+    if (!element.isConnected) {
+      chartDefinitions.delete(element);
+      destroyChartInstance(element, { clear: false });
+    }
   }
+}
+
+export function syncChartVisibility() {
+  destroyDisconnectedCharts();
+  // spec: frontend-v2/frontend-fundacao-v2 v0.9 — critérios 26 e 27
+  for (const [element, definition] of [...chartDefinitions]) {
+    if (element.closest("[hidden]")) {
+      if (chartInstances.has(element)) destroyChartInstance(element);
+    } else if (!chartInstances.has(element)) {
+      renderChart(element, definition.options, definition.presentation);
+    }
+  }
+}
+
+export function destroyAllCharts() {
+  for (const element of chartDefinitions.keys()) destroyChartInstance(element);
+  chartDefinitions.clear();
 }
 
 function scheduleDisconnectedChartCleanup() {
@@ -28,14 +49,16 @@ function scheduleDisconnectedChartCleanup() {
   cleanupScheduled = true;
   queueMicrotask(() => {
     cleanupScheduled = false;
-    destroyDisconnectedCharts();
+    syncChartVisibility();
   });
 }
 
 function ensureChartCleanupObserver() {
   if (cleanupObserver || !globalThis.MutationObserver || !document.documentElement) return;
   cleanupObserver = new MutationObserver(scheduleDisconnectedChartCleanup);
-  cleanupObserver.observe(document.documentElement, { childList: true, subtree: true });
+  cleanupObserver.observe(document.documentElement, {
+    childList: true, subtree: true, attributes: true, attributeFilter: ["hidden"],
+  });
 }
 
 function cssToken(name, fallback) {
@@ -74,6 +97,7 @@ export function centeredMonthlyAxis(rows) {
 }
 
 export function destroyChart(element) {
+  chartDefinitions.delete(element);
   destroyChartInstance(element);
 }
 
@@ -82,23 +106,32 @@ export function renderChart(element, options, { emptyMessage = "Sem dados para e
   ensureChartCleanupObserver();
   destroyDisconnectedCharts();
   destroyChart(element);
+  if (!element.isConnected) return null;
+  chartDefinitions.set(element, { options, presentation: { emptyMessage } });
+  if (element.closest("[hidden]")) return null;
   if (!globalThis.ApexCharts) {
+    chartDefinitions.delete(element);
     element.innerHTML = `<p class="muted-copy" role="status">${emptyMessage}</p>`;
     return null;
   }
 
-  const reduceMotion = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches === true;
   const instance = new globalThis.ApexCharts(element, {
     ...options,
     chart: {
       background: "transparent",
       foreColor: cssToken("--muted", "#6b7280"),
       fontFamily: "inherit",
-      animations: { enabled: !reduceMotion },
       toolbar: { show: false },
       zoom: { enabled: false },
       parentHeightOffset: 0,
       ...(options.chart || {}),
+      // spec: frontend-v2/frontend-fundacao-v2 v0.9 — critério 25
+      // Apply last so a view cannot accidentally restore expensive transitions.
+      animations: {
+        enabled: false,
+        animateGradually: { enabled: false },
+        dynamicAnimation: { enabled: false },
+      },
     },
     grid: {
       borderColor: cssToken("--line", "#d9dde7"),
@@ -111,6 +144,7 @@ export function renderChart(element, options, { emptyMessage = "Sem dados para e
   chartInstances.set(element, instance);
   instance.render().catch(() => {
     if (chartInstances.get(element) !== instance) return;
+    chartDefinitions.delete(element);
     destroyChartInstance(element, { clear: false });
     element.innerHTML = `<p class="muted-copy" role="status">${emptyMessage}</p>`;
   });

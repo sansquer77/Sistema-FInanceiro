@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.68
+versao: 3.70
 atualizado: 2026-08-31
 relacionados:
   - "[[requisitos]]"
@@ -60,7 +60,7 @@ O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Co
 | `date-utils.js` | Datas locais, meses e exibição de datas. |
 | `money-utils.js` | Formatação e parsing numérico/monetário. |
 | `dom-utils.js` | Helpers de formulário, mensagens, empty state e escaping. |
-| `chart-adapter.js` | Fronteira única para instâncias ApexCharts, tokens do tema, movimento reduzido, descarte e fallback. |
+| `chart-adapter.js` | Fronteira única para ApexCharts: animações desativadas, suspensão sob `hidden`, retomada com última configuração local, descarte de desconectados e limpeza completa na sessão. |
 | `transaction-kind.js` | Predicados de tipo de lançamento. |
 | `labels.js` | Labels de domínio usados pela interface. |
 | `month-picker.js` | Popover reutilizável de seleção de mês. |
@@ -324,7 +324,7 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | `cockpit.py` | Agregações de domínio do resumo mensal do Cockpit, fora do adaptador HTTP. |
 | `balance_projections.py` | Saldos conciliados/projetados, reservas de faturas e consolidação por moeda; autoridade backend consumida por Cockpit e Extrato. |
 | `portfolio.py` | API pública do Portfólio; ainda concentra CRUD, valorização, rentabilidade e transporte/cache. Resgates e encerramentos preparam posições fora da escrita e revalidam entradas locais na transação, sem recotação. Ver [[investimentos-portfolio]]. |
-| `portfolio_positions.py` | Identidade, auxiliares de lotes/FIFO e leitura consistente das entradas locais pela conexão recebida. Não contém o CRUD completo de posições nem consultas externas. |
+| `portfolio_positions.py` | Identidade, auxiliares de lotes/FIFO e leitura única das entradas locais para a tela e consumidores internos; histórico de resgates por conexão recebida. Não contém o CRUD completo nem consultas externas. |
 | `portfolio_quotes.py` | Helpers de integrações externas e limites de cache de cotações. |
 | `portfolio_calculations.py` | Agregações, normalizações e cálculos puros do Portfólio. |
 | `financial_health.py` | Núcleo analítico do Score de Saúde Financeira: cálculo atômico dos pilares, lista `pilares`, Paz Financeira e função de histórico com validação de `months` (1-36). Ver [[score-saude-financeira]]. |
@@ -564,6 +564,8 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.70` — 2026-08-31 — Observador compartilhado acompanha `hidden` para destruir gráficos de telas/abas/drawers ocultos e restaurar somente a apresentação ao retornar. Reset de sessão descarta instâncias e configurações; nenhuma consulta nova ou mudança de contrato financeiro.
+- `3.69` — 2026-08-31 — Tela do Portfólio e preparo interno compartilham `load_position_inputs` e `assemble_portfolio_positions`. Snapshot fechado antes de cotar e aplicar overrides; histórico mantém nomes e ordem. Removidas consultas e montagem paralelas da fachada, sem alteração de rotas ou schema.
 - `3.68` — 2026-08-31 — Salvamento de lançamentos não aguarda recargas globais para mostrar a resposta confirmada. Projeções acumulam lotes cronológicos e eventos de vencimento de faturas, sem percorrer integralmente o histórico a cada data. Nenhuma rota ou tabela nova.
 - `3.67` — 2026-08-31 — Conciliação com atualização imediata; cache limitado e concorrência por seleção no Extrato; projeção por conta filtra lançamentos/cartões irrelevantes antes de calcular. Apoio restrito a link local na tela Sobre, sem widget global.
 

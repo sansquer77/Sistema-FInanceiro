@@ -100,7 +100,13 @@ def load_position_inputs(conn, user_id: int) -> dict:
         (user_id,),
     ).fetchall()
     closed_rows = conn.execute(
-        "SELECT * FROM investment_closed_positions WHERE user_id = ?",
+        """
+        SELECT investment_closed_positions.*, checking_accounts.name AS account_name
+        FROM investment_closed_positions
+        JOIN checking_accounts ON checking_accounts.id = investment_closed_positions.account_id
+            AND checking_accounts.user_id = investment_closed_positions.user_id
+        WHERE investment_closed_positions.user_id = ?
+        """,
         (user_id,),
     ).fetchall()
     override_rows = conn.execute(
@@ -116,3 +122,19 @@ def load_position_inputs(conn, user_id: int) -> dict:
         "closed": ordered(closed_rows),
         "overrides": ordered(override_rows),
     }
+
+
+def load_redemption_history(conn, user_id: int) -> list[dict]:
+    """Histórico de apresentação, separado das entradas revalidadas na escrita."""
+    rows = conn.execute(
+        """
+        SELECT investment_redemption_summaries.*, checking_accounts.name AS account_name
+        FROM investment_redemption_summaries
+        JOIN checking_accounts ON checking_accounts.id = investment_redemption_summaries.account_id
+            AND checking_accounts.user_id = investment_redemption_summaries.user_id
+        WHERE investment_redemption_summaries.user_id = ?
+        ORDER BY investment_redemption_summaries.date DESC, investment_redemption_summaries.id DESC
+        """,
+        (user_id,),
+    ).fetchall()
+    return [dict(row) for row in rows]

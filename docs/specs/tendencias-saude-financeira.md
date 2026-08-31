@@ -2,8 +2,8 @@
 tipo: spec
 area: tendencias-saude-financeira
 status: implementado
-versao: 2.22
-atualizado: 2026-08-11
+versao: 2.23
+atualizado: 2026-08-31
 relacionados:
   - "[[score-saude-financeira]]"
   - "[[relatorios]]"
@@ -20,7 +20,7 @@ aliases: ["Tendências de Saúde Financeira", "Achados Financeiros", "Insights F
 # Tendências e Achados de Saúde Financeira
 
 > [!info] Status
-> **implementado** · área: `tendencias-saude-financeira` · atualizado em 2026-08-11 · relacionados: [[score-saude-financeira]], [[relatorios]], [[lancamentos]], [[cartoes]]
+> **implementado** · área: `tendencias-saude-financeira` · atualizado em 2026-08-31 · relacionados: [[score-saude-financeira]], [[relatorios]], [[lancamentos]], [[cartoes]]
 
 ## Problema
 
@@ -259,6 +259,8 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 - Dado um usuário em tela estreita ou intermediária, quando visualiza a aba **Tendências**, então **Tendências e achados**, **Budget x Realizado** e os cards de confiança aparecem em fluxo vertical usando a largura disponível.
 - Dado um usuário com saldo previsto no fim do mês em contas de liquidez/carteira igual ou acima de 2x as despesas planejadas, quando consulta a aba **Tendências**, então o resumo exibe um aviso explicativo de oportunidade de revisar o caixa usando o saldo previsto que considera lançamentos futuros e faturas abertas dos cartões vinculados.
 
+- Dado o gráfico de Tendências em tema claro ou escuro, quando o tooltip é exibido ou o tema muda, então texto, cabeçalho e indicadores dos eixos mantêm cores de texto e superfície do tema ativo, sem alterar as cores das séries. Contrato CSS automatizado; aparência no Safari requer validação manual.
+
 ## Pendências
 
 > [!question] Pendências
@@ -278,6 +280,7 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 
 ## Plano de implementação
 
+- [x] Ajustar contraste do tooltip e dos indicadores dos eixos com tokens reativos ao tema; testar os seletores e preservar séries. Fecha: critério adicional de contraste. Teste estrutural aprovado; aparência no Safari pendente de validação manual.
 - [x] Passo 1 — Atualizar specs afetadas e resolver pendências obrigatórias antes de codificar. Fecha: critérios 1 a 28.
 - [x] Passo 2 — Criar armazenamento local criptografado de configuração de IA por usuário, seguindo o padrão de segurança aplicável. Fecha: critérios 17, 18, 19, 21, 23, 27 e 28.
 - [x] Passo 3 — Implementar núcleo local de cálculo de tendências em Python, com série mensal, Budget x Realizado, achados estruturados em centavos inteiros, eventos pontuais, assinaturas e serviços recorrentes, oportunidade de caixa e confiança. Fecha: critérios 1, 3, 4, 5, 6, 7, 8, 9, 13, 22, 25, 26, 27, 28, 29 e 54.
@@ -289,6 +292,7 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 
 ## Changelog
 
+- `2.23` — 2026-08-31 — Corrigido o contraste do tooltip de Tendências com tokens dos temas claro e escuro, incluindo cabeçalho e indicadores dos eixos; contrato CSS coberto por teste automatizado.
 - `2.22` — 2026-08-11 — Versionamento da app registrado: PATCH `1.4.0` → `1.4.1` aplicado em `financeiro/app_metadata.py` junto com a melhoria desta spec (v2.21), documentado no changelog do MoC.
 - `2.21` — 2026-08-11 — Tendências passa a sinalizar oportunidade de revisar caixa quando o saldo previsto no fim do mês em contas de liquidez/carteira fica igual ou acima de 2x as despesas planejadas.
 - `2.20` — 2026-08-10 — Card **Despesas** da aba Tendências ganha indicador discreto de fonte, explicando contas por data, cartões por competência e exclusão de pagamentos de fatura.

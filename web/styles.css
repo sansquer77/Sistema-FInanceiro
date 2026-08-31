@@ -8145,6 +8145,45 @@ form[aria-busy="true"] .form-actions {
   overflow: auto;
 }
 
+/* Override the vendor's light surface without inheriting dark-theme text. */
+.portfolio-return-chart .apexcharts-canvas .apexcharts-tooltip,
+.portfolio-return-chart .apexcharts-canvas .apexcharts-xaxistooltip,
+.portfolio-return-chart .apexcharts-canvas .apexcharts-yaxistooltip,
+.trends-chart .apexcharts-canvas .apexcharts-tooltip,
+.trends-chart .apexcharts-canvas .apexcharts-xaxistooltip,
+.trends-chart .apexcharts-canvas .apexcharts-yaxistooltip {
+  color: var(--ink);
+  background: var(--panel);
+  border-color: var(--line);
+}
+
+.portfolio-return-chart .apexcharts-canvas .apexcharts-tooltip .apexcharts-tooltip-title,
+.trends-chart .apexcharts-canvas .apexcharts-tooltip .apexcharts-tooltip-title {
+  color: var(--ink);
+  background: var(--surface-low);
+  border-bottom-color: var(--line);
+}
+
+.portfolio-return-chart .apexcharts-canvas .apexcharts-xaxistooltip-bottom::before,
+.trends-chart .apexcharts-canvas .apexcharts-xaxistooltip-bottom::before {
+  border-bottom-color: var(--line);
+}
+
+.portfolio-return-chart .apexcharts-canvas .apexcharts-xaxistooltip-bottom::after,
+.trends-chart .apexcharts-canvas .apexcharts-xaxistooltip-bottom::after {
+  border-bottom-color: var(--panel);
+}
+
+.portfolio-return-chart .apexcharts-canvas .apexcharts-xaxistooltip-top::before,
+.trends-chart .apexcharts-canvas .apexcharts-xaxistooltip-top::before {
+  border-top-color: var(--line);
+}
+
+.portfolio-return-chart .apexcharts-canvas .apexcharts-xaxistooltip-top::after,
+.trends-chart .apexcharts-canvas .apexcharts-xaxistooltip-top::after {
+  border-top-color: var(--panel);
+}
+
 .trends-chart svg,
 .trends-apex-chart {
   width: 100%;

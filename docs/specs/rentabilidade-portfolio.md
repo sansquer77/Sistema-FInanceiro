@@ -2,8 +2,8 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 1.7
-atualizado: 2026-08-22
+versao: 1.8
+atualizado: 2026-08-31
 relacionados:
   - "[[investimentos-portfolio]]"
   - "[[arquitetura]]"
@@ -14,7 +14,7 @@ aliases: ["Rentabilidade do Portfólio"]
 # Rentabilidade do Portfólio
 
 > [!info] Status
-> **implementado** · área: `investimentos` · atualizado em 2026-08-22 · relacionados: [[investimentos-portfolio]]
+> **implementado** · área: `investimentos` · atualizado em 2026-08-31 · relacionados: [[investimentos-portfolio]]
 
 ## Problema
 
@@ -87,6 +87,8 @@ Tabelas: `investment_opening_positions`, `investment_operations`, `investment_re
 - Dado uma posição que entrou no mês atual, quando o gráfico calcula aquele mês, então o aporte não é tratado como retorno (marca baseline).
 - Dado o usuário abrindo o gráfico em desktop, quando o flyover é exibido, então ocupa aproximadamente metade da viewport e o gráfico tem área de desenho de 420px de altura, sem prejudicar a adaptação para telas estreitas.
 
+- Dado o gráfico de rentabilidade, quando o tooltip aparece em tema claro ou escuro, então texto, fundo, cabeçalho e indicador de mês usam cores do tema ativo sem alterar as séries. Contrato CSS automatizado; aparência no Safari requer validação manual.
+
 ## Pendências
 
 > [!question] Pendências
@@ -101,6 +103,7 @@ Tabelas: `investment_opening_positions`, `investment_operations`, `investment_re
 
 ## Plano de implementação
 
+- [x] Aplicar ao gráfico de rentabilidade as regras de contraste já usadas em Tendências e verificar o contrato CSS. Fecha: critério 13. Teste estrutural aprovado; validação visual no Safari pendente.
 - [x] Passo 1 — Reescrever `get_portfolio_returns` em `financeiro/portfolio.py` para série mensal **por moeda** (BRL e USD em %) com CDI e IPCA por mês, com cache de fator por mês. Fecha: critérios 2, 6, 7, 8, 12.
 - [x] Passo 2 — Adicionar `_position_value_native_as_of`, `_cdi_factor_for_month` e `_ipca_factor_for_month` em `financeiro/portfolio.py`, limitando a série a 12 meses. Fecha: critérios 3, 4, 5, 7, 8.
 - [x] Passo 3 — Manter endpoint `GET /api/portfolio/returns` retornando `series` mensal por moeda + CDI + IPCA. Fecha: critérios 1, 2, 9, 10.
@@ -111,6 +114,7 @@ Tabelas: `investment_opening_positions`, `investment_operations`, `investment_re
 
 ## Changelog
 
+- `1.8` — 2026-08-31 — Corrigido contraste do tooltip, cabeçalho e indicador de mês com as regras compartilhadas de Tendências, preservando séries e percentuais. Contrato CSS coberto por teste.
 - `1.7` — 2026-08-22 — Flyover de rentabilidade ampliado para aproximadamente metade da viewport em desktop; área do gráfico passa a 420px e o SVG nativo diferencia carteira (preenchimento sutil) de benchmarks (traço pontilhado), sem adicionar dependências.
 - `1.6` — 2026-08-09 — Rentabilidade passa a ser carregada sob demanda no drawer e `get_portfolio_returns` aceita posições já calculadas para evitar segunda consolidação do Portfólio quando houver contexto disponível.
 - `1.5` — 2026-08-09 — Refinamento visual do gráfico de rentabilidade: linhas mais finas/discretas e pontos menores com destaque apenas no hover.

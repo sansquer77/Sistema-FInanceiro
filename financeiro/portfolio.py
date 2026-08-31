@@ -119,146 +119,19 @@ class PortfolioError(Exception):
 
 
 def get_portfolio(user_id: int, force_refresh: bool = False) -> dict:
+    # spec: arquitetura-v2/desconcentracao-arquitetura-v2 v2.1 — critérios 12–14
     with get_connection() as conn:
-        operation_rows_raw = conn.execute(
-            """
-            SELECT
-                investment_operations.*,
-                'operation' AS source_type,
-                investment_operations.id AS source_id,
-                1 AS apply_tax_estimate,
-                transactions.date,
-                transactions.description,
-                transactions.amount_cents,
-                transactions.exchange_rate_micros,
-                transactions.amount_brl_cents,
-                checking_accounts.name AS account_name,
-                checking_accounts.currency AS account_currency
-            FROM investment_operations
-            JOIN transactions
-                ON transactions.id = investment_operations.transaction_id
-                AND transactions.user_id = investment_operations.user_id
-                AND transactions.archived_at IS NULL
-                AND (
-                    transactions.reconciled_at IS NOT NULL
-                    OR (
-                        transactions.series_kind = 'single'
-                        AND transactions.date <= DATE('now', 'localtime')
-                    )
-                )
-            JOIN checking_accounts
-                ON checking_accounts.id = investment_operations.account_id
-                AND checking_accounts.user_id = investment_operations.user_id
-            WHERE investment_operations.user_id = ?
-            """,
-            (user_id,),
-        ).fetchall()
-        opening_rows_raw = conn.execute(
-            """
-            SELECT
-                investment_opening_positions.id,
-                'opening' AS source_type,
-                investment_opening_positions.id AS source_id,
-                investment_opening_positions.user_id,
-                NULL AS transaction_id,
-                investment_opening_positions.account_id,
-                investment_opening_positions.asset_type,
-                investment_opening_positions.asset_identifier,
-                investment_opening_positions.asset_name,
-                investment_opening_positions.cnpj,
-                investment_opening_positions.quantity_micros,
-                investment_opening_positions.unit_price_cents,
-                investment_opening_positions.total_cost_cents AS invested_amount_cents,
-                0 AS brokerage_fee_cents,
-                0 AS exchange_fee_cents,
-                0 AS tax_cents,
-                0 AS other_costs_cents,
-                investment_opening_positions.fixed_income_mode,
-                investment_opening_positions.fixed_income_indexer,
-                investment_opening_positions.fixed_income_rate_micros,
-                investment_opening_positions.fixed_income_maturity_date,
-                investment_opening_positions.apply_tax_estimate,
-                investment_opening_positions.emergency_reserve_eligible,
-                investment_opening_positions.savings_anniversaries_json,
-                investment_opening_positions.acquisition_date AS date,
-                'Posicao inicial' AS description,
-                investment_opening_positions.total_cost_cents AS amount_cents,
-                investment_opening_positions.exchange_rate_micros,
-                convert_placeholder.amount_brl_cents AS amount_brl_cents,
-                checking_accounts.name AS account_name,
-                checking_accounts.currency AS account_currency
-            FROM investment_opening_positions
-            JOIN checking_accounts
-                ON checking_accounts.id = investment_opening_positions.account_id
-                AND checking_accounts.user_id = investment_opening_positions.user_id
-            LEFT JOIN (
-                SELECT 0 AS amount_brl_cents
-            ) AS convert_placeholder
-            WHERE investment_opening_positions.user_id = ?
-            """,
-            (user_id,),
-        ).fetchall()
-        redemption_rows = conn.execute(
-            """
-            SELECT
-                source_type,
-                source_id,
-                SUM(redeemed_cost_cents) AS redeemed_cost_cents,
-                SUM(redeemed_quantity_micros) AS redeemed_quantity_micros
-            FROM investment_redemptions
-            WHERE user_id = ?
-            GROUP BY source_type, source_id
-            """,
-            (user_id,),
-        ).fetchall()
-        closed_rows = conn.execute(
-            """
-            SELECT investment_closed_positions.*, checking_accounts.name AS account_name
-            FROM investment_closed_positions
-            JOIN checking_accounts
-                ON checking_accounts.id = investment_closed_positions.account_id
-                AND checking_accounts.user_id = investment_closed_positions.user_id
-            WHERE investment_closed_positions.user_id = ?
-            ORDER BY investment_closed_positions.closed_at DESC, investment_closed_positions.id DESC
-            """,
-            (user_id,),
-        ).fetchall()
-        redemption_summary_rows = conn.execute(
-            """
-            SELECT investment_redemption_summaries.*, checking_accounts.name AS account_name
-            FROM investment_redemption_summaries
-            JOIN checking_accounts
-                ON checking_accounts.id = investment_redemption_summaries.account_id
-                AND checking_accounts.user_id = investment_redemption_summaries.user_id
-            WHERE investment_redemption_summaries.user_id = ?
-            ORDER BY investment_redemption_summaries.date DESC, investment_redemption_summaries.id DESC
-            """,
-            (user_id,),
-        ).fetchall()
+        conn.execute("BEGIN")
+        inputs = positions_store.load_position_inputs(conn, user_id)
+        redemption_rows = positions_store.load_redemption_history(conn, user_id)
 
-    redemption_totals = {
-        (row["source_type"], row["source_id"]): {
-            "redeemed_cost_cents": int(row["redeemed_cost_cents"] or 0),
-            "redeemed_quantity_micros": int(row["redeemed_quantity_micros"] or 0),
-        }
-        for row in redemption_rows
-    }
-    operation_rows = [portfolio_row_with_redemptions(row_to_dict(row), redemption_totals) for row in operation_rows_raw]
-    opening_rows = [portfolio_row_with_redemptions(row_to_dict(row), redemption_totals) for row in opening_rows_raw]
-    closed_positions = [format_closed_position(row_to_dict(row)) for row in closed_rows]
-    redemption_history = [format_redemption_summary(row_to_dict(row)) for row in redemption_summary_rows]
-    rows = filter_closed_portfolio_rows([*operation_rows, *opening_rows], closed_positions)
-    rows = sorted(rows, key=lambda row: (row["date"], row["id"]))
-    positions = build_positions(rows)
-    quote_positions(positions, user_id=user_id, force_refresh=force_refresh)
-    apply_value_overrides(user_id, positions)
-    summary = summarize_positions(positions)
-    positions = [format_quoted_position(position) for position in positions]
+    positions = assemble_portfolio_positions(inputs, user_id, force_refresh=force_refresh)
+    closed_rows = sorted(inputs["closed"], key=lambda row: (row["closed_at"], row["id"]), reverse=True)
     return {
-        "positions": positions,
-        "history": closed_positions,
-        "redemption_history": redemption_history,
-        "summary": summary,
+        "positions": [format_quoted_position(position) for position in positions],
+        "history": [format_closed_position(row) for row in closed_rows],
+        "redemption_history": [format_redemption_summary(row) for row in redemption_rows],
+        "summary": summarize_positions(positions),
         "indexers": indexer_catalog(),
         "allocation_goals": get_allocation_goals(user_id),
     }
@@ -909,14 +782,26 @@ def prepare_portfolio_positions(user_id: int, force_refresh: bool = False) -> tu
     with get_connection() as conn:
         conn.execute("BEGIN")
         inputs = positions_store.load_position_inputs(conn, user_id)
-    redemption_totals = {(row["source_type"], row["source_id"]): {"redeemed_cost_cents": int(row["redeemed_cost_cents"] or 0), "redeemed_quantity_micros": int(row["redeemed_quantity_micros"] or 0)} for row in inputs["redemptions"]}
+    return inputs, assemble_portfolio_positions(inputs, user_id, force_refresh=force_refresh)
+
+
+def assemble_portfolio_positions(inputs: dict, user_id: int, force_refresh: bool = False) -> list[dict]:
+    """Monta e valoriza um snapshot já desconectado, sem modificar suas entradas."""
+    # spec: arquitetura-v2/desconcentracao-arquitetura-v2 v2.1 — critérios 12 e 13
+    redemption_totals = {
+        (row["source_type"], row["source_id"]): {
+            "redeemed_cost_cents": int(row["redeemed_cost_cents"] or 0),
+            "redeemed_quantity_micros": int(row["redeemed_quantity_micros"] or 0),
+        }
+        for row in inputs["redemptions"]
+    }
     closed_positions = [format_closed_position(row_to_dict(row)) for row in inputs["closed"]]
     rows = [portfolio_row_with_redemptions(row_to_dict(row), redemption_totals) for row in [*inputs["operations"], *inputs["openings"]]]
     rows = filter_closed_portfolio_rows(rows, closed_positions)
     positions = build_positions(sorted(rows, key=lambda row: (row["date"], row["id"])))
     quote_positions(positions, user_id=user_id, force_refresh=force_refresh)
     apply_value_overrides(user_id, positions, rows=inputs["overrides"])
-    return inputs, positions
+    return positions
 
 
 def assert_portfolio_inputs_unchanged(conn, user_id: int, inputs: dict) -> None:
@@ -1801,7 +1686,7 @@ def _position_value_native_as_of(
     force_refresh: bool = False,
     factor_cache: dict[str, Decimal] | None = None,
 ) -> int:
-    # spec: rentabilidade-portfolio v1.7 — critério 4
+    # spec: rentabilidade-portfolio v1.8 — critério 4
     if as_of_date < date.fromisoformat(position["first_operation_date"]):
         return 0
     if position["asset_type"] == "fixed_income":
@@ -1849,7 +1734,7 @@ def _monthly_return_pct(prev_value: int, end_value: int, net_contribution: int) 
 
 
 def get_portfolio_returns(user_id: int, force_refresh: bool = False, positions: list[dict] | None = None) -> dict:
-    # spec: rentabilidade-portfolio v1.7 — critérios 1 a 10
+    # spec: rentabilidade-portfolio v1.8 — critérios 1 a 10
     # Rentabilidade mensal (em percentual) por moeda consolidada (BRL e USD),
     # comparada ao CDI e ao IPCA do mês. Últimos 12 meses, ou todos os meses
     # disponíveis quando a base é menor. Cada moeda é calculada na própria
@@ -2697,7 +2582,7 @@ def micros_to_decimal(micros: int) -> Decimal:
 
 
 def parse_rate_decimal(value: object) -> Decimal:
-    # spec: rentabilidade-portfolio v1.7 — critério 4
+    # spec: rentabilidade-portfolio v1.8 — critério 4
     # get_portfolio retorna a taxa ja formatada (ex.: "4,27"); aceita Decimal ou
     # string com ponto/virgula para nao quebrar o calculo de valor por data.
     return calculations.parse_rate_decimal(value)

@@ -78,11 +78,18 @@ class FrontendModuleContractTest(unittest.TestCase):
             "c46de876c375aab3fbc23d82418f7d77251403335808983d2b832d4a38481948",
         )
         self.assertIn("new globalThis.ApexCharts", adapter)
-        self.assertIn("prefers-reduced-motion: reduce", adapter)
+        self.assertIn("animateGradually: { enabled: false }", adapter)
+        self.assertIn("dynamicAnimation: { enabled: false }", adapter)
+        self.assertIn("animations: {\n        enabled: false", adapter)
+        self.assertLess(adapter.index("...(options.chart || {})"), adapter.index("animations: {"))
         self.assertIn("instance.destroy()", adapter)
         self.assertIn("const chartInstances = new Map()", adapter)
         self.assertIn("new MutationObserver(scheduleDisconnectedChartCleanup)", adapter)
-        self.assertIn("if (!element.isConnected) destroyChartInstance", adapter)
+        self.assertIn("if (!element.isConnected) {", adapter)
+        self.assertIn("chartDefinitions.delete(element)", adapter)
+        self.assertIn('attributeFilter: ["hidden"]', adapter)
+        self.assertIn('element.closest("[hidden]")', adapter)
+        self.assertIn("destroyAllCharts();", (WEB_ROOT / "app.js").read_text(encoding="utf-8"))
         self.assertIn("destroyDisconnectedCharts();", adapter)
         self.assertNotIn("const chartInstances = new WeakMap()", adapter)
         for name in chart_views:
@@ -243,6 +250,34 @@ class FrontendModuleContractTest(unittest.TestCase):
         container = styles.split(".simulation-chart {", 1)[1].split("}", 1)[0]
         self.assertIn("overflow-x: auto", container)
         self.assertLess(html.index('id="simulationChart"'), html.index('id="simulationWeeklyProjection"'))
+
+    def test_trends_tooltips_pair_text_and_surface_theme_tokens(self) -> None:
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+        start = styles.index(".trends-chart .apexcharts-canvas .apexcharts-tooltip,")
+        rule = styles[start:styles.index("}", start)]
+        for declaration in ("color: var(--ink)", "background: var(--panel)", "border-color: var(--line)",
+                            ".apexcharts-xaxistooltip", ".apexcharts-yaxistooltip"):
+            self.assertIn(declaration, rule)
+        title = styles.split(".trends-chart .apexcharts-canvas .apexcharts-tooltip .apexcharts-tooltip-title {", 1)[1].split("}", 1)[0]
+        self.assertIn("color: var(--ink)", title)
+        self.assertIn("background: var(--surface-low)", title)
+        for direction in ("top", "bottom"):
+            arrow = styles.split(f".trends-chart .apexcharts-canvas .apexcharts-xaxistooltip-{direction}::after {{", 1)[1].split("}", 1)[0]
+            self.assertIn(f"border-{direction}-color: var(--panel)", arrow)
+
+    def test_portfolio_return_tooltip_reuses_theme_contrast_rules(self) -> None:
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+        cases = {
+            ".apexcharts-tooltip,": ("color: var(--ink)", "background: var(--panel)"),
+            ".apexcharts-tooltip .apexcharts-tooltip-title,": ("color: var(--ink)", "background: var(--surface-low)"),
+            ".apexcharts-xaxistooltip-bottom::after,": ("border-bottom-color: var(--panel)",),
+            ".apexcharts-xaxistooltip-top::after,": ("border-top-color: var(--panel)",),
+        }
+        for selector, declarations in cases.items():
+            rule = styles.split(f".portfolio-return-chart .apexcharts-canvas {selector}", 1)[1].split("}", 1)[0]
+            self.assertIn(".trends-chart", rule)
+            for declaration in declarations:
+                self.assertIn(declaration, rule)
 
     def test_simulations_view_tolerates_mixed_static_asset_versions(self) -> None:
         source = (MODULE_ROOT / "simulations-view.js").read_text(encoding="utf-8")

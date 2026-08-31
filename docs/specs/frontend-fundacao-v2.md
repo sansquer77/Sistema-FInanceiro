@@ -2,8 +2,8 @@
 tipo: spec
 area: frontend-v2
 status: em-implementacao
-versao: 0.7
-atualizado: 2026-08-30
+versao: 0.9
+atualizado: 2026-08-31
 relacionados:
   - "[[frontend-modularizacao]]"
   - "[[../adr/0002-modularizacao-frontend]]"
@@ -21,7 +21,7 @@ aliases: ["Fundação visual da v2", "Gráficos, máscaras, Command Palette e vi
 # Fundação do frontend v2
 
 > [!info] Status
-> **em-implementacao** · área: `frontend-v2` · atualizado em 2026-08-30 · relacionados: [[frontend-modularizacao]], [[../adr/0013-dependencias-frontend-v2]], [[../design/design-system]], [[relatorios]], [[lancamentos]], [[cartoes]], [[investimentos-portfolio]], [[efeito-borboleta]]
+> **em-implementacao** · área: `frontend-v2` · atualizado em 2026-08-31 · relacionados: [[frontend-modularizacao]], [[../adr/0013-dependencias-frontend-v2]], [[../design/design-system]], [[relatorios]], [[lancamentos]], [[cartoes]], [[investimentos-portfolio]], [[efeito-borboleta]]
 
 ## Problema
 
@@ -116,9 +116,9 @@ Usuário que acompanha muitos lançamentos, faturas, operações ou posições e
 - Cores vêm do design system; receita, despesa, saldo negativo, benchmark e simulação não podem trocar de semântica entre telas.
 - Tooltip e labels usam formatadores compartilhados, nunca divisão implícita de centavos.
 - Todo gráfico oferece alternativa textual ou tabular equivalente aos valores essenciais.
-- Animações respeitam `prefers-reduced-motion`; resize não recria instâncias em loop.
+- Animações de gráficos ficam desativadas em todos os temas e navegadores, inclusive transições iniciais, graduais e de atualização; views não podem reativá-las. Tooltips, filtros, séries e demais interações permanecem disponíveis conforme cada tela. Resize não recria instâncias em loop.
 - Instâncias são destruídas ao substituir contêiner ou desmontar view.
-- O adaptador mantém um único observador de remoções do DOM e destrói instâncias associadas a elementos desconectados, inclusive quando uma view substitui o contêiner com `innerHTML` antes da próxima renderização.
+- O adaptador mantém um único observador de remoções e mudanças do atributo `hidden`. Gráficos em contêineres desconectados são descartados; gráficos dentro de telas, abas ou drawers ocultos são destruídos, preservando somente sua última configuração de apresentação para recriação ao retornar, sem novas consultas. Atualizações recebidas enquanto ocultos substituem essa configuração sem criar instâncias. Logout descarta também as configurações preservadas.
 - Impressão/exportação mantém os demonstrativos atuais; não depende de recurso premium do ApexCharts.
 
 ### Máscaras
@@ -182,6 +182,10 @@ Usuário que acompanha muitos lançamentos, faturas, operações ou posições e
 22. Dado histórico mensal de conta ou cartão, quando o gráfico renderiza, então cada marcador fica horizontalmente centralizado com o card do mês correspondente.
 23. Dado histórico mensal de conta ou cartão, quando o usuário aponta um marcador, então nenhum tooltip redundante é exibido, pois o card mensal correspondente já apresenta o valor e seu contexto.
 24. Dado um gráfico ApexCharts cujo elemento é removido ou substituído no DOM, quando o ciclo de mutações termina, então sua instância é destruída e deixa de reter listeners, observadores ou estruturas internas da biblioteca.
+25. Dado qualquer gráfico, quando renderizado mesmo com animações solicitadas pela view, então o adaptador desativa animações iniciais, graduais e dinâmicas sem modificar séries, formatadores ou a configuração de tooltip.
+
+26. Dado um gráfico em tela, aba ou drawer oculto por `hidden`, quando a visibilidade muda, então sua instância é destruída e só é recriada ao reaparecer, com os últimos dados disponíveis e sem consulta adicional.
+27. Dado um gráfico suspenso, quando seu contêiner é removido ou a sessão termina, então sua configuração é descartada e não reaparece na próxima sessão.
 
 ## Pendências
 
@@ -198,6 +202,8 @@ Usuário que acompanha muitos lançamentos, faturas, operações ou posições e
 
 ## Plano de implementação
 
+- [x] Suspender gráficos sob ancestrais `hidden`, restaurar configurações recentes e limpar na sessão; testar ciclos, respostas tardias e descarte. Fecha: critérios 17, 24, 26 e 27 no adaptador, com instâncias simuladas. Memória real no Safari continua sujeita à validação manual.
+- [x] Desativar animações no adaptador compartilhado e testar precedência, preservação das interações e descarte em ciclos repetidos. Fecha: critérios 3 e 25; regressão do adaptador para 17 e 24. Teste usa instâncias simuladas, não mede memória real. A estabilização de memória no Safari exige validação manual.
 - [x] Passo 1 — adicionar inventário/licenças e assets vendorizados, com testes de ausência de CDN e `node_modules`. Fecha: critérios 1 e 18.
 - [x] Passo 2 — criar adaptador ApexCharts com tokens, formatadores, lifecycle, fallback e acessibilidade; migrar um gráfico piloto. Fecha: critérios 1 a 4 e 17.
 - [x] Passo 3 — migrar progressivamente gráficos de Lançamentos, Cartões, Cockpit/Relatórios, Portfólio e Efeito Borboleta, com testes de equivalência por fluxo. Fecha: critérios 2 a 4.
@@ -209,6 +215,8 @@ Usuário que acompanha muitos lançamentos, faturas, operações ou posições e
 
 ## Changelog
 
+- `0.9` — 2026-08-31 — Implementada suspensão de gráficos de módulos, abas e drawers sob `hidden`, com retomada local e limpeza na troca de sessão. Testes de ciclos repetidos, configuração mais recente e falha tardia aprovados; memória real no Safari não medida.
+- `0.8` — 2026-08-31 — Desativadas animações globais, graduais e dinâmicas, com precedência sobre opções das views. Testadas configuração, preservação de interações e limpeza em ciclos com instâncias simuladas. Mitigação não garante ausência de recarregamentos nem elimina gráficos retidos em telas apenas ocultas.
 - `0.7` — 2026-08-30 — Primeiro virtualizador compartilhado integrado a Lançamentos, rankings de Relatórios e posições do Portfólio; Faturas e Histórico de Operações ficam explicitamente na etapa seguinte.
 - `0.6` — 2026-08-30 — Corrigido o ciclo de vida do ApexCharts com descarte automático de instâncias ligadas a elementos removidos do DOM, evitando crescimento contínuo de memória no Safari.
 - `0.5` — 2026-08-30 — Removidos os tooltips redundantes dos históricos mensais de contas e cartões; os valores permanecem disponíveis nos cards correspondentes.

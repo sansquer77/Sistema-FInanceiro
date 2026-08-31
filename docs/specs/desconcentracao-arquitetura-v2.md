@@ -2,7 +2,7 @@
 tipo: spec
 area: arquitetura-v2
 status: implementado
-versao: 2.0
+versao: 2.1
 atualizado: 2026-08-31
 relacionados:
   - "[[../arquitetura]]"
@@ -72,6 +72,9 @@ Usuários da v2 que precisam manter os fluxos e dados atuais estáveis enquanto 
 
 10. Dado um usuário do Consultor, quando altera configurações ou perfil, então consentimento, criptografia, expurgo de histórico e isolamento por usuário continuam iguais.
 11. Dado um consumidor do catálogo, quando lista análises ou monta prompts, então IDs, ordem, períodos, textos e exceção pública permanecem compatíveis.
+12. Dadas as mesmas entradas e cotações, quando a tela e os consumidores internos consultam posições, então usam a mesma leitura e montagem, preservando ordem, fontes, resgates, encerramentos e ajustes manuais.
+13. Dada uma consulta do Portfólio, quando ocorrem cotações ou câmbio, então a conexão do snapshot local já está fechada; resgates e encerramentos mantêm a revalidação antes da escrita.
+14. Dado o histórico da carteira, quando a tela é consultada, então nomes de conta, ordem dos históricos, isolamento por usuário e formato público permanecem iguais.
 
 ## Fora de escopo
 
@@ -88,6 +91,8 @@ Usuários da v2 que precisam manter os fluxos e dados atuais estáveis enquanto 
 
 ## Plano de implementação
 
+- [x] Passo 15 — Unificar consultas de entradas em `portfolio_positions.py` e montagem na fachada, sem duplicar a preparação. Fecha: critérios 12 e 13.
+- [x] Passo 16 — Testar equivalência pública/interna, histórico, isolamento e fronteira transacional; executar suíte completa. Fecha: critérios 12–14.
 - [x] Passo 12 — extrair configurações, consentimento e perfil criptografado para `consultor_settings.py`; preservar expurgo e isolamento por usuário.
 - [x] Passo 13 — extrair catálogo, perfis educacionais, validação de seleção e prompts para `consultor_catalog.py`; compartilhar `ConsultorError` por módulo mínimo de erros, sem importar a fachada.
 - [x] Passo 14 — manter reexports públicos, verificar contratos e executar a suíte completa. Fecha: critérios 10 e 11.
@@ -109,6 +114,7 @@ Usuários da v2 que precisam manter os fluxos e dados atuais estáveis enquanto 
 
 ## Changelog
 
+- `2.1` — 2026-08-31 — Unificadas leitura e montagem das posições: tela e consumidores internos compartilham entradas, descontos de resgates, exclusão de encerrados, cotações e overrides do snapshot. Históricos preservados; testes de equivalência, imutabilidade, isolamento e fronteira transacional.
 - `2.0` — 2026-08-31 — Extrações concluídas e documentação sincronizada: catálogo e prompts idênticos ao snapshot anterior, configurações e exceção pública preservadas; 419 testes aprovados. Fachada reduzida de 967 para 398 linhas, sem incremento da versão do produto.
 
 - `1.9` — 2026-08-31 — Iniciada extração de configurações e catálogo, mantendo prompts, consentimento, criptografia e exceção pública.

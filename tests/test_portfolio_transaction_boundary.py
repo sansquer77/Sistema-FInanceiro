@@ -91,6 +91,67 @@ class PortfolioTransactionBoundaryTest(unittest.TestCase):
                          for table in ("transactions", "investment_redemptions",
                                        "investment_redemption_summaries", "investment_closed_positions"))
 
+    def test_public_and_internal_positions_share_loading_and_assembly(self):
+        portfolio.redeem_position(self.user["id"], self.payload)
+        portfolio.update_position_value_override(self.user["id"], {**self.payload, "current_value": "123,45"})
+        with patch.object(portfolio.positions_store, "load_position_inputs", wraps=portfolio.positions_store.load_position_inputs) as load, \
+             patch.object(portfolio, "assemble_portfolio_positions", wraps=portfolio.assemble_portfolio_positions) as assemble:
+            public = portfolio.get_portfolio(self.user["id"], force_refresh=True)
+            self.assertEqual(load.call_count, 1)
+            self.assertEqual(assemble.call_count, 1)
+            self.assertTrue(assemble.call_args.kwargs["force_refresh"])
+            internal = portfolio.current_portfolio_positions(self.user["id"], force_refresh=True)
+            self.assertEqual(load.call_count, 2)
+            self.assertEqual(assemble.call_count, 2)
+        self.assertEqual(public["positions"], [portfolio.format_quoted_position(row) for row in internal])
+        self.assertEqual(public["summary"], portfolio.summarize_positions(internal))
+        self.assertTrue(public["positions"][0]["manual_value_override"])
+        self.assertEqual(internal[0]["current_value_cents"], 12345)
+
+    def test_assembly_does_not_mutate_snapshot_or_reopen_database(self):
+        from copy import deepcopy
+        inputs, _ = portfolio.prepare_portfolio_positions(self.user["id"])
+        original = deepcopy(inputs)
+        with patch.object(portfolio, "get_connection", side_effect=AssertionError("Unexpected read")), \
+             patch.object(portfolio, "quote_positions") as quote:
+            portfolio.assemble_portfolio_positions(inputs, self.user["id"], force_refresh=True)
+        self.assertEqual(inputs, original)
+        self.assertEqual(quote.call_count, 1)
+        self.assertTrue(quote.call_args.kwargs["force_refresh"])
+
+    def test_histories_preserve_order_names_and_user_isolation(self):
+        portfolio.redeem_position(self.user["id"], self.payload)
+        portfolio.redeem_position(self.user["id"], self.payload)
+        portfolio.close_position(self.user["id"], self.payload)
+        public = portfolio.get_portfolio(self.user["id"])
+        self.assertEqual(public["positions"], [])
+        self.assertEqual(portfolio.current_portfolio_positions(self.user["id"]), [])
+        self.assertEqual(len(public["history"]), 1)
+        self.assertEqual(len(public["redemption_history"]), 2)
+        for key in ("history", "redemption_history"):
+            self.assertTrue(all(row["account_name"] == "Carteira" for row in public[key]))
+            ids = [row["id"] for row in public[key]]
+            self.assertEqual(ids, sorted(ids, reverse=True))
+        other = create_user("Outro", "history-boundary@example.com", "correct-password")
+        isolated = portfolio.get_portfolio(other["id"])
+        for key in ("positions", "history", "redemption_history"):
+            self.assertEqual(isolated[key], [])
+
+    def test_override_uses_snapshot_even_if_changed_during_quotes(self):
+        portfolio.update_position_value_override(self.user["id"], {**self.payload, "current_value": "123,45"})
+        quote = portfolio.quote_positions
+
+        def change_during_quote(*args, **kwargs):
+            self.assertEqual(self.connections, [])
+            with database.get_connection() as conn:
+                conn.execute("UPDATE investment_value_overrides SET current_value_cents = 54321 WHERE user_id = ?", (self.user["id"],))
+            return quote(*args, **kwargs)
+
+        with patch.object(portfolio, "quote_positions", side_effect=change_during_quote):
+            public = portfolio.get_portfolio(self.user["id"])
+        self.assertEqual(public["positions"][0]["current_value"], "123.45")
+        self.assertEqual(portfolio.current_portfolio_positions(self.user["id"])[0]["current_value_cents"], 54321)
+
     def test_redemption_and_closing_do_not_requote_after_cache_is_cleared(self):
         original_begin = portfolio.begin_immediate
 

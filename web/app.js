@@ -1,4 +1,5 @@
 import { api, configureApi, fetchAllListed, upload } from "./modules/api.js";
+import { destroyAllCharts } from "./modules/chart-adapter.js";
 import {
   currentMonthValue,
   formatDate,
@@ -1320,6 +1321,7 @@ async function loadLatestVersion() {
 }
 
 function resetSessionState() {
+  destroyAllCharts();
   resetSessionData(state, { currentMonth: currentMonthValue() });
   operationHistoryView.resetCache();
   userAdminViewController.resetPreferencesCache();

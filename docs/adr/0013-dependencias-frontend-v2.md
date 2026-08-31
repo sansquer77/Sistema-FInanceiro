@@ -2,8 +2,8 @@
 tipo: adr
 area: frontend-v2
 status: implementado
-versao: 1.0
-atualizado: 2026-08-30
+versao: 1.2
+atualizado: 2026-08-31
 relacionados:
   - "[[0002-modularizacao-frontend]]"
   - "[[0008-licenca-apache-2-0]]"
@@ -17,7 +17,7 @@ aliases: ["Dependências do frontend v2", "ApexCharts, IMask e Command Palette"]
 # ADR-0013 — Dependências e primitives do frontend v2
 
 > [!info] Status
-> **implementado** · área: `frontend-v2` · atualizado em 2026-08-30 · relacionados: [[0002-modularizacao-frontend]], [[0008-licenca-apache-2-0]], [[../specs/frontend-fundacao-v2]], [[../distribuição]], [[../design/design-system]]
+> **implementado** · área: `frontend-v2` · atualizado em 2026-08-31 · relacionados: [[0002-modularizacao-frontend]], [[0008-licenca-apache-2-0]], [[../specs/frontend-fundacao-v2]], [[../distribuição]], [[../design/design-system]]
 
 ## Contexto
 
@@ -35,6 +35,12 @@ As escolhas precisam respeitar essas restrições. ApexCharts oferece API para J
 - Atualização para a linha 5 ou posterior fica bloqueada até revisão explícita de licença e novo ADR.
 - Somente recursos presentes na versão fixada e compatíveis com o design system podem ser utilizados.
 - A integração ficará atrás de um adaptador local, evitando que views construam configurações divergentes ou dependam diretamente de detalhes da biblioteca.
+
+### Animações e estabilidade
+
+O adaptador desativa animações iniciais, graduais e dinâmicas em todos os navegadores, com precedência sobre as opções das views. A perda de transições decorativas é aceita para reduzir trabalho de renderização e possíveis picos de memória; séries, tooltips e interações permanecem iguais. Desativar somente quando `prefers-reduced-motion` estiver ativo não cobre usuários do Safari sem essa preferência. Não se altera a biblioteca vendorizada.
+
+Esta medida não comprova a resolução dos recarregamentos. Além do descarte de instâncias substituídas ou removidas, o observador compartilhado acompanha mudanças de `hidden` em ancestrais: destrói gráficos ocultos e preserva só a última configuração de apresentação até a reabertura. Configurações são removidas junto com o contêiner ou no reset da sessão. Isso cobre abas e drawers sem espalhar callbacks de limpeza por cada view. O trade-off é recriar o gráfico ao retornar e reter seus dados/opções locais enquanto o contêiner existe; não há recarga de API. A validação de estabilização de memória real continua necessária. Visibilidade controlada exclusivamente por CSS, sem `hidden`, não faz parte deste mecanismo.
 
 ### IMask
 
@@ -93,6 +99,8 @@ As escolhas precisam respeitar essas restrições. ApexCharts oferece API para J
 
 ## Changelog
 
+- `1.2` — 2026-08-31 — Suspensão/restauração centralizada por `hidden`, com limpeza de configurações na remoção e no reset da sessão.
+- `1.1` — 2026-08-31 — Desativação global de animações como mitigação de renderização/memória, preservando interações e explicitando limites da limpeza de telas ocultas.
 - `1.0` — 2026-08-30 — Definidos ApexCharts 4.7.0 MIT e IMask vendorizados, Command Palette nativa com contrato cmdk e virtualização compartilhada sem dependência.
 
 ## Relacionados
