@@ -113,7 +113,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 Cada módulo tem responsabilidade única — não misture domínios entre módulos:
 
-`database.py` (schema/migrações) · `money.py` (centavos/arredondamento) · `calendar_rules.py` (datas/meses) · `identifiers.py` (IDs positivos) · `recurrence.py` (séries/frequências) · `auth.py` (usuários/sessões) · `accounts.py` (contas-correntes) · `transactions.py` (lançamentos) · `categories.py` (categorias/tags) · `classification_suggestions.py` (sugestão local) · `credit_cards.py` (cartões/faturas) · `spending_limits.py` (limites) · `portfolio.py` (fachada de investimentos) · `portfolio_positions.py` (posições/lotes) · `portfolio_quotes.py` (cotações/cache) · `portfolio_calculations.py` (cálculos/agregações) · `cockpit.py` (agregações do Cockpit) · `http_routes.py` (resolução de rotas) · `imports.py` (importação) · `operation_logs.py` (auditoria) · `emailer.py` (envio SMTP) · `secure_config.py` (config criptografada).
+`database.py` (schema/migrações) · `money.py` (centavos/arredondamento) · `calendar_rules.py` (datas/meses) · `identifiers.py` (IDs positivos) · `recurrence.py` (séries/frequências) · `auth.py` (usuários/sessões) · `accounts.py` (contas-correntes) · `transactions.py` (lançamentos) · `categories.py` (categorias/tags) · `classification_suggestions.py` (sugestão local) · `credit_cards.py` (cartões/faturas) · `balance_projections.py` (saldos/faturas projetados) · `spending_limits.py` (limites) · `portfolio.py` (fachada de investimentos) · `portfolio_positions.py` (posições/lotes) · `portfolio_quotes.py` (cotações/cache) · `portfolio_calculations.py` (cálculos/agregações) · `cockpit.py` (agregações do Cockpit) · `http_routes.py` (resolução de rotas) · `imports.py` (importação) · `operation_logs.py` (auditoria) · `emailer.py` (envio SMTP) · `secure_config.py` (config criptografada).
 
 Veja o mapeamento completo de rotas e tabelas em [`docs/arquitetura.md`](docs/arquitetura.md) antes de adicionar qualquer endpoint.
 
@@ -180,6 +180,7 @@ Consulte [`docs/design/design-system.md`](docs/design/design-system.md) para a p
 | [`docs/sdd.md`](docs/sdd.md) | Processo completo, frontmatter, ciclo de vida de status. |
 | [`docs/requisitos.md`](docs/requisitos.md) | Escopo funcional e requisitos não funcionais. |
 | [`docs/arquitetura.md`](docs/arquitetura.md) | Rotas, tabelas, módulos, fluxos principais. |
+| [`docs/qualidade-codigo.md`](docs/qualidade-codigo.md) | Fronteiras de responsabilidade, sinais de alerta e revisão de tamanho dos módulos. |
 | [`docs/glossario.md`](docs/glossario.md) | Vocabulário de domínio. |
 | [`docs/templates/spec-template.md`](docs/templates/spec-template.md) | Base obrigatória para qualquer novo documento. |
 | [`docs/design/design-system.md`](docs/design/design-system.md) | Tokens visuais e regras de UI. |

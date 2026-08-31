@@ -1,20 +1,21 @@
 ---
 tipo: spec
 area: frontend
-status: implementado
-versao: 4.4
+status: em-implementacao
+versao: 4.7
 atualizado: 2026-08-30
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
   - "[[arquitetura]]"
-tags: [spec, "area/frontend"]
+  - "[[../qualidade-codigo]]"
+tags: [spec, "area/frontend", "status/em-implementacao"]
 aliases: ["Modularização Frontend", "ES Modules"]
 ---
 
 # Modularização do Frontend
 
 > [!info] Status
-> **implementado** · área: `frontend` · atualizado em 2026-08-29 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]]
+> **em-implementacao** · área: `frontend` · atualizado em 2026-08-30 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]], [[../qualidade-codigo]]
 
 ## Problema
 
@@ -70,7 +71,12 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `consultor-view.js` | Aba Consultor/Calendário do Cockpit: vencimentos, atrasos e plano próximo. |
 | `accounts-view.js` | Contas: cadastro, edição, arquivamento e restauração. |
 | `cards-view.js` | Cartões: cadastro, faturas, busca/filtro da fatura, pagamento e conciliação. |
-| `portfolio-view.js` | Ativos: posições, consolidações com escala BRL, histórico, resgate e encerramento. |
+| `portfolio-view.js` | Fachada/coordenador da tela de Portfólio, carregamento, abas e integração dos submódulos. |
+| `portfolio-chart.js` | Renderização e ciclo de vida do gráfico de rentabilidade do Portfólio. |
+| `portfolio-grouping.js` | Agrupamentos, metas, consolidações e totais puros da apresentação do Portfólio. |
+| `portfolio-form.js` | Payloads e normalizações de entrada dos formulários e ações do Portfólio. |
+| `app-state.js` | Fábrica do estado inicial e reset puro dos dados de sessão, sem DOM, API ou views. |
+| `app-data-loader.js` | Coordenação dos carregamentos compartilhados, com serviços, views e ações recebidos explicitamente. |
 | `transactions-view.js` | Lançamentos: formulário, recorrência, parcelas e câmbio. |
 | `operation-history-view.js` | Histórico de Operações: filtros, busca, agrupamentos e paginação incremental. |
 | `simulations-view.js` | Efeito Borboleta: formulário de cenário hipotético e projeções retornadas pelo backend. |
@@ -96,7 +102,11 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Não introduzir framework, bundler ou dependências de frontend.
 - Módulos têm nomes em inglês e funções pequenas.
 - Regras financeiras permanecem no domínio Python; o frontend apenas formata e orquestra.
+- A raiz `app.js` segue as fronteiras e os sinais de alerta de [[../qualidade-codigo]].
 - Novos módulos recebem dependências explicitamente via contrato de fábrica.
+- `app.js` permanece o composition root: seleciona DOM, registra views, injeta dependências, controla boot, autenticação visual e navegação.
+- `app-state.js` não exporta singleton nem chama formulários/views; cria o estado e limpa somente dados de sessão.
+- `app-data-loader.js` usa acesso tardio às views injetadas para evitar imports circulares e não se torna autoridade de regras financeiras.
 - Cores de UI e gráficos devem vir de tokens CSS compartilhados; literais ficam restritos a marcas/logos externos.
 - Tema visual é uma preferência local: `theme-utils.js` aplica `data-theme` no elemento raiz e persiste em `localStorage`.
 - Modo privacidade é uma preferência local: `privacy-utils.js` aplica `data-privacy` no elemento raiz, persiste em `localStorage` e não altera dados, cálculos ou chamadas de API.
@@ -142,6 +152,10 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Plano de implementação
 
+- [ ] Extrair fábrica/reset puro de estado para `app-state.js` sem dependência de DOM.
+- [ ] Extrair carregamentos coordenados para `app-data-loader.js` com dependências explícitas e views tardias.
+- [ ] Preservar `boot()`, sessão visual, navegação e composição em `app.js`.
+- [ ] Atualizar contratos automatizados e validar todos os fluxos existentes.
 - [x] Unificar semântica e teclado de modais, dialogs e drawers.
 - [x] Centralizar toasts de sucesso e manter erros inline.
 - [x] Padronizar cabeçalhos de cards e última atualização.
@@ -151,7 +165,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## API e dados
 
-- Nenhum endpoint novo.
+- `GET /api/balance-projection?month=YYYY-MM&account_id={id}` entrega saldos conciliados/projetados por data calculados no núcleo Python.
 - Nenhuma tabela nova.
 - `index.html` carrega `app.js` como `type="module"`.
 
@@ -223,6 +237,9 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Changelog
 
+- `4.7` — 2026-08-30 — Iniciada extração de estado puro e carregadores coordenados, preservando `app.js` como composition root.
+- `4.6` — 2026-08-30 — Vinculada à spec implementada [[../qualidade-codigo]], que formaliza a distinção entre raiz de composição e views coesas.
+- `4.5` — 2026-08-30 — `portfolio-view.js` passa a coordenar módulos dedicados de gráfico, agrupamento e formulário; projeções de saldos/faturas deixam `app.js` e passam ao contrato Python `/api/balance-projection`.
 - `4.4` — 2026-08-30 — Registrado `chart-adapter.js` como fronteira compartilhada entre as views e o ApexCharts 4.7.0 vendorizado.
 - `4.3` — 2026-08-29 — Autocomplete de ativos compartilhado entre Portfólio e Lançamentos; modal de decisão passa a aceitar atualização derivada de campos durante a digitação.
 - `4.2` — 2026-08-29 — Resumo pré-salvamento torna-se expansível, recolhido em lançamentos à vista e aberto automaticamente nos modos parcelado e recorrente.

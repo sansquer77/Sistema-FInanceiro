@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 12.2
+versao: 12.4
 atualizado: 2026-08-30
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -27,6 +27,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[visao-produto]] | Direção de produto, princípios de experiência e estado atual dos módulos. |
 | [[roadmap]] | Sequência de evolução, status por módulo e próximas prioridades. |
 | [[glossario]] | Vocabulário de domínio com links para as specs onde cada conceito é definido. |
+| [[qualidade-codigo]] | Fronteiras de responsabilidade, sinais de alerta e regras de organização do código. |
 | [[distribuição]] | Regras de geração, limpeza, instalação e validação dos pacotes macOS e Windows. |
 | [[templates/spec-template]] | Template obrigatório para criar novos documentos. |
 
@@ -142,6 +143,8 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `12.4` — 2026-08-30 — Incorporada [[qualidade-codigo]] como referência implementada para fronteiras de responsabilidade e prevenção de regressões arquiteturais.
+- `12.3` — 2026-08-30 — Portfólio frontend modularizado e projeções financeiras movidas ao núcleo Python por contrato de leitura dedicado.
 - `12.2` — 2026-08-30 — Implementada a desconcentração inicial da arquitetura v2, com roteamento declarativo e módulos internos de Portfólio/Cockpit. Ver [[specs/desconcentracao-arquitetura-v2]] e [[adr/0014-desconcentracao-fachadas-e-roteamento]].
 - `12.1` — 2026-08-30 — Extraídos utilitários conceituais compartilhados de dinheiro, calendário, identificadores e recorrência. Ver [[specs/utilitarios-dominio]].
 - `12.0` — 2026-08-30 — Implementada [[specs/manutencao-cache-cotacoes]] com retenção de 30 dias, limites e compactação controlada do cache regenerável de mercado.

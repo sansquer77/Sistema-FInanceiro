@@ -23,7 +23,7 @@ class FrontendModuleContractTest(unittest.TestCase):
             "cards-view.js",
             "transactions-view.js",
             "simulations-view.js",
-            "portfolio-view.js",
+            "portfolio-chart.js",
             "reports-view.js",
         )
 
@@ -49,12 +49,12 @@ class FrontendModuleContractTest(unittest.TestCase):
             self.assertNotIn("new ApexCharts", source, name)
 
     def test_portfolio_analysis_keeps_class_rows_distinct_by_currency(self) -> None:
-        portfolio = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
+        portfolio = (MODULE_ROOT / "portfolio-grouping.js").read_text(encoding="utf-8")
 
         self.assertIn('new Map(rows.map((row) => [`${row.label}::${row.currency || "BRL"}`, row]))', portfolio)
 
     def test_portfolio_goals_separate_usd_variable_income(self) -> None:
-        portfolio = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
+        portfolio = (MODULE_ROOT / "portfolio-grouping.js").read_text(encoding="utf-8")
         backend = (REPOSITORY_ROOT / "financeiro/portfolio.py").read_text(encoding="utf-8")
 
         self.assertIn('goal.asset_type === "stock_usd"', portfolio)
@@ -153,13 +153,11 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("#cockpitView.is-refreshing", styles)
 
     def test_paid_card_invoice_is_not_subtracted_twice_from_cockpit_forecast(self) -> None:
-        app_source = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+        projection_source = (REPOSITORY_ROOT / "financeiro/balance_projections.py").read_text(encoding="utf-8")
 
-        self.assertIn("isCardInvoicePaid(card.id, cockpitMonth)", app_source)
-        self.assertRegex(
-            app_source,
-            r"const signedAmount = isCardInvoicePaid\(card\.id, cockpitMonth\)\s*\? 0\s*: -Math\.max\(openAmount - reservedAmount, 0\)",
-        )
+        self.assertIn("0 if is_invoice_paid", projection_source)
+        self.assertIn("-max(open_cents - reserved, 0)", projection_source)
+        self.assertNotIn("preferredCardForecastAmount", (WEB_ROOT / "app.js").read_text(encoding="utf-8"))
 
     def test_all_analytical_tabsets_share_keyboard_and_transition_helpers(self) -> None:
         modules = {
@@ -341,6 +339,7 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn(".report-table td:first-child", styles)
         self.assertIn(".toast-region", styles)
         portfolio = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
+        portfolio_form = (MODULE_ROOT / "portfolio-form.js").read_text(encoding="utf-8")
         transactions = (MODULE_ROOT / "transactions-view.js").read_text(encoding="utf-8")
         asset_autocomplete = (MODULE_ROOT / "asset-autocomplete.js").read_text(encoding="utf-8")
         self.assertIn("data-restore-automatic-quote-payload", portfolio)
@@ -359,7 +358,7 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn('document.createElement("datalist")', asset_autocomplete)
         self.assertIn("updateQuantityRedemptionPreview", portfolio)
         self.assertIn('name: "remaining_quantity"', portfolio)
-        self.assertIn("quantity: position.quantity || 0", portfolio)
+        self.assertIn("quantity: position.quantity || 0", portfolio_form)
         self.assertIn("portfolio.redemption_history || []", portfolio)
         self.assertIn("Ganho/perda", portfolio)
         self.assertIn("Custo FIFO", portfolio)

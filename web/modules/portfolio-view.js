@@ -1,7 +1,9 @@
 import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";
 import { setLastUpdated, stateMarkup } from "./dom-utils.js";
 import { createAssetAutocomplete } from "./asset-autocomplete.js";
-import { chartToken, renderChart } from "./chart-adapter.js";
+import { createPortfolioChart } from "./portfolio-chart.js";
+import * as portfolioGrouping from "./portfolio-grouping.js";
+import * as portfolioForm from "./portfolio-form.js";
 
 export function registerPortfolioView({
   state,
@@ -94,6 +96,12 @@ export function registerPortfolioView({
     history: document.querySelector("#portfolioHistoryPanel"),
   };
   const portfolioRoot = document.querySelector("#portfolioView");
+  const portfolioChart = createPortfolioChart({
+    state,
+    elements,
+    formatPercentValue,
+    chartColor,
+  });
   // O drawer precisa ser filho direto do body para não herdar o contexto de
   // empilhamento criado pelos painéis sticky do Portfólio.
   if (portfolioReturnDrawer && portfolioReturnDrawer.parentElement !== document.body) {
@@ -188,7 +196,7 @@ export function registerPortfolioView({
         state.portfolioReturns = { error: error.message || "Erro ao carregar" };
       }
     }
-    renderPortfolioReturns();
+    portfolioChart.renderReturns();
   }
 
   function closePortfolioReturnDrawer() {
@@ -771,31 +779,7 @@ export function registerPortfolioView({
   }
 
   function portfolioAllocationRows(rows, goals) {
-    const byLabel = new Map(rows.map((row) => [`${row.label}::${row.currency || "BRL"}`, row]));
-    for (const goal of goals) {
-      if (Number(goal.target_percent || 0) > 0) {
-        const isUsdVariableIncomeGoal = goal.asset_type === "stock_usd";
-        const hasGoalClassRow = isUsdVariableIncomeGoal
-          ? byLabel.has("Renda variável::USD")
-          : goal.asset_type === "stock"
-            ? byLabel.has("Renda variável::BRL")
-            : [...byLabel.keys()].some((key) => key.startsWith(`${goal.label}::`));
-        if (!hasGoalClassRow) {
-          const label = isUsdVariableIncomeGoal ? "Renda variável" : goal.label;
-          const currency = isUsdVariableIncomeGoal ? "USD" : "BRL";
-          byLabel.set(`${label}::${currency}`, {
-            label,
-            currency,
-            count: 0,
-            current_brl: "0.00",
-            chart_current_brl: "0.00",
-            result_brl: "0.00",
-            result_percent: "0.00",
-          });
-        }
-      }
-    }
-    return [...byLabel.values()];
+    return portfolioGrouping.allocationRows(rows, goals);
   }
 
   function renderHighlightedPortfolioPosition() {
@@ -813,229 +797,6 @@ export function registerPortfolioView({
     row.classList.add("portfolio-highlight-row");
     window.setTimeout(() => row.classList.remove("portfolio-highlight-row"), 3200);
     state.portfolioHighlightId = "";
-  }
-
-  function renderPortfolioReturns() {
-    // spec: rentabilidade-portfolio v1.7 — critérios 2, 3 e 12
-    // (SVG nativo diferencia as séries da carteira dos benchmarks e mantém
-    // a escala percentual comum sem introduzir dependência de gráficos)
-    const returns = state.portfolioReturns;
-    if (!returns) {
-      return;
-    }
-    if (returns.error) {
-      if (portfolioReturnChart) {
-        portfolioReturnChart.innerHTML = "";
-      }
-      if (portfolioReturnXLabels) {
-        portfolioReturnXLabels.innerHTML = "";
-      }
-      if (portfolioReturnLegend) {
-        portfolioReturnLegend.innerHTML = `<span class="error-text">Não foi possível carregar a rentabilidade.</span>`;
-      }
-      return;
-    }
-    if (!returns.series || returns.series.length === 0) {
-      return;
-    }
-    if (portfolioReturnDrawerTitle) {
-      const start = formatReturnMonthLabel(returns.start_month);
-      const end = formatReturnMonthLabel(returns.end_month);
-      portfolioReturnDrawerTitle.textContent = start === end ? start : `${start} a ${end}`;
-    }
-    if (portfolioReturnNotice) {
-      portfolioReturnNotice.hidden = !returns.has_historical_approximation;
-    }
-
-    const entries = returns.series;
-    const plotWidth = 100;
-    const plotTop = 3;
-    const plotBottom = 61;
-    const plotHeight = plotBottom - plotTop;
-    const marginX = 2;
-    const step = entries.length > 1 ? (plotWidth - marginX * 2) / (entries.length - 1) : 0;
-
-    const seriesConfig = [
-      { key: "BRL_return_pct", label: "R$", color: chartColor(0) },
-      { key: "USD_return_pct", label: "US$", color: chartColor(1) },
-      { key: "cdi_return_pct", label: "CDI", color: "var(--muted)" },
-      { key: "ipca_return_pct", label: "IPCA", color: "var(--accent)" },
-    ];
-
-    const maxAbs = Math.max(
-      0.01,
-      ...entries.map((entry) => Math.max(
-        Math.abs(Number(entry.BRL_return_pct || 0)),
-        Math.abs(Number(entry.USD_return_pct || 0)),
-        Math.abs(Number(entry.cdi_return_pct || 0)),
-        Math.abs(Number(entry.ipca_return_pct || 0)),
-      )),
-    );
-
-    const niceMax = niceCeil(maxAbs);
-    const halfMax = niceMax / 2;
-    const yTicks = [-niceMax, -halfMax, 0, halfMax, niceMax];
-
-    const yFor = (value) => {
-      const zeroY = plotTop + plotHeight / 2;
-      const out = zeroY - (value / niceMax) * (plotHeight / 2);
-      return Math.max(plotTop, Math.min(plotBottom, out));
-    };
-    const xFor = (index) => (entries.length > 1 ? marginX + index * step : plotWidth / 2);
-
-    const yTicksGrid = yTicks.map((tick) => {
-      const y = yFor(tick);
-      if (Math.abs(tick) < 0.0001) {
-        return "";
-      }
-      return `<line x1="${marginX}" y1="${y.toFixed(2)}" x2="${plotWidth - marginX}" y2="${y.toFixed(2)}" stroke="var(--line)" stroke-width="0.22" stroke-dasharray="0.9 0.9" stroke-opacity="0.58" />`;
-    }).join("");
-
-    const chart = seriesConfig.map((series) => {
-      const points = entries
-        .map((entry, index) => {
-          if (entry[series.key] === undefined || entry[series.key] === null) {
-            return null;
-          }
-          const value = Number(entry[series.key]);
-          return { x: xFor(index), y: yFor(value), value, index };
-        })
-        .filter((point) => point !== null);
-
-      if (points.length === 0) {
-        return "";
-      }
-
-      const linePath = smoothPath(points);
-      const isPortfolioSeries = series.key === "BRL_return_pct" || series.key === "USD_return_pct";
-      const gradientId = `portfolio-return-${series.key}`;
-
-      const circles = points.map((point) => {
-        const monthLabel = formatReturnMonthLabel(entries[point.index].month);
-        const displayValue = `${(point.value > 0 ? "+" : "")}${point.value.toFixed(2)}%`;
-        return `<circle cx="${point.x.toFixed(2)}" cy="${point.y.toFixed(2)}" r="1.35" fill="${series.color}" fill-opacity="0.82">
-          <title>${escapeHtml(series.label)} · ${escapeHtml(monthLabel)}: ${escapeHtml(displayValue)}</title>
-        </circle>`;
-      }).join("");
-
-      return `
-        <g class="portfolio-return-line-group ${isPortfolioSeries ? "portfolio-series" : "benchmark-series"}">
-          ${isPortfolioSeries ? `<defs><linearGradient id="${gradientId}" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="${series.color}" stop-opacity="0.24" /><stop offset="100%" stop-color="${series.color}" stop-opacity="0.015" /></linearGradient></defs><path d="${smoothAreaPath(points, yFor(0))}" fill="url(#${gradientId})" />` : ""}
-          <path d="${linePath}" fill="none" stroke="${series.color}" stroke-width="${isPortfolioSeries ? "1.02" : "0.76"}" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="${isPortfolioSeries ? "0.92" : "0.82"}" vector-effect="non-scaling-stroke" />
-          ${circles}
-        </g>
-      `;
-    }).join("");
-
-    if (portfolioReturnChart) {
-      renderChart(portfolioReturnChart, {
-        chart: { type: "area", height: 310 },
-        series: seriesConfig.map((series) => ({
-          name: series.label,
-          data: entries.map((entry) => entry[series.key] == null ? null : Number(entry[series.key])),
-        })),
-        colors: [
-          chartToken("--chart-1", "#5f7fff"),
-          chartToken("--chart-2", "#36b37e"),
-          chartToken("--muted", "#6b7280"),
-          chartToken("--accent", "#ffab00"),
-        ],
-        stroke: { curve: "smooth", width: [3, 3, 2, 2], dashArray: [0, 0, 5, 5] },
-        fill: { type: "gradient", gradient: { opacityFrom: 0.16, opacityTo: 0.01 } },
-        markers: { size: 3 },
-        xaxis: { categories: entries.map((entry) => formatReturnMonthShortLabel(entry.month)) },
-        yaxis: { labels: { formatter: (value) => `${value > 0 ? "+" : ""}${formatPercentValue(value)}` } },
-        tooltip: { y: { formatter: (value) => `${value > 0 ? "+" : ""}${formatPercentValue(value)}` } },
-        legend: { show: false },
-        annotations: { yaxis: [{ y: 0, borderColor: chartToken("--ink", "#111827") }] },
-      });
-    }
-    if (portfolioReturnYAxis) {
-      const labelFor = (tick) => {
-        if (Math.abs(tick) < 0.0001) {
-          return "0%";
-        }
-        const sign = tick > 0 ? "+" : "";
-        return `${sign}${formatPercentValue(tick)}`;
-      };
-      portfolioReturnYAxis.innerHTML = yTicks.map((tick) => {
-        const top = (yFor(tick) / 64) * 100;
-        return `<span style="top:${top.toFixed(1)}%">${labelFor(tick)}</span>`;
-      }).join("");
-    }
-    if (portfolioReturnXLabels) {
-      portfolioReturnXLabels.innerHTML = entries.map((entry, index) => {
-        const xCenter = xFor(index);
-        return `<span style="left:${(xCenter / plotWidth * 100).toFixed(2)}%">${formatReturnMonthShortLabel(entry.month)}</span>`;
-      }).join("");
-    }
-    if (portfolioReturnLegend) {
-      portfolioReturnLegend.innerHTML = seriesConfig
-        .map((series) => `<span><i style="background:${series.color}"></i>${series.label}</span>`)
-        .join("");
-    }
-  }
-
-  function niceCeil(value) {
-    if (value <= 0) {
-      return 1;
-    }
-    const power = Math.pow(10, Math.floor(Math.log10(value)));
-    const fraction = value / power;
-    if (fraction <= 1) {
-      return power;
-    }
-    if (fraction <= 2) {
-      return 2 * power;
-    }
-    if (fraction <= 5) {
-      return 5 * power;
-    }
-    return 10 * power;
-  }
-
-  function smoothPath(points) {
-    if (points.length === 0) {
-      return "";
-    }
-    if (points.length === 1) {
-      return `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
-    }
-    const start = points[0];
-    let d = `M ${start.x.toFixed(2)} ${start.y.toFixed(2)}`;
-    for (let i = 0; i < points.length - 1; i += 1) {
-      const p0 = points[Math.max(i - 1, 0)];
-      const p1 = points[i];
-      const p2 = points[i + 1];
-      const p3 = points[Math.min(i + 2, points.length - 1)];
-      const cp1x = p1.x + (p2.x - p0.x) / 6;
-      const cp1y = p1.y + (p2.y - p0.y) / 6;
-      const cp2x = p2.x - (p3.x - p1.x) / 6;
-      const cp2y = p2.y - (p3.y - p1.y) / 6;
-      d += ` C ${cp1x.toFixed(2)} ${cp1y.toFixed(2)}, ${cp2x.toFixed(2)} ${cp2y.toFixed(2)}, ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`;
-    }
-    return d;
-  }
-
-  function smoothAreaPath(points, baselineY) {
-    if (points.length === 0) {
-      return "";
-    }
-    const first = points[0];
-    const last = points[points.length - 1];
-    return `${smoothPath(points)} L ${last.x.toFixed(2)} ${baselineY.toFixed(2)} L ${first.x.toFixed(2)} ${baselineY.toFixed(2)} Z`;
-  }
-
-  function formatReturnMonthLabel(month) {
-    const [year, monthNumber] = month.split("-").map(Number);
-    const date = new Date(year, monthNumber - 1, 1);
-    return date.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
-  }
-
-  function formatReturnMonthShortLabel(month) {
-    const [year, monthNumber] = month.split("-").map(Number);
-    const date = new Date(year, monthNumber - 1, 1);
-    return date.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "").slice(0, 1).toUpperCase();
   }
 
   function portfolioSummaryCurrencyRows(summary) {
@@ -1134,20 +895,7 @@ export function registerPortfolioView({
   }
 
   function portfolioAllocationGoalKey(row) {
-    if (row.label === "Renda variável" && row.currency === "USD") {
-      return "stock_usd";
-    }
-    const labels = {
-      "Renda variável": "stock",
-      Cripto: "crypto",
-      Stablecoin: "stablecoin",
-      Fundos: "fund",
-      "Renda fixa": "fixed_income",
-      "Previdência privada": "private_pension",
-      Poupança: "savings",
-      Outros: "other",
-    };
-    return labels[row.label] || row.label;
+    return portfolioGrouping.allocationGoalKey(row);
   }
 
   function updatePortfolioGoalsTotal() {
@@ -1182,12 +930,7 @@ export function registerPortfolioView({
   }
 
   function portfolioTotalsByCurrency(rows) {
-    const totals = new Map();
-    rows.forEach((row) => {
-      const currency = row.currency || "BRL";
-      totals.set(currency, (totals.get(currency) || 0) + Number(row.current_brl || 0));
-    });
-    return totals;
+    return portfolioGrouping.totalsByCurrency(rows);
   }
 
   function renderPortfolioPositions(positions) {
@@ -1521,53 +1264,11 @@ export function registerPortfolioView({
   }
 
   function portfolioAssetGroupKey(position) {
-    const assetName = position.asset_name || position.asset_identifier || "Sem nome";
-    return JSON.stringify([
-      position.account_id,
-      position.currency,
-      position.asset_type,
-      assetName,
-      position.cnpj || "",
-    ]);
+    return portfolioGrouping.assetGroupKey(position);
   }
 
   function aggregatePortfolioPositions(positions, groupKey) {
-    const base = { ...positions[0] };
-    const sum = (field) => positions.reduce((total, position) => total + Number(position[field] || 0), 0);
-    const quantity = sum("quantity");
-    const totalCost = sum("total_cost");
-    const totalCostBrl = sum("total_cost_brl");
-    const currentValue = sum("current_value");
-    const currentValueBrl = sum("current_value_brl");
-    const dayResult = sum("day_result");
-    const dayResultBrl = sum("day_result_brl");
-    const fixedIncomeGross = sum("fixed_income_gross_value");
-    const fixedIncomeIof = sum("fixed_income_iof_tax");
-    const fixedIncomeTax = sum("fixed_income_income_tax");
-    const fixedIncomeNet = sum("fixed_income_net_value");
-    base.quantity = quantity;
-    base.average_price = quantity > 0 ? totalCost / quantity : Number(base.average_price || 0);
-    base.invested = sum("invested");
-    base.costs = sum("costs");
-    base.total_cost = totalCost;
-    base.total_cost_brl = totalCostBrl;
-    base.current_value = currentValue;
-    base.current_value_brl = currentValueBrl;
-    base.current_value_cents = Math.round(currentValue * 100);
-    base.current_value_brl_cents = Math.round(currentValueBrl * 100);
-    base.day_result = dayResult;
-    base.day_result_brl = dayResultBrl;
-    base.fixed_income_gross_value = fixedIncomeGross;
-    base.fixed_income_iof_tax = fixedIncomeIof;
-    base.fixed_income_income_tax = fixedIncomeTax;
-    base.fixed_income_net_value = fixedIncomeNet;
-    base.apply_tax_estimate = positions.every((position) => Boolean(position.apply_tax_estimate));
-    base.source_type = "aggregate";
-    base.source_id = null;
-    base.source_transaction_id = null;
-    base.operations_count = positions.length;
-    base.portfolio_group_key = groupKey;
-    return base;
+    return portfolioGrouping.aggregatePositions(positions, groupKey);
   }
 
   function portfolioPositionRow(position, options = {}) {
@@ -1917,54 +1618,23 @@ export function registerPortfolioView({
   }
 
   function portfolioRedemptionPayload(position) {
-    return {
-      account_id: position.account_id,
-      currency: position.currency,
-      asset_type: position.asset_type,
-      asset_identifier: position.asset_identifier || "",
-      asset_name: position.asset_name || "",
-      cnpj: position.cnpj || "",
-      quantity: position.quantity || 0,
-      current_value: position.current_value,
-    };
+    return portfolioForm.redemptionPayload(position);
   }
 
   function portfolioValuePayload(position) {
-    return {
-      account_id: position.account_id,
-      asset_type: position.asset_type,
-      asset_identifier: position.asset_identifier || "",
-      asset_name: position.asset_name || "",
-      cnpj: position.cnpj || "",
-      fixed_income_indexer: position.fixed_income_indexer || "",
-      fixed_income_maturity_date: position.fixed_income_maturity_date || "",
-      current_value: position.current_value,
-    };
+    return portfolioForm.valuePayload(position);
   }
 
   function portfolioClosePayload(position) {
-    return {
-      ...portfolioRedemptionPayload(position),
-      fixed_income_indexer: position.fixed_income_indexer || "",
-      fixed_income_maturity_date: position.fixed_income_maturity_date || "",
-    };
+    return portfolioForm.closePayload(position);
   }
 
   function savingsAnniversariesInputValue(entries) {
-    if (!Array.isArray(entries)) {
-      return "";
-    }
-    return entries
-      .map((entry) => `${entry.date || ""}; ${moneyInputValue(entry.amount)}`)
-      .filter((line) => !line.startsWith(";"))
-      .join("\n");
+    return portfolioForm.savingsAnniversariesInputValue(entries, moneyInputValue);
   }
 
   function decimalInputValue(value) {
-    if (value === null || value === undefined || value === "") {
-      return "";
-    }
-    return String(value).replace(".", ",");
+    return portfolioForm.decimalInputValue(value);
   }
 
   return {

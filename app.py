@@ -40,6 +40,7 @@ from financeiro.auth import (
     update_user_email,
     update_user_password,
 )
+from financeiro.balance_projections import build_balance_projection
 from financeiro.calendar import get_cockpit_calendar
 from financeiro.categories import (
     create_category,
@@ -443,13 +444,43 @@ class AppHandler(BaseHTTPRequestHandler):
             }
         )
 
+    def handle_balance_projection(self) -> None:
+        user = self.require_user()
+        query = parse_qs(urlsplit(self.path).query)
+        month = (query.get("month") or [date.today().strftime("%Y-%m")])[0]
+        account_id = (query.get("account_id") or [None])[0]
+        try:
+            normalized_account_id = int(account_id) if account_id else None
+            date.fromisoformat(f"{month}-01")
+        except (TypeError, ValueError) as exc:
+            raise ApiError("Periodo ou conta invalidos.") from exc
+        self.send_json(build_balance_projection(
+            accounts=list_checking_accounts(user["id"]),
+            transactions=list_transactions(user["id"]),
+            cards=list_credit_cards(user["id"]),
+            card_transactions=list_credit_card_transactions(user["id"]),
+            card_payments=list_credit_card_payments(user["id"]),
+            month=month,
+            account_id=normalized_account_id,
+        ))
+
     def handle_cockpit(self) -> None:
         user = self.require_user()
         query = parse_qs(urlsplit(self.path).query)
         month = (query.get("month") or [date.today().strftime("%Y-%m")])[0]
         transactions = list_transactions(user["id"], month=month)
         card_transactions = list_credit_card_transactions(user["id"], invoice_month=month)
-        self.send_json(cockpit_payload([*transactions, *card_transactions]))
+        payload = cockpit_payload([*transactions, *card_transactions])
+        projection = build_balance_projection(
+            accounts=list_checking_accounts(user["id"]),
+            transactions=list_transactions(user["id"]),
+            cards=list_credit_cards(user["id"]),
+            card_transactions=list_credit_card_transactions(user["id"]),
+            card_payments=list_credit_card_payments(user["id"]),
+            month=month,
+        )
+        payload["currency_totals"] = projection["currency_totals"]
+        self.send_json(payload)
 
     def handle_cockpit_calendar(self) -> None:
         # spec: cockpit-calendario v0.8 — critérios 17 e 18

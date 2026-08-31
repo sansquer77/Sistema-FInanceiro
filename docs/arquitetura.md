@@ -2,12 +2,13 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.54
+versao: 3.56
 atualizado: 2026-08-30
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
   - "[[glossario]]"
+  - "[[qualidade-codigo]]"
   - "[[adr/0001-stack-local-sem-framework]]"
   - "[[adr/0002-modularizacao-frontend]]"
 tags: [arquitetura, meta]
@@ -16,7 +17,7 @@ tags: [arquitetura, meta]
 # Arquitetura
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-08-30 · relacionados: [[requisitos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
+> **implementado** · área: `meta` · atualizado em 2026-08-30 · relacionados: [[requisitos]], [[qualidade-codigo]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
 
 ## Visão geral
 
@@ -32,6 +33,8 @@ docs/               Requisitos, arquitetura, specs e referências
 ```
 
 O servidor HTTP revalida arquivos estáticos com `ETag` e `Last-Modified`; arquivos não versionados usam `Cache-Control: no-cache` para permitir `304 Not Modified` sem cache agressivo. Respostas JSON acima de 1 KB podem ser comprimidas com gzip quando o cliente envia `Accept-Encoding: gzip`.
+
+As fronteiras de responsabilidade e os sinais de alerta para crescimento de módulos estão consolidados em [[qualidade-codigo]]. O documento é uma referência implementada de revisão manual; não cria um gate automatizado de CI.
 
 O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Cockpit > Consultor**. Em Preferências, o usuário configura a IA geral, ativa o Consultor, aceita o consentimento de acesso aos dados e pode preencher/remover o Perfil Complementar criptografado. No Cockpit, a aba Consultor exibe os indicadores de atrasos/vencimentos, a subaba **Análises** com catálogo fechado de 9 análises em seletor (incluindo o card `evolucao_score_tempo` com seletor de 6/12 meses), botão único **Gerar** e a subaba **Histórico** com filtro textual. O módulo não possui prompt livre: cada execução envia apenas o contexto minimizado da análise escolhida e persiste somente respostas bem-sucedidas.
 
@@ -302,6 +305,7 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | `spending_limits.py` | Metas e orçamentos mensais. Ver [[limites-gastos]]. |
 | `http_routes.py` | Tabela declarativa e resolução de rotas, independente do transporte HTTP. Ver [[specs/desconcentracao-arquitetura-v2]]. |
 | `cockpit.py` | Agregações de domínio do resumo mensal do Cockpit, fora do adaptador HTTP. |
+| `balance_projections.py` | Saldos conciliados/projetados, reservas de faturas e consolidação por moeda; autoridade backend consumida por Cockpit e Extrato. |
 | `portfolio.py` | Fachada pública e orquestração compatível do Portfólio. Ver [[investimentos-portfolio]]. |
 | `portfolio_positions.py` | Regras internas de identidade, lotes e persistência lógica das posições. |
 | `portfolio_quotes.py` | Helpers de integrações externas e limites de cache de cotações. |
@@ -537,6 +541,8 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.56` — 2026-08-30 — [[qualidade-codigo]] incorporada como referência implementada de fronteiras de responsabilidade, sinais de alerta e prevenção de regressões arquiteturais.
+- `3.55` — 2026-08-30 — Projeções de saldos/faturas migram de `app.js` para `balance_projections.py` e `portfolio-view.js` passa a coordenar módulos dedicados de gráfico, agrupamento e formulário.
 - `3.54` — 2026-08-30 — Roteamento declarativo e fronteiras internas de Portfólio/Cockpit reduzem concentração sem alterar contratos públicos. Ver [[specs/desconcentracao-arquitetura-v2]] e [[adr/0014-desconcentracao-fachadas-e-roteamento]].
 - `3.53` — 2026-08-30 — Documentados os utilitários puros de dinheiro, calendário, identificadores e recorrência compartilhados pelo núcleo. Ver [[specs/utilitarios-dominio]].
 - `3.52` — 2026-08-30 — Documentada manutenção automática do `quote_cache` com retenção stale, limites e `VACUUM` condicionado. Ver [[specs/manutencao-cache-cotacoes]].

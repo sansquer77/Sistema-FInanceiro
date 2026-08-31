@@ -41,8 +41,6 @@ export function registerTransactionsView({
   openMonthPicker,
   decisionModal,
   ensureSelectedAccount,
-  getBalanceUntil,
-  accountHasPreferredCardForecast,
   loadCockpit,
   markPortfolioDirty,
   renderBaseViews,
@@ -286,7 +284,10 @@ export function registerTransactionsView({
       state.accountTransactions = [];
       return;
     }
-    const response = await fetchAllListed(`/api/transactions?month=${encodeURIComponent(month)}&account_id=${encodeURIComponent(accountId)}`, "transactions");
+    const [response, projection] = await Promise.all([
+      fetchAllListed(`/api/transactions?month=${encodeURIComponent(month)}&account_id=${encodeURIComponent(accountId)}`, "transactions"),
+      api(`/api/balance-projection?month=${encodeURIComponent(month)}&account_id=${encodeURIComponent(accountId)}`),
+    ]);
     if (
       requestId !== state.transactionSliceRequestId
       || month !== state.transactionMonth
@@ -295,6 +296,17 @@ export function registerTransactionsView({
       return;
     }
     state.accountTransactions = response;
+    state.balanceProjection = projection;
+  }
+
+  function getBalanceUntil(limitDate, _transactions = null, reconciledOnly = false) {
+    const row = state.balanceProjection?.balances?.[limitDate];
+    return new Map(Object.entries(row?.[reconciledOnly ? "reconciled" : "projected"] || {}));
+  }
+
+  function accountHasPreferredCardForecast(account, limitDate) {
+    if (!account) return false;
+    return Boolean(state.balanceProjection?.preferred_card_forecasts?.[`${account.id}:${limitDate}`]);
   }
 
   async function handleTransactionSubmit(event) {

@@ -73,6 +73,7 @@ import { registerInstructionsView } from "./modules/instructions-view.js";
 import { registerGlobalSearch } from "./modules/global-search.js";
 import { initializeOverlayUX } from "./modules/overlay-utils.js";
 import { initializeDataUX } from "./modules/data-ux.js";
+import { createAppState, resetSessionData } from "./modules/app-state.js";
 
 applyTheme();
 applyDensity();
@@ -87,61 +88,7 @@ configureApi({
   onUnauthorized: handleSessionExpired,
 });
 
-const state = {
-  user: null,
-  accounts: [],
-  archivedAccounts: [],
-  creditCards: [],
-  archivedCreditCards: [],
-  cardInvoiceTransactions: [],
-  cardInvoicePayments: [],
-  cardTransactions: [],
-  cardPayments: [],
-  selectedCreditCardId: "",
-  selectedAccountId: "",
-  cardInvoiceSearch: "",
-  cardInvoiceStatusFilter: "all",
-  transactionSearch: "",
-  transactionStatusFilter: "all",
-  transactionHighlightId: "",
-  transactions: [],
-  accountTransactions: [],
-  cockpit: null,
-  cockpitLoadedMonth: "",
-  cockpitTab: "summary",
-  cockpitMonth: currentMonthValue(),
-  categories: [],
-  tags: [],
-  spendingLimits: [],
-  currentSpendingLimits: [],
-  appInfo: null,
-  latestVersion: null,
-  portfolio: null,
-  portfolioReturns: null,
-  portfolioDirty: true,
-  portfolioLoading: false,
-  portfolioError: "",
-  portfolioGroup: "account_name",
-  portfolioExpandedGroups: new Set(),
-  portfolioCollapsedGroups: new Set(),
-  portfolioAssetSaving: false,
-  portfolioHighlightId: "",
-  portfolioTab: "position",
-  view: "cockpit",
-  cockpitRefreshRequestId: 0,
-  transactionMonth: currentMonthValue(),
-  limitMonth: currentMonthValue(),
-  cardInvoiceMonth: currentMonthValue(),
-  reportMonth: currentMonthValue(),
-  reportTab: "categories",
-  reportAccountId: "",
-  statementScope: "consolidated",
-  statementCurrency: "all",
-  statementAccountIds: [],
-  statementCardIds: [],
-  transactionSliceRequestId: 0,
-  cardInvoiceRequestId: 0,
-};
+const state = createAppState({ currentMonth: currentMonthValue() });
 
 const authView = document.querySelector("#authView");
 const dashboardView = document.querySelector("#dashboardView");
@@ -1030,8 +977,6 @@ const transactionsView = registerTransactionsView({
   openMonthPicker,
   decisionModal,
   ensureSelectedAccount,
-  getBalanceUntil,
-  accountHasPreferredCardForecast,
   loadCockpit,
   markPortfolioDirty,
   renderBaseViews,
@@ -1331,29 +1276,7 @@ async function loadLatestVersion() {
 }
 
 function resetSessionState() {
-  state.user = null;
-  state.accounts = [];
-  state.archivedAccounts = [];
-  state.creditCards = [];
-  state.archivedCreditCards = [];
-  state.cardInvoiceTransactions = [];
-  state.cardInvoicePayments = [];
-  state.cardTransactions = [];
-  state.cardPayments = [];
-  state.selectedCreditCardId = "";
-  state.transactionSearch = "";
-  state.transactionStatusFilter = "all";
-  state.transactionHighlightId = "";
-  state.transactions = [];
-  state.accountTransactions = [];
-  state.cockpit = null;
-  state.cockpitTab = "summary";
-  state.cockpitMonth = currentMonthValue();
-  state.categories = [];
-  state.tags = [];
-  state.spendingLimits = [];
-  state.currentSpendingLimits = [];
-  state.portfolio = null;
+  resetSessionData(state, { currentMonth: currentMonthValue() });
   resetAccountForm();
   resetCreditCardForm();
   resetCardTransactionForm();
@@ -1904,177 +1827,10 @@ function selectedAccountTransactions(transactions = state.accountTransactions) {
 }
 
 function getCurrencyTotals() {
-  const cockpitMonth = cockpitMonthValue();
-  const cockpitLimitDate = monthEndDate(cockpitMonth);
-  const totals = new Map();
-  for (const account of state.accounts) {
-    const row = currencyTotalRow(totals, account.currency);
-    const amount = accountProjectedBalance(account, cockpitLimitDate);
-    row.current += amount;
-    row.accounts.push({
-      id: account.id,
-      name: account.name,
-      type: accountTypeLabel(account.account_type),
-      amount,
-      reconciled: accountReconciledBalance(account, cockpitLimitDate),
-    });
-  }
-  for (const card of state.creditCards) {
-    const row = currencyTotalRow(totals, card.currency);
-    const openAmount = cardInvoiceCompetenceBalance(card.id, cockpitMonth);
-    const reservedAmount = preferredCardForecastAmount(card, cockpitLimitDate);
-    // spec: relatorios/relatorios v2.17 — critério 36
-    // O pagamento ja reduziu a conta pagadora; a linha do cartao so cobre
-    // faturas abertas que ainda nao foram reservadas na conta preferencial.
-    const signedAmount = isCardInvoicePaid(card.id, cockpitMonth)
-      ? 0
-      : -Math.max(openAmount - reservedAmount, 0);
-    const displayedAmount = -Math.max(openAmount, 0);
-    row.current += signedAmount;
-    row.cards.push({
-      id: card.id,
-      name: card.name,
-      issuer: card.issuer,
-      amount: displayedAmount,
-      reconciled: -cardReconciledBalance(card.id, cockpitMonth),
-    });
-  }
-  return new Map([...totals.entries()].sort(([currencyA], [currencyB]) => currencyA.localeCompare(currencyB)));
-}
-
-function currencyTotalRow(totals, currency) {
-  const normalizedCurrency = currency || "BRL";
-  if (!totals.has(normalizedCurrency)) {
-    totals.set(normalizedCurrency, {
-      current: 0,
-      accounts: [],
-      cards: [],
-    });
-  }
-  return totals.get(normalizedCurrency);
-}
-
-function accountReconciledBalance(account, limitDate) {
-  return accountBalanceUntil(account, limitDate, true);
-}
-
-function accountProjectedBalance(account, limitDate) {
-  return accountBalanceUntil(account, limitDate, false) - preferredCardForecastForAccount(account, limitDate);
-}
-
-function accountBalanceUntil(account, limitDate, reconciledOnly) {
-  return Number(account.initial_balance || 0) + state.transactions.reduce((total, transaction) => {
-    if (transaction.date > limitDate || !transaction.reconciled_at) {
-      if (reconciledOnly || transaction.date > limitDate) {
-        return total;
-      }
-    }
-    if (reconciledOnly && !transaction.reconciled_at) {
-      return total;
-    }
-    const amount = Number(transaction.amount);
-    if (String(transaction.account_id) === String(account.id)) {
-      total += transactionSourceDelta(transaction.type, amount);
-    }
-    if (transaction.type === "transfer" && String(transaction.destination_account_id || "") === String(account.id)) {
-      total += Number(transaction.destination_amount || transaction.amount);
-    }
-    return total;
-  }, 0);
-}
-
-function accountHasPreferredCardForecast(account, limitDate) {
-  return preferredCardForecastForAccount(account, limitDate) > 0;
-}
-
-function preferredCardForecastForAccount(account, limitDate) {
-  if (!account || !limitDate) {
-    return 0;
-  }
-  return state.creditCards.reduce((total, card) => {
-    if (String(card.preferred_payment_account_id || "") !== String(account.id)) {
-      return total;
-    }
-    if ((card.currency || "BRL") !== (account.currency || "BRL")) {
-      return total;
-    }
-    return total + preferredCardForecastAmount(card, limitDate);
-  }, 0);
-}
-
-function preferredCardForecastAmount(card, limitDate) {
-  if (!card || !card.preferred_payment_account_id) {
-    return 0;
-  }
-  const forecastByInvoice = new Map();
-  for (const transaction of state.cardTransactions) {
-    if (
-      String(transaction.credit_card_id) !== String(card.id)
-      || !transaction.reconciled_at
-      || !transaction.invoice_month
-      || cardInvoiceDueDateValue(transaction.invoice_month, card.due_day) > limitDate
-      || isCardInvoicePaid(card.id, transaction.invoice_month)
-    ) {
-      continue;
-    }
-    const current = forecastByInvoice.get(transaction.invoice_month) || 0;
-    forecastByInvoice.set(transaction.invoice_month, current + cardTransactionInvoiceDelta(transaction));
-  }
-  return [...forecastByInvoice.values()].reduce((total, amount) => total + Math.max(amount, 0), 0);
-}
-
-function cardTransactionInvoiceDelta(transaction) {
-  const amount = Number(transaction.amount || 0);
-  if (transaction.type === "income") {
-    return -amount;
-  }
-  if (transaction.type === "expense") {
-    return amount;
-  }
-  return 0;
-}
-
-function isCardInvoicePaid(cardId, invoiceMonth) {
-  return state.cardPayments.some((payment) => (
-    String(payment.credit_card_id) === String(cardId) && payment.invoice_month === invoiceMonth
-  ));
-}
-
-function cardInvoiceDueDateValue(invoiceMonth, dueDay) {
-  return cardInvoiceDateValue(invoiceMonth, dueDay);
-}
-
-function cardInvoiceDateValue(invoiceMonth, day) {
-  const [year, month] = String(invoiceMonth).split("-").map(Number);
-  const safeDay = Number(day || 1);
-  if (!year || !month) {
-    return `${invoiceMonth}-01`;
-  }
-  const lastDay = new Date(year, month, 0).getDate();
-  const invoiceDay = Math.min(Math.max(safeDay, 1), lastDay);
-  return `${year}-${String(month).padStart(2, "0")}-${String(invoiceDay).padStart(2, "0")}`;
-}
-
-function cardInvoiceCompetenceBalance(cardId, invoiceMonth) {
-  return state.cardTransactions.reduce((total, transaction) => {
-    if (String(transaction.credit_card_id) !== String(cardId) || transaction.invoice_month !== invoiceMonth) {
-      return total;
-    }
-    return total + cardTransactionInvoiceDelta(transaction);
-  }, 0);
-}
-
-function cardReconciledBalance(cardId, invoiceMonth) {
-  return state.cardTransactions.reduce((total, transaction) => {
-    if (
-      String(transaction.credit_card_id) !== String(cardId)
-      || transaction.invoice_month !== invoiceMonth
-      || !transaction.reconciled_at
-    ) {
-      return total;
-    }
-    return total + cardTransactionInvoiceDelta(transaction);
-  }, 0);
+  return new Map((state.cockpit?.currency_totals || []).map(({ currency, ...row }) => [currency, {
+    ...row,
+    accounts: (row.accounts || []).map((account) => ({ ...account, type: accountTypeLabel(account.type) })),
+  }]));
 }
 
 function cardOpenBalance(cardId, untilInvoiceMonth = null) {
@@ -2090,78 +1846,6 @@ function cockpitMonthValue() {
     state.cockpitMonth = currentMonthValue();
   }
   return state.cockpitMonth;
-}
-
-function getBalanceUntil(limitDate, transactions = state.transactions, reconciledOnly = false) {
-  const totals = new Map();
-  
-  // If a specific account is selected, calculate balance only for that account
-  if (state.selectedAccountId) {
-    const account = state.accounts.find((entry) => String(entry.id) === String(state.selectedAccountId));
-    if (account) {
-      totals.set(account.currency, Number(account.initial_balance));
-      
-      for (const transaction of transactions) {
-        if (transaction.date > limitDate) {
-          continue;
-        }
-        if (reconciledOnly && !transaction.reconciled_at) {
-          continue;
-        }
-        const amount = Number(transaction.amount);
-        const sourceCurrency = transaction.account_currency;
-        if (String(transaction.account_id) === String(state.selectedAccountId)) {
-          totals.set(sourceCurrency, (totals.get(sourceCurrency) || 0) + transactionSourceDelta(transaction.type, amount));
-        }
-        if (transaction.type === "transfer" && transaction.destination_account_id) {
-          const destinationCurrency = transaction.destination_account_currency || sourceCurrency;
-          const destinationAmount = Number(transaction.destination_amount || transaction.amount);
-          if (String(transaction.destination_account_id) === String(state.selectedAccountId)) {
-            totals.set(destinationCurrency, (totals.get(destinationCurrency) || 0) + destinationAmount);
-          }
-        }
-      }
-      if (!reconciledOnly) {
-        totals.set(account.currency, (totals.get(account.currency) || 0) - preferredCardForecastForAccount(account, limitDate));
-      }
-    }
-  } else {
-    // No account selected: calculate balance for all accounts
-    for (const account of state.accounts) {
-      const current = totals.get(account.currency) || 0;
-      totals.set(account.currency, current + Number(account.initial_balance));
-    }
-    for (const transaction of transactions) {
-      if (transaction.date > limitDate) {
-        continue;
-      }
-      if (reconciledOnly && !transaction.reconciled_at) {
-        continue;
-      }
-      const amount = Number(transaction.amount);
-      const sourceCurrency = transaction.account_currency;
-      totals.set(sourceCurrency, (totals.get(sourceCurrency) || 0) + transactionSourceDelta(transaction.type, amount));
-      if (transaction.type === "transfer" && transaction.destination_account_id) {
-        const destinationCurrency = transaction.destination_account_currency || sourceCurrency;
-        const destinationAmount = Number(transaction.destination_amount || transaction.amount);
-        totals.set(destinationCurrency, (totals.get(destinationCurrency) || 0) + destinationAmount);
-      }
-    }
-    if (!reconciledOnly) {
-      for (const account of state.accounts) {
-        totals.set(account.currency, (totals.get(account.currency) || 0) - preferredCardForecastForAccount(account, limitDate));
-      }
-    }
-  }
-  
-  return new Map([...totals.entries()].sort(([currencyA], [currencyB]) => currencyA.localeCompare(currencyB)));
-}
-
-function transactionSourceDelta(type, amount) {
-  if (type === "income") {
-    return amount;
-  }
-  return -amount;
 }
 
 function renderCockpitPortfolioByType() {

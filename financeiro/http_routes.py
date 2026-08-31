@@ -17,6 +17,7 @@ EXACT_ROUTES: dict[str, dict[str, str]] = {
         "/api/credit-card-transactions": "handle_list_credit_card_transactions",
         "/api/credit-card-payments": "handle_list_credit_card_payments",
         "/api/transactions": "handle_list_transactions",
+        "/api/balance-projection": "handle_balance_projection",
         "/api/exchange-rate": "handle_exchange_rate",
         "/api/classification-suggestion": "handle_classification_suggestion",
         "/api/email-config": "handle_email_config_status",
