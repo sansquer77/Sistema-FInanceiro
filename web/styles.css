@@ -1941,6 +1941,31 @@ textarea:focus {
   margin-top: 18px;
 }
 
+.virtual-list,
+.portfolio-virtual-list {
+  position: relative;
+  max-height: min(70vh, 720px);
+  overflow-y: auto;
+  contain: strict;
+}
+
+.virtual-list-surface {
+  position: relative;
+  min-width: 100%;
+}
+
+.virtual-list-item {
+  position: absolute;
+  right: 0;
+  left: 0;
+  min-height: var(--virtual-row-height);
+}
+
+.portfolio-virtual-list .virtual-list-item > tr,
+.portfolio-virtual-list .virtual-list-item > table {
+  width: 100%;
+}
+
 .cockpit-alert,
 .limit-alert {
   margin: 14px 0 18px;

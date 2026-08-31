@@ -1,3 +1,4 @@
+import { renderVirtualList } from "./virtual-list.js";
 import { stateMarkup } from "./dom-utils.js";
 import { createAssetAutocomplete } from "./asset-autocomplete.js";
 import {
@@ -901,6 +902,7 @@ export function registerTransactionsView({
         || isTransactionDayExpanded(dateKey, today);
       group.className = `transaction-group${compact ? "" : " collapsible-day"}${isExpanded ? "" : " is-collapsed"}`;
       const rows = items.map((transaction) => transactionTemplate(transaction, compact)).join("");
+        const rows = items.map((transaction) => transactionTemplate(transaction, compact)).join("");
       const heading = document.createElement("h3");
       if (compact) {
         heading.textContent = formatDate(dateKey);
@@ -918,6 +920,13 @@ export function registerTransactionsView({
       content.className = "transaction-day-content";
       content.hidden = !isExpanded;
       content.innerHTML = `<div class="transaction-rows">${rows}</div>`;
+            content.innerHTML = `<div class="transaction-rows">${rows}</div>`;
+            if (!compact && isExpanded && items.length > 200) {
+              renderVirtualList(content.querySelector(".transaction-rows"), items, {
+                rowHeight: 86,
+                renderItem: (transaction) => transactionTemplate(transaction, compact),
+              });
+            }
       group.append(heading, content);
       if (!compact && isExpanded) {
         content.append(dailyBalance(dateKey, balanceTransactions));

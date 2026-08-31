@@ -2,7 +2,7 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 4.10
+versao: 4.11
 atualizado: 2026-08-30
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
@@ -52,6 +52,7 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `density-utils.js` | Preferência visual local de densidade e aplicação de `data-density` no documento. |
 | `overlay-utils.js` | Semântica, foco e teclado compartilhados por drawers e overlays persistentes. |
 | `data-ux.js` | Ordenação local, contagem de linhas e chips removíveis para tabelas e filtros. |
+| `virtual-list.js` | Janela visível com overscan para coleções extensas de altura fixa. |
 | `asset-autocomplete.js` | Sugestões de ativos existentes por `datalist`, preenchimento de metadados e preservação da digitação livre. |
 | `instructions-content.js` | Conteúdo estático, offline e versionado da central de ajuda. |
 
@@ -239,6 +240,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Changelog
 
+- `4.11` — 2026-08-30 — Adicionado `virtual-list.js` para virtualização progressiva de listas extensas de Portfólio, Lançamentos e Relatórios.
 - `4.10` — 2026-08-30 — Concluído o primeiro contrato `onEnter()`/`onLeave()` no Portfólio, acionado pelo composition root e coberto por testes de fronteira.
 - `4.9` — 2026-08-30 — Iniciado ciclo de vida seletivo para liberar DOM e recursos gráficos de views pesadas sem descartar seu estado de dados.
 - `4.8` — 2026-08-30 — Concluída a extração de estado e carregamentos coordenados, com contratos automatizados para preservar as fronteiras do composition root.

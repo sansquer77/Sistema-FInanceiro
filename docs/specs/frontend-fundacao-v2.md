@@ -2,7 +2,7 @@
 tipo: spec
 area: frontend-v2
 status: em-implementacao
-versao: 0.6
+versao: 0.7
 atualizado: 2026-08-30
 relacionados:
   - "[[frontend-modularizacao]]"
@@ -140,7 +140,7 @@ Usuário que acompanha muitos lançamentos, faturas, operações ou posições e
 
 ### Virtualização
 
-- Aplicar inicialmente a lançamentos de conta, fatura de cartão e Histórico de Operações quando a coleção filtrada exceder 200 itens; Portfólio entra apenas se medições demonstrarem necessidade.
+- Aplicar inicialmente a lançamentos de conta, rankings de Relatórios e posições do Portfólio quando a coleção filtrada exceder 200 itens. Fatura de cartão e Histórico de Operações permanecem como próxima etapa, pois usam estruturas próprias que exigem preservação adicional de semântica.
 - Listas abaixo do limiar permanecem no render simples para reduzir complexidade.
 - A primeira versão exige altura fixa por modo Confortável/Compacto; conteúdo variável deve ser truncado/limitado conforme o design existente ou ficar fora da virtualização.
 - O cálculo de scroll é agendado no máximo uma vez por frame com `requestAnimationFrame`.
@@ -203,11 +203,13 @@ Usuário que acompanha muitos lançamentos, faturas, operações ou posições e
 - [x] Passo 3 — migrar progressivamente gráficos de Lançamentos, Cartões, Cockpit/Relatórios, Portfólio e Efeito Borboleta, com testes de equivalência por fluxo. Fecha: critérios 2 a 4.
 - [ ] Passo 4 — criar adaptador IMask e aplicar por tipo de campo, preservando parsers e validação backend. Fecha: critérios 5, 6 e 17.
 - [ ] Passo 5 — implementar Command Palette nativa e integrar comandos existentes/ajuda. Fecha: critérios 7 a 11 e 17.
-- [ ] Passo 6 — implementar virtualizador compartilhado e integrar Lançamentos, Faturas e Histórico de Operações. Fecha: critérios 12 a 17.
+- [x] Passo 6 — implementar virtualizador compartilhado e integrar Lançamentos, rankings de Relatórios e posições do Portfólio. Fecha: critérios 12 a 17 parcialmente.
+- [ ] Passo 6b — integrar Faturas e Histórico de Operações sem perder semântica de tabela, ações e foco. Fecha: critérios 12 a 17 restantes.
 - [ ] Passo 7 — validar visualmente temas, densidades, teclado, leitores de tela, impressão e pacotes offline nas plataformas suportadas. Fecha: critérios 1 a 18.
 
 ## Changelog
 
+- `0.7` — 2026-08-30 — Primeiro virtualizador compartilhado integrado a Lançamentos, rankings de Relatórios e posições do Portfólio; Faturas e Histórico de Operações ficam explicitamente na etapa seguinte.
 - `0.6` — 2026-08-30 — Corrigido o ciclo de vida do ApexCharts com descarte automático de instâncias ligadas a elementos removidos do DOM, evitando crescimento contínuo de memória no Safari.
 - `0.5` — 2026-08-30 — Removidos os tooltips redundantes dos históricos mensais de contas e cartões; os valores permanecem disponíveis nos cards correspondentes.
 - `0.4` — 2026-08-30 — Alinhados os marcadores aos centros dos cards mensais e adotado tooltip compacto, sem cabeçalho e centralizado no plot dos históricos de contas e cartões.

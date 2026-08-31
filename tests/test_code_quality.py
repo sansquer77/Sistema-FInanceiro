@@ -15,9 +15,9 @@ REVIEWED_OVERSIZED_MODULES = {
     "financeiro/transactions.py": 1334,
     "financeiro/trends.py": 1237,
     "financeiro/consultor.py": 1511,
-    "web/modules/portfolio-view.js": 1650,
-    "web/modules/reports-view.js": 1322,
-    "web/modules/transactions-view.js": 1584,
+    "web/modules/portfolio-view.js": 1663,
+    "web/modules/reports-view.js": 1336,
+    "web/modules/transactions-view.js": 1593,
 }
 MODULE_SIZE_REVIEW_THRESHOLD = 1200
 

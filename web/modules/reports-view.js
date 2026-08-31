@@ -2,6 +2,7 @@ import { api } from "./api.js";
 import { stateMarkup } from "./dom-utils.js";
 import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";
 import { renderChart } from "./chart-adapter.js";
+import { renderVirtualList } from "./virtual-list.js";
 
 export function registerReportsView({
   state,
@@ -193,6 +194,7 @@ export function registerReportsView({
     reportContent.innerHTML = sections.map(([title, type]) => (
       reportRankedSection(title, groupReportItems(items.filter((item) => item.reportType === type), "category"), `Nenhum item em ${title.toLowerCase()} neste mês.`)
     )).join("");
+    virtualizeReportLists();
   }
 
   function renderSubcategoriesReport(items) {
@@ -204,6 +206,7 @@ export function registerReportsView({
     reportContent.innerHTML = sections.map(([title, type]) => (
       reportRankedSection(title, groupReportItems(items.filter((item) => item.reportType === type), "subcategory"), `Nenhuma subcategoria em ${title.toLowerCase()} neste mês.`)
     )).join("");
+    virtualizeReportLists();
   }
 
   async function renderTagsReport() {
@@ -419,9 +422,20 @@ export function registerReportsView({
           <h2>${escapeHtml(title)}</h2>
           <strong>${formatMoneyTotals(total)}</strong>
         </div>
-        <div class="report-rank-list">${content}</div>
+        <div class="report-rank-list" data-virtualize-report>${content}</div>
       </section>
     `;
+  }
+
+  function virtualizeReportLists() {
+    reportContent.querySelectorAll("[data-virtualize-report]").forEach((list) => {
+      if (list.children.length <= 200) return;
+      const items = [...list.children].map((item) => item.outerHTML);
+      renderVirtualList(list, items, {
+        rowHeight: 106,
+        renderItem: (item) => item,
+      });
+    });
   }
 
   function reportItemsForMonth(month) {

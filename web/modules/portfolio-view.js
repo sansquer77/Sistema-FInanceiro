@@ -5,6 +5,7 @@ import { createPortfolioChart } from "./portfolio-chart.js";
 import * as portfolioGrouping from "./portfolio-grouping.js";
 import * as portfolioForm from "./portfolio-form.js";
 import { canReusePortfolioSnapshot, clearPortfolioPresentation } from "./portfolio-lifecycle.js";
+import { renderVirtualList } from "./virtual-list.js";
 
 export function registerPortfolioView({
   state,
@@ -936,8 +937,10 @@ export function registerPortfolioView({
     }
     const grouped = groupPortfolioPositions(positions);
     const hasTreasuryDirect = positions.some((position) => isTreasuryDirectPosition(position));
-    portfolioPositions.innerHTML = `${grouped.map((group) => {
+    portfolioPositions.innerHTML = `${grouped.map((group, groupIndex) => {
       const collapsed = state.portfolioCollapsedGroups.has(group.key);
+      const positionRows = portfolioPositionRows(group.positions);
+      const virtualRows = positionRows.length > 200;
       return `
       ${group.label ? portfolioGroupHeader(group, collapsed) : ""}
       <div class="report-table-wrap ${collapsed ? "portfolio-group-collapsed" : ""}">
@@ -958,13 +961,25 @@ export function registerPortfolioView({
               <th>Ações</th>
             </tr>
           </thead>
-          <tbody>
-            ${portfolioPositionRows(group.positions).join("")}
-          </tbody>
+          ${virtualRows ? `<tbody><tr><td colspan="11"><div class="portfolio-virtual-list" data-portfolio-virtual-group="${groupIndex}"></div></td></tr></tbody>` : `<tbody>${positionRows.join("")}</tbody>`}
         </table>
       </div>
     `;
     }).join("")}${hasTreasuryDirect ? portfolioTreasuryNote() : ""}`;
+    grouped.forEach((group, groupIndex) => {
+      const list = portfolioPositions.querySelector(`[data-portfolio-virtual-group="${groupIndex}"]`);
+      if (!list) return;
+      const rows = portfolioPositionRows(group.positions);
+      renderVirtualList(list, rows, {
+        rowHeight: 74,
+        renderItem: (row) => {
+          const table = document.createElement("table");
+          table.className = "report-table portfolio-table";
+          table.innerHTML = `<tbody>${row}</tbody>`;
+          return table;
+        },
+      });
+    });
   }
 
   function portfolioTreasuryNote() {

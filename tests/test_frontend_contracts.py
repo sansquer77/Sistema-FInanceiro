@@ -61,6 +61,22 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn('return "stock_usd"', portfolio)
         self.assertIn('"stock_usd": "Renda variável - USD"', backend)
 
+    def test_long_lists_use_shared_virtualizer_contract(self) -> None:
+        virtualizer = (MODULE_ROOT / "virtual-list.js").read_text(encoding="utf-8")
+        transactions = (MODULE_ROOT / "transactions-view.js").read_text(encoding="utf-8")
+        reports = (MODULE_ROOT / "reports-view.js").read_text(encoding="utf-8")
+        portfolio = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
+
+        self.assertIn("DEFAULT_OVERSCAN = 5", virtualizer)
+        self.assertIn("requestAnimationFrame", virtualizer)
+        self.assertIn('items.length <= threshold', virtualizer)
+        self.assertIn('from "./virtual-list.js"', transactions)
+        self.assertIn('from "./virtual-list.js"', reports)
+        self.assertIn('from "./virtual-list.js"', portfolio)
+        self.assertIn('items.length > 200', transactions)
+        self.assertIn('list.children.length <= 200', reports)
+        self.assertIn('positionRows.length > 200', portfolio)
+
     def test_portfolio_analysis_flyout_avoids_persistent_webkit_layers(self) -> None:
         portfolio = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
         portfolio_chart = (MODULE_ROOT / "portfolio-chart.js").read_text(encoding="utf-8")
