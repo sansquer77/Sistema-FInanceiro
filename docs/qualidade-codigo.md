@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 1.8
+versao: 1.9
 atualizado: 2026-08-31
 relacionados:
   - "[[arquitetura]]"
@@ -17,7 +17,7 @@ aliases: ["Qualidade de Código", "Padrões de Qualidade", "Convenções de Cód
 # Qualidade de Código
 
 > [!info] Status
-> **implementado** · área: `meta` · versão: `1.8` · atualizado em 2026-08-31 · relacionados: [[arquitetura]], [[sdd]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]], [[adr/0003-sqlite-fonte-de-verdade]]
+> **implementado** · área: `meta` · versão: `1.9` · atualizado em 2026-08-31 · relacionados: [[arquitetura]], [[sdd]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]], [[adr/0003-sqlite-fonte-de-verdade]]
 
 ## Objetivo
 
@@ -83,6 +83,7 @@ Os limites numéricos da seção "Sinais de alerta" são verificados pelo teste 
 
 ## Changelog
 
+- `1.9` — 2026-08-31 — Linha-base revisada de `consultor.py` reduzida de 1.511 para 1.454 linhas após extração de histórico, quota e cooldown.
 - `1.8` — 2026-08-31 — `transactions-view.js` reduzido abaixo do limiar de módulos superdimensionados por extrações de gráfico, lista, formulário e classificação compartilhada.
 - `1.7` — 2026-08-31 — Reduzida a linha-base revisada de `transactions-view.js` para 1.528 linhas após remoção de resíduos SVG comprovadamente mortos.
 - `1.6` — 2026-08-31 — Sincronizados frontmatter e callout de status; arquitetura passa a reconhecer explicitamente o gate automatizado já aplicado por `tests/test_code_quality.py`.

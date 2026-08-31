@@ -2,8 +2,8 @@
 tipo: spec
 area: arquitetura-v2
 status: implementado
-versao: 1.2
-atualizado: 2026-08-30
+versao: 1.4
+atualizado: 2026-08-31
 relacionados:
   - "[[../arquitetura]]"
   - "[[../adr/0014-desconcentracao-fachadas-e-roteamento]]"
@@ -17,7 +17,7 @@ aliases: ["Desconcentração arquitetural da v2"]
 # Desconcentração arquitetural da v2
 
 > [!info] Status
-> **implementado** · área: `arquitetura-v2` · atualizado em 2026-08-30 · relacionados: [[../arquitetura]], [[../adr/0014-desconcentracao-fachadas-e-roteamento]], [[investimentos-portfolio]], [[frontend-modularizacao]], [[../qualidade-codigo]]
+> **implementado** · área: `arquitetura-v2` · atualizado em 2026-08-31 · relacionados: [[../arquitetura]], [[../adr/0014-desconcentracao-fachadas-e-roteamento]], [[investimentos-portfolio]], [[frontend-modularizacao]], [[../qualidade-codigo]]
 
 ## Problema
 
@@ -77,6 +77,9 @@ Usuários da v2 que precisam manter os fluxos e dados atuais estáveis enquanto 
 
 ## Plano de implementação
 
+- [x] Passo 6 — extrair persistência do histórico, quota diária e cooldown para `consultor_history.py`, preservando imports públicos e exceções de `consultor.py`.
+- [x] Passo 7 — adicionar contratos contra regressão e executar testes do Consultor e suíte completa.
+
 - [x] Passo 1 — extrair tabela e resolução de rotas. Fecha: critérios 1 e 2.
 - [x] Passo 2 — extrair agregação do Cockpit de `app.py`. Fecha: critério 6.
 - [x] Passo 3 — criar fronteiras internas do Portfólio preservando fachada. Fecha: critérios 3 a 5.
@@ -85,6 +88,8 @@ Usuários da v2 que precisam manter os fluxos e dados atuais estáveis enquanto 
 
 ## Changelog
 
+- `1.4` — 2026-08-31 — Extração de `consultor_history.py` concluída e protegida por wrappers compatíveis, testes do Consultor e gate de qualidade.
+- `1.3` — 2026-08-31 — Iniciada a desconcentração do Consultor pela extração isolada de histórico, quota e cooldown, mantendo `consultor.py` como fachada pública.
 - `1.2` — 2026-08-30 — Vinculada à spec implementada [[../qualidade-codigo]], que formaliza as fronteiras preservadas por esta desconcentração.
 - `1.1` — 2026-08-30 — Projeções de saldo/fatura movidas ao núcleo e Portfólio frontend dividido em gráfico, agrupamento, formulário e coordenador.
 - `1.0` — 2026-08-30 — Refatoração arquitetural inicial da fundação v2 implementada e verificada.

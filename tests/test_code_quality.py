@@ -14,7 +14,7 @@ REVIEWED_OVERSIZED_MODULES = {
     "financeiro/portfolio.py": 2812,
     "financeiro/transactions.py": 1334,
     "financeiro/trends.py": 1237,
-    "financeiro/consultor.py": 1511,
+    "financeiro/consultor.py": 1454,
     "web/modules/cards-view.js": 1209,
     "web/modules/portfolio-view.js": 1663,
     "web/modules/reports-view.js": 1336,
@@ -27,6 +27,18 @@ def line_count(path: Path) -> int:
 
 
 class CodeQualityContractTest(unittest.TestCase):
+    def test_consultor_history_is_extracted_behind_compatible_facade(self) -> None:
+        facade = (REPOSITORY_ROOT / "financeiro/consultor.py").read_text(encoding="utf-8")
+        history = (REPOSITORY_ROOT / "financeiro/consultor_history.py").read_text(encoding="utf-8")
+        self.assertIn("from financeiro import consultor_history as history_store", facade)
+        self.assertIn("def list_consultor_history", facade)
+        self.assertIn("def delete_consultor_history", facade)
+        self.assertNotIn("INSERT INTO consultor_analyses", facade)
+        self.assertNotIn("DELETE FROM consultor_analyses", facade)
+        self.assertIn("INSERT INTO consultor_analyses", history)
+        self.assertIn("DELETE FROM consultor_analyses", history)
+        self.assertIn("_FAILURE_COOLDOWNS", history)
+
     def test_quality_spec_is_implemented_and_indexed(self) -> None:
         spec = (REPOSITORY_ROOT / "docs/qualidade-codigo.md").read_text(encoding="utf-8")
         index = (REPOSITORY_ROOT / "docs/README.md").read_text(encoding="utf-8")

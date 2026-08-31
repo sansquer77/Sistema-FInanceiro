@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.61
+versao: 3.62
 atualizado: 2026-08-31
 relacionados:
   - "[[requisitos]]"
@@ -328,7 +328,8 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | `financial_health.py` | Núcleo analítico do Score de Saúde Financeira: cálculo atômico dos pilares, lista `pilares`, Paz Financeira e função de histórico com validação de `months` (1-36). Ver [[score-saude-financeira]]. |
 | `trends.py` | Núcleo local de Tendências e Achados: série mensal, Budget x Realizado, achados estruturados, eventos pontuais, assinaturas/serviços recorrentes, confiança e resumo determinístico. Ver [[tendencias-saude-financeira]]. |
 | `ai_summary.py` | Reescrita opcional do resumo por IA com payload minimizado, timeout curto e fallback para resumo local. Ver [[tendencias-saude-financeira]]. |
-| `consultor.py` | Domínio do Consultor: catálogo fechado de 9 análises, validações de enums, prompts estritos, persona, disclaimer, configuração por usuário, Perfil Complementar criptografado, contexto minimizado por card (incluindo série histórica dos 5 pilares do Score para o card `evolucao_score_tempo`), metadados de cotações herdados do Portfólio, executor de IA via `user_ai_settings`, pós-processamento de respostas, quota/cooldown de resiliência e expurgo de histórico por privacidade. Ver [[specs/consultor]]. |
+| `consultor.py` | Fachada pública e orquestração do Consultor: catálogo, contexto, execução, configurações e reexportação compatível das operações de histórico. Ver [[specs/consultor]]. |
+| `consultor_history.py` | Persistência/listagem/expurgo das análises, quota diária e cooldown de falhas, isolados do executor e da configuração. Ver [[specs/consultor]]. |
 | `imports.py` | Leitura de arquivos externos legados e planilhas modelo. Ver [[importacao-dados]]. |
 | `operation_logs.py` | Auditoria funcional das operações do usuário. Ver [[historico-operacoes]]. |
 | `emailer.py` | Envio SMTP do código de recuperação de senha. Ver [[recuperacao-senha]]. |
@@ -556,6 +557,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.62` — 2026-08-31 — Histórico, quota diária e cooldown do Consultor extraídos para `consultor_history.py`; `consultor.py` preserva sua API pública por wrappers explícitos.
 - `3.61` — 2026-08-31 — `transactions-view.js` torna-se fachada compatível sobre módulos de gráfico, lista, formulário base/investimento e classificação compartilhada; a prévia cambial passa a `financeiro/exchange_rates.py`.
 - `3.60` — 2026-08-31 — Documentados `bank-logos.js`, os catálogos de assets compartilhados por Contas/Cartões e o gate automatizado efetivamente aplicado por `tests/test_code_quality.py`.
 - `3.59` — 2026-08-30 — Carregamentos de Preferências, Histórico, Extrato e Simulações adotam política compartilhada `dirty + loadedAt + in-flight`, invalidada centralmente após mutações HTTP.

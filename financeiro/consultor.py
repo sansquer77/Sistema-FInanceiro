@@ -4,12 +4,13 @@ import json
 import re
 import unicodedata
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 from financeiro.database import get_connection
+from financeiro import consultor_history as history_store
 from financeiro.ai_summary import ai_ssl_context, extract_summary_text
 from financeiro.secure_config import (
     SecureConfigError,
@@ -91,10 +92,9 @@ SCORE_EVOLUTION_WINDOWS = {
 }
 CONSULTOR_MAX_TOKENS = 900
 CONSULTOR_MIN_TIMEOUT_SECONDS = 20
-CONSULTOR_DAILY_QUOTA = 20
-CONSULTOR_FAILURE_COOLDOWN_SECONDS = 30
+CONSULTOR_DAILY_QUOTA = history_store.CONSULTOR_DAILY_QUOTA
+CONSULTOR_FAILURE_COOLDOWN_SECONDS = history_store.CONSULTOR_FAILURE_COOLDOWN_SECONDS
 DEFAULT_TEMPERATURE = 0.2
-_FAILURE_COOLDOWNS: dict[tuple[int, str], datetime] = {}
 MARKET_DATA_SOURCES = (
     "Yahoo Finance",
     "CoinGecko",
@@ -510,21 +510,12 @@ def execute_consultor_analysis(
 
 
 def assert_daily_quota_available(user_id: int, current_date: date) -> None:
-    if consultor_daily_usage(user_id, current_date) >= CONSULTOR_DAILY_QUOTA:
+    if history_store.daily_quota_exceeded(user_id, current_date):
         raise ConsultorError("Limite diario do Consultor atingido. Tente novamente amanha.")
 
 
 def consultor_daily_usage(user_id: int, current_date: date) -> int:
-    with get_connection() as conn:
-        row = conn.execute(
-            """
-            SELECT COUNT(*) AS total
-            FROM consultor_analyses
-            WHERE user_id = ? AND created_date = ?
-            """,
-            (int(user_id), current_date.isoformat()),
-        ).fetchone()
-    return int(row["total"] if row else 0)
+    return history_store.daily_usage(user_id, current_date)
 
 
 def persist_consultor_analysis(
@@ -534,45 +525,11 @@ def persist_consultor_analysis(
     output: str,
     current_time: datetime,
 ) -> dict:
-    created_at = current_time.strftime("%Y-%m-%d %H:%M:%S")
-    created_date = current_time.date().isoformat()
-    with get_connection() as conn:
-        cursor = conn.execute(
-            """
-            INSERT INTO consultor_analyses (
-                user_id, analysis_id, period_window, analysis_output, created_at, created_date
-            )
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (int(user_id), analysis_id, period_window, output, created_at, created_date),
-        )
-        execution_id = int(cursor.lastrowid)
-    return {"id": execution_id, "created_at": created_at}
+    return history_store.persist_analysis(user_id, analysis_id, period_window, output, current_time)
 
 
 def list_consultor_history(user_id: int, *, limit: int = 50) -> list[dict]:
-    bounded_limit = min(max(int(limit), 1), 100)
-    with get_connection() as conn:
-        rows = conn.execute(
-            """
-            SELECT id, analysis_id, period_window, analysis_output, created_at
-            FROM consultor_analyses
-            WHERE user_id = ?
-            ORDER BY created_at DESC, id DESC
-            LIMIT ?
-            """,
-            (int(user_id), bounded_limit),
-        ).fetchall()
-    return [
-        {
-            "analysis_execution_id": int(row["id"]),
-            "analysis_id": row["analysis_id"],
-            "period_window": row["period_window"] or None,
-            "analysis_output": row["analysis_output"],
-            "created_at": row["created_at"],
-        }
-        for row in rows
-    ]
+    return history_store.list_history(user_id, limit=limit)
 
 
 def assert_not_in_failure_cooldown(user_id: int, analysis_id: str, current_time: datetime) -> None:
@@ -584,24 +541,15 @@ def assert_not_in_failure_cooldown(user_id: int, analysis_id: str, current_time:
 
 
 def register_failure_cooldown(user_id: int, analysis_id: str, current_time: datetime) -> None:
-    _FAILURE_COOLDOWNS[(int(user_id), analysis_id)] = current_time + timedelta(
-        seconds=CONSULTOR_FAILURE_COOLDOWN_SECONDS
-    )
+    history_store.register_failure_cooldown(user_id, analysis_id, current_time)
 
 
 def clear_failure_cooldown(user_id: int, analysis_id: str) -> None:
-    _FAILURE_COOLDOWNS.pop((int(user_id), analysis_id), None)
+    history_store.clear_failure_cooldown(user_id, analysis_id)
 
 
 def failure_cooldown_remaining(user_id: int, analysis_id: str, current_time: datetime) -> int:
-    expires_at = _FAILURE_COOLDOWNS.get((int(user_id), analysis_id))
-    if expires_at is None:
-        return 0
-    remaining = int((expires_at - current_time).total_seconds())
-    if remaining <= 0:
-        clear_failure_cooldown(user_id, analysis_id)
-        return 0
-    return remaining
+    return history_store.failure_cooldown_remaining(user_id, analysis_id, current_time)
 
 
 def postprocess_consultor_output(output: object) -> str:
@@ -1397,12 +1345,7 @@ def sync_consultor_with_ai_settings(user_id: int) -> None:
 
 
 def delete_consultor_history(user_id: int) -> int:
-    with get_connection() as conn:
-        cursor = conn.execute(
-            "DELETE FROM consultor_analyses WHERE user_id = ?",
-            (int(user_id),),
-        )
-        return int(cursor.rowcount or 0)
+    return history_store.delete_history(user_id)
 
 
 def get_complementary_profile(user_id: int) -> dict:
