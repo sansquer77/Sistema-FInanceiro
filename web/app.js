@@ -74,6 +74,7 @@ import { registerGlobalSearch } from "./modules/global-search.js";
 import { initializeOverlayUX } from "./modules/overlay-utils.js";
 import { initializeDataUX } from "./modules/data-ux.js";
 import { createAppState, resetSessionData } from "./modules/app-state.js";
+import { createAppDataLoader } from "./modules/app-data-loader.js";
 
 applyTheme();
 applyDensity();
@@ -517,6 +518,48 @@ const CONTEXTUAL_HELP_TOPICS = {
 const SIDEBAR_COLLAPSED_KEY = "financeiro.sidebar.collapsed";
 const NAV_GROUPS_COLLAPSED_KEY = "financeiro.sidebar.navGroupsCollapsed";
 const viewScrollPositions = new Map();
+
+const appDataLoader = createAppDataLoader({
+  state,
+  services: { api, fetchAllListed },
+  getViews: () => ({
+    accounts: accountsView,
+    cards: cardsView,
+    transactions: transactionsView,
+    cockpit: cockpitView,
+    portfolio: portfolioView,
+    classifications: classificationsView,
+    limits: limitsView,
+  }),
+  actions: {
+    cockpitMonthValue,
+    ensureSelectedAccount,
+    invalidateFinancialHealth,
+    markPortfolioDirty,
+    renderBase: renderBaseViews,
+    renderFinance: () => { renderBaseViews(); renderFinanceViews(); },
+    renderAll: () => { renderBaseViews(); renderFinanceViews(); renderManagementViews(); },
+    renderCockpit,
+    touchCockpitUpdated: () => setLastUpdated(cockpitLastUpdated),
+    setLoadError: (message) => setMessage(accountMessage, message, "error"),
+  },
+});
+
+const {
+  loadAll,
+  loadAccounts,
+  loadCreditCards,
+  loadTransactionsAndAccounts,
+  loadTransactionSlice,
+  loadCockpit,
+  refreshCockpitData,
+  loadPortfolio,
+  loadClassifications,
+  loadSpendingLimits,
+  loadCurrentSpendingLimits,
+  loadCardInvoice,
+  loadCardTransactions,
+} = appDataLoader;
 
 registerGlobalSearch({
   state,
@@ -1301,180 +1344,6 @@ async function loadDashboard() {
   showModule(state.view);
 }
 
-async function loadAll() {
-  try {
-    const [accountsResponse, creditCardsResponse, transactionsResponse, cardTransactionsResponse, cardPaymentsResponse, cockpitResponse] = await Promise.all([
-      api("/api/checking-accounts"),
-      api("/api/credit-cards"),
-      fetchAllListed("/api/transactions", "transactions"),
-      fetchAllListed("/api/credit-card-transactions", "transactions"),
-      fetchAllListed("/api/credit-card-payments", "payments"),
-      api(`/api/cockpit?month=${encodeURIComponent(cockpitMonthValue())}`),
-    ]);
-    state.accounts = accountsResponse.accounts;
-    state.creditCards = creditCardsResponse.cards;
-    ensureSelectedCreditCard();
-    ensureSelectedAccount();
-    state.transactions = transactionsResponse;
-    state.accountTransactions = [];
-    state.cardTransactions = cardTransactionsResponse;
-    state.cardPayments = cardPaymentsResponse || [];
-    state.cockpit = cockpitResponse;
-    state.cockpitLoadedMonth = cockpitMonthValue();
-    invalidateFinancialHealth();
-    await loadArchivedAccounts();
-    await loadArchivedCreditCards();
-    await loadClassifications();
-    await loadSpendingLimits();
-    await loadCurrentSpendingLimits();
-    await loadTransactionSlice();
-    await loadCardInvoice();
-  } catch (error) {
-    state.accounts = [];
-    state.archivedAccounts = [];
-    state.creditCards = [];
-    state.archivedCreditCards = [];
-    state.cardInvoiceTransactions = [];
-    state.cardInvoicePayments = [];
-    state.cardTransactions = [];
-    state.cardPayments = [];
-    state.selectedCreditCardId = "";
-    state.transactions = [];
-    state.accountTransactions = [];
-    state.cockpit = null;
-    state.cockpitLoadedMonth = "";
-    state.categories = [];
-    state.tags = [];
-    state.spendingLimits = [];
-    state.currentSpendingLimits = [];
-    state.portfolio = null;
-    setMessage(accountMessage, error.message, "error");
-  }
-  renderBaseViews();
-  renderFinanceViews();
-  renderManagementViews();
-}
-
-async function loadAccounts() {
-  await accountsView.loadAccounts();
-  await loadTransactionSlice();
-  markPortfolioDirty();
-  renderBaseViews();
-  renderFinanceViews();
-}
-
-async function loadCreditCards() {
-  await cardsView.loadCreditCards();
-  await loadCockpit();
-  renderBaseViews();
-  renderFinanceViews();
-}
-
-async function loadArchivedAccounts() {
-  await accountsView.loadArchivedAccounts();
-}
-
-async function loadArchivedCreditCards() {
-  await cardsView.loadArchivedCreditCards();
-}
-
-async function loadTransactionsAndAccounts() {
-  const [accountsResponse, creditCardsResponse, transactionsResponse, cardTransactionsResponse, cardPaymentsResponse, cockpitResponse] = await Promise.all([
-    api("/api/checking-accounts"),
-    api("/api/credit-cards"),
-    fetchAllListed("/api/transactions", "transactions"),
-    fetchAllListed("/api/credit-card-transactions", "transactions"),
-    fetchAllListed("/api/credit-card-payments", "payments"),
-    api(`/api/cockpit?month=${encodeURIComponent(cockpitMonthValue())}`),
-  ]);
-  state.accounts = accountsResponse.accounts;
-  state.creditCards = creditCardsResponse.cards;
-  ensureSelectedCreditCard();
-  ensureSelectedAccount();
-  state.transactions = transactionsResponse;
-  await loadTransactionSlice();
-  state.cardTransactions = cardTransactionsResponse;
-  state.cardPayments = cardPaymentsResponse || [];
-  state.cockpit = cockpitResponse;
-  state.cockpitLoadedMonth = cockpitMonthValue();
-  invalidateFinancialHealth();
-  await loadArchivedAccounts();
-  await loadArchivedCreditCards();
-  await loadClassifications();
-  await loadSpendingLimits();
-  await loadCurrentSpendingLimits();
-  await loadCardInvoice();
-  markPortfolioDirty();
-  renderBaseViews();
-  renderFinanceViews();
-  renderManagementViews();
-}
-
-async function loadTransactionSlice() {
-  await transactionsView.loadTransactionSlice();
-}
-
-async function loadCockpit() {
-  const response = await api(`/api/cockpit?month=${encodeURIComponent(cockpitMonthValue())}`);
-  state.cockpit = response;
-  state.cockpitLoadedMonth = cockpitMonthValue();
-  invalidateFinancialHealth();
-}
-
-async function refreshCockpitData() {
-  const requestId = ++state.cockpitRefreshRequestId;
-  const month = cockpitMonthValue();
-  if (state.cockpit && state.cockpitLoadedMonth === month) {
-    cockpitView.setLoading(false);
-    renderCockpit();
-    setLastUpdated(cockpitLastUpdated);
-    return;
-  }
-  cockpitView.setLoading(true);
-  try {
-    const [
-      accountsResponse,
-      transactionsResponse,
-      cardTransactionsResponse,
-      cardPaymentsResponse,
-      cockpitResponse,
-      spendingLimitsResponse,
-    ] = await Promise.all([
-      api("/api/checking-accounts"),
-      fetchAllListed("/api/transactions", "transactions"),
-      fetchAllListed("/api/credit-card-transactions", "transactions"),
-      fetchAllListed("/api/credit-card-payments", "payments"),
-      api(`/api/cockpit?month=${encodeURIComponent(month)}`),
-      api(`/api/spending-limits?month=${encodeURIComponent(month)}`),
-    ]);
-    if (requestId !== state.cockpitRefreshRequestId) {
-      return;
-    }
-    state.accounts = accountsResponse.accounts || [];
-    ensureSelectedAccount();
-    state.transactions = transactionsResponse || [];
-    state.cardTransactions = cardTransactionsResponse || [];
-    state.cardPayments = cardPaymentsResponse || [];
-    state.cockpit = cockpitResponse;
-    state.cockpitLoadedMonth = month;
-    state.currentSpendingLimits = spendingLimitsResponse.limits || [];
-    invalidateFinancialHealth();
-    renderBaseViews();
-    if (state.view === "cockpit") {
-      renderCockpit();
-      setLastUpdated(cockpitLastUpdated);
-    }
-  } finally {
-    if (requestId === state.cockpitRefreshRequestId) {
-      cockpitView.setLoading(false);
-    }
-  }
-}
-
-async function loadPortfolio(options = {}) {
-  await portfolioView.loadPortfolio(options);
-}
-
 function markPortfolioDirty() {
   portfolioView.markPortfolioDirty();
   invalidateFinancialHealth();
@@ -1504,26 +1373,6 @@ function editPortfolioSourceTransaction(transactionId) {
   state.selectedAccountId = transaction.account_id;
   renderTransactions();
   editTransaction(transaction);
-}
-
-async function loadClassifications() {
-  await classificationsView.loadClassifications();
-}
-
-async function loadSpendingLimits() {
-  await limitsView.loadSpendingLimits();
-}
-
-async function loadCurrentSpendingLimits() {
-  await limitsView.loadCurrentSpendingLimits(cockpitMonthValue());
-}
-
-async function loadCardInvoice() {
-  await cardsView.loadCardInvoice();
-}
-
-async function loadCardTransactions() {
-  await cardsView.loadCardTransactions();
 }
 
 function ensureSelectedCreditCard() {

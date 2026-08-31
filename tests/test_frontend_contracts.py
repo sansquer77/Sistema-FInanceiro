@@ -136,21 +136,41 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("Projeção diária de caixa", index)
 
     def test_cockpit_uses_progressive_fluid_interactions(self) -> None:
-        app_source = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+        loader_source = (MODULE_ROOT / "app-data-loader.js").read_text(encoding="utf-8")
         cockpit_source = (MODULE_ROOT / "cockpit-view.js").read_text(encoding="utf-8")
         tab_utils = (MODULE_ROOT / "tab-utils.js").read_text(encoding="utf-8")
         styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
         index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
 
         self.assertIn('id="cockpitView" aria-busy="false"', index)
-        self.assertIn("cockpitView.setLoading(true)", app_source)
-        self.assertIn("cockpitView.setLoading(false)", app_source)
+        self.assertIn("cockpit.setLoading(true)", loader_source)
+        self.assertIn("cockpit.setLoading(false)", loader_source)
         self.assertIn("transitionView(updateActivePanel)", cockpit_source)
         self.assertIn('event.key === "ArrowRight"', tab_utils)
         self.assertIn('event.key === "ArrowLeft"', tab_utils)
         self.assertIn("prefers-reduced-motion: reduce", tab_utils)
         self.assertIn("view-transition-name: cockpit-active-panel", styles)
         self.assertIn("#cockpitView.is-refreshing", styles)
+
+    def test_app_keeps_composition_root_and_extracted_application_services(self) -> None:
+        app_source = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+        state_source = (MODULE_ROOT / "app-state.js").read_text(encoding="utf-8")
+        loader_source = (MODULE_ROOT / "app-data-loader.js").read_text(encoding="utf-8")
+
+        self.assertIn("const state = createAppState", app_source)
+        self.assertIn("const appDataLoader = createAppDataLoader", app_source)
+        self.assertIn("async function boot()", app_source)
+        self.assertIn("function resetSessionState()", app_source)
+        self.assertIn("function showModule(view)", app_source)
+        self.assertNotIn("async function loadAll()", app_source)
+        self.assertIn("export function createAppState", state_source)
+        self.assertIn("export function resetSessionData", state_source)
+        self.assertNotIn("document.", state_source)
+        self.assertNotIn("api(", state_source)
+        self.assertIn("export function createAppDataLoader", loader_source)
+        self.assertIn("getViews", loader_source)
+        self.assertNotIn("document.", loader_source)
+        self.assertNotIn('from "./', loader_source)
 
     def test_paid_card_invoice_is_not_subtracted_twice_from_cockpit_forecast(self) -> None:
         projection_source = (REPOSITORY_ROOT / "financeiro/balance_projections.py").read_text(encoding="utf-8")

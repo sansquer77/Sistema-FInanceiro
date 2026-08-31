@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 12.4
+versao: 12.5
 atualizado: 2026-08-30
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -142,6 +142,8 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 O Sistema Financeiro é disponibilizado gratuitamente como projeto open source sob a **Apache License 2.0** (`Apache-2.0`). Consulte o arquivo [`LICENSE`](../LICENSE) na raiz do repositório.
 
 ## Changelog
+
+- `12.5` — 2026-08-30 — Atualizadas [[arquitetura]] e [[specs/frontend-modularizacao]] para registrar estado e carregamentos coordenados como serviços de aplicação separados do composition root.
 
 - `12.4` — 2026-08-30 — Incorporada [[qualidade-codigo]] como referência implementada para fronteiras de responsabilidade e prevenção de regressões arquiteturais.
 - `12.3` — 2026-08-30 — Portfólio frontend modularizado e projeções financeiras movidas ao núcleo Python por contrato de leitura dedicado.

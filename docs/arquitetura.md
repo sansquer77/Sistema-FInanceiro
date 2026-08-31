@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.56
+versao: 3.57
 atualizado: 2026-08-30
 relacionados:
   - "[[requisitos]]"
@@ -48,7 +48,7 @@ O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Co
 |---|---|
 | `index.html` | Estrutura das telas. |
 | `styles.css` | Aparência e responsividade conforme [[design/design-system]]. |
-| `app.js` | Ponto de entrada, estado geral e orquestração dos módulos de tela. |
+| `app.js` | Composition root: seleciona DOM, registra views, injeta dependências e controla boot, sessão visual e navegação. |
 | `web/modules/` | Módulos ES nativos sem etapa de build. |
 
 **Módulos utilitários já extraídos:**
@@ -68,6 +68,8 @@ O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Co
 | `theme-utils.js` | Persistência local e aplicação do tema visual. |
 | `privacy-utils.js` | Persistência local e aplicação do modo de ocultação de valores. |
 | `instructions-content.js` | Conteúdo estático, offline e versionado da central de ajuda. Ver [[instrucoes-app]]. |
+| `app-state.js` | Fábrica do estado inicial e reset puro dos dados de sessão, sem singleton, DOM ou API. |
+| `app-data-loader.js` | Coordenação dos carregamentos compartilhados por dependências explícitas e acesso tardio às views, sem regras financeiras. |
 
 **Fundação da v2 em implementação:** os gráficos existentes já usam ApexCharts 4.7.0 vendorizado por meio de `chart-adapter.js`; [[specs/frontend-fundacao-v2]] mantém planejados o adaptador IMask, uma Command Palette em ES Modules com experiência equivalente ao padrão cmdk e um virtualizador compartilhado de listas de altura fixa. O pacote React `cmdk` não integra a arquitetura; o frontend continua sem framework, bundler ou download de CDN. Ver [[adr/0013-dependencias-frontend-v2]].
 
@@ -540,6 +542,8 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 - [[adr/0014-desconcentracao-fachadas-e-roteamento]] — Fachadas compatíveis, roteamento declarativo e módulos internos menores para a fundação v2.
 
 ## Changelog
+
+- `3.57` — 2026-08-30 — Documentada a extração de `app-state.js` e `app-data-loader.js`, preservando `app.js` como composition root e as regras financeiras no núcleo Python.
 
 - `3.56` — 2026-08-30 — [[qualidade-codigo]] incorporada como referência implementada de fronteiras de responsabilidade, sinais de alerta e prevenção de regressões arquiteturais.
 - `3.55` — 2026-08-30 — Projeções de saldos/faturas migram de `app.js` para `balance_projections.py` e `portfolio-view.js` passa a coordenar módulos dedicados de gráfico, agrupamento e formulário.

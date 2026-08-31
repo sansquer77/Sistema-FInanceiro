@@ -1,21 +1,21 @@
 ---
 tipo: spec
 area: frontend
-status: em-implementacao
-versao: 4.7
+status: implementado
+versao: 4.8
 atualizado: 2026-08-30
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
   - "[[arquitetura]]"
   - "[[../qualidade-codigo]]"
-tags: [spec, "area/frontend", "status/em-implementacao"]
+tags: [spec, "area/frontend", "status/implementado"]
 aliases: ["Modularização Frontend", "ES Modules"]
 ---
 
 # Modularização do Frontend
 
 > [!info] Status
-> **em-implementacao** · área: `frontend` · atualizado em 2026-08-30 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]], [[../qualidade-codigo]]
+> **implementado** · área: `frontend` · atualizado em 2026-08-30 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]], [[../qualidade-codigo]]
 
 ## Problema
 
@@ -152,10 +152,10 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Plano de implementação
 
-- [ ] Extrair fábrica/reset puro de estado para `app-state.js` sem dependência de DOM.
-- [ ] Extrair carregamentos coordenados para `app-data-loader.js` com dependências explícitas e views tardias.
-- [ ] Preservar `boot()`, sessão visual, navegação e composição em `app.js`.
-- [ ] Atualizar contratos automatizados e validar todos os fluxos existentes.
+- [x] Extrair fábrica/reset puro de estado para `app-state.js` sem dependência de DOM.
+- [x] Extrair carregamentos coordenados para `app-data-loader.js` com dependências explícitas e views tardias.
+- [x] Preservar `boot()`, sessão visual, navegação e composição em `app.js`.
+- [x] Atualizar contratos automatizados e validar todos os fluxos existentes.
 - [x] Unificar semântica e teclado de modais, dialogs e drawers.
 - [x] Centralizar toasts de sucesso e manter erros inline.
 - [x] Padronizar cabeçalhos de cards e última atualização.
@@ -237,6 +237,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Changelog
 
+- `4.8` — 2026-08-30 — Concluída a extração de estado e carregamentos coordenados, com contratos automatizados para preservar as fronteiras do composition root.
 - `4.7` — 2026-08-30 — Iniciada extração de estado puro e carregadores coordenados, preservando `app.js` como composition root.
 - `4.6` — 2026-08-30 — Vinculada à spec implementada [[../qualidade-codigo]], que formaliza a distinção entre raiz de composição e views coesas.
 - `4.5` — 2026-08-30 — `portfolio-view.js` passa a coordenar módulos dedicados de gráfico, agrupamento e formulário; projeções de saldos/faturas deixam `app.js` e passam ao contrato Python `/api/balance-projection`.
