@@ -7,12 +7,9 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from http import HTTPStatus
 import json
 import re
-import ssl
 import sqlite3
-from threading import Lock
-from urllib.error import HTTPError, URLError
+from urllib.error import URLError
 from urllib.parse import quote
-from urllib.request import Request, urlopen
 
 from financeiro.accounts import cents_to_money, empty_to_none, money_to_cents, recompute_account_balance
 from financeiro.calendar_rules import add_months, normalize_iso_date
@@ -31,14 +28,10 @@ COINGECKO_SIMPLE_PRICE_URL = "https://api.coingecko.com/api/v3/simple/price?ids=
 MAIS_RETORNO_QUOTES_URL = "https://data.maisretorno.com/mr-data/v4/api/quotes/{symbol}?start_date={start}&end_date={end}"
 BCB_SERIES_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{series}/dados/ultimos/1?formato=json"
 BCB_SERIES_RANGE_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{series}/dados?formato=json&dataInicial={start}&dataFinal={end}"
-MARKET_QUOTE_TTL_SECONDS = 6 * 60 * 60
-INDEXER_QUOTE_TTL_SECONDS = 24 * 60 * 60
-QUOTE_MEMORY_CACHE: OrderedDict[str, tuple[datetime, dict | list]] = OrderedDict()
-FX_MEMORY_CACHE: OrderedDict[tuple[str, str], int] = OrderedDict()
-QUOTE_MEMORY_CACHE_LOCK = Lock()
-FX_MEMORY_CACHE_LOCK = Lock()
-QUOTE_MEMORY_CACHE_MAX_ENTRIES = 512
-FX_MEMORY_CACHE_MAX_ENTRIES = 128
+MARKET_QUOTE_TTL_SECONDS = quotes.MARKET_QUOTE_TTL_SECONDS
+INDEXER_QUOTE_TTL_SECONDS = quotes.INDEXER_QUOTE_TTL_SECONDS
+QUOTE_MEMORY_CACHE_MAX_ENTRIES = quotes.QUOTE_MEMORY_CACHE_MAX_ENTRIES
+FX_MEMORY_CACHE_MAX_ENTRIES = quotes.FX_MEMORY_CACHE_MAX_ENTRIES
 
 ASSET_TYPE_LABELS = {
     "stock": "Renda variável",
@@ -118,8 +111,23 @@ class PortfolioError(Exception):
         super().__init__(message)
 
 
+urlopen = quotes.urlopen  # Compatibility seam for existing consumers/tests.
+_quote_cache = quotes.QuoteCache(
+    connection_factory=lambda: get_connection(),
+    read_json=lambda *args, **kwargs: read_json_url(*args, **kwargs),
+    error_type=PortfolioError,
+    clock=lambda: datetime.now(),
+    max_entries=QUOTE_MEMORY_CACHE_MAX_ENTRIES,
+    fx_max_entries=FX_MEMORY_CACHE_MAX_ENTRIES,
+)
+QUOTE_MEMORY_CACHE = _quote_cache.memory
+QUOTE_MEMORY_CACHE_LOCK = _quote_cache.memory_lock
+FX_MEMORY_CACHE = _quote_cache.fx_memory
+FX_MEMORY_CACHE_LOCK = _quote_cache.fx_lock
+
+
 def get_portfolio(user_id: int, force_refresh: bool = False) -> dict:
-    # spec: arquitetura-v2/desconcentracao-arquitetura-v2 v2.1 — critérios 12–14
+    # spec: arquitetura-v2/desconcentracao-arquitetura-v2 v2.2 — critérios 12–14
     with get_connection() as conn:
         conn.execute("BEGIN")
         inputs = positions_store.load_position_inputs(conn, user_id)
@@ -787,7 +795,7 @@ def prepare_portfolio_positions(user_id: int, force_refresh: bool = False) -> tu
 
 def assemble_portfolio_positions(inputs: dict, user_id: int, force_refresh: bool = False) -> list[dict]:
     """Monta e valoriza um snapshot já desconectado, sem modificar suas entradas."""
-    # spec: arquitetura-v2/desconcentracao-arquitetura-v2 v2.1 — critérios 12 e 13
+    # spec: arquitetura-v2/desconcentracao-arquitetura-v2 v2.2 — critérios 12 e 13
     redemption_totals = {
         (row["source_type"], row["source_id"]): {
             "redeemed_cost_cents": int(row["redeemed_cost_cents"] or 0),
@@ -2307,17 +2315,13 @@ def format_bcb_date(value: date) -> str:
 
 
 def bcb_range_ttl_seconds(end_date: date) -> int:
-    if end_date < date.today():
-        return 30 * 24 * 60 * 60
-    return INDEXER_QUOTE_TTL_SECONDS
+    return quotes.bcb_range_ttl_seconds(end_date, date.today())
 
 
 def seconds_until_end_of_day() -> int:
     # spec: investimentos/investimentos-portfolio v2.49 — criterios 27 e 28
     # (cache de cotacao de fundos vale ate o fim do dia corrente)
-    now = datetime.now()
-    end = datetime(now.year, now.month, now.day) + timedelta(days=1)
-    return max(1, int((end - now).total_seconds()))
+    return quotes.seconds_until_end_of_day(datetime.now())
 
 
 def cached_json_url(
@@ -2328,97 +2332,31 @@ def cached_json_url(
     force_refresh: bool = False,
     headers: dict | None = None,
 ) -> dict | list:
-    now = datetime.now()
-    if not force_refresh:
-        memory_payload = get_memory_cached_payload(cache_key, now)
-        if memory_payload is not None:
-            return memory_payload
-        persistent_payload = get_persistent_cached_payload(cache_key, now)
-        if persistent_payload is not None:
-            return persistent_payload
-    try:
-        payload = read_json_url(url, message, headers=headers)
-        store_cached_payload(cache_key, payload, now + timedelta(seconds=ttl_seconds))
-        return payload
-    except PortfolioError:
-        stale_payload = get_persistent_cached_payload(cache_key, now, allow_stale=True)
-        if stale_payload is not None:
-            return stale_payload
-        raise
+    return _quote_cache.cached_json_url(url, message, cache_key, ttl_seconds, force_refresh=force_refresh, headers=headers)
 
 
 def get_memory_cached_payload(cache_key: str, now: datetime) -> dict | list | None:
-    with QUOTE_MEMORY_CACHE_LOCK:
-        prune_quote_memory_cache_locked(now)
-        cached = QUOTE_MEMORY_CACHE.get(cache_key)
-        if not cached:
-            return None
-        expires_at, payload = cached
-        if expires_at > now:
-            # Move para o fim para manter política LRU sob pressão de memória.
-            QUOTE_MEMORY_CACHE.move_to_end(cache_key)
-            return payload
-        QUOTE_MEMORY_CACHE.pop(cache_key, None)
-        return None
+    return _quote_cache.get_memory_cached_payload(cache_key, now)
 
 
 def get_persistent_cached_payload(cache_key: str, now: datetime, allow_stale: bool = False) -> dict | list | None:
-    try:
-        with get_connection() as conn:
-            row = conn.execute(
-                "SELECT payload_json, expires_at FROM quote_cache WHERE cache_key = ?",
-                (cache_key,),
-            ).fetchone()
-    except Exception:
-        return None
-    if not row:
-        return None
-    try:
-        expires_at = datetime.fromisoformat(row["expires_at"])
-        payload = json.loads(row["payload_json"])
-    except (TypeError, ValueError, json.JSONDecodeError):
-        return None
-    if not allow_stale and expires_at <= now:
-        return None
-    set_quote_memory_cache(cache_key, expires_at, payload, now)
-    return payload
+    return _quote_cache.get_persistent_cached_payload(cache_key, now, allow_stale=allow_stale)
 
 
 def store_cached_payload(cache_key: str, payload: dict | list, expires_at: datetime) -> None:
-    set_quote_memory_cache(cache_key, expires_at, payload, datetime.now())
-    try:
-        with get_connection() as conn:
-            conn.execute(
-                """
-                INSERT INTO quote_cache (cache_key, payload_json, expires_at, updated_at)
-                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-                ON CONFLICT(cache_key) DO UPDATE SET
-                    payload_json = excluded.payload_json,
-                    expires_at = excluded.expires_at,
-                    updated_at = CURRENT_TIMESTAMP
-                """,
-                (cache_key, json.dumps(payload, ensure_ascii=True), expires_at.isoformat()),
-            )
-    except Exception:
-        return
+    return _quote_cache.store_cached_payload(cache_key, payload, expires_at)
 
 
 def set_quote_memory_cache(cache_key: str, expires_at: datetime, payload: dict | list, now: datetime) -> None:
-    with QUOTE_MEMORY_CACHE_LOCK:
-        prune_quote_memory_cache_locked(now)
-        QUOTE_MEMORY_CACHE[cache_key] = (expires_at, payload)
-        _trim_cache_to_limit(QUOTE_MEMORY_CACHE, QUOTE_MEMORY_CACHE_MAX_ENTRIES)
+    return _quote_cache.set_quote_memory_cache(cache_key, expires_at, payload, now)
 
 
 def prune_quote_memory_cache(now: datetime) -> None:
-    with QUOTE_MEMORY_CACHE_LOCK:
-        prune_quote_memory_cache_locked(now)
+    return _quote_cache.prune_quote_memory_cache(now)
 
 
 def prune_quote_memory_cache_locked(now: datetime) -> None:
-    expired_keys = [key for key, (expires_at, _payload) in QUOTE_MEMORY_CACHE.items() if expires_at <= now]
-    for key in expired_keys:
-        QUOTE_MEMORY_CACHE.pop(key, None)
+    return _quote_cache.prune_quote_memory_cache_locked(now)
 
 
 def _trim_cache_to_limit(cache: OrderedDict, max_entries: int) -> None:
@@ -2426,26 +2364,11 @@ def _trim_cache_to_limit(cache: OrderedDict, max_entries: int) -> None:
 
 
 def read_json_url(url: str, message: str, headers: dict | None = None) -> dict | list:
-    request_headers = {"User-Agent": "SistemaFinanceiro/0.1", **(headers or {})}
-    request = Request(url, headers=request_headers)
-    try:
-        with urlopen(request, timeout=6) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except URLError as exc:
-        if is_ssl_certificate_error(exc):
-            try:
-                with urlopen(request, timeout=6, context=ssl._create_unverified_context()) as response:
-                    return json.loads(response.read().decode("utf-8"))
-            except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as retry_exc:
-                raise PortfolioError(message) from retry_exc
-        raise PortfolioError(message) from exc
-    except (HTTPError, TimeoutError, json.JSONDecodeError) as exc:
-        raise PortfolioError(message) from exc
+    return quotes.read_json_url(url, message, headers=headers, opener=urlopen, error_type=PortfolioError)
 
 
 def is_ssl_certificate_error(exc: URLError) -> bool:
-    reason = getattr(exc, "reason", None)
-    return isinstance(reason, ssl.SSLError) and "CERTIFICATE_VERIFY_FAILED" in str(reason)
+    return quotes.is_ssl_certificate_error(exc)
 
 
 def yahoo_symbol(position: dict) -> str:
@@ -2623,17 +2546,9 @@ def value_to_brl(amount_cents: int, currency: str) -> int:
 
 def portfolio_exchange_rate_micros(currency: str) -> int:
     quote_date = previous_business_day(date.today()).isoformat()
-    cache_key = (currency, quote_date)
-    with FX_MEMORY_CACHE_LOCK:
-        if cache_key not in FX_MEMORY_CACHE:
-            try:
-                FX_MEMORY_CACHE[cache_key] = rate_to_micros(get_exchange_rate_to_brl(currency, quote_date))
-            except Exception:
-                FX_MEMORY_CACHE[cache_key] = rate_to_micros(Decimal("1"))
-            _trim_cache_to_limit(FX_MEMORY_CACHE, FX_MEMORY_CACHE_MAX_ENTRIES)
-        else:
-            FX_MEMORY_CACHE.move_to_end(cache_key)
-        return FX_MEMORY_CACHE[cache_key]
+    return _quote_cache.exchange_rate_micros(
+        currency, quote_date, get_rate=get_exchange_rate_to_brl, to_micros=rate_to_micros,
+    )
 
 
 def previous_business_day(reference_date: date) -> date:

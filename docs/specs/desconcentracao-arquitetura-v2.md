@@ -2,7 +2,7 @@
 tipo: spec
 area: arquitetura-v2
 status: implementado
-versao: 2.1
+versao: 2.2
 atualizado: 2026-08-31
 relacionados:
   - "[[../arquitetura]]"
@@ -76,6 +76,10 @@ Usuários da v2 que precisam manter os fluxos e dados atuais estáveis enquanto 
 13. Dada uma consulta do Portfólio, quando ocorrem cotações ou câmbio, então a conexão do snapshot local já está fechada; resgates e encerramentos mantêm a revalidação antes da escrita.
 14. Dado o histórico da carteira, quando a tela é consultada, então nomes de conta, ordem dos históricos, isolamento por usuário e formato público permanecem iguais.
 
+15. Dado um consumidor das cotações, quando transporte/cache são delegados, então timeout, cabeçalhos, exceção pública, TTL, force-refresh e fallback de cache vencido permanecem compatíveis, sem importação da fachada pelo módulo interno.
+16. Dado cache persistente indisponível ou inválido, quando há consulta de cotação, então leitura/escrita falham de forma tolerada como antes e nenhuma conexão fica aberta durante a chamada HTTP.
+17. Dado cache em memória ou cambial, quando expira ou atinge o limite, então expurgo, LRU, locks e objetos públicos de cache continuam equivalentes.
+
 ## Fora de escopo
 
 - Alterar contratos públicos, schema SQLite ou comportamento financeiro.
@@ -91,6 +95,8 @@ Usuários da v2 que precisam manter os fluxos e dados atuais estáveis enquanto 
 
 ## Plano de implementação
 
+- [x] Passo 17 — Mover transporte HTTP e estado/políticas dos caches para `portfolio_quotes.py`, mantendo wrappers públicos e dependências explícitas. Fecha: critérios 15–17.
+- [x] Passo 18 — Testar cache quente/frio/vencido, refresh, falhas de persistência/transporte e fronteiras de escrita; executar suíte completa. Fecha: critérios 13, 15–17. Suíte de 446 testes aprovada; após adicionar dois casos complementares, os 10 testes isolados de cache/transporte também passaram.
 - [x] Passo 15 — Unificar consultas de entradas em `portfolio_positions.py` e montagem na fachada, sem duplicar a preparação. Fecha: critérios 12 e 13.
 - [x] Passo 16 — Testar equivalência pública/interna, histórico, isolamento e fronteira transacional; executar suíte completa. Fecha: critérios 12–14.
 - [x] Passo 12 — extrair configurações, consentimento e perfil criptografado para `consultor_settings.py`; preservar expurgo e isolamento por usuário.
@@ -114,6 +120,7 @@ Usuários da v2 que precisam manter os fluxos e dados atuais estáveis enquanto 
 
 ## Changelog
 
+- `2.2` — 2026-08-31 — Transferidos transporte HTTP/JSON, caches de cotação/câmbio, persistência, locks, TTL, expurgo/LRU e fallback para `portfolio_quotes.py`. Fachada compatível e dependências injetadas sem ciclo. Testes de domínio, transporte/cache e fronteira transacional aprovados; sem incremento de produto. Retry SSL legado preservado e sinalizado no ADR-0014 para revisão própria.
 - `2.1` — 2026-08-31 — Unificadas leitura e montagem das posições: tela e consumidores internos compartilham entradas, descontos de resgates, exclusão de encerrados, cotações e overrides do snapshot. Históricos preservados; testes de equivalência, imutabilidade, isolamento e fronteira transacional.
 - `2.0` — 2026-08-31 — Extrações concluídas e documentação sincronizada: catálogo e prompts idênticos ao snapshot anterior, configurações e exceção pública preservadas; 419 testes aprovados. Fachada reduzida de 967 para 398 linhas, sem incremento da versão do produto.
 

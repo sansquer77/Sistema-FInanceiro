@@ -2,7 +2,7 @@
 tipo: adr
 area: arquitetura-v2
 status: implementado
-versao: 1.2
+versao: 1.3
 atualizado: 2026-08-31
 relacionados:
   - "[[../specs/desconcentracao-arquitetura-v2]]"
@@ -34,6 +34,12 @@ Aquecer cache e recomputar dentro da escrita foi descartado: expiração, falha 
 
 ## Consequências
 
+### Transporte/cache do Portfólio
+
+`portfolio_quotes.QuoteCache` possui os caches e locks, consulta/grava o cache SQLite e coordena TTL, expurgo, LRU, refresh e fallback vencido. A fachada injeta conexão, relógio, leitor HTTP e classe de erro, mantendo wrappers públicos e aliases dos mesmos objetos de cache. O transporte HTTP/JSON também reside no módulo interno; não há importação reversa de `portfolio.py` nem troca temporária de globais para encaminhar dependências. Assim testes e consumidores existentes podem continuar substituindo `portfolio.read_json_url`, `portfolio.urlopen` e `portfolio.get_connection`.
+
+Alternativa descartada: mover funções com importação da fachada dentro do módulo interno, pois manteria acoplamento circular. O custo aceito é manter wrappers de compatibilidade explícitos. Normalização dos provedores e cálculos de valorização não fazem parte desta etapa. Políticas existentes foram preservadas, inclusive o retry legado sem verificação de certificado para erro SSL específico; esse comportamento precisa de revisão de segurança separada e não é uma garantia de transporte seguro.
+
 ### Atualização após salvar lançamentos e custo da projeção
 
 A resposta confirmada do servidor atualiza a ocorrência antes das recargas. A fatia conta/mês tem prioridade e confirma os efeitos de séries e exclusões; contas e histórico global são atualizados depois, sem bloquear o formulário. Essas respostas auxiliares só são aplicadas se revisão e sessão continuam atuais. O Cockpit é invalidado para a próxima entrada. Saldos ficam indisponíveis enquanto a projeção é revalidada, em vez de mostrar valores antigos ou calcular deltas no navegador. Falha após gravação é comunicada como falha de atualização, não de salvamento.
@@ -53,6 +59,7 @@ O backend ordena os movimentos e acumula lotes por data, em centavos. Faturas co
 
 ## Changelog
 
+- `1.3` — 2026-08-31 — Transporte/cache efetivos no módulo interno, com dependências injetadas e fachada compatível; política TLS legada identificada para revisão separada.
 - `1.2` — 2026-08-31 — Atualização confirmada de lançamentos desacoplada de dados auxiliares e projeção incremental por data.
 - `1.1` — 2026-08-31 — Decisão de confirmação otimista sem rede para resgate/encerramento, com conflito seguro em vez de recomposição sob bloqueio.
 
