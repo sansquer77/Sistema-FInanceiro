@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.57
+versao: 3.58
 atualizado: 2026-08-30
 relacionados:
   - "[[requisitos]]"
@@ -89,7 +89,8 @@ O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Co
 | `consultor-view.js` | Aba **Consultor** do Cockpit: seletor fechado de análises, execução sob demanda, período condicional para ralos, histórico, vencimentos e atrasos, com renderização de tabelas markdown nas respostas. |
 | `accounts-view.js` | Contas: cadastro, edição, arquivamento, restauração. |
 | `cards-view.js` | Cartões: cadastro, faturas, pagamento, conciliação. |
-| `portfolio-view.js` | Ativos: posições, histórico, resgate, encerramento. |
+| `portfolio-view.js` | Ativos: posições, histórico, resgate e encerramento; libera gráficos, overlays e DOM dinâmico ao sair e remonta a apresentação do estado ao entrar. |
+| `portfolio-lifecycle.js` | Política de reaproveitamento do snapshot e limpeza seletiva do DOM dinâmico do Portfólio. |
 | `transactions-view.js` | Lançamentos: formulário, recorrência, parcelas, câmbio. |
 | `operation-history-view.js` | Histórico de Operações: filtros, busca, agrupamentos e paginação. |
 | `simulations-view.js` | Efeito Borboleta: formulário e renderização das projeções calculadas pelo backend. |
@@ -543,6 +544,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.58` — 2026-08-30 — Portfólio adota ciclo seletivo `onEnter()`/`onLeave()`, snapshot fresco por 30 segundos e invalidação imediata após mutações para reduzir memória e chamadas redundantes.
 - `3.57` — 2026-08-30 — Documentada a extração de `app-state.js` e `app-data-loader.js`, preservando `app.js` como composition root e as regras financeiras no núcleo Python.
 
 - `3.56` — 2026-08-30 — [[qualidade-codigo]] incorporada como referência implementada de fronteiras de responsabilidade, sinais de alerta e prevenção de regressões arquiteturais.

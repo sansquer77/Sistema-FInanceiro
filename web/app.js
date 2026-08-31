@@ -1401,6 +1401,9 @@ function showModule(view) {
     expandNavGroupOfView(view);
     moduleEyebrow.textContent = viewTitles[view][0];
     pageTitle.textContent = viewTitles[view][1];
+    if (previousView !== view && previousView === "portfolio") {
+      portfolioView.onLeave();
+    }
   };
   if (shouldAnimateModuleTransition(previousView, view)) {
     document.startViewTransition(updateVisibleModule);
@@ -1440,8 +1443,7 @@ function showModule(view) {
     reportsView.renderReports();
   }
   if (view === "portfolio") {
-    portfolioView.renderPortfolio();
-    loadPortfolio({ revalidate: true });
+    portfolioView.onEnter().catch((error) => setMessage(portfolioMessage, error.message, "error"));
   }
   if (view === "creditCards") {
     renderCreditCards();

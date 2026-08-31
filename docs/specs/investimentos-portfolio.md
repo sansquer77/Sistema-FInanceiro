@@ -2,21 +2,21 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.45
+versao: 2.47
 atualizado: 2026-08-30
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
   - "[[relatorios]]"
   - "[[arquitetura]]"
-tags: [spec, "area/investimentos"]
+tags: [spec, "area/investimentos", "status/implementado"]
 aliases: ["Investimentos", "Portfólio"]
 ---
 
 # Investimentos e Portfólio
 
 > [!info] Status
-> **implementado** · área: `investimentos` · atualizado em 2026-08-29 · relacionados: [[contas-correntes]], [[lancamentos]], [[relatorios]]
+> **implementado** · área: `investimentos` · atualizado em 2026-08-30 · relacionados: [[contas-correntes]], [[lancamentos]], [[relatorios]]
 
 ## Problema
 
@@ -238,6 +238,8 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado uma meta `Renda variável - USD` salva, quando a Análise é exibida, então a linha de Renda variável em USD usa essa meta e a linha em BRL usa a meta de Renda variável.
 - Dado metas antigas sem `Renda variável - USD`, quando são carregadas, então o novo campo aparece com 0% e a soma das metas existentes permanece válida.
 - Dado o flyout de composição da aba Análise fechado, quando o Safari processa a página, então o overlay e seu conteúdo não permanecem em uma camada fixa renderizada fora da tela.
+- Dado o usuário saindo do Portfólio, quando outra view se torna ativa, então gráficos, overlays e DOM dinâmico volumoso são desmontados, preservando dados, filtros e aba no estado da sessão.
+- Dado o usuário retornando ao Portfólio pouco depois de uma carga bem-sucedida, quando os dados não foram invalidados, então a apresentação é reconstruída do estado sem repetir imediatamente a mesma chamada ao backend.
 - Dado o flyout de composição aberto, quando o overlay cobre a página do Portfólio, então usa fundo sem filtro de desfoque para não criar uma superfície gráfica do tamanho da página subjacente.
 - Dado uma classe acima ou abaixo da meta, quando exibida no gráfico, então mostra o desvio em pontos percentuais e o valor absoluto correspondente em BRL.
 - Dado uma classe com meta positiva e nenhuma posição atual, quando a análise é exibida, então a classe permanece visível com participação atual de 0%.
@@ -245,6 +247,8 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 
 ## Changelog
 
+- `2.47` — 2026-08-30 — Implementado ciclo de saída/entrada que libera gráfico, overlays e DOM dinâmico, preserva o estado e evita revalidação redundante por 30 segundos ou durante requisição em andamento.
+- `2.46` — 2026-08-30 — Especificado ciclo de vida seletivo e reaproveitamento temporário do snapshot para reduzir memória e chamadas redundantes.
 - `2.45` — 2026-08-30 — Reduzido o uso de memória gráfica do flyout de composição: o componente fechado sai da renderização, libera o conteúdo e o overlay aberto não usa blur no Safari/WebKit.
 - `2.44` — 2026-08-30 — Em implementação: separa a meta de Renda Variável em USD e aplica a meta específica à linha USD da Análise.
 - `2.43` — 2026-08-29 — Corrige auditoria do salvamento de Metas e disponibiliza metas/participação/desvio para os cards Alocação vs. Perfil e Análise da Carteira do Consultor.

@@ -2,7 +2,7 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 4.8
+versao: 4.10
 atualizado: 2026-08-30
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
@@ -75,6 +75,7 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `portfolio-chart.js` | Renderização e ciclo de vida do gráfico de rentabilidade do Portfólio. |
 | `portfolio-grouping.js` | Agrupamentos, metas, consolidações e totais puros da apresentação do Portfólio. |
 | `portfolio-form.js` | Payloads e normalizações de entrada dos formulários e ações do Portfólio. |
+| `portfolio-lifecycle.js` | Política pura de frescor do snapshot e limpeza seletiva da apresentação do Portfólio. |
 | `app-state.js` | Fábrica do estado inicial e reset puro dos dados de sessão, sem DOM, API ou views. |
 | `app-data-loader.js` | Coordenação dos carregamentos compartilhados, com serviços, views e ações recebidos explicitamente. |
 | `transactions-view.js` | Lançamentos: formulário, recorrência, parcelas e câmbio. |
@@ -107,6 +108,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - `app.js` permanece o composition root: seleciona DOM, registra views, injeta dependências, controla boot, autenticação visual e navegação.
 - `app-state.js` não exporta singleton nem chama formulários/views; cria o estado e limpa somente dados de sessão.
 - `app-data-loader.js` usa acesso tardio às views injetadas para evitar imports circulares e não se torna autoridade de regras financeiras.
+- Views pesadas podem expor `onEnter()`/`onLeave()`; o composition root aciona esse ciclo sem conhecer detalhes internos de desmontagem.
 - Cores de UI e gráficos devem vir de tokens CSS compartilhados; literais ficam restritos a marcas/logos externos.
 - Tema visual é uma preferência local: `theme-utils.js` aplica `data-theme` no elemento raiz e persiste em `localStorage`.
 - Modo privacidade é uma preferência local: `privacy-utils.js` aplica `data-privacy` no elemento raiz, persiste em `localStorage` e não altera dados, cálculos ou chamadas de API.
@@ -237,6 +239,8 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Changelog
 
+- `4.10` — 2026-08-30 — Concluído o primeiro contrato `onEnter()`/`onLeave()` no Portfólio, acionado pelo composition root e coberto por testes de fronteira.
+- `4.9` — 2026-08-30 — Iniciado ciclo de vida seletivo para liberar DOM e recursos gráficos de views pesadas sem descartar seu estado de dados.
 - `4.8` — 2026-08-30 — Concluída a extração de estado e carregamentos coordenados, com contratos automatizados para preservar as fronteiras do composition root.
 - `4.7` — 2026-08-30 — Iniciada extração de estado puro e carregadores coordenados, preservando `app.js` como composition root.
 - `4.6` — 2026-08-30 — Vinculada à spec implementada [[../qualidade-codigo]], que formaliza a distinção entre raiz de composição e views coesas.

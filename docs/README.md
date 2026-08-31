@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 12.5
+versao: 12.6
 atualizado: 2026-08-30
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -143,6 +143,7 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `12.6` — 2026-08-30 — Portfólio passa a liberar recursos de apresentação ao sair e a reaproveitar snapshot recente sem recarga redundante; specs e arquitetura sincronizadas.
 - `12.5` — 2026-08-30 — Atualizadas [[arquitetura]] e [[specs/frontend-modularizacao]] para registrar estado e carregamentos coordenados como serviços de aplicação separados do composition root.
 
 - `12.4` — 2026-08-30 — Incorporada [[qualidade-codigo]] como referência implementada para fronteiras de responsabilidade e prevenção de regressões arquiteturais.

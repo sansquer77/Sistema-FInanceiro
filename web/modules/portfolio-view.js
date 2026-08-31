@@ -4,6 +4,7 @@ import { createAssetAutocomplete } from "./asset-autocomplete.js";
 import { createPortfolioChart } from "./portfolio-chart.js";
 import * as portfolioGrouping from "./portfolio-grouping.js";
 import * as portfolioForm from "./portfolio-form.js";
+import { canReusePortfolioSnapshot, clearPortfolioPresentation } from "./portfolio-lifecycle.js";
 
 export function registerPortfolioView({
   state,
@@ -99,6 +100,7 @@ export function registerPortfolioView({
   const portfolioChart = createPortfolioChart({
     state,
     elements,
+    api,
     formatPercentValue,
     chartColor,
   });
@@ -177,39 +179,17 @@ export function registerPortfolioView({
   portfolioGoalsForm.addEventListener("submit", savePortfolioGoals);
   portfolioGoalsFields.addEventListener("input", updatePortfolioGoalsTotal);
   portfolioPositions.addEventListener("click", handlePortfolioPositionsClick);
-  portfolioReturnChartBtn?.addEventListener("click", openPortfolioReturnDrawer);
-  portfolioReturnDrawerOverlay?.addEventListener("click", closePortfolioReturnDrawer);
-  portfolioReturnDrawerCloseBtn?.addEventListener("click", closePortfolioReturnDrawer);
+  portfolioReturnChartBtn?.addEventListener("click", portfolioChart.openReturns);
+  portfolioReturnDrawerOverlay?.addEventListener("click", portfolioChart.closeReturns);
+  portfolioReturnDrawerCloseBtn?.addEventListener("click", portfolioChart.closeReturns);
   portfolioGroupDrawerOverlay?.addEventListener("click", closePortfolioGroupDrawer);
   portfolioGroupDrawerCloseBtn?.addEventListener("click", closePortfolioGroupDrawer);
 
-  async function openPortfolioReturnDrawer() {
-    if (!portfolioReturnDrawer) {
-      return;
-    }
-    portfolioReturnDrawer.hidden = false;
-    portfolioReturnDrawer.setAttribute("aria-hidden", "false");
-    if (!state.portfolioReturns || state.portfolioReturns.error) {
-      try {
-        state.portfolioReturns = await api("/api/portfolio/returns");
-      } catch (error) {
-        state.portfolioReturns = { error: error.message || "Erro ao carregar" };
-      }
-    }
-    portfolioChart.renderReturns();
-  }
-
-  function closePortfolioReturnDrawer() {
-    if (!portfolioReturnDrawer) {
-      return;
-    }
-    portfolioReturnDrawer.hidden = true;
-    portfolioReturnDrawer.setAttribute("aria-hidden", "true");
-  }
-
   async function loadPortfolio(options = {}) {
-    if (state.portfolio && !state.portfolioDirty && !options.force && !options.refreshMessage && !options.revalidate) {
-      renderPortfolio();
+    if (canReusePortfolioSnapshot(state, options)) {
+      if (options.renderCached !== false && state.view === "portfolio") {
+        renderPortfolio();
+      }
       onPortfolioChanged();
       return;
     }
@@ -232,6 +212,7 @@ export function registerPortfolioView({
     if (portfolioResult.status === "fulfilled") {
       state.portfolio = portfolioResult.value;
       state.portfolioDirty = false;
+      state.portfolioLoadedAt = Date.now();
       setLastUpdated(portfolioLastUpdated);
       portfolioAssetAutocomplete.refresh();
       if (options.refreshMessage) {
@@ -251,13 +232,28 @@ export function registerPortfolioView({
     state.portfolioLoading = false;
     portfolioRoot?.setAttribute("aria-busy", "false");
     portfolioRoot?.classList.remove("is-refreshing");
-    renderPortfolio();
+    if (state.view === "portfolio") {
+      renderPortfolio();
+    }
     onPortfolioChanged();
   }
 
   function markPortfolioDirty() {
     state.portfolioDirty = true;
+    state.portfolioLoadedAt = 0;
     state.portfolioReturns = null;
+  }
+
+  async function onEnter() {
+    renderPortfolio();
+    await loadPortfolio({ revalidate: true, renderCached: false });
+  }
+
+  function onLeave() {
+    portfolioChart.closeReturns();
+    closePortfolioGroupDrawer();
+    clearPortfolioPresentation(portfolioTypeList, portfolioIndexerList, portfolioCurrencyList,
+      portfolioAccountList, portfolioPositions, portfolioHistory, portfolioGoalsFields);
   }
 
   async function handlePortfolioAssetSubmit(event) {
@@ -1638,6 +1634,8 @@ export function registerPortfolioView({
   }
 
   return {
+    onEnter,
+    onLeave,
     loadPortfolio,
     markPortfolioDirty,
     showPortfolioAssetForm,

@@ -63,9 +63,20 @@ class FrontendModuleContractTest(unittest.TestCase):
 
     def test_portfolio_analysis_flyout_avoids_persistent_webkit_layers(self) -> None:
         portfolio = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
+        portfolio_chart = (MODULE_ROOT / "portfolio-chart.js").read_text(encoding="utf-8")
+        portfolio_lifecycle = (MODULE_ROOT / "portfolio-lifecycle.js").read_text(encoding="utf-8")
+        app = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
         styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
 
         self.assertIn("portfolioGroupDrawerList?.replaceChildren()", portfolio)
+        self.assertIn("function onLeave()", portfolio)
+        self.assertIn("clearPortfolioPresentation", portfolio)
+        self.assertIn("portfolioView.onLeave()", app)
+        self.assertIn("portfolioView.onEnter()", app)
+        self.assertIn("destroyChart(portfolioReturnChart)", portfolio_chart)
+        self.assertIn("function closeReturns()", portfolio_chart)
+        self.assertIn("REVALIDATE_AFTER_MS = 30_000", portfolio_lifecycle)
+        self.assertIn("now - state.portfolioLoadedAt", portfolio_lifecycle)
         hidden_rule = styles[styles.index(".portfolio-group-drawer[hidden] {"):]
         hidden_rule = hidden_rule[:hidden_rule.index("}")]
         self.assertIn("display: none !important", hidden_rule)
@@ -360,14 +371,16 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn(".toast-region", styles)
         portfolio = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
         portfolio_form = (MODULE_ROOT / "portfolio-form.js").read_text(encoding="utf-8")
+        portfolio_lifecycle = (MODULE_ROOT / "portfolio-lifecycle.js").read_text(encoding="utf-8")
         transactions = (MODULE_ROOT / "transactions-view.js").read_text(encoding="utf-8")
         asset_autocomplete = (MODULE_ROOT / "asset-autocomplete.js").read_text(encoding="utf-8")
         self.assertIn("data-restore-automatic-quote-payload", portfolio)
         self.assertIn('method: "DELETE"', portfolio)
         self.assertIn('triggerButton.textContent = "Atualizando..."', portfolio)
         self.assertIn('quoteCell?.setAttribute("aria-busy", "true")', portfolio)
-        self.assertIn("!options.revalidate", portfolio)
-        self.assertIn("loadPortfolio({ revalidate: true })", app_source)
+        self.assertIn("!options.revalidate", portfolio_lifecycle)
+        self.assertIn("portfolioView.onEnter()", app_source)
+        self.assertIn("loadPortfolio({ revalidate: true, renderCached: false })", portfolio)
         self.assertLess(
             portfolio.index("const data = formData(portfolioAssetForm);"),
             portfolio.index("setFormBusy(portfolioAssetForm, true);"),

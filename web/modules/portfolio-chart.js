@@ -1,6 +1,6 @@
-import { chartToken, renderChart } from "./chart-adapter.js";
+import { chartToken, destroyChart, renderChart } from "./chart-adapter.js";
 
-export function createPortfolioChart({ state, elements, formatPercentValue, chartColor }) {
+export function createPortfolioChart({ state, elements, api, formatPercentValue, chartColor }) {
   const {
     portfolioReturnChart,
     portfolioReturnXLabels,
@@ -9,6 +9,27 @@ export function createPortfolioChart({ state, elements, formatPercentValue, char
     portfolioReturnNotice,
     portfolioReturnDrawerTitle,
   } = elements;
+
+  async function openReturns() {
+    if (!elements.portfolioReturnDrawer) return;
+    elements.portfolioReturnDrawer.hidden = false;
+    elements.portfolioReturnDrawer.setAttribute("aria-hidden", "false");
+    if (!state.portfolioReturns || state.portfolioReturns.error) {
+      try {
+        state.portfolioReturns = await api("/api/portfolio/returns");
+      } catch (error) {
+        state.portfolioReturns = { error: error.message || "Erro ao carregar" };
+      }
+    }
+    renderReturns();
+  }
+
+  function closeReturns() {
+    if (!elements.portfolioReturnDrawer) return;
+    elements.portfolioReturnDrawer.hidden = true;
+    elements.portfolioReturnDrawer.setAttribute("aria-hidden", "true");
+    destroyReturns();
+  }
 
   function renderReturns() {
     const returns = state.portfolioReturns;
@@ -63,7 +84,14 @@ export function createPortfolioChart({ state, elements, formatPercentValue, char
     return `${value > 0 ? "+" : ""}${formatPercentValue(value)}`;
   }
 
-  return { renderReturns };
+  function destroyReturns() {
+    destroyChart(portfolioReturnChart);
+    portfolioReturnXLabels?.replaceChildren();
+    portfolioReturnYAxis?.replaceChildren();
+    portfolioReturnLegend?.replaceChildren();
+  }
+
+  return { closeReturns, openReturns, renderReturns };
 }
 
 function monthLabel(month) {
