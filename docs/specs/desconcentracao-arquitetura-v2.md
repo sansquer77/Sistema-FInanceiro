@@ -2,7 +2,7 @@
 tipo: spec
 area: arquitetura-v2
 status: implementado
-versao: 2.2
+versao: 2.3
 atualizado: 2026-08-31
 relacionados:
   - "[[../arquitetura]]"
@@ -80,6 +80,10 @@ Usuários da v2 que precisam manter os fluxos e dados atuais estáveis enquanto 
 16. Dado cache persistente indisponível ou inválido, quando há consulta de cotação, então leitura/escrita falham de forma tolerada como antes e nenhuma conexão fica aberta durante a chamada HTTP.
 17. Dado cache em memória ou cambial, quando expira ou atinge o limite, então expurgo, LRU, locks e objetos públicos de cache continuam equivalentes.
 
+18. Dadas posições idênticas, quando valorizadas após a separação, então valores líquidos/brutos, impostos, aniversários e variação diária permanecem equivalentes.
+19. Dadas posições já carregadas, quando a rentabilidade histórica é solicitada, então não há nova leitura da carteira; séries por moeda, baseline, limite de 12 meses e aproximações permanecem iguais.
+20. Dadas consultas simultâneas, quando os motores internos calculam valores, então caches de fatores continuam locais à chamada e não há importação reversa da fachada nem substituição temporária de dependências globais.
+
 ## Fora de escopo
 
 - Alterar contratos públicos, schema SQLite ou comportamento financeiro.
@@ -94,6 +98,9 @@ Usuários da v2 que precisam manter os fluxos e dados atuais estáveis enquanto 
 - `web/app.js`: wrappers de views e o bloco legado de projeção financeira foram removidos; o arquivo permanece como composição do contrato backend.
 
 ## Plano de implementação
+
+- [x] Passo 19 — Separar valorização por data e série histórica, com dependências explícitas e fachada compatível. Fecha: critérios 18–20.
+- [x] Passo 20 — Verificar contratos, fatores compartilhados, impostos, aniversários e fronteiras transacionais com testes isolados e suíte completa. Fecha: critérios 18–20. Suíte completa: 453 testes aprovados, incluindo cinco novos contratos de fronteira.
 
 - [x] Passo 17 — Mover transporte HTTP e estado/políticas dos caches para `portfolio_quotes.py`, mantendo wrappers públicos e dependências explícitas. Fecha: critérios 15–17.
 - [x] Passo 18 — Testar cache quente/frio/vencido, refresh, falhas de persistência/transporte e fronteiras de escrita; executar suíte completa. Fecha: critérios 13, 15–17. Suíte de 446 testes aprovada; após adicionar dois casos complementares, os 10 testes isolados de cache/transporte também passaram.
@@ -119,6 +126,8 @@ Usuários da v2 que precisam manter os fluxos e dados atuais estáveis enquanto 
 - [x] Passo 5 — executar testes de contratos, domínio e suíte completa. Fecha: critérios 1 a 7.
 
 ## Changelog
+
+- `2.3` — 2026-08-31 — Separadas valorização por data (`portfolio_valuation.py`) e rentabilidade histórica (`portfolio_returns.py`), preservando regras, contratos e caches locais; testes de fronteira adicionados. Aplicação de cotações de mercado/fundos continua na fachada.
 
 - `2.2` — 2026-08-31 — Transferidos transporte HTTP/JSON, caches de cotação/câmbio, persistência, locks, TTL, expurgo/LRU e fallback para `portfolio_quotes.py`. Fachada compatível e dependências injetadas sem ciclo. Testes de domínio, transporte/cache e fronteira transacional aprovados; sem incremento de produto. Retry SSL legado preservado e sinalizado no ADR-0014 para revisão própria.
 - `2.1` — 2026-08-31 — Unificadas leitura e montagem das posições: tela e consumidores internos compartilham entradas, descontos de resgates, exclusão de encerrados, cotações e overrides do snapshot. Históricos preservados; testes de equivalência, imutabilidade, isolamento e fronteira transacional.

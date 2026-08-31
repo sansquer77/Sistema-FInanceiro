@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.71
+versao: 3.72
 atualizado: 2026-08-31
 relacionados:
   - "[[requisitos]]"
@@ -323,9 +323,11 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | `http_routes.py` | Tabela declarativa e resolução de rotas, independente do transporte HTTP. Ver [[specs/desconcentracao-arquitetura-v2]]. |
 | `cockpit.py` | Agregações de domínio do resumo mensal do Cockpit, fora do adaptador HTTP. |
 | `balance_projections.py` | Saldos conciliados/projetados, reservas de faturas e consolidação por moeda; autoridade backend consumida por Cockpit e Extrato. |
-| `portfolio.py` | API pública do Portfólio; ainda concentra CRUD, valorização, rentabilidade e transporte/cache. Resgates e encerramentos preparam posições fora da escrita e revalidam entradas locais na transação, sem recotação. Ver [[investimentos-portfolio]]. |
+| `portfolio.py` | API pública e composição do Portfólio; mantém CRUD, adaptação dos provedores e aplicação de cotações de mercado/fundos. Delega transporte/cache, valorização por data e série histórica. Resgates e encerramentos preparam posições fora da escrita e revalidam entradas locais na transação, sem recotação. Ver [[investimentos-portfolio]]. |
 | `portfolio_positions.py` | Identidade, auxiliares de lotes/FIFO e leitura única das entradas locais para a tela e consumidores internos; histórico de resgates por conexão recebida. Não contém o CRUD completo nem consultas externas. |
-| `portfolio_quotes.py` | Transporte HTTP/JSON, cache SQLite, caches em memória de cotações/câmbio, locks, TTL, expurgo/LRU e fallback vencido. Dependências injetadas sem importar a fachada; normalização de provedores e valorização permanecem em `portfolio.py`. |
+| `portfolio_quotes.py` | Transporte HTTP/JSON, cache SQLite, caches em memória de cotações/câmbio, locks, TTL, expurgo/LRU e fallback vencido. Dependências injetadas sem importar a fachada; normalização de provedores permanece em `portfolio.py`. |
+| `portfolio_valuation.py` | `PositionValuation`: valor por data de renda fixa/poupança, impostos, custódia, aniversários, variação diária e fatores mensais compartilhados. Sem SQL/HTTP; recebe provedores e relógio na composição. |
+| `portfolio_returns.py` | `PortfolioReturns`: série mensal por moeda, baseline e benchmarks CDI/IPCA; recebe valorização por data e carregador opcional da carteira, sem duplicar juros/impostos. Caches de fatores locais à chamada. |
 | `portfolio_calculations.py` | Agregações, normalizações e cálculos puros do Portfólio. |
 | `financial_health.py` | Núcleo analítico do Score de Saúde Financeira: cálculo atômico dos pilares, lista `pilares`, Paz Financeira e função de histórico com validação de `months` (1-36). Ver [[score-saude-financeira]]. |
 | `trends.py` | Núcleo local de Tendências e Achados: série mensal, Budget x Realizado, achados estruturados, eventos pontuais, assinaturas/serviços recorrentes, confiança e resumo determinístico. Ver [[tendencias-saude-financeira]]. |
@@ -384,7 +386,7 @@ O baseline inicial da v2 usa `PRAGMA user_version = 20000`. Banco ausente é cri
 | `investment_redemptions` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
 | `investment_closed_positions` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
 | `investment_value_overrides` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
-| `quote_cache` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
+| `quote_cache` | `portfolio_quotes.py` — Ver [[investimentos-portfolio]]. |
 | `user_ai_settings` | `secure_config.py` — metadados não secretos de configuração opcional de IA por usuário; segredo fica em `secure_configs`. Ver [[tendencias-saude-financeira]]. |
 | `secure_configs` | `secure_config.py` — envelopes criptografados por usuário para SMTP, IA e Mais Retorno; `source_path` indica arquivo legado migrado quando aplicável. Ver [[specs/preferencias-abas]], [[adr/0010-segredos-criptografados-sqlite]]. |
 | `consultor_settings` | `database.py` — configuração do Consultor por usuário (`consultor_enabled`, `investor_profile`, `data_access_consent`). Ver [[specs/consultor]]. |
@@ -563,6 +565,8 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 - [[adr/0014-desconcentracao-fachadas-e-roteamento]] — Fachadas compatíveis, roteamento declarativo e módulos internos menores para a fundação v2.
 
 ## Changelog
+
+- `3.72` — 2026-08-31 — Separados motores de valorização por data e rentabilidade histórica, com fachada compatível e dependências explícitas. Sem novas rotas, tabelas ou regras financeiras.
 
 - `3.71` — 2026-08-31 — Transporte e estado/políticas de cache transferidos para `portfolio_quotes.py`. Fachada mantém wrappers e aliases dos objetos públicos; SQLite fechado antes de HTTP. Sem novas rotas, tabelas ou mudança nas políticas de cotação.
 - `3.70` — 2026-08-31 — Observador compartilhado acompanha `hidden` para destruir gráficos de telas/abas/drawers ocultos e restaurar somente a apresentação ao retornar. Reset de sessão descarta instâncias e configurações; nenhuma consulta nova ou mudança de contrato financeiro.

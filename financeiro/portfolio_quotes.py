@@ -50,7 +50,7 @@ def yahoo_symbol(position: dict, aliases: dict[tuple[str, str], str]) -> str:
 
 class QuoteCache:
     """Owns quote/FX caches; dependencies are injected without importing the facade."""
-    # spec: arquitetura-v2/desconcentracao-arquitetura-v2 v2.2 — critérios 15–17
+    # spec: arquitetura-v2/desconcentracao-arquitetura-v2 v2.3 — critérios 15–17
 
     def __init__(self, *, connection_factory, read_json, error_type, clock=datetime.now,
                  max_entries=QUOTE_MEMORY_CACHE_MAX_ENTRIES, fx_max_entries=FX_MEMORY_CACHE_MAX_ENTRIES):

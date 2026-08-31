@@ -2,7 +2,7 @@
 tipo: adr
 area: arquitetura-v2
 status: implementado
-versao: 1.3
+versao: 1.4
 atualizado: 2026-08-31
 relacionados:
   - "[[../specs/desconcentracao-arquitetura-v2]]"
@@ -34,6 +34,10 @@ Aquecer cache e recomputar dentro da escrita foi descartado: expiração, falha 
 
 ## Consequências
 
+### Valorização e rentabilidade histórica
+
+`PositionValuation` reúne o valor por data de renda fixa/poupança, impostos, custódia e aniversários; `PortfolioReturns` monta séries mensais por moeda e benchmarks, recebendo o mesmo motor de valorização por callable. A fachada compõe serviços sem estado de carteira e preserva assinaturas públicas. Relógio, provedores e erro são explícitos; caches de fatores pertencem a cada chamada. Nenhum módulo interno importa a fachada ou troca globais temporariamente. Duplicar fórmulas históricas foi descartado pelo risco de divergência. A aplicação de cotações de mercado/fundos permanece na fachada nesta etapa; não se introduzem cotações históricas reais nem TWR/MWR.
+
 ### Transporte/cache do Portfólio
 
 `portfolio_quotes.QuoteCache` possui os caches e locks, consulta/grava o cache SQLite e coordena TTL, expurgo, LRU, refresh e fallback vencido. A fachada injeta conexão, relógio, leitor HTTP e classe de erro, mantendo wrappers públicos e aliases dos mesmos objetos de cache. O transporte HTTP/JSON também reside no módulo interno; não há importação reversa de `portfolio.py` nem troca temporária de globais para encaminhar dependências. Assim testes e consumidores existentes podem continuar substituindo `portfolio.read_json_url`, `portfolio.urlopen` e `portfolio.get_connection`.
@@ -58,6 +62,8 @@ O backend ordena os movimentos e acumula lotes por data, em centavos. Faturas co
 - Mover apenas funções entre arquivos JS: rejeitada para regras financeiras, pois não corrige a fronteira de autoridade.
 
 ## Changelog
+
+- `1.4` — 2026-08-31 — Separação entre valorização por data e séries históricas, com motor compartilhado e serviços sem estado de carteira.
 
 - `1.3` — 2026-08-31 — Transporte/cache efetivos no módulo interno, com dependências injetadas e fachada compatível; política TLS legada identificada para revisão separada.
 - `1.2` — 2026-08-31 — Atualização confirmada de lançamentos desacoplada de dados auxiliares e projeção incremental por data.
