@@ -1,10 +1,24 @@
 const DEFAULT_THRESHOLD = 200;
 const DEFAULT_OVERSCAN = 5;
 
-export function renderVirtualList(container, items, { rowHeight, renderItem, overscan = DEFAULT_OVERSCAN, threshold = DEFAULT_THRESHOLD, viewportHeight = 560 } = {}) {
+export function destroyVirtualLists(root) {
+  root?.querySelectorAll(".virtual-list-surface").forEach(surface => surface._virtualCleanup?.());
+}
+
+export function renderCollectionRows(container, items, { expanded = true, virtual = true, ...options }) {
+  destroyVirtualLists(container);
+  container.replaceChildren();
+  if (!expanded) return;
+  // spec: frontend-v2/frontend-fundacao-v2 v0.10 — critérios 28 e 29
+  if (virtual && renderVirtualList(container, items, options)) return;
+  container.innerHTML = items.map(options.renderItem).join("");
+}
+
+export function renderVirtualList(container, items, { rowHeight, renderItem, overscan = DEFAULT_OVERSCAN, threshold = DEFAULT_THRESHOLD, viewportHeight = 560, initialIndex = 0 } = {}) {
   if (!container || items.length <= threshold) {
     return false;
   }
+  destroyVirtualLists(container);
   container.replaceChildren();
   container.classList.add("virtual-list");
   container.setAttribute("aria-rowcount", String(items.length));
@@ -45,6 +59,7 @@ export function renderVirtualList(container, items, { rowHeight, renderItem, ove
     if (frame) cancelAnimationFrame(frame);
   };
   container.append(surface);
+  container.scrollTop = Math.max(0, Math.min(initialIndex, items.length - 1) - overscan) * rowHeight;
   renderWindow();
   return true;
 }

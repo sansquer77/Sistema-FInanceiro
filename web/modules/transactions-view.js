@@ -1,4 +1,4 @@
-import { renderVirtualList } from "./virtual-list.js";
+import { renderCollectionRows, destroyVirtualLists } from "./virtual-list.js";
 import { createAssetAutocomplete } from "./asset-autocomplete.js";
 import { createTransactionSliceLoader } from "./transaction-slice-loader.js";
 import { createTransactionReconciliation } from "./transaction-reconciliation.js";
@@ -545,6 +545,7 @@ export function registerTransactionsView({
   }
 
   function renderTransactionCollection(container, transactions, compact, balanceTransactions = transactions) {
+    destroyVirtualLists(container);
     container.innerHTML = "";
     if (transactions.length === 0) {
       const hasActiveFilter = Boolean(state.transactionSearch) || state.transactionStatusFilter !== "all";
@@ -567,7 +568,6 @@ export function registerTransactionsView({
         || containsHighlightedTransaction
         || isTransactionDayExpanded(dateKey, today);
       group.className = `transaction-group${compact ? "" : " collapsible-day"}${isExpanded ? "" : " is-collapsed"}`;
-      const rows = items.map((transaction) => transactionTemplate(transaction, compact)).join("");
       const heading = document.createElement("h3");
       if (compact) {
         heading.textContent = formatDate(dateKey);
@@ -584,18 +584,19 @@ export function registerTransactionsView({
       const content = document.createElement("div");
       content.className = "transaction-day-content";
       content.hidden = !isExpanded;
-      content.innerHTML = `<div class="transaction-rows">${rows}</div>`;
-      if (!compact && isExpanded && items.length > 200) {
-        renderVirtualList(content.querySelector(".transaction-rows"), items, {
-          rowHeight: 86,
-          renderItem: (transaction) => transactionTemplate(transaction, compact),
-        });
-      }
+      const rowsContainer = document.createElement("div");
+      rowsContainer.className = "transaction-rows";
+      content.append(rowsContainer);
       group.append(heading, content);
+      container.append(group);
+      renderCollectionRows(rowsContainer, items, {
+        expanded: isExpanded, virtual: !compact, rowHeight: 86,
+        initialIndex: items.findIndex(transaction => String(transaction.id) === state.transactionHighlightId),
+        renderItem: transaction => transactionTemplate(transaction, compact),
+      });
       if (!compact && isExpanded) {
         content.append(dailyBalance(dateKey, balanceTransactions));
       }
-      container.append(group);
     }
 
     if (!compact) {

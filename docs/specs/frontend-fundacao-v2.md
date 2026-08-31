@@ -2,7 +2,7 @@
 tipo: spec
 area: frontend-v2
 status: em-implementacao
-versao: 0.9
+versao: 0.10
 atualizado: 2026-08-31
 relacionados:
   - "[[frontend-modularizacao]]"
@@ -187,6 +187,9 @@ Usuário que acompanha muitos lançamentos, faturas, operações ou posições e
 26. Dado um gráfico em tela, aba ou drawer oculto por `hidden`, quando a visibilidade muda, então sua instância é destruída e só é recriada ao reaparecer, com os últimos dados disponíveis e sem consulta adicional.
 27. Dado um gráfico suspenso, quando seu contêiner é removido ou a sessão termina, então sua configuração é descartada e não reaparece na próxima sessão.
 
+28. Dado um dia expandido com mais de 200 lançamentos, quando renderizado, então apenas a janela visível e overscan passam pelo template, sem pré-montagem integral; dias recolhidos não montam linhas.
+29. Dado um lançamento destacado fora da primeira janela, quando sua lista é virtualizada, então a janela inicial inclui o lançamento destacado.
+
 ## Pendências
 
 > [!question] Pendências
@@ -202,6 +205,8 @@ Usuário que acompanha muitos lançamentos, faturas, operações ou posições e
 
 ## Plano de implementação
 
+- [x] Remover pré-montagem nos Lançamentos, liberar listeners/frames das listas substituídas e testar janela inicial, destaque, listas pequenas e dias recolhidos. Fecha: critérios 15, 17, 28 e 29. Teste com DOM simulado e 10 mil itens; memória real no Safari não medida.
+- [ ] Avaliar em etapa própria a pré-montagem dos rankings de Relatórios (DOM convertido em `outerHTML`) e do Portfólio (linhas formatadas antes de virtualizar), preservando expansão e agrupamento.
 - [x] Suspender gráficos sob ancestrais `hidden`, restaurar configurações recentes e limpar na sessão; testar ciclos, respostas tardias e descarte. Fecha: critérios 17, 24, 26 e 27 no adaptador, com instâncias simuladas. Memória real no Safari continua sujeita à validação manual.
 - [x] Desativar animações no adaptador compartilhado e testar precedência, preservação das interações e descarte em ciclos repetidos. Fecha: critérios 3 e 25; regressão do adaptador para 17 e 24. Teste usa instâncias simuladas, não mede memória real. A estabilização de memória no Safari exige validação manual.
 - [x] Passo 1 — adicionar inventário/licenças e assets vendorizados, com testes de ausência de CDN e `node_modules`. Fecha: critérios 1 e 18.
@@ -215,6 +220,7 @@ Usuário que acompanha muitos lançamentos, faturas, operações ou posições e
 
 ## Changelog
 
+- `0.10` — 2026-08-31 — Implementada renderização sob demanda de lançamentos, sem pré-montagem dos dias grandes ou recolhidos; destaque fora da janela inicial preservado e limpeza de listeners/frames ao substituir listas. Pré-montagem em Relatórios/Portfólio identificada para etapa própria.
 - `0.9` — 2026-08-31 — Implementada suspensão de gráficos de módulos, abas e drawers sob `hidden`, com retomada local e limpeza na troca de sessão. Testes de ciclos repetidos, configuração mais recente e falha tardia aprovados; memória real no Safari não medida.
 - `0.8` — 2026-08-31 — Desativadas animações globais, graduais e dinâmicas, com precedência sobre opções das views. Testadas configuração, preservação de interações e limpeza em ciclos com instâncias simuladas. Mitigação não garante ausência de recarregamentos nem elimina gráficos retidos em telas apenas ocultas.
 - `0.7` — 2026-08-30 — Primeiro virtualizador compartilhado integrado a Lançamentos, rankings de Relatórios e posições do Portfólio; Faturas e Histórico de Operações ficam explicitamente na etapa seguinte.

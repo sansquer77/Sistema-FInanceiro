@@ -122,7 +122,11 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn('from "./virtual-list.js"', transactions)
         self.assertIn('from "./virtual-list.js"', reports)
         self.assertIn('from "./virtual-list.js"', portfolio)
-        self.assertIn('items.length > 200', transactions)
+        self.assertNotIn('const rows = items.map((transaction) => transactionTemplate', transactions)
+        self.assertIn("expanded: isExpanded, virtual: !compact", transactions)
+        self.assertIn("renderCollectionRows(rowsContainer, items", transactions)
+        self.assertIn("destroyVirtualLists(container)", transactions)
+        self.assertIn('DEFAULT_THRESHOLD = 200', virtualizer)
         self.assertIn('list.children.length <= 200', reports)
         self.assertIn('positionRows.length > 200', portfolio)
 

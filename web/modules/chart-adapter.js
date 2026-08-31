@@ -29,7 +29,7 @@ export function destroyDisconnectedCharts() {
 
 export function syncChartVisibility() {
   destroyDisconnectedCharts();
-  // spec: frontend-v2/frontend-fundacao-v2 v0.9 — critérios 26 e 27
+  // spec: frontend-v2/frontend-fundacao-v2 v0.10 — critérios 26 e 27
   for (const [element, definition] of [...chartDefinitions]) {
     if (element.closest("[hidden]")) {
       if (chartInstances.has(element)) destroyChartInstance(element);
@@ -125,7 +125,7 @@ export function renderChart(element, options, { emptyMessage = "Sem dados para e
       zoom: { enabled: false },
       parentHeightOffset: 0,
       ...(options.chart || {}),
-      // spec: frontend-v2/frontend-fundacao-v2 v0.9 — critério 25
+      // spec: frontend-v2/frontend-fundacao-v2 v0.10 — critério 25
       // Apply last so a view cannot accidentally restore expensive transitions.
       animations: {
         enabled: false,
