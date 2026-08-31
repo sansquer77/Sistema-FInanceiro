@@ -111,6 +111,7 @@ from financeiro.secure_config import (
     save_email_config,
     save_mais_retorno_settings,
 )
+from financeiro.exchange_rates import calculate_exchange_preview
 from financeiro.simulations import simulate_butterfly_effect
 from financeiro.trends import TrendsError, calculate_trends
 from financeiro.spending_limits import (
@@ -669,8 +670,14 @@ class AppHandler(BaseHTTPRequestHandler):
         query = parse_qs(urlsplit(self.path).query)
         currency = (query.get("currency") or ["BRL"])[0]
         transaction_date = (query.get("date") or [None])[0]
-        rate = get_exchange_rate_to_brl(currency, transaction_date)
-        self.send_json({"currency": currency.upper(), "date": transaction_date, "rate": f"{rate:.6f}"})
+        target_currency = (query.get("target_currency") or ["BRL"])[0]
+        amount = (query.get("amount") or [None])[0]
+        transfer_rate = (query.get("transfer_rate") or [None])[0]
+        if target_currency.upper() == "BRL" and amount is None and transfer_rate is None:
+            rate = get_exchange_rate_to_brl(currency, transaction_date)
+            self.send_json({"currency": currency.upper(), "date": transaction_date, "rate": f"{rate:.6f}"})
+            return
+        self.send_json(calculate_exchange_preview(currency, target_currency, transaction_date, amount, transfer_rate))
 
     def handle_classification_suggestion(self) -> None:
         user = self.require_user()

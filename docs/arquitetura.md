@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.60
+versao: 3.61
 atualizado: 2026-08-31
 relacionados:
   - "[[requisitos]]"
@@ -96,6 +96,11 @@ Os assets normalizados do catálogo ficam em `web/assets/banks/` e `web/assets/b
 | `portfolio-view.js` | Ativos: posições, histórico, resgate e encerramento; libera gráficos, overlays e DOM dinâmico ao sair e remonta a apresentação do estado ao entrar. |
 | `portfolio-lifecycle.js` | Política de reaproveitamento do snapshot e limpeza seletiva do DOM dinâmico do Portfólio. |
 | `transactions-view.js` | Lançamentos: formulário, recorrência, parcelas, câmbio. |
+| `transaction-balance-chart.js` | Renderização ApexCharts da evolução mensal de saldos do Extrato. |
+| `transaction-list.js` | Coordenação de busca, filtros e renderização da lista mensal. |
+| `transaction-form.js` | Comportamento base do formulário e prévia cambial fornecida pelo backend. |
+| `transaction-investment-form.js` | Campos, estado condicional e assistência próprios dos aportes. |
+| `classification-suggestion.js` | Sugestão local compartilhada pelos formulários de Contas e Cartões. |
 | `operation-history-view.js` | Histórico de Operações: filtros, busca, agrupamentos e paginação. |
 | `simulations-view.js` | Efeito Borboleta: formulário e renderização das projeções calculadas pelo backend. |
 | `load-policy.js` | Política compartilhada de cache curto, invalidação, chave contextual e deduplicação de requisições em andamento. |
@@ -167,7 +172,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `PUT` | `/api/transactions/{id}` |
 | `DELETE` | `/api/transactions/{id}` |
 | `PUT` | `/api/transactions/{id}/reconciliation` |
-| `GET` | `/api/exchange-rate` |
+| `GET` | `/api/exchange-rate?currency={origem}&target_currency={destino}&date={data}&amount={valor}&transfer_rate={cotacao_opcional}` |
 | `GET` | `/api/classification-suggestion?description={texto}&group_type={grupo}` |
 
 #### Rotas — Cartões de Crédito → [[cartoes]]
@@ -308,6 +313,7 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | `auth.py` | Usuários, hashes, sessões, recuperação de senha. Ver [[seguranca-autenticacao]], [[recuperacao-senha]]. |
 | `accounts.py` | Contas-correntes, saldos e arquivamento. Ver [[contas-correntes]]. |
 | `transactions.py` | Lançamentos, transferências, tags, câmbio, recorrência/parcelamento e conciliação. Ver [[lancamentos]]. |
+| `exchange_rates.py` | Cálculo decimal da prévia cambial entre moedas e do valor de destino. Ver [[lancamentos]]. |
 | `categories.py` | Categorias, subcategorias, tags e bloqueios de exclusão. Ver [[categorias-tags-gestao]]. |
 | `classification_suggestions.py` | Normalização de descrições e sugestão local por histórico exato indexado. Ver [[classificacao-assistida]]. |
 | `credit_cards.py` | Cartões, faturas mensais, transações e pagamentos. Ver [[cartoes]]. |
@@ -550,6 +556,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.61` — 2026-08-31 — `transactions-view.js` torna-se fachada compatível sobre módulos de gráfico, lista, formulário base/investimento e classificação compartilhada; a prévia cambial passa a `financeiro/exchange_rates.py`.
 - `3.60` — 2026-08-31 — Documentados `bank-logos.js`, os catálogos de assets compartilhados por Contas/Cartões e o gate automatizado efetivamente aplicado por `tests/test_code_quality.py`.
 - `3.59` — 2026-08-30 — Carregamentos de Preferências, Histórico, Extrato e Simulações adotam política compartilhada `dirty + loadedAt + in-flight`, invalidada centralmente após mutações HTTP.
 - `3.58` — 2026-08-30 — Portfólio adota ciclo seletivo `onEnter()`/`onLeave()`, snapshot fresco por 30 segundos e invalidação imediata após mutações para reduzir memória e chamadas redundantes.

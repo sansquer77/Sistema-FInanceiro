@@ -12,6 +12,24 @@ MODULE_ROOT = WEB_ROOT / "modules"
 
 
 class FrontendModuleContractTest(unittest.TestCase):
+    def test_transactions_view_composes_extracted_responsibilities(self) -> None:
+        transactions = (MODULE_ROOT / "transactions-view.js").read_text(encoding="utf-8")
+        cards = (MODULE_ROOT / "cards-view.js").read_text(encoding="utf-8")
+        base_form = (MODULE_ROOT / "transaction-form.js").read_text(encoding="utf-8")
+
+        for module_name in (
+            "classification-suggestion.js",
+            "transaction-balance-chart.js",
+            "transaction-list.js",
+            "transaction-form.js",
+            "transaction-investment-form.js",
+        ):
+            self.assertIn(f'from "./{module_name}"', transactions)
+        self.assertIn('from "./classification-suggestion.js"', cards)
+        self.assertNotIn("sourceToBrl / destinationToBrl", transactions)
+        self.assertNotIn("amount * rate", transactions)
+        self.assertIn("/api/exchange-rate?", base_form)
+
     def test_apexcharts_is_pinned_local_and_used_through_shared_adapter(self) -> None:
         index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
         adapter = (MODULE_ROOT / "chart-adapter.js").read_text(encoding="utf-8")
@@ -21,7 +39,7 @@ class FrontendModuleContractTest(unittest.TestCase):
             "cockpit-view.js",
             "trends-view.js",
             "cards-view.js",
-            "transactions-view.js",
+            "transaction-balance-chart.js",
             "simulations-view.js",
             "portfolio-chart.js",
             "reports-view.js",
@@ -106,7 +124,7 @@ class FrontendModuleContractTest(unittest.TestCase):
         reports = (MODULE_ROOT / "reports-view.js").read_text(encoding="utf-8")
         adapter = (MODULE_ROOT / "chart-adapter.js").read_text(encoding="utf-8")
         cards = (MODULE_ROOT / "cards-view.js").read_text(encoding="utf-8")
-        transactions = (MODULE_ROOT / "transactions-view.js").read_text(encoding="utf-8")
+        transactions = (MODULE_ROOT / "transaction-balance-chart.js").read_text(encoding="utf-8")
         styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
 
         self.assertIn("document.body.append(portfolioReturnDrawer)", portfolio)
@@ -123,6 +141,14 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("min: -0.5", adapter)
         self.assertIn("rows.length - 0.5", adapter)
         self.assertNotIn("centeredValueTooltip", adapter)
+        for legacy_symbol in (
+            "balanceHistoryChartTop",
+            "balanceHistoryChartBaseline",
+            "balanceHistoryPath",
+            "balanceHistoryAreaPath",
+            "smoothBalancePath",
+        ):
+            self.assertNotIn(legacy_symbol, transactions)
         plot_rule = styles[styles.index(".invoice-history-chart .invoice-history-plot {"):]
         plot_rule = plot_rule[:plot_rule.index("}")]
         self.assertIn("height: 92px", plot_rule)

@@ -2,8 +2,8 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 4.14
-atualizado: 2026-08-30
+versao: 4.18
+atualizado: 2026-08-31
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
   - "[[arquitetura]]"
@@ -15,7 +15,7 @@ aliases: ["Modularização Frontend", "ES Modules"]
 # Modularização do Frontend
 
 > [!info] Status
-> **implementado** · área: `frontend` · atualizado em 2026-08-30 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]], [[../qualidade-codigo]]
+> **implementado** · área: `frontend` · atualizado em 2026-08-31 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]], [[../qualidade-codigo]]
 
 ## Problema
 
@@ -82,7 +82,12 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `app-data-loader.js` | Coordenação dos carregamentos compartilhados, com serviços, views e ações recebidos explicitamente. |
 | `load-policy.js` | Política compartilhada de snapshot recente, invalidação e promessa em andamento. |
 | `transaction-slice-loader.js` | Carregamento coordenado da fatia conta+mês e da projeção de saldo do Extrato. |
-| `transactions-view.js` | Lançamentos: formulário, recorrência, parcelas e câmbio. |
+| `transaction-balance-chart.js` | Apresentação e ciclo de vida do gráfico mensal de saldos do Extrato. |
+| `classification-suggestion.js` | Classificação assistida reutilizável pelos formulários de Contas e Cartões. |
+| `transaction-list.js` | Busca, filtros, agrupamento diário e renderização da lista do Extrato. |
+| `transaction-form.js` | Fluxo base do formulário, séries, contas, categorias e câmbio assistido pelo backend. |
+| `transaction-investment-form.js` | Campos e assistência específicos do aporte de investimento. |
+| `transactions-view.js` | Fachada compatível de Lançamentos; compõe lista, gráfico, formulário base/investimento e carregador. |
 | `operation-history-view.js` | Histórico de Operações: filtros, busca, agrupamentos e paginação incremental. |
 | `simulations-view.js` | Efeito Borboleta: formulário de cenário hipotético e projeções retornadas pelo backend. |
 | `instructions-view.js` | Central de ajuda: busca, grupos, tópicos expansíveis e navegação contextual. |
@@ -157,6 +162,14 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Textos de interface usam português brasileiro acentuado e consistente.
 
 ## Plano de implementação
+
+- [x] Extrair o gráfico de saldo sem alterar sua apresentação ou navegação mensal.
+- [x] Compartilhar a classificação assistida entre Lançamentos de Contas e Cartões.
+- [x] Extrair busca, filtros, agrupamento e renderização da lista mensal.
+- [x] Separar o formulário base dos campos e assistências próprios de investimento.
+- [x] Remover cálculos cambiais financeiros do JavaScript, consumindo valores derivados pelo backend.
+- [x] Preservar `transactions-view.js` como fachada compatível com o composition root atual.
+- [x] Atualizar contratos automatizados e executar a suíte completa.
 
 - [x] Extrair fábrica/reset puro de estado para `app-state.js` sem dependência de DOM.
 - [x] Extrair carregamentos coordenados para `app-data-loader.js` com dependências explícitas e views tardias.
@@ -243,6 +256,10 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Changelog
 
+- `4.18` — 2026-08-31 — Concluída a decomposição de Lançamentos; a fachada preserva o contrato público e Cartões reutiliza a classificação assistida compartilhada.
+- `4.17` — 2026-08-31 — Iniciada a decomposição de `transactions-view.js` em gráfico, classificação compartilhada, lista e formulários especializados, preservando a fachada pública atual.
+- `4.16` — 2026-08-31 — Removidos coordenadas e geradores de path SVG sem consumidores do Extrato; teste impede reintrodução do legado após a migração para ApexCharts.
+- `4.15` — 2026-08-31 — Iniciada remoção dos resíduos SVG sem consumidores em `transactions-view.js`, preservando o gráfico ApexCharts vigente.
 - `4.14` — 2026-08-30 — Política `dirty + loadedAt + in-flight` concluída em Preferências, Histórico, Extrato e Simulações, com chave contextual, proteção contra corrida e reset de sessão.
 - `4.13` — 2026-08-30 — Iniciada política compartilhada `dirty + loadedAt + in-flight` para carregamentos de views.
 - `4.12` — 2026-08-30 — Adicionado `bank-logos.js` como catálogo compartilhado de logos de instituições financeiras, usado em Contas e Cartões.

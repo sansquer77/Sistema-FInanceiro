@@ -18,7 +18,6 @@ REVIEWED_OVERSIZED_MODULES = {
     "web/modules/cards-view.js": 1209,
     "web/modules/portfolio-view.js": 1663,
     "web/modules/reports-view.js": 1336,
-    "web/modules/transactions-view.js": 1593,
 }
 MODULE_SIZE_REVIEW_THRESHOLD = 1200
 

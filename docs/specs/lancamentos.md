@@ -2,8 +2,8 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 3.27
-atualizado: 2026-08-29
+versao: 3.29
+atualizado: 2026-08-31
 relacionados:
   - "[[contas-correntes]]"
   - "[[categorias-tags-gestao]]"
@@ -17,7 +17,7 @@ aliases: ["Lançamentos", "Transações"]
 # Lançamentos
 
 > [!info] Status
-> **implementado** · área: `lancamentos` · atualizado em 2026-08-29 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]]
+> **implementado** · área: `lancamentos` · atualizado em 2026-08-31 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]]
 
 ## Problema
 
@@ -63,6 +63,7 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 - **Investimento**: reduz a liquidez da conta quando for aporte e pode criar/atualizar a posição no portfólio. Ver [[investimentos-portfolio]].
 - **Transferência**: reduz saldo da origem, aumenta saldo do destino. Exige contas diferentes com a mesma moeda.
 - **Câmbio**: movimentação entre contas de moedas diferentes; registra valor de origem, valor de destino e cotação ajustável.
+- A prévia cambial entre duas contas é calculada no backend com precisão decimal; a interface apenas apresenta a cotação e o valor de destino devolvidos pela API.
 - Lançamentos em conta de moeda estrangeira normalizam o valor em BRL pela cotação informada manualmente; quando ela não for informada, o sistema consulta a última PTAX de venda disponível até a data do lançamento. Se a PTAX estiver indisponível, o usuário deve informar a cotação manualmente.
 - Valor deve ser maior que zero.
 - Categoria é obrigatória para receitas, despesas e investimentos. Transferências e câmbio não exigem categoria.
@@ -134,7 +135,7 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 | `PUT` | `/api/transactions/{id}` |
 | `DELETE` | `/api/transactions/{id}` |
 | `PUT` | `/api/transactions/{id}/reconciliation` |
-| `GET` | `/api/exchange-rate` |
+| `GET` | `/api/exchange-rate` (aceita origem, destino, data, valor e cotação manual opcional para prévia) |
 | `GET` | `/api/classification-suggestion` |
 | `GET` | `/api/portfolio/fund-quote?cnpj={cnpj}` |
 
@@ -205,6 +206,8 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 
 ## Changelog
 
+- `3.29` — 2026-08-31 — Prévia cambial concluída no backend com precisão decimal e cobertura para cotação cruzada e manual; o frontend apenas apresenta o resultado.
+- `3.28` — 2026-08-31 — Iniciada a transferência da prévia cambial residual do formulário para o backend, mantendo cotação e valor de destino editáveis.
 - `3.27` — 2026-08-30 — Fatia do Extrato e projeção passam a compartilhar cache por conta+mês, requisição em andamento e invalidação após mutações.
 - `3.26` — 2026-08-30 — Iniciado reaproveitamento da fatia mensal por conta enquanto fresca, com invalidação após mutações.
 - `3.25` — 2026-08-29 — Campo de ativo em lançamentos de investimento sugere posições já cadastradas, preenche o nome ao selecionar e preserva a criação livre de novos códigos.
