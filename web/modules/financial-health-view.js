@@ -1,4 +1,4 @@
-// spec: score-saude-financeira v3.6 — critérios 15, 16, 17, 22, 23, 24, 25, 26, 27, 28, 29, 30 e 31
+// spec: score-saude-financeira v3.7 — critérios 15, 16, 17, 22, 23, 24, 25, 26, 27, 28, 29, 30 e 31
 import { stateMarkup } from "./dom-utils.js";
 export function registerFinancialHealthView({
   elements,
@@ -99,7 +99,7 @@ export function registerFinancialHealthView({
     const score = Math.max(0, Math.min(1000, Number(data.score_total || 0)));
     const ratio = score / 1000;
     const rotation = -90 + ratio * 180;
-    const zone = financialHealthScoreZone(score);
+    const zone = financialHealthScoreZone(data.nivel);
     return `
       <section class="financial-health-gauge-card ${zone.className}" aria-label="Score de saúde financeira">
         <div class="financial-health-gauge-shell">
@@ -114,7 +114,7 @@ export function registerFinancialHealthView({
           </div>
           <div class="financial-health-gauge-scale" aria-hidden="true">
             <span>0</span>
-            <span>300</span>
+            <span>250</span>
             <span>500</span>
             <span>750</span>
             <span>1000</span>
@@ -127,8 +127,8 @@ export function registerFinancialHealthView({
           <h3>${escapeHtml(zone.title)}</h3>
           <p>${escapeHtml(zone.meaning)}</p>
           <div class="financial-health-zone-legend" aria-label="Faixas do score">
-            <span><i class="zone-critico"></i>0–299 Crítico</span>
-            <span><i class="zone-atencao"></i>300–499 Atenção</span>
+            <span><i class="zone-critico"></i>0–249 Crítico</span>
+            <span><i class="zone-atencao"></i>250–499 Atenção</span>
             <span><i class="zone-bom"></i>500–749 Moderado</span>
             <span><i class="zone-excelente"></i>750–1000 Excelente</span>
           </div>
@@ -275,8 +275,8 @@ export function registerFinancialHealthView({
     return `level-${["critico", "atencao", "bom", "excelente"].includes(level) ? level : "atencao"}`;
   }
 
-  function financialHealthScoreZone(score) {
-    if (score < 300) {
+  function financialHealthScoreZone(level) {
+    if (level === "critico") {
       return {
         className: "level-critico",
         label: "Crítico",
@@ -284,7 +284,7 @@ export function registerFinancialHealthView({
         meaning: "Risco elevado de endividamento, ausência de reserva ou orçamento no vermelho. Pede ação imediata nos pilares mais fracos.",
       };
     }
-    if (score < 500) {
+    if (level === "atencao") {
       return {
         className: "level-atencao",
         label: "Vulnerável / Atenção",
@@ -292,7 +292,7 @@ export function registerFinancialHealthView({
         meaning: "Há pouca margem de manobra; um imprevisto pode comprometer o mês. Priorize reserva, limites e redução de pressão financeira.",
       };
     }
-    if (score < 750) {
+    if (level === "bom") {
       return {
         className: "level-bom",
         label: "Moderado / Em construção",

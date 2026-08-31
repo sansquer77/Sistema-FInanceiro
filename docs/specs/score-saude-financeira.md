@@ -2,8 +2,8 @@
 tipo: spec
 area: score-saude-financeira
 status: implementado
-versao: 3.6
-atualizado: 2026-08-09
+versao: 3.7
+atualizado: 2026-08-31
 relacionados:
   - "[[relatorios]]"
   - "[[limites-gastos]]"
@@ -18,7 +18,7 @@ aliases: ["Score de Saúde Financeira", "Diagnóstico Financeiro", "Financial He
 # Score de Saúde Financeira
 
 > [!info] Status
-> **implementado** · área: `score-saude-financeira` · atualizado em 2026-08-09 · relacionados: [[relatorios]], [[limites-gastos]], [[investimentos-portfolio]], [[cartoes]], [[contas-correntes]]
+> **implementado** · área: `score-saude-financeira` · atualizado em 2026-08-31 · relacionados: [[relatorios]], [[limites-gastos]], [[investimentos-portfolio]], [[cartoes]], [[contas-correntes]]
 
 ## Problema
 
@@ -43,7 +43,7 @@ Qualquer usuário autenticado localmente que deseje entender sua saúde financei
 |---|---|---|
 | `month` | `AAAA-MM` | Obrigatório. Mês de referência da avaliação. |
 | `score_total` | inteiro | Pontuação consolidada entre `0` e `1000`. |
-| `nivel` | texto | Categoria visual normalizada: `critico` (0-299), `atencao` (300-499), `bom` (500-749), `excelente` (750-1000). |
+| `nivel` | texto | Categoria visual normalizada: `critico` (0-249), `atencao` (250-499), `bom` (500-749), `excelente` (750-1000). |
 | `pilar_poupanca` | inteiro | Pontuação da Taxa de Poupança (0 a 250 pontos; peso 25%). |
 | `pilar_reserva` | inteiro | Pontuação da Reserva de Emergência (0 a 250 pontos; peso 25%). |
 | `pilar_endividamento` | inteiro | Pontuação do Comprometimento de Renda (0 a 200 pontos; peso 20%). |
@@ -81,8 +81,8 @@ Qualquer usuário autenticado localmente que deseje entender sua saúde financei
   - **Concentração em Poupança**: Quando Poupança representar mais de 25% do Portfólio cadastrado, o pilar deve aplicar penalidade adicional e exibir mensagem explicativa, por exemplo: `Poupança representa xx% do seu portfólio; há produtos com melhor relação de rendimento e liquidez que podem ser avaliados conforme seu perfil.` Essa mensagem deve ser educativa, não uma recomendação personalizada de investimento.
 - **Interface e Navegação**: O Score de Saúde Financeira e suas recomendações acionáveis são exibidos em uma aba dedicada dentro do módulo **Cockpit**, separada da aba **Situação do mês**, permitindo acesso direto ao diagnóstico sem exigir rolagem pelos KPIs, saldos, planejamento, dívidas e gráficos do resumo mensal.
 - **Zonas do Score**: A classificação visual do score total e dos pilares deve usar quatro zonas normalizadas de 0 a 1000:
-  - `0 a 299 pts` — **Crítico** / vermelho: risco elevado de endividamento, ausência de reserva ou orçamento no vermelho; exige atenção imediata.
-  - `300 a 499 pts` — **Vulnerável / Atenção** / laranja: situação instável, com pouca margem de manobra para imprevistos.
+  - `0 a 249 pts` — **Crítico** / vermelho: risco elevado de endividamento, ausência de reserva ou orçamento no vermelho; exige atenção imediata.
+  - `250 a 499 pts` — **Vulnerável / Atenção** / laranja: situação instável, com pouca margem de manobra para imprevistos.
   - `500 a 749 pts` — **Moderado / Em construção** / amarelo: orçamento sob controle, com oportunidades de aumentar poupança, reserva ou disciplina de limites.
   - `750 a 1000 pts` — **Excelente / Sólido** / verde: saúde financeira sólida, reserva consistente, dívidas controladas e aportes recorrentes.
 - **Velocímetro/Gauge do Score**: A aba **Saúde Financeira** deve substituir o bloco textual central de pontuação por um velocímetro/gauge nativo em CSS/HTML, com escala de 0 a 1000, ponteiro proporcional ao score e legenda das quatro zonas. Para preservar clareza visual, o gauge deve ficar livre de score/status/texto no centro; pontuação, status e interpretação ficam no bloco textual lateral. O gauge deve ser uma melhoria visual sem biblioteca externa e sem alterar a fórmula do score.
@@ -145,8 +145,8 @@ Tabelas: consulta `transactions`, `credit_card_transactions`, `spending_limits`,
 - Dado um usuário em viewport estreita ou usando leitor de tela, quando acessa o gráfico dos pilares, então os mesmos dados do gráfico ficam disponíveis em lista textual equivalente e sem overflow horizontal.
 - Dado o Cockpit carregado na aba **Situação do mês**, quando o usuário visualiza o KPI/card **Taxa de poupança**, então há um pequeno indicador `i` que abre uma caixa de ajuda textual acessível em hover, foco ou clique/foco, explicando a fórmula e as exclusões do cálculo.
 - Dado o Cockpit carregado na aba Saúde Financeira, quando o usuário visualiza a linha do pilar ou o card detalhado de **Taxa de Poupança**, então há um pequeno indicador `i` que abre uma caixa de ajuda textual acessível em hover, foco ou clique/foco, explicando a fórmula e as exclusões do cálculo.
-- Dado um score total de 280, quando a aba Saúde Financeira é exibida, então o gauge classifica o diagnóstico como **Crítico** dentro da faixa 0–299.
-- Dado um score total de 420, quando a aba Saúde Financeira é exibida, então o gauge classifica o diagnóstico como **Vulnerável / Atenção** dentro da faixa 300–499.
+- Dado um score total de 249, quando a aba Saúde Financeira é exibida, então o gauge classifica o diagnóstico como **Crítico** dentro da faixa 0–249.
+- Dado um score total de 250, quando a aba Saúde Financeira é exibida, então o gauge classifica o diagnóstico como **Vulnerável / Atenção** dentro da faixa 250–499.
 - Dado um score total de 680, quando a aba Saúde Financeira é exibida, então o gauge classifica o diagnóstico como **Moderado / Em construção** dentro da faixa 500–749.
 - Dado um score total de 820, quando a aba Saúde Financeira é exibida, então o gauge classifica o diagnóstico como **Excelente / Sólido** dentro da faixa 750–1000.
 - Dado a aba Saúde Financeira exibindo o gauge, quando o usuário observa o gráfico, então o centro do velocímetro não exibe texto que concorra com o ponteiro; score, status e interpretação aparecem no bloco lateral.
@@ -164,6 +164,8 @@ Nenhuma pendência conhecida.
 
 ## Plano de implementação
 
+- [x] Uniformizar zonas em 250 pontos no backend, escala/legenda e arco visual; testar limites e pilares normalizados. Pontuação e pesos não mudam; 250–299 passa de Crítico a Atenção. Gauge com quatro arcos de 45° e escala 0/250/500/750/1000. Fecha: critérios 24–27. Aparência no Safari requer validação manual.
+
 - [x] Passo 1 — Adicionar metadado explícito de elegibilidade para reserva de emergência no Portfólio, com migração idempotente e campo de marcação na UI de posições elegíveis. Fecha: critérios 2 e 3.
 - [x] Passo 2 — Criar módulo Python `financeiro/financial_health.py` implementando as funções atômicas de cálculo de cada pilar (com a distribuição 25/25/20/15/15), a lista `pilares` e a seção informativa Paz Financeira em centavos inteiros. Fecha: critérios 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 e 11.
 - [x] Passo 3 — Adicionar as rotas `GET /api/financial-health-score` e `GET /api/financial-health-score/history` em `app.py` com validação de sessão e origem. Fecha: critérios 12, 13 e 14.
@@ -173,6 +175,8 @@ Nenhuma pendência conhecida.
 - [ ] Passo 6 — Atualizar `docs/arquitetura.md` e `docs/requisitos.md` com as novas rotas, módulo e metadado de reserva no Portfólio.
 
 ## Changelog
+
+- `3.7` — 2026-08-31 — Faixas uniformes no gauge e na classificação normalizada dos pilares; interface usa nível retornado pelo backend. Sem mudança na pontuação ou nos pesos.
 
 - `3.6` — 2026-08-09 — Histórico de Score passa a reutilizar uma única fotografia do Portfólio por request, evitando recálculo de cotações externas para cada mês solicitado.
 - `3.5` — 2026-08-07 — Alinhamento com a regra de **Normalização de Moedas**: lançamentos de cartão (fatura) passam a entrar no cálculo do Score via `amount_brl_cents` (BRL normalizado) em todas as consultas de soma (resumo mensal, contexto de dívida e aderência a limites), garantindo consistência com [[tendencias-saude-financeira]] e com a regra vigente de \[\[relatorios\]\] para cartões em moeda estrangeira; teste de regressão adicionado.

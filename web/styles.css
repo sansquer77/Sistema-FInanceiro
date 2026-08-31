@@ -2687,8 +2687,8 @@ textarea:focus {
   background:
     conic-gradient(
       from 270deg at 50% 100%,
-      var(--health-critical) 0deg 54deg,
-      var(--health-attention) 54deg 90deg,
+      var(--health-critical) 0deg 45deg,
+      var(--health-attention) 45deg 90deg,
       var(--health-moderate) 90deg 135deg,
       var(--health-solid) 135deg 180deg,
       transparent 180deg 360deg
