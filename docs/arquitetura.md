@@ -2,13 +2,14 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.58
-atualizado: 2026-08-30
+versao: 3.60
+atualizado: 2026-08-31
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
   - "[[glossario]]"
   - "[[qualidade-codigo]]"
+  - "[[specs/bank-logos]]"
   - "[[adr/0001-stack-local-sem-framework]]"
   - "[[adr/0002-modularizacao-frontend]]"
 tags: [arquitetura, meta]
@@ -17,7 +18,7 @@ tags: [arquitetura, meta]
 # Arquitetura
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-08-30 · relacionados: [[requisitos]], [[qualidade-codigo]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
+> **implementado** · área: `meta` · atualizado em 2026-08-31 · relacionados: [[requisitos]], [[qualidade-codigo]], [[specs/bank-logos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
 
 ## Visão geral
 
@@ -34,7 +35,7 @@ docs/               Requisitos, arquitetura, specs e referências
 
 O servidor HTTP revalida arquivos estáticos com `ETag` e `Last-Modified`; arquivos não versionados usam `Cache-Control: no-cache` para permitir `304 Not Modified` sem cache agressivo. Respostas JSON acima de 1 KB podem ser comprimidas com gzip quando o cliente envia `Accept-Encoding: gzip`.
 
-As fronteiras de responsabilidade e os sinais de alerta para crescimento de módulos estão consolidados em [[qualidade-codigo]]. O documento é uma referência implementada de revisão manual; não cria um gate automatizado de CI.
+As fronteiras de responsabilidade e os sinais de alerta para crescimento de módulos estão consolidados em [[qualidade-codigo]]. Além da revisão manual, `tests/test_code_quality.py` aplica um gate automatizado aos limites e às fronteiras arquiteturais verificáveis.
 
 O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Cockpit > Consultor**. Em Preferências, o usuário configura a IA geral, ativa o Consultor, aceita o consentimento de acesso aos dados e pode preencher/remover o Perfil Complementar criptografado. No Cockpit, a aba Consultor exibe os indicadores de atrasos/vencimentos, a subaba **Análises** com catálogo fechado de 9 análises em seletor (incluindo o card `evolucao_score_tempo` com seletor de 6/12 meses), botão único **Gerar** e a subaba **Histórico** com filtro textual. O módulo não possui prompt livre: cada execução envia apenas o contexto minimizado da análise escolhida e persiste somente respostas bem-sucedidas.
 
@@ -70,6 +71,9 @@ O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Co
 | `instructions-content.js` | Conteúdo estático, offline e versionado da central de ajuda. Ver [[instrucoes-app]]. |
 | `app-state.js` | Fábrica do estado inicial e reset puro dos dados de sessão, sem singleton, DOM ou API. |
 | `app-data-loader.js` | Coordenação dos carregamentos compartilhados por dependências explícitas e acesso tardio às views, sem regras financeiras. |
+| `bank-logos.js` | Catálogo e resolvedor compartilhado de logos de instituições e bandeiras, com normalização, aliases e fallback visual. Ver [[specs/bank-logos]]. |
+
+Os assets normalizados do catálogo ficam em `web/assets/banks/` e `web/assets/bandeiras/`, com nomes ASCII minúsculos. Contas e Cartões reutilizam o mesmo resolvedor; Cartões também exibem a bandeira quando catalogada.
 
 **Fundação da v2 em implementação:** os gráficos existentes já usam ApexCharts 4.7.0 vendorizado por meio de `chart-adapter.js`; [[specs/frontend-fundacao-v2]] mantém planejados o adaptador IMask, uma Command Palette em ES Modules com experiência equivalente ao padrão cmdk e um virtualizador compartilhado de listas de altura fixa. O pacote React `cmdk` não integra a arquitetura; o frontend continua sem framework, bundler ou download de CDN. Ver [[adr/0013-dependencias-frontend-v2]].
 
@@ -94,6 +98,8 @@ O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Co
 | `transactions-view.js` | Lançamentos: formulário, recorrência, parcelas, câmbio. |
 | `operation-history-view.js` | Histórico de Operações: filtros, busca, agrupamentos e paginação. |
 | `simulations-view.js` | Efeito Borboleta: formulário e renderização das projeções calculadas pelo backend. |
+| `load-policy.js` | Política compartilhada de cache curto, invalidação, chave contextual e deduplicação de requisições em andamento. |
+| `transaction-slice-loader.js` | Coordena lançamentos e projeção do Extrato por conta e mês, fora da view. |
 | `instructions-view.js` | Central de ajuda: busca, grupos, tópicos expansíveis, links internos e botões contextuais `?` no header. Ver [[instrucoes-app]]. |
 
 > [!tip] Regra de fronteira
@@ -544,6 +550,8 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.60` — 2026-08-31 — Documentados `bank-logos.js`, os catálogos de assets compartilhados por Contas/Cartões e o gate automatizado efetivamente aplicado por `tests/test_code_quality.py`.
+- `3.59` — 2026-08-30 — Carregamentos de Preferências, Histórico, Extrato e Simulações adotam política compartilhada `dirty + loadedAt + in-flight`, invalidada centralmente após mutações HTTP.
 - `3.58` — 2026-08-30 — Portfólio adota ciclo seletivo `onEnter()`/`onLeave()`, snapshot fresco por 30 segundos e invalidação imediata após mutações para reduzir memória e chamadas redundantes.
 - `3.57` — 2026-08-30 — Documentada a extração de `app-state.js` e `app-data-loader.js`, preservando `app.js` como composition root e as regras financeiras no núcleo Python.
 

@@ -87,6 +87,7 @@ const decisionModal = createDecisionModal();
 
 configureApi({
   onUnauthorized: handleSessionExpired,
+  onMutation: handleDataMutation,
 });
 
 const state = createAppState({ currentMonth: currentMonthValue() });
@@ -1320,6 +1321,10 @@ async function loadLatestVersion() {
 
 function resetSessionState() {
   resetSessionData(state, { currentMonth: currentMonthValue() });
+  operationHistoryView.resetCache();
+  userAdminViewController.resetPreferencesCache();
+  transactionsView.resetTransactionSliceCache();
+  simulationsView.resetFormDataCache();
   resetAccountForm();
   resetCreditCardForm();
   resetCardTransactionForm();
@@ -1456,7 +1461,7 @@ function showModule(view) {
   }
   if (view === "operationHistory") {
     operationHistoryView.renderFilters();
-    operationHistoryView.loadOperationLogs({ reset: true });
+    operationHistoryView.loadOperationLogs({ reset: true, revalidate: true });
   }
   if (view === "instructions") {
     instructionsView.renderInstructions();
@@ -1465,12 +1470,15 @@ function showModule(view) {
     emailForm.elements.email.value = state.user.email;
     userAdminViewController.syncThemePreference();
     userAdminViewController.syncDensityPreference();
-    userAdminViewController.loadEmailConfigStatus();
-    userAdminViewController.loadAIConfigStatus();
-    userAdminViewController.loadConsultorConfigStatus();
-    userAdminViewController.loadConsultorProfile();
-    userAdminViewController.loadMaisRetornoConfigStatus();
+    userAdminViewController.loadPreferences();
   }
+}
+
+function handleDataMutation() {
+  operationHistoryView?.markDirty();
+  userAdminViewController?.markPreferencesDirty();
+  transactionsView?.markTransactionSliceDirty();
+  simulationsView?.markFormDataDirty();
 }
 
 function shouldAnimateModuleTransition(previousView, nextView) {

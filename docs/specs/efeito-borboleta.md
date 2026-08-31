@@ -2,7 +2,7 @@
 tipo: spec
 area: simulacoes
 status: implementado
-versao: 1.5
+versao: 1.7
 atualizado: 2026-08-28
 relacionados:
   - "[[contas-correntes]]"
@@ -160,6 +160,8 @@ Resposta esperada:
 
 ## Changelog
 
+- `1.7` — 2026-08-30 — Dados auxiliares de contas passam a usar cache curto, in-flight compartilhado, invalidação após mutações e reset entre sessões.
+- `1.6` — 2026-08-30 — Iniciado reaproveitamento dos dados auxiliares do formulário com invalidação após mutações.
 - `1.5` — 2026-08-28 — Projeção semanal substituída por linha do tempo diária de 15 pontos, com janela deslocada para cenários distantes e identificação da primeira data negativa e do efeito de causar ou evitar saldo negativo.
 - `1.4` — 2026-08-28 — A tabela semanal ganha resolução de elemento compatível com versões transitórias dos arquivos estáticos e deixa de interromper toda a simulação quando o contêiner não foi injetado.
 - `1.3` — 2026-08-23 — Adicionada tabela de projeção semanal abaixo do gráfico: saldo atual mais 8 semanas, com linhas Previsto, Simulado e Diferença.

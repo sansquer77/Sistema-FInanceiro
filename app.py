@@ -156,9 +156,9 @@ SESSION_COOKIE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60
 SECURITY_HEADERS = {
     "Content-Security-Policy": (
         "default-src 'self'; "
-        "script-src 'self'; "
+        "script-src 'self' https://cdnjs.buymeacoffee.com 'sha256-7eeb3904b2089033e0669fa55596d106417dfbc163981cd0e15665e2393faaa9'; "
         "style-src 'self' 'unsafe-inline'; "
-        "img-src 'self' data: blob:; "
+        "img-src 'self' data: blob: https://cdn.buymeacoffee.com; "
         "font-src 'self' data:; "
         "connect-src 'self'; "
         "base-uri 'self'; "

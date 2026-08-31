@@ -2,7 +2,7 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 3.25
+versao: 3.27
 atualizado: 2026-08-29
 relacionados:
   - "[[contas-correntes]]"
@@ -205,6 +205,8 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 
 ## Changelog
 
+- `3.27` — 2026-08-30 — Fatia do Extrato e projeção passam a compartilhar cache por conta+mês, requisição em andamento e invalidação após mutações.
+- `3.26` — 2026-08-30 — Iniciado reaproveitamento da fatia mensal por conta enquanto fresca, com invalidação após mutações.
 - `3.25` — 2026-08-29 — Campo de ativo em lançamentos de investimento sugere posições já cadastradas, preenche o nome ao selecionar e preserva a criação livre de novos códigos.
 - `3.24` — 2026-08-20 — Modal de escopo em série recorrente com média ativa passa a explicar que a escolha **Apenas este lançamento** não recalcula os próximos, enquanto **Este e os próximos** os recalcula pela média; sem mudança na regra de cálculo ou no escopo aplicado.
 - `3.23` — 2026-08-17 — Modal de escopo restaurado em edições de séries recorrentes: o sistema pula o modal **somente** quando a flag de média é alterada na edição (marcada em série sem a marcação ou desmarcada em série que a tinha); com a flag inalterada — ativa ou inativa — o modal `Apenas este lançamento` / `Este e os próximos` volta a aparecer; escolhendo os próximos em série com a flag ativa, os valores futuros continuam recalculados pela média; escolhendo apenas este, a cascata não ocorre.

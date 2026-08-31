@@ -3,12 +3,14 @@ import { formatMoney } from "./money-utils.js";
 import { escapeHtml, formData, setFormBusy, setMessage, stateMarkup } from "./dom-utils.js";
 import { formatDate, formatShortMonthName, todayLocalDateValue } from "./date-utils.js";
 import { chartToken, renderChart } from "./chart-adapter.js";
+import { createLoadPolicy } from "./load-policy.js";
 
 export function registerSimulationsView({
   state,
   elements,
   formatMoney,
 }) {
+  const formDataLoadPolicy = createLoadPolicy();
   const balanceHistoryChartTop = 24;
   const balanceHistoryChartBottom = 48;
   const balanceHistoryChartBaseline = 54;
@@ -46,18 +48,16 @@ export function registerSimulationsView({
     }
   });
 
-  async function loadSimulationFormData() {
-    const accountsResponse = await api("/api/checking-accounts");
-    state.accounts = accountsResponse.accounts || [];
-    renderAccounts();
-    if (state.selectedAccountId) {
-      simulationAccount.value = String(state.selectedAccountId);
-    }
-    const account = state.accounts.find((entry) => String(entry.id) === simulationAccount.value);
-    if (account) {
-      clearSimulationResult();
-    }
-    simulationDate.value = todayLocalDateValue();
+  async function loadSimulationFormData({ force = false } = {}) {
+    return formDataLoadPolicy.run(async () => {
+      const accountsResponse = await api("/api/checking-accounts");
+      state.accounts = accountsResponse.accounts || [];
+      renderAccounts();
+      if (state.selectedAccountId) simulationAccount.value = String(state.selectedAccountId);
+      const account = state.accounts.find((entry) => String(entry.id) === simulationAccount.value);
+      if (account) clearSimulationResult();
+      simulationDate.value = todayLocalDateValue();
+    }, { force });
   }
 
   function renderAccounts() {
@@ -331,5 +331,11 @@ export function registerSimulationsView({
     }, "");
   }
 
-  return { loadSimulationFormData, resetForm, renderSimulation };
+  return {
+    loadSimulationFormData,
+    markFormDataDirty: formDataLoadPolicy.markDirty,
+    resetFormDataCache: formDataLoadPolicy.reset,
+    resetForm,
+    renderSimulation,
+  };
 }

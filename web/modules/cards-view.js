@@ -5,6 +5,7 @@ import {
   chartToken,
   renderChart,
 } from "./chart-adapter.js";
+import { renderBankLogo, renderCardNetworkLogo, attachBankLogoFallbacks } from "./bank-logos.js";
 
 export function registerCardsView({
   state,
@@ -604,6 +605,7 @@ export function registerCardsView({
       state.creditCards.forEach((card) => {
         creditCardList.append(creditCardCard(card, "active"));
       });
+      attachBankLogoFallbacks(creditCardList);
     }
     renderArchivedCreditCards();
     renderCardInvoice();
@@ -618,6 +620,7 @@ export function registerCardsView({
     state.archivedCreditCards.forEach((card) => {
       archivedCreditCardList.append(creditCardCard(card, "archived"));
     });
+    attachBankLogoFallbacks(archivedCreditCardList);
   }
 
   function renderCardInvoice() {
@@ -1087,15 +1090,23 @@ export function registerCardsView({
         <button class="ghost" type="button" data-action="edit">Editar</button>
         <button class="danger" type="button" data-action="archive">Arquivar</button>
       `;
+    const logoHtml = renderBankLogo({ name: card.issuer });
+    const networkLogoHtml = renderCardNetworkLogo({ name: card.network });
     item.innerHTML = `
-      <div>
-        <h3>${escapeHtml(card.name)}</h3>
-        <div class="account-meta">
-          <span>${escapeHtml(card.issuer)}</span>
-          ${card.network ? `<span>${escapeHtml(card.network)}</span>` : ""}
-          <span>${escapeHtml(card.currency)}</span>
-          <span>Fecha dia ${card.closing_day}</span>
-          <span>Vence dia ${card.due_day}</span>
+      <div class="account-card-info">
+        ${logoHtml}
+        <div>
+          <h3>${escapeHtml(card.name)}</h3>
+          <div class="account-meta">
+            <span>${escapeHtml(card.issuer)}</span>
+            ${card.network ? `<span>${escapeHtml(card.network)}</span>` : ""}
+            <span>${escapeHtml(card.currency)}</span>
+            <span>Fecha dia ${card.closing_day}</span>
+            <span>Vence dia ${card.due_day}</span>
+          </div>
+        </div>
+        <div class="card-network-logo" title="${escapeHtml(card.network || "Bandeira")}">
+          ${networkLogoHtml}
         </div>
       </div>
       <div class="balance">

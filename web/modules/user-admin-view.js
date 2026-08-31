@@ -1,4 +1,5 @@
 import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";
+import { createLoadPolicy } from "./load-policy.js";
 
 export function registerUserAdminView(context) {
   const {
@@ -17,6 +18,17 @@ export function registerUserAdminView(context) {
   let emailConfigPresets = [];
   let aiConfigPresets = [];
   let consultorSettings = null;
+  const preferencesLoadPolicy = createLoadPolicy();
+
+  function loadPreferences({ force = false } = {}) {
+    return preferencesLoadPolicy.run(() => Promise.all([
+      loadEmailConfigStatus(),
+      loadAIConfigStatus({ loadConsultor: false }),
+      loadConsultorConfigStatus(),
+      loadConsultorProfile(),
+      loadMaisRetornoConfigStatus(),
+    ]), { force });
+  }
 
   function switchUserTab(tabName) {
     if (!elements.userPrefTabs) {
@@ -183,7 +195,7 @@ export function registerUserAdminView(context) {
     }
   }
 
-  async function loadAIConfigStatus() {
+  async function loadAIConfigStatus({ loadConsultor = true } = {}) {
     if (!elements.aiConfigForm) {
       return;
     }
@@ -213,7 +225,7 @@ export function registerUserAdminView(context) {
       } else {
         setMessage(elements.aiConfigMessage, "IA não configurada.", "");
       }
-      await loadConsultorConfigStatus();
+      if (loadConsultor) await loadConsultorConfigStatus();
     } catch (error) {
       setMessage(elements.aiConfigMessage, error.message, "error");
     }
@@ -628,6 +640,9 @@ export function registerUserAdminView(context) {
   elements.deleteUserForm.addEventListener("submit", handleDeleteUserSubmit);
 
   return {
+    loadPreferences,
+    markPreferencesDirty: preferencesLoadPolicy.markDirty,
+    resetPreferencesCache: preferencesLoadPolicy.reset,
     loadEmailConfigStatus,
     loadAIConfigStatus,
     loadConsultorConfigStatus,

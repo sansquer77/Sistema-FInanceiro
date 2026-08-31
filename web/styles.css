@@ -6652,6 +6652,28 @@ form[aria-busy="true"] .form-actions {
   object-fit: contain;
 }
 
+.card-network-logo {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.card-network-badge {
+  position: relative;
+  width: 38px;
+  height: 38px;
+}
+
+.card-network-initial {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--bank-logo-generic-ink);
+}
+
 .account-card h3 {
   margin: 0 0 5px;
   font-size: 17px;

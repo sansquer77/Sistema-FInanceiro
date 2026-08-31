@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 1.3
-atualizado: 2026-08-30
+versao: 1.6
+atualizado: 2026-08-31
 relacionados:
   - "[[arquitetura]]"
   - "[[sdd]]"
@@ -17,7 +17,7 @@ aliases: ["Qualidade de Código", "Padrões de Qualidade", "Convenções de Cód
 # Qualidade de Código
 
 > [!info] Status
-> **implementado** · área: `meta` · versão: `1.3` · atualizado em 2026-08-30 · relacionados: [[arquitetura]], [[sdd]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]], [[adr/0003-sqlite-fonte-de-verdade]]
+> **implementado** · área: `meta` · versão: `1.6` · atualizado em 2026-08-31 · relacionados: [[arquitetura]], [[sdd]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]], [[adr/0003-sqlite-fonte-de-verdade]]
 
 ## Objetivo
 
@@ -57,7 +57,7 @@ Não cobre estilo de formatação (indentação, aspas, ordenação de imports) 
 
 Tamanho de arquivo não é uma regra rígida — é um sinal para revisar se há mistura de responsabilidades. Como referência do que já foi observado neste projeto:
 
-- Módulo de domínio em `financeiro/` ou módulo de view em `web/modules/` acima de **~1.200 linhas**: revisar se há mais de uma sub-responsabilidade misturada antes de simplesmente aceitar o crescimento. (`cards-view.js`, com 1.197 linhas, é hoje o maior módulo de view "saudável" — usado aqui como referência, não como teto absoluto.)
+- Módulo de domínio em `financeiro/` ou módulo de view em `web/modules/` acima de **~1.200 linhas**: revisar se há mais de uma sub-responsabilidade misturada antes de simplesmente aceitar o crescimento. (`cards-view.js`, com 1.209 linhas, é hoje o maior módulo de view "saudável" — usado aqui como referência, não como teto absoluto.)
 - Qualquer função ou bloco de nível de módulo em `app.py` ou `app.js` que faça conta sobre valor monetário (soma, proporção, `Math.*`, `reduce` sobre `amount`/`valor`/`cents`) é um sinal de lógica de domínio fora de lugar, independentemente do tamanho do arquivo.
 - Uma classe `AppHandler` (ou equivalente) crescendo por adição de novos `handle_*` é esperado; crescendo por adição de lógica dentro de um `handle_*` existente não é.
 
@@ -83,6 +83,9 @@ Os limites numéricos da seção "Sinais de alerta" são verificados pelo teste 
 
 ## Changelog
 
+- `1.6` — 2026-08-31 — Sincronizados frontmatter e callout de status; arquitetura passa a reconhecer explicitamente o gate automatizado já aplicado por `tests/test_code_quality.py`.
+- `1.5` — 2026-08-30 — Atualizada referência de tamanho de `cards-view.js` para 1.209 linhas após adição do badge de bandeira; módulo mantido no conjunto revisado do teste de qualidade.
+- `1.4` — 2026-08-30 — Atualizada referência de tamanho de `cards-view.js` para 1.205 linhas após adição do badge de logo compartilhado; módulo registrado no conjunto revisado do teste de qualidade.
 - `1.3` — 2026-08-30 — Criado `tests/test_code_quality.py` para verificar fronteiras das raízes, detectar cálculo financeiro residual e controlar crescimento de módulos acima do limite revisado.
 - `1.2` — 2026-08-30 — Spec incorporada ao vault e promovida para `implementado`, com pendências encerradas e referências às extrações arquiteturais concluídas.
 - `1.1` — 2026-08-30 — Adicionada a seção de ativação dos limites numéricos e da validação automatizada após as limpezas arquiteturais.

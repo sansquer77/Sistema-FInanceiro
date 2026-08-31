@@ -137,6 +137,32 @@ class FrontendModuleContractTest(unittest.TestCase):
         missing = [relative for relative in imports if not (WEB_ROOT / relative.split("?", 1)[0]).resolve().is_file()]
         self.assertEqual(missing, [], f"Imports ES sem arquivo correspondente: {missing}")
 
+    def test_bank_logo_catalog_assets_exist(self) -> None:
+        bank_logos = (MODULE_ROOT / "bank-logos.js").read_text(encoding="utf-8")
+        bank_asset_dir = WEB_ROOT / "assets" / "banks"
+        network_asset_dir = WEB_ROOT / "assets" / "bandeiras"
+
+        self.assertIn("export const BANK_LOGOS", bank_logos)
+        self.assertIn("export const CARD_NETWORK_LOGOS", bank_logos)
+        self.assertIn("normalizeBankName", bank_logos)
+        self.assertIn("renderBankLogo", bank_logos)
+        self.assertIn("renderCardNetworkLogo", bank_logos)
+        self.assertIn("attachBankLogoFallbacks", bank_logos)
+
+        bank_entries = re.findall(r'export const BANK_LOGOS = \[.*?\];', bank_logos, re.DOTALL)[0]
+        network_entries = re.findall(r'export const CARD_NETWORK_LOGOS = \[.*?\];', bank_logos, re.DOTALL)[0]
+
+        bank_files = re.findall(r'file:\s*"([^"]+)"', bank_entries)
+        network_files = re.findall(r'file:\s*"([^"]+)"', network_entries)
+
+        missing_banks = [file for file in bank_files if not (bank_asset_dir / file).is_file()]
+        missing_networks = [file for file in network_files if not (network_asset_dir / file).is_file()]
+        self.assertEqual(missing_banks, [], f"Assets de banco ausentes: {missing_banks}")
+        self.assertEqual(missing_networks, [], f"Assets de bandeira ausentes: {missing_networks}")
+
+        for file in bank_files + network_files:
+            self.assertRegex(file, r"^[a-z0-9\-]+\.[a-z0-9]+$", f"Nome de asset fora do padrão ASCII minúsculo: {file}")
+
     def test_all_frontend_modules_are_documented_in_the_frontend_spec(self) -> None:
         spec = (REPOSITORY_ROOT / "docs/specs/frontend-modularizacao.md").read_text(encoding="utf-8")
         undocumented = [path.name for path in MODULE_ROOT.glob("*.js") if f"`{path.name}`" not in spec]
@@ -198,6 +224,29 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("getViews", loader_source)
         self.assertNotIn("document.", loader_source)
         self.assertNotIn('from "./', loader_source)
+
+    def test_heavy_view_loads_share_freshness_invalidation_and_inflight_policy(self) -> None:
+        app = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+        api = (MODULE_ROOT / "api.js").read_text(encoding="utf-8")
+        policy = (MODULE_ROOT / "load-policy.js").read_text(encoding="utf-8")
+        history = (MODULE_ROOT / "operation-history-view.js").read_text(encoding="utf-8")
+        preferences = (MODULE_ROOT / "user-admin-view.js").read_text(encoding="utf-8")
+        transactions = (MODULE_ROOT / "transaction-slice-loader.js").read_text(encoding="utf-8")
+        simulations = (MODULE_ROOT / "simulations-view.js").read_text(encoding="utf-8")
+
+        self.assertIn("let dirty = true", policy)
+        self.assertIn("let loadedAt = 0", policy)
+        self.assertIn("let inFlight = null", policy)
+        self.assertIn("revision === loadRevision", policy)
+        self.assertIn("onMutation: handleDataMutation", app)
+        self.assertIn("notifyMutation(path, options.method)", api)
+        self.assertIn("markDirty: loadPolicy.markDirty", history)
+        self.assertIn("loadPreferences", preferences)
+        self.assertIn("markPreferencesDirty", preferences)
+        self.assertIn('key: `${accountId}:${month}`', transactions)
+        self.assertIn("markFormDataDirty", simulations)
+        self.assertIn("resetPreferencesCache", app)
+        self.assertIn("resetTransactionSliceCache", app)
 
     def test_paid_card_invoice_is_not_subtracted_twice_from_cockpit_forecast(self) -> None:
         projection_source = (REPOSITORY_ROOT / "financeiro/balance_projections.py").read_text(encoding="utf-8")

@@ -1,6 +1,7 @@
 import { renderVirtualList } from "./virtual-list.js";
 import { stateMarkup } from "./dom-utils.js";
 import { createAssetAutocomplete } from "./asset-autocomplete.js";
+import { createTransactionSliceLoader } from "./transaction-slice-loader.js";
 import {
   centeredMonthlyAxis,
   centeredMonthlyPoints,
@@ -49,6 +50,7 @@ export function registerTransactionsView({
   renderPortfolio,
   renderImportTargets,
 }) {
+  const transactionSliceLoader = createTransactionSliceLoader({ state, api, fetchAllListed, ensureSelectedAccount });
   const balanceHistoryChartTop = 10;
   const balanceHistoryChartBottom = 88;
   const balanceHistoryChartBaseline = 94;
@@ -276,29 +278,7 @@ export function registerTransactionsView({
     }
   }
 
-  async function loadTransactionSlice() {
-    ensureSelectedAccount();
-    const requestId = ++state.transactionSliceRequestId;
-    const accountId = String(state.selectedAccountId || "");
-    const month = state.transactionMonth;
-    if (!state.selectedAccountId) {
-      state.accountTransactions = [];
-      return;
-    }
-    const [response, projection] = await Promise.all([
-      fetchAllListed(`/api/transactions?month=${encodeURIComponent(month)}&account_id=${encodeURIComponent(accountId)}`, "transactions"),
-      api(`/api/balance-projection?month=${encodeURIComponent(month)}&account_id=${encodeURIComponent(accountId)}`),
-    ]);
-    if (
-      requestId !== state.transactionSliceRequestId
-      || month !== state.transactionMonth
-      || accountId !== String(state.selectedAccountId || "")
-    ) {
-      return;
-    }
-    state.accountTransactions = response;
-    state.balanceProjection = projection;
-  }
+  const loadTransactionSlice = transactionSliceLoader.load;
 
   function getBalanceUntil(limitDate, _transactions = null, reconciledOnly = false) {
     const row = state.balanceProjection?.balances?.[limitDate];
@@ -456,7 +436,7 @@ export function registerTransactionsView({
 
   async function refreshAfterTransactionChange() {
     const [, accountsResponse, transactionsResponse] = await Promise.all([
-      loadTransactionSlice(),
+      loadTransactionSlice({ force: true }),
       api("/api/checking-accounts"),
       fetchAllListed("/api/transactions", "transactions"),
       loadCockpit(),
@@ -902,7 +882,6 @@ export function registerTransactionsView({
         || isTransactionDayExpanded(dateKey, today);
       group.className = `transaction-group${compact ? "" : " collapsible-day"}${isExpanded ? "" : " is-collapsed"}`;
       const rows = items.map((transaction) => transactionTemplate(transaction, compact)).join("");
-        const rows = items.map((transaction) => transactionTemplate(transaction, compact)).join("");
       const heading = document.createElement("h3");
       if (compact) {
         heading.textContent = formatDate(dateKey);
@@ -920,13 +899,12 @@ export function registerTransactionsView({
       content.className = "transaction-day-content";
       content.hidden = !isExpanded;
       content.innerHTML = `<div class="transaction-rows">${rows}</div>`;
-            content.innerHTML = `<div class="transaction-rows">${rows}</div>`;
-            if (!compact && isExpanded && items.length > 200) {
-              renderVirtualList(content.querySelector(".transaction-rows"), items, {
-                rowHeight: 86,
-                renderItem: (transaction) => transactionTemplate(transaction, compact),
-              });
-            }
+      if (!compact && isExpanded && items.length > 200) {
+        renderVirtualList(content.querySelector(".transaction-rows"), items, {
+          rowHeight: 86,
+          renderItem: (transaction) => transactionTemplate(transaction, compact),
+        });
+      }
       group.append(heading, content);
       if (!compact && isExpanded) {
         content.append(dailyBalance(dateKey, balanceTransactions));
@@ -1572,6 +1550,8 @@ export function registerTransactionsView({
 
   return {
     loadTransactionSlice,
+    markTransactionSliceDirty: transactionSliceLoader.markDirty,
+    resetTransactionSliceCache: transactionSliceLoader.reset,
     refreshAfterTransactionChange,
     resetTransactionForm,
     editTransaction,

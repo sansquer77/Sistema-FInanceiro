@@ -1,5 +1,6 @@
 import { api } from "./api.js";
 import { escapeHtml, formData, setMessage, stateMarkup } from "./dom-utils.js";
+import { createLoadPolicy } from "./load-policy.js";
 
 const MODULE_LABELS = {
   accounts: "Contas",
@@ -49,15 +50,23 @@ export function registerOperationHistoryView({ state, elements, formatDate }) {
   let loading = false;
   let currentLogs = [];
   let hasMore = false;
+  const loadPolicy = createLoadPolicy();
 
   operationHistoryForm.addEventListener("submit", (event) => {
     event.preventDefault();
-    loadOperationLogs({ reset: true });
+    loadOperationLogs({ reset: true, force: true });
   });
   operationHistoryLoadMoreButton.addEventListener("click", () => loadOperationLogs({ reset: false }));
   operationHistoryGroupBy.addEventListener("change", renderLogs);
 
-  async function loadOperationLogs({ reset = true } = {}) {
+  async function loadOperationLogs({ reset = true, force = false, revalidate = false, bypassPolicy = false } = {}) {
+    if (reset && !bypassPolicy) {
+      const key = JSON.stringify(formData(operationHistoryForm));
+      return loadPolicy.run(
+        () => loadOperationLogs({ reset: true, bypassPolicy: true }),
+        { force, key: revalidate ? key : `forced:${key}` },
+      );
+    }
     if (loading) {
       return;
     }
@@ -106,6 +115,14 @@ export function registerOperationHistoryView({ state, elements, formatDate }) {
       `<option value="${card.id}">${escapeHtml(card.name)}</option>`
     )).join("");
     operationHistoryCard.value = state.creditCards.some((card) => String(card.id) === cardValue) ? cardValue : "";
+  }
+
+  function resetCache() {
+    loadPolicy.reset();
+    offset = 0;
+    currentLogs = [];
+    hasMore = false;
+    operationHistoryList.replaceChildren();
   }
 
   function renderLogs() {
@@ -193,6 +210,8 @@ export function registerOperationHistoryView({ state, elements, formatDate }) {
 
   return {
     loadOperationLogs,
+    markDirty: loadPolicy.markDirty,
+    resetCache,
     renderFilters,
   };
 }

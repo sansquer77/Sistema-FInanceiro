@@ -2,8 +2,8 @@
 tipo: spec
 area: seguranca
 status: implementado
-versao: 1.4
-atualizado: 2026-08-28
+versao: 1.5
+atualizado: 2026-08-30
 relacionados:
   - "[[recuperacao-senha]]"
   - "[[adr/0005-smtp-criptografado-local]]"
@@ -66,7 +66,7 @@ Usuários locais do Sistema Financeiro que protegem dados financeiros sensíveis
 - Hosts adicionais podem ser definidos em `APP_ALLOWED_HOSTS` como CSV; valores sem porta também aceitam `APP_PORT`.
 - Origens adicionais podem ser definidas em `APP_ALLOWED_ORIGINS` como CSV; valores sem esquema assumem `http://` e valores sem porta assumem `APP_PORT`.
 - Respostas JSON e arquivos estáticos enviam headers defensivos:
-  - `Content-Security-Policy: frame-ancestors 'none'`
+  - `Content-Security-Policy` restritivo, permitindo scripts e imagens apenas de origens controladas; exceção explícita para o widget voluntário de contribuição no `Buy Me a Coffee` (`https://cdnjs.buymeacoffee.com` e `https://cdn.buymeacoffee.com`).
   - `X-Content-Type-Options: nosniff`
   - `Referrer-Policy: same-origin`
   - `Permissions-Policy` restritiva.
@@ -111,6 +111,7 @@ Rotas afetadas:
 
 ## Changelog
 
+- `1.5` — 2026-08-30 — CSP ajustado para permitir o widget voluntário de contribuição do Buy Me a Coffee (`cdnjs.buymeacoffee.com` para scripts e `cdn.buymeacoffee.com` para imagens).
 - `1.4` — 2026-08-28 — O despacho de rotas `GET` de perfil, contas, cartões e lançamentos passa a exigir caminho exato, impedindo colisões por prefixo; adicionada cobertura automatizada positiva e negativa.
 - `1.3` — 2026-07-10 — Adicionada expiração absoluta de 30 dias e alerta não bloqueante para exposição em LAN sem HTTPS; HTTP local permanece permitido.
 - `1.2` — 2026-07-10 — Tokens de sessão passam a ser armazenados com hash, `Origin` torna-se obrigatório em mutações e troca/recuperação de senha revoga todas as sessões.

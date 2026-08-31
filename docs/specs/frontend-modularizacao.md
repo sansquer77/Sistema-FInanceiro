@@ -2,7 +2,7 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 4.11
+versao: 4.14
 atualizado: 2026-08-30
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
@@ -55,6 +55,7 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `virtual-list.js` | Janela visível com overscan para coleções extensas de altura fixa. |
 | `asset-autocomplete.js` | Sugestões de ativos existentes por `datalist`, preenchimento de metadados e preservação da digitação livre. |
 | `instructions-content.js` | Conteúdo estático, offline e versionado da central de ajuda. |
+| `bank-logos.js` | Catálogo compartilhado de logos de instituições financeiras com normalização de nomes e fallback visual. |
 
 ## Views funcionais
 
@@ -79,6 +80,8 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `portfolio-lifecycle.js` | Política pura de frescor do snapshot e limpeza seletiva da apresentação do Portfólio. |
 | `app-state.js` | Fábrica do estado inicial e reset puro dos dados de sessão, sem DOM, API ou views. |
 | `app-data-loader.js` | Coordenação dos carregamentos compartilhados, com serviços, views e ações recebidos explicitamente. |
+| `load-policy.js` | Política compartilhada de snapshot recente, invalidação e promessa em andamento. |
+| `transaction-slice-loader.js` | Carregamento coordenado da fatia conta+mês e da projeção de saldo do Extrato. |
 | `transactions-view.js` | Lançamentos: formulário, recorrência, parcelas e câmbio. |
 | `operation-history-view.js` | Histórico de Operações: filtros, busca, agrupamentos e paginação incremental. |
 | `simulations-view.js` | Efeito Borboleta: formulário de cenário hipotético e projeções retornadas pelo backend. |
@@ -240,6 +243,9 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Changelog
 
+- `4.14` — 2026-08-30 — Política `dirty + loadedAt + in-flight` concluída em Preferências, Histórico, Extrato e Simulações, com chave contextual, proteção contra corrida e reset de sessão.
+- `4.13` — 2026-08-30 — Iniciada política compartilhada `dirty + loadedAt + in-flight` para carregamentos de views.
+- `4.12` — 2026-08-30 — Adicionado `bank-logos.js` como catálogo compartilhado de logos de instituições financeiras, usado em Contas e Cartões.
 - `4.11` — 2026-08-30 — Adicionado `virtual-list.js` para virtualização progressiva de listas extensas de Portfólio, Lançamentos e Relatórios.
 - `4.10` — 2026-08-30 — Concluído o primeiro contrato `onEnter()`/`onLeave()` no Portfólio, acionado pelo composition root e coberto por testes de fronteira.
 - `4.9` — 2026-08-30 — Iniciado ciclo de vida seletivo para liberar DOM e recursos gráficos de views pesadas sem descartar seu estado de dados.

@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 12.6
-atualizado: 2026-08-30
+versao: 12.8
+atualizado: 2026-08-31
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -53,6 +53,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[specs/instrucoes-app]] | ✅ implementado | Usuário |
 | [[specs/preferencias-abas]] | ✅ implementado | Usuário |
 | [[specs/frontend-modularizacao]] | ✅ implementado | Frontend |
+| [[specs/bank-logos]] | ✅ implementado | Frontend |
 | [[specs/tendencias-saude-financeira]] | ✅ implementado | Diagnóstico |
 | [[specs/score-saude-financeira]] | ✅ implementado | Diagnóstico |
 | [[specs/consultor]] | ✅ implementado | Consultor |
@@ -143,6 +144,8 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `12.8` — 2026-08-31 — Indexada [[specs/bank-logos]] e sincronizadas [[arquitetura]] e [[qualidade-codigo]] com o catálogo compartilhado e o gate automatizado de qualidade.
+- `12.7` — 2026-08-30 — Preferências, Histórico, Extrato e Simulações passam a evitar recargas redundantes com invalidação segura e deduplicação de requisições.
 - `12.6` — 2026-08-30 — Portfólio passa a liberar recursos de apresentação ao sair e a reaproveitar snapshot recente sem recarga redundante; specs e arquitetura sincronizadas.
 - `12.5` — 2026-08-30 — Atualizadas [[arquitetura]] e [[specs/frontend-modularizacao]] para registrar estado e carregamentos coordenados como serviços de aplicação separados do composition root.
 
