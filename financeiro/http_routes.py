@@ -8,6 +8,8 @@ RoutePredicate = Callable[[str], bool]
 
 EXACT_ROUTES: dict[str, dict[str, str]] = {
     "GET": {
+        "/api/reports/open-debts": "handle_open_debts",
+        "/api/reports/statement": "handle_statement_report",
         "/api/app-info": "handle_app_info",
         "/api/latest-version": "handle_latest_version",
         "/api/me": "handle_me",
@@ -43,6 +45,7 @@ EXACT_ROUTES: dict[str, dict[str, str]] = {
         "/api/operation-logs": "handle_list_operation_logs",
     },
     "POST": {
+        "/api/portfolio/preview": "handle_portfolio_preview",
         "/api/register": "handle_register", "/api/login": "handle_login",
         "/api/password-reset/request": "handle_password_reset_request",
         "/api/password-reset/confirm": "handle_password_reset_confirm",

@@ -17,7 +17,7 @@ def build_balance_projection(
     account_id: int | None = None,
 ) -> dict:
     selected_accounts = [account for account in accounts if account_id is None or int(account["id"]) == account_id]
-    # spec: lancamentos/lancamentos v3.32 — projeção limitada à conta selecionada
+    # spec: lancamentos/lancamentos v3.33 — projeção limitada à conta selecionada
     # Mantém transferências recebidas; não recalcula outras contas a cada troca.
     if account_id is not None:
         transactions = [
@@ -35,7 +35,7 @@ def build_balance_projection(
     for offset in range(-1, 4):
         dates.add(month_end_date(add_months(reference, offset).strftime("%Y-%m")))
 
-    # spec: lancamentos/lancamentos v3.32 — projeções preservam os saldos sem
+    # spec: lancamentos/lancamentos v3.33 — projeções preservam os saldos sem
     # reprocessar todo o histórico para cada data solicitada.
     ordered = sorted(transactions, key=lambda row: str(row.get("date") or ""))
     zero_accounts = [{**account, "initial_balance": 0} for account in selected_accounts]

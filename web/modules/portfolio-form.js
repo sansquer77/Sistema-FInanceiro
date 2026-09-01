@@ -8,7 +8,7 @@ export function fixedIncomePreview({ mode, indexer, rate, fallbackAsset, parseDe
 }
 
 export function redemptionPayload(position) {
-  return { account_id: position.account_id, currency: position.currency, asset_type: position.asset_type, asset_identifier: position.asset_identifier || "", asset_name: position.asset_name || "", cnpj: position.cnpj || "", quantity: position.quantity || 0, current_value: position.current_value };
+  return { account_id: position.account_id, currency: position.currency, asset_type: position.asset_type, asset_identifier: position.asset_identifier || "", asset_name: position.asset_name || "", cnpj: position.cnpj || "", quantity: position.quantity || 0, current_value: position.current_value, redemption_unit_price: position.redemption_unit_price };
 }
 
 export function valuePayload(position) {

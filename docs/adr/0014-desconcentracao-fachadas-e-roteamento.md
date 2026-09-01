@@ -2,7 +2,7 @@
 tipo: adr
 area: arquitetura-v2
 status: implementado
-versao: 1.4
+versao: 1.7
 atualizado: 2026-08-31
 relacionados:
   - "[[../specs/desconcentracao-arquitetura-v2]]"
@@ -34,6 +34,20 @@ Aquecer cache e recomputar dentro da escrita foi descartado: expiração, falha 
 
 ## Consequências
 
+### Apresentação de Relatórios
+
+`reports-view.js` permanece como fachada compatível e composition root local. A apresentação do demonstrativo e da evolução vive em fábricas separadas, instanciadas uma vez; cada fábrica possui seus listeners, estado de requisição e ciclo de vida. A fachada invalida o demonstrativo durante a coordenação, mas não conhece seu HTML, e a evolução controla integralmente o drawer/ApexCharts. Dependências são explícitas e não há singleton global, listener instalado a cada render ou importação reversa da fachada. As outras abas de Relatórios continuam no arquivo coordenador nesta etapa.
+
+### Parcelas em aberto compartilhadas
+
+`open_debts.py` concentra leitura e agregação em centavos para Cockpit e Relatórios. O indicador representa o estoque **atual** de parcelas, incluindo vencidas: conciliação em conta significa liquidação, enquanto no cartão apenas confere a compra; o registro de pagamento encerra a fatura. O mês selecionado identifica a competência, não reconstrói liquidação histórica. Consultas usam uma transação de leitura curta e não fazem chamadas externas.
+
+Não inferimos parcelamentos por descrição nem redistribuímos o saldo de pagamento parcial entre compras: o modelo existente transfere esse saldo como lançamento avulso sem vínculo estruturado. Esse saldo não integra o indicador de parcelas. Duplicar classificadores no JS ou chamar todo esse estoque de dívida total foi descartado por produzir resultados divergentes e abrangência enganosa. Outros cálculos legados de Relatórios permanecem migração separada.
+
+### Cálculos da apresentação do Portfólio
+
+O snapshot entrega resultados, agregados, composição e desvios calculados em Python. Formulários editáveis usam uma prévia analítica autenticada, com debounce e uma chamada ativa por formulário; resultados antigos são descartados e confirmação fica bloqueada até a resposta atual. A prévia não grava nem recota posições e não autoriza resgate: a mutação continua validando os dados reais. Isso evita replicar regras monetárias em JS. Aceita-se uma ida ao servidor local durante a edição; falhas são visíveis, sem fallback financeiro no navegador. Grupos de moedas diferentes usam valores convertidos em BRL, evitando somar unidades incompatíveis.
+
 ### Valorização e rentabilidade histórica
 
 `PositionValuation` reúne o valor por data de renda fixa/poupança, impostos, custódia e aniversários; `PortfolioReturns` monta séries mensais por moeda e benchmarks, recebendo o mesmo motor de valorização por callable. A fachada compõe serviços sem estado de carteira e preserva assinaturas públicas. Relógio, provedores e erro são explícitos; caches de fatores pertencem a cada chamada. Nenhum módulo interno importa a fachada ou troca globais temporariamente. Duplicar fórmulas históricas foi descartado pelo risco de divergência. A aplicação de cotações de mercado/fundos permanece na fachada nesta etapa; não se introduzem cotações históricas reais nem TWR/MWR.
@@ -62,6 +76,12 @@ O backend ordena os movimentos e acumula lotes por data, em centavos. Faturas co
 - Mover apenas funções entre arquivos JS: rejeitada para regras financeiras, pois não corrige a fronteira de autoridade.
 
 ## Changelog
+
+- `1.7` — 2026-08-31 — `reports-view.js` vira fachada/coordenador do demonstrativo e evolução, extraídos como fábricas com estado local.
+
+- `1.6` — 2026-08-31 — Contrato compartilhado de parcelas em aberto, fronteira Python/frontend e limites de competência e pagamento parcial.
+
+- `1.5` — 2026-08-31 — Modelos financeiros da apresentação e prévias passam ao backend; frontend mantém apenas estado, formatação e coordenação assíncrona.
 
 - `1.4` — 2026-08-31 — Separação entre valorização por data e séries históricas, com motor compartilhado e serviços sem estado de carteira.
 

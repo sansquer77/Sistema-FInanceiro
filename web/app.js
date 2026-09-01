@@ -791,7 +791,6 @@ const cockpitView = registerCockpitView({
   renderLimitAlerts: () => limitsView.renderLimitAlerts(cockpitMonthValue()),
   onCockpitMonthChanged: refreshCockpitData,
   loadPortfolio,
-  portfolioTotalsByCurrency: (rows) => portfolioView.portfolioTotalsByCurrency(rows),
   portfolioMaturityAlerts: () => portfolioView.portfolioMaturityAlerts(),
   goToPortfolio: () => showModule("portfolio"),
   onNavigateToTransaction: (transactionId, accountId, date) => {

@@ -27,6 +27,8 @@ from financeiro.accounts import (
 )
 from financeiro.app_metadata import APP_NAME, APP_VERSION, app_info
 from financeiro.cockpit import cockpit_payload
+from financeiro.open_debts import get_open_debts
+from financeiro.reports import build_statement_report, build_evolution_presentation
 from financeiro.auth import (
     clear_user_launches,
     create_session,
@@ -481,7 +483,28 @@ class AppHandler(BaseHTTPRequestHandler):
             month=month,
         )
         payload["currency_totals"] = projection["currency_totals"]
+        payload["open_debts"] = get_open_debts(user["id"], month)
         self.send_json(payload)
+
+    def handle_open_debts(self) -> None:
+        user = self.require_user()
+        query = parse_qs(urlsplit(self.path).query)
+        try:
+            result = get_open_debts(user['id'], **{key: query[key][0] for key in ('month', 'account_ids', 'card_ids', 'currency') if key in query})
+        except ValueError as exc:
+            raise ApiError(str(exc), HTTPStatus.BAD_REQUEST) from None
+        self.send_json(result)
+
+    def handle_statement_report(self) -> None:
+        user = self.require_user()
+        query = parse_qs(urlsplit(self.path).query)
+        try:
+            result = build_statement_report(user['id'], **{
+                key: query[key][0] for key in ('month', 'account_ids', 'card_ids', 'currency') if key in query
+            })
+        except ValueError as exc:
+            raise ApiError(str(exc), HTTPStatus.BAD_REQUEST) from None
+        self.send_json(result)
 
     def handle_cockpit_calendar(self) -> None:
         # spec: cockpit-calendario v0.8 — critérios 17 e 18
@@ -719,7 +742,7 @@ class AppHandler(BaseHTTPRequestHandler):
             subcategory_id = None
 
         evolution = get_category_evolution(user["id"], category_id, subcategory_id, period)
-        self.send_json({"evolution": evolution})
+        self.send_json(build_evolution_presentation(evolution))
 
     def handle_list_tags(self) -> None:
         user = self.require_user()
@@ -806,6 +829,11 @@ class AppHandler(BaseHTTPRequestHandler):
         result = delete_opening_position(user["id"], position_id)
         self.record_operation(user["id"], "portfolio", "delete", "portfolio_position", "Posicao de portfolio excluida", position_id)
         self.send_json(result)
+
+    def handle_portfolio_preview(self) -> None:
+        self.require_user()
+        from financeiro.portfolio import preview_portfolio
+        self.send_json(preview_portfolio(self.read_json()))
 
     def handle_redeem_portfolio_position(self) -> None:
         user = self.require_user()

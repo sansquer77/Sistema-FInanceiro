@@ -45,7 +45,7 @@ def money_value_to_cents(value: object) -> int:
 
 
 def is_credit_card_payment_transaction(transaction: dict) -> bool:
-    # spec: relatorios/relatorios v2.17 — critério 6
+    # spec: relatorios/relatorios v2.20 — critério 6
     return bool(transaction.get("is_credit_card_payment"))
 
 

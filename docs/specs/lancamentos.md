@@ -2,7 +2,7 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 3.32
+versao: 3.33
 atualizado: 2026-08-31
 relacionados:
   - "[[contas-correntes]]"
@@ -225,6 +225,7 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 
 ## Changelog
 
+- `3.33` — 2026-08-31 — Correção visual no campo de busca do Extrato de Contas: remove o ícone nativo duplicado do `input[type="search"]` e centraliza o botão explícito de limpar, evitando dois ícones "×" desalinhados.
 - `3.32` — 2026-08-31 — Complemento implementado: edição com resposta imediata, atualização auxiliar desacoplada e projeções sem releitura integral a cada data. Testes automatizados de apresentação, concorrência e equivalência financeira; percepção de fluidez no Safari ainda requer validação no ambiente do usuário.
 - `3.31` — 2026-08-31 — Correções concluídas: conciliação aplica resposta confirmada sem recarga global, troca de conta independente por chave e cache limitado. Projeção filtra dados da conta no backend. Validados por testes de concorrência, apresentação e projeção.
 

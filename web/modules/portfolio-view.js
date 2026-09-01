@@ -4,8 +4,9 @@ import { createAssetAutocomplete } from "./asset-autocomplete.js";
 import { createPortfolioChart } from "./portfolio-chart.js";
 import * as portfolioGrouping from "./portfolio-grouping.js";
 import * as portfolioForm from "./portfolio-form.js";
-import { canReusePortfolioSnapshot, clearPortfolioPresentation } from "./portfolio-lifecycle.js";
-import { renderVirtualList } from "./virtual-list.js";
+import { canReusePortfolioSnapshot, clearPortfolioPresentation, hasPortfolioPresentation, PORTFOLIO_COMPATIBILITY_ERROR } from "./portfolio-lifecycle.js";
+import { renderVirtualList, destroyVirtualLists } from "./virtual-list.js";
+import { createPortfolioPreview } from "./portfolio-preview.js";
 
 export function registerPortfolioView({
   state,
@@ -117,6 +118,10 @@ export function registerPortfolioView({
     const nextTab = portfolioTabPanels[name] ? name : "position";
     const panel = portfolioTabPanels[nextTab];
     if (!panel) return;
+    if (nextTab !== "position") {
+      destroyVirtualLists(portfolioPositions);
+      portfolioPositions.replaceChildren();
+    }
     transitionView(() => {
       state.portfolioTab = nextTab;
       syncRovingTabState(portfolioTabButtons, nextTab, (button) => button.dataset.portfolioTab);
@@ -187,6 +192,7 @@ export function registerPortfolioView({
   portfolioGroupDrawerCloseBtn?.addEventListener("click", closePortfolioGroupDrawer);
 
   async function loadPortfolio(options = {}) {
+    if (state.portfolioError && !options.force && !options.refreshMessage && !options.revalidate) return;
     if (canReusePortfolioSnapshot(state, options)) {
       if (options.renderCached !== false && state.view === "portfolio") {
         renderPortfolio();
@@ -207,7 +213,9 @@ export function registerPortfolioView({
     let portfolioErrorMessage = "";
     const portfolioEndpoint = options.refreshMessage || options.force ? "/api/portfolio?refresh=1" : "/api/portfolio";
     const portfolioResult = await Promise.resolve(api(portfolioEndpoint)).then(
-      (value) => ({ status: "fulfilled", value }),
+      (value) => hasPortfolioPresentation(value)
+        ? ({ status: "fulfilled", value })
+        : ({ status: "rejected", reason: new Error(PORTFOLIO_COMPATIBILITY_ERROR) }),
       (reason) => ({ status: "rejected", reason }),
     );
     if (portfolioResult.status === "fulfilled") {
@@ -222,6 +230,7 @@ export function registerPortfolioView({
     } else {
       state.portfolio = null;
       portfolioErrorMessage = portfolioResult.reason?.message || "Erro ao carregar portfólio";
+      state.portfolioError = portfolioErrorMessage;
       if (options.refreshMessage || state.view === "portfolio") {
         setMessage(portfolioMessage, portfolioErrorMessage, "error");
       }
@@ -251,6 +260,8 @@ export function registerPortfolioView({
   }
 
   function onLeave() {
+    destroyVirtualLists(portfolioPositions);
+    portfolioPreview.clear();
     portfolioChart.closeReturns();
     closePortfolioGroupDrawer();
     clearPortfolioPresentation(portfolioTypeList, portfolioIndexerList, portfolioCurrencyList,
@@ -306,7 +317,7 @@ export function registerPortfolioView({
   function resetPortfolioAssetForm() {
     portfolioAssetForm.reset();
     portfolioAssetForm.elements.id.value = "";
-    // spec: investimentos-portfolio v2.49 — criterio 48
+    // spec: investimentos-portfolio v2.51 — criterio 48
     portfolioAssetForm.elements.exchange_rate_to_brl.value = "";
     portfolioAssetFormTitle.textContent = "Ativo em carteira";
     deletePortfolioAssetButton.hidden = true;
@@ -379,7 +390,7 @@ export function registerPortfolioView({
   async function redeemPortfolioPosition(position) {
     const availableQuantity = Number(position.quantity || 0);
     const usesQuantity = availableQuantity > 0;
-    const estimatedUnitPrice = usesQuantity ? Number(position.current_value || 0) / availableQuantity : 0;
+    const estimatedUnitPrice = position.redemption_unit_price || 0;
     const fields = [
       {
         name: "date",
@@ -466,17 +477,21 @@ export function registerPortfolioView({
   }
 
   function updateQuantityRedemptionPreview(form, availableQuantity) {
-    const quantity = Math.max(parseDecimalInput(form.elements.quantity?.value), 0);
-    const unitPrice = Math.max(parseDecimalInput(form.elements.unit_price?.value), 0);
-    const fees = Math.max(parseDecimalInput(form.elements.fees?.value), 0);
-    const gross = quantity * unitPrice;
-    const net = Math.max(gross - fees, 0);
-    form.elements.gross_amount.value = moneyInputValue(gross);
-    form.elements.amount.value = moneyInputValue(net);
-    form.elements.remaining_quantity.value = decimalInputValue(Math.max(availableQuantity - quantity, 0));
-    form.elements.quantity.setCustomValidity(quantity > availableQuantity ? "A quantidade excede o saldo disponível." : "");
-    form.elements.fees.setCustomValidity(fees > gross ? "As taxas não podem superar o valor bruto." : "");
+    requestPortfolioPreview(form, {
+      kind: "redemption", available_quantity: String(availableQuantity),
+      quantity: form.elements.quantity.value, unit_price: form.elements.unit_price.value,
+      fees: form.elements.fees.value,
+    }, (data) => {
+      form.elements.gross_amount.value = moneyInputValue(data.gross_amount);
+      form.elements.amount.value = moneyInputValue(data.amount);
+      form.elements.remaining_quantity.value = decimalInputValue(data.remaining_quantity);
+      form.elements.quantity.setCustomValidity(data.errors.quantity);
+      form.elements.fees.setCustomValidity(data.errors.fees);
+    });
   }
+
+  const portfolioPreview = createPortfolioPreview(api, (error) => setMessage(portfolioMessage, error.message, "error"));
+  const requestPortfolioPreview = portfolioPreview.request;
 
   function updatePortfolioAssetTypeState() {
     const assetType = portfolioAssetType.value;
@@ -623,8 +638,16 @@ export function registerPortfolioView({
 
   function renderPortfolio() {
     const portfolio = state.portfolio;
+    if (portfolio && !hasPortfolioPresentation(portfolio)) {
+      destroyVirtualLists(portfolioPositions);
+      clearPortfolioPresentation(portfolioTypeList, portfolioIndexerList, portfolioCurrencyList,
+        portfolioAccountList, portfolioPositions, portfolioHistory);
+      portfolioPositions.innerHTML = stateMarkup(PORTFOLIO_COMPATIBILITY_ERROR, { kind: "error" });
+      return;
+    }
     portfolioGroupFilter.value = state.portfolioGroup;
     if (!portfolio) {
+      destroyVirtualLists(portfolioPositions);
       portfolioCostSummary.textContent = formatMoney(0, "BRL");
       portfolioCurrentSummary.textContent = formatMoney(0, "BRL");
       portfolioResultSummary.textContent = formatMoney(0, "BRL");
@@ -635,7 +658,7 @@ export function registerPortfolioView({
       portfolioIndexerList.innerHTML = "";
       portfolioCurrencyList.innerHTML = "";
       portfolioAccountList.innerHTML = "";
-      portfolioPositions.innerHTML = stateMarkup("Adicione um ativo ou registre um aporte para formar a carteira.", { kind: "empty", compact: false });
+      portfolioPositions.innerHTML = stateMarkup(state.portfolioError || "Adicione um ativo ou registre um aporte para formar a carteira.", { kind: state.portfolioError ? "error" : "empty", compact: false });
       portfolioHistory.innerHTML = stateMarkup("Posições encerradas aparecerão aqui após um resgate total.", { kind: "empty" });
       return;
     }
@@ -659,12 +682,13 @@ export function registerPortfolioView({
 
   function renderActivePortfolioTab() {
     const portfolio = state.portfolio;
-    if (!portfolio) {
+    if (!hasPortfolioPresentation(portfolio)) {
+      renderPortfolio();
       return;
     }
     const activeTab = state.portfolioTab || "position";
     if (activeTab === "analysis") {
-      renderPortfolioAnalysis(portfolio.summary);
+      renderPortfolioAnalysis(portfolio.presentation.analysis);
     } else if (activeTab === "history") {
       renderPortfolioHistory(portfolio.history || [], portfolio.redemption_history || []);
     } else if (activeTab === "goals") {
@@ -677,7 +701,7 @@ export function registerPortfolioView({
 
   function renderPortfolioAnalysis(summary) {
     const allocationGoals = state.portfolio?.allocation_goals || [];
-    renderPortfolioGroupList(portfolioTypeList, portfolioAllocationRows(summary.by_type || [], allocationGoals), { goals: allocationGoals, groupKey: "asset_type_label" });
+    renderPortfolioGroupList(portfolioTypeList, state.portfolio.presentation.allocation, { goals: allocationGoals, groupKey: "asset_type_label" });
     renderPortfolioGroupList(portfolioIndexerList, summary.by_indexer, { groupKey: "fixed_income_indexer" });
     renderPortfolioGroupList(portfolioCurrencyList, summary.by_currency, { groupKey: "currency" });
     renderPortfolioGroupList(portfolioAccountList, summary.by_account, { groupKey: "account_name" });
@@ -716,6 +740,7 @@ export function registerPortfolioView({
   }
 
   function openPortfolioGroupDrawer({ groupKey, label, currency, matches }) {
+    if (!hasPortfolioPresentation(state.portfolio)) { renderPortfolio(); return; }
     if (!portfolioGroupDrawer || !portfolioGroupDrawerTitle || !portfolioGroupDrawerList) {
       return;
     }
@@ -725,13 +750,9 @@ export function registerPortfolioView({
       currency: "Moeda",
       account_name: "Carteira",
     };
-    const total = matches.reduce((sum, position) => {
-      const positionValue = Number(position.current_value_brl || position.current_value || position.current_value_cents / 100 || 0);
-      return sum + (Number.isFinite(positionValue) ? positionValue : 0);
-    }, 0);
-    const totalLabel = matches.some((position) => Number(position.current_value_brl || 0) > 0)
-      ? formatMoney(total, "BRL")
-      : formatMoney(total, currency || "BRL");
+    const composition = state.portfolio.presentation.compositions[JSON.stringify([groupKey, label, currency])];
+    if (!composition) { setMessage(portfolioMessage, PORTFOLIO_COMPATIBILITY_ERROR, "error"); return; }
+    const totalLabel = formatMoney(composition.total, "BRL");
     portfolioGroupDrawerTitle.textContent = `${kindLabels[groupKey] || "Composição"}: ${label}`;
     portfolioGroupDrawerList.innerHTML = matches.length
       ? `
@@ -741,20 +762,18 @@ export function registerPortfolioView({
           <small>${matches.length} ativo(s) · ${currency || "BRL"}</small>
         </div>
         <div class="portfolio-group-drawer-table" role="list">
-          ${matches.map((position) => {
-            const name = position.asset_name || position.asset_identifier || "Ativo sem nome";
-            const value = Number(position.current_value_brl || position.current_value || position.current_value_cents / 100 || 0);
-            const percent = total > 0 ? value / total : 0;
-            const lineValue = position.current_value_brl ? formatMoney(position.current_value_brl, "BRL") : formatMoney(position.current_value || position.current_value_cents / 100, position.currency || "BRL");
+          ${composition.members.map((position) => {
+            const name = position.name;
+            const lineValue = formatMoney(position.value, "BRL");
             return `
               <article class="portfolio-group-drawer-item" role="listitem">
                 <div>
                   <strong>${escapeHtml(name)}</strong>
-                  <span>${escapeHtml(position.asset_identifier || position.account_name || "Sem código")}</span>
+                  <span>${escapeHtml(position.identifier)}</span>
                 </div>
                 <div class="portfolio-group-drawer-metrics">
                   <strong>${lineValue}</strong>
-                  <span>${formatPercent(percent)} · ${escapeHtml(position.currency || "BRL")}</span>
+                  <span>${formatPortfolioPercent(position.percent)} · ${escapeHtml(position.currency || "BRL")}</span>
                 </div>
               </article>
             `;
@@ -775,9 +794,6 @@ export function registerPortfolioView({
     portfolioGroupDrawerList?.replaceChildren();
   }
 
-  function portfolioAllocationRows(rows, goals) {
-    return portfolioGrouping.allocationRows(rows, goals);
-  }
 
   function renderHighlightedPortfolioPosition() {
     if (!state.portfolioHighlightId) {
@@ -844,22 +860,17 @@ export function registerPortfolioView({
       container.innerHTML = stateMarkup("Carregue ou cadastre posições para visualizar esta consolidação.", { kind: "empty" });
       return;
     }
-    const chartTotal = portfolioGroupChartTotal(rows);
-    const goals = new Map((options.goals || []).map((goal) => [goal.asset_type, Number(goal.target_percent || 0)]));
     container.innerHTML = rows.map((row, index) => {
-      const chartValue = Number(row.chart_current_brl || row.current_brl || 0);
       const currentValue = Number(row.current_brl || 0);
       const result = Number(row.result_brl || 0);
       const currency = row.currency || "BRL";
-      const percent = chartTotal > 0 ? chartValue / chartTotal : 0;
-      const targetPercent = goals.get(portfolioAllocationGoalKey(row)) || 0;
-      const actualPercent = percent * 100;
-      const deviation = actualPercent - targetPercent;
-      const targetValue = chartTotal * targetPercent / 100;
+      const actualPercent = Number(row.participation_percent);
+      const targetPercent = Number(row.target_percent);
+      const deviation = Number(row.deviation_percent);
       const allocationComparison = options.goals ? `
         <div class="portfolio-allocation-comparison">
           <span>Atual ${formatPortfolioPercent(actualPercent)} · Meta ${formatPortfolioPercent(targetPercent)}</span>
-          <span class="allocation-deviation ${deviation > 0.005 ? "allocation-over" : deviation < -0.005 ? "allocation-under" : ""}">${deviation >= 0 ? "+" : ""}${formatPortfolioPercent(deviation)} · ${formatMoney(Math.abs(chartValue - targetValue), "BRL")}</span>
+          <span class="allocation-deviation ${row.deviation_level === "over" ? "allocation-over" : row.deviation_level === "under" ? "allocation-under" : ""}">${deviation >= 0 ? "+" : ""}${formatPortfolioPercent(deviation)} · ${formatMoney(row.deviation_value, "BRL")}</span>
         </div>
       ` : "";
       const targetMarker = options.goals && targetPercent > 0
@@ -876,7 +887,7 @@ export function registerPortfolioView({
             <span class="${result < 0 ? "danger-text" : "positive-text"}">${formatMoney(row.result_brl, currency)} · ${Number(row.result_percent).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%</span>
           </div>
           ${allocationComparison}
-          <div class="report-bar ${options.goals ? "allocation-bar" : ""}"><span style="width:${Math.max(percent * 100, 2)}%; background:${chartColor(index)}"></span>${targetMarker}</div>
+          <div class="report-bar ${options.goals ? "allocation-bar" : ""}"><span style="width:${Math.max(actualPercent, 2)}%; background:${chartColor(index)}"></span>${targetMarker}</div>
         </article>
       `;
     }).join("");
@@ -891,15 +902,15 @@ export function registerPortfolioView({
     updatePortfolioGoalsTotal();
   }
 
-  function portfolioAllocationGoalKey(row) {
-    return portfolioGrouping.allocationGoalKey(row);
-  }
 
   function updatePortfolioGoalsTotal() {
-    const total = [...portfolioGoalsFields.querySelectorAll("[data-allocation-asset-type]")]
-      .reduce((sum, input) => sum + Math.max(parseDecimalInput(input.value), 0), 0);
-    portfolioGoalsTotal.textContent = formatPortfolioPercent(total);
-    portfolioGoalsTotal.classList.toggle("danger-text", Math.abs(total - 100) > 0.005);
+    const goals = [...portfolioGoalsFields.querySelectorAll("[data-allocation-asset-type]")]
+      .map((input) => ({ target_percent: input.value }));
+    portfolioGoalsTotal.textContent = "Calculando…";
+    requestPortfolioPreview(portfolioGoalsForm, { kind: "goals", goals }, (data) => {
+      portfolioGoalsTotal.textContent = formatPortfolioPercent(data.total_percent);
+      portfolioGoalsTotal.classList.toggle("danger-text", !data.valid);
+    });
   }
 
   async function savePortfolioGoals(event) {
@@ -922,15 +933,14 @@ export function registerPortfolioView({
     }
   }
 
-  function portfolioGroupChartTotal(rows) {
-    return rows.reduce((total, row) => total + Math.max(Number(row.chart_current_brl || row.current_brl || 0), 0), 0);
-  }
 
-  function portfolioTotalsByCurrency(rows) {
-    return portfolioGrouping.totalsByCurrency(rows);
-  }
 
   function renderPortfolioPositions(positions) {
+    if (!hasPortfolioPresentation(state.portfolio)) {
+      renderPortfolio();
+      return;
+    }
+    destroyVirtualLists(portfolioPositions);
     if (positions.length === 0) {
       portfolioPositions.innerHTML = stateMarkup("Lance uma compra de investimento ou adicione uma posição inicial.", { kind: "empty", compact: false });
       return;
@@ -939,6 +949,7 @@ export function registerPortfolioView({
     const hasTreasuryDirect = positions.some((position) => isTreasuryDirectPosition(position));
     portfolioPositions.innerHTML = `${grouped.map((group, groupIndex) => {
       const collapsed = state.portfolioCollapsedGroups.has(group.key);
+      if (collapsed) return group.label ? portfolioGroupHeader(group, true) : "";
       const positionRows = portfolioPositionRows(group.positions);
       const virtualRows = positionRows.length > 200;
       return `
@@ -961,7 +972,7 @@ export function registerPortfolioView({
               <th>Ações</th>
             </tr>
           </thead>
-          ${virtualRows ? `<tbody><tr><td colspan="11"><div class="portfolio-virtual-list" data-portfolio-virtual-group="${groupIndex}"></div></td></tr></tbody>` : `<tbody>${positionRows.join("")}</tbody>`}
+          ${virtualRows ? `<tbody><tr><td colspan="11"><div class="portfolio-virtual-list" data-portfolio-virtual-group="${groupIndex}"></div></td></tr></tbody>` : `<tbody>${positionRows.map((render) => render()).join("")}</tbody>`}
         </table>
       </div>
     `;
@@ -975,7 +986,7 @@ export function registerPortfolioView({
         renderItem: (row) => {
           const table = document.createElement("table");
           table.className = "report-table portfolio-table";
-          table.innerHTML = `<tbody>${row}</tbody>`;
+          table.innerHTML = `<tbody>${row()}</tbody>`;
           return table;
         },
       });
@@ -1065,12 +1076,11 @@ export function registerPortfolioView({
   }
 
   function portfolioGroupHeader(group, collapsed) {
-    const currentValue = group.positions.reduce((total, position) => total + Number(position.current_value || 0), 0);
-    const totalCost = group.positions.reduce((total, position) => total + Number(position.total_cost || 0), 0);
-    const result = currentValue - totalCost;
-    const resultPercent = totalCost > 0 ? result / totalCost : 0;
+    const metrics = state.portfolio.presentation.sections[group.key];
+    const currentValue = metrics.current;
+    const result = Number(metrics.result);
     const groupKind = state.portfolioGroup === "account_name" ? "Carteira" : "Grupo";
-    const groupCurrency = portfolioGroupCurrency(group.positions);
+    const groupCurrency = metrics.currency;
     return `
       <button class="portfolio-group-title" type="button" data-toggle-portfolio-section="${escapeHtml(group.key)}" aria-expanded="${String(!collapsed)}">
         <span class="portfolio-group-toggle">${collapsed ? "+" : "-"}</span>
@@ -1081,16 +1091,12 @@ export function registerPortfolioView({
         </span>
         <span class="portfolio-group-total">
           <strong>${formatMoney(currentValue, groupCurrency)}</strong>
-          <em class="${result < 0 ? "danger-text" : "positive-text"}">${formatMoney(result, groupCurrency)} · ${formatPercent(resultPercent)}</em>
+          <em class="${result < 0 ? "danger-text" : "positive-text"}">${formatMoney(result, groupCurrency)} · ${formatPortfolioPercent(metrics.result_percent)}</em>
         </span>
       </button>
     `;
   }
 
-  function portfolioGroupCurrency(positions) {
-    const currencies = new Set(positions.map((position) => position.currency || "BRL"));
-    return currencies.size === 1 ? [...currencies][0] : "BRL";
-  }
 
   function renderPortfolioHistory(history, redemptions) {
     if (!history.length && !redemptions.length) {
@@ -1203,17 +1209,17 @@ export function registerPortfolioView({
         const position = group.positions[0];
         const sources = Array.isArray(position.sources) ? position.sources : [];
         if (sources.length <= 1) {
-          return [portfolioPositionRow(position)];
+          return [() => portfolioPositionRow(position)];
         }
         const expanded = state.portfolioExpandedGroups.has(group.key);
-        const rows = [portfolioPositionRow(position, {
+        const rows = [() => portfolioPositionRow(position, {
           parent: true,
           expanded,
           childCount: sources.length,
           groupKey: group.key,
         })];
         if (expanded) {
-          rows.push(...sources.map((source, index) => portfolioPositionRow(portfolioSourcePosition(position, source), {
+          rows.push(...sources.map((source, index) => () => portfolioPositionRow(portfolioSourcePosition(position, source), {
             child: true,
             childLabel: source.description || `Lançamento ${index + 1}`,
           })));
@@ -1222,14 +1228,14 @@ export function registerPortfolioView({
       }
       const expanded = state.portfolioExpandedGroups.has(group.key);
       const parent = aggregatePortfolioPositions(group.positions, group.key);
-      const rows = [portfolioPositionRow(parent, {
+      const rows = [() => portfolioPositionRow(parent, {
         parent: true,
         expanded,
         childCount: group.positions.length,
         groupKey: group.key,
       })];
       if (expanded) {
-        rows.push(...group.positions.map((position, index) => portfolioPositionRow(position, {
+        rows.push(...group.positions.map((position, index) => () => portfolioPositionRow(position, {
           child: true,
           childLabel: `Lançamento ${index + 1}`,
         })));
@@ -1279,15 +1285,15 @@ export function registerPortfolioView({
   }
 
   function aggregatePortfolioPositions(positions, groupKey) {
-    return portfolioGrouping.aggregatePositions(positions, groupKey);
+    const indices = positions.map((position) => state.portfolio.positions.indexOf(position));
+    return state.portfolio.presentation.asset_groups[JSON.stringify(indices)];
   }
 
   function portfolioPositionRow(position, options = {}) {
-    const result = Number(position.current_value || 0) - Number(position.total_cost || 0);
-    const resultPercent = Number(position.total_cost) > 0 ? result / Number(position.total_cost) : 0;
+    const result = Number(position.result || 0);
+    const resultPercent = position.result_percent;
     const dayResult = Number(position.day_result || 0);
-    const dayBase = Number(position.current_value || 0) - dayResult;
-    const dayPercent = dayBase > 0 ? dayResult / dayBase : 0;
+    const dayPercent = position.day_result_percent;
     const quoteStatus = position.quote_status === "ok" ? position.quote_source : position.quote_status;
     const quoteText = portfolioQuoteText(position);
     const quoteStatusLabel = quoteStatus || "Pendente";
@@ -1350,9 +1356,9 @@ export function registerPortfolioView({
         <td class="money-cell">${formatMoney(position.average_price, position.currency)}</td>
         <td class="money-cell">${formatMoney(position.total_cost, position.currency)}${portfolioSecondaryMoney(position.total_cost, position.total_cost_brl, position.currency)}</td>
         <td class="money-cell portfolio-quote-cell"><span class="portfolio-primary">${quoteText}</span><span title="${escapeHtml(quoteStatusLabel)}">${escapeHtml(quoteStatusLabel)}</span>${automaticQuoteAction}</td>
-        <td class="money-cell">${formatMoney(position.current_value_cents / 100, position.currency)}${valueDetail}</td>
-        <td class="money-cell ${dayResult < 0 ? "danger-text" : "positive-text"}">${formatMoney(dayResult, position.currency)}<span>${formatPercent(dayPercent)}</span></td>
-        <td class="money-cell ${result < 0 ? "danger-text" : "positive-text"}">${formatMoney(result, position.currency)}<span>${formatPercent(resultPercent)}</span></td>
+        <td class="money-cell">${formatMoney(position.current_value, position.currency)}${valueDetail}</td>
+        <td class="money-cell ${dayResult < 0 ? "danger-text" : "positive-text"}">${formatMoney(dayResult, position.currency)}<span>${formatPortfolioPercent(dayPercent)}</span></td>
+        <td class="money-cell ${result < 0 ? "danger-text" : "positive-text"}">${formatMoney(result, position.currency)}<span>${formatPortfolioPercent(resultPercent)}</span></td>
         <td><div class="portfolio-actions">${redeemAction}${valueAction}${closeAction}${actions}</div></td>
       </tr>
     `;
@@ -1376,7 +1382,7 @@ export function registerPortfolioView({
     `;
   }
 
-  // spec: investimentos-portfolio v2.49 — criterio 47
+  // spec: investimentos-portfolio v2.51 — criterio 47
   function portfolioEmergencyShieldIcon() {
     return '<svg class="portfolio-emergency-shield" viewBox="0 0 24 24" width="12" height="12" role="img" aria-label="Reserva de emergência" title="Reserva de emergência" fill="currentColor"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5l8-3z"/></svg>';
   }
@@ -1657,7 +1663,6 @@ export function registerPortfolioView({
     resetPortfolioAssetForm,
     renderPortfolioAssetAccounts,
     renderPortfolio,
-    portfolioTotalsByCurrency,
     portfolioMaturityAlerts,
   };
 }

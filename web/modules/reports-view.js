@@ -1,3 +1,5 @@
+import { createReportStatement } from "./report-statement.js";
+import { createReportEvolution } from "./report-evolution.js";
 import { api } from "./api.js";
 import { stateMarkup } from "./dom-utils.js";
 import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";
@@ -15,7 +17,6 @@ export function registerReportsView({
   formatPercent,
   escapeHtml,
   isInvestmentTransaction,
-  isInstallmentTransaction,
   chartColor,
 }) {
   let tagsRequestId = 0;
@@ -31,13 +32,17 @@ export function registerReportsView({
     reportAccountFilter,
     reportAccountSelect,
     statementControls,
-    statementScopeSelect,
-    statementCurrencySelect,
-    statementAccountSelect,
-    statementCardSelect,
     printStatementButton,
     reportContent,
   } = elements;
+
+  const statement = createReportStatement({
+    state, elements, api, renderReports, formatDate, formatMonthLabel,
+    formatMoney, formatPercent, escapeHtml, chartColor, reportItemClassification,
+  });
+  createReportEvolution({
+    reportContent, api, formatMoney, formatMonthShortLabel,
+  });
 
   previousReportMonthButton.addEventListener("click", () => shiftReportMonth(-1));
   nextReportMonthButton.addEventListener("click", () => shiftReportMonth(1));
@@ -49,27 +54,10 @@ export function registerReportsView({
     state.reportAccountId = reportAccountSelect.value;
     renderReports();
   });
-  statementScopeSelect.addEventListener("change", () => {
-    state.statementScope = statementScopeSelect.value;
-    normalizeStatementSelections();
-    renderReports();
-  });
-  statementCurrencySelect.addEventListener("change", () => {
-    state.statementCurrency = statementCurrencySelect.value;
-    renderReports();
-  });
-  statementAccountSelect.addEventListener("change", () => {
-    state.statementAccountIds = selectedValues(statementAccountSelect);
-    renderReports();
-  });
-  statementCardSelect.addEventListener("change", () => {
-    state.statementCardIds = selectedValues(statementCardSelect);
-    renderReports();
-  });
-  printStatementButton.addEventListener("click", () => window.print());
   reportContent.addEventListener("click", handleReportContentClick);
 
   function renderReports() {
+    statement.invalidate();
     if (state.reportTab !== "tags") tagsRequestId += 1;
     reportMonthLabel.textContent = formatMonthShortLabel(state.reportMonth);
     syncRovingTabState(reportTabs, state.reportTab, (button) => button.dataset.reportTab);
@@ -85,10 +73,9 @@ export function registerReportsView({
     reportResultSummary.classList.toggle("positive-text", [...resultTotals.values()].some((total) => total > 0) && ![...resultTotals.values()].some((total) => total < 0));
     reportAccountFilter.hidden = state.reportTab !== "accounts";
     statementControls.hidden = state.reportTab !== "statement";
-    renderStatementScopeOptions();
-    const statementItems = state.reportTab === "statement" ? statementExpenseItems() : [];
+    statement.renderStatementScopeOptions();
     printStatementButton.hidden = state.reportTab !== "statement";
-    printStatementButton.disabled = state.reportTab === "statement" && !statementItems.length;
+    printStatementButton.disabled = true;
     reportContent.classList.toggle("statement-print-area", state.reportTab === "statement");
     if (state.reportTab === "cashflow") {
       renderCashflowReport(items);
@@ -107,7 +94,7 @@ export function registerReportsView({
       return;
     }
     if (state.reportTab === "statement") {
-      renderStatementReport();
+      statement.renderStatementReport();
       return;
     }
     renderCategoriesReport(items);
@@ -123,66 +110,6 @@ export function registerReportsView({
       state.reportAccountId = state.accounts[0] ? String(state.accounts[0].id) : "";
     }
     reportAccountSelect.value = state.reportAccountId;
-  }
-
-  function renderStatementScopeOptions() {
-    if (state.reportTab !== "statement") {
-      return;
-    }
-    if (![...statementScopeSelect.options].some((option) => option.value === state.statementScope)) {
-      state.statementScope = "consolidated";
-    }
-    statementScopeSelect.value = state.statementScope;
-    const currencies = statementRegisteredCurrencies();
-    statementCurrencySelect.innerHTML = [
-      '<option value="all">Todas as moedas</option>',
-      ...currencies.map((currency) => `<option value="${escapeHtml(currency)}">Consolidado ${escapeHtml(currency)}</option>`),
-    ].join("");
-    if (![...statementCurrencySelect.options].some((option) => option.value === state.statementCurrency)) {
-      state.statementCurrency = "all";
-    }
-    statementCurrencySelect.value = state.statementCurrency;
-    statementAccountSelect.innerHTML = state.accounts.map((account) => (
-      `<option value="${account.id}">${escapeHtml(account.name)} (${escapeHtml(account.currency)})</option>`
-    )).join("");
-    statementCardSelect.innerHTML = state.creditCards.map((card) => (
-      `<option value="${card.id}">${escapeHtml(card.name)} (${escapeHtml(card.currency)})</option>`
-    )).join("");
-    applyMultiSelectValues(statementAccountSelect, state.statementAccountIds);
-    applyMultiSelectValues(statementCardSelect, state.statementCardIds);
-    const selectedMode = state.statementScope === "selected";
-    statementAccountSelect.disabled = !selectedMode || state.accounts.length === 0;
-    statementCardSelect.disabled = !selectedMode || state.creditCards.length === 0;
-    statementAccountSelect.closest("label").hidden = !selectedMode;
-    statementCardSelect.closest("label").hidden = !selectedMode;
-  }
-
-  function statementRegisteredCurrencies() {
-    return [...new Set([
-      ...state.accounts.map((account) => account.currency || "BRL"),
-      ...state.creditCards.map((card) => card.currency || "BRL"),
-    ])].sort();
-  }
-
-  function selectedValues(select) {
-    return [...select.selectedOptions].map((option) => option.value);
-  }
-
-  function applyMultiSelectValues(select, values) {
-    const selected = new Set((values || []).map(String));
-    for (const option of select.options) {
-      option.selected = selected.has(String(option.value));
-    }
-  }
-
-  function normalizeStatementSelections() {
-    if (state.statementScope !== "selected") {
-      return;
-    }
-    const validAccountIds = new Set(state.accounts.map((account) => String(account.id)));
-    const validCardIds = new Set(state.creditCards.map((card) => String(card.id)));
-    state.statementAccountIds = state.statementAccountIds.filter((id) => validAccountIds.has(String(id)));
-    state.statementCardIds = state.statementCardIds.filter((id) => validCardIds.has(String(id)));
   }
 
   function renderCategoriesReport(items) {
@@ -210,7 +137,7 @@ export function registerReportsView({
   }
 
   async function renderTagsReport() {
-    // spec: relatorios/relatorios v2.17 — relatório de tags agrupado por tag com
+    // spec: relatorios/relatorios v2.20 — relatório de tags agrupado por tag com
     // Receitas, Despesas, Saldo e Investimentos, separados por moeda.
     const requestId = ++tagsRequestId;
     const requestedMonth = state.reportMonth;
@@ -504,348 +431,6 @@ export function registerReportsView({
     };
   }
 
-  function renderStatementReport() {
-    const items = statementExpenseItems();
-    const sections = statementCurrencySections(items);
-    if (!sections.length) {
-      reportContent.innerHTML = `
-        <article class="monthly-statement">
-          ${statementHeader(statementScopeInfo(), "BRL", new Date())}
-          ${stateMarkup("Selecione outro período ou amplie o escopo de contas e cartões.", { kind: "empty" })}
-        </article>
-      `;
-      return;
-    }
-    const issuedAt = new Date();
-    const scope = statementScopeInfo();
-    reportContent.innerHTML = `
-      <article class="monthly-statement">
-        ${sections.map((section, index) => statementCurrencyReport(section.items, scope, section.currency, issuedAt, index)).join("")}
-        <footer class="statement-footer">
-          <span>Sistema Financeiro</span>
-          <span>Página <span class="statement-page-number"></span> de <span class="statement-page-total"></span></span>
-        </footer>
-      </article>
-    `;
-  }
-
-  function statementCurrencyReport(items, scope, currency, issuedAt, index) {
-    const totalMap = sumStatementMoney(items);
-    const total = items.reduce((sum, item) => sum + item.amount, 0);
-    const monthDaysElapsed = statementElapsedDays(state.reportMonth);
-    const averageMap = divideMoneyTotals(totalMap, Math.max(monthDaysElapsed, 1));
-    const accountTotalMap = sumStatementMoney(items.filter((item) => item.source === "Conta"));
-    const cardTotalMap = sumStatementMoney(items.filter((item) => item.source === "Cartão"));
-    const debtTotals = statementDebtTotals(currency);
-    const categoryRows = groupReportItems(items, "category").slice(0, 5);
-    const compositionRows = groupReportItems(items, "subcategory");
-    const topCategory = categoryRows[0] || null;
-    const topTransaction = items.slice().sort((a, b) => b.amount - a.amount)[0] || null;
-    const currencyInfo = { label: currency, currency, single: true };
-    return `
-      <section class="statement-currency-report ${index > 0 ? "statement-page-break" : ""}">
-        ${statementHeader(scope, currencyInfo.label, issuedAt)}
-        <section class="statement-kpis" aria-label="Resumo executivo">
-          ${statementKpi("Total de Saídas", formatMoneyTotals(totalMap))}
-          ${statementKpi("Média Diária", formatMoneyTotals(averageMap))}
-          ${statementKpi("Saídas em Conta", formatMoneyTotals(accountTotalMap))}
-          ${statementKpi("Despesas em Cartão", formatMoneyTotals(cardTotalMap))}
-          ${statementKpi("Endividamento Atual", formatMoneyTotals(debtTotals))}
-          ${statementKpi("Maior Despesa", topCategory ? `${escapeHtml(topCategory.label)} · ${formatMoneyTotals(topCategory.totals)}` : "Sem despesas")}
-          ${statementKpi("Transação de Maior Impacto", topTransaction ? `${escapeHtml(topTransaction.description || topTransaction.category)} · ${formatMoney(topTransaction.amount, topTransaction.currency)}` : "Sem despesas")}
-        </section>
-        <section class="statement-visuals">
-          <div class="statement-chart-card statement-donut-card">
-            <h3>Distribuição por categoria</h3>
-            ${statementDonutChart(categoryRows, total, currencyInfo)}
-          </div>
-          <div class="statement-chart-card">
-            <h3>Gastos por dia do mês</h3>
-            ${statementDailyBars(items, currencyInfo)}
-          </div>
-        </section>
-        <section class="statement-section">
-          <h3>Composição de Despesas</h3>
-          ${statementCompositionBySource(items, totalMap)}
-        </section>
-        <section class="statement-section">
-          <h3>Detalhamento de Lançamentos</h3>
-          ${statementDetailTable(items)}
-        </section>
-      </section>
-    `;
-  }
-
-  function statementHeader(scope, currencyLabel, issuedAt) {
-    return `
-      <header class="statement-header">
-        <img src="assets/app-icon.png" alt="Sistema Financeiro">
-        <div>
-          <h2>Relatório de Despesas Mensal (${escapeHtml(formatMonthLabel(state.reportMonth))})</h2>
-          <p>Escopo: ${escapeHtml(scope.label)}</p>
-          <p>Moeda Base: ${escapeHtml(currencyLabel)}</p>
-          <p>Data de Emissão: ${escapeHtml(formatStatementDateTime(issuedAt))}</p>
-        </div>
-      </header>
-    `;
-  }
-
-  function statementKpi(label, value) {
-    return `
-      <div>
-        <span>${escapeHtml(label)}</span>
-        <strong>${value}</strong>
-      </div>
-    `;
-  }
-
-  function statementExpenseItems() {
-    return reportItemsForMonth(state.reportMonth)
-      .filter((item) => item.reportType === "expense")
-      .filter((item) => statementItemMatchesScope(item))
-      .filter((item) => state.statementCurrency === "all" || item.currency === state.statementCurrency);
-  }
-
-  function statementCurrencySections(items) {
-    const grouped = new Map();
-    for (const item of items) {
-      const currency = item.currency || "BRL";
-      if (!grouped.has(currency)) {
-        grouped.set(currency, []);
-      }
-      grouped.get(currency).push(item);
-    }
-    return [...grouped.entries()]
-      .sort(([currencyA], [currencyB]) => currencyA.localeCompare(currencyB))
-      .map(([currency, currencyItems]) => ({ currency, items: currencyItems }));
-  }
-
-  function statementItemMatchesScope(item) {
-    if (state.statementScope === "selected") {
-      const accountIds = state.statementAccountIds.length ? new Set(state.statementAccountIds.map(String)) : new Set(state.accounts.map((account) => String(account.id)));
-      const cardIds = state.statementCardIds.length ? new Set(state.statementCardIds.map(String)) : new Set(state.creditCards.map((card) => String(card.id)));
-      return (item.source === "Conta" && accountIds.has(String(item.accountId))) || (item.source === "Cartão" && cardIds.has(String(item.cardId)));
-    }
-    return true;
-  }
-
-  function statementScopeInfo() {
-    if (state.statementScope === "selected") {
-      const accountNames = state.statementAccountIds.length
-        ? state.accounts.filter((account) => state.statementAccountIds.map(String).includes(String(account.id))).map((account) => account.name)
-        : state.accounts.map((account) => account.name);
-      const cardNames = state.statementCardIds.length
-        ? state.creditCards.filter((card) => state.statementCardIds.map(String).includes(String(card.id))).map((card) => card.name)
-        : state.creditCards.map((card) => card.name);
-      return { label: [...accountNames, ...cardNames].join(", ") || "Itens selecionados", currency: "" };
-    }
-    return { label: "Visão Consolidada", currency: "" };
-  }
-
-  function statementElapsedDays(month) {
-    const [year, monthNumber] = month.split("-").map(Number);
-    const lastDay = new Date(year, monthNumber, 0).getDate();
-    const today = new Date();
-    const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
-    if (month === currentMonth) {
-      return Math.min(today.getDate(), lastDay);
-    }
-    return month < currentMonth ? lastDay : 0;
-  }
-
-  function singleCurrencyTotal(totals) {
-    return [...totals.values()].reduce((sum, amount) => sum + amount, 0);
-  }
-
-  function sumStatementMoney(items) {
-    return items.reduce((totals, item) => addMoneyTotal(totals, item.currency, item.amount), new Map());
-  }
-
-  function divideMoneyTotals(totals, divisor) {
-    const result = new Map();
-    for (const [currency, amount] of totals.entries()) {
-      result.set(currency, amount / divisor);
-    }
-    return result;
-  }
-
-  function statementDonutChart(rows, total, currencyInfo) {
-    if (!rows.length || total <= 0) {
-      return stateMarkup("Selecione outro período ou escopo para compor o gráfico.", { kind: "empty" });
-    }
-    if (!currencyInfo.single) {
-      return stateMarkup("Selecione uma única moeda para visualizar este gráfico.", { kind: "info" });
-    }
-    const topRows = rows.slice(0, 5);
-    const topTotal = topRows.reduce((sum, row) => sum + singleCurrencyTotal(row.totals), 0);
-    const donutRows = topTotal < total
-      ? [...topRows, { label: "Outros", totals: new Map([[currencyInfo.currency, total - topTotal]]), sortTotal: total - topTotal }]
-      : topRows;
-    let offset = 25;
-    const segments = donutRows.map((row, index) => {
-      const amount = singleCurrencyTotal(row.totals);
-      const dash = Math.max((amount / total) * 100, 0);
-      const segment = `<circle r="15.9155" cx="18" cy="18" style="stroke:${chartColor(index)}; stroke-dasharray:${dash.toFixed(2)} ${Math.max(100 - dash, 0).toFixed(2)}; stroke-dashoffset:${offset.toFixed(2)}"></circle>`;
-      offset -= dash;
-      return segment;
-    }).join("");
-    const legend = donutRows.map((row, index) => {
-      const amount = singleCurrencyTotal(row.totals);
-      return `
-        <li><i style="background:${chartColor(index)}"></i><span>${escapeHtml(row.label)}</span><strong>${formatPercent(total > 0 ? amount / total : 0)}</strong></li>
-      `;
-    }).join("");
-    return `
-      <div class="statement-donut">
-        <svg viewBox="0 0 36 36" aria-hidden="true">
-          <circle r="15.9155" cx="18" cy="18" class="statement-donut-track"></circle>
-          ${segments}
-        </svg>
-        <div class="statement-donut-center">
-          <span>Total Gasto</span>
-          <strong>${formatMoney(total, currencyInfo.currency)}</strong>
-        </div>
-      </div>
-      <ul class="statement-chart-legend">${legend}</ul>
-    `;
-  }
-
-  function statementDailyBars(items, currencyInfo) {
-    if (!currencyInfo.single) {
-      return stateMarkup("Selecione uma única moeda para visualizar o histograma.", { kind: "info" });
-    }
-    const days = monthDayRows(state.reportMonth);
-    const totals = new Map(days.map((day) => [day, 0]));
-    for (const item of items) {
-      totals.set(item.date, (totals.get(item.date) || 0) + item.amount);
-    }
-    const max = Math.max(...totals.values(), 1);
-    return `
-      <div class="statement-daily-bars">
-        ${days.map((day) => {
-          const amount = totals.get(day) || 0;
-          return `
-            <div>
-              <span style="height:${Math.max((amount / max) * 100, amount > 0 ? 4 : 0).toFixed(2)}%" title="${escapeHtml(formatDate(day))}: ${formatMoney(amount, currencyInfo.currency)}"></span>
-              <small>${Number(day.slice(-2))}</small>
-            </div>
-          `;
-        }).join("")}
-      </div>
-    `;
-  }
-
-  function statementCompositionBySource(items, totalMap) {
-    const accountRows = groupReportItems(items.filter((item) => item.source === "Conta"), "subcategory");
-    const cardRows = groupReportItems(items.filter((item) => item.source === "Cartão"), "subcategory");
-    return `
-      <div class="statement-source-grid">
-        <section>
-          <h4>Despesas oriundas de Conta</h4>
-          ${statementCompositionTable(accountRows, totalMap)}
-        </section>
-        <section>
-          <h4>Despesas em Cartão de Crédito</h4>
-          ${statementCompositionTable(cardRows, totalMap)}
-        </section>
-      </div>
-    `;
-  }
-
-  function statementCompositionTable(rows, totalMap) {
-    if (!rows.length) {
-      return stateMarkup("Não há composição de despesas no período selecionado.", { kind: "empty" });
-    }
-    return `
-      <div class="report-table-wrap">
-        <table class="report-table statement-table">
-          <thead><tr><th>Categoria / Subcategoria</th><th>Total Gasto</th><th>% do Mês</th></tr></thead>
-          <tbody>
-            ${rows.map((row) => {
-              const percent = reportRowPercent(row, totalMap);
-              return `<tr><td>${escapeHtml(row.label.replace(" / ", " › "))}</td><td class="money-cell">${formatMoneyTotals(row.totals)}</td><td class="money-cell">${percent === null ? "Multimoeda" : formatPercent(percent)}</td></tr>`;
-            }).join("")}
-          </tbody>
-        </table>
-      </div>
-    `;
-  }
-
-  function statementDetailTable(items) {
-    if (!items.length) {
-      return stateMarkup("Selecione outro período ou registre lançamentos para gerar o demonstrativo.", { kind: "empty" });
-    }
-    const rows = items.slice().sort((a, b) => a.date.localeCompare(b.date) || b.amount - a.amount).map((item) => `
-      <tr>
-        <td>${formatDate(item.date)}</td>
-        <td>${escapeHtml(item.description || item.category)}</td>
-        <td>${escapeHtml(statementItemOriginLabel(item))}</td>
-        <td>${escapeHtml(reportItemClassification(item).replace(" / ", " › "))}</td>
-        <td><span class="statement-tags">${escapeHtml(item.tags.map((tag) => `#${tag}`).join(" "))}</span></td>
-        <td class="money-cell">${formatMoney(item.amount, item.currency)}</td>
-      </tr>
-    `).join("");
-    return `
-      <div class="report-table-wrap">
-        <table class="report-table statement-table">
-          <thead><tr><th>Data</th><th>Descrição</th><th>Origem</th><th>Categoria / Subcategoria</th><th>Tags</th><th>Valor</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>
-    `;
-  }
-
-  function statementItemOriginLabel(item) {
-    return `${item.source} · ${item.accountName || (item.source === "Cartão" ? "Cartão" : "Conta")}`;
-  }
-
-  function statementDebtTotals(currency) {
-    const totals = new Map();
-    const currentMonth = statementCurrentMonthValue();
-    for (const transaction of state.transactions) {
-      const transactionMonth = transaction.date?.slice(0, 7) || "";
-      if (!isOpenStatementDebt(transaction, transactionMonth, currentMonth)) {
-        continue;
-      }
-      const item = accountTransactionReportItem(transaction);
-      if (!item || !statementItemMatchesScope(item) || item.currency !== currency) {
-        continue;
-      }
-      addMoneyTotal(totals, item.currency, item.amount);
-    }
-    for (const transaction of state.cardTransactions) {
-      const transactionMonth = transaction.invoice_month || transaction.date?.slice(0, 7) || "";
-      if (!isOpenStatementDebt(transaction, transactionMonth, currentMonth)) {
-        continue;
-      }
-      const item = cardTransactionReportItem(transaction);
-      if (!item || !statementItemMatchesScope(item) || item.currency !== currency) {
-        continue;
-      }
-      addMoneyTotal(totals, item.currency, item.amount);
-    }
-    return totals;
-  }
-
-  function isOpenStatementDebt(transaction, transactionMonth, currentMonth) {
-    if (!isInstallmentTransaction(transaction) || transaction.type !== "expense" || transactionMonth < currentMonth) {
-      return false;
-    }
-    return transactionMonth > currentMonth || !transaction.reconciled_at;
-  }
-
-  function statementCurrentMonthValue() {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  }
-
-  function formatStatementDateTime(date) {
-    return date.toLocaleString("pt-BR", {
-      dateStyle: "short",
-      timeStyle: "short",
-    });
-  }
-
   function reportTotals(items) {
     return items.reduce((totals, item) => {
       addMoneyTotal(totals[item.reportType], item.currency, item.amount);
@@ -937,302 +522,8 @@ export function registerReportsView({
       .join("");
   }
 
-  // --- Evolution Drawer Logic ---
-  
-  const drawer = document.getElementById("evolutionDrawer");
-  const drawerOverlay = document.getElementById("evolutionDrawerCloseOverlay");
-  const drawerCloseBtn = document.getElementById("evolutionDrawerCloseBtn");
-  const drawerTitle = document.getElementById("evolutionDrawerTitle");
-  const chartTrend = document.getElementById("evolutionChartTrend");
-  const chartTotal = document.getElementById("evolutionChartTotal");
-  const svgEl = document.getElementById("evolutionSvg");
-  const xLabelsEl = document.getElementById("evolutionXLabels");
-  const filterBtns = document.querySelectorAll(".evolution-filter-btn");
-  const smaToggle = document.getElementById("evolutionSmaToggle");
-  const forecastMonthsSelect = document.getElementById("evolutionForecastMonths");
-  
-  let currentEvolutionContext = null;
-  let currentEvolutionData = [];
-  let currentEvolutionColor = "";
-  let evolutionRequestId = 0;
-
-  if (drawerOverlay && drawerCloseBtn) {
-    drawerOverlay.addEventListener("click", closeEvolutionDrawer);
-    drawerCloseBtn.addEventListener("click", closeEvolutionDrawer);
-  }
-
-  filterBtns.forEach(btn => {
-    btn.addEventListener("click", () => {
-      filterBtns.forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-      if (currentEvolutionContext) {
-        loadEvolutionChart(currentEvolutionContext, btn.dataset.period);
-      }
-    });
-  });
-
-  if (smaToggle) {
-    smaToggle.addEventListener("change", redrawCurrentEvolutionChart);
-  }
-
-  if (forecastMonthsSelect) {
-    forecastMonthsSelect.addEventListener("change", redrawCurrentEvolutionChart);
-  }
-
-  reportContent.addEventListener("click", (e) => {
-    const btn = e.target.closest(".report-rank-evolution-btn");
-    if (btn) {
-      e.preventDefault();
-      e.stopPropagation();
-      openEvolutionDrawer({
-        categoryId: btn.dataset.evolutionCategory,
-        subcategoryId: btn.dataset.evolutionSubcategory,
-        name: btn.dataset.evolutionName,
-        color: btn.dataset.evolutionColor
-      });
-    }
-  });
-
-  function openEvolutionDrawer(context) {
-    if (!drawer || !drawerTitle) {
-      return;
-    }
-    currentEvolutionContext = context;
-    drawerTitle.textContent = context.name;
-    drawer.hidden = false;
-    drawer.setAttribute("aria-hidden", "false");
-    
-    const activeBtn = document.querySelector(".evolution-filter-btn.active");
-    loadEvolutionChart(context, activeBtn ? activeBtn.dataset.period : "12m");
-  }
-
-  function closeEvolutionDrawer() {
-    if (!drawer) {
-      return;
-    }
-    drawer.hidden = true;
-    drawer.setAttribute("aria-hidden", "true");
-    evolutionRequestId += 1;
-  }
-
-  async function loadEvolutionChart(context, period) {
-    if (!svgEl || !xLabelsEl || !chartTotal || !chartTrend) {
-      return;
-    }
-    svgEl.innerHTML = "";
-    xLabelsEl.innerHTML = "";
-    chartTotal.textContent = "Carregando...";
-    chartTrend.textContent = "";
-    const requestId = ++evolutionRequestId;
-
-    try {
-      const url = new URL("/api/reports/category-evolution", window.location.origin);
-      if (context.categoryId) url.searchParams.set("category_id", context.categoryId);
-      if (context.subcategoryId) url.searchParams.set("subcategory_id", context.subcategoryId);
-      url.searchParams.set("period", period);
-      
-      const res = await api(url.pathname + url.search);
-      if (requestId !== evolutionRequestId || context !== currentEvolutionContext) {
-        return;
-      }
-      drawEvolutionChart(res.evolution || [], context.color);
-    } catch (err) {
-      if (requestId !== evolutionRequestId || context !== currentEvolutionContext) {
-        return;
-      }
-      const fallback = localCategoryEvolution(context, period);
-      if (fallback.length) {
-        drawEvolutionChart(fallback, context.color);
-        chartTrend.textContent = [chartTrend.textContent, "Dados locais"].filter(Boolean).join(" · ");
-        return;
-      }
-      chartTotal.textContent = "Erro ao carregar";
-      chartTrend.textContent = err.message || "Nao foi possivel carregar a evolucao.";
-    }
-  }
-
-  function localCategoryEvolution(context, period) {
-    if (!context.categoryId) {
-      return [];
-    }
-    const months = evolutionMonths(period);
-    const allowedMonths = new Set(months);
-    const totals = new Map(months.map((month) => [month, 0]));
-    for (const transaction of state.transactions) {
-      if (isCreditCardPaymentTransaction(transaction)) {
-        continue;
-      }
-      addLocalEvolutionTransaction(totals, allowedMonths, context, transaction, transaction.date?.slice(0, 7));
-    }
-    for (const transaction of state.cardTransactions) {
-      addLocalEvolutionTransaction(totals, allowedMonths, context, transaction, transaction.invoice_month || transaction.date?.slice(0, 7));
-    }
-    if (period === "all") {
-      return [...totals.entries()]
-        .filter(([, total]) => total !== 0)
-        .sort(([monthA], [monthB]) => monthA.localeCompare(monthB))
-        .map(([month, total_cents]) => ({ month, total_cents }));
-    }
-    return months.map((month) => ({ month, total_cents: totals.get(month) || 0 }));
-  }
-
-  function addLocalEvolutionTransaction(totals, allowedMonths, context, transaction, month) {
-    if (!month || String(transaction.category_id || "") !== String(context.categoryId || "")) {
-      return;
-    }
-    const subId = context.subcategoryId;
-    const txSubId = transaction.subcategory_id;
-    if (subId && (subId === "null" || subId === "None" || subId === "-1")) {
-      // Filter by NULL subcategory
-      if (txSubId != null && txSubId !== "") {
-        return;
-      }
-    } else if (subId && String(txSubId || "") !== String(subId)) {
-      return;
-    }
-    if (!totals.has(month)) {
-      if (!allowedMonths.size) {
-        totals.set(month, 0);
-      } else {
-        return;
-      }
-    }
-    // spec: relatorios/relatorios v2.17 — critério 14
-    // A API de evolução usa BRL normalizado; o fallback local deve manter a mesma unidade.
-    totals.set(month, (totals.get(month) || 0) + moneyToCents(transaction.amount_brl ?? transaction.amount));
-  }
-
   function isCreditCardPaymentTransaction(transaction) {
     return Boolean(transaction?.is_credit_card_payment);
-  }
-
-  function evolutionMonths(period) {
-    if (period === "all") {
-      return [];
-    }
-    const now = new Date();
-    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-    if (period === "ytd") {
-      const months = [];
-      for (let index = 1; index <= now.getMonth() + 1; index += 1) {
-        months.push(`${now.getFullYear()}-${String(index).padStart(2, "0")}`);
-      }
-      return months;
-    }
-    const count = period === "3m" ? 3 : period === "6m" ? 6 : 12;
-    return Array.from({ length: count }, (_, index) => shiftMonth(currentMonth, index - count + 1));
-  }
-
-  function moneyToCents(value) {
-    return Math.round(Number(value || 0) * 100);
-  }
-
-  function formatChartValue(cents) {
-    const value = Number(cents || 0) / 100;
-    const abs = Math.abs(value);
-    const signal = value < 0 ? "-" : "";
-    if (abs >= 1000000) {
-      return `${signal}${(abs / 1000000).toFixed(1).replace(".", ",")}M`;
-    }
-    if (abs >= 1000) {
-      return `${signal}${(abs / 1000).toFixed(1).replace(".", ",")}k`;
-    }
-    return `${signal}${abs.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}`;
-  }
-
-  function drawEvolutionChart(data, color) {
-    currentEvolutionData = data;
-    currentEvolutionColor = color;
-    chartTrend.textContent = "";
-    if (data.length === 0) {
-      chartTotal.textContent = "Sem dados";
-      return;
-    }
-
-    const totalAmount = data.reduce((acc, pt) => acc + pt.total_cents, 0);
-    chartTotal.textContent = formatMoney(totalAmount / 100, "BRL");
-    
-    if (data.length > 1) {
-      const first = data[0].total_cents;
-      const last = data[data.length - 1].total_cents;
-      if (first !== 0) {
-        const diff = ((last - first) / Math.abs(first)) * 100;
-        chartTrend.textContent = `${diff > 0 ? '+' : ''}${diff.toFixed(1)}% em relação ao início`;
-      }
-    }
-
-    const forecastMonths = Number(forecastMonthsSelect?.value || 3);
-    const forecast = smaToggle?.checked ? smaForecast(data, forecastMonths) : [];
-    if (forecast.length) {
-      chartTrend.textContent = [chartTrend.textContent, `SMA projetando ${forecastMonths} meses`].filter(Boolean).join(" · ");
-    }
-    const categories = [...data.map((entry) => entry.month), ...forecast.map((entry) => entry.month)];
-    renderChart(svgEl, {
-      chart: { type: "area", height: 300 },
-      series: [
-        { name: "Realizado", data: [...data.map((entry) => Number(entry.total_cents || 0)), ...forecast.map(() => null)] },
-        { name: "Projeção SMA", data: [
-          ...data.map((entry, index) => index === data.length - 1 ? Number(entry.total_cents || 0) : null),
-          ...forecast.map((entry) => Number(entry.total_cents || 0)),
-        ] },
-      ],
-      colors: [color, color],
-      stroke: { curve: "smooth", width: [3, 2], dashArray: [0, 6] },
-      fill: { type: "gradient", gradient: { opacityFrom: 0.28, opacityTo: 0.01 } },
-      markers: { size: [4, 3] },
-      xaxis: { categories, labels: { formatter: (month) => formatMonthShortLabel(month) } },
-      yaxis: { labels: { formatter: formatChartValue } },
-      tooltip: { y: { formatter: (value) => formatMoney(value / 100, "BRL") } },
-      legend: { show: false },
-    });
-
-    if (data.length > 0) {
-      const formatMonth = (m) => {
-        const [yy, mm] = m.split("-");
-        const date = new Date(parseInt(yy), parseInt(mm) - 1, 1);
-        return date.toLocaleString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', '');
-      };
-      
-      const labels = [];
-      labels.push(`<span>${formatMonth(data[0].month)}</span>`);
-      if (data.length > 2) {
-        const mid = Math.floor(data.length / 2);
-        labels.push(`<span>${formatMonth(data[mid].month)}</span>`);
-      }
-      if (data.length > 1) {
-        labels.push(`<span>${formatMonth(data[data.length - 1].month)}</span>`);
-      }
-      if (forecast.length > 0) {
-        labels.push(`<span>${formatMonth(forecast[forecast.length - 1].month)}</span>`);
-      }
-      xLabelsEl.innerHTML = labels.join("");
-    }
-  }
-
-  function redrawCurrentEvolutionChart() {
-    if (!currentEvolutionData.length || !currentEvolutionColor) {
-      return;
-    }
-    drawEvolutionChart(currentEvolutionData, currentEvolutionColor);
-  }
-
-  function smaForecast(data, months) {
-    const values = data.map((entry) => Number(entry.total_cents || 0));
-    if (!values.length || months <= 0) {
-      return [];
-    }
-    const windowSize = Math.min(3, values.length);
-    const projected = [];
-    for (let index = 0; index < months; index += 1) {
-      const base = [...values, ...projected.map((entry) => entry.total_cents)];
-      const averageSource = base.slice(-windowSize);
-      const total = Math.round(averageSource.reduce((sum, value) => sum + value, 0) / averageSource.length);
-      projected.push({
-        month: shiftMonth(data[data.length - 1].month, index + 1),
-        total_cents: total,
-      });
-    }
-    return projected;
   }
 
   function moneyTotalsSignalClass(totals) {

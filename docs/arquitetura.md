@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.72
+versao: 3.77
 atualizado: 2026-08-31
 relacionados:
   - "[[requisitos]]"
@@ -85,7 +85,9 @@ Os assets normalizados do catálogo ficam em `web/assets/banks/` e `web/assets/b
 | `user-admin-view.js` | Preferências de usuário, tema, SMTP, IA, Mais Retorno, ativação/perfil do Consultor, limpeza e exclusão. |
 | `classifications-view.js` | Categorias, subcategorias e tags. |
 | `limits-view.js` | Limites de gastos e índice de consumo. |
-| `reports-view.js` | Filtros, abas, agrupamentos e tabelas. |
+| `reports-view.js` | Fachada compatível e coordenação de Relatórios: compõe subviews uma vez, delega demonstrativo/evolução e mantém as demais abas legadas. |
+| `report-statement.js` | Controles, consulta assíncrona, estados e apresentação imprimível do demonstrativo; consome agregações Python sem regra financeira local. |
+| `report-evolution.js` | Drawer, consulta, formatação e ciclo de vida do ApexCharts da evolução; descarta respostas obsoletas, destrói instância ao fechar e não calcula SMA/fallback. |
 | `imports-view.js` | Upload, download de modelo e resultado da importação. |
 | `cockpit-view.js` | Resumo, saldos, planejamento, dívidas, portfólio e alertas; registra sub-views de Calendário, Tendências e Saúde Financeira. |
 | `financial-health-view.js` | Aba **Saúde Financeira** do Cockpit: score/gauge, pilares, Paz Financeira e consolidado do diagnóstico. |
@@ -234,6 +236,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `PUT` | `/api/portfolio/positions/{id}` |
 | `DELETE` | `/api/portfolio/positions/{id}` |
 | `POST` | `/api/portfolio/redeem` |
+| `POST` | `/api/portfolio/preview` (prévia analítica autenticada, sem gravação) |
 | `POST` | `/api/portfolio/close` |
 | `PUT` | `/api/portfolio/value` |
 | `DELETE` | `/api/portfolio/value` |
@@ -246,6 +249,8 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `GET` | `/api/cockpit?month=AAAA-MM` |
 | `GET` | `/api/cockpit/calendar` |
 | `GET` | `/api/reports/tags?month=AAAA-MM` |
+| `GET` | `/api/reports/open-debts?month=AAAA-MM&account_ids=1,2&card_ids=3&currency=BRL` |
+| `GET` | `/api/reports/statement?month=AAAA-MM&account_ids=1,2&card_ids=3&currency=BRL` |
 | `GET` | `/api/reports/category-evolution?category_id={id}&subcategory_id={id}&period={periodo}` |
 
 #### Rotas — Tendências e IA → [[tendencias-saude-financeira]]
@@ -322,6 +327,7 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | `spending_limits.py` | Metas e orçamentos mensais. Ver [[limites-gastos]]. |
 | `http_routes.py` | Tabela declarativa e resolução de rotas, independente do transporte HTTP. Ver [[specs/desconcentracao-arquitetura-v2]]. |
 | `cockpit.py` | Agregações de domínio do resumo mensal do Cockpit, fora do adaptador HTTP. |
+| `open_debts.py` | Leitura consistente e agregação de parcelas em aberto, por usuário e moeda, compartilhada entre `/api/cockpit` (`open_debts`) e Relatórios. Conciliação liquida parcela de conta; registro de pagamento encerra fatura. Inclui vencidas, sem reconstrução histórica, rede ou escrita. |
 | `balance_projections.py` | Saldos conciliados/projetados, reservas de faturas e consolidação por moeda; autoridade backend consumida por Cockpit e Extrato. |
 | `portfolio.py` | API pública e composição do Portfólio; mantém CRUD, adaptação dos provedores e aplicação de cotações de mercado/fundos. Delega transporte/cache, valorização por data e série histórica. Resgates e encerramentos preparam posições fora da escrita e revalidam entradas locais na transação, sem recotação. Ver [[investimentos-portfolio]]. |
 | `portfolio_positions.py` | Identidade, auxiliares de lotes/FIFO e leitura única das entradas locais para a tela e consumidores internos; histórico de resgates por conexão recebida. Não contém o CRUD completo nem consultas externas. |
@@ -329,6 +335,7 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | `portfolio_valuation.py` | `PositionValuation`: valor por data de renda fixa/poupança, impostos, custódia, aniversários, variação diária e fatores mensais compartilhados. Sem SQL/HTTP; recebe provedores e relógio na composição. |
 | `portfolio_returns.py` | `PortfolioReturns`: série mensal por moeda, baseline e benchmarks CDI/IPCA; recebe valorização por data e carregador opcional da carteira, sem duplicar juros/impostos. Caches de fatores locais à chamada. |
 | `portfolio_calculations.py` | Agregações, normalizações e cálculos puros do Portfólio. |
+| `portfolio_presentation.py` | Modelos financeiros de leitura para posições/fontes, agregados, cabeçalhos, composição e metas; prévias de resgate e soma de metas. Centavos/Decimal, sem SQL ou rede. |
 | `financial_health.py` | Núcleo analítico do Score de Saúde Financeira: cálculo atômico dos pilares, lista `pilares`, Paz Financeira e função de histórico com validação de `months` (1-36). Ver [[score-saude-financeira]]. |
 | `trends.py` | Núcleo local de Tendências e Achados: série mensal, Budget x Realizado, achados estruturados, eventos pontuais, assinaturas/serviços recorrentes, confiança e resumo determinístico. Ver [[tendencias-saude-financeira]]. |
 | `ai_summary.py` | Reescrita opcional do resumo por IA com payload minimizado, timeout curto e fallback para resumo local. Ver [[tendencias-saude-financeira]]. |
@@ -346,7 +353,7 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | `version_check.py` | Consulta a landing page oficial por nova versão, compara com a versão local e mantém cache de 1h. Ver [[alerta-nova-versao]]. |
 | `calendar.py` | Cálculo da aba **Calendário** do Cockpit: contas a receber/pagar atrasadas e vencimentos de renda fixa em 30 e 60 dias. Ver [[specs/cockpit-calendario]]. |
 | `simulations.py` | Validação e projeção comparativa, sem persistência, de cenários hipotéticos do Efeito Borboleta. Ver [[efeito-borboleta]]. |
-| `reports.py` | Agregações de relatórios por tag e por evolução de categoria/subcategoria, normalizadas em BRL quando necessário. Ver [[relatorios]]. |
+| `reports.py` | Relatório por tag e demonstrativo mensal: KPIs, média diária, ranking, distribuição, composição, percentuais, série diária e detalhes, separados por moeda nativa. Reutiliza leitores de lançamentos e `open_debts.py`; autenticação/adaptação HTTP ficam em `app.py`. Evolução de categoria permanece em `categories.py`. Ver [[relatorios]]. |
 
 ---
 
@@ -517,7 +524,7 @@ Ver [[investimentos-portfolio]].
 5. Faturas de cartão de crédito continuam visíveis no Cockpit pelo mês de competência mesmo após pagamento; o pagamento agregado em conta-corrente permanece excluído das despesas analíticas.
 6. Relatórios no frontend agrupam por categoria, subcategoria, conta, tag e fluxo diário.
 7. Lançamentos de cartão entram em relatórios e limites pela competência da fatura.
-8. `GET /api/reports/category-evolution` retorna séries mensais por categoria/subcategoria para o drawer de evolução, com `periodo` igual a `3m`, `6m`, `12m`, `ytd` ou `all`.
+8. `GET /api/reports/category-evolution` retorna séries mensais por categoria/subcategoria para o drawer de evolução, com `periodo` igual a `3m`, `6m`, `12m`, `ytd` ou `all`. `categories.py` preserva a leitura/competência; `reports.build_evolution_presentation` acrescenta `total_cents`, `trend_percent` (nullable) e `forecast` (12 pontos SMA), mantendo `evolution` compatível. Frontend apenas seleciona o horizonte e formata/desenha.
 
 Ver [[relatorios]], [[limites-gastos]], [[specs/cockpit-calendario]].
 
@@ -565,6 +572,16 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 - [[adr/0014-desconcentracao-fachadas-e-roteamento]] — Fachadas compatíveis, roteamento declarativo e módulos internos menores para a fundação v2.
 
 ## Changelog
+
+- `3.77` — 2026-08-31 — Apresentação de demonstrativo e evolução extraída de `reports-view.js`; fachada preservada como composition root local e módulos possuem ciclo de vida assíncrono independente.
+
+- `3.76` — 2026-08-31 — Total, tendência e SMA da evolução calculados por `reports.py`; payload aditivo e erro explícito substituem fallback financeiro local.
+
+- `3.75` — 2026-08-31 — Agregações do demonstrativo transferidas a `reports.py` e expostas por `/api/reports/statement`; frontend mantém desenho/impressão, sem fallback financeiro para este relatório.
+
+- `3.74` — 2026-08-31 — Serviço compartilhado de parcelas em aberto e endpoint de Relatórios; frontend deixa de classificar liquidação e somar este indicador. Sem alteração de schema ou do score de saúde financeira.
+
+- `3.73` — 2026-08-31 — Resultados, composição, alocação e prévias residuais do Portfólio centralizados em Python. `portfolio-preview.js` coordena debounce e respostas obsoletas; a view somente apresenta valores. `POST /api/portfolio/preview` é analítico, autenticado e não invalida caches de mutação.
 
 - `3.72` — 2026-08-31 — Separados motores de valorização por data e rentabilidade histórica, com fachada compatível e dependências explícitas. Sem novas rotas, tabelas ou regras financeiras.
 

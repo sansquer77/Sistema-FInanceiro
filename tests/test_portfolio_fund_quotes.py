@@ -77,13 +77,13 @@ class IsolatedDatabaseMixin(unittest.TestCase):
 
 class FundQuoteApplicationTest(IsolatedDatabaseMixin):
     def test_vwra_usd_resolves_to_london_yahoo_symbol(self) -> None:
-        # spec: investimentos/investimentos-portfolio v2.49 — critério 53
+        # spec: investimentos/investimentos-portfolio v2.51 — critério 53
         self.assertEqual(yahoo_symbol({
             "asset_type": "stock", "asset_identifier": "VWRA", "currency": "USD",
         }), "VWRA.L")
 
     def test_manual_override_can_return_to_automatic_even_after_legacy_reclassification(self) -> None:
-        # spec: investimentos/investimentos-portfolio v2.49 — critérios 51 e 52
+        # spec: investimentos/investimentos-portfolio v2.51 — critérios 51 e 52
         user = create_user("Alice", "alice@example.com", "correct-password")
         account = create_checking_account(user["id"], {
             "name": "Coinbase", "bank_name": "Coinbase", "account_type": "investment", "currency": "BRL",
@@ -110,7 +110,7 @@ class FundQuoteApplicationTest(IsolatedDatabaseMixin):
         self.assertEqual(remaining, 0)
 
     def test_stablecoins_have_own_class_and_keep_account_quote_currency(self) -> None:
-        # spec: investimentos/investimentos-portfolio v2.49 — critérios 49 e 50
+        # spec: investimentos/investimentos-portfolio v2.51 — critérios 49 e 50
         self.assertEqual(effective_asset_type("crypto", "USDC-BRL"), "stablecoin")
         self.assertEqual(effective_asset_type("crypto", "BTC-BRL"), "crypto")
         self.assertEqual(normalize_asset_identifier("USDT-USD", "stablecoin"), "USDT")
@@ -153,7 +153,7 @@ class FundQuoteApplicationTest(IsolatedDatabaseMixin):
         self.assertEqual(position["day_result_brl_cents"], 500)
 
     def test_private_pension_with_cnpj_uses_mais_retorno_quote(self) -> None:
-        # spec: investimentos/investimentos-portfolio v2.49 — criterio previdencia-mais-retorno
+        # spec: investimentos/investimentos-portfolio v2.51 — criterio previdencia-mais-retorno
         position = {**fund_position(quantity="8", cnpj="46.422.299/0001-73"), "asset_type": "private_pension"}
         with (
             mock.patch("financeiro.portfolio.load_mais_retorno_api_key", return_value="mr-secret"),
@@ -280,7 +280,7 @@ class FetchMaisRetornoQuoteTest(IsolatedDatabaseMixin):
         self.assertIn("Mais Retorno", quote["source"])
 
     def test_cnpj_formatted_is_normalized_to_digits_only(self) -> None:
-        # spec: investimentos/investimentos-portfolio v2.49 — critério fundos-mais-retorno
+        # spec: investimentos/investimentos-portfolio v2.51 — critério fundos-mais-retorno
         # (API exige CNPJ sem pontos/barra; ex.: 46.422.299/0001-73 -> 46422299000173)
         self.assertEqual(
             mais_retorno_fund_identifier(fund_position(cnpj="46.422.299/0001-73")),
@@ -293,7 +293,7 @@ class FetchMaisRetornoQuoteTest(IsolatedDatabaseMixin):
         self.assertEqual(mais_retorno_fund_identifier(fund_position(cnpj="")), "")
 
     def test_fetch_fund_quote_for_launch_form_returns_editable_unit_price_data(self) -> None:
-        # spec: lancamentos v3.32 — criterio cota-fundo-lancamento
+        # spec: lancamentos v3.33 — criterio cota-fundo-lancamento
         with (
             mock.patch("financeiro.portfolio.load_mais_retorno_api_key", return_value="mr-secret"),
             mock.patch("financeiro.portfolio.fetch_mais_retorno_quote", return_value=fake_quote(
@@ -312,7 +312,7 @@ class FetchMaisRetornoQuoteTest(IsolatedDatabaseMixin):
         self.assertEqual(quote["quote_source"], "Mais Retorno (46422299000173:fi)")
 
     def test_fetch_fund_quote_for_launch_form_requires_mais_retorno_key(self) -> None:
-        # spec: lancamentos v3.32 — criterio cota-fundo-lancamento
+        # spec: lancamentos v3.33 — criterio cota-fundo-lancamento
         with (
             mock.patch("financeiro.portfolio.load_mais_retorno_api_key", return_value=""),
             mock.patch("financeiro.portfolio.fetch_mais_retorno_quote", side_effect=AssertionError("nao deve chamar")),
@@ -332,7 +332,7 @@ class FetchMaisRetornoQuoteTest(IsolatedDatabaseMixin):
         self.assertEqual(quote["date"], "2026-08-07")
 
     def test_quote_with_comma_string_is_normalized(self) -> None:
-        # spec: investimentos/investimentos-portfolio v2.49 — critério fundos-mais-retorno
+        # spec: investimentos/investimentos-portfolio v2.51 — critério fundos-mais-retorno
         # (defesa caso a API retorne texto com virgula: "1,50" -> 150 centavos)
         payload = {"quotes": [{"d": "2026-08-07", "c": "1,50"}]}
         with mock.patch("financeiro.portfolio.urlopen", return_value=self._response(payload)):
@@ -347,7 +347,7 @@ class FetchMaisRetornoQuoteTest(IsolatedDatabaseMixin):
         self.assertEqual(error.exception.message, "Cotacao do fundo indisponivel")
 
     def test_no_quote_today_falls_back_to_recent_window(self) -> None:
-        # spec: investimentos/investimentos-portfolio v2.49 — critério fundos-mais-retorno
+        # spec: investimentos/investimentos-portfolio v2.51 — critério fundos-mais-retorno
         # (fim de semana/feriado: a data atual vem vazia e a consulta retroage 7 dias)
         today = datetime.now().strftime("%Y-%m-%d")
         start7 = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")

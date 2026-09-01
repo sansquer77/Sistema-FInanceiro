@@ -22,14 +22,12 @@ export function registerCockpitView({
   emptyState,
   escapeHtml,
   formatCategoryPath,
-  isInstallmentTransaction,
   isInvestmentTransaction,
   chartColor,
   getCurrencyTotals,
   renderLimitAlerts,
   onCockpitMonthChanged,
   loadPortfolio,
-  portfolioTotalsByCurrency,
   portfolioMaturityAlerts,
   goToPortfolio,
   onNavigateToTransaction,
@@ -517,33 +515,17 @@ export function registerCockpitView({
     if (!installmentDebtList) {
       return;
     }
-    const currentMonth = cockpitMonthValue();
-    const rows = new Map();
-    for (const transaction of state.transactions) {
-      const transactionMonth = transaction.date.slice(0, 7);
-      if (!isOpenInstallmentDebt(transaction, transactionMonth, currentMonth)) {
-        continue;
-      }
-      const key = `account:${transaction.account_id}`;
-      const row = rows.get(key) || { label: transaction.account_name || "Conta", detail: "Conta", currency: transaction.account_currency || "BRL", total: 0, debts: new Map() };
-      addInstallmentDebt(row, transaction, "account");
-      rows.set(key, row);
+    const data = state.cockpit?.open_debts;
+    if (!data) {
+      installmentDebtList.innerHTML = stateMarkup("Atualize o Cockpit para consultar as parcelas em aberto.", { kind: "loading" });
+      return;
     }
-    for (const transaction of state.cardTransactions) {
-      if (!isOpenInstallmentDebt(transaction, transaction.invoice_month, currentMonth)) {
-        continue;
-      }
-      const key = `card:${transaction.credit_card_id}`;
-      const row = rows.get(key) || { label: transaction.credit_card_name || "Cartão", detail: "Cartão", currency: transaction.card_currency || "BRL", total: 0, debts: new Map() };
-      addInstallmentDebt(row, transaction, "card");
-      rows.set(key, row);
-    }
-    const debts = [...rows.values()].sort((a, b) => b.total - a.total);
+    const debts = data.groups;
     if (debts.length === 0) {
       installmentDebtList.innerHTML = `
         <section class="planning-section">
           <div class="planning-section-header">
-            <h3>Total em aberto desde ${escapeHtml(formatMonthLabel(currentMonth))}</h3>
+            <h3>Parcelas em aberto · estado atual</h3>
             <strong class="danger-text">${formatMoney(0, "BRL")}</strong>
           </div>
           ${stateMarkup("Compras parceladas em aberto aparecerão nesta seção.", { kind: "empty" })}
@@ -551,11 +533,11 @@ export function registerCockpitView({
       `;
       return;
     }
-    const debtTotals = summarizeDebtTotals(debts);
+    const debtTotals = new Map(Object.entries(data.by_currency));
     installmentDebtList.innerHTML = `
       <section class="planning-section">
         <div class="planning-section-header">
-          <h3>Total em aberto desde ${escapeHtml(formatMonthLabel(currentMonth))}</h3>
+          <h3>Parcelas em aberto · estado atual</h3>
           <strong class="danger-text">${formatDebtTotals(debtTotals)}</strong>
         </div>
         ${debts.map((row) => `
@@ -565,7 +547,7 @@ export function registerCockpitView({
               <strong>${formatMoney(row.total, row.currency)}</strong>
             </div>
             <div class="debt-items">
-              ${[...row.debts.values()].sort((a, b) => b.total - a.total).map((debt) => `
+              ${row.debts.map((debt) => `
                 <div class="debt-item">
                   <span>${escapeHtml(debt.description)} - ${installmentDebtCountLabel(debt.count)}</span>
                   <strong>${formatMoney(debt.total, row.currency)}</strong>
@@ -578,12 +560,6 @@ export function registerCockpitView({
     `;
   }
 
-  function summarizeDebtTotals(debts) {
-    return debts.reduce((totals, row) => {
-      totals.set(row.currency, (totals.get(row.currency) || 0) + row.total);
-      return totals;
-    }, new Map());
-  }
 
   function formatDebtTotals(totals) {
     if (!totals.size) {
@@ -592,28 +568,11 @@ export function registerCockpitView({
     return [...totals.entries()].map(([currency, total]) => formatMoney(total, currency)).join(" · ");
   }
 
-  function addInstallmentDebt(row, transaction, origin) {
-    const amount = Number(transaction.amount || 0);
-    const debtKey = transaction.series_id
-      ? `${origin}:series:${transaction.series_id}`
-      : `${origin}:single:${transaction.description}`;
-    const debt = row.debts.get(debtKey) || { description: transaction.description || "Lançamento parcelado", total: 0, count: 0 };
-    row.total += amount;
-    debt.total += amount;
-    debt.count += 1;
-    row.debts.set(debtKey, debt);
-  }
 
   function installmentDebtCountLabel(count) {
     return `${count} ${count === 1 ? "parcela restante" : "parcelas restantes"}`;
   }
 
-  function isOpenInstallmentDebt(transaction, transactionMonth, currentMonth) {
-    if (!isInstallmentTransaction(transaction) || transaction.type !== "expense" || transactionMonth < currentMonth) {
-      return false;
-    }
-    return transactionMonth > currentMonth || !transaction.reconciled_at;
-  }
 
   function renderTopExpensesChart() {
     if (state.cockpit?.top_expenses) {
@@ -795,6 +754,10 @@ export function registerCockpitView({
     if (!cockpitPortfolioByType) {
       return;
     }
+    if (state.portfolioError) {
+      cockpitPortfolioByType.innerHTML = stateMarkup(state.portfolioError, { kind: "error" });
+      return;
+    }
     if (!state.portfolio && state.portfolioDirty) {
       cockpitPortfolioByType.innerHTML = stateMarkup("Atualizando posições e cotações do portfólio.", { kind: "loading" });
       loadPortfolio();
@@ -811,23 +774,20 @@ export function registerCockpitView({
     if (state.portfolio && state.portfolioDirty && !state.portfolioLoading) {
       loadPortfolio();
     }
-    const rows = state.portfolio && state.portfolio.summary ? state.portfolio.summary.by_type || [] : [];
+    const rows = state.portfolio?.presentation?.analysis?.by_type || [];
     if (rows.length === 0) {
       cockpitPortfolioByType.innerHTML = stateMarkup("Adicione uma posição ou registre um aporte para acompanhar o portfólio.", { kind: "empty" });
       return;
     }
-    const totalsByCurrency = portfolioTotalsByCurrency(rows);
     cockpitPortfolioByType.innerHTML = rows.map((row, index) => {
       const current = Number(row.current_brl || 0);
       const result = Number(row.result_brl || 0);
       const currency = row.currency || "BRL";
-      const total = totalsByCurrency.get(currency) || 0;
-      const percent = total > 0 ? current / total : 0;
       return `
         <article class="portfolio-cockpit-row">
           <div>
             <strong><i style="background:${chartColor(index)}"></i>${escapeHtml(row.label)}</strong>
-            <span>${row.count} posição(ões) · ${formatPercent(percent)}</span>
+            <span>${row.count} posição(ões) · ${Number(row.currency_participation_percent).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%</span>
           </div>
           <div>
             <strong>${formatMoney(current, currency)}</strong>

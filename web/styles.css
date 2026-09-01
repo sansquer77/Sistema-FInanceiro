@@ -6563,10 +6563,17 @@ form[aria-busy="true"] .form-actions {
   padding-right: 38px;
 }
 
+.search-input-wrap input[type="search"]::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+
 .clear-search-button {
   position: absolute;
   top: 50%;
   right: 7px;
+  transform: translateY(-50%);
   display: inline-grid;
   place-items: center;
   width: 26px;

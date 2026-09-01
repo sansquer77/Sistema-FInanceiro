@@ -852,7 +852,7 @@ def get_category_evolution(user_id: int, category_id: int, subcategory_id: int |
             WITH combined AS (
                 SELECT
                     strftime('%Y-%m', date) AS period_month,
-                    -- spec: relatorios/relatorios v2.17 — criterio 14
+                    -- spec: relatorios/relatorios v2.20 — criterio 14
                     -- A evolucao combina contas/cartoes em BRL para nao somar centavos
                     -- nominais de moedas diferentes e rotular o resultado como reais.
                     transactions.amount_brl_cents AS amount_cents
@@ -864,7 +864,7 @@ def get_category_evolution(user_id: int, category_id: int, subcategory_id: int |
                   AND transactions.category_id = ?
                   {subcat_filter_t}
                   AND transactions.archived_at IS NULL
-                  -- spec: relatorios/relatorios v2.17 — criterio 6
+                  -- spec: relatorios/relatorios v2.20 — criterio 6
                   -- pagamento de fatura fica fora da evolucao para nao duplicar
                   -- os lancamentos detalhados do cartao.
                   AND credit_card_payments.id IS NULL

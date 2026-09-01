@@ -2,7 +2,7 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 4.20
+versao: 4.22
 atualizado: 2026-08-31
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
@@ -65,7 +65,9 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `user-admin-view.js` | Preferência visual, troca de email/senha, config. SMTP, limpeza e exclusão. |
 | `classifications-view.js` | Categorias, subcategorias e tags. |
 | `limits-view.js` | Limites de gastos e índice de consumo. |
-| `reports-view.js` | Filtros, abas, agrupamentos e tabelas. |
+| `reports-view.js` | Fachada compatível e coordenação de Relatórios; demais abas legadas mantêm renderização/agregações existentes. |
+| `report-statement.js` | Filtros, consulta, modelo e impressão do demonstrativo; sem cálculos financeiros locais. |
+| `report-evolution.js` | Drawer, consulta, apresentação e ciclo de vida do gráfico de evolução; sem SMA/fallback local. |
 | `imports-view.js` | Upload, download de modelo e resultado da importação. |
 | `cockpit-view.js` | Resumo, saldos, planejamento, dívidas, portfólio e alertas. |
 | `financial-health-view.js` | Aba Saúde Financeira do Cockpit: score/gauge, pilares, Paz Financeira e recomendações. |
@@ -75,7 +77,8 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `cards-view.js` | Cartões: cadastro, faturas, busca/filtro da fatura, pagamento e conciliação. |
 | `portfolio-view.js` | Fachada/coordenador da tela de Portfólio, carregamento, abas e integração dos submódulos. |
 | `portfolio-chart.js` | Renderização e ciclo de vida do gráfico de rentabilidade do Portfólio. |
-| `portfolio-grouping.js` | Agrupamentos, metas, consolidações e totais puros da apresentação do Portfólio. |
+| `portfolio-grouping.js` | Identidade estável de agrupamentos visuais; cálculos e consolidações pertencem ao backend. |
+| `portfolio-preview.js` | Coordenação das prévias no servidor: debounce, requisição em andamento, bloqueio de confirmação e descarte de respostas obsoletas, sem regras financeiras. |
 | `portfolio-form.js` | Payloads e normalizações de entrada dos formulários e ações do Portfólio. |
 | `portfolio-lifecycle.js` | Política pura de frescor do snapshot e limpeza seletiva da apresentação do Portfólio. |
 | `app-state.js` | Fábrica do estado inicial e reset puro dos dados de sessão, sem DOM, API ou views. |
@@ -164,6 +167,10 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Textos de interface usam português brasileiro acentuado e consistente.
 
 ## Plano de implementação
+
+- [x] Extrair demonstrativo e evolução para fábricas com dependências explícitas, preservando o contrato `registerReportsView`/`renderReports`.
+- [x] Manter isolamento das respostas assíncronas e destruir o gráfico ao fechar; preservar eventos, filtros e impressão sem registros duplicados nas renderizações.
+- [x] Adaptar testes aos módulos extraídos e validar composição real das fábricas.
 
 - [x] Extrair o gráfico de saldo sem alterar sua apresentação ou navegação mensal.
 - [x] Compartilhar a classificação assistida entre Lançamentos de Contas e Cartões.
@@ -257,6 +264,10 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Alterar regras financeiras, endpoints ou banco.
 
 ## Changelog
+
+- `4.22` — 2026-08-31 — Extração da apresentação de demonstrativo/evolução e coordenação pela fachada compatível de Relatórios.
+
+- `4.21` — 2026-08-31 — Cálculos residuais do Portfólio movidos para Python; views recebem resultados, composição, metas e agregados. Prévias editáveis usam coordenador assíncrono e a participação por moeda do resumo do Cockpit vem do backend.
 
 - `4.20` — 2026-08-31 — Documentada a coordenação de atualização após salvar lançamentos, separada de recargas auxiliares.
 - `4.19` — 2026-08-31 — Fatias do Extrato ganham cache limitado e concorrência por chave; conciliação isolada atualiza a linha antes das recargas secundárias.

@@ -51,6 +51,8 @@ export async function upload(path, body) {
 }
 
 function notifyMutation(path, method = "GET") {
+  // Analytical preview has no mutations and must not invalidate loaded views.
+  if (path === "/api/portfolio/preview") return;
   const normalizedMethod = String(method || "GET").toUpperCase();
   if (normalizedMethod !== "GET" && mutationHandler) mutationHandler(path, normalizedMethod);
 }

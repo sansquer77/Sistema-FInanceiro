@@ -100,20 +100,27 @@ class FrontendModuleContractTest(unittest.TestCase):
     def test_portfolio_analysis_keeps_class_rows_distinct_by_currency(self) -> None:
         portfolio = (MODULE_ROOT / "portfolio-grouping.js").read_text(encoding="utf-8")
 
-        self.assertIn('new Map(rows.map((row) => [`${row.label}::${row.currency || "BRL"}`, row]))', portfolio)
+        self.assertNotIn('reduce(', portfolio)
+        self.assertIn('position.currency', portfolio)
 
     def test_portfolio_goals_separate_usd_variable_income(self) -> None:
         portfolio = (MODULE_ROOT / "portfolio-grouping.js").read_text(encoding="utf-8")
         backend = (REPOSITORY_ROOT / "financeiro/portfolio.py").read_text(encoding="utf-8")
 
-        self.assertIn('goal.asset_type === "stock_usd"', portfolio)
-        self.assertIn('return "stock_usd"', portfolio)
+        self.assertNotIn('aggregatePositions', portfolio)
+        self.assertIn('presentation.build_presentation', backend)
+        view = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
+        self.assertNotIn('.reduce(', view)
+        self.assertNotIn('quantity * unitPrice', view)
+        self.assertIn('position.result_percent', view)
+        self.assertIn('position.day_result_percent', view)
         self.assertIn('"stock_usd": "Renda variável - USD"', backend)
 
     def test_long_lists_use_shared_virtualizer_contract(self) -> None:
         virtualizer = (MODULE_ROOT / "virtual-list.js").read_text(encoding="utf-8")
         transactions = (MODULE_ROOT / "transactions-view.js").read_text(encoding="utf-8")
         reports = (MODULE_ROOT / "reports-view.js").read_text(encoding="utf-8")
+        evolution = (MODULE_ROOT / "report-evolution.js").read_text(encoding="utf-8")
         portfolio = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
 
         self.assertIn("DEFAULT_OVERSCAN = 5", virtualizer)
@@ -157,14 +164,15 @@ class FrontendModuleContractTest(unittest.TestCase):
     def test_apexcharts_overlays_races_and_history_bounds_are_guarded(self) -> None:
         portfolio = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
         reports = (MODULE_ROOT / "reports-view.js").read_text(encoding="utf-8")
+        evolution = (MODULE_ROOT / "report-evolution.js").read_text(encoding="utf-8")
         adapter = (MODULE_ROOT / "chart-adapter.js").read_text(encoding="utf-8")
         cards = (MODULE_ROOT / "cards-view.js").read_text(encoding="utf-8")
         transactions = (MODULE_ROOT / "transaction-balance-chart.js").read_text(encoding="utf-8")
         styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
 
         self.assertIn("document.body.append(portfolioReturnDrawer)", portfolio)
-        self.assertIn("const requestId = ++evolutionRequestId", reports)
-        self.assertIn("requestId !== evolutionRequestId || context !== currentEvolutionContext", reports)
+        self.assertIn("const requestId = ++evolutionRequestId", evolution)
+        self.assertIn("requestId !== evolutionRequestId || context !== currentEvolutionContext", evolution)
         self.assertIn('height: 92, sparkline: { enabled: true }', cards)
         self.assertIn('height: 92, sparkline: { enabled: true }', transactions)
         self.assertIn("centeredMonthlyPoints(rows", cards)
@@ -568,7 +576,7 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("portfolio.redemption_history || []", portfolio)
         self.assertIn("Ganho/perda", portfolio)
         self.assertIn("Custo FIFO", portfolio)
-        self.assertIn("portfolioAllocationRows", portfolio)
+        self.assertIn("state.portfolio.presentation.allocation", portfolio)
         self.assertIn("/api/portfolio/allocation-goals", portfolio)
         self.assertIn('data-portfolio-tab="goals"', index)
         self.assertIn('id="portfolioGoalsForm"', index)

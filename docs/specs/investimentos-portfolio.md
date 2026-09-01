@@ -2,7 +2,7 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.49
+versao: 2.51
 atualizado: 2026-08-31
 relacionados:
   - "[[contas-correntes]]"
@@ -128,6 +128,9 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 
 ## API e dados
 
+- `GET /api/portfolio` mantém os campos anteriores e acrescenta `presentation` com agregados de ativos, cabeçalhos, composição e análise por moeda. Posições/fontes incluem resultado, percentual diário e cotação unitária sugerida para resgate, calculados em Python.
+- `POST /api/portfolio/preview` exige sessão e validação de origem, mas não grava dados nem consulta cotações. `kind=redemption` recebe quantidade, quantidade disponível de referência, cotação e taxas; devolve bruto, líquido, remanescente e erros por campo. `kind=goals` recebe metas e devolve soma e validade. A prévia não substitui validações de propriedade, disponibilidade ou limites na gravação.
+
 | Método | Rota |
 |---|---|
 | `GET` | `/api/portfolio` |
@@ -144,6 +147,12 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emergency_reserve_eligible` para posições/aportes elegíveis), `investment_redemptions`, `investment_redemption_summaries` (snapshot por resgate com bruto, líquido, taxas, custo FIFO, resultado realizado e posição remanescente), `portfolio_allocation_goals`, `investment_closed_positions`, `investment_value_overrides`, `transactions`, `checking_accounts`, `quote_cache`. A configuração da integração Mais Retorno vive em `secure_configs` (ver [[preferencias-abas]]).
 
 ## Plano de implementação
+
+- [x] Rejeitar snapshots sem apresentação compatível antes de reutilizar/renderizar; informar necessidade de reiniciar servidor desatualizado sem retry automático em loop. Virtualização monta HTML somente das linhas visíveis e não materializa grupos recolhidos; cancelar listeners/frames ao substituir, sair ou trocar de aba. Testes com snapshot antigo, 10 mil posições e mil fontes; consumo real do Safari requer validação no ambiente do usuário.
+
+- [x] Centralizar resultados/percentuais de posições e fontes, agregações, composição e desvios de metas no núcleo Python; preservar moedas nativas, normalizando grupos mistos em BRL.
+- [x] Disponibilizar `POST /api/portfolio/preview` autenticado, sem gravação/rede externa, para prévias de resgate quantitativo e total de metas. Quantidades disponíveis recebidas são apenas referência visual; gravação revalida a posição real.
+- [x] Frontend renderiza os dados calculados; prévias pendentes bloqueiam confirmação e respostas antigas não substituem a edição atual. Contratos de centavos, moedas, limites e coordenação assíncrona automatizados; validação visual no Safari permanece manual.
 
 - [x] Atualizar rótulos e dicas dos campos de renda fixa no lançamento de investimento.
 - [x] Atualizar rótulos e dicas dos campos de renda fixa na posição inicial do Portfólio.
@@ -250,11 +259,23 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 
 ## Plano de implementação — transações sem rede
 
+### Critérios complementares da apresentação financeira
+
+- Posições, fontes e agregados apresentam resultado e variação diária calculados em centavos/Decimal no backend, inclusive custo zero e quantidades fracionadas.
+- Cabeçalhos de grupos mistos somam valores convertidos em BRL; grupos homogêneos mantêm a moeda nativa. A composição exibe total e participação calculados sobre a mesma base BRL, inclusive valor zero.
+- Análise preserva metas distintas de renda variável BRL/USD e classes sem posição; participação, desvio percentual e monetário são calculados no servidor.
+- A prévia do resgate usa arredondamento de centavos e precisão de quantidade equivalentes à gravação; informa excesso de quantidade/taxas sem escrever dados.
+- Durante prévias pendentes ou com falha a confirmação fica bloqueada; edição rápida, fechamento e saída da view não aplicam respostas obsoletas. Prévia não invalida caches de dados como se fosse mutação.
+
 - [x] Ler entradas locais consistentes e obter cotações antes da escrita. Fecha: critério 77.
 - [x] Revalidar entradas pela conexão da transação; reutilizar posições preparadas ou cancelar por conflito. Fecha: critérios 78 e 79.
 - [x] Testar resgate/encerramento, alteração concorrente, rollback e ausência de rede/cache durante escrita. Fecha: critérios 77 a 79.
 
 ## Changelog
+
+- `2.51` — 2026-08-31 — Correção de compatibilidade do snapshot do Portfólio, bloqueio de recargas em cascata após falha e renderização preguiçosa das linhas virtualizadas.
+
+- `2.50` — 2026-08-31 — Retirados cálculos financeiros residuais do frontend: resultados, agregados, metas, composição e prévias calculados no backend. Grupos com moedas distintas usam valores convertidos em BRL; nenhuma soma entre moedas nativas distintas. Prévia com debounce, confirmação bloqueada enquanto pendente e proteção contra respostas obsoletas; testes Python e JavaScript adicionados.
 
 - `2.49` — 2026-08-31 — Confirmação sem rede implementada com snapshots locais e conflito 409 antes de qualquer escrita financeira. Sete testes de fronteira adicionados; suíte completa com 426 testes aprovada. Mantidos FIFO e crédito opt-in, sem alteração de schema.
 
