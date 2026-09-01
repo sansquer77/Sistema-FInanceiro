@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+import warnings
+import zipfile
+from io import BytesIO
 from pathlib import Path
 from unittest import mock
 
 from financeiro import database
+from financeiro import xlsx_security
 import financeiro.imports as imports_module
 from financeiro.accounts import create_checking_account
 from financeiro.auth import create_user
@@ -233,6 +237,95 @@ class SystemTemplateImportTest(unittest.TestCase):
         )
         self.assertEqual(example_parcelado[headers.index("parcelas")], "3")
         self.assertEqual(example_parcelado[headers.index("data")], "15.06.2026")
+
+    def test_xlsx_rejects_high_compression_ratio_before_xml_parse(self) -> None:
+        output = BytesIO()
+        with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("xl/worksheets/sheet1.xml", b"A" * (2 * 1024 * 1024))
+
+        with self.assertRaisesRegex(imports_module.ImportError, "limites seguros"):
+            import_system_template(
+                self.user["id"], "account", self.account["id"], output.getvalue(), "modelo.xlsx",
+            )
+        with get_connection() as conn:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0], 0)
+
+    def test_xlsx_rejects_member_count_and_duplicate_names(self) -> None:
+        output = BytesIO()
+        with mock.patch.object(xlsx_security, "MAX_XLSX_ARCHIVE_MEMBERS", 2):
+            with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
+                for index in range(3):
+                    archive.writestr(f"safe/member{index}.xml", "<root/>")
+            with self.assertRaisesRegex(imports_module.ImportError, "limites seguros"):
+                parse_xlsx_rows(output.getvalue(), "Lançamentos")
+
+        output = BytesIO()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
+                archive.writestr("xl/workbook.xml", "<workbook/>")
+                archive.writestr("xl/workbook.xml", "<workbook/>")
+        with self.assertRaisesRegex(imports_module.ImportError, "membro duplicado"):
+            parse_xlsx_rows(output.getvalue(), "Lançamentos")
+
+    def test_xlsx_rejects_unsafe_sheet_target(self) -> None:
+        workbook = imports_module.create_xlsx_workbook([("Lançamentos", [["data"]])])
+        source = zipfile.ZipFile(BytesIO(workbook))
+        output = BytesIO()
+        with source, zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as target:
+            for member in source.infolist():
+                content = source.read(member.filename)
+                if member.filename == "xl/_rels/workbook.xml.rels":
+                    content = content.replace(b'Target="worksheets/sheet1.xml"', b'Target="../worksheets/sheet1.xml"')
+                target.writestr(member.filename, content)
+
+        with self.assertRaisesRegex(imports_module.ImportError, "caminho interno inseguro"):
+            parse_xlsx_rows(output.getvalue(), "Lançamentos")
+
+    def test_xlsx_accepts_absolute_internal_worksheet_target(self) -> None:
+        workbook = imports_module.create_xlsx_workbook([("Lançamentos", [["data"], ["15.06.2026"]])])
+        source = zipfile.ZipFile(BytesIO(workbook))
+        output = BytesIO()
+        with source, zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as target:
+            for member in source.infolist():
+                content = source.read(member.filename)
+                if member.filename == "xl/_rels/workbook.xml.rels":
+                    content = content.replace(
+                        b'Target="worksheets/sheet1.xml"',
+                        b'Target="/xl/worksheets/sheet1.xml"',
+                    )
+                target.writestr(member.filename, content)
+
+        self.assertEqual(parse_xlsx_rows(output.getvalue(), "Lançamentos")[1][0], "15.06.2026")
+
+    def test_xlsx_rejects_rows_cells_and_distant_columns(self) -> None:
+        rows_workbook = imports_module.create_xlsx_workbook([("Lançamentos", [["data"], ["1"], ["2"]])])
+        with mock.patch.object(imports_module, "MAX_XLSX_ROWS", 2):
+            with self.assertRaisesRegex(imports_module.ImportError, "limites seguros"):
+                parse_xlsx_rows(rows_workbook, "Lançamentos")
+
+        cells_workbook = imports_module.create_xlsx_workbook([("Lançamentos", [["a", "b", "c", "d"]])])
+        with mock.patch.object(imports_module, "MAX_XLSX_CELLS", 3):
+            with self.assertRaisesRegex(imports_module.ImportError, "limites seguros"):
+                parse_xlsx_rows(cells_workbook, "Lançamentos")
+
+        columns_workbook = imports_module.create_xlsx_workbook([("Lançamentos", [[None] * 256 + ["fora"]])])
+        with self.assertRaisesRegex(imports_module.ImportError, "limites seguros"):
+            parse_xlsx_rows(columns_workbook, "Lançamentos")
+
+    def test_xlsx_rejects_excess_shared_strings(self) -> None:
+        output = BytesIO()
+        shared_strings = """<?xml version="1.0" encoding="UTF-8"?>
+        <sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+          <si><t>um</t></si><si><t>dois</t></si>
+        </sst>"""
+        with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("xl/sharedStrings.xml", shared_strings)
+        with zipfile.ZipFile(BytesIO(output.getvalue())) as archive:
+            xlsx_security.validate_xlsx_archive(archive)
+            with mock.patch.object(imports_module, "MAX_XLSX_SHARED_STRINGS", 1):
+                with self.assertRaisesRegex(imports_module.ImportError, "limites seguros"):
+                    imports_module.xlsx_shared_strings(archive)
 
 
 if __name__ == "__main__":

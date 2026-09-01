@@ -9,7 +9,7 @@ export function renderCollectionRows(container, items, { expanded = true, virtua
   destroyVirtualLists(container);
   container.replaceChildren();
   if (!expanded) return;
-  // spec: frontend-v2/frontend-fundacao-v2 v0.10 — critérios 28 e 29
+  // spec: frontend-v2/frontend-fundacao-v2 v0.13 — critérios 28 e 29
   if (virtual && renderVirtualList(container, items, options)) return;
   container.innerHTML = items.map(options.renderItem).join("");
 }

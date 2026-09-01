@@ -333,6 +333,10 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("export function createAppDataLoader", loader_source)
         self.assertIn("getViews", loader_source)
         self.assertNotIn("document.", loader_source)
+        self.assertNotIn('fetchAllListed("/api/transactions", "transactions")', loader_source)
+        self.assertNotIn('fetchAllListed("/api/credit-card-payments", "payments")', loader_source)
+        self.assertIn('/api/transactions?month=', loader_source)
+        self.assertIn('/api/credit-card-transactions?month=', loader_source)
         self.assertNotIn('from "./', loader_source)
 
     def test_heavy_view_loads_share_freshness_invalidation_and_inflight_policy(self) -> None:

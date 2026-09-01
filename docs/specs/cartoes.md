@@ -2,8 +2,8 @@
 tipo: spec
 area: cartoes
 status: implementado
-versao: 2.15
-atualizado: 2026-08-20
+versao: 2.16
+atualizado: 2026-09-01
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -18,7 +18,7 @@ aliases: ["Cartões de Crédito", "Faturas"]
 # Cartões de Crédito
 
 > [!info] Status
-> **implementado** · área: `cartoes` · atualizado em 2026-08-20 · relacionados: [[contas-correntes]], [[lancamentos]], [[limites-gastos]], [[relatorios]]
+> **implementado** · área: `cartoes` · atualizado em 2026-09-01 · relacionados: [[contas-correntes]], [[lancamentos]], [[limites-gastos]], [[relatorios]]
 
 ## Problema
 
@@ -201,6 +201,8 @@ Tabelas: `credit_cards`, `credit_card_transactions`, `credit_card_payments`, `cr
 - Dado o usuário visualizando o gráfico de evolução de faturas, quando a linha de referência da média é exibida, então o valor da média formatado na moeda do cartão aparece em texto compacto ao final (lado direito) da linha.
 
 ## Changelog
+
+- `2.16` — 2026-09-01 — `GET /api/credit-card-transactions` aceita filtro `month` por competência antes da paginação; carga inicial e Relatórios deixam de percorrer todo o histórico de cartões e pagamentos.
 
 - `2.15` — 2026-08-20 — Modal de escopo em série recorrente de cartão com média ativa passa a explicar que a escolha **Apenas este lançamento** não recalcula os próximos, enquanto **Este e os próximos** os recalcula pela média; sem mudança na regra de cálculo ou no escopo aplicado.
 - `2.14` — 2026-08-17 — Modal de escopo restaurado em edições de séries recorrentes de cartão: o sistema pula o modal **somente** quando a flag de média é alterada na edição (marcada em série sem a marcação ou desmarcada em série que a tinha); com a flag inalterada — ativa ou inativa — o modal `Apenas este lançamento` / `Este e os próximos` volta a aparecer; escolhendo os próximos em série com a flag ativa, os valores futuros continuam recalculados pela média; escolhendo apenas este, a cascata não ocorre.

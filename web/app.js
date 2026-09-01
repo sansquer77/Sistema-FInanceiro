@@ -1458,6 +1458,9 @@ function showModule(view) {
   }
   if (view === "creditCards") {
     renderCreditCards();
+    if (!state.cardDataLoaded) {
+      cardsView.loadCreditCards().then(renderCreditCards).catch((error) => setMessage(creditCardMessage, error.message, "error"));
+    }
   }
   if (view === "cardLaunches") {
     renderCardInvoice();
@@ -1485,6 +1488,8 @@ function handleDataMutation() {
   userAdminViewController?.markPreferencesDirty();
   transactionsView?.markTransactionSliceDirty();
   simulationsView?.markFormDataDirty();
+  state.reportDataMonth = "";
+  state.reportOverviewMonth = "";
 }
 
 function shouldAnimateModuleTransition(previousView, nextView) {

@@ -1,6 +1,6 @@
 import { createReportStatement } from "./report-statement.js";
 import { createReportEvolution } from "./report-evolution.js";
-import { api } from "./api.js";
+import { api, fetchAllListed } from "./api.js";
 import { stateMarkup } from "./dom-utils.js";
 import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";
 import { renderChart } from "./chart-adapter.js";
@@ -62,21 +62,32 @@ export function registerReportsView({
     reportMonthLabel.textContent = formatMonthShortLabel(state.reportMonth);
     syncRovingTabState(reportTabs, state.reportTab, (button) => button.dataset.reportTab);
     renderReportAccountOptions();
-    const items = reportItemsForMonth(state.reportMonth);
-    const totals = reportTotals(items);
-    const resultTotals = reportResultTotals(totals);
-    reportIncomeSummary.innerHTML = formatMoneyTotals(totals.income);
-    reportExpenseSummary.innerHTML = formatMoneyTotals(totals.expense);
-    reportInvestmentSummary.innerHTML = formatMoneyTotals(totals.investment);
-    reportResultSummary.innerHTML = formatMoneyTotals(resultTotals);
-    reportResultSummary.classList.toggle("danger-text", [...resultTotals.values()].some((total) => total < 0));
-    reportResultSummary.classList.toggle("positive-text", [...resultTotals.values()].some((total) => total > 0) && ![...resultTotals.values()].some((total) => total < 0));
     reportAccountFilter.hidden = state.reportTab !== "accounts";
     statementControls.hidden = state.reportTab !== "statement";
     statement.renderStatementScopeOptions();
     printStatementButton.hidden = state.reportTab !== "statement";
     printStatementButton.disabled = true;
     reportContent.classList.toggle("statement-print-area", state.reportTab === "statement");
+    if (state.reportOverviewMonth !== state.reportMonth) {
+      renderReportLoading();
+      if (state.reportOverviewLoadingMonth !== state.reportMonth) loadReportOverview(state.reportMonth);
+      if (!["tags", "statement"].includes(state.reportTab) && state.reportDataLoadingMonth !== state.reportMonth) {
+        loadReportMonth(state.reportMonth);
+      }
+      return;
+    }
+    renderReportOverview();
+    if (state.reportTab === "tags" || state.reportTab === "statement") {
+      if (state.reportTab === "tags") renderTagsReport();
+      else statement.renderStatementReport();
+      return;
+    }
+    if (state.reportDataMonth !== state.reportMonth) {
+      renderReportLoading();
+      loadReportMonth(state.reportMonth);
+      return;
+    }
+    const items = reportItemsForMonth(state.reportMonth);
     if (state.reportTab === "cashflow") {
       renderCashflowReport(items);
       return;
@@ -85,19 +96,74 @@ export function registerReportsView({
       renderAccountsReport();
       return;
     }
-    if (state.reportTab === "tags") {
-      renderTagsReport();
-      return;
-    }
     if (state.reportTab === "subcategories") {
       renderSubcategoriesReport(items);
       return;
     }
-    if (state.reportTab === "statement") {
-      statement.renderStatementReport();
-      return;
-    }
     renderCategoriesReport(items);
+  }
+
+  function renderReportOverview() {
+    const raw = state.reportOverview?.totals_by_type || {};
+    const income = new Map(Object.entries(raw.income || {}).map(([currency, cents]) => [currency, Number(cents) / 100]));
+    const expense = new Map(Object.entries(raw.expense || {}).map(([currency, cents]) => [currency, Number(cents) / 100]));
+    const investment = new Map(Object.entries(raw.investment || {}).map(([currency, cents]) => [currency, Number(cents) / 100]));
+    const result = new Map(income);
+    mergeMoneyTotals(result, expense, -1);
+    mergeMoneyTotals(result, investment, -1);
+    reportIncomeSummary.innerHTML = formatMoneyTotals(income);
+    reportExpenseSummary.innerHTML = formatMoneyTotals(expense);
+    reportInvestmentSummary.innerHTML = formatMoneyTotals(investment);
+    reportResultSummary.innerHTML = formatMoneyTotals(result);
+    reportResultSummary.classList.toggle("danger-text", [...result.values()].some((total) => total < 0));
+    reportResultSummary.classList.toggle("positive-text", [...result.values()].some((total) => total > 0) && ![...result.values()].some((total) => total < 0));
+  }
+
+  async function loadReportOverview(month) {
+    const requestId = ++state.reportOverviewRequestId;
+    state.reportOverviewLoadingMonth = month;
+    try {
+      const overview = await api(`/api/reports/overview?month=${encodeURIComponent(month)}`);
+      if (requestId !== state.reportOverviewRequestId || state.reportMonth !== month) return;
+      state.reportOverview = overview;
+      state.reportOverviewMonth = month;
+      renderReports();
+    } catch (error) {
+      if (requestId !== state.reportOverviewRequestId || state.reportMonth !== month) return;
+      reportContent.innerHTML = stateMarkup(error.message, { kind: "error" });
+    } finally {
+      if (requestId === state.reportOverviewRequestId) state.reportOverviewLoadingMonth = "";
+    }
+  }
+
+  function renderReportLoading() {
+    reportIncomeSummary.textContent = "—";
+    reportExpenseSummary.textContent = "—";
+    reportInvestmentSummary.textContent = "—";
+    reportResultSummary.textContent = "—";
+    printStatementButton.disabled = true;
+    reportContent.innerHTML = stateMarkup("Carregando o recorte mensal do relatório.", { kind: "loading" });
+  }
+
+  async function loadReportMonth(month) {
+    const requestId = ++state.reportDataRequestId;
+    state.reportDataLoadingMonth = month;
+    try {
+      const [transactions, cardTransactions] = await Promise.all([
+        fetchAllListed(`/api/transactions?month=${encodeURIComponent(month)}`, "transactions"),
+        fetchAllListed(`/api/credit-card-transactions?month=${encodeURIComponent(month)}`, "transactions"),
+      ]);
+      if (requestId !== state.reportDataRequestId || state.reportMonth !== month) return;
+      state.reportTransactions = transactions;
+      state.reportCardTransactions = cardTransactions;
+      state.reportDataMonth = month;
+      renderReports();
+    } catch (error) {
+      if (requestId !== state.reportDataRequestId || state.reportMonth !== month) return;
+      reportContent.innerHTML = stateMarkup(error.message, { kind: "error" });
+    } finally {
+      if (requestId === state.reportDataRequestId) state.reportDataLoadingMonth = "";
+    }
   }
 
   function renderReportAccountOptions() {
@@ -137,7 +203,7 @@ export function registerReportsView({
   }
 
   async function renderTagsReport() {
-    // spec: relatorios/relatorios v2.20 — relatório de tags agrupado por tag com
+    // spec: relatorios/relatorios v2.21 — relatório de tags agrupado por tag com
     // Receitas, Despesas, Saldo e Investimentos, separados por moeda.
     const requestId = ++tagsRequestId;
     const requestedMonth = state.reportMonth;
@@ -277,7 +343,7 @@ export function registerReportsView({
       reportContent.innerHTML = stateMarkup("Cadastre uma conta para visualizar este relatório.", { kind: "empty", compact: false });
       return;
     }
-    const items = state.transactions
+    const items = state.reportTransactions
       .filter((transaction) => transaction.date.startsWith(state.reportMonth))
       .filter((transaction) => !isCreditCardPaymentTransaction(transaction))
       .filter((transaction) => String(transaction.account_id) === String(account.id));
@@ -366,12 +432,12 @@ export function registerReportsView({
   }
 
   function reportItemsForMonth(month) {
-    const accountItems = state.transactions
+    const accountItems = state.reportTransactions
       .filter((transaction) => transaction.date.startsWith(month))
       .filter((transaction) => !isCreditCardPaymentTransaction(transaction))
       .map(accountTransactionReportItem)
       .filter(Boolean);
-    const cardItems = state.cardTransactions
+    const cardItems = state.reportCardTransactions
       .filter((transaction) => (transaction.invoice_month || transaction.date.slice(0, 7)) === month)
       .map(cardTransactionReportItem)
       .filter(Boolean);

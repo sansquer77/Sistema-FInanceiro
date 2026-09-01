@@ -1478,7 +1478,7 @@ def apply_fund_quote(position: dict, user_id: int | None = None, force_refresh: 
 
 
 def fetch_fund_quote_for_user(user_id: int, cnpj: str, force_refresh: bool = False) -> dict:
-    # spec: lancamentos v3.33 — criterio cota-fundo-lancamento
+    # spec: lancamentos v3.34 — criterio cota-fundo-lancamento
     # (busca assistida de cota de fundo no formulario de aporte; o preco segue editavel)
     identifier = mais_retorno_identifier_from_cnpj(cnpj)
     if not identifier:

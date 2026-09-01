@@ -2,8 +2,8 @@
 tipo: spec
 area: frontend-v2
 status: em-implementacao
-versao: 0.10
-atualizado: 2026-08-31
+versao: 0.13
+atualizado: 2026-09-01
 relacionados:
   - "[[frontend-modularizacao]]"
   - "[[../adr/0002-modularizacao-frontend]]"
@@ -21,7 +21,7 @@ aliases: ["Fundação visual da v2", "Gráficos, máscaras, Command Palette e vi
 # Fundação do frontend v2
 
 > [!info] Status
-> **em-implementacao** · área: `frontend-v2` · atualizado em 2026-08-31 · relacionados: [[frontend-modularizacao]], [[../adr/0013-dependencias-frontend-v2]], [[../design/design-system]], [[relatorios]], [[lancamentos]], [[cartoes]], [[investimentos-portfolio]], [[efeito-borboleta]]
+> **em-implementacao** · área: `frontend-v2` · atualizado em 2026-09-01 · relacionados: [[frontend-modularizacao]], [[../adr/0013-dependencias-frontend-v2]], [[../design/design-system]], [[relatorios]], [[lancamentos]], [[cartoes]], [[investimentos-portfolio]], [[efeito-borboleta]]
 
 ## Problema
 
@@ -189,6 +189,9 @@ Usuário que acompanha muitos lançamentos, faturas, operações ou posições e
 
 28. Dado um dia expandido com mais de 200 lançamentos, quando renderizado, então apenas a janela visível e overscan passam pelo template, sem pré-montagem integral; dias recolhidos não montam linhas.
 29. Dado um lançamento destacado fora da primeira janela, quando sua lista é virtualizada, então a janela inicial inclui o lançamento destacado.
+30. Dado o gráfico mensal de Tendências, quando a aba renderiza, então o contêiner ApexCharts é criado diretamente, sem montar ou substituir um SVG financeiro intermediário.
+31. Dado o demonstrativo mensal com distribuição por categoria, quando seus dados são exibidos ou uma fatia recebe hover, então o donut usa o adaptador ApexCharts, mantém legenda textual com percentuais e reserva o centro exclusivamente ao total formatado na moeda da seção, sem vazamento de textos para fora da área interna.
+32. Dado o demonstrativo mensal com gastos diários, quando seus dados são exibidos, então as colunas usam o adaptador ApexCharts, preservam os dias no eixo e formatam valores e tooltip na moeda da seção.
 
 ## Pendências
 
@@ -205,6 +208,7 @@ Usuário que acompanha muitos lançamentos, faturas, operações ou posições e
 
 ## Plano de implementação
 
+- [x] Remover o SVG transitório de Tendências e migrar donut de distribuição e colunas diárias do demonstrativo para o adaptador ApexCharts, preservando legendas, moedas, impressão e lifecycle compartilhado. Fecha: critérios 17, 24, 30, 31 e 32.
 - [x] Remover pré-montagem nos Lançamentos, liberar listeners/frames das listas substituídas e testar janela inicial, destaque, listas pequenas e dias recolhidos. Fecha: critérios 15, 17, 28 e 29. Teste com DOM simulado e 10 mil itens; memória real no Safari não medida.
 - [ ] Avaliar em etapa própria a pré-montagem dos rankings de Relatórios (DOM convertido em `outerHTML`) e do Portfólio (linhas formatadas antes de virtualizar), preservando expansão e agrupamento.
 - [x] Suspender gráficos sob ancestrais `hidden`, restaurar configurações recentes e limpar na sessão; testar ciclos, respostas tardias e descarte. Fecha: critérios 17, 24, 26 e 27 no adaptador, com instâncias simuladas. Memória real no Safari continua sujeita à validação manual.
@@ -220,6 +224,9 @@ Usuário que acompanha muitos lançamentos, faturas, operações ou posições e
 
 ## Changelog
 
+- `0.13` — 2026-09-01 — Corrigida a exibição do total central do donut: os elementos internos exigidos pelo ApexCharts permanecem ativos, mas seus formatadores ficam fixos no rótulo e total da seção, sem troca pela categoria em hover.
+- `0.12` — 2026-09-01 — Centro do donut do demonstrativo passa a exibir somente o total, com área interna ampliada e tipografia contida; nomes de categorias permanecem no tooltip e na legenda sem substituir o conteúdo central durante hover.
+- `0.11` — 2026-09-01 — Removido o SVG financeiro intermediário de Tendências; donut por categoria e colunas diárias do demonstrativo passam a usar diretamente o adaptador ApexCharts, mantendo alternativas textuais, moeda e impressão.
 - `0.10` — 2026-08-31 — Implementada renderização sob demanda de lançamentos, sem pré-montagem dos dias grandes ou recolhidos; destaque fora da janela inicial preservado e limpeza de listeners/frames ao substituir listas. Pré-montagem em Relatórios/Portfólio identificada para etapa própria.
 - `0.9` — 2026-08-31 — Implementada suspensão de gráficos de módulos, abas e drawers sob `hidden`, com retomada local e limpeza na troca de sessão. Testes de ciclos repetidos, configuração mais recente e falha tardia aprovados; memória real no Safari não medida.
 - `0.8` — 2026-08-31 — Desativadas animações globais, graduais e dinâmicas, com precedência sobre opções das views. Testadas configuração, preservação de interações e limpeza em ciclos com instâncias simuladas. Mitigação não garante ausência de recarregamentos nem elimina gráficos retidos em telas apenas ocultas.

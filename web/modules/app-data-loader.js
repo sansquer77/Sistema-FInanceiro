@@ -46,9 +46,9 @@ export function createAppDataLoader({ state, services, getViews, actions }) {
     const month = actions.cockpitMonthValue();
     return Promise.all([
       api("/api/checking-accounts"), api("/api/credit-cards"),
-      fetchAllListed("/api/transactions", "transactions"),
-      fetchAllListed("/api/credit-card-transactions", "transactions"),
-      fetchAllListed("/api/credit-card-payments", "payments"),
+      fetchAllListed(`/api/transactions?month=${encodeURIComponent(month)}`, "transactions"),
+      fetchAllListed(`/api/credit-card-transactions?month=${encodeURIComponent(month)}`, "transactions"),
+      Promise.resolve([]),
       api(`/api/cockpit?month=${encodeURIComponent(month)}`),
     ]);
   }
@@ -61,6 +61,7 @@ export function createAppDataLoader({ state, services, getViews, actions }) {
     state.transactions = transactions;
     state.cardTransactions = cardTransactions;
     state.cardPayments = cardPayments || [];
+    state.cardDataLoaded = false;
     state.cockpit = cockpit;
     state.cockpitLoadedMonth = actions.cockpitMonthValue();
   }
@@ -68,8 +69,10 @@ export function createAppDataLoader({ state, services, getViews, actions }) {
   function clearLoadedData() {
     Object.assign(state, {
       accounts: [], archivedAccounts: [], creditCards: [], archivedCreditCards: [],
-      cardInvoiceTransactions: [], cardInvoicePayments: [], cardTransactions: [], cardPayments: [],
+      cardInvoiceTransactions: [], cardInvoicePayments: [], cardTransactions: [], cardPayments: [], cardDataLoaded: false,
       selectedCreditCardId: "", transactions: [], accountTransactions: [], balanceProjection: null,
+      reportTransactions: [], reportCardTransactions: [], reportDataMonth: "", reportDataRequestId: 0, reportDataLoadingMonth: "",
+      reportOverview: null, reportOverviewMonth: "", reportOverviewRequestId: 0, reportOverviewLoadingMonth: "",
       cockpit: null, cockpitLoadedMonth: "", categories: [], tags: [], spendingLimits: [],
       currentSpendingLimits: [], portfolio: null,
     });
@@ -99,9 +102,9 @@ export function createAppDataLoader({ state, services, getViews, actions }) {
     cockpit.setLoading(true);
     try {
       const [accountsResponse, transactions, cardTransactions, cardPayments, cockpitResponse, spendingLimitsResponse] = await Promise.all([
-        api("/api/checking-accounts"), fetchAllListed("/api/transactions", "transactions"),
-        fetchAllListed("/api/credit-card-transactions", "transactions"),
-        fetchAllListed("/api/credit-card-payments", "payments"),
+        api("/api/checking-accounts"), fetchAllListed(`/api/transactions?month=${encodeURIComponent(month)}`, "transactions"),
+        fetchAllListed(`/api/credit-card-transactions?month=${encodeURIComponent(month)}`, "transactions"),
+        Promise.resolve([]),
         api(`/api/cockpit?month=${encodeURIComponent(month)}`),
         api(`/api/spending-limits?month=${encodeURIComponent(month)}`),
       ]);
@@ -111,6 +114,7 @@ export function createAppDataLoader({ state, services, getViews, actions }) {
       state.transactions = transactions || [];
       state.cardTransactions = cardTransactions || [];
       state.cardPayments = cardPayments || [];
+      state.cardDataLoaded = false;
       state.cockpit = cockpitResponse;
       state.cockpitLoadedMonth = month;
       state.currentSpendingLimits = spendingLimitsResponse.limits || [];

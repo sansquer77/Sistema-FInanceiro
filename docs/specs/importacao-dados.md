@@ -2,8 +2,8 @@
 tipo: spec
 area: importacao
 status: implementado
-versao: 1.5
-atualizado: 2026-08-28
+versao: 1.6
+atualizado: 2026-09-01
 relacionados:
   - "[[contas-correntes]]"
   - "[[cartoes]]"
@@ -18,7 +18,7 @@ aliases: ["Importação", "Importação de dados"]
 # Importação de dados
 
 > [!info] Status
-> **implementado** · área: `importacao` · atualizado em 2026-08-28 · relacionados: [[contas-correntes]], [[cartoes]], [[categorias-tags-gestao]], [[adr/0004-importador-xls-sem-dependencia]]
+> **implementado** · área: `importacao` · atualizado em 2026-09-01 · relacionados: [[contas-correntes]], [[cartoes]], [[categorias-tags-gestao]], [[adr/0004-importador-xls-sem-dependencia]]
 
 ## Problema
 
@@ -84,6 +84,8 @@ Usuário que está migrando dados de outro sistema ou que deseja lançar movimen
 - A rota de importação exige sessão autenticada.
 - A conta ou cartão de destino precisa pertencer ao usuário autenticado e estar ativo.
 - O upload aceita arquivos de até **5 MB**.
+- O parser XLSX reaplica o limite de **5 MB** fora da camada HTTP e rejeita pacotes com mais de **128 membros**, nomes duplicados ou caminhos inseguros, criptografia, compressão diferente de `stored`/`deflate`, membro expandido acima de **16 MB**, total expandido acima de **32 MB** ou razão de compressão acima de **100:1**.
+- A aba importada aceita no máximo **20.000 linhas**, **250.000 células** e coluna `IV` (índice 256); `sharedStrings.xml` aceita no máximo **100.000 entradas**. Arquivos que ultrapassam os limites são rejeitados integralmente antes de qualquer escrita financeira.
 - A importação não aceita identificadores de outro usuário para contas, cartões, categorias ou tags.
 - Dados textuais importados são normalizados antes de persistir.
 
@@ -111,9 +113,14 @@ Tabelas: `transactions`, `credit_card_transactions`, `transaction_tags`, `credit
 - Dado uma linha parcelada com `parcelas` = 3, quando importada, gera 3 lançamentos da mesma série.
 - Dado uma linha recorrente com Média `sim`, quando importada, a série usa o valor médio do histórico.
 - Dado um modelo antigo sem as colunas de repetição, quando importado, continua funcionando (linhas avulsas).
+- Dado um XLSX cuja expansão, razão de compressão, quantidade de membros ou membro individual exceda o orçamento seguro, quando importado, é rejeitado com mensagem amigável antes de abrir transação SQLite.
+- Dado um XLSX com membro duplicado, criptografado, método de compressão não suportado ou caminho interno inseguro, quando importado, é rejeitado como modelo inválido.
+- Dado uma worksheet acima dos limites de linhas, células ou coluna, quando analisada, é rejeitada sem preencher listas proporcionais ao índice malicioso.
+- Dado o modelo XLSX oficial ou um modelo antigo dentro dos limites, quando importado, continua sendo aceito com as mesmas colunas e valores.
 
 ## Changelog
 
+- `1.6` — 2026-09-01 — Parser XLSX passa a limitar arquivo, membros ZIP, expansão, razão de compressão, caminhos, linhas, células, colunas e shared strings antes da persistência, mitigando ZIP/XML bombs sem alterar CSV/XLS.
 - `1.5` — 2026-08-28 — Timestamp UTC dos modelos XLSX passa a usar `timezone.utc`, preservando o formato W3CDTF e a compatibilidade com o Python 3.9 usado pelo launcher da homologação.
 - `1.4` — 2026-08-28 — Metadados dos modelos XLSX passam a gerar timestamp UTC com API de data consciente de fuso, preservando o formato W3CDTF terminado em `Z`.
 - `1.3` — 2026-08-23 — Removidas referências a soluções concorrentes; rota de importação legada renomeada para `/api/import/legacy-transactions`.

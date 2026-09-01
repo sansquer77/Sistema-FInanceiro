@@ -185,6 +185,7 @@ export function registerCardsView({
     ]);
     state.cardTransactions = transactionsResponse || [];
     state.cardPayments = paymentsResponse || [];
+    state.cardDataLoaded = true;
   }
 
   function ensureSelectedCreditCard() {
@@ -243,18 +244,18 @@ export function registerCardsView({
         && Boolean(editingCardTransaction.use_average) !== cardUseAverage.checked,
     );
     if (editingCardTransaction && editingCardTransaction.series_kind === "recurring" && cardUseAverage) {
-      // spec: cartoes v2.15 — critério 33
+      // spec: cartoes v2.16 — critério 33
       // (ao editar recorrente, o estado do checkbox de média é enviado explicitamente)
       data.use_average = cardUseAverage.checked ? "1" : "0";
     }
     if (isEditing && shouldAskFutureCardReplication(data.id)) {
       if (averageChanged) {
-        // spec: cartoes v2.15 — critérios 34, 35 e 40
+        // spec: cartoes v2.16 — critérios 34, 35 e 40
         // (flag de média alterada — marcada em série sem a marcação ou desmarcada
         //  em série que a tinha — não exibe modal e aplica em cascata)
         data.apply_to_future = true;
       } else {
-        // spec: cartoes v2.15 — critérios 24 e 38
+        // spec: cartoes v2.16 — critérios 24 e 38
         // (flag inalterada — ativa ou inativa — mantém o modal de escopo)
         const scope = await chooseSeriesEditScope(Boolean(editingCardTransaction.use_average));
         if (!scope) {
@@ -298,7 +299,7 @@ export function registerCardsView({
   }
 
   async function handlePartialCardInvoicePayment() {
-    // spec: cartoes v2.15 — criterio 174
+    // spec: cartoes v2.16 — criterio 174
     setMessage(cardInvoiceMessage, "");
     const card = selectedCreditCard();
     const total = cardInvoiceOpenAmount();
@@ -905,7 +906,7 @@ export function registerCardsView({
     }, 0);
   }
 
-  // spec: cartoes v2.15 — criterios 36 e 37
+  // spec: cartoes v2.16 — criterios 36 e 37
   // (linha de referencia horizontal com a media dos valores absolutos das
   //  5 faturas em tela, na mesma escala vertical do grafico, com o valor
   //  da media em texto ao final da linha)

@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.77
-atualizado: 2026-08-31
+versao: 3.80
+atualizado: 2026-09-01
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -18,7 +18,7 @@ tags: [arquitetura, meta]
 # Arquitetura
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-08-31 · relacionados: [[requisitos]], [[qualidade-codigo]], [[specs/bank-logos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
+> **implementado** · área: `meta` · atualizado em 2026-09-01 · relacionados: [[requisitos]], [[qualidade-codigo]], [[specs/bank-logos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
 
 ## Visão geral
 
@@ -70,7 +70,7 @@ O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Co
 | `privacy-utils.js` | Persistência local e aplicação do modo de ocultação de valores. |
 | `instructions-content.js` | Conteúdo estático, offline e versionado da central de ajuda. Ver [[instrucoes-app]]. |
 | `app-state.js` | Fábrica do estado inicial e reset puro dos dados de sessão, sem singleton, DOM ou API. |
-| `app-data-loader.js` | Coordenação dos carregamentos compartilhados por dependências explícitas e acesso tardio às views, sem regras financeiras. |
+| `app-data-loader.js` | Coordenação dos carregamentos compartilhados por dependências explícitas e acesso tardio às views; o boot e o Cockpit mantêm somente recortes mensais, sem históricos integrais ou pagamentos globais. |
 | `bank-logos.js` | Catálogo e resolvedor compartilhado de logos de instituições e bandeiras, com normalização, aliases e fallback visual. Ver [[specs/bank-logos]]. |
 
 Os assets normalizados do catálogo ficam em `web/assets/banks/` e `web/assets/bandeiras/`, com nomes ASCII minúsculos. Contas e Cartões reutilizam o mesmo resolvedor; Cartões também exibem a bandeira quando catalogada.
@@ -144,7 +144,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `GET` | `/api/app-info` | Metadados públicos do app, incluindo nome e versão atual. |
 | `GET` | `/api/latest-version` | Versão local e versão mais recente publicada no site oficial, com indicação de atualização disponível. |
 | `GET` | `/api/me` | Dados do usuário autenticado. |
-| `POST` | `/api/register` | Cadastro de novo usuário. |
+| `POST` | `/api/register` | Cadastro de novo usuário, limitado persistentemente por origem antes da criação. |
 | `POST` | `/api/login` | Login com e-mail e senha. |
 | `POST` | `/api/logout` | Encerra a sessão. |
 | `POST` | `/api/password-reset/request` | Solicita código de recuperação. |
@@ -249,6 +249,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `GET` | `/api/cockpit?month=AAAA-MM` |
 | `GET` | `/api/cockpit/calendar` |
 | `GET` | `/api/reports/tags?month=AAAA-MM` |
+| `GET` | `/api/reports/overview?month=AAAA-MM` |
 | `GET` | `/api/reports/open-debts?month=AAAA-MM&account_ids=1,2&card_ids=3&currency=BRL` |
 | `GET` | `/api/reports/statement?month=AAAA-MM&account_ids=1,2&card_ids=3&currency=BRL` |
 | `GET` | `/api/reports/category-evolution?category_id={id}&subcategory_id={id}&period={periodo}` |
@@ -326,7 +327,7 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | `credit_cards.py` | Cartões, faturas mensais, transações e pagamentos. Ver [[cartoes]]. |
 | `spending_limits.py` | Metas e orçamentos mensais. Ver [[limites-gastos]]. |
 | `http_routes.py` | Tabela declarativa e resolução de rotas, independente do transporte HTTP. Ver [[specs/desconcentracao-arquitetura-v2]]. |
-| `cockpit.py` | Agregações de domínio do resumo mensal do Cockpit, fora do adaptador HTTP. |
+| `cockpit.py` | Agregações de domínio do resumo mensal do Cockpit com `SUM`, `COUNT` e `GROUP BY` no SQLite, fora do adaptador HTTP e sem materializar lançamentos detalhados. |
 | `open_debts.py` | Leitura consistente e agregação de parcelas em aberto, por usuário e moeda, compartilhada entre `/api/cockpit` (`open_debts`) e Relatórios. Conciliação liquida parcela de conta; registro de pagamento encerra fatura. Inclui vencidas, sem reconstrução histórica, rede ou escrita. |
 | `balance_projections.py` | Saldos conciliados/projetados, reservas de faturas e consolidação por moeda; autoridade backend consumida por Cockpit e Extrato. |
 | `portfolio.py` | API pública e composição do Portfólio; mantém CRUD, adaptação dos provedores e aplicação de cotações de mercado/fundos. Delega transporte/cache, valorização por data e série histórica. Resgates e encerramentos preparam posições fora da escrita e revalidam entradas locais na transação, sem recotação. Ver [[investimentos-portfolio]]. |
@@ -347,13 +348,14 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | `consultor_context.py` | Builders dos nove contextos, agregação e compactação dos dados e formatação monetária de borda; reutiliza serviços de domínio e posições recebidas. Não acessa configuração, histórico ou transporte de IA. A fachada valida a seleção via catálogo e enriquece o contexto com perfis via configurações; reexporta os builders. |
 | `consultor_history.py` | Persistência/listagem/expurgo das análises, quota diária e cooldown de falhas, isolados do executor e da configuração. Ver [[specs/consultor]]. |
 | `imports.py` | Leitura de arquivos externos legados e planilhas modelo. Ver [[importacao-dados]]. |
+| `xlsx_security.py` | Fronteira defensiva dos pacotes XLSX: valida o contêiner ZIP, limita expansão e compressão, normaliza caminhos internos e faz leituras limitadas antes do parsing XML, sem persistência. Ver [[importacao-dados]]. |
 | `operation_logs.py` | Auditoria funcional das operações do usuário. Ver [[historico-operacoes]]. |
 | `emailer.py` | Envio SMTP do código de recuperação de senha. Ver [[recuperacao-senha]]. |
 | `secure_config.py` | Armazenamento criptografado da configuração SMTP local, segredos de IA e chaves de integrações por usuário em `secure_configs`, com compatibilidade para arquivos `.enc` legados. Ver [[recuperacao-senha]], [[tendencias-saude-financeira]], [[specs/preferencias-abas]]. |
 | `version_check.py` | Consulta a landing page oficial por nova versão, compara com a versão local e mantém cache de 1h. Ver [[alerta-nova-versao]]. |
 | `calendar.py` | Cálculo da aba **Calendário** do Cockpit: contas a receber/pagar atrasadas e vencimentos de renda fixa em 30 e 60 dias. Ver [[specs/cockpit-calendario]]. |
 | `simulations.py` | Validação e projeção comparativa, sem persistência, de cenários hipotéticos do Efeito Borboleta. Ver [[efeito-borboleta]]. |
-| `reports.py` | Relatório por tag e demonstrativo mensal: KPIs, média diária, ranking, distribuição, composição, percentuais, série diária e detalhes, separados por moeda nativa. Reutiliza leitores de lançamentos e `open_debts.py`; autenticação/adaptação HTTP ficam em `app.py`. Evolução de categoria permanece em `categories.py`. Ver [[relatorios]]. |
+| `reports.py` | Relatório por tag agregado no SQLite e demonstrativo mensal com KPIs, média diária, ranking, distribuição, composição, percentuais, série diária e detalhes separados por moeda nativa. Reutiliza `open_debts.py`; autenticação/adaptação HTTP ficam em `app.py`. Evolução de categoria permanece em `categories.py`. Ver [[relatorios]]. |
 
 ---
 
@@ -572,6 +574,12 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 - [[adr/0014-desconcentracao-fachadas-e-roteamento]] — Fachadas compatíveis, roteamento declarativo e módulos internos menores para a fundação v2.
 
 ## Changelog
+
+- `3.80` — 2026-09-01 — Boot e troca mensal do Cockpit passam a carregar somente recortes mensais; Relatórios isolam seu recorte por competência; Cockpit e Tags usam agregações SQL em vez de leitores detalhados.
+
+- `3.79` — 2026-09-01 — Cadastro público passa pela contenção persistente de `auth.py`, com orçamento independente por endereço de origem antes do hash de senha e das escritas de criação. Ver [[specs/seguranca-autenticacao]] v1.6.
+
+- `3.78` — 2026-09-01 — Extraída a fronteira defensiva `financeiro/xlsx_security.py` para validar pacotes XLSX e limitar membros, expansão, compressão e caminhos antes do parsing XML e de qualquer escrita financeira. Ver [[specs/importacao-dados]] v1.6.
 
 - `3.77` — 2026-08-31 — Apresentação de demonstrativo e evolução extraída de `reports-view.js`; fachada preservada como composition root local e módulos possuem ciclo de vida assíncrono independente.
 

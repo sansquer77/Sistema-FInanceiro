@@ -17,6 +17,7 @@ from financeiro import database
 from financeiro.accounts import AccountError, create_checking_account, update_checking_account
 from financeiro.auth import (
     AuthError,
+    create_public_user,
     create_session,
     create_user,
     get_current_user,
@@ -78,6 +79,85 @@ class IsolatedDatabaseTest(unittest.TestCase):
 
 
 class BruteForceProtectionTest(IsolatedDatabaseTest):
+    def test_register_handler_uses_direct_client_address_as_source(self) -> None:
+        handler = object.__new__(app.AppHandler)
+        handler.client_address = ("192.0.2.40", 43210)
+        handler.read_json = mock.Mock(return_value={
+            "name": "Route User",
+            "email": "route@example.com",
+            "password": "correct-password",
+        })
+        handler.send_json = mock.Mock()
+        handler.session_cookie = mock.Mock(return_value={"Set-Cookie": "session=test"})
+
+        with (
+            mock.patch("app.create_public_user", return_value={"id": 1, "email": "route@example.com"}) as create,
+            mock.patch("app.create_session", return_value="test"),
+        ):
+            handler.handle_register()
+
+        self.assertEqual(create.call_args.kwargs["source_key"], "192.0.2.40")
+        handler.send_json.assert_called_once_with(
+            {"user": {"id": 1, "email": "route@example.com"}},
+            headers={"Set-Cookie": "session=test"},
+            status=HTTPStatus.CREATED,
+        )
+
+    def test_public_registration_is_limited_persistently_by_source(self) -> None:
+        for index in range(auth_module.PUBLIC_REGISTRATION_MAX_REQUESTS):
+            user = create_public_user(
+                f"User {index}",
+                f"user-{index}@example.com",
+                "correct-password",
+                source_key="192.0.2.10",
+            )
+            self.assertEqual(user["email"], f"user-{index}@example.com")
+
+        with self.assertRaises(AuthError) as locked:
+            create_public_user(
+                "Blocked User",
+                "blocked@example.com",
+                "correct-password",
+                source_key="192.0.2.10",
+            )
+
+        self.assertEqual(locked.exception.status, HTTPStatus.TOO_MANY_REQUESTS)
+        with database.get_connection() as conn:
+            self.assertIsNone(conn.execute("SELECT id FROM users WHERE email = ?", ("blocked@example.com",)).fetchone())
+
+    def test_public_registration_limit_does_not_block_another_source(self) -> None:
+        for index in range(auth_module.PUBLIC_REGISTRATION_MAX_REQUESTS):
+            create_public_user(
+                f"User {index}",
+                f"source-a-{index}@example.com",
+                "correct-password",
+                source_key="192.0.2.20",
+            )
+
+        user = create_public_user(
+            "Legitimate User",
+            "legitimate@example.com",
+            "correct-password",
+            source_key="192.0.2.21",
+        )
+
+        self.assertEqual(user["email"], "legitimate@example.com")
+
+    def test_invalid_public_registrations_also_consume_the_source_budget(self) -> None:
+        for _ in range(auth_module.PUBLIC_REGISTRATION_MAX_REQUESTS):
+            with self.assertRaises(AuthError) as invalid:
+                create_public_user("", "invalid", "short", source_key="192.0.2.30")
+            self.assertEqual(invalid.exception.status, HTTPStatus.BAD_REQUEST)
+
+        with self.assertRaises(AuthError) as locked:
+            create_public_user(
+                "Valid User",
+                "valid-after-abuse@example.com",
+                "correct-password",
+                source_key="192.0.2.30",
+            )
+        self.assertEqual(locked.exception.status, HTTPStatus.TOO_MANY_REQUESTS)
+
     def test_login_uses_single_connection_on_success(self) -> None:
         create_user("Alice", "alice@example.com", "correct-password")
 

@@ -1,4 +1,5 @@
 import { stateMarkup } from "./dom-utils.js";
+import { renderChart } from "./chart-adapter.js";
 
 export function createReportStatement({
   state, elements, api, renderReports, formatDate, formatMonthLabel,
@@ -133,6 +134,7 @@ export function createReportStatement({
         </footer>
       </article>
     `;
+    renderStatementCharts(sections);
   }
 
   function statementCurrencyReport(section, scope, issuedAt, index) {
@@ -152,11 +154,11 @@ export function createReportStatement({
         <section class="statement-visuals">
           <div class="statement-chart-card statement-donut-card">
             <h3>Distribuição por categoria</h3>
-            ${statementDonutChart(section.distribution, section.total, currency)}
+            ${statementDonutChart(section.distribution, section.total, currency, index)}
           </div>
           <div class="statement-chart-card">
             <h3>Gastos por dia do mês</h3>
-            ${statementDailyBars(section.daily, currency)}
+            ${statementDailyBars(section.daily, currency, index)}
           </div>
         </section>
         <section class="statement-section">
@@ -207,17 +209,10 @@ export function createReportStatement({
     return { label: "Visão Consolidada", currency: "" };
   }
 
-  function statementDonutChart(rows, total, currency) {
+  function statementDonutChart(rows, total, currency, sectionIndex) {
     if (!rows.length || total <= 0) {
       return stateMarkup("Selecione outro período ou escopo para compor o gráfico.", { kind: "empty" });
     }
-    let offset = 25;
-    const segments = rows.map((row, index) => {
-      const dash = Math.max(row.share * 100, 0);
-      const segment = `<circle r="15.9155" cx="18" cy="18" style="stroke:${chartColor(index)}; stroke-dasharray:${dash.toFixed(2)} ${Math.max(100 - dash, 0).toFixed(2)}; stroke-dashoffset:${offset.toFixed(2)}"></circle>`;
-      offset -= dash;
-      return segment;
-    }).join("");
     const legend = rows.map((row, index) => {
       return `
         <li><i style="background:${chartColor(index)}"></i><span>${escapeHtml(row.label)}</span><strong>${formatPercent(row.share)}</strong></li>
@@ -225,32 +220,87 @@ export function createReportStatement({
     }).join("");
     return `
       <div class="statement-donut">
-        <svg viewBox="0 0 36 36" aria-hidden="true">
-          <circle r="15.9155" cx="18" cy="18" class="statement-donut-track"></circle>
-          ${segments}
-        </svg>
-        <div class="statement-donut-center">
-          <span>Total Gasto</span>
-          <strong>${formatMoney(total, currency)}</strong>
-        </div>
+        <div class="statement-distribution-apex" data-statement-distribution-chart="${sectionIndex}" role="img" aria-label="Distribuição das despesas por categoria em ${escapeHtml(currency)}"></div>
       </div>
       <ul class="statement-chart-legend">${legend}</ul>
     `;
   }
 
-  function statementDailyBars(days, currency) {
+  function statementDailyBars(days, currency, sectionIndex) {
+    if (!days.length) {
+      return stateMarkup("Não há gastos diários no período selecionado.", { kind: "empty" });
+    }
     return `
-      <div class="statement-daily-bars">
-        ${days.map((day) => {
-          return `
-            <div>
-              <span style="height:${Math.max(day.ratio * 100, day.ratio > 0 ? 4 : 0).toFixed(2)}%" title="${escapeHtml(formatDate(day.date))}: ${formatMoney(day.amount, currency)}"></span>
-              <small>${Number(day.date.slice(-2))}</small>
-            </div>
-          `;
-        }).join("")}
-      </div>
+      <div class="statement-daily-apex" data-statement-daily-chart="${sectionIndex}" role="img" aria-label="Gastos por dia do mês em ${escapeHtml(currency)}"></div>
     `;
+  }
+
+  function renderStatementCharts(sections) {
+    sections.forEach((section, index) => {
+      renderStatementDistributionChart(section, index);
+      renderStatementDailyChart(section, index);
+    });
+  }
+
+  function renderStatementDistributionChart(section, index) {
+    const element = reportContent.querySelector(`[data-statement-distribution-chart="${index}"]`);
+    if (!element) return;
+    const rows = section.distribution || [];
+    renderChart(element, {
+      chart: { type: "donut", height: 190 },
+      series: rows.map((row) => Number(row.amount || 0)),
+      labels: rows.map((row) => row.label),
+      colors: rows.map((_, colorIndex) => chartColor(colorIndex)),
+      stroke: { width: 2 },
+      legend: { show: false },
+      tooltip: { y: { formatter: (value) => formatMoney(value, section.currency) } },
+      plotOptions: {
+        pie: {
+          donut: {
+            size: "72%",
+            labels: {
+              show: true,
+              name: { show: true, offsetY: -5, formatter: () => "Total gasto" },
+              value: {
+                show: true,
+                offsetY: 5,
+                formatter: () => formatMoney(section.total, section.currency),
+              },
+              total: {
+                show: true,
+                showAlways: true,
+                label: "Total gasto",
+                fontSize: "11px",
+                fontWeight: 800,
+                formatter: () => formatMoney(section.total, section.currency),
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  function renderStatementDailyChart(section, index) {
+    const element = reportContent.querySelector(`[data-statement-daily-chart="${index}"]`);
+    if (!element) return;
+    const days = section.daily || [];
+    renderChart(element, {
+      chart: { type: "bar", height: 190 },
+      series: [{ name: "Gastos", data: days.map((day) => Number(day.amount || 0)) }],
+      colors: [chartColor(0)],
+      plotOptions: { bar: { borderRadius: 3, columnWidth: "68%" } },
+      xaxis: {
+        categories: days.map((day) => Number(day.date.slice(-2))),
+        labels: { rotate: 0, hideOverlappingLabels: true },
+      },
+      yaxis: { labels: { formatter: (value) => formatMoney(value, section.currency) } },
+      tooltip: {
+        x: { formatter: (_, context) => formatDate(days[context.dataPointIndex]?.date || "") },
+        y: { formatter: (value) => formatMoney(value, section.currency) },
+      },
+      legend: { show: false },
+    });
   }
 
   function statementCompositionBySource(composition, currency) {

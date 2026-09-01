@@ -27,12 +27,13 @@ from financeiro.accounts import (
 )
 from financeiro.app_metadata import APP_NAME, APP_VERSION, app_info
 from financeiro.cockpit import cockpit_payload
+from financeiro.cockpit import build_cockpit_summary
 from financeiro.open_debts import get_open_debts
-from financeiro.reports import build_statement_report, build_evolution_presentation
+from financeiro.reports import build_statement_report, build_evolution_presentation, build_report_overview
 from financeiro.auth import (
     clear_user_launches,
+    create_public_user,
     create_session,
-    create_user,
     delete_user_account,
     get_current_user,
     login_user,
@@ -299,7 +300,12 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def handle_register(self) -> None:
         data = self.read_json()
-        user = create_user(data.get("name", ""), data.get("email", ""), data.get("password", ""))
+        user = create_public_user(
+            data.get("name", ""),
+            data.get("email", ""),
+            data.get("password", ""),
+            source_key=self.client_source_key(),
+        )
         token = create_session(user["id"])
         self.send_json({"user": user}, headers=self.session_cookie(token), status=HTTPStatus.CREATED)
 
@@ -397,8 +403,12 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def handle_list_credit_card_transactions(self) -> None:
         user = self.require_user()
+        query = parse_qs(urlsplit(self.path).query)
+        month = (query.get("month") or [None])[0]
         limit, offset = self.pagination_params()
-        transactions = list_credit_card_transactions(user["id"], limit=limit + 1, offset=offset)
+        transactions = list_credit_card_transactions(
+            user["id"], invoice_month=month, limit=limit + 1, offset=offset,
+        )
         self.send_json(
             {
                 "transactions": transactions[:limit],
@@ -471,9 +481,10 @@ class AppHandler(BaseHTTPRequestHandler):
         user = self.require_user()
         query = parse_qs(urlsplit(self.path).query)
         month = (query.get("month") or [date.today().strftime("%Y-%m")])[0]
-        transactions = list_transactions(user["id"], month=month)
-        card_transactions = list_credit_card_transactions(user["id"], invoice_month=month)
-        payload = cockpit_payload([*transactions, *card_transactions])
+        try:
+            payload = build_cockpit_summary(user["id"], month)
+        except ValueError as exc:
+            raise ApiError(str(exc), HTTPStatus.BAD_REQUEST) from None
         projection = build_balance_projection(
             accounts=list_checking_accounts(user["id"]),
             transactions=list_transactions(user["id"]),
@@ -720,6 +731,15 @@ class AppHandler(BaseHTTPRequestHandler):
         query = parse_qs(urlsplit(self.path).query)
         month = (query.get("month") or [None])[0]
         self.send_json(build_tag_report(user["id"], month))
+
+    def handle_report_overview(self) -> None:
+        user = self.require_user()
+        query = parse_qs(urlsplit(self.path).query)
+        month = (query.get("month") or [date.today().strftime("%Y-%m")])[0]
+        try:
+            self.send_json(build_report_overview(user["id"], month))
+        except ValueError as exc:
+            raise ApiError(str(exc), HTTPStatus.BAD_REQUEST) from None
 
     def handle_category_evolution(self) -> None:
         user = self.require_user()

@@ -2,8 +2,8 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 4.22
-atualizado: 2026-08-31
+versao: 4.23
+atualizado: 2026-09-01
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
   - "[[arquitetura]]"
@@ -15,7 +15,7 @@ aliases: ["Modularização Frontend", "ES Modules"]
 # Modularização do Frontend
 
 > [!info] Status
-> **implementado** · área: `frontend` · atualizado em 2026-08-31 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]], [[../qualidade-codigo]]
+> **implementado** · área: `frontend` · atualizado em 2026-09-01 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]], [[../qualidade-codigo]]
 
 ## Problema
 
@@ -212,6 +212,8 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Dado o usuário acessando um desses itens, quando a tela abre, então o título da página usa o mesmo nome desambiguado do menu.
 - Dado um navegador com suporte a View Transitions API, quando o usuário alterna módulos pelo menu lateral, então a troca visual acontece com transição curta e sem bloquear os carregamentos da tela.
 - Dado o dashboard carregado com dados do Cockpit para o mês atual, quando o usuário navega para Cockpit novamente sem alterar mês ou dados, então a UI reaproveita o snapshot em memória e não dispara nova busca completa dos endpoints pesados.
+- Dado o boot ou uma troca de mês do Cockpit, quando os dados auxiliares são atualizados, então somente a competência necessária de contas/cartões é carregada e nenhum endpoint de pagamentos ou histórico integral é percorrido.
+- Dado o usuário alternando o mês de Relatórios, quando a resposta anterior chega depois, então ela é descartada e o estado mantém somente o recorte da competência atual.
 - Dado o usuário abrindo o Portfólio, quando a tela carrega, então a aba **Posição** renderiza primeiro; **Análise**, **Histórico** e rentabilidade detalhada são renderizados/carregados sob demanda no primeiro acesso.
 - Dado o usuário alterando o agrupamento ou colapsando/expandindo grupos no Portfólio, quando a tela já tem dados carregados, então apenas a lista de posições é renderizada novamente.
 - Dado a interface carregando scripts de terceiros não essenciais, quando o HTML é parseado, então esses scripts não bloqueiam a inicialização do app (`async`/`defer` quando aplicável).
@@ -264,6 +266,8 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Alterar regras financeiras, endpoints ou banco.
 
 ## Changelog
+
+- `4.23` — 2026-09-01 — Loader inicial e atualização do Cockpit deixam de baixar históricos integrais; Relatórios passam a carregar e descartar recortes mensais isolados por request id.
 
 - `4.22` — 2026-08-31 — Extração da apresentação de demonstrativo/evolução e coordenação pela fachada compatível de Relatórios.
 

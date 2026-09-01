@@ -2,8 +2,8 @@
 tipo: spec
 area: relatorios
 status: implementado
-versao: 2.20
-atualizado: 2026-08-31
+versao: 2.21
+atualizado: 2026-09-01
 relacionados:
   - "[[lancamentos]]"
   - "[[cartoes]]"
@@ -17,7 +17,7 @@ aliases: ["Relatórios", "Cockpit"]
 # Relatórios
 
 > [!info] Status
-> **implementado** · área: `relatorios` · atualizado em 2026-08-31 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[limites-gastos]]
+> **implementado** · área: `relatorios` · atualizado em 2026-09-01 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[limites-gastos]]
 
 ## Problema
 
@@ -56,6 +56,7 @@ Qualquer usuário autenticado localmente que queira analisar seus gastos e recei
 - O relatório de subcategorias agrupa por `Categoria / Subcategoria`.
 - O relatório de tags considera lançamentos de contas e cartões com tag, mesmo quando não houver subcategoria.
 - O relatório de tags agrupa por tag e exibe, para cada uma, quatro totais separados por moeda: **Receitas**, **Despesas**, **Saldo** (receitas menos despesas) e **Investimentos**.
+- O relatório de tags consolida `SUM` e `COUNT` por tag, moeda e tipo diretamente no SQLite; não materializa lançamentos detalhados para executar a agregação.
 - Um lançamento com múltiplas tags contribui com o mesmo valor para o total de cada uma das tags.
 - Investimentos e aportes aparecem na linha própria de Investimentos do relatório de tags e não são misturados com despesas.
 - Transferências, câmbio e pagamentos de fatura não entram no relatório de tags.
@@ -72,6 +73,7 @@ Qualquer usuário autenticado localmente que queira analisar seus gastos e recei
 - O seletor de mês do Cockpit deve seguir o mesmo padrão visual dos seletores mensais de Lançamentos, com botões compactos por ícone para mês anterior, mês atual e próximo mês.
 - Rótulos de seletores mensais devem usar o formato compacto `MM/AAAA` para manter largura visual estável.
 - Ao trocar o mês do Cockpit, a aba **Situação do mês** deve recalcular KPIs, maiores receitas/despesas, limites, planejamento e totais por moeda com base no mês selecionado. Parcelas em aberto representam o estado atual de liquidação, não uma fotografia histórica; apenas o componente mensal usa a competência selecionada.
+- KPIs, rankings e planejamento do Cockpit são agregados no SQLite por mês, tipo, categoria e moeda, sem transportar linhas detalhadas até o agregador Python ou recarregar todo o histórico no navegador.
 - O mês inicial do Cockpit deve ser o mês corrente.
 - A leitura do Cockpit para meses passados deve funcionar como fotografia analítica do período, sem esconder despesas de cartão apenas porque a fatura foi paga posteriormente.
 - Faturas de cartão devem impactar o Cockpit pela competência da fatura (`invoice_month`) do mês selecionado, preservando o valor da fatura daquele mês tanto em leituras previstas quanto conciliadas quando aplicável.
@@ -107,6 +109,8 @@ Qualquer usuário autenticado localmente que queira analisar seus gastos e recei
 | Método | Rota |
 |---|---|
 | `GET` | `/api/cockpit?month=AAAA-MM` |
+| `GET` | `/api/reports/overview?month=AAAA-MM` |
+| `GET` | `/api/reports/tags?month=AAAA-MM` |
 | `GET` | `/api/reports/open-debts?month=AAAA-MM&account_ids=1,2&card_ids=3&currency=BRL` |
 | `GET` | `/api/reports/statement?month=AAAA-MM&account_ids=1,2&card_ids=3&currency=BRL` |
 | `GET` | `/api/reports/category-evolution?category_id={id}&subcategory_id={id}&period={periodo}` |
@@ -228,6 +232,8 @@ Cobertura: `tests/test_statement_report.py` e `tests/frontend_open_debts.test.mj
 ## Changelog
 
 <!-- Validação automatizada desta etapa: tests/test_evolution_presentation.py e tests/frontend_evolution.test.mjs. Validação visual no Safari não executada. -->
+
+- `2.21` — 2026-09-01 — Cockpit e relatório de tags passam a usar `SUM`, `COUNT` e `GROUP BY` no SQLite; o navegador carrega somente recortes mensais e Relatórios mantém cache isolado por competência.
 
 - `2.20` — 2026-08-31 — Total, tendência e SMA da evolução no Python; erro explícito substitui recálculo local, com descarte do modelo e gráfico anteriores.
 

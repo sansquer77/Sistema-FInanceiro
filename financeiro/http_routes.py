@@ -41,6 +41,7 @@ EXACT_ROUTES: dict[str, dict[str, str]] = {
         "/api/portfolio/returns": "handle_portfolio_returns",
         "/api/portfolio/fund-quote": "handle_portfolio_fund_quote",
         "/api/reports/tags": "handle_tag_report",
+        "/api/reports/overview": "handle_report_overview",
         "/api/reports/category-evolution": "handle_category_evolution",
         "/api/operation-logs": "handle_list_operation_logs",
     },

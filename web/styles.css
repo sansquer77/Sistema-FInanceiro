@@ -4776,42 +4776,24 @@ form[aria-busy="true"] .form-actions {
 }
 
 .statement-donut {
-  position: relative;
-  width: min(170px, 100%);
+  width: min(220px, 100%);
   margin: 0 auto;
 }
 
-.statement-donut svg {
+.statement-distribution-apex,
+.statement-daily-apex {
+  min-width: 0;
   width: 100%;
-  transform: rotate(-90deg);
+  height: 190px;
 }
 
-.statement-donut circle {
-  fill: none;
-  stroke-width: 4;
+.statement-distribution-apex .apexcharts-datalabel-label {
+  font-size: 10px !important;
 }
 
-.statement-donut-track {
-  stroke: var(--progress-track);
-}
-
-.statement-donut-center {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-content: center;
-  text-align: center;
-}
-
-.statement-donut-center span {
-  color: var(--muted);
-  font-size: 0.62rem;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-
-.statement-donut-center strong {
-  font-size: 0.82rem;
+.statement-distribution-apex .apexcharts-datalabel-value {
+  font-size: 11px !important;
+  font-variant-numeric: tabular-nums;
 }
 
 .statement-chart-legend {
@@ -4836,38 +4818,6 @@ form[aria-busy="true"] .form-actions {
   width: 10px;
   height: 10px;
   border-radius: 999px;
-}
-
-.statement-daily-bars {
-  display: grid;
-  grid-template-columns: repeat(31, minmax(4px, 1fr));
-  align-items: end;
-  gap: 3px;
-  min-height: 165px;
-  padding-top: 8px;
-}
-
-.statement-daily-bars > div {
-  display: grid;
-  grid-template-rows: minmax(120px, 1fr) auto;
-  align-items: end;
-  gap: 3px;
-  height: 100%;
-}
-
-.statement-daily-bars span {
-  display: block;
-  min-height: 0;
-  border-radius: 4px 4px 0 0;
-  background: var(--accent-dark);
-  opacity: 0.78;
-}
-
-.statement-daily-bars small {
-  color: var(--muted);
-  font-size: 0.52rem;
-  font-weight: 800;
-  text-align: center;
 }
 
 .statement-section {
@@ -4909,8 +4859,7 @@ form[aria-busy="true"] .form-actions {
 .monthly-statement .money-cell,
 .monthly-statement .money-stack-line,
 .monthly-statement .money-stack-line em,
-.monthly-statement .statement-chart-legend strong,
-.monthly-statement .statement-donut-center strong {
+.monthly-statement .statement-chart-legend strong {
   font-size: inherit;
   font-weight: 700;
 }
@@ -8191,71 +8140,11 @@ form[aria-busy="true"] .form-actions {
   border-top-color: var(--panel);
 }
 
-.trends-chart svg,
 .trends-apex-chart {
   width: 100%;
   min-width: 520px;
   min-height: 260px;
   color: var(--text);
-}
-
-.trends-axis-y text,
-.trends-axis-x text {
-  fill: var(--muted);
-  font-weight: 750;
-}
-
-.trends-zero-line {
-  stroke: currentColor;
-  stroke-opacity: 0.28;
-  stroke-width: 1.2;
-}
-
-.trends-month-shading rect {
-  opacity: 0.15;
-}
-
-.trends-month-shading rect.surplus {
-  fill: var(--positive);
-}
-
-.trends-month-shading rect.deficit {
-  fill: var(--danger);
-}
-
-.trends-bars rect.income {
-  fill: var(--positive);
-}
-
-.trends-bars rect.expense {
-  fill: var(--danger);
-}
-
-.trends-bars rect,
-.trends-balance-line polyline,
-.trends-balance-line circle {
-  transition: opacity 0.16s ease;
-}
-
-.trends-chart.mixed svg:hover .trends-bars rect,
-.trends-chart.mixed svg:hover .trends-balance-line polyline,
-.trends-chart.mixed svg:hover .trends-balance-line circle {
-  opacity: 0.88;
-}
-
-.trends-month-group:hover rect,
-.trends-balance-line circle:hover {
-  opacity: 1;
-}
-
-.trends-balance-line polyline,
-.trends-balance-line circle {
-  stroke: var(--accent);
-}
-
-.trends-balance-line circle {
-  fill: var(--panel);
-  stroke-width: 2.2;
 }
 
 .trends-chart-legend {
@@ -8730,8 +8619,7 @@ form[aria-busy="true"] .form-actions {
   body:has(.statement-print-area) .monthly-statement .money-cell,
   body:has(.statement-print-area) .monthly-statement .money-stack-line,
   body:has(.statement-print-area) .monthly-statement .money-stack-line em,
-  body:has(.statement-print-area) .monthly-statement .statement-chart-legend strong,
-  body:has(.statement-print-area) .monthly-statement .statement-donut-center strong {
+  body:has(.statement-print-area) .monthly-statement .statement-chart-legend strong {
     font-size: inherit;
     font-weight: 700;
   }
@@ -8741,12 +8629,19 @@ form[aria-busy="true"] .form-actions {
   }
 
   body:has(.statement-print-area) .statement-donut {
-    width: 130px;
+    width: 160px;
   }
 
-  body:has(.statement-print-area) .statement-daily-bars {
-    min-height: 115px;
-    gap: 2px;
+  body:has(.statement-print-area) .statement-distribution-apex,
+  body:has(.statement-print-area) .statement-daily-apex {
+    height: 145px;
+  }
+
+  body:has(.statement-print-area) .statement-distribution-apex .apexcharts-canvas,
+  body:has(.statement-print-area) .statement-distribution-apex .apexcharts-svg,
+  body:has(.statement-print-area) .statement-daily-apex .apexcharts-canvas,
+  body:has(.statement-print-area) .statement-daily-apex .apexcharts-svg {
+    height: 145px !important;
   }
 
   body:has(.statement-print-area) .statement-table th,

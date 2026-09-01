@@ -14,6 +14,8 @@ from financeiro.emailer import send_password_reset_email
 RESET_TOKEN_MINUTES = 15
 LOGIN_MAX_FAILURES = 5
 LOGIN_LOCK_MINUTES = 15
+PUBLIC_REGISTRATION_MAX_REQUESTS = 5
+PUBLIC_REGISTRATION_LOCK_MINUTES = 60
 PASSWORD_RESET_MAX_REQUESTS = 3
 PASSWORD_RESET_LOCK_MINUTES = 30
 PASSWORD_RESET_CONFIRM_MAX_FAILURES = 5
@@ -47,6 +49,28 @@ def create_user(name: str, email: str, password: str) -> dict:
         if "UNIQUE constraint failed" in str(exc):
             raise AuthError("Ja existe um usuario com este email.", HTTPStatus.CONFLICT) from exc
         raise
+
+
+def create_public_user(name: str, email: str, password: str, source_key: str | None) -> dict:
+    # spec: seguranca-autenticacao v1.6 — contenção persistente do cadastro público
+    identifier = f"register:source:{source_key or 'unknown'}"
+    with get_connection() as conn:
+        begin_immediate(conn)
+        ensure_not_locked(
+            conn,
+            "register",
+            [identifier],
+            PUBLIC_REGISTRATION_MAX_REQUESTS,
+            PUBLIC_REGISTRATION_LOCK_MINUTES,
+        )
+        record_auth_failure(
+            conn,
+            "register",
+            [identifier],
+            PUBLIC_REGISTRATION_MAX_REQUESTS,
+            PUBLIC_REGISTRATION_LOCK_MINUTES,
+        )
+    return create_user(name, email, password)
 
 
 def login_user(email: str, password: str, source_key: str | None = None) -> dict:

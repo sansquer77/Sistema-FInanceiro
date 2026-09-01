@@ -2,8 +2,8 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 3.33
-atualizado: 2026-08-31
+versao: 3.34
+atualizado: 2026-09-01
 relacionados:
   - "[[contas-correntes]]"
   - "[[categorias-tags-gestao]]"
@@ -17,7 +17,7 @@ aliases: ["Lançamentos", "Transações"]
 # Lançamentos
 
 > [!info] Status
-> **implementado** · área: `lancamentos` · atualizado em 2026-08-31 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]]
+> **implementado** · área: `lancamentos` · atualizado em 2026-09-01 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]]
 
 ## Problema
 
@@ -123,7 +123,7 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 - No formulário de investimento de Lançamentos de Contas, aportes de Renda Fixa ou Poupança devem exibir marcador compacto `Usar este aporte como reserva de emergência`, persistindo essa decisão na operação de investimento. A marcação não aparece nem é enviada para outros tipos de ativo.
 - O formulário de investimento deve se adaptar ao ativo selecionado para reduzir dúvidas: quando o aporte for Poupança, campos de quantidade, preço unitário, renda fixa, CNPJ, corretagem, emolumentos, impostos e outros custos ficam ocultos/desabilitados, pois não são aplicáveis.
 - No formulário de investimento em **Fundos de Investimentos** ou **Previdência Privada**, o usuário pode informar CNPJ opcionalmente e buscar a cota pela **Mais Retorno**; a busca preenche **Preço unitário** como assistência editável e não salva dados automaticamente.
-- A listagem completa de lançamentos (`GET /api/transactions`) é paginada por `limit` (padrão 2000, máximo 5000) e `offset`, respondendo `has_more`; o frontend percorre as páginas até receber uma página menor que `limit`.
+- A listagem (`GET /api/transactions`) é paginada por `limit` (padrão 2000, máximo 5000) e `offset`, respondendo `has_more`; a carga inicial e os Relatórios solicitam apenas a competência mensal necessária, enquanto fluxos explicitamente históricos podem percorrer páginas sob demanda.
 - Com `month` e `account_id` juntos, a listagem retorna todo o histórico da conta até o fim do mês informado (sem limite inferior de data) — o extrato usa essa fatia para calcular saldos previsto/conciliado a partir do saldo inicial da conta; o intervalo estrito do mês (`>= primeira data do mês`) aplica-se apenas à listagem sem conta.
 
 ## API e dados
@@ -224,6 +224,8 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - [x] Testar sucesso, falha, concorrência e contratos de apresentação aplicáveis.
 
 ## Changelog
+
+- `3.34` — 2026-09-01 — Carga inicial deixa de percorrer todo o histórico e mantém apenas o recorte mensal necessário; Relatórios carregam competência própria sem reutilizar um histórico global integral.
 
 - `3.33` — 2026-08-31 — Correção visual no campo de busca do Extrato de Contas: remove o ícone nativo duplicado do `input[type="search"]` e centraliza o botão explícito de limpar, evitando dois ícones "×" desalinhados.
 - `3.32` — 2026-08-31 — Complemento implementado: edição com resposta imediata, atualização auxiliar desacoplada e projeções sem releitura integral a cada data. Testes automatizados de apresentação, concorrência e equivalência financeira; percepção de fluidez no Safari ainda requer validação no ambiente do usuário.
