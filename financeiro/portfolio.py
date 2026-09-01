@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections import defaultdict, OrderedDict
+from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP

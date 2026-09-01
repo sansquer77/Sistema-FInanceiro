@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 import json
-import os
 import ssl
 from urllib.parse import quote
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from financeiro import database
 from financeiro.secure_config import (
     SecureConfigError,
     ai_settings_status,

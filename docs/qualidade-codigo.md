@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 1.13
+versao: 1.14
 atualizado: 2026-08-31
 relacionados:
   - "[[arquitetura]]"
@@ -17,7 +17,7 @@ aliases: ["Qualidade de Código", "Padrões de Qualidade", "Convenções de Cód
 # Qualidade de Código
 
 > [!info] Status
-> **implementado** · área: `meta` · versão: `1.13` · atualizado em 2026-08-31 · relacionados: [[arquitetura]], [[sdd]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]], [[adr/0003-sqlite-fonte-de-verdade]]
+> **implementado** · área: `meta` · versão: `1.14` · atualizado em 2026-08-31 · relacionados: [[arquitetura]], [[sdd]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]], [[adr/0003-sqlite-fonte-de-verdade]]
 
 ## Objetivo
 
@@ -66,6 +66,21 @@ Tamanho de arquivo não é uma regra rígida — é um sinal para revisar se há
 - Ao abrir uma spec ou PR que toque um dos três diretórios do escopo, checar as regras acima antes de considerar a mudança pronta — não é necessário um documento à parte por PR, só a revisão consciente contra esta lista.
 - Divergência entre este documento e o código real é tratada como o modelo *spec-anchored* de [[sdd]]: investiga-se a causa antes de presumir qual dos dois está errado, e o lado desatualizado é corrigido.
 
+### Remoção de código morto com evidência
+
+Uma função, import, atribuição, wrapper, asset ou caminho de compatibilidade só pode ser removido depois de registrar evidência cumulativa — resultado de ferramenta isolada não basta:
+
+1. executar a suíte Python e os testes frontend antes da alteração, registrando inclusive falhas preexistentes;
+2. comprovar ausência de referências estáticas no código, considerando imports/reexports públicos e acessos indiretos conhecidos;
+3. buscar o símbolo ou artefato nos contratos de frontend (`tests/test_frontend_contracts.py` e `tests/frontend_*.test.mjs`);
+4. identificar teste de caracterização ou cobertura do fluxo preservado; se não existir, criá-lo antes da remoção;
+5. buscar o candidato em `docs/`, scripts e árvores de distribuição/empacotamento, distinguindo referência histórica de consumidor operacional;
+6. aplicar a menor remoção possível e executar novamente as mesmas suítes, além de verificação estática e `git diff --check`.
+
+Reexports de fachada, aliases de payload, migrações e caminhos explicitamente documentados como compatibilidade não são código morto apenas porque o próprio módulo não os chama. Na dúvida, o candidato permanece até haver evidência de seu contrato externo.
+
+Primeira aplicação desta política: a análise estática apontou reexports não usados internamente em `consultor.py`, mas eles foram preservados como fachada compatível. Foram aceitos somente quatro imports sem uso (`os` e `database` em `ai_summary.py`, `timedelta` em `version_check.py`, `defaultdict` em `portfolio.py`) e uma atribuição imediatamente substituída em `transactions.py`. As buscas não encontraram esses imports/atribuição em contratos frontend nem na árvore de distribuição; os módulos e fluxos permanecem cobertos pelas suítes de Tendências/IA, alerta de versão, Portfólio e lançamentos.
+
 ### Ativação dos limites e da validação automatizada
 
 Os limites numéricos da seção "Sinais de alerta" são verificados pelo teste `tests/test_code_quality.py`. O teste permite explicitamente os módulos grandes já revisados e falha quando surge um novo módulo acima do limite ou quando um módulo revisado cresce além do tamanho registrado. As extrações necessárias estão documentadas em [[specs/desconcentracao-arquitetura-v2]] e [[specs/frontend-modularizacao]].
@@ -82,6 +97,8 @@ Os limites numéricos da seção "Sinais de alerta" são verificados pelo teste 
 - Cobertura de teste em si (tratada por [[sdd]], seção "Fluxo", passo 7).
 
 ## Changelog
+
+- `1.14` — 2026-08-31 — Instituído gate cumulativo para remoção de código morto e registrada a primeira limpeza evidenciada de imports/atribuição sem consumidores; reexports de compatibilidade do Consultor foram explicitamente preservados.
 
 - `1.13` — 2026-08-31 — Sincronizados callout e versão; corrigida referência de tamanho de Cartões e removida sua exceção no gate. Portfólio revisado em 2.759 linhas após isolamento da leitura transacional.
 

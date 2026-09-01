@@ -266,7 +266,6 @@ def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
             ensure_transfer_accounts(source, destination)
             normalize_transfer_amounts(transaction, source, destination)
         exchange_rate_micros = resolve_exchange_rate_micros(source["currency"], transaction["date"], transaction["exchange_rate"])
-        amount_brl_cents = convert_to_brl_cents(transaction["amount_cents"], exchange_rate_micros)
         category_id, subcategory_id = resolve_transaction_category(conn, user_id, transaction, destination)
         tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
         series_id = existing["series_id"]

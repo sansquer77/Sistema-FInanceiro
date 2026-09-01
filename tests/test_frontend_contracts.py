@@ -120,7 +120,6 @@ class FrontendModuleContractTest(unittest.TestCase):
         virtualizer = (MODULE_ROOT / "virtual-list.js").read_text(encoding="utf-8")
         transactions = (MODULE_ROOT / "transactions-view.js").read_text(encoding="utf-8")
         reports = (MODULE_ROOT / "reports-view.js").read_text(encoding="utf-8")
-        evolution = (MODULE_ROOT / "report-evolution.js").read_text(encoding="utf-8")
         portfolio = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
 
         self.assertIn("DEFAULT_OVERSCAN = 5", virtualizer)
@@ -163,7 +162,6 @@ class FrontendModuleContractTest(unittest.TestCase):
 
     def test_apexcharts_overlays_races_and_history_bounds_are_guarded(self) -> None:
         portfolio = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
-        reports = (MODULE_ROOT / "reports-view.js").read_text(encoding="utf-8")
         evolution = (MODULE_ROOT / "report-evolution.js").read_text(encoding="utf-8")
         adapter = (MODULE_ROOT / "chart-adapter.js").read_text(encoding="utf-8")
         cards = (MODULE_ROOT / "cards-view.js").read_text(encoding="utf-8")

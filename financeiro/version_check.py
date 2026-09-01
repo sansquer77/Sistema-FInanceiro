@@ -7,7 +7,7 @@ import ssl
 import threading
 import urllib.error
 import urllib.request
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any
 
 from financeiro.app_metadata import APP_VERSION
