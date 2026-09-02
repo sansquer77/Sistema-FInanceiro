@@ -16,6 +16,7 @@ class HttpRoutesTest(unittest.TestCase):
     def test_exact_route_is_resolved(self) -> None:
         self.assertEqual(resolve_route("GET", "/api/portfolio"), "handle_portfolio")
         self.assertEqual(resolve_route("GET", "/api/reports/overview"), "handle_report_overview")
+        self.assertEqual(resolve_route("GET", "/api/global-search"), "handle_global_search")
 
     def test_more_specific_pattern_wins(self) -> None:
         self.assertEqual(resolve_route("PUT", "/api/transactions/42/reconciliation"), "handle_reconcile_transaction")

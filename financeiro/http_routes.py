@@ -27,6 +27,7 @@ EXACT_ROUTES: dict[str, dict[str, str]] = {
         "/api/categories": "handle_list_categories",
         "/api/tags": "handle_list_tags",
         "/api/spending-limits": "handle_list_spending_limits",
+        "/api/global-search": "handle_global_search",
         "/api/cockpit": "handle_cockpit",
         "/api/cockpit/calendar": "handle_cockpit_calendar",
         "/api/financial-health-score": "handle_financial_health_score",

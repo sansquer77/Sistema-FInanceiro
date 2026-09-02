@@ -2,8 +2,8 @@
 tipo: spec
 area: limites
 status: implementado
-versao: 1.2
-atualizado: 2026-08-02
+versao: 1.3
+atualizado: 2026-09-01
 relacionados:
   - "[[categorias-tags-gestao]]"
   - "[[cartoes]]"
@@ -16,7 +16,7 @@ aliases: ["Limites de Gastos", "Budgets", "Metas"]
 # Limites de Gastos
 
 > [!info] Status
-> **implementado** · área: `limites` · atualizado em 2026-08-02 · relacionados: [[categorias-tags-gestao]], [[cartoes]], [[relatorios]]
+> **implementado** · versão: `1.3` · área: `limites` · atualizado em 2026-09-01 · relacionados: [[categorias-tags-gestao]], [[cartoes]], [[relatorios]]
 
 ## Problema
 
@@ -52,6 +52,7 @@ Qualquer usuário autenticado localmente que queira controlar seu orçamento de 
 - O consumo considera despesas em contas pelo mês da data do lançamento.
 - O consumo considera despesas em cartões pela fatura aberta do mês (`invoice_month`), mesmo quando a data da compra pertence ao mês anterior. Ver [[cartoes]].
 - Pagamentos de fatura não removem o consumo do limite — o limite mede competência/gasto da fatura, não a quitação.
+- O consumo mensal é agregado no SQLite por categoria e subcategoria e acompanha cada limite retornado pela API. A interface não depende da fatia de lançamentos mantida por Cockpit, Extrato ou Cartões.
 - É permitida apenas uma única definição por mês inicial (`AAAA-MM`), categoria e subcategoria (restrição UNIQUE no banco).
 - O limite deve ser um valor monetário positivo maior que zero.
 - O seletor mensal da tela de Limites deve usar botões compactos por ícone e rótulo no formato `MM/AAAA`.
@@ -77,9 +78,11 @@ Tabelas: `spending_limits`, `categories`, `subcategories`.
 - Dado despesas de cartão na fatura aberta do mês, quando computadas, impactam o limite da categoria/subcategoria correspondente.
 - Dado um limite ultrapassado no mês corrente, quando exibido, o menu de Limites e o Cockpit exibem alertas visuais.
 - Dado o usuário visualizando o seletor mensal de Limites, quando o mês é exibido, então o rótulo usa o formato `MM/AAAA`.
+- Dado o usuário navegando entre competências de Limites, quando o mês muda, então cada limite apresenta o consumo daquele mês mesmo que nenhuma lista detalhada dessa competência esteja carregada no navegador.
 
 ## Changelog
 
+- `1.3` — 2026-09-01 — Consumo por limite passa a ser agregado no SQLite para a competência consultada, removendo a dependência do estado mensal compartilhado do frontend.
 - `1.2` — 2026-08-02 — Seletor mensal de Limites padronizado com botões compactos por ícone e rótulo `MM/AAAA`.
 - `1.1` — 2026-07-08 — Limites passam a ser documentados como recorrentes, com `month` representando início de vigência.
 - `1.0` — 2026-06-29 — Frontmatter e critérios formalizados.

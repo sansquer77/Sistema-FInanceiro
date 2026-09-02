@@ -464,7 +464,7 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn(".instructions-toolbar {\n  position: sticky;\n  top: 82px", styles)
         self.assertIn(".transaction-day-heading {\n  position: sticky;\n  top: 82px", styles)
 
-    def test_global_search_is_local_keyboard_accessible_and_preserves_view_context(self) -> None:
+    def test_global_search_is_bounded_keyboard_accessible_and_preserves_view_context(self) -> None:
         index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
         app_source = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
         search_source = (MODULE_ROOT / "global-search.js").read_text(encoding="utf-8")
@@ -474,11 +474,13 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn('role="listbox"', index)
         self.assertIn('event.key === "/"', search_source)
         self.assertIn('!trigger.closest("[hidden]")', search_source)
-        self.assertIn("state.transactions || []", search_source)
-        self.assertIn("state.cardTransactions || []", search_source)
+        self.assertNotIn("state.transactions || []", search_source)
+        self.assertNotIn("state.cardTransactions || []", search_source)
         self.assertIn("state.portfolio?.positions || []", search_source)
         self.assertNotIn("fetch(", search_source)
-        self.assertNotIn("api(", search_source)
+        self.assertIn("/api/global-search?", search_source)
+        self.assertIn("requestRevision", search_source)
+        self.assertIn("setTimeout(async () =>", search_source)
         self.assertIn("const viewScrollPositions = new Map()", app_source)
         self.assertIn("viewScrollPositions.set(previousView, window.scrollY)", app_source)
         self.assertIn("window.scrollTo({ top: viewScrollPositions.get(view) || 0", app_source)

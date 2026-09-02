@@ -29,6 +29,7 @@ from financeiro.app_metadata import APP_NAME, APP_VERSION, app_info
 from financeiro.cockpit import cockpit_payload
 from financeiro.cockpit import build_cockpit_summary
 from financeiro.open_debts import get_open_debts
+from financeiro.global_search import GlobalSearchError, search_global
 from financeiro.reports import build_statement_report, build_evolution_presentation, build_report_overview
 from financeiro.auth import (
     clear_user_launches,
@@ -121,6 +122,7 @@ from financeiro.spending_limits import (
     create_spending_limit,
     delete_spending_limit,
     list_spending_limits,
+    list_spending_limits_with_consumption,
     update_spending_limit,
 )
 from financeiro.transactions import (
@@ -764,7 +766,20 @@ class AppHandler(BaseHTTPRequestHandler):
         user = self.require_user()
         query = parse_qs(urlsplit(self.path).query)
         month = (query.get("month") or [None])[0]
-        self.send_json({"limits": list_spending_limits(user["id"], month)})
+        self.send_json({"limits": list_spending_limits_with_consumption(user["id"], month)})
+
+    def handle_global_search(self) -> None:
+        user = self.require_user()
+        query = parse_qs(urlsplit(self.path).query)
+        term = (query.get("q") or [""])[0]
+        try:
+            limit = int((query.get("limit") or ["24"])[0])
+            offset = int((query.get("offset") or ["0"])[0])
+            self.send_json(search_global(user["id"], term, limit=limit, offset=offset))
+        except (GlobalSearchError, ValueError) as exc:
+            message = exc.message if isinstance(exc, GlobalSearchError) else "Paginação inválida."
+            status = exc.status if isinstance(exc, GlobalSearchError) else HTTPStatus.BAD_REQUEST
+            raise ApiError(message, status) from None
 
     def handle_list_operation_logs(self) -> None:
         user = self.require_user()

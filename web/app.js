@@ -575,6 +575,7 @@ registerGlobalSearch({
   viewTitles,
   normalizeSearch,
   escapeHtml,
+  api,
   onNavigate: showModule,
 });
 

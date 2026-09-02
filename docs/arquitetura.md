@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.81
+versao: 3.82
 atualizado: 2026-09-01
 relacionados:
   - "[[requisitos]]"
@@ -219,6 +219,14 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `PUT` | `/api/spending-limits/{id}` |
 | `DELETE` | `/api/spending-limits/{id}` |
 
+`GET /api/spending-limits?month=AAAA-MM` inclui o consumo da competência agregado por categoria/subcategoria no SQLite, sem depender das listas detalhadas do frontend.
+
+#### Rota — Busca Global → [[specs/frontend-modularizacao]]
+
+| Método | Rota |
+|---|---|
+| `GET` | `/api/global-search?q={termo}&limit={1-50}&offset={n}` |
+
 #### Rotas — Simulações → [[efeito-borboleta]]
 
 | Método | Rota |
@@ -325,7 +333,8 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | `categories.py` | Categorias, subcategorias, tags e bloqueios de exclusão. Ver [[categorias-tags-gestao]]. |
 | `classification_suggestions.py` | Normalização de descrições e sugestão local por histórico exato indexado. Ver [[classificacao-assistida]]. |
 | `credit_cards.py` | Cartões, faturas mensais, transações e pagamentos. Ver [[cartoes]]. |
-| `spending_limits.py` | Metas e orçamentos mensais. Ver [[limites-gastos]]. |
+| `spending_limits.py` | Metas recorrentes e consumo mensal agregado por categoria/subcategoria, incluindo competência de faturas e exclusão do pagamento agregado. Ver [[limites-gastos]]. |
+| `global_search.py` | Busca histórica autenticada e paginada em lançamentos de contas/cartões, isolada por usuário e executada sob demanda pela Command Palette. |
 | `http_routes.py` | Tabela declarativa e resolução de rotas, independente do transporte HTTP. Ver [[specs/desconcentracao-arquitetura-v2]]. |
 | `cockpit.py` | Agregações de domínio do resumo mensal do Cockpit com `SUM`, `COUNT` e `GROUP BY` no SQLite, fora do adaptador HTTP e sem materializar lançamentos detalhados. |
 | `open_debts.py` | Leitura consistente e agregação de parcelas em aberto, por usuário e moeda, compartilhada entre `/api/cockpit` (`open_debts`) e Relatórios. Conciliação liquida parcela de conta; registro de pagamento encerra fatura. Inclui vencidas, sem reconstrução histórica, rede ou escrita. |
@@ -575,6 +584,8 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 - [[adr/0014-desconcentracao-fachadas-e-roteamento]] — Fachadas compatíveis, roteamento declarativo e módulos internos menores para a fundação v2.
 
 ## Changelog
+
+- `3.82` — 2026-09-01 — Limites recebem consumo mensal agregado no SQLite e a Busca Global passa a consultar lançamentos históricos sob demanda pela nova rota paginada `/api/global-search`, sem restaurar históricos no estado global.
 
 - `3.81` — 2026-09-01 — `/api/cockpit` deixa de montar a projeção detalhada a partir de três históricos completos; `currency_totals` passa a vir de agregações SQLite específicas, preservando o contrato financeiro e mantendo a projeção completa restrita ao Extrato.
 

@@ -1,12 +1,14 @@
 import { stateMarkup } from "./dom-utils.js";
 
-export function registerGlobalSearch({ state, elements, viewTitles, normalizeSearch, escapeHtml, onNavigate }) {
+export function registerGlobalSearch({ state, elements, viewTitles, normalizeSearch, escapeHtml, api, onNavigate }) {
   const { trigger, dialog, input, results, closeButton } = elements;
   let visibleItems = [];
+  let requestRevision = 0;
+  let searchTimer = null;
 
   trigger.addEventListener("click", open);
   closeButton.addEventListener("click", close);
-  input.addEventListener("input", render);
+  input.addEventListener("input", scheduleRender);
   input.addEventListener("keydown", handleInputKeydown);
   results.addEventListener("click", handleResultClick);
   results.addEventListener("keydown", handleResultsKeydown);
@@ -23,18 +25,40 @@ export function registerGlobalSearch({ state, elements, viewTitles, normalizeSea
   function open() {
     if (!dialog.open) dialog.showModal();
     input.value = "";
-    render();
+    scheduleRender();
     queueMicrotask(() => input.focus());
   }
 
   function close() {
+    requestRevision += 1;
+    clearTimeout(searchTimer);
     if (dialog.open) dialog.close();
     trigger.focus();
   }
 
-  function render() {
+  function scheduleRender() {
     const query = normalizeSearch(input.value);
-    visibleItems = searchItems().filter((item) => !query || normalizeSearch(`${item.title} ${item.meta}`).includes(query)).slice(0, 24);
+    const revision = ++requestRevision;
+    clearTimeout(searchTimer);
+    render(query, [], query.length >= 2);
+    if (query.length < 2) return;
+    searchTimer = setTimeout(async () => {
+      try {
+        const response = await api(`/api/global-search?q=${encodeURIComponent(input.value.trim())}&limit=24`);
+        if (revision !== requestRevision || !dialog.open) return;
+        render(query, remoteSearchItems(response.results || []), false);
+      } catch (error) {
+        if (revision !== requestRevision || !dialog.open) return;
+        render(query, [], false, error.message);
+      }
+    }, 180);
+  }
+
+  function render(query, remoteItems = [], loading = false, error = "") {
+    const candidates = query ? [...remoteItems, ...searchItems()] : searchItems();
+    visibleItems = candidates
+      .filter((item) => !query || normalizeSearch(`${item.title} ${item.meta}`).includes(query))
+      .slice(0, 24);
     results.innerHTML = visibleItems.length
       ? visibleItems.map((item, index) => `
           <button class="global-search-result" type="button" role="option" data-global-search-index="${index}">
@@ -42,7 +66,10 @@ export function registerGlobalSearch({ state, elements, viewTitles, normalizeSea
             <em>${escapeHtml(item.section)}</em>
           </button>
         `).join("")
-      : stateMarkup("Revise o termo ou carregue o módulo que contém o dado procurado.", { kind: "empty" });
+      : stateMarkup(
+          error || (loading ? "Buscando em todo o histórico…" : "Revise o termo procurado."),
+          { kind: error ? "error" : loading ? "loading" : "empty" },
+        );
   }
 
   function handleInputKeydown(event) {
@@ -93,27 +120,6 @@ export function registerGlobalSearch({ state, elements, viewTitles, normalizeSea
       meta: `${card.issuer || "Cartão"} · ${card.currency || "BRL"}`,
       section: "Cartão",
     }));
-    const transactions = (state.transactions || []).map((transaction) => ({
-      view: "transactions",
-      title: transaction.description || "Lançamento",
-      meta: `${transaction.date || ""} · ${transaction.category || "Sem categoria"}`,
-      section: "Lançamento",
-      prepare: () => {
-        state.selectedAccountId = String(transaction.account_id || state.selectedAccountId || "");
-        state.transactionMonth = String(transaction.date || "").slice(0, 7) || state.transactionMonth;
-        state.transactionHighlightId = String(transaction.id || "");
-      },
-    }));
-    const cardTransactions = (state.cardTransactions || []).map((transaction) => ({
-      view: "cardLaunches",
-      title: transaction.description || "Lançamento do cartão",
-      meta: `${transaction.date || ""} · ${transaction.category || "Sem categoria"}`,
-      section: "Fatura",
-      prepare: () => {
-        state.selectedCreditCardId = String(transaction.credit_card_id || state.selectedCreditCardId || "");
-        state.cardInvoiceMonth = transaction.invoice_month || String(transaction.date || "").slice(0, 7) || state.cardInvoiceMonth;
-      },
-    }));
     const positions = (state.portfolio?.positions || []).map((position) => ({
       view: "portfolio",
       title: position.name || position.asset_name || position.identifier || "Ativo",
@@ -128,7 +134,29 @@ export function registerGlobalSearch({ state, elements, viewTitles, normalizeSea
       ...(state.categories || []).map((item) => ({ view: "classifications", title: item.name, meta: "Categoria", section: "Classificação" })),
       ...(state.tags || []).map((item) => ({ view: "classifications", title: item.name, meta: "Tag", section: "Classificação" })),
     ];
-    return [...modules, ...accounts, ...cards, ...transactions, ...cardTransactions, ...positions, ...classifications];
+    return [...modules, ...accounts, ...cards, ...positions, ...classifications];
+  }
+
+  function remoteSearchItems(rows) {
+    return rows.map((row) => {
+      const accountTransaction = row.kind === "account_transaction";
+      return {
+        view: accountTransaction ? "transactions" : "cardLaunches",
+        title: row.title || (accountTransaction ? "Lançamento" : "Lançamento do cartão"),
+        meta: row.meta || row.date || "",
+        section: accountTransaction ? "Lançamento" : "Fatura",
+        prepare: () => {
+          if (accountTransaction) {
+            state.selectedAccountId = String(row.owner_id || state.selectedAccountId || "");
+            state.transactionMonth = row.month || state.transactionMonth;
+            state.transactionHighlightId = String(row.id || "");
+          } else {
+            state.selectedCreditCardId = String(row.owner_id || state.selectedCreditCardId || "");
+            state.cardInvoiceMonth = row.month || state.cardInvoiceMonth;
+          }
+        },
+      };
+    });
   }
 }
 

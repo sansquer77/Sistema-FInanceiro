@@ -240,9 +240,8 @@ export function registerLimitsView({
   }
 
   function spendingLimitRows(limits = state.spendingLimits, targetMonth = state.limitMonth) {
-    const spentIndex = buildSpendingLimitSpentIndex(targetMonth);
     return limits.map((limit) => {
-      const spent = spendingLimitSpentFromIndex(spentIndex, limit, targetMonth);
+      const spent = Number(limit.spent_amount || 0);
       const limitAmount = Number(limit.limit_amount);
       return {
         limitRecord: limit,
@@ -255,45 +254,6 @@ export function registerLimitsView({
         remaining: limitAmount - spent,
       };
     }).sort((a, b) => b.percent - a.percent || b.spent - a.spent);
-  }
-
-  function buildSpendingLimitSpentIndex(targetMonth = state.limitMonth) {
-    const index = new Map();
-    const addSpent = (month, categoryId, subcategoryId, amount) => {
-      const categoryKey = spendingLimitSpentKey(month, categoryId, "");
-      index.set(categoryKey, (index.get(categoryKey) || 0) + amount);
-      if (subcategoryId) {
-        const subcategoryKey = spendingLimitSpentKey(month, categoryId, subcategoryId);
-        index.set(subcategoryKey, (index.get(subcategoryKey) || 0) + amount);
-      }
-    };
-    state.transactions.forEach((transaction) => {
-      const month = transaction.date ? transaction.date.slice(0, 7) : "";
-      if (transaction.type !== "expense" || month !== targetMonth || isCreditCardPaymentTransaction(transaction)) {
-        return;
-      }
-      addSpent(month, transaction.category_id, transaction.subcategory_id, Number(transaction.amount_brl || transaction.amount));
-    });
-    state.cardTransactions.forEach((transaction) => {
-      const month = transaction.invoice_month || (transaction.date ? transaction.date.slice(0, 7) : "");
-      if (transaction.type !== "expense" || month !== targetMonth) {
-        return;
-      }
-      addSpent(month, transaction.category_id, transaction.subcategory_id, Number(transaction.amount_brl || transaction.amount));
-    });
-    return index;
-  }
-
-  function spendingLimitSpentFromIndex(index, limit, targetMonth = state.limitMonth) {
-    return index.get(spendingLimitSpentKey(targetMonth, limit.category_id, limit.subcategory_id || "")) || 0;
-  }
-
-  function spendingLimitSpentKey(month, categoryId, subcategoryId) {
-    return `${month || ""}|${categoryId || ""}|${subcategoryId || ""}`;
-  }
-
-  function isCreditCardPaymentTransaction(transaction) {
-    return Boolean(transaction?.is_credit_card_payment);
   }
 
   return {
