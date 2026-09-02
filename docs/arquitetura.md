@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.80
+versao: 3.81
 atualizado: 2026-09-01
 relacionados:
   - "[[requisitos]]"
@@ -329,7 +329,7 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | `http_routes.py` | Tabela declarativa e resolução de rotas, independente do transporte HTTP. Ver [[specs/desconcentracao-arquitetura-v2]]. |
 | `cockpit.py` | Agregações de domínio do resumo mensal do Cockpit com `SUM`, `COUNT` e `GROUP BY` no SQLite, fora do adaptador HTTP e sem materializar lançamentos detalhados. |
 | `open_debts.py` | Leitura consistente e agregação de parcelas em aberto, por usuário e moeda, compartilhada entre `/api/cockpit` (`open_debts`) e Relatórios. Conciliação liquida parcela de conta; registro de pagamento encerra fatura. Inclui vencidas, sem reconstrução histórica, rede ou escrita. |
-| `balance_projections.py` | Saldos conciliados/projetados, reservas de faturas e consolidação por moeda; autoridade backend consumida por Cockpit e Extrato. |
+| `balance_projections.py` | Saldos conciliados/projetados e reservas de faturas; a projeção detalhada atende o Extrato, enquanto o Cockpit usa uma consolidação por moeda agregada diretamente no SQLite, sem materializar históricos. |
 | `portfolio.py` | API pública e composição do Portfólio; mantém CRUD, adaptação dos provedores e aplicação de cotações de mercado/fundos. Delega transporte/cache, valorização por data e série histórica. Resgates e encerramentos preparam posições fora da escrita e revalidam entradas locais na transação, sem recotação. Ver [[investimentos-portfolio]]. |
 | `portfolio_positions.py` | Identidade, auxiliares de lotes/FIFO e leitura única das entradas locais para a tela e consumidores internos; histórico de resgates por conexão recebida. Não contém o CRUD completo nem consultas externas. |
 | `portfolio_quotes.py` | Transporte HTTP/JSON, cache SQLite, caches em memória de cotações/câmbio, locks, TTL, expurgo/LRU e fallback vencido. Dependências injetadas sem importar a fachada; normalização de provedores permanece em `portfolio.py`. |
@@ -527,6 +527,7 @@ Ver [[investimentos-portfolio]].
 6. Relatórios no frontend agrupam por categoria, subcategoria, conta, tag e fluxo diário.
 7. Lançamentos de cartão entram em relatórios e limites pela competência da fatura.
 8. `GET /api/reports/category-evolution` retorna séries mensais por categoria/subcategoria para o drawer de evolução, com `periodo` igual a `3m`, `6m`, `12m`, `ytd` ou `all`. `categories.py` preserva a leitura/competência; `reports.build_evolution_presentation` acrescenta `total_cents`, `trend_percent` (nullable) e `forecast` (12 pontos SMA), mantendo `evolution` compatível. Frontend apenas seleciona o horizonte e formata/desenha.
+9. O consolidado `currency_totals` do Cockpit usa três consultas agregadas e limitadas ao usuário/competência: saldos por conta, faturas do mês por cartão e reservas conciliadas ainda não pagas. A rota não chama os leitores detalhados de lançamentos, compras ou pagamentos e não constrói o mapa de datas da projeção do Extrato.
 
 Ver [[relatorios]], [[limites-gastos]], [[specs/cockpit-calendario]].
 
@@ -574,6 +575,8 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 - [[adr/0014-desconcentracao-fachadas-e-roteamento]] — Fachadas compatíveis, roteamento declarativo e módulos internos menores para a fundação v2.
 
 ## Changelog
+
+- `3.81` — 2026-09-01 — `/api/cockpit` deixa de montar a projeção detalhada a partir de três históricos completos; `currency_totals` passa a vir de agregações SQLite específicas, preservando o contrato financeiro e mantendo a projeção completa restrita ao Extrato.
 
 - `3.80` — 2026-09-01 — Boot e troca mensal do Cockpit passam a carregar somente recortes mensais; Relatórios isolam seu recorte por competência; Cockpit e Tags usam agregações SQL em vez de leitores detalhados.
 

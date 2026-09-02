@@ -2,7 +2,7 @@
 tipo: spec
 area: relatorios
 status: implementado
-versao: 2.21
+versao: 2.22
 atualizado: 2026-09-01
 relacionados:
   - "[[lancamentos]]"
@@ -17,7 +17,7 @@ aliases: ["Relatórios", "Cockpit"]
 # Relatórios
 
 > [!info] Status
-> **implementado** · área: `relatorios` · atualizado em 2026-09-01 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[limites-gastos]]
+> **implementado** · versão: `2.22` · área: `relatorios` · atualizado em 2026-09-01 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[limites-gastos]]
 
 ## Problema
 
@@ -74,6 +74,7 @@ Qualquer usuário autenticado localmente que queira analisar seus gastos e recei
 - Rótulos de seletores mensais devem usar o formato compacto `MM/AAAA` para manter largura visual estável.
 - Ao trocar o mês do Cockpit, a aba **Situação do mês** deve recalcular KPIs, maiores receitas/despesas, limites, planejamento e totais por moeda com base no mês selecionado. Parcelas em aberto representam o estado atual de liquidação, não uma fotografia histórica; apenas o componente mensal usa a competência selecionada.
 - KPIs, rankings e planejamento do Cockpit são agregados no SQLite por mês, tipo, categoria e moeda, sem transportar linhas detalhadas até o agregador Python ou recarregar todo o histórico no navegador.
+- Os saldos operacionais por moeda do Cockpit são calculados por agregações SQLite de contas, faturas e pagamentos. A rota não chama leitores de históricos detalhados nem monta a projeção completa usada pelo Extrato.
 - O mês inicial do Cockpit deve ser o mês corrente.
 - A leitura do Cockpit para meses passados deve funcionar como fotografia analítica do período, sem esconder despesas de cartão apenas porque a fatura foi paga posteriormente.
 - Faturas de cartão devem impactar o Cockpit pela competência da fatura (`invoice_month`) do mês selecionado, preservando o valor da fatura daquele mês tanto em leituras previstas quanto conciliadas quando aplicável.
@@ -168,6 +169,8 @@ O ponto crítico é cartão de crédito: a fatura pertence ao mês de competênc
 - [x] Revisar agregações do Cockpit para garantir que faturas de cartão pagas continuem consideradas por `invoice_month`.
 - [x] Revisar rótulos de saldo para explicitar o mês selecionado e evitar ambiguidade com saldo atual.
 - [x] Criar testes automatizados para Cockpit mensal, especialmente fatura paga em mês selecionado e exclusão do pagamento agregado.
+- [x] Separar o consolidado de saldos por moeda da projeção detalhada do Extrato e calculá-lo por agregações SQLite.
+- [x] Caracterizar o contrato financeiro anterior e provar que `/api/cockpit` não chama leitores de históricos detalhados.
 
 ## Critérios de aceite
 
@@ -207,6 +210,7 @@ O ponto crítico é cartão de crédito: a fatura pertence ao mês de competênc
 - Dado o usuário abrindo o gráfico de evolução de uma categoria/subcategoria, quando o drawer é exibido, então a área do gráfico é aproximadamente 20% maior que o tamanho anterior.
 - Dado o gráfico de evolução exibido, quando há pontos de dados históricos ou projeção SMA, então cada ponto exibe o respectivo valor formatado, mesmo quando a linha de tendência está ativada.
 - Dado uma fatura paga por uma conta em BRL, quando o Cockpit calcula o saldo previsto após a data do pagamento, então considera somente o débito registrado na conta e não subtrai novamente a mesma fatura pela linha do cartão.
+- Dado qualquer volume de histórico, quando `/api/cockpit` consolida saldos por moeda, então usa agregações SQLite e não materializa listas detalhadas de lançamentos, compras ou pagamentos; contas e cartões preservam os mesmos valores do contrato anterior.
 
 ### Critérios complementares — dívida aberta
 
@@ -232,6 +236,8 @@ Cobertura: `tests/test_statement_report.py` e `tests/frontend_open_debts.test.mj
 ## Changelog
 
 <!-- Validação automatizada desta etapa: tests/test_evolution_presentation.py e tests/frontend_evolution.test.mjs. Validação visual no Safari não executada. -->
+
+- `2.22` — 2026-09-01 — Saldo operacional por moeda do Cockpit passa a ser agregado diretamente no SQLite, sem carregar históricos detalhados nem executar a projeção completa do Extrato; contrato anterior preservado por teste de caracterização.
 
 - `2.21` — 2026-09-01 — Cockpit e relatório de tags passam a usar `SUM`, `COUNT` e `GROUP BY` no SQLite; o navegador carrega somente recortes mensais e Relatórios mantém cache isolado por competência.
 

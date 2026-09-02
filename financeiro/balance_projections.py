@@ -4,6 +4,182 @@ from datetime import date
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from financeiro.calendar_rules import add_months, month_end_date
+from financeiro.database import get_connection
+
+
+def build_currency_totals_for_user(user_id: int, month: str) -> list[dict]:
+    """Build the Cockpit balance summary from bounded SQLite aggregates."""
+    limit_date = month_end_date(month)
+    # spec: relatorios/relatorios v2.22 — Cockpit não materializa históricos
+    # detalhados para consolidar saldos e reservas de fatura por moeda.
+    with get_connection() as conn:
+        account_rows = conn.execute(
+            """
+            SELECT
+                accounts.id,
+                accounts.name,
+                accounts.account_type,
+                accounts.currency,
+                accounts.initial_balance_cents + COALESCE(SUM(
+                    CASE
+                        WHEN transactions.account_id = accounts.id
+                            AND transactions.type = 'income' THEN transactions.amount_cents
+                        WHEN transactions.account_id = accounts.id
+                            AND transactions.type IN ('expense', 'investment', 'transfer') THEN -transactions.amount_cents
+                        WHEN transactions.destination_account_id = accounts.id
+                            AND transactions.type = 'transfer'
+                            THEN COALESCE(NULLIF(transactions.destination_amount_cents, 0), transactions.amount_cents)
+                        ELSE 0
+                    END
+                ), 0) AS projected_cents,
+                accounts.initial_balance_cents + COALESCE(SUM(
+                    CASE
+                        WHEN transactions.reconciled_at IS NULL THEN 0
+                        WHEN transactions.account_id = accounts.id
+                            AND transactions.type = 'income' THEN transactions.amount_cents
+                        WHEN transactions.account_id = accounts.id
+                            AND transactions.type IN ('expense', 'investment', 'transfer') THEN -transactions.amount_cents
+                        WHEN transactions.destination_account_id = accounts.id
+                            AND transactions.type = 'transfer'
+                            THEN COALESCE(NULLIF(transactions.destination_amount_cents, 0), transactions.amount_cents)
+                        ELSE 0
+                    END
+                ), 0) AS reconciled_cents
+            FROM checking_accounts AS accounts
+            LEFT JOIN transactions
+                ON transactions.user_id = accounts.user_id
+                AND transactions.archived_at IS NULL
+                AND transactions.date <= ?
+                AND (
+                    transactions.account_id = accounts.id
+                    OR transactions.destination_account_id = accounts.id
+                )
+            WHERE accounts.user_id = ? AND accounts.archived_at IS NULL
+            GROUP BY accounts.id
+            ORDER BY accounts.id
+            """,
+            (limit_date, user_id),
+        ).fetchall()
+        card_rows = conn.execute(
+            """
+            SELECT
+                cards.id,
+                cards.name,
+                cards.issuer,
+                cards.currency,
+                COALESCE(SUM(
+                    CASE card_transactions.type
+                        WHEN 'expense' THEN card_transactions.amount_cents
+                        WHEN 'income' THEN -card_transactions.amount_cents
+                        ELSE 0
+                    END
+                ), 0) AS open_cents,
+                COALESCE(SUM(
+                    CASE
+                        WHEN card_transactions.reconciled_at IS NULL THEN 0
+                        WHEN card_transactions.type = 'expense' THEN card_transactions.amount_cents
+                        WHEN card_transactions.type = 'income' THEN -card_transactions.amount_cents
+                        ELSE 0
+                    END
+                ), 0) AS reconciled_cents,
+                EXISTS (
+                    SELECT 1
+                    FROM credit_card_payments
+                    WHERE credit_card_payments.user_id = cards.user_id
+                        AND credit_card_payments.credit_card_id = cards.id
+                        AND credit_card_payments.invoice_month = ?
+                ) AS is_paid
+            FROM credit_cards AS cards
+            LEFT JOIN credit_card_transactions AS card_transactions
+                ON card_transactions.user_id = cards.user_id
+                AND card_transactions.credit_card_id = cards.id
+                AND card_transactions.invoice_month = ?
+                AND card_transactions.archived_at IS NULL
+            WHERE cards.user_id = ? AND cards.archived_at IS NULL
+            GROUP BY cards.id
+            ORDER BY cards.id
+            """,
+            (month, month, user_id),
+        ).fetchall()
+        reservation_rows = conn.execute(
+            """
+            SELECT
+                cards.id AS card_id,
+                cards.preferred_payment_account_id AS account_id,
+                card_transactions.invoice_month,
+                cards.due_day,
+                SUM(
+                    CASE card_transactions.type
+                        WHEN 'expense' THEN card_transactions.amount_cents
+                        WHEN 'income' THEN -card_transactions.amount_cents
+                        ELSE 0
+                    END
+                ) AS invoice_cents
+            FROM credit_card_transactions AS card_transactions
+            JOIN credit_cards AS cards
+                ON cards.id = card_transactions.credit_card_id
+                AND cards.user_id = card_transactions.user_id
+                AND cards.archived_at IS NULL
+            JOIN checking_accounts AS accounts
+                ON accounts.id = cards.preferred_payment_account_id
+                AND accounts.user_id = cards.user_id
+                AND accounts.archived_at IS NULL
+                AND accounts.currency = cards.currency
+            WHERE card_transactions.user_id = ?
+                AND card_transactions.archived_at IS NULL
+                AND card_transactions.reconciled_at IS NOT NULL
+                AND card_transactions.invoice_month <= ?
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM credit_card_payments
+                    WHERE credit_card_payments.user_id = card_transactions.user_id
+                        AND credit_card_payments.credit_card_id = card_transactions.credit_card_id
+                        AND credit_card_payments.invoice_month = card_transactions.invoice_month
+                )
+            GROUP BY cards.id, cards.preferred_payment_account_id, card_transactions.invoice_month
+            """,
+            (user_id, month),
+        ).fetchall()
+
+    reserved_by_account: dict[int, int] = {}
+    reserved_by_card_month: dict[tuple[int, str], int] = {}
+    for row in reservation_rows:
+        invoice_month = str(row["invoice_month"])
+        if card_invoice_date(invoice_month, row["due_day"]) > limit_date:
+            continue
+        reserved_cents = max(int(row["invoice_cents"] or 0), 0)
+        account_id = int(row["account_id"])
+        reserved_by_account[account_id] = reserved_by_account.get(account_id, 0) + reserved_cents
+        reserved_by_card_month[(int(row["card_id"]), invoice_month)] = reserved_cents
+
+    totals: dict[str, dict] = {}
+    for account in account_rows:
+        currency = normalized_currency(account["currency"])
+        row = totals.setdefault(currency, {"currency": currency, "current_cents": 0, "accounts": [], "cards": []})
+        projected_cents = int(account["projected_cents"] or 0) - reserved_by_account.get(int(account["id"]), 0)
+        reconciled_cents = int(account["reconciled_cents"] or 0)
+        row["current_cents"] += projected_cents
+        row["accounts"].append({
+            "id": account["id"], "name": account["name"], "type": account["account_type"],
+            "amount": cents_to_value(projected_cents), "reconciled": cents_to_value(reconciled_cents),
+        })
+    for card in card_rows:
+        currency = normalized_currency(card["currency"])
+        row = totals.setdefault(currency, {"currency": currency, "current_cents": 0, "accounts": [], "cards": []})
+        open_cents = int(card["open_cents"] or 0)
+        reconciled_cents = int(card["reconciled_cents"] or 0)
+        reserved_cents = reserved_by_card_month.get((int(card["id"]), month), 0)
+        signed_cents = 0 if card["is_paid"] else -max(open_cents - reserved_cents, 0)
+        row["current_cents"] += signed_cents
+        row["cards"].append({
+            "id": card["id"], "name": card["name"], "issuer": card["issuer"],
+            "amount": cents_to_value(-max(open_cents, 0)),
+            "reconciled": cents_to_value(-reconciled_cents),
+        })
+    return [
+        {**row, "current": cents_to_value(row.pop("current_cents"))}
+        for _, row in sorted(totals.items())
+    ]
 
 
 def build_balance_projection(

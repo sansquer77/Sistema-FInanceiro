@@ -43,7 +43,7 @@ from financeiro.auth import (
     update_user_email,
     update_user_password,
 )
-from financeiro.balance_projections import build_balance_projection
+from financeiro.balance_projections import build_balance_projection, build_currency_totals_for_user
 from financeiro.calendar import get_cockpit_calendar
 from financeiro.categories import (
     create_category,
@@ -485,15 +485,7 @@ class AppHandler(BaseHTTPRequestHandler):
             payload = build_cockpit_summary(user["id"], month)
         except ValueError as exc:
             raise ApiError(str(exc), HTTPStatus.BAD_REQUEST) from None
-        projection = build_balance_projection(
-            accounts=list_checking_accounts(user["id"]),
-            transactions=list_transactions(user["id"]),
-            cards=list_credit_cards(user["id"]),
-            card_transactions=list_credit_card_transactions(user["id"]),
-            card_payments=list_credit_card_payments(user["id"]),
-            month=month,
-        )
-        payload["currency_totals"] = projection["currency_totals"]
+        payload["currency_totals"] = build_currency_totals_for_user(user["id"], month)
         payload["open_debts"] = get_open_debts(user["id"], month)
         self.send_json(payload)
 

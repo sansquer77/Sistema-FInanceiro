@@ -13,7 +13,7 @@ from financeiro.calendar_rules import shift_month
 
 
 def build_evolution_presentation(evolution):
-    # spec: relatorios/relatorios v2.21 — evolução: total, tendência e SMA recursiva
+    # spec: relatorios/relatorios v2.22 — evolução: total, tendência e SMA recursiva
     values = [int(point['total_cents']) for point in evolution]
     trend = None
     if len(values) > 1 and values[0] != 0:
@@ -95,7 +95,7 @@ def build_statement_report(user_id, month=None, account_ids=None, card_ids=None,
         'card': active_cards & set(selected_cards) if selected_cards else active_cards,
     }
     sections = {}
-    # spec: relatorios/relatorios v2.21 — demonstrativo mensal e filtros por moeda
+    # spec: relatorios/relatorios v2.22 — demonstrativo mensal e filtros por moeda
     for origin, transactions in (
         ('account', list_transactions(user_id, month=month)),
         ('card', list_credit_card_transactions(user_id, invoice_month=month)),
@@ -133,7 +133,7 @@ def _statement_groups(items, total, *, subcategory=False):
 
 
 def _statement_section(currency, items, debt_cents, month, today):
-    # spec: relatorios/relatorios v2.21 — média, composição e série diária do demonstrativo
+    # spec: relatorios/relatorios v2.22 — média, composição e série diária do demonstrativo
     total = sum(item['amount_cents'] for item in items)
     days = monthrange(*map(int, month.split('-')))[1]
     current_month = today.strftime('%Y-%m')
@@ -167,7 +167,7 @@ def _statement_section(currency, items, debt_cents, month, today):
 
 
 def build_tag_report(user_id: int, month: str | None = None) -> dict:
-    # spec: relatorios/relatorios v2.21 — relatório de tags agregado no SQLite
+    # spec: relatorios/relatorios v2.22 — relatório de tags agregado no SQLite
     normalized_month = None
     if month:
         try:

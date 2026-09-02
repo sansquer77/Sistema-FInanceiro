@@ -47,7 +47,7 @@ def get_open_debts(user_id, month=None, account_ids=None, card_ids=None, currenc
             ('account', 'transactions', 'checking_accounts', 'account_id', accounts),
             ('card', 'credit_card_transactions', 'credit_cards', 'credit_card_id', cards),
         ):
-            # spec: relatorios/relatorios v2.21 — critérios complementares de dívida aberta
+            # spec: relatorios/relatorios v2.22 — critérios complementares de dívida aberta
             # Card reconciliation verifies consumption; only invoice settlement closes it.
             settled = ("t.reconciled_at IS NULL AND NOT EXISTS (SELECT 1 FROM credit_card_payments p WHERE p.user_id = t.user_id AND p.transaction_id = t.id)"
                        if origin == 'account' else
