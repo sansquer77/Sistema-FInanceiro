@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 12.10
+versao: 12.11
 atualizado: 2026-09-03
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -80,6 +80,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 
 | Spec | Status | Área |
 |---|---|---|
+| [[specs/alertas-cockpit]] | 📝 rascunho | Cockpit |
 | [[specs/frontend-fundacao-v2]] | 🚧 em implementação | Frontend v2 |
 | [[specs/open-finance]] | 📝 rascunho | Open Finance |
 | [[specs/consolidacao-familiar]] | 📝 rascunho | Consolidação Familiar |
@@ -147,6 +148,7 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `12.11` — 2026-09-03 — Indexada [[specs/alertas-cockpit]] em rascunho para a reformulação dos alertas do Cockpit em indicadores dedicados (críticos e informativos) com flyout global.
 - `12.10` — 2026-09-03 — Indexada [[specs/seguranca-ai-ssrf]] e [[adr/0015-ssrf-ai-endpoints]] para proteção SSRF de endpoints de IA configuráveis.
 
 - `12.9` — 2026-09-03 — Indexada [[specs/seguranca-transporte-externo]] para TLS verificado e leitura JSON externa limitada.

@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.86
+versao: 3.87
 atualizado: 2026-09-03
 relacionados:
   - "[[requisitos]]"
@@ -10,6 +10,7 @@ relacionados:
   - "[[glossario]]"
   - "[[qualidade-codigo]]"
   - "[[specs/bank-logos]]"
+  - "[[specs/alertas-cockpit]]"
   - "[[adr/0001-stack-local-sem-framework]]"
   - "[[adr/0002-modularizacao-frontend]]"
 tags: [arquitetura, meta]
@@ -259,6 +260,8 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 |---|---|
 | `GET` | `/api/cockpit?month=AAAA-MM` |
 | `GET` | `/api/cockpit/calendar` |
+| `GET` | `/api/cockpit/notifications` |
+| `POST` | `/api/cockpit/notifications/mark-seen` |
 | `GET` | `/api/reports/tags?month=AAAA-MM` |
 | `GET` | `/api/reports/overview?month=AAAA-MM` |
 | `GET` | `/api/reports/open-debts?month=AAAA-MM&account_ids=1,2&card_ids=3&currency=BRL` |
@@ -416,6 +419,7 @@ O baseline inicial da v2 usa `PRAGMA user_version = 20000`. Banco ausente é cri
 | `consultor_settings` | `database.py` — configuração do Consultor por usuário (`consultor_enabled`, `investor_profile`, `data_access_consent`). Ver [[specs/consultor]]. |
 | `consultor_analyses` | `database.py` — histórico de execuções bem-sucedidas do Consultor, indexado por usuário, data e `analysis_id` para leitura e quota diária. Ver [[specs/consultor]]. |
 | `consultor_perfil_complementar` | `database.py` — payload criptografado do Perfil Complementar por usuário (`payload_enc`, `schema_version`). Ver [[specs/consultor]]. |
+| `notification_reads` | `database.py` — registro de leitura de informativos do Cockpit por usuário (`user_id`, `notification_id`, `seen_at`). Ver [[specs/alertas-cockpit]]. |
 
 `transactions` e `credit_card_transactions` persistem `normalized_description` para a classificação assistida. Ambas também mantêm valor normalizado em BRL (`amount_brl_cents`); em moedas estrangeiras sem cotação manual, a normalização usa a última PTAX de venda disponível até a data do lançamento. Bancos existentes são retroalimentados de forma idempotente durante a inicialização.
 
@@ -543,8 +547,9 @@ Ver [[investimentos-portfolio]].
 7. Lançamentos de cartão entram em relatórios e limites pela competência da fatura.
 8. `GET /api/reports/category-evolution` retorna séries mensais por categoria/subcategoria para o drawer de evolução, com `periodo` igual a `3m`, `6m`, `12m`, `ytd` ou `all`. `categories.py` preserva a leitura/competência; `reports.build_evolution_presentation` acrescenta `total_cents`, `trend_percent` (nullable) e `forecast` (12 pontos SMA), mantendo `evolution` compatível. Frontend apenas seleciona o horizonte e formata/desenha.
 9. O consolidado `currency_totals` do Cockpit usa três consultas agregadas e limitadas ao usuário/competência: saldos por conta, faturas do mês por cartão e reservas conciliadas ainda não pagas. A rota não chama os leitores detalhados de lançamentos, compras ou pagamentos e não constrói o mapa de datas da projeção do Extrato.
+10. A Central de Notificações do Cockpit expõe `GET /api/cockpit/notifications` compilando no backend os alertas críticos (limites excedidos, saldo negativo projetado, contas/faturas vencidas) e informativos periódicos (dividendos e vencimentos da semana), mantendo o frontend em `web/` puramente de apresentação para os indicadores de abas e o flyout global em camada superior de sobreposição (evitando problemas de z-index/clipping). `POST /api/cockpit/notifications/mark-seen` permite registrar leitura de informativos por usuário. Ver [[specs/alertas-cockpit]].
 
-Ver [[relatorios]], [[limites-gastos]], [[specs/cockpit-calendario]].
+Ver [[relatorios]], [[limites-gastos]], [[specs/cockpit-calendario]], [[specs/alertas-cockpit]].
 
 ### Importação de Arquivos
 
@@ -591,6 +596,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.87` — 2026-09-03 — Registradas as rotas `GET /api/cockpit/notifications` e `POST /api/cockpit/notifications/mark-seen` e o fluxo de montagem centralizada de notificações críticas e informativas do Cockpit com flyout desacoplado em camada global. Ver [[specs/alertas-cockpit]].
 - `3.86` — 2026-09-03 — Adicionada fronteira `financeiro/ai_endpoint_security.py` para proteger endpoints configuráveis de IA contra SSRF, com DNS pinning, validação da URL final e variáveis de ambiente `AI_ALLOW_PRIVATE_ENDPOINTS`, `AI_ALLOWED_LOCAL_HOSTS` e `AI_ALLOWED_LOCAL_ENDPOINTS` para operadores.
 
 - `3.85` — 2026-09-03 — Transporte externo passa a falhar fechado em erros TLS de cotações e centraliza leitura JSON limitada para cotações, PTAX, IA, Consultor e versão.

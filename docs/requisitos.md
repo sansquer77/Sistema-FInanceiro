@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 3.2
+versao: 3.3
 atualizado: 2026-09-03
 relacionados:
   - "[[arquitetura]]"
@@ -40,7 +40,7 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
   - Ver [[investimentos-portfolio]].
 - **Categorias e Tags**: cadastro, edição, listagem e exclusão de categorias (tipo receita, despesa, investimento), subcategorias e múltiplos marcadores (tags) por transação. Ver [[categorias-tags-gestao]].
 - **Classificação Assistida**: sugestão local de categoria e subcategoria por correspondência exata normalizada com o histórico do próprio usuário, sem dependência de internet. Ver [[classificacao-assistida]].
-- **Cockpit e Relatórios**: resumo financeiro mensal com seletor de mês, saldos por moeda, planejamento recorrente, dívidas parceladas, portfólio por tipo, maiores receitas/despesas, relatórios por categoria, subcategoria, conta, tag e fluxo diário. Ver [[relatorios]] e [[arquitetura]].
+- **Cockpit e Relatórios**: resumo financeiro mensal com seletor de mês, saldos por moeda, planejamento recorrente, dívidas parceladas, portfólio por tipo, maiores receitas/despesas, relatórios por categoria, subcategoria, conta, tag e fluxo diário. Alertas do Cockpit organizados em indicadores dedicados (críticos e informativos) via flyout global. Ver [[specs/alertas-cockpit]], [[relatorios]] e [[arquitetura]].
 - **Importação de Dados**:
   - Leitura e importação de extratos externos em formato `.csv` ou `.xls`.
   - Importação de lançamentos por meio de planilhas de modelo do sistema (`.xlsx`) para contas e cartões.
@@ -133,6 +133,7 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 
 ## Changelog
 
+- `3.3` — 2026-09-03 — Incluída especificação dos Alertas e Notificações do Cockpit com indicadores dedicados (críticos e informativos), flyout global e backend centralizado. Ver [[specs/alertas-cockpit]].
 - `3.2` — 2026-09-03 — Adicionada regra de segurança para validação anti-SSRF de endpoints configuráveis de IA, com DNS pinning, validação da URL final, allowlist por host:port e opt-in por env para provedores locais. Ver [[specs/seguranca-ai-ssrf]] e [[adr/0015-ssrf-ai-endpoints]].
 
 - `3.1` — 2026-08-30 — Cache persistente de cotações passa a exigir retenção, limites e compactação física condicionada. Ver [[specs/manutencao-cache-cotacoes]].
