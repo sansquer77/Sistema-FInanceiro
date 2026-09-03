@@ -698,6 +698,13 @@ def _initialize_schema(db_path: Path) -> None:
                 UNIQUE (user_id)
             );
 
+            CREATE TABLE IF NOT EXISTS notification_reads (
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                notification_id TEXT NOT NULL,
+                seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, notification_id)
+            );
+
             CREATE UNIQUE INDEX IF NOT EXISTS idx_spending_limits_category
             ON spending_limits (user_id, month, category_id)
             WHERE subcategory_id IS NULL;
@@ -797,6 +804,7 @@ def _initialize_schema(db_path: Path) -> None:
         ensure_ai_settings(conn)
         ensure_secure_configs(conn)
         ensure_consultor_schema(conn)
+        ensure_notification_reads(conn)
         migrate_category_unique_constraint(conn)
         migrate_transaction_type_constraint(conn)
         migrate_transaction_tags(conn)
@@ -1138,6 +1146,20 @@ def ensure_consultor_schema(conn: sqlite3.Connection) -> None:
         """
         CREATE UNIQUE INDEX IF NOT EXISTS idx_consultor_perfil_complementar_user
         ON consultor_perfil_complementar (user_id)
+        """
+    )
+
+
+def ensure_notification_reads(conn: sqlite3.Connection) -> None:
+    # spec: cockpit/alertas-cockpit v0.3 — critério 11
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS notification_reads (
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            notification_id TEXT NOT NULL,
+            seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (user_id, notification_id)
+        )
         """
     )
 

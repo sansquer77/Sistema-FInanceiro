@@ -169,6 +169,56 @@ class DatabaseIndexTest(unittest.TestCase):
         self.assertEqual(analyses_count, 0)
         self.assertEqual(perfil_count, 0)
 
+    def test_initialize_database_creates_notification_reads_schema(self) -> None:
+        # spec: cockpit/alertas-cockpit v0.3 — critério 11
+        initialize_database()
+        initialize_database()
+
+        with get_connection() as conn:
+            columns = column_names(conn, "notification_reads")
+
+        self.assertEqual({"user_id", "notification_id", "seen_at"}, columns)
+
+    def test_notification_reads_enforces_composite_pk_and_cascade(self) -> None:
+        # spec: cockpit/alertas-cockpit v0.3 — critério 11
+        initialize_database()
+
+        with get_connection() as conn:
+            user_id = conn.execute(
+                """
+                INSERT INTO users (name, email, password_hash)
+                VALUES ('Carlos', 'carlos@example.com', 'hash')
+                RETURNING id
+                """
+            ).fetchone()["id"]
+
+            conn.execute(
+                """
+                INSERT INTO notification_reads (user_id, notification_id, seen_at)
+                VALUES (?, 'dividend_week:ITUB4:2026-09-05', '2026-09-03T12:00:00Z')
+                """,
+                (user_id,),
+            )
+
+            # Duplicatas do par (user_id, notification_id) devem falhar pela PK composta
+            with self.assertRaises(sqlite3.IntegrityError):
+                conn.execute(
+                    """
+                    INSERT INTO notification_reads (user_id, notification_id, seen_at)
+                    VALUES (?, 'dividend_week:ITUB4:2026-09-05', '2026-09-03T13:00:00Z')
+                    """,
+                    (user_id,),
+                )
+
+            # Exclusão do usuário deve remover registros em cascata
+            conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            reads_count = conn.execute(
+                "SELECT COUNT(*) FROM notification_reads WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()[0]
+
+        self.assertEqual(reads_count, 0)
+
     def test_get_connection_closes_after_context_exit(self) -> None:
         initialize_database()
 

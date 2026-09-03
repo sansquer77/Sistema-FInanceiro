@@ -80,7 +80,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 
 | Spec | Status | Área |
 |---|---|---|
-| [[specs/alertas-cockpit]] | 📝 rascunho | Cockpit |
+| [[specs/alertas-cockpit]] | 🚧 em implementação | Cockpit |
 | [[specs/frontend-fundacao-v2]] | 🚧 em implementação | Frontend v2 |
 | [[specs/open-finance]] | 📝 rascunho | Open Finance |
 | [[specs/consolidacao-familiar]] | 📝 rascunho | Consolidação Familiar |

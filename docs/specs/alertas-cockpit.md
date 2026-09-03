@@ -1,8 +1,8 @@
 ---
 tipo: spec
 area: cockpit
-status: rascunho
-versao: 0.2
+status: em-implementacao
+versao: 0.3
 atualizado: 2026-09-03
 relacionados:
   - "[[cockpit-calendario]]"
@@ -12,14 +12,14 @@ relacionados:
   - "[[investimentos-portfolio]]"
   - "[[arquitetura]]"
   - "[[requisitos]]"
-tags: [spec, "area/cockpit", "status/rascunho"]
+tags: [spec, "area/cockpit", "status/em-implementacao"]
 aliases: ["Alertas e Notificações do Cockpit", "Alertas Cockpit", "Central de Notificações do Cockpit"]
 ---
 
 # Alertas e Notificações do Cockpit
 
 > [!info] Status
-> **rascunho** · versão: `0.2` · área: `cockpit` · atualizado em 2026-09-03 · relacionados: [[cockpit-calendario]], [[limites-gastos]], [[cartoes]], [[lancamentos]], [[investimentos-portfolio]], [[arquitetura]], [[requisitos]]
+> **em implementação** · versão: `0.3` · área: `cockpit` · atualizado em 2026-09-03 · relacionados: [[cockpit-calendario]], [[limites-gastos]], [[cartoes]], [[lancamentos]], [[investimentos-portfolio]], [[arquitetura]], [[requisitos]]
 
 ### Problema
 
@@ -225,7 +225,7 @@ Restrição de unicidade: `PRIMARY KEY (user_id, notification_id)`.
 
 ### Plano de implementação
 
-- [ ] Passo 1 — Schema: criar a tabela `notification_reads` de forma idempotente em `financeiro/database.py` com `PRIMARY KEY (user_id, notification_id)`. Fecha: critério 11.
+- [x] Passo 1 — Schema: criar a tabela `notification_reads` de forma idempotente em `financeiro/database.py` com `PRIMARY KEY (user_id, notification_id)`. Fecha: critério 11.
 - [ ] Passo 2 — Backend: criar o motor de agregação de notificações em `financeiro/cockpit_notifications.py` (ou dentro de `financeiro/cockpit.py`), compilando limites excedidos, saldo negativo projetado, contas vencidas e eventos da semana, cruzando com `notification_reads`. Fecha: critérios 1, 3, 4, 5, 6, 11.
 - [ ] Passo 3 — Backend: expor o endpoint exclusivo autenticado `GET /api/cockpit/notifications` e a rota `POST /api/cockpit/notifications/mark-seen` em `financeiro/http_routes.py`. Fecha: critérios 6, 10, 11.
 - [ ] Passo 4 — Frontend: criar o componente de flyout global acessível e desacoplado de empilhamentos em `web/modules/notification-flyout.js` (ou utilitário de overlay), respeitando ARIA e tecla Escape. Fecha: critérios 2, 8, 9.
@@ -235,6 +235,7 @@ Restrição de unicidade: `PRIMARY KEY (user_id, notification_id)`.
 
 ### Changelog
 
+- `0.3` — 2026-09-03 — Passo 1 concluído: criada a tabela `notification_reads` de forma idempotente em `financeiro/database.py` com chave primária composta `(user_id, notification_id)`, cascata por usuário e testes unitários de integridade.
 - `0.2` — 2026-09-03 — Resolvidas as pendências de arquitetura: persistência de leitura via tabela SQLite `notification_reads`, permanência do banner independente de nova versão no painel e rota exclusiva `GET /api/cockpit/notifications`.
 - `0.1` — 2026-09-03 — Especificação inicial da reformulação dos alertas do Cockpit em dois indicadores (Alertas Críticos e Informativos) com flyout global desacoplado de empilhamentos, backend centralizado e suporte responsivo.
 
