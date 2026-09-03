@@ -1448,8 +1448,8 @@ textarea:focus {
 }
 
 .cockpit-notification-button.critical.has-items b {
-  color: var(--on-error, #fff);
-  background: var(--error);
+  color: var(--danger-pill-text, #9b1c1c);
+  background: var(--danger-pill-surface, #ffd2d2);
 }
 
 .cockpit-notification-button.informational.has-items {
@@ -1459,8 +1459,8 @@ textarea:focus {
 }
 
 .cockpit-notification-button.informational.has-items b {
-  color: #241a00;
-  background: var(--warning, #e8ad16);
+  color: var(--warning-pill-text, #8a4b00);
+  background: var(--warning-pill-surface, #ffe8a3);
 }
 
 .cockpit-notification-button.combined { display: none; }
@@ -8753,7 +8753,7 @@ form[aria-busy="true"] .form-actions {
     overflow: visible;
   }
 }
-/* spec: cockpit/alertas-cockpit v0.8 — flyout global de notificações */
+/* spec: cockpit/alertas-cockpit v0.9 — flyout global de notificações */
 .notification-flyout { width:min(520px,calc(100vw - 32px)); max-height:calc(100vh - 32px); margin:auto 16px auto auto; padding:0; border:1px solid var(--outline-variant); border-radius:18px; color:var(--on-surface); background:var(--surface-container); box-shadow:var(--drawer-shadow); }
 .notification-flyout::backdrop { background:var(--modal-overlay); }
 .notification-flyout-surface { display:grid; grid-template-rows:auto auto minmax(120px,1fr) auto; max-height:calc(100vh - 32px); }

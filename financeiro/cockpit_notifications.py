@@ -27,7 +27,7 @@ def build_cockpit_notifications(
     reference_date = reference_date or date.today()
     month = reference_date.strftime("%Y-%m")
 
-    # spec: cockpit/alertas-cockpit v0.8 — critérios 1, 3, 4, 5, 6 e 11
+    # spec: cockpit/alertas-cockpit v0.9 — critérios 1, 3, 4, 5, 6 e 11
     critical = _limit_notifications(limits_loader(user_id, month), month)
     critical.extend(_negative_balance_notifications(totals_loader(user_id, month), month))
 

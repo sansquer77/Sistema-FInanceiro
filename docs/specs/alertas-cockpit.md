@@ -2,7 +2,7 @@
 tipo: spec
 area: cockpit
 status: em-implementacao
-versao: 0.8
+versao: 0.9
 atualizado: 2026-09-03
 relacionados:
   - "[[cockpit-calendario]]"
@@ -235,6 +235,7 @@ Restrição de unicidade: `PRIMARY KEY (user_id, notification_id)`.
 
 ### Changelog
 
+- `0.9` — 2026-09-03 — Corrigido contraste do badge de Alertas Críticos no menu de notificações: pílula passa a usar `--danger-pill-surface` e `--danger-pill-text`, garantindo número escuro sobre fundo claro e alinhamento visual com o badge de Informativos.
 - `0.8` — 2026-09-03 — Passos 6 e 7 concluídos: ações dos cards navegam com competência e entidade de contexto para Limites, Extrato, Cartões, Calendário ou Portfólio; informativos são marcados via API e atualizam o badge sem sumir da semana. Testes cobrem fatura vencida, isolamento entre usuários, autenticação, limites de payload, banner independente e contrato de navegação.
 - `0.7` — 2026-09-03 — Passo 5 concluído: indicadores críticos e informativos integrados à barra do Cockpit com contadores e rótulos acessíveis; modo estreito usa botão combinado com prioridade visual para críticos, carregamento dedicado deduplicado e cache curto. Faixas financeiras legadas deixam o topo do painel, preservando o banner de versão.
 - `0.6` — 2026-09-03 — Passo 4 concluído: componente `notification-flyout.js` cria um diálogo global seguro e acessível, com abas de severidade, estados vazios, fechamento por botão/backdrop/Escape e restauração de foco; estilos responsivos adicionados sem acoplamento à barra do Cockpit.

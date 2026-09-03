@@ -170,7 +170,7 @@ class DatabaseIndexTest(unittest.TestCase):
         self.assertEqual(perfil_count, 0)
 
     def test_initialize_database_creates_notification_reads_schema(self) -> None:
-        # spec: cockpit/alertas-cockpit v0.8 — critério 11
+        # spec: cockpit/alertas-cockpit v0.9 — critério 11
         initialize_database()
         initialize_database()
 
@@ -180,7 +180,7 @@ class DatabaseIndexTest(unittest.TestCase):
         self.assertEqual({"user_id", "notification_id", "seen_at"}, columns)
 
     def test_notification_reads_enforces_composite_pk_and_cascade(self) -> None:
-        # spec: cockpit/alertas-cockpit v0.8 — critério 11
+        # spec: cockpit/alertas-cockpit v0.9 — critério 11
         initialize_database()
 
         with get_connection() as conn:
