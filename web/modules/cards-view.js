@@ -12,7 +12,6 @@ export function registerCardsView({
   state,
   elements,
   api,
-  fetchAllListed,
   formData,
   setFormBusy,
   setMessage,
@@ -147,9 +146,8 @@ export function registerCardsView({
     const response = await api("/api/credit-cards");
     state.creditCards = response.cards;
     ensureSelectedCreditCard();
-    await loadArchivedCreditCards();
-    await loadCardTransactions();
-    await loadCardInvoice();
+    await Promise.all([loadArchivedCreditCards(), loadCardInvoice()]);
+    state.cardDataLoaded = true;
   }
 
   async function loadArchivedCreditCards() {
@@ -164,6 +162,7 @@ export function registerCardsView({
     if (!state.selectedCreditCardId) {
       state.cardInvoiceTransactions = [];
       state.cardInvoicePayments = [];
+      state.cardInvoiceHistory = [];
       return;
     }
     const response = await api(`/api/credit-card-invoice?card_id=${encodeURIComponent(cardId)}&month=${encodeURIComponent(month)}`);
@@ -176,16 +175,7 @@ export function registerCardsView({
     }
     state.cardInvoiceTransactions = response.transactions || [];
     state.cardInvoicePayments = response.payments || [];
-  }
-
-  async function loadCardTransactions() {
-    const [transactionsResponse, paymentsResponse] = await Promise.all([
-      fetchAllListed("/api/credit-card-transactions", "transactions"),
-      fetchAllListed("/api/credit-card-payments", "payments"),
-    ]);
-    state.cardTransactions = transactionsResponse || [];
-    state.cardPayments = paymentsResponse || [];
-    state.cardDataLoaded = true;
+    state.cardInvoiceHistory = response.history || [];
   }
 
   function ensureSelectedCreditCard() {
@@ -237,25 +227,25 @@ export function registerCardsView({
     data.invoice_month = state.cardInvoiceMonth;
     const isEditing = Boolean(data.id);
     const editingCardTransaction = isEditing
-      ? state.cardTransactions.find((entry) => String(entry.id) === String(data.id))
+      ? state.cardInvoiceTransactions.find((entry) => String(entry.id) === String(data.id))
       : null;
     const averageChanged = Boolean(
       editingCardTransaction && editingCardTransaction.series_kind === "recurring" && cardUseAverage
         && Boolean(editingCardTransaction.use_average) !== cardUseAverage.checked,
     );
     if (editingCardTransaction && editingCardTransaction.series_kind === "recurring" && cardUseAverage) {
-      // spec: cartoes v2.16 — critério 33
+      // spec: cartoes v2.17 — critério 33
       // (ao editar recorrente, o estado do checkbox de média é enviado explicitamente)
       data.use_average = cardUseAverage.checked ? "1" : "0";
     }
     if (isEditing && shouldAskFutureCardReplication(data.id)) {
       if (averageChanged) {
-        // spec: cartoes v2.16 — critérios 34, 35 e 40
+        // spec: cartoes v2.17 — critérios 34, 35 e 40
         // (flag de média alterada — marcada em série sem a marcação ou desmarcada
         //  em série que a tinha — não exibe modal e aplica em cascata)
         data.apply_to_future = true;
       } else {
-        // spec: cartoes v2.16 — critérios 24 e 38
+        // spec: cartoes v2.17 — critérios 24 e 38
         // (flag inalterada — ativa ou inativa — mantém o modal de escopo)
         const scope = await chooseSeriesEditScope(Boolean(editingCardTransaction.use_average));
         if (!scope) {
@@ -299,7 +289,7 @@ export function registerCardsView({
   }
 
   async function handlePartialCardInvoicePayment() {
-    // spec: cartoes v2.16 — criterio 174
+    // spec: cartoes v2.17 — criterio 174
     setMessage(cardInvoiceMessage, "");
     const card = selectedCreditCard();
     const total = cardInvoiceOpenAmount();
@@ -369,7 +359,7 @@ export function registerCardsView({
 
   async function deleteCardTransaction(id) {
     try {
-      const scope = await deleteSeriesScope(id, state.cardTransactions, "cartão");
+      const scope = await deleteSeriesScope(id, state.cardInvoiceTransactions, "cartão");
       if (scope === null) {
         return;
       }
@@ -408,13 +398,12 @@ export function registerCardsView({
 
   async function refreshCardLaunches() {
     await loadCardInvoice();
-    await loadCardTransactions();
     renderCreditCards();
     onCardTransactionsChanged();
   }
 
   function shouldAskFutureCardReplication(transactionId) {
-    const transaction = state.cardTransactions.find((entry) => String(entry.id) === String(transactionId));
+    const transaction = state.cardInvoiceTransactions.find((entry) => String(entry.id) === String(transactionId));
     return Boolean(transaction && transaction.series_id && isInstallmentTransaction(transaction));
   }
 
@@ -897,16 +886,14 @@ export function registerCardsView({
   }
 
   function cardInvoiceMonthAmount(cardId, month) {
-    return state.cardTransactions.reduce((total, transaction) => {
-      if (String(transaction.credit_card_id) !== String(cardId) || transaction.invoice_month !== month) {
-        return total;
-      }
-      const amount = Number(transaction.amount || 0);
-      return total + (transaction.type === "expense" ? amount : -amount);
-    }, 0);
+    if (String(cardId) !== String(state.selectedCreditCardId)) {
+      return 0;
+    }
+    const summary = state.cardInvoiceHistory.find((entry) => entry.month === month);
+    return Number(summary?.amount || 0);
   }
 
-  // spec: cartoes v2.16 — criterios 36 e 37
+  // spec: cartoes v2.17 — criterios 36 e 37
   // (linha de referencia horizontal com a media dos valores absolutos das
   //  5 faturas em tela, na mesma escala vertical do grafico, com o valor
   //  da media em texto ao final da linha)
@@ -1088,40 +1075,6 @@ export function registerCardsView({
     renderCreditCards();
   }
 
-  function cardReconciledBalance(cardId) {
-    const currentMonth = currentMonthValue();
-    const transactionTotal = state.cardTransactions.reduce((total, transaction) => {
-      if (String(transaction.credit_card_id) !== String(cardId) || !transaction.reconciled_at || transaction.invoice_month > currentMonth) {
-        return total;
-      }
-      const amount = Number(transaction.amount);
-      return total + (transaction.type === "expense" ? amount : -amount);
-    }, 0);
-    const paidTotal = state.cardPayments.reduce((total, payment) => (
-      String(payment.credit_card_id) === String(cardId) && payment.invoice_month <= currentMonth ? total + Number(payment.amount) : total
-    ), 0);
-    return transactionTotal - paidTotal;
-  }
-
-  function cardOpenBalance(cardId, untilInvoiceMonth = null) {
-    const transactionTotal = state.cardTransactions.reduce((total, transaction) => {
-      if (String(transaction.credit_card_id) !== String(cardId)) {
-        return total;
-      }
-      if (untilInvoiceMonth && transaction.invoice_month > untilInvoiceMonth) {
-        return total;
-      }
-      const amount = Number(transaction.amount);
-      return total + (transaction.type === "expense" ? amount : -amount);
-    }, 0);
-    const paidTotal = state.cardPayments.reduce((total, payment) => (
-      String(payment.credit_card_id) === String(cardId) && (!untilInvoiceMonth || payment.invoice_month <= untilInvoiceMonth)
-        ? total + Number(payment.amount)
-        : total
-    ), 0);
-    return transactionTotal - paidTotal;
-  }
-
   function creditCardCurrency(cardId) {
     const card = state.creditCards.find((entry) => String(entry.id) === String(cardId));
     return card ? card.currency : "BRL";
@@ -1131,7 +1084,6 @@ export function registerCardsView({
     loadCreditCards,
     loadArchivedCreditCards,
     loadCardInvoice,
-    loadCardTransactions,
     ensureSelectedCreditCard,
     renderCreditCards,
     renderCardInvoice,
@@ -1143,8 +1095,6 @@ export function registerCardsView({
     updateCardSeriesState,
     setCardInvoiceMonth,
     shiftCardInvoiceMonth,
-    cardReconciledBalance,
-    cardOpenBalance,
     creditCardCurrency,
   };
 }

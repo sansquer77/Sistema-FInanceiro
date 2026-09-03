@@ -13,7 +13,7 @@ from financeiro.calendar_rules import shift_month
 
 
 def build_evolution_presentation(evolution):
-    # spec: relatorios/relatorios v2.22 — evolução: total, tendência e SMA recursiva
+    # spec: relatorios/relatorios v2.23 — evolução: total, tendência e SMA recursiva
     values = [int(point['total_cents']) for point in evolution]
     trend = None
     if len(values) > 1 and values[0] != 0:
@@ -95,7 +95,7 @@ def build_statement_report(user_id, month=None, account_ids=None, card_ids=None,
         'card': active_cards & set(selected_cards) if selected_cards else active_cards,
     }
     sections = {}
-    # spec: relatorios/relatorios v2.22 — demonstrativo mensal e filtros por moeda
+    # spec: relatorios/relatorios v2.23 — demonstrativo mensal e filtros por moeda
     for origin, transactions in (
         ('account', list_transactions(user_id, month=month)),
         ('card', list_credit_card_transactions(user_id, invoice_month=month)),
@@ -133,7 +133,7 @@ def _statement_groups(items, total, *, subcategory=False):
 
 
 def _statement_section(currency, items, debt_cents, month, today):
-    # spec: relatorios/relatorios v2.22 — média, composição e série diária do demonstrativo
+    # spec: relatorios/relatorios v2.23 — média, composição e série diária do demonstrativo
     total = sum(item['amount_cents'] for item in items)
     days = monthrange(*map(int, month.split('-')))[1]
     current_month = today.strftime('%Y-%m')
@@ -167,7 +167,7 @@ def _statement_section(currency, items, debt_cents, month, today):
 
 
 def build_tag_report(user_id: int, month: str | None = None) -> dict:
-    # spec: relatorios/relatorios v2.22 — relatório de tags agregado no SQLite
+    # spec: relatorios/relatorios v2.23 — relatório de tags agregado no SQLite
     normalized_month = None
     if month:
         try:
@@ -181,8 +181,39 @@ def build_tag_report(user_id: int, month: str | None = None) -> dict:
         month_end = f"{normalized_month}-{monthrange(year, month_number)[1]:02d}"
     groups: dict[str, dict] = {}
     with get_connection() as conn:
-        rows = conn.execute(
-            """
+        sql, params = _tag_report_query(user_id, normalized_month, month_start, month_end)
+        rows = conn.execute(sql, params).fetchall()
+    for row in rows:
+        _accumulate_tag_aggregate(groups, row)
+    rows = sorted(
+        groups.values(),
+        key=lambda row: (
+            -(row["expense_cents"] + row["investment_cents"]),
+            row["tag"],
+        ),
+    )
+    return {
+        "month": normalized_month,
+        "tags": [_serialize_tag_row(row) for row in rows],
+    }
+
+
+def _tag_report_query(
+    user_id: int,
+    normalized_month: str | None,
+    month_start: str | None,
+    month_end: str | None,
+) -> tuple[str, tuple]:
+    account_period = ""
+    card_period = ""
+    account_params: tuple = (user_id,)
+    card_params: tuple = (user_id,)
+    if normalized_month:
+        account_period = "AND transactions.date BETWEEN ? AND ?"
+        card_period = "AND credit_card_transactions.invoice_month = ?"
+        account_params += (month_start, month_end)
+        card_params += (normalized_month,)
+    return f"""
             WITH tagged AS (
                 SELECT
                     tags.name AS tag,
@@ -198,7 +229,7 @@ def build_tag_report(user_id: int, month: str | None = None) -> dict:
                 WHERE transactions.user_id = ?
                     AND transactions.archived_at IS NULL
                     AND transactions.type IN ('income', 'expense', 'investment')
-                    AND (? IS NULL OR transactions.date BETWEEN ? AND ?)
+                    {account_period}
                     AND NOT EXISTS (
                         SELECT 1 FROM credit_card_payments
                         WHERE credit_card_payments.user_id = transactions.user_id
@@ -222,27 +253,12 @@ def build_tag_report(user_id: int, month: str | None = None) -> dict:
                 WHERE credit_card_transactions.user_id = ?
                     AND credit_card_transactions.archived_at IS NULL
                     AND credit_card_transactions.type IN ('income', 'expense', 'investment')
-                    AND (? IS NULL OR credit_card_transactions.invoice_month = ?)
+                    {card_period}
             )
             SELECT tag, currency, report_type, SUM(amount_cents) AS total_cents, COUNT(*) AS item_count
             FROM tagged
             GROUP BY tag, currency, report_type
-            """,
-            (user_id, normalized_month, month_start, month_end, user_id, normalized_month, normalized_month),
-        ).fetchall()
-    for row in rows:
-        _accumulate_tag_aggregate(groups, row)
-    rows = sorted(
-        groups.values(),
-        key=lambda row: (
-            -(row["expense_cents"] + row["investment_cents"]),
-            row["tag"],
-        ),
-    )
-    return {
-        "month": normalized_month,
-        "tags": [_serialize_tag_row(row) for row in rows],
-    }
+            """, account_params + card_params
 
 
 def _accumulate_tag_aggregate(groups: dict[str, dict], row) -> None:

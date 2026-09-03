@@ -2,8 +2,8 @@
 tipo: spec
 area: frontend-v2
 status: em-implementacao
-versao: 0.13
-atualizado: 2026-09-01
+versao: 0.14
+atualizado: 2026-09-03
 relacionados:
   - "[[frontend-modularizacao]]"
   - "[[../adr/0002-modularizacao-frontend]]"
@@ -21,7 +21,7 @@ aliases: ["Fundação visual da v2", "Gráficos, máscaras, Command Palette e vi
 # Fundação do frontend v2
 
 > [!info] Status
-> **em-implementacao** · área: `frontend-v2` · atualizado em 2026-09-01 · relacionados: [[frontend-modularizacao]], [[../adr/0013-dependencias-frontend-v2]], [[../design/design-system]], [[relatorios]], [[lancamentos]], [[cartoes]], [[investimentos-portfolio]], [[efeito-borboleta]]
+> **em-implementacao** · área: `frontend-v2` · atualizado em 2026-09-03 · relacionados: [[frontend-modularizacao]], [[../adr/0013-dependencias-frontend-v2]], [[../design/design-system]], [[relatorios]], [[lancamentos]], [[cartoes]], [[investimentos-portfolio]], [[efeito-borboleta]]
 
 ## Problema
 
@@ -192,6 +192,7 @@ Usuário que acompanha muitos lançamentos, faturas, operações ou posições e
 30. Dado o gráfico mensal de Tendências, quando a aba renderiza, então o contêiner ApexCharts é criado diretamente, sem montar ou substituir um SVG financeiro intermediário.
 31. Dado o demonstrativo mensal com distribuição por categoria, quando seus dados são exibidos ou uma fatia recebe hover, então o donut usa o adaptador ApexCharts, mantém legenda textual com percentuais e reserva o centro exclusivamente ao total formatado na moeda da seção, sem vazamento de textos para fora da área interna.
 32. Dado o demonstrativo mensal com gastos diários, quando seus dados são exibidos, então as colunas usam o adaptador ApexCharts, preservam os dias no eixo e formatam valores e tooltip na moeda da seção.
+33. Dado o app aberto no Safari/WebKit, quando o documento é carregado, então a detecção automática de telefone, data, endereço e e-mail permanece desativada para evitar análise e mutação implícita do DOM financeiro; a fonte continua seguindo a cadeia nativa do sistema.
 
 ## Pendências
 
@@ -223,6 +224,8 @@ Usuário que acompanha muitos lançamentos, faturas, operações ou posições e
 - [ ] Passo 7 — validar visualmente temas, densidades, teclado, leitores de tela, impressão e pacotes offline nas plataformas suportadas. Fecha: critérios 1 a 18.
 
 ## Changelog
+
+- `0.14` — 2026-09-03 — Documento passa a desativar a detecção automática de telefone, data, endereço e e-mail do Safari/WebKit; cadeia tipográfica do sistema preservada e contenção CSS não aplicada.
 
 - `0.13` — 2026-09-01 — Corrigida a exibição do total central do donut: os elementos internos exigidos pelo ApexCharts permanecem ativos, mas seus formatadores ficam fixos no rótulo e total da seção, sem troca pela categoria em hover.
 - `0.12` — 2026-09-01 — Centro do donut do demonstrativo passa a exibir somente o total, com área interna ampliada e tipografia contida; nomes de categorias permanecem no tooltip e na legenda sem substituir o conteúdo central durante hover.

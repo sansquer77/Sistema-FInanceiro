@@ -6,7 +6,7 @@ export function createTransactionRefresh({ state, api, fetchAllListed, loader, r
     const revision = loader.getRevision();
     const userId = state.user?.id;
     const current = () => userId === state.user?.id && revision === loader.getRevision();
-    // spec: lancamentos/lancamentos v3.34 — resposta confirmada antes das recargas.
+    // spec: lancamentos/lancamentos v3.35 — resposta confirmada antes das recargas.
     for (const key of ["accountTransactions", "transactions"]) {
       const rows = (state[key] || []).filter(row => String(row.id) !== String(transaction?.id ?? deletedId));
       state[key] = transaction ? [...rows, transaction] : rows;

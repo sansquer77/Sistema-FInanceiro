@@ -2,8 +2,8 @@
 tipo: spec
 area: cartoes
 status: implementado
-versao: 2.16
-atualizado: 2026-09-01
+versao: 2.17
+atualizado: 2026-09-03
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -18,7 +18,7 @@ aliases: ["Cartões de Crédito", "Faturas"]
 # Cartões de Crédito
 
 > [!info] Status
-> **implementado** · área: `cartoes` · atualizado em 2026-09-01 · relacionados: [[contas-correntes]], [[lancamentos]], [[limites-gastos]], [[relatorios]]
+> **implementado** · área: `cartoes` · atualizado em 2026-09-03 · relacionados: [[contas-correntes]], [[lancamentos]], [[limites-gastos]], [[relatorios]]
 
 ## Problema
 
@@ -126,6 +126,7 @@ Qualquer usuário autenticado localmente que utilize cartões de crédito para d
 - Campos do formulário de lançamento no cartão devem manter altura e alinhamento consistentes dentro da mesma linha; linhas com apenas um campo visível devem ocupar a largura completa para evitar lacunas visuais.
 - O formulário de Lançamentos de Cartões deve exibir ação `Cancelar` também durante novo cadastro, em variante discreta, permitindo limpar a entrada atual e retornar ao estado inicial sem depender de salvar ou navegar.
 - As listagens completas de lançamentos e pagamentos de cartão (`GET /api/credit-card-transactions` e `GET /api/credit-card-payments`) são paginadas por `limit` (padrão 2000, máximo 5000) e `offset`, respondendo `has_more`; o frontend percorre as páginas até receber uma página menor que `limit`.
+- Ao entrar em Lançamentos de Cartões, o frontend carrega apenas os detalhes da fatura selecionada. O histórico visual recebe do backend cinco totais mensais agregados (duas competências anteriores, a atual e duas posteriores), sem carregar linhas históricas de compras ou pagamentos.
 
 ## API e dados
 
@@ -199,8 +200,11 @@ Tabelas: `credit_cards`, `credit_card_transactions`, `credit_card_payments`, `cr
 - Dado uma série recorrente de cartão sendo editada com a flag de média alterada (marcada ou desmarcada), quando o usuário salva, então o sistema não exibe o modal de escopo e aplica a alteração automaticamente às ocorrências futuras não conciliadas — ao marcar, persiste a marcação e recalcula pela média; ao desmarcar, mantém o valor informado sem recálculo e remove a marcação.
 - Dado o usuário visualizando o gráfico de evolução de faturas, quando há valores nas 5 faturas em tela, então uma linha horizontal de referência é desenhada na altura da média aritmética dos valores absolutos dessas faturas, no mesmo estilo das linhas atuais (contínua, `--chart-average-line`: branca no tema escuro, cinza no claro) e na mesma escala vertical do gráfico.
 - Dado o usuário visualizando o gráfico de evolução de faturas, quando a linha de referência da média é exibida, então o valor da média formatado na moeda do cartão aparece em texto compacto ao final (lado direito) da linha.
+- Dado qualquer volume de histórico de cartões, quando o usuário entra em Lançamentos de Cartões ou troca de fatura, então são transferidos somente os lançamentos e pagamentos da competência ativa e cinco totais mensais agregados para o gráfico, sem percorrer as listagens históricas completas.
 
 ## Changelog
+
+- `2.17` — 2026-09-03 — A tela de Lançamentos de Cartões deixa de baixar compras e pagamentos históricos completos; a fatura ativa passa a fornecer detalhes da competência e um resumo agregado limitado a cinco meses para o gráfico.
 
 - `2.16` — 2026-09-01 — `GET /api/credit-card-transactions` aceita filtro `month` por competência antes da paginação; carga inicial e Relatórios deixam de percorrer todo o histórico de cartões e pagamentos.
 

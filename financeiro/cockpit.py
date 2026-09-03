@@ -15,7 +15,7 @@ def build_cockpit_summary(user_id: int, month: str) -> dict:
         raise ValueError("Informe um mes valido.") from exc
     month_start = f"{normalized_month}-01"
     month_end = f"{normalized_month}-31"
-    # spec: relatorios/relatorios v2.22 — Cockpit agregado sem materializar lançamentos
+    # spec: relatorios/relatorios v2.23 — Cockpit agregado sem materializar lançamentos
     with get_connection() as conn:
         category_rows = conn.execute(
             """
@@ -219,7 +219,7 @@ def money_value_to_cents(value: object) -> int:
 
 
 def is_credit_card_payment_transaction(transaction: dict) -> bool:
-    # spec: relatorios/relatorios v2.22 — critério 6
+    # spec: relatorios/relatorios v2.23 — critério 6
     return bool(transaction.get("is_credit_card_payment"))
 
 

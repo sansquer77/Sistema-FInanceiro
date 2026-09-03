@@ -203,7 +203,7 @@ export function registerReportsView({
   }
 
   async function renderTagsReport() {
-    // spec: relatorios/relatorios v2.22 — relatório de tags agrupado por tag com
+    // spec: relatorios/relatorios v2.23 — relatório de tags agrupado por tag com
     // Receitas, Despesas, Saldo e Investimentos, separados por moeda.
     const requestId = ++tagsRequestId;
     const requestedMonth = state.reportMonth;

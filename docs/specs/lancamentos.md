@@ -2,8 +2,8 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 3.34
-atualizado: 2026-09-01
+versao: 3.35
+atualizado: 2026-09-03
 relacionados:
   - "[[contas-correntes]]"
   - "[[categorias-tags-gestao]]"
@@ -17,7 +17,7 @@ aliases: ["Lançamentos", "Transações"]
 # Lançamentos
 
 > [!info] Status
-> **implementado** · área: `lancamentos` · atualizado em 2026-09-01 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]]
+> **implementado** · versão: `3.35` · área: `lancamentos` · atualizado em 2026-09-03 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]]
 
 ## Problema
 
@@ -124,7 +124,7 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 - O formulário de investimento deve se adaptar ao ativo selecionado para reduzir dúvidas: quando o aporte for Poupança, campos de quantidade, preço unitário, renda fixa, CNPJ, corretagem, emolumentos, impostos e outros custos ficam ocultos/desabilitados, pois não são aplicáveis.
 - No formulário de investimento em **Fundos de Investimentos** ou **Previdência Privada**, o usuário pode informar CNPJ opcionalmente e buscar a cota pela **Mais Retorno**; a busca preenche **Preço unitário** como assistência editável e não salva dados automaticamente.
 - A listagem (`GET /api/transactions`) é paginada por `limit` (padrão 2000, máximo 5000) e `offset`, respondendo `has_more`; a carga inicial e os Relatórios solicitam apenas a competência mensal necessária, enquanto fluxos explicitamente históricos podem percorrer páginas sob demanda.
-- Com `month` e `account_id` juntos, a listagem retorna todo o histórico da conta até o fim do mês informado (sem limite inferior de data) — o extrato usa essa fatia para calcular saldos previsto/conciliado a partir do saldo inicial da conta; o intervalo estrito do mês (`>= primeira data do mês`) aplica-se apenas à listagem sem conta.
+- Com `month` e `account_id` juntos, a listagem retorna apenas lançamentos cuja data pertence à competência informada. Saldos previsto/conciliado, inclusive o acumulado anterior, vêm de `/api/balance-projection` e não exigem transportar o histórico da conta ao navegador.
 
 ## API e dados
 
@@ -214,6 +214,7 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dada uma recarga auxiliar em andamento, quando há nova mutação ou troca de sessão, então sua resposta antiga não substitui os dados atuais.
 - Dado o mesmo histórico financeiro, quando a projeção otimizada é calculada, então todos os saldos e indicadores de reserva correspondem ao cálculo de referência, inclusive em transferências e faturas pagas.
 - Dado um mês recente em cache, quando o usuário retorna a ele, então o app reaproveita a fatia válida; uma resposta de outro mês não substitui o selecionado.
+- Dado uma conta com lançamentos em competências anteriores, quando o Extrato consulta `month` e `account_id`, então recebe apenas as linhas do mês solicitado e preserva os saldos acumulados fornecidos pela projeção backend.
 
 ## Plano de implementação desta correção
 
@@ -224,6 +225,8 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - [x] Testar sucesso, falha, concorrência e contratos de apresentação aplicáveis.
 
 ## Changelog
+
+- `3.35` — 2026-09-03 — A fatia `month + account_id` passa a usar intervalo mensal estrito; o Extrato preserva saldos acumulados exclusivamente pelo contrato `/api/balance-projection`, sem transportar o histórico anterior.
 
 - `3.34` — 2026-09-01 — Carga inicial deixa de percorrer todo o histórico e mantém apenas o recorte mensal necessário; Relatórios carregam competência própria sem reutilizar um histórico global integral.
 

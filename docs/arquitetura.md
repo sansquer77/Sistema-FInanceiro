@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.82
-atualizado: 2026-09-01
+versao: 3.84
+atualizado: 2026-09-03
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -18,7 +18,7 @@ tags: [arquitetura, meta]
 # Arquitetura
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-09-01 · relacionados: [[requisitos]], [[qualidade-codigo]], [[specs/bank-logos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
+> **implementado** · área: `meta` · atualizado em 2026-09-03 · relacionados: [[requisitos]], [[qualidade-codigo]], [[specs/bank-logos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
 
 ## Visão geral
 
@@ -333,6 +333,7 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | `categories.py` | Categorias, subcategorias, tags e bloqueios de exclusão. Ver [[categorias-tags-gestao]]. |
 | `classification_suggestions.py` | Normalização de descrições e sugestão local por histórico exato indexado. Ver [[classificacao-assistida]]. |
 | `credit_cards.py` | Cartões, faturas mensais, transações e pagamentos. Ver [[cartoes]]. |
+| `credit_card_invoice.py` | Consulta agregada e serialização do recorte de fatura/histórico visual limitado. Ver [[cartoes]]. |
 | `spending_limits.py` | Metas recorrentes e consumo mensal agregado por categoria/subcategoria, incluindo competência de faturas e exclusão do pagamento agregado. Ver [[limites-gastos]]. |
 | `global_search.py` | Busca histórica autenticada e paginada em lançamentos de contas/cartões, isolada por usuário e executada sob demanda pela Command Palette. |
 | `http_routes.py` | Tabela declarativa e resolução de rotas, independente do transporte HTTP. Ver [[specs/desconcentracao-arquitetura-v2]]. |
@@ -584,6 +585,10 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 - [[adr/0014-desconcentracao-fachadas-e-roteamento]] — Fachadas compatíveis, roteamento declarativo e módulos internos menores para a fundação v2.
 
 ## Changelog
+
+- `3.84` — 2026-09-03 — Lançamentos de Cartões carregam apenas a fatura ativa e cinco totais mensais agregados por `credit_card_invoice.py`; o relatório mensal de tags separa o SQL com competência para preservar o uso dos índices temporais.
+
+- `3.83` — 2026-09-03 — `GET /api/transactions` com `month + account_id` passa a retornar intervalo mensal estrito; saldos acumulados do Extrato permanecem sob autoridade de `/api/balance-projection`.
 
 - `3.82` — 2026-09-01 — Limites recebem consumo mensal agregado no SQLite e a Busca Global passa a consultar lançamentos históricos sob demanda pela nova rota paginada `/api/global-search`, sem restaurar históricos no estado global.
 

@@ -2,8 +2,8 @@
 tipo: spec
 area: relatorios
 status: implementado
-versao: 2.22
-atualizado: 2026-09-01
+versao: 2.23
+atualizado: 2026-09-03
 relacionados:
   - "[[lancamentos]]"
   - "[[cartoes]]"
@@ -17,7 +17,7 @@ aliases: ["Relatórios", "Cockpit"]
 # Relatórios
 
 > [!info] Status
-> **implementado** · versão: `2.22` · área: `relatorios` · atualizado em 2026-09-01 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[limites-gastos]]
+> **implementado** · versão: `2.23` · área: `relatorios` · atualizado em 2026-09-03 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[limites-gastos]]
 
 ## Problema
 
@@ -57,6 +57,7 @@ Qualquer usuário autenticado localmente que queira analisar seus gastos e recei
 - O relatório de tags considera lançamentos de contas e cartões com tag, mesmo quando não houver subcategoria.
 - O relatório de tags agrupa por tag e exibe, para cada uma, quatro totais separados por moeda: **Receitas**, **Despesas**, **Saldo** (receitas menos despesas) e **Investimentos**.
 - O relatório de tags consolida `SUM` e `COUNT` por tag, moeda e tipo diretamente no SQLite; não materializa lançamentos detalhados para executar a agregação.
+- Quando uma competência é informada, o relatório de tags aplica diretamente o intervalo de datas nas contas e a igualdade de `invoice_month` nos cartões, permitindo o uso dos índices temporais; a consulta sem competência usa um caminho SQL separado, sem predicados opcionais com `OR`.
 - Um lançamento com múltiplas tags contribui com o mesmo valor para o total de cada uma das tags.
 - Investimentos e aportes aparecem na linha própria de Investimentos do relatório de tags e não são misturados com despesas.
 - Transferências, câmbio e pagamentos de fatura não entram no relatório de tags.
@@ -183,6 +184,7 @@ O ponto crítico é cartão de crédito: a fatura pertence ao mês de competênc
 - Dado um lançamento de investimento com tag, quando o relatório de tags é exibido, então o valor aparece na linha Investimentos da tag e não soma às Despesas.
 - Dado uma tag com despesas em BRL e receitas em USD, quando o relatório de tags é exibido, então cada moeda mantém seus próprios totais e o Saldo é calculado dentro de cada moeda.
 - Dado uma transferência entre contas com tag, quando o relatório de tags é exibido, então o lançamento não aparece no relatório.
+- Dado uma competência no relatório de tags, quando a agregação é consultada, então o plano do SQLite usa os índices de usuário e data/competência das duas origens, sem predicado opcional `IS NULL OR`.
 - Dado uma fatura paga no mês, quando relatórios e Cockpit somam despesas do período, então o pagamento da fatura não é somado como despesa analítica e apenas as despesas detalhadas do cartão entram no total.
 - Dado movimentações em múltiplas moedas, quando exibidas, os totais são separados por moeda.
 - Dado um planejamento mensal com lançamentos em moedas distintas, quando o Cockpit é exibido, cada seção apresenta subtotal e itens por moeda, sem rotular valores estrangeiros como reais.
@@ -236,6 +238,8 @@ Cobertura: `tests/test_statement_report.py` e `tests/frontend_open_debts.test.mj
 ## Changelog
 
 <!-- Validação automatizada desta etapa: tests/test_evolution_presentation.py e tests/frontend_evolution.test.mjs. Validação visual no Safari não executada. -->
+
+- `2.23` — 2026-09-03 — Relatório de tags passa a usar consultas distintas com e sem competência; o caminho mensal aplica predicados temporais diretos e utiliza os índices de data e `invoice_month`.
 
 - `2.22` — 2026-09-01 — Saldo operacional por moeda do Cockpit passa a ser agregado diretamente no SQLite, sem carregar históricos detalhados nem executar a projeção completa do Extrato; contrato anterior preservado por teste de caracterização.
 

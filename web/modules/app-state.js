@@ -2,7 +2,7 @@ export function createAppState({ currentMonth }) {
   return {
     user: null,
     accounts: [], archivedAccounts: [], creditCards: [], archivedCreditCards: [],
-    cardInvoiceTransactions: [], cardInvoicePayments: [], cardTransactions: [], cardPayments: [], cardDataLoaded: false,
+    cardInvoiceTransactions: [], cardInvoicePayments: [], cardInvoiceHistory: [], cardTransactions: [], cardPayments: [], cardDataLoaded: false,
     selectedCreditCardId: "", selectedAccountId: "",
     cardInvoiceSearch: "", cardInvoiceStatusFilter: "all",
     transactionSearch: "", transactionStatusFilter: "all", transactionHighlightId: "",
@@ -29,7 +29,7 @@ export function resetSessionData(state, { currentMonth }) {
   Object.assign(state, {
     user: null,
     accounts: [], archivedAccounts: [], creditCards: [], archivedCreditCards: [],
-    cardInvoiceTransactions: [], cardInvoicePayments: [], cardTransactions: [], cardPayments: [], cardDataLoaded: false,
+    cardInvoiceTransactions: [], cardInvoicePayments: [], cardInvoiceHistory: [], cardTransactions: [], cardPayments: [], cardDataLoaded: false,
     selectedCreditCardId: "", selectedAccountId: "",
     transactionSearch: "", transactionStatusFilter: "all", transactionHighlightId: "",
     transactions: [], accountTransactions: [], balanceProjection: null,

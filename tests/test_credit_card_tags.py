@@ -69,6 +69,26 @@ class CreditCardTransactionTagsTest(unittest.TestCase):
 
         self.assertEqual(updated["tags"], ["Recorrente"])
 
+    def test_invoice_returns_only_current_details_and_five_month_summary(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        card = create_credit_card(user["id"], {
+            "name": "Cartao", "issuer": "Banco", "currency": "BRL", "limit": "5000,00",
+            "closing_day": "28", "due_day": "10",
+        })
+        for month, amount in (("2026-03", "30,00"), ("2026-05", "50,00"), ("2026-07", "70,00"), ("2026-08", "800,00")):
+            create_credit_card_transaction(user["id"], {
+                "credit_card_id": str(card["id"]), "type": "expense", "description": f"Compra {month}",
+                "amount": amount, "date": f"{month}-10", "invoice_month": month, "category": "Compras",
+            })
+
+        invoice = list_credit_card_invoice(user["id"], card["id"], "2026-05")
+
+        self.assertEqual([row["month"] for row in invoice["history"]], [
+            "2026-03", "2026-04", "2026-05", "2026-06", "2026-07",
+        ])
+        self.assertEqual([row["amount_cents"] for row in invoice["history"]], [3000, 0, 5000, 0, 7000])
+        self.assertEqual([row["invoice_month"] for row in invoice["transactions"]], ["2026-05"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -49,15 +49,10 @@ def list_transactions(
     params: list[object] = [user_id]
     if month:
         normalized_month = normalize_month_filter(month)
-        if account_id:
-            # spec: lancamentos v3.34 — a fatia de mes+conta mantem todo o historico
-            # ate o fim do mes (sem limite inferior) porque o extrato calcula saldos
-            # acumulados partindo do saldo inicial da conta (ver web/app.js getBalanceUntil)
-            filters.append("transactions.date <= ?")
-            params.append(month_end_date(normalized_month))
-        else:
-            filters.append("transactions.date >= ? AND transactions.date <= ?")
-            params.extend([f"{normalized_month}-01", month_end_date(normalized_month)])
+        # spec: lancamentos/lancamentos v3.35 — a lista da conta transporta
+        # somente a competência; saldos acumulados vêm de balance-projection.
+        filters.append("transactions.date >= ? AND transactions.date <= ?")
+        params.extend([f"{normalized_month}-01", month_end_date(normalized_month)])
     if account_id:
         filters.append("(transactions.account_id = ? OR transactions.destination_account_id = ?)")
         params.extend([account_id, account_id])
@@ -291,7 +286,7 @@ def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
             additional_occurrences = occurrences[1:]
             series_id = str(uuid4())
 
-        # spec: lancamentos v3.34 — criterios 46, 56, 57 e 60
+        # spec: lancamentos v3.35 — criterios 46, 56, 57 e 60
         # (a cascata automatica so ocorre quando a flag de media muda no
         #  salvamento — ativada agora ou desmarcada — ou quando o usuario
         #  escolhe futuro no modal; serie com flag ativa mas inalterada e
@@ -358,10 +353,10 @@ def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
 
 
 def update_future_series_transactions(conn, user_id: int, existing, transaction: dict, force_apply_to_future: bool = False) -> None:
-    # spec: lancamentos v3.34 — criterios 56, 57, 59 e 60
+    # spec: lancamentos v3.35 — criterios 56, 57, 59 e 60
     # (series recorrentes com use_average ativo no salvamento recalculam
     #  valores futuros pela media; demais series mantem apply_to_future)
-    # spec: lancamentos v3.34 — criterio 7 (apply_to_future)
+    # spec: lancamentos v3.35 — criterio 7 (apply_to_future)
     # (propaga apenas para ocorrencias futuras nao conciliadas da mesma serie;
     #  o delta de data e reaplicado, nao a data absoluta, para preservar o espacamento)
     if not existing["series_id"]:
@@ -399,7 +394,7 @@ def update_future_series_transactions(conn, user_id: int, existing, transaction:
         transaction["exchange_rate"],
     )
     category_id, subcategory_id = resolve_transaction_category(conn, user_id, transaction, destination)
-    # spec: lancamentos v3.34 — criterios 56, 57 e 59
+    # spec: lancamentos v3.35 — criterios 56, 57 e 59
     # (quando use_average estiver ativo no salvamento, recalcula o valor da serie pela media)
     if force_apply_to_future and existing["series_kind"] == "recurring":
         average_amount = average_amount_for_recurring_description(
@@ -505,7 +500,7 @@ def insert_additional_series_occurrences(
     tag_ids: list[int],
     series_id: str,
 ) -> None:
-    # spec: lancamentos v3.34 — critério 47
+    # spec: lancamentos v3.35 — critério 47
     # (editar um lançamento avulso para parcelado/recorrente reaproveita a
     # ocorrência atual como primeira parcela e cria somente as próximas)
     for occurrence in occurrences:
@@ -552,7 +547,7 @@ def preserve_existing_series_metadata(transaction: dict, existing, data: dict) -
     transaction["installment_count"] = existing["installment_count"]
     transaction["recurrence_frequency"] = existing["recurrence_frequency"]
     transaction["recurrence_count"] = existing["installment_count"]
-    # spec: lancamentos v3.34 — criterio 52
+    # spec: lancamentos v3.35 — criterio 52
     # (a flag de media so e herdada da serie quando o payload nao a envia;
     #  ao editar um recorrente, o frontend envia o estado do checkbox explicitamente)
     if "use_average" not in data:
@@ -588,7 +583,7 @@ def delete_transaction(user_id: int, transaction_id: str, apply_to_future: bool 
 
 
 def future_transactions_to_delete(conn, user_id: int, transaction, apply_to_future: bool):
-    # spec: lancamentos v3.34 — criterio 6 (scope=future)
+    # spec: lancamentos v3.35 — criterio 6 (scope=future)
     # (so remove ocorrencias futuras ainda nao conciliadas da mesma serie;
     #  uma vez conciliada, a ocorrencia fica fora do alcance da exclusao em cascata)
     if not apply_to_future or not transaction["series_id"]:
@@ -693,7 +688,7 @@ def normalize_series_payload(data: dict) -> dict:
         recurrence_frequency = str(data.get("recurrence_frequency", "")).strip().lower()
         if recurrence_frequency not in RECURRENCE_FREQUENCIES:
             raise TransactionError("Informe a frequencia da recorrencia.")
-        # spec: lancamentos v3.34 — critérios 24 e 25
+        # spec: lancamentos v3.35 — critérios 24 e 25
         # (recorrentes usam 120 ocorrencias automaticamente quando o campo nao e enviado;
         #  o campo nao e mais exibido no formulario, mas a API mantem compatibilidade)
         raw_count = str(data.get("recurrence_count") or "").strip()
@@ -833,7 +828,7 @@ def average_amount_for_recurring_description(
     subcategory_id: int | None,
     max_date: str | None = None,
 ) -> int | None:
-    # spec: lancamentos v3.34 — critério 27
+    # spec: lancamentos v3.35 — critério 27
     # (media dos ultimos 12 lancamentos anteriores ou na data de corte; ao recalcular
     #  uma serie, os lancamentos futuros da propria serie nao devem influenciar a media)
     normalized = normalize_description(description)
@@ -882,7 +877,7 @@ def average_amount_for_recurring_description(
 
 
 def build_transaction_occurrences(transaction: dict) -> list[dict]:
-    # spec: lancamentos v3.34 — regra de parcelamento/recorrencia (secao "Regras de negocio")
+    # spec: lancamentos v3.35 — regra de parcelamento/recorrencia (secao "Regras de negocio")
     # (parcelado: valor informado e o TOTAL, dividido entre as parcelas via split_cents;
     #  recorrente: cada ocorrencia mantem o valor informado integralmente — nao dividir)
     start_date = date.fromisoformat(transaction["date"])
@@ -1219,7 +1214,7 @@ def fetch_transaction(conn, user_id: int, transaction_id: int) -> dict:
 
 def format_transaction(transaction: dict) -> dict:
     investment_operation = extract_investment_operation(transaction)
-    # spec: relatorios/relatorios v2.22 — criterio 6
+    # spec: relatorios/relatorios v2.23 — criterio 6
     # (pagamento de fatura reduz saldo, mas fica fora de analises de despesa
     #  para nao duplicar os lancamentos detalhados do cartao)
     transaction["is_credit_card_payment"] = bool(transaction.pop("credit_card_payment_id", None))

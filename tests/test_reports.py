@@ -16,7 +16,7 @@ from financeiro.credit_cards import (
 )
 from financeiro.database import initialize_database
 from financeiro.cockpit import build_cockpit_summary
-from financeiro.reports import build_report_overview, build_tag_report
+from financeiro.reports import _tag_report_query, build_report_overview, build_tag_report
 from financeiro.transactions import create_transaction, set_transaction_reconciled
 
 
@@ -90,6 +90,17 @@ class TagReportTest(unittest.TestCase):
             response = build_tag_report(user["id"], "2026-01")
 
         self.assertEqual(response["tags"][0]["expense_cents"], 1000)
+
+    def test_tag_report_month_query_uses_temporal_indexes_without_optional_or(self) -> None:
+        sql, params = _tag_report_query(1, "2026-01", "2026-01-01", "2026-01-31")
+
+        self.assertNotIn("IS NULL OR", sql)
+        self.assertIn("transactions.date BETWEEN ? AND ?", sql)
+        self.assertIn("credit_card_transactions.invoice_month = ?", sql)
+        with database.get_connection() as conn:
+            plan = "\n".join(row["detail"] for row in conn.execute(f"EXPLAIN QUERY PLAN {sql}", params))
+        self.assertIn("idx_transactions_user_date", plan)
+        self.assertIn("idx_credit_card_transactions_user_invoice_date", plan)
 
     def test_cockpit_summary_aggregates_month_without_detailed_lists(self) -> None:
         user = create_user("Alice", "alice@example.com", "correct-password")

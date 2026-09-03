@@ -339,6 +339,26 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn('/api/credit-card-transactions?month=', loader_source)
         self.assertNotIn('from "./', loader_source)
 
+    def test_cards_loads_only_selected_invoice_and_bounded_history(self) -> None:
+        cards_source = (MODULE_ROOT / "cards-view.js").read_text(encoding="utf-8")
+        state_source = (MODULE_ROOT / "app-state.js").read_text(encoding="utf-8")
+
+        self.assertIn("response.history || []", cards_source)
+        self.assertIn("cardInvoiceHistory", state_source)
+        self.assertNotIn('fetchAllListed("/api/credit-card-transactions"', cards_source)
+        self.assertNotIn('fetchAllListed("/api/credit-card-payments"', cards_source)
+
+    def test_safari_data_detection_is_disabled_without_overriding_system_fonts(self) -> None:
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn(
+            '<meta name="format-detection" content="telephone=no, date=no, address=no, email=no">',
+            index,
+        )
+        self.assertIn("system-ui", styles)
+        self.assertIn("-apple-system", styles)
+
     def test_heavy_view_loads_share_freshness_invalidation_and_inflight_policy(self) -> None:
         app = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
         api = (MODULE_ROOT / "api.js").read_text(encoding="utf-8")

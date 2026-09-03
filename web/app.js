@@ -560,7 +560,6 @@ const {
   loadSpendingLimits,
   loadCurrentSpendingLimits,
   loadCardInvoice,
-  loadCardTransactions,
 } = appDataLoader;
 
 registerGlobalSearch({
@@ -893,7 +892,6 @@ const cardsView = registerCardsView({
     cancelCardTransactionEditButton,
   },
   api,
-  fetchAllListed,
   formData,
   setFormBusy,
   setMessage,
@@ -1704,9 +1702,6 @@ function getCurrencyTotals() {
   }]));
 }
 
-function cardOpenBalance(cardId, untilInvoiceMonth = null) {
-  return cardsView.cardOpenBalance(cardId, untilInvoiceMonth);
-}
 
 function creditCardCurrency(cardId) {
   return cardsView.creditCardCurrency(cardId);

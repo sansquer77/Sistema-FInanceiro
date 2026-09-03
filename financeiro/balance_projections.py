@@ -10,7 +10,7 @@ from financeiro.database import get_connection
 def build_currency_totals_for_user(user_id: int, month: str) -> list[dict]:
     """Build the Cockpit balance summary from bounded SQLite aggregates."""
     limit_date = month_end_date(month)
-    # spec: relatorios/relatorios v2.22 — Cockpit não materializa históricos
+    # spec: relatorios/relatorios v2.23 — Cockpit não materializa históricos
     # detalhados para consolidar saldos e reservas de fatura por moeda.
     with get_connection() as conn:
         account_rows = conn.execute(
@@ -193,7 +193,7 @@ def build_balance_projection(
     account_id: int | None = None,
 ) -> dict:
     selected_accounts = [account for account in accounts if account_id is None or int(account["id"]) == account_id]
-    # spec: lancamentos/lancamentos v3.34 — projeção limitada à conta selecionada
+    # spec: lancamentos/lancamentos v3.35 — projeção limitada à conta selecionada
     # Mantém transferências recebidas; não recalcula outras contas a cada troca.
     if account_id is not None:
         transactions = [
@@ -211,7 +211,7 @@ def build_balance_projection(
     for offset in range(-1, 4):
         dates.add(month_end_date(add_months(reference, offset).strftime("%Y-%m")))
 
-    # spec: lancamentos/lancamentos v3.34 — projeções preservam os saldos sem
+    # spec: lancamentos/lancamentos v3.35 — projeções preservam os saldos sem
     # reprocessar todo o histórico para cada data solicitada.
     ordered = sorted(transactions, key=lambda row: str(row.get("date") or ""))
     zero_accounts = [{**account, "initial_balance": 0} for account in selected_accounts]

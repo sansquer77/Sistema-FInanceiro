@@ -116,7 +116,7 @@ class ListPaginationTest(unittest.TestCase):
         self.assertEqual(len(payload["transactions"]), 3)
         self.assertTrue(payload["has_more"])
 
-    def test_month_account_slice_keeps_history_for_cumulative_balance(self) -> None:
+    def test_month_account_slice_returns_only_requested_competence(self) -> None:
         user = create_user("Alice", "alice@example.com", "correct-password")
         account = self._account(user["id"])
         create_transaction(user["id"], {
@@ -137,8 +137,8 @@ class ListPaginationTest(unittest.TestCase):
         })
 
         rows = list_transactions(user["id"], month="2026-01", account_id=account["id"])
-        self.assertEqual(len(rows), 2)
-        self.assertIn("2025-12-05", [row["date"] for row in rows])
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["date"], "2026-01-10")
 
     def test_transactions_endpoint_clamps_oversized_limit(self) -> None:
         user = create_user("Alice", "alice@example.com", "correct-password")

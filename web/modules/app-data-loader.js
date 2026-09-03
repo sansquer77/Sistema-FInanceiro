@@ -134,12 +134,11 @@ export function createAppDataLoader({ state, services, getViews, actions }) {
   async function loadSpendingLimits() { await getViews().limits.loadSpendingLimits(); }
   async function loadCurrentSpendingLimits() { await getViews().limits.loadCurrentSpendingLimits(actions.cockpitMonthValue()); }
   async function loadCardInvoice() { await getViews().cards.loadCardInvoice(); }
-  async function loadCardTransactions() { await getViews().cards.loadCardTransactions(); }
 
   return {
     loadAll, loadAccounts, loadCreditCards, loadArchivedAccounts, loadArchivedCreditCards,
     loadTransactionsAndAccounts, loadTransactionSlice, loadCockpit, refreshCockpitData,
     loadPortfolio, loadClassifications, loadSpendingLimits, loadCurrentSpendingLimits,
-    loadCardInvoice, loadCardTransactions,
+    loadCardInvoice,
   };
 }
