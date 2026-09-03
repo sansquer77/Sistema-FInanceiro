@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 import tempfile
+import os
 import contextlib
 from datetime import datetime, timedelta
 from http import HTTPStatus
@@ -675,6 +676,7 @@ class ConsultorAIExecutorTest(unittest.TestCase):
         database.DATA_DIR = Path(self.tempdir.name)
         database.DB_PATH = database.DATA_DIR / "test-consultor-ai.db"
         database.initialize_database()
+        os.environ["AI_ALLOW_PRIVATE_ENDPOINTS"] = "true"
 
     def tearDown(self) -> None:
         database.DATA_DIR = self.original_data_dir
@@ -854,12 +856,12 @@ class ConsultorAIExecutorTest(unittest.TestCase):
     def test_provider_network_errors_are_standardized(self) -> None:
         messages = build_ai_messages("Prompt seguro", {"analysis_id": "score_saude_financeira"})
 
-        with mock.patch("financeiro.consultor.urlopen", side_effect=TimeoutError("timed out")):
+        with mock.patch("financeiro.consultor.ai_urlopen", side_effect=TimeoutError("timed out")):
             with self.assertRaisesRegex(ConsultorError, "indisponivel"):
                 call_consultor_ai_provider(
                     {
                         "provider": "openai",
-                        "base_url": "https://api.openai.com/v1",
+                        "base_url": "http://127.0.0.1:1234",
                         "model": "gpt-test",
                         "api_key": "sk-test",
                         "auth_type": "bearer",
@@ -873,14 +875,14 @@ class ConsultorAIExecutorTest(unittest.TestCase):
         messages = build_ai_messages("Prompt seguro", {"analysis_id": "score_saude_financeira"})
 
         with mock.patch("financeiro.consultor.extract_summary_text", return_value=""):
-            with mock.patch("financeiro.consultor.urlopen") as urlopen_mock:
+            with mock.patch("financeiro.consultor.ai_urlopen") as urlopen_mock:
                 urlopen_mock.return_value.__enter__.return_value.read.return_value = b'{"choices":[]}'
 
                 with self.assertRaisesRegex(ConsultorError, "indisponivel"):
                     call_consultor_ai_provider(
                         {
                             "provider": "openai",
-                            "base_url": "https://api.openai.com/v1",
+                            "base_url": "http://127.0.0.1:1234",
                             "model": "gpt-test",
                             "api_key": "sk-test",
                             "auth_type": "bearer",

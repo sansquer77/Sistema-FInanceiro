@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.84
-atualizado: 2026-09-03
+versao: 3.86
+atualizado: 2026-08-31
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -134,6 +134,8 @@ Responsabilidades:
 | `APP_URL` | URL pública esperada do app; entra na lista de origens/hosts permitidos e define cookie `Secure` quando usa HTTPS. |
 | `APP_ALLOWED_HOSTS` | CSV de hosts adicionais aceitos. Entradas sem porta também aceitam a porta padrão configurada. |
 | `APP_ALLOWED_ORIGINS` | CSV de origens adicionais aceitas. Entradas sem esquema assumem `http://`; entradas sem porta assumem `APP_PORT`. |
+| `AI_ALLOW_PRIVATE_ENDPOINTS` | Quando `true`, permite que a URL base de IA resolva para IPs privados/loopback/link-local. Padrão: rejeitado. |
+| `AI_ALLOWED_LOCAL_HOSTS` | CSV opcional de hostnames locais permitidos além da validação de IP (exige `AI_ALLOW_PRIVATE_ENDPOINTS=true`). |
 
 O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pacotes usa `APP_HOST=0.0.0.0`, detecta o IP local e preenche `APP_URL`, `APP_ALLOWED_HOSTS` e `APP_ALLOWED_ORIGINS`; esse modo é adequado apenas para redes confiáveis. Quando essa exposição usa HTTP, a inicialização emite um alerta não bloqueante. Acesso remoto deve ficar atrás de reverse-proxy com HTTPS.
 
@@ -349,12 +351,13 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | `portfolio_presentation.py` | Modelos financeiros de leitura para posições/fontes, agregados, cabeçalhos, composição e metas; prévias de resgate e soma de metas. Centavos/Decimal, sem SQL ou rede. |
 | `financial_health.py` | Núcleo analítico do Score de Saúde Financeira: cálculo atômico dos pilares, lista `pilares`, Paz Financeira e função de histórico com validação de `months` (1-36). Ver [[score-saude-financeira]]. |
 | `trends.py` | Núcleo local de Tendências e Achados: série mensal, Budget x Realizado, achados estruturados, eventos pontuais, assinaturas/serviços recorrentes, confiança e resumo determinístico. Ver [[tendencias-saude-financeira]]. |
-| `ai_summary.py` | Reescrita opcional do resumo por IA com payload minimizado, timeout curto e fallback para resumo local. Ver [[tendencias-saude-financeira]]. |
+| `ai_endpoint_security.py` | Fronteira anti-SSRF para endpoints de IA configuráveis: validação de esquema, hostname, IP resolvido, bloqueio de redirecionamentos e opt-in por env para endpoints privados. Ver [[specs/seguranca-ai-ssrf]], [[adr/0015-ssrf-ai-endpoints]]. |
+| `ai_summary.py` | Reescrita opcional do resumo por IA com payload minimizado, timeout curto e fallback para resumo local. Valida o endpoint via `ai_endpoint_security` antes de cada chamada. Ver [[tendencias-saude-financeira]]. |
 | `consultor.py` | Fachada pública, composição dos contextos, execução e pós-processamento das respostas; reexports compatíveis de catálogo, configurações, contexto e histórico. Ver [[specs/consultor]]. |
 | `consultor_settings.py` | Configuração, consentimento, sincronização com IA geral e perfil complementar criptografado por usuário; delega expurgo ao histórico. |
 | `consultor_catalog.py` | Catálogo fechado, perfis educacionais, períodos, validações de seleção, prompts e estrutura de resposta; sem persistência ou transporte. |
 | `consultor_errors.py` | Definição única de `ConsultorError`, reexportada pela fachada e compartilhada por catálogo/configurações sem importações circulares. |
-| `consultor_provider.py` | Mensagens minimizadas, payloads dos provedores e transporte HTTP; dependências injetáveis e erros traduzidos pela fachada. Sem acesso ao SQLite. |
+| `consultor_provider.py` | Mensagens minimizadas, payloads dos provedores e transporte HTTP; dependências injetáveis e erros traduzidos pela fachada. Valida o endpoint via `ai_endpoint_security` e bloqueia redirecionamentos. Sem acesso ao SQLite. |
 | `consultor_context.py` | Builders dos nove contextos, agregação e compactação dos dados e formatação monetária de borda; reutiliza serviços de domínio e posições recebidas. Não acessa configuração, histórico ou transporte de IA. A fachada valida a seleção via catálogo e enriquece o contexto com perfis via configurações; reexporta os builders. |
 | `consultor_history.py` | Persistência/listagem/expurgo das análises, quota diária e cooldown de falhas, isolados do executor e da configuração. Ver [[specs/consultor]]. |
 | `imports.py` | Leitura de arquivos externos legados e planilhas modelo. Ver [[importacao-dados]]. |
@@ -363,6 +366,7 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | `emailer.py` | Envio SMTP do código de recuperação de senha. Ver [[recuperacao-senha]]. |
 | `secure_config.py` | Armazenamento criptografado da configuração SMTP local, segredos de IA e chaves de integrações por usuário em `secure_configs`, com compatibilidade para arquivos `.enc` legados. Ver [[recuperacao-senha]], [[tendencias-saude-financeira]], [[specs/preferencias-abas]]. |
 | `version_check.py` | Consulta a landing page oficial por nova versão, compara com a versão local e mantém cache de 1h. Ver [[alerta-nova-versao]]. |
+| `outbound_json.py` | Fronteira compartilhada para leitura limitada de JSON externo; valida tamanho declarado e efetivo antes de decodificar, com limites por integração. Ver [[specs/seguranca-transporte-externo]]. |
 | `calendar.py` | Cálculo da aba **Calendário** do Cockpit: contas a receber/pagar atrasadas e vencimentos de renda fixa em 30 e 60 dias. Ver [[specs/cockpit-calendario]]. |
 | `simulations.py` | Validação e projeção comparativa, sem persistência, de cenários hipotéticos do Efeito Borboleta. Ver [[efeito-borboleta]]. |
 | `reports.py` | Relatório por tag agregado no SQLite e demonstrativo mensal com KPIs, média diária, ranking, distribuição, composição, percentuais, série diária e detalhes separados por moeda nativa. Reutiliza `open_debts.py`; autenticação/adaptação HTTP ficam em `app.py`. Evolução de categoria permanece em `categories.py`. Ver [[relatorios]]. |
@@ -585,6 +589,10 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 - [[adr/0014-desconcentracao-fachadas-e-roteamento]] — Fachadas compatíveis, roteamento declarativo e módulos internos menores para a fundação v2.
 
 ## Changelog
+
+- `3.86` — 2026-08-31 — Adicionada fronteira `financeiro/ai_endpoint_security.py` para proteger endpoints configuráveis de IA contra SSRF, com variáveis de ambiente `AI_ALLOW_PRIVATE_ENDPOINTS` e `AI_ALLOWED_LOCAL_HOSTS` para operadores.
+
+- `3.85` — 2026-09-03 — Transporte externo passa a falhar fechado em erros TLS de cotações e centraliza leitura JSON limitada para cotações, PTAX, IA, Consultor e versão.
 
 - `3.84` — 2026-09-03 — Lançamentos de Cartões carregam apenas a fatura ativa e cinco totais mensais agregados por `credit_card_invoice.py`; o relatório mensal de tags separa o SQL com competência para preservar o uso dos índices temporais.
 

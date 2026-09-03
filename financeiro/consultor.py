@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from datetime import date, datetime
-from urllib.request import urlopen
+from financeiro.ai_endpoint_security import ai_urlopen
 
 # Reexports preservam os imports públicos; a montagem central continua nesta fachada.
 from financeiro.consultor_context import (
@@ -322,7 +322,7 @@ def call_consultor_ai_provider(
     try:
         return provider_adapter.call_consultor_ai_provider(
             ai_settings, messages, max_tokens=max_tokens, timeout_seconds=timeout_seconds,
-            opener=urlopen, ssl_context_factory=ai_ssl_context,
+            opener=ai_urlopen, ssl_context_factory=ai_ssl_context,
             text_extractor=extract_summary_text, request_builder=build_consultor_ai_request,
         )
     except provider_adapter.ConsultorProviderError as exc:

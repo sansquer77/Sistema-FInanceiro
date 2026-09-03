@@ -7,6 +7,7 @@ import sqlite3
 import tempfile
 import unittest
 from unittest.mock import Mock
+import ssl
 from urllib.error import URLError
 
 from financeiro import portfolio, portfolio_quotes as quotes
@@ -110,6 +111,19 @@ class QuoteCacheTest(unittest.TestCase):
             opener.side_effect = error
             with self.assertRaisesRegex(portfolio.PortfolioError, "indisponivel"):
                 quotes.read_json_url("https://example.invalid", "indisponivel", opener=opener, error_type=portfolio.PortfolioError)
+
+    def test_certificate_error_fails_closed_without_unverified_retry(self):
+        error = URLError(ssl.SSLCertVerificationError("CERTIFICATE_VERIFY_FAILED"))
+        opener = Mock(side_effect=error)
+        with self.assertRaisesRegex(portfolio.PortfolioError, "indisponivel"):
+            quotes.read_json_url(
+                "https://example.invalid",
+                "indisponivel",
+                opener=opener,
+                error_type=portfolio.PortfolioError,
+            )
+        opener.assert_called_once()
+        self.assertNotIn("context", opener.call_args.kwargs)
 
     def test_public_cache_objects_alias_owned_state(self):
         self.assertIs(portfolio.QUOTE_MEMORY_CACHE, portfolio._quote_cache.memory)

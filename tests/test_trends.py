@@ -702,6 +702,7 @@ class TrendsRouteTest(unittest.TestCase):
         self.original_db_path = database.DB_PATH
         database.DATA_DIR = Path(self.tempdir.name)
         database.DB_PATH = database.DATA_DIR / "test-trends.db"
+        os.environ["AI_ALLOW_PRIVATE_ENDPOINTS"] = "true"
         initialize_database()
 
     def tearDown(self) -> None:
@@ -758,7 +759,7 @@ class TrendsRouteTest(unittest.TestCase):
         save_ai_settings(user["id"], {
             "provider": "local",
             "enabled": True,
-            "base_url": "http://localhost:1234/v1",
+            "base_url": "http://localhost:1234",
             "model": "llama",
             "auth_type": "none",
         })
@@ -787,7 +788,7 @@ class TrendsRouteTest(unittest.TestCase):
             body={
                 "provider": "local",
                 "enabled": True,
-                "base_url": "http://localhost:1234/v1",
+                "base_url": "http://localhost:1234",
                 "model": "llama",
                 "auth_type": "none",
                 "timeout_seconds": 5,
@@ -821,7 +822,7 @@ class TrendsRouteTest(unittest.TestCase):
             body={
                 "provider": "local",
                 "enabled": True,
-                "base_url": "http://localhost:1234/v1",
+                "base_url": "http://localhost:1234",
                 "model": "llama",
                 "auth_type": "none",
             },
@@ -861,7 +862,7 @@ class TrendsRouteTest(unittest.TestCase):
         save_ai_settings(user["id"], {
             "provider": "local",
             "enabled": True,
-            "base_url": "http://localhost:1234/v1",
+            "base_url": "http://localhost:1234",
             "model": "llama",
             "auth_type": "none",
         })
@@ -874,7 +875,7 @@ class TrendsRouteTest(unittest.TestCase):
         response_mock.read.return_value = json.dumps(fake_response).encode("utf-8")
 
         with self._context(user):
-            with mock.patch("financeiro.ai_summary.urlopen", return_value=response_mock) as urlopen_mock:
+            with mock.patch("financeiro.ai_summary.ai_urlopen", return_value=response_mock) as urlopen_mock:
                 handler.handle_ai_summary()
         payload = handler.send_json.call_args[0][0]
         self.assertEqual(payload["resumo_ia"], "Resumo reescrito pela IA.")
@@ -921,7 +922,7 @@ class TrendsRouteTest(unittest.TestCase):
         response_mock.__exit__ = mock.Mock(return_value=False)
         response_mock.read.return_value = json.dumps(fake_response).encode("utf-8")
 
-        with mock.patch("financeiro.ai_summary.urlopen", return_value=response_mock) as urlopen_mock:
+        with mock.patch("financeiro.ai_summary.ai_urlopen", return_value=response_mock) as urlopen_mock:
             summary = generate_ai_summary(user["id"], trends_payload)
 
         self.assertEqual(summary, "Resumo IA.")
@@ -949,22 +950,24 @@ class TrendsRouteTest(unittest.TestCase):
         # spec: tendencias-saude-financeira v2.23 — critérios 12, 24 e 32
         user = create_user("GeminiUser", "gemini@example.com", "strong-password")
         from financeiro.secure_config import save_ai_settings
-        save_ai_settings(user["id"], {
-            "provider": "google",
-            "enabled": True,
-            "model": "gemini-1.5-flash",
-            "api_key": "gemini-secret",
-            "timeout_seconds": 3,
-            "temperature": 0.1,
-            "max_tokens": 321,
-        })
+        with mock.patch("financeiro.secure_config.validate_ai_base_url", side_effect=lambda url: url):
+            save_ai_settings(user["id"], {
+                "provider": "google",
+                "enabled": True,
+                "model": "gemini-1.5-flash",
+                "api_key": "gemini-secret",
+                "timeout_seconds": 3,
+                "temperature": 0.1,
+                "max_tokens": 321,
+            })
         fake_response = {"candidates": [{"content": {"parts": [{"text": "Resumo Gemini."}]}}]}
         response_mock = mock.Mock()
         response_mock.__enter__ = mock.Mock(return_value=response_mock)
         response_mock.__exit__ = mock.Mock(return_value=False)
         response_mock.read.return_value = json.dumps(fake_response).encode("utf-8")
 
-        with mock.patch("financeiro.ai_summary.urlopen", return_value=response_mock) as urlopen_mock:
+        with mock.patch("financeiro.ai_summary.ai_urlopen", return_value=response_mock) as urlopen_mock, \
+                mock.patch("financeiro.ai_summary.validate_ai_base_url", side_effect=lambda url, **_: url):
             summary = generate_ai_summary(user["id"], {"month": "2026-07", "resumo_local": "Local"})
 
         self.assertEqual(summary, "Resumo Gemini.")
@@ -984,19 +987,21 @@ class TrendsRouteTest(unittest.TestCase):
         # spec: tendencias-saude-financeira v2.23 — critérios 12, 24 e 32
         user = create_user("GeminiPrefixedUser", "gemini-prefixed@example.com", "strong-password")
         from financeiro.secure_config import save_ai_settings
-        save_ai_settings(user["id"], {
-            "provider": "google",
-            "enabled": True,
-            "model": "models/gemini-1.5-flash",
-            "api_key": "gemini-secret",
-        })
+        with mock.patch("financeiro.secure_config.validate_ai_base_url", side_effect=lambda url: url):
+            save_ai_settings(user["id"], {
+                "provider": "google",
+                "enabled": True,
+                "model": "models/gemini-1.5-flash",
+                "api_key": "gemini-secret",
+            })
         fake_response = {"candidates": [{"content": {"parts": [{"text": "Resumo Gemini."}]}}]}
         response_mock = mock.Mock()
         response_mock.__enter__ = mock.Mock(return_value=response_mock)
         response_mock.__exit__ = mock.Mock(return_value=False)
         response_mock.read.return_value = json.dumps(fake_response).encode("utf-8")
 
-        with mock.patch("financeiro.ai_summary.urlopen", return_value=response_mock) as urlopen_mock:
+        with mock.patch("financeiro.ai_summary.ai_urlopen", return_value=response_mock) as urlopen_mock, \
+                mock.patch("financeiro.ai_summary.validate_ai_base_url", side_effect=lambda url, **_: url):
             summary = generate_ai_summary(user["id"], {"month": "2026-07", "resumo_local": "Local"})
 
         self.assertEqual(summary, "Resumo Gemini.")
@@ -1010,22 +1015,24 @@ class TrendsRouteTest(unittest.TestCase):
         # spec: tendencias-saude-financeira v2.23 — critérios 12, 24 e 32
         user = create_user("ClaudeUser", "claude@example.com", "strong-password")
         from financeiro.secure_config import save_ai_settings
-        save_ai_settings(user["id"], {
-            "provider": "anthropic",
-            "enabled": True,
-            "model": "claude-3-5-haiku-latest",
-            "api_key": "anthropic-secret",
-            "timeout_seconds": 3,
-            "temperature": 0.1,
-            "max_tokens": 321,
-        })
+        with mock.patch("financeiro.secure_config.validate_ai_base_url", side_effect=lambda url: url):
+            save_ai_settings(user["id"], {
+                "provider": "anthropic",
+                "enabled": True,
+                "model": "claude-3-5-haiku-latest",
+                "api_key": "anthropic-secret",
+                "timeout_seconds": 3,
+                "temperature": 0.1,
+                "max_tokens": 321,
+            })
         fake_response = {"content": [{"type": "text", "text": "Resumo Claude."}]}
         response_mock = mock.Mock()
         response_mock.__enter__ = mock.Mock(return_value=response_mock)
         response_mock.__exit__ = mock.Mock(return_value=False)
         response_mock.read.return_value = json.dumps(fake_response).encode("utf-8")
 
-        with mock.patch("financeiro.ai_summary.urlopen", return_value=response_mock) as urlopen_mock:
+        with mock.patch("financeiro.ai_summary.ai_urlopen", return_value=response_mock) as urlopen_mock, \
+                mock.patch("financeiro.ai_summary.validate_ai_base_url", side_effect=lambda url, **_: url):
             summary = generate_ai_summary(user["id"], {"month": "2026-07", "resumo_local": "Local"})
 
         self.assertEqual(summary, "Resumo Claude.")
@@ -1047,11 +1054,11 @@ class TrendsRouteTest(unittest.TestCase):
         save_ai_settings(user["id"], {
             "provider": "local",
             "enabled": True,
-            "base_url": "http://localhost:1234/v1",
+            "base_url": "http://localhost:1234",
             "model": "llama",
             "auth_type": "none",
         })
-        with mock.patch("financeiro.ai_summary.urlopen", side_effect=URLError("offline")):
+        with mock.patch("financeiro.ai_summary.ai_urlopen", side_effect=URLError("offline")):
             summary = generate_ai_summary(user["id"], {"month": "2026-07", "resumo_local": "Local"})
         self.assertIsNone(summary)
 

@@ -8,7 +8,6 @@ from http import HTTPStatus
 import json
 import re
 import sqlite3
-from urllib.error import URLError
 from urllib.parse import quote
 
 from financeiro.accounts import cents_to_money, empty_to_none, money_to_cents, recompute_account_balance
@@ -1930,10 +1929,6 @@ def _trim_cache_to_limit(cache: OrderedDict, max_entries: int) -> None:
 
 def read_json_url(url: str, message: str, headers: dict | None = None) -> dict | list:
     return quotes.read_json_url(url, message, headers=headers, opener=urlopen, error_type=PortfolioError)
-
-
-def is_ssl_certificate_error(exc: URLError) -> bool:
-    return quotes.is_ssl_certificate_error(exc)
 
 
 def yahoo_symbol(position: dict) -> str:

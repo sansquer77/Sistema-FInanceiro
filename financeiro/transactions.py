@@ -17,6 +17,7 @@ from financeiro.calendar_rules import add_months, month_end_date, normalize_iso_
 from financeiro.database import begin_immediate, get_connection, row_to_dict
 from financeiro.identifiers import positive_int_id
 from financeiro.money import split_cents, split_optional_cents
+from financeiro.outbound_json import MAX_EXCHANGE_RATE_JSON_BYTES, OutboundJsonError, read_limited_json
 from financeiro.recurrence import RECURRENCE_FREQUENCIES, SERIES_KINDS, add_recurrence
 
 TRANSACTION_TYPES = {"income", "expense", "transfer", "investment"}
@@ -971,8 +972,8 @@ def get_exchange_rate_to_brl(currency: str, transaction_date: str | None = None)
     request = Request(url, headers={"User-Agent": "SistemaFinanceiro/0.1"})
     try:
         with urlopen(request, timeout=5) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
+            payload = read_limited_json(response, max_bytes=MAX_EXCHANGE_RATE_JSON_BYTES)
+    except (HTTPError, URLError, TimeoutError, OutboundJsonError) as exc:
         raise TransactionError("Nao foi possivel consultar a PTAX. Informe a cotacao manualmente.") from exc
     try:
         quotes = payload.get("value") or []

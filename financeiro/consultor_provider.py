@@ -3,9 +3,15 @@ from __future__ import annotations
 import json
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
-from urllib.request import Request, urlopen
+from urllib.request import Request
 
+from financeiro.ai_endpoint_security import (
+    AIEndpointSecurityError,
+    ai_urlopen,
+    validate_ai_base_url,
+)
 from financeiro.ai_summary import ai_ssl_context, extract_summary_text
+from financeiro.outbound_json import MAX_AI_JSON_BYTES, OutboundJsonError, read_limited_json
 
 
 DEFAULT_TEMPERATURE = 0.2
@@ -41,10 +47,15 @@ def call_consultor_ai_provider(
     text_extractor=None,
     request_builder=None,
 ) -> str:
-    opener = opener or urlopen
+    opener = opener or ai_urlopen
     ssl_context_factory = ssl_context_factory or ai_ssl_context
     text_extractor = text_extractor or extract_summary_text
     request_builder = request_builder or build_consultor_ai_request
+    base_url = str(ai_settings.get("base_url") or "").rstrip("/")
+    try:
+        validate_ai_base_url(base_url)
+    except AIEndpointSecurityError as exc:
+        raise ConsultorProviderError("O Consultor esta indisponivel no momento.") from exc
     request_payload = request_builder(ai_settings, messages, max_tokens=max_tokens)
     request = Request(
         request_payload["url"],
@@ -54,8 +65,8 @@ def call_consultor_ai_provider(
     )
     try:
         with opener(request, timeout=timeout_seconds, context=ssl_context_factory()) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
+            payload = read_limited_json(response, max_bytes=MAX_AI_JSON_BYTES)
+    except (HTTPError, URLError, TimeoutError, OutboundJsonError, OSError) as exc:
         raise ConsultorProviderError("O Consultor esta indisponivel no momento.") from exc
     text = text_extractor(payload, provider=str(ai_settings.get("provider") or "custom"))
     if not text:

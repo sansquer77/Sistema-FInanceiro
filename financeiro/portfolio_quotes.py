@@ -4,10 +4,11 @@ from collections import OrderedDict
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 import json
-import ssl
 from threading import Lock
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+
+from financeiro.outbound_json import MAX_QUOTE_JSON_BYTES, OutboundJsonError, read_limited_json
 
 MARKET_QUOTE_TTL_SECONDS = 6 * 60 * 60
 INDEXER_QUOTE_TTL_SECONDS = 24 * 60 * 60
@@ -184,19 +185,6 @@ def read_json_url(url: str, message: str, headers: dict | None = None, *, opener
     request = Request(url, headers=request_headers)
     try:
         with opener(request, timeout=6) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except URLError as exc:
-        if is_ssl_certificate_error(exc):
-            try:
-                with opener(request, timeout=6, context=ssl._create_unverified_context()) as response:
-                    return json.loads(response.read().decode("utf-8"))
-            except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as retry_exc:
-                raise error_type(message) from retry_exc
+            return read_limited_json(response, max_bytes=MAX_QUOTE_JSON_BYTES)
+    except (HTTPError, URLError, TimeoutError, OutboundJsonError) as exc:
         raise error_type(message) from exc
-    except (HTTPError, TimeoutError, json.JSONDecodeError) as exc:
-        raise error_type(message) from exc
-
-
-def is_ssl_certificate_error(exc: URLError) -> bool:
-    reason = getattr(exc, "reason", None)
-    return isinstance(reason, ssl.SSLError) and "CERTIFICATE_VERIFY_FAILED" in str(reason)

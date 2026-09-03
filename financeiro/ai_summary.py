@@ -4,7 +4,14 @@ import json
 import ssl
 from urllib.parse import quote
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import Request
+
+from financeiro.ai_endpoint_security import (
+    AIEndpointSecurityError,
+    ai_urlopen,
+    validate_ai_base_url,
+)
+from financeiro.outbound_json import MAX_AI_JSON_BYTES, OutboundJsonError, read_limited_json
 
 from financeiro.secure_config import (
     SecureConfigError,
@@ -49,6 +56,11 @@ def generate_ai_summary(user_id: int, trends_payload: dict) -> str | None:
     if not base_url or not model:
         return None
 
+    try:
+        base_url = validate_ai_base_url(base_url)
+    except AIEndpointSecurityError:
+        return None
+
     minimized = minimize_trends_payload(trends_payload)
     request_payload = build_ai_request(settings, api_key, minimized)
 
@@ -64,9 +76,9 @@ def generate_ai_summary(user_id: int, trends_payload: dict) -> str | None:
     # (a conexão já foi fechada antes de chamar esta função)
     timeout = int(settings.get("timeout_seconds") or SUMMARY_TIMEOUT_SECONDS)
     try:
-        with urlopen(request, timeout=timeout, context=ai_ssl_context()) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError):
+        with ai_urlopen(request, timeout=timeout, context=ai_ssl_context()) as response:
+            payload = read_limited_json(response, max_bytes=MAX_AI_JSON_BYTES)
+    except (HTTPError, URLError, TimeoutError, OutboundJsonError, OSError):
         return None
 
     return extract_summary_text(payload, provider=str(settings.get("provider") or "custom"))

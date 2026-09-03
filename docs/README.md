@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 12.8
+versao: 12.10
 atualizado: 2026-08-31
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -49,6 +49,8 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[specs/historico-operacoes]] | ✅ implementado | Auditoria |
 | [[specs/recuperacao-senha]] | ✅ implementado | Segurança |
 | [[specs/seguranca-autenticacao]] | ✅ implementado | Segurança |
+| [[specs/seguranca-transporte-externo]] | ✅ implementado | Segurança |
+| [[specs/seguranca-ai-ssrf]] | ✅ implementado | Segurança |
 | [[specs/sobre-app]] | ✅ implementado | Usuário |
 | [[specs/instrucoes-app]] | ✅ implementado | Usuário |
 | [[specs/preferencias-abas]] | ✅ implementado | Usuário |
@@ -104,6 +106,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[adr/0012-fundacao-v2-contrato-e-migracao-de-dados]] | Fundação da linha 2.x com contrato congelado, schema-base canônico e migração controlada do banco 1.x para um novo banco 2.x. |
 | [[adr/0013-dependencias-frontend-v2]] | ApexCharts 4.7.0 e IMask vendorizados, Command Palette nativa no padrão cmdk e virtualização compartilhada sem framework. |
 | [[adr/0014-desconcentracao-fachadas-e-roteamento]] | Fachadas compatíveis, roteamento declarativo e responsabilidades internas menores na fundação v2. |
+| [[adr/0015-ssrf-ai-endpoints]] | Validação de endpoints configuráveis de IA contra SSRF, com opt-in por env para provedores locais. |
 
 ---
 
@@ -144,6 +147,9 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `12.10` — 2026-08-31 — Indexada [[specs/seguranca-ai-ssrf]] e [[adr/0015-ssrf-ai-endpoints]] para proteção SSRF de endpoints de IA configuráveis.
+
+- `12.9` — 2026-09-03 — Indexada [[specs/seguranca-transporte-externo]] para TLS verificado e leitura JSON externa limitada.
 - `12.8` — 2026-08-31 — Indexada [[specs/bank-logos]] e sincronizadas [[arquitetura]] e [[qualidade-codigo]] com o catálogo compartilhado e o gate automatizado de qualidade.
 - `12.7` — 2026-08-30 — Preferências, Histórico, Extrato e Simulações passam a evitar recargas redundantes com invalidação segura e deduplicação de requisições.
 - `12.6` — 2026-08-30 — Portfólio passa a liberar recursos de apresentação ao sair e a reaproveitar snapshot recente sem recarga redundante; specs e arquitetura sincronizadas.

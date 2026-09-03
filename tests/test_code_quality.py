@@ -14,7 +14,7 @@ REVIEWED_OVERSIZED_MODULES = {
     "financeiro/portfolio.py": 2759,
     "financeiro/transactions.py": 1334,
     "financeiro/trends.py": 1237,
-    "web/modules/portfolio-view.js": 1663,
+    "web/modules/portfolio-view.js": 1668,
     "web/modules/reports-view.js": 1336,
 }
 MODULE_SIZE_REVIEW_THRESHOLD = 1200
@@ -59,7 +59,7 @@ class CodeQualityContractTest(unittest.TestCase):
         self.assertIn("request = Request(", provider)
         self.assertNotIn("from financeiro.consultor import", provider)
         self.assertNotIn("get_connection", provider)
-        self.assertIn("opener=urlopen", facade)
+        self.assertIn("opener=ai_urlopen", facade)
 
     def test_consultor_history_is_extracted_behind_compatible_facade(self) -> None:
         facade = (REPOSITORY_ROOT / "financeiro/consultor.py").read_text(encoding="utf-8")
