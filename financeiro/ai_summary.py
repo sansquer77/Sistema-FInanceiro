@@ -78,7 +78,7 @@ def generate_ai_summary(user_id: int, trends_payload: dict) -> str | None:
     try:
         with ai_urlopen(request, timeout=timeout, context=ai_ssl_context()) as response:
             payload = read_limited_json(response, max_bytes=MAX_AI_JSON_BYTES)
-    except (HTTPError, URLError, TimeoutError, OutboundJsonError, OSError):
+    except (HTTPError, URLError, TimeoutError, OutboundJsonError, OSError, AIEndpointSecurityError):
         return None
 
     return extract_summary_text(payload, provider=str(settings.get("provider") or "custom"))

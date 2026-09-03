@@ -15,6 +15,11 @@ class ConsultorProviderContractTest(unittest.TestCase):
         }
         self.messages = consultor.build_ai_messages("Prompt", {"total_cents": 123})
         os.environ["AI_ALLOW_PRIVATE_ENDPOINTS"] = "true"
+        os.environ["AI_ALLOWED_LOCAL_ENDPOINTS"] = "127.0.0.1:1234"
+
+    def tearDown(self) -> None:
+        os.environ.pop("AI_ALLOW_PRIVATE_ENDPOINTS", None)
+        os.environ.pop("AI_ALLOWED_LOCAL_ENDPOINTS", None)
 
     def test_facade_and_adapter_preserve_all_request_shapes(self) -> None:
         for provider in ("openai", "custom", "google", "anthropic"):

@@ -677,11 +677,14 @@ class ConsultorAIExecutorTest(unittest.TestCase):
         database.DB_PATH = database.DATA_DIR / "test-consultor-ai.db"
         database.initialize_database()
         os.environ["AI_ALLOW_PRIVATE_ENDPOINTS"] = "true"
+        os.environ["AI_ALLOWED_LOCAL_ENDPOINTS"] = "127.0.0.1:1234"
 
     def tearDown(self) -> None:
         database.DATA_DIR = self.original_data_dir
         database.DB_PATH = self.original_db_path
         self.tempdir.cleanup()
+        os.environ.pop("AI_ALLOW_PRIVATE_ENDPOINTS", None)
+        os.environ.pop("AI_ALLOWED_LOCAL_ENDPOINTS", None)
 
     def test_execute_uses_existing_ai_settings_and_caps_tokens(self) -> None:
         user = create_user("Queli", "queli@example.com", "strong-password")

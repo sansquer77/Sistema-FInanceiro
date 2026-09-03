@@ -66,7 +66,7 @@ def call_consultor_ai_provider(
     try:
         with opener(request, timeout=timeout_seconds, context=ssl_context_factory()) as response:
             payload = read_limited_json(response, max_bytes=MAX_AI_JSON_BYTES)
-    except (HTTPError, URLError, TimeoutError, OutboundJsonError, OSError) as exc:
+    except (HTTPError, URLError, TimeoutError, OutboundJsonError, OSError, AIEndpointSecurityError) as exc:
         raise ConsultorProviderError("O Consultor esta indisponivel no momento.") from exc
     text = text_extractor(payload, provider=str(ai_settings.get("provider") or "custom"))
     if not text:

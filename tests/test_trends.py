@@ -703,12 +703,15 @@ class TrendsRouteTest(unittest.TestCase):
         database.DATA_DIR = Path(self.tempdir.name)
         database.DB_PATH = database.DATA_DIR / "test-trends.db"
         os.environ["AI_ALLOW_PRIVATE_ENDPOINTS"] = "true"
+        os.environ["AI_ALLOWED_LOCAL_ENDPOINTS"] = "localhost:1234"
         initialize_database()
 
     def tearDown(self) -> None:
         database.DATA_DIR = self.original_data_dir
         database.DB_PATH = self.original_db_path
         self.tempdir.cleanup()
+        os.environ.pop("AI_ALLOW_PRIVATE_ENDPOINTS", None)
+        os.environ.pop("AI_ALLOWED_LOCAL_ENDPOINTS", None)
 
     def _handler(self, path: str, user: dict | None = None, body: dict | None = None) -> app.AppHandler:
         handler = object.__new__(app.AppHandler)

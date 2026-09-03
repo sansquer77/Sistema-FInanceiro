@@ -2,8 +2,8 @@
 tipo: spec
 area: seguranca
 status: implementado
-versao: 1.0
-atualizado: 2026-08-31
+versao: 1.1
+atualizado: 2026-09-03
 relacionados:
   - "[[seguranca-transporte-externo]]"
   - "[[tendencias-saude-financeira]]"
@@ -17,7 +17,7 @@ aliases: ["Segurança de endpoints de IA", "SSRF em endpoints de IA"]
 # Segurança de endpoints de IA contra SSRF
 
 > [!info] Status
-> **implementado** · área: `seguranca` · atualizado em 2026-08-31 · relacionados: [[seguranca-transporte-externo]], [[tendencias-saude-financeira]], [[consultor]], [[preferencias-abas]], [[arquitetura]]
+> **implementado** · área: `seguranca` · atualizado em 2026-09-03 · relacionados: [[seguranca-transporte-externo]], [[tendencias-saude-financeira]], [[consultor]], [[preferencias-abas]], [[arquitetura]]
 
 ## Problema
 
@@ -42,6 +42,7 @@ Todo usuário que configura um provedor de IA customizado/local em **Preferênci
 | `base_url` | URL | URL base do endpoint de IA, configurável pelo usuário. |
 | `AI_ALLOW_PRIVATE_ENDPOINTS` | env boolean | Quando `true`, permite que a URL resolva para IPs privados, loopback ou link-local. |
 | `AI_ALLOWED_LOCAL_HOSTS` | env CSV | Lista opcional de hostnames permitidos além da validação de IP (ex.: `ollama.local,lmstudio.local`). |
+| `AI_ALLOWED_LOCAL_ENDPOINTS` | env CSV | Allowlist estrita de endpoints locais no formato `host:port` ou `ip:port`, preferencialmente com porta. Exige `AI_ALLOW_PRIVATE_ENDPOINTS=true`. |
 
 ## Regras
 
@@ -54,7 +55,11 @@ Todo usuário que configura um provedor de IA customizado/local em **Preferênci
 - Redirecionamentos HTTP são bloqueados: respostas 3xx resultam em falha segura.
 - A validação ocorre no salvamento da configuração e no momento da requisição.
 - Erros de validação expõem apenas mensagem amigável, sem detalhes de rede interna.
-- Quando `AI_ALLOW_PRIVATE_ENDPOINTS=true`, endereços privados são aceitos; `AI_ALLOWED_LOCAL_HOSTS` pode ampliar a allowlist por hostname sem resolução.
+- Quando `AI_ALLOW_PRIVATE_ENDPOINTS=true`, endereços privados só são aceitos se houver uma allowlist explícita (`AI_ALLOWED_LOCAL_ENDPOINTS` ou `AI_ALLOWED_LOCAL_HOSTS`).
+- `AI_ALLOWED_LOCAL_ENDPOINTS` usa o formato `host:port` ou `ip:port`; quando a porta é informada, apenas essa porta é permitida para o host/IP.
+- O transporte de IA resolve o hostname uma única vez e conecta diretamente ao IP validado (DNS pinning), preservando o hostname original no cabeçalho `Host`, no SNI e na validação do certificado TLS.
+- A URL final montada (`/chat/completions`, `/messages`, `/models/...:generateContent`) é validada antes da requisição, além da `base_url`.
+- `AI_ALLOWED_LOCAL_HOSTS` pode ampliar a allowlist por hostname sem resolução, mas ainda respeita a exigência de allowlist explícita.
 
 ## API e dados
 
@@ -81,6 +86,10 @@ Todo usuário que configura um provedor de IA customizado/local em **Preferênci
 - Dado uma URL base com hostname que resolve para IP privado, quando `AI_ALLOW_PRIVATE_ENDPOINTS` não está ativada, então é rejeitada.
 - Dado uma URL base inválida no formulário de Preferências, quando o usuário salva, então recebe mensagem amigável e a configuração não é persistida.
 - Dado uma configuração já persistida com URL válida que posteriormente passa a resolver para IP privado, quando usada sem permissão de privado, então a requisição falha de forma segura.
+- Dado `AI_ALLOWED_LOCAL_ENDPOINTS=127.0.0.1:11434`, quando a URL base é `http://127.0.0.1:11434`, então é aceita; quando é `http://127.0.0.1:11435`, então é rejeitada.
+- Dado `AI_ALLOW_PRIVATE_ENDPOINTS=true` sem allowlist configurada, quando a URL base resolve para IP privado, então é rejeitada.
+- Dado uma requisição de IA para `https://api.example.com/v1/chat/completions`, quando o transporte é iniciado, então o socket conecta ao IP validado, o cabeçalho `Host` e o SNI usam `api.example.com`.
+- Dado uma requisição de IA cujo hostname resolve para IP público na validação e para IP privado na conexão, quando o transporte é iniciado, então a conexão usa o IP da validação e não sofre DNS rebinding.
 
 ## Pendências
 
@@ -100,11 +109,16 @@ Todo usuário que configura um provedor de IA customizado/local em **Preferênci
 - [x] Passo 2 — Integrar validação em `financeiro/secure_config.py` no salvamento de `base_url`. Fecha: critérios 1, 2, 12.
 - [x] Passo 3 — Integrar validação e bloqueio de redirecionamentos em `financeiro/ai_summary.py` e `financeiro/consultor_provider.py`. Fecha: critérios 10, 13.
 - [x] Passo 4 — Adicionar `tests/test_ai_endpoint_security.py` com casos de esquema, hostname, IP, redirecionamento e env. Fecha: todos os critérios.
-- [x] Passo 5 — Atualizar `docs/arquitetura.md`, `docs/requisitos.md` e README do vault com a nova fronteira de segurança. Fecha: documentação.
+- [x] Passo 5 — Implementar DNS pinning no transporte (`ai_urlopen`) conectando ao IP validado e preservando Host/SNI. Fecha: critérios de transporte.
+- [x] Passo 6 — Adicionar allowlist estrita por host:port (`AI_ALLOWED_LOCAL_ENDPOINTS`) e exigi-la quando privados estiverem habilitados. Fecha: critérios de allowlist.
+- [x] Passo 7 — Validar a URL final da requisição em `ai_urlopen`, além da `base_url`. Fecha: defesa em profundidade.
+- [x] Passo 8 — Atualizar `docs/arquitetura.md`, `docs/requisitos.md` e README do vault com a nova fronteira de segurança. Fecha: documentação.
 
 ## Changelog
 
-- `1.0` — 2026-08-31 — Implementada proteção SSRF para endpoints configuráveis de IA: validação de esquema, hostname, IP resolvido, bloqueio de redirecionamentos e opt-in controlado por operador para endpoints privados (`AI_ALLOW_PRIVATE_ENDPOINTS` / `AI_ALLOWED_LOCAL_HOSTS`).
+- `1.1` — 2026-09-03 — DNS pinning no transporte de IA, allowlist estrita por host:port (`AI_ALLOWED_LOCAL_ENDPOINTS`) e validação da URL final da requisição.
+
+- `1.0` — 2026-09-03 — Implementada proteção SSRF para endpoints configuráveis de IA: validação de esquema, hostname, IP resolvido, bloqueio de redirecionamentos e opt-in controlado por operador para endpoints privados (`AI_ALLOW_PRIVATE_ENDPOINTS` / `AI_ALLOWED_LOCAL_HOSTS`).
 
 ## Relacionados
 

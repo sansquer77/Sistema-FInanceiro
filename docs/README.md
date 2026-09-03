@@ -3,7 +3,7 @@ tipo: produto
 area: meta
 status: implementado
 versao: 12.10
-atualizado: 2026-08-31
+atualizado: 2026-09-03
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -147,7 +147,7 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
-- `12.10` — 2026-08-31 — Indexada [[specs/seguranca-ai-ssrf]] e [[adr/0015-ssrf-ai-endpoints]] para proteção SSRF de endpoints de IA configuráveis.
+- `12.10` — 2026-09-03 — Indexada [[specs/seguranca-ai-ssrf]] e [[adr/0015-ssrf-ai-endpoints]] para proteção SSRF de endpoints de IA configuráveis.
 
 - `12.9` — 2026-09-03 — Indexada [[specs/seguranca-transporte-externo]] para TLS verificado e leitura JSON externa limitada.
 - `12.8` — 2026-08-31 — Indexada [[specs/bank-logos]] e sincronizadas [[arquitetura]] e [[qualidade-codigo]] com o catálogo compartilhado e o gate automatizado de qualidade.

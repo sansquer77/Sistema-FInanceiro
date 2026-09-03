@@ -3,7 +3,7 @@ tipo: arquitetura
 area: meta
 status: implementado
 versao: 3.86
-atualizado: 2026-08-31
+atualizado: 2026-09-03
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -134,8 +134,9 @@ Responsabilidades:
 | `APP_URL` | URL pública esperada do app; entra na lista de origens/hosts permitidos e define cookie `Secure` quando usa HTTPS. |
 | `APP_ALLOWED_HOSTS` | CSV de hosts adicionais aceitos. Entradas sem porta também aceitam a porta padrão configurada. |
 | `APP_ALLOWED_ORIGINS` | CSV de origens adicionais aceitas. Entradas sem esquema assumem `http://`; entradas sem porta assumem `APP_PORT`. |
-| `AI_ALLOW_PRIVATE_ENDPOINTS` | Quando `true`, permite que a URL base de IA resolva para IPs privados/loopback/link-local. Padrão: rejeitado. |
+| `AI_ALLOW_PRIVATE_ENDPOINTS` | Quando `true`, permite que a URL base de IA resolva para IPs privados/loopback/link-local. Padrão: rejeitado. Exige também uma allowlist explícita. |
 | `AI_ALLOWED_LOCAL_HOSTS` | CSV opcional de hostnames locais permitidos além da validação de IP (exige `AI_ALLOW_PRIVATE_ENDPOINTS=true`). |
+| `AI_ALLOWED_LOCAL_ENDPOINTS` | CSV opcional de endpoints locais no formato `host:port` ou `ip:port` (exige `AI_ALLOW_PRIVATE_ENDPOINTS=true`). Preferencialmente com porta, para não abrir toda a rede local. |
 
 O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pacotes usa `APP_HOST=0.0.0.0`, detecta o IP local e preenche `APP_URL`, `APP_ALLOWED_HOSTS` e `APP_ALLOWED_ORIGINS`; esse modo é adequado apenas para redes confiáveis. Quando essa exposição usa HTTP, a inicialização emite um alerta não bloqueante. Acesso remoto deve ficar atrás de reverse-proxy com HTTPS.
 
@@ -590,7 +591,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
-- `3.86` — 2026-08-31 — Adicionada fronteira `financeiro/ai_endpoint_security.py` para proteger endpoints configuráveis de IA contra SSRF, com variáveis de ambiente `AI_ALLOW_PRIVATE_ENDPOINTS` e `AI_ALLOWED_LOCAL_HOSTS` para operadores.
+- `3.86` — 2026-09-03 — Adicionada fronteira `financeiro/ai_endpoint_security.py` para proteger endpoints configuráveis de IA contra SSRF, com DNS pinning, validação da URL final e variáveis de ambiente `AI_ALLOW_PRIVATE_ENDPOINTS`, `AI_ALLOWED_LOCAL_HOSTS` e `AI_ALLOWED_LOCAL_ENDPOINTS` para operadores.
 
 - `3.85` — 2026-09-03 — Transporte externo passa a falhar fechado em erros TLS de cotações e centraliza leitura JSON limitada para cotações, PTAX, IA, Consultor e versão.
 

@@ -3,7 +3,7 @@ tipo: produto
 area: meta
 status: implementado
 versao: 3.2
-atualizado: 2026-08-31
+atualizado: 2026-09-03
 relacionados:
   - "[[arquitetura]]"
   - "[[visao-produto]]"
@@ -106,7 +106,7 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 - Detalhes completos de bloqueio de tentativas, cookies e headers defensivos em [[seguranca-autenticacao]] e [[recuperacao-senha]].
 - Exposição em LAN deve configurar `APP_URL`, `APP_ALLOWED_HOSTS` e `APP_ALLOWED_ORIGINS`; acesso remoto deve usar reverse-proxy com HTTPS.
 - Exposição em LAN via HTTP deve gerar alerta de segurança sem impedir a inicialização; HTTP local continua permitido.
-- URLs configuráveis de IA devem ser validadas contra SSRF antes de cada requisição e no salvamento: esquema permitido, hostname resolvido, bloqueio de IPs privados/loopback/link-local por padrão, bloqueio de redirecionamentos e opt-in controlado pelo operador via `AI_ALLOW_PRIVATE_ENDPOINTS`/`AI_ALLOWED_LOCAL_HOSTS`. Ver [[specs/seguranca-ai-ssrf]] e [[adr/0015-ssrf-ai-endpoints]].
+- URLs configuráveis de IA devem ser validadas contra SSRF antes de cada requisição e no salvamento: esquema permitido, hostname resolvido, bloqueio de IPs privados/loopback/link-local por padrão, bloqueio de redirecionamentos, DNS pinning no transporte, validação da URL final e opt-in controlado pelo operador via `AI_ALLOW_PRIVATE_ENDPOINTS`/`AI_ALLOWED_LOCAL_HOSTS`/`AI_ALLOWED_LOCAL_ENDPOINTS`. Ver [[specs/seguranca-ai-ssrf]] e [[adr/0015-ssrf-ai-endpoints]].
 
 ## Requisitos não funcionais
 
@@ -133,7 +133,7 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 
 ## Changelog
 
-- `3.2` — 2026-08-31 — Adicionada regra de segurança para validação anti-SSRF de endpoints configuráveis de IA, com opt-in por env para provedores locais. Ver [[specs/seguranca-ai-ssrf]] e [[adr/0015-ssrf-ai-endpoints]].
+- `3.2` — 2026-09-03 — Adicionada regra de segurança para validação anti-SSRF de endpoints configuráveis de IA, com DNS pinning, validação da URL final, allowlist por host:port e opt-in por env para provedores locais. Ver [[specs/seguranca-ai-ssrf]] e [[adr/0015-ssrf-ai-endpoints]].
 
 - `3.1` — 2026-08-30 — Cache persistente de cotações passa a exigir retenção, limites e compactação física condicionada. Ver [[specs/manutencao-cache-cotacoes]].
 - `3.0` — 2026-08-30 — Fundação planejada da v2 passa a incluir ApexCharts local, IMask, Command Palette nativa por `Cmd/Ctrl+K` e virtualização de listas longas; dependências browser deixam de ser proibidas de forma absoluta e passam a exigir versão, licença, hash e operação offline.

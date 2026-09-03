@@ -267,6 +267,16 @@ class HttpCachingAndCompressionTest(unittest.TestCase):
 
 
 class IdorProtectionTest(IsolatedDatabaseTest):
+    def setUp(self) -> None:
+        super().setUp()
+        os.environ["AI_ALLOW_PRIVATE_ENDPOINTS"] = "true"
+        os.environ["AI_ALLOWED_LOCAL_ENDPOINTS"] = "127.0.0.1:11434"
+
+    def tearDown(self) -> None:
+        os.environ.pop("AI_ALLOW_PRIVATE_ENDPOINTS", None)
+        os.environ.pop("AI_ALLOWED_LOCAL_ENDPOINTS", None)
+        super().tearDown()
+
     def test_account_update_requires_owner(self) -> None:
         owner = create_user("Owner", "owner@example.com", "strong-password")
         attacker = create_user("Attacker", "attacker@example.com", "strong-password")

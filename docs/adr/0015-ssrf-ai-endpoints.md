@@ -3,7 +3,7 @@ tipo: adr
 area: seguranca
 status: implementado
 versao: 1.0
-atualizado: 2026-08-31
+atualizado: 2026-09-03
 relacionados:
   - "[[../specs/seguranca-ai-ssrf]]"
   - "[[../specs/seguranca-transporte-externo]]"
@@ -17,7 +17,7 @@ aliases: ["ADR-0015", "SSRF em endpoints de IA"]
 # ADR-0015 — Validação de endpoints configuráveis de IA contra SSRF
 
 > [!info] Status
-> **implementado** · área: `seguranca` · atualizado em 2026-08-31 · relacionados: [[../specs/seguranca-ai-ssrf]], [[../specs/seguranca-transporte-externo]], [[../specs/preferencias-abas]]
+> **implementado** · área: `seguranca` · atualizado em 2026-09-03 · relacionados: [[../specs/seguranca-ai-ssrf]], [[../specs/seguranca-transporte-externo]], [[../specs/preferencias-abas]]
 
 ## Problema
 
@@ -40,12 +40,14 @@ Usuários que configuram IA customizada/local e operadores que decidem se a inst
 
 Adotar uma **fronteira de validação SSRF dedicada** em `financeiro/ai_endpoint_security.py`:
 
-- Validar esquema, hostname, porta, ausência de credenciais/path/query/fragment e resolução DNS.
+- Validar esquema, hostname, porta, ausência de credenciais/query/fragment, path seguro e resolução DNS.
 - Rejeitar IPs privados/reservados por padrão.
-- Permitir IPs privados apenas quando o operador definir `AI_ALLOW_PRIVATE_ENDPOINTS=true`.
+- Permitir IPs privados apenas quando o operador definir `AI_ALLOW_PRIVATE_ENDPOINTS=true` **e** uma allowlist explícita (`AI_ALLOWED_LOCAL_ENDPOINTS` ou `AI_ALLOWED_LOCAL_HOSTS`).
 - Permitir hostnames locais adicionais via `AI_ALLOWED_LOCAL_HOSTS` (CSV), desde que a flag de privados esteja habilitada.
+- Exigir allowlist por host:port via `AI_ALLOWED_LOCAL_ENDPOINTS` para restringir ainda mais endpoints privados.
 - Bloquear redirecionamentos HTTP nas requisições de IA.
 - Aplicar a validação tanto no salvamento da configuração quanto no momento da requisição.
+- Fazer DNS pinning no transporte: resolver o hostname uma única vez e conectar diretamente ao IP validado, preservando o hostname original no cabeçalho `Host`, no SNI e na validação do certificado TLS.
 
 ### Motivos
 
@@ -65,14 +67,16 @@ Adotar uma **fronteira de validação SSRF dedicada** em `financeiro/ai_endpoint
 
 - Nenhuma rota ou tabela nova.
 - Rotas afetadas: `PUT /api/ai-settings`, `POST /api/financial-health-trends/ai-summary`, `POST /api/consultor/analyze`.
-- Variáveis de ambiente: `AI_ALLOW_PRIVATE_ENDPOINTS`, `AI_ALLOWED_LOCAL_HOSTS`.
+- Variáveis de ambiente: `AI_ALLOW_PRIVATE_ENDPOINTS`, `AI_ALLOWED_LOCAL_HOSTS`, `AI_ALLOWED_LOCAL_ENDPOINTS`.
 
 ## Critérios de aceite
 
 - Dado um endpoint `https` público válido, quando validado, então é aceito.
 - Dado um endpoint `http` local sem permissão explícita, quando validado, então é rejeitado.
-- Dado um endpoint que resolva para IP privado com `AI_ALLOW_PRIVATE_ENDPOINTS=true`, quando validado, então é aceito.
+- Dado um endpoint que resolva para IP privado com `AI_ALLOW_PRIVATE_ENDPOINTS=true` e allowlist explícita, quando validado, então é aceito.
+- Dado um endpoint privado com `AI_ALLOW_PRIVATE_ENDPOINTS=true` mas sem allowlist, quando validado, então é rejeitado.
 - Dado um redirecionamento 3xx em uma requisição de IA, quando ocorrido, então é bloqueado.
+- Dado uma requisição de IA para um hostname, quando o transporte conecta, então usa o IP previamente validado e preserva o hostname para Host/SNI.
 
 ## Alternativas consideradas
 
@@ -93,7 +97,9 @@ Adotar uma **fronteira de validação SSRF dedicada** em `financeiro/ai_endpoint
 
 ## Changelog
 
-- `1.0` — 2026-08-31 — Decisão adotada e implementada: validação SSRF centralizada em `financeiro/ai_endpoint_security.py`, integrada ao salvamento de configuração e às requisições de IA, com opt-in por env para provedores locais.
+- `1.1` — 2026-09-03 — Adicionado DNS pinning no transporte, allowlist estrita por host:port (`AI_ALLOWED_LOCAL_ENDPOINTS`) e exigência de allowlist explícita quando privados estão habilitados.
+
+- `1.0` — 2026-09-03 — Decisão adotada e implementada: validação SSRF centralizada em `financeiro/ai_endpoint_security.py`, integrada ao salvamento de configuração e às requisições de IA, com opt-in por env para provedores locais.
 
 ## Relacionados
 
