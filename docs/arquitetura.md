@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.87
+versao: 3.93
 atualizado: 2026-09-03
 relacionados:
   - "[[requisitos]]"
@@ -62,6 +62,7 @@ O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Co
 | `money-utils.js` | Formatação e parsing numérico/monetário. |
 | `dom-utils.js` | Helpers de formulário, mensagens, empty state e escaping. |
 | `chart-adapter.js` | Fronteira única para ApexCharts: animações desativadas, suspensão sob `hidden`, retomada com última configuração local, descarte de desconectados e limpeza completa na sessão. |
+| `notification-flyout.js` | Diálogo global acessível para alertas críticos e informativos do Cockpit; anexado ao `body`, restaura foco, persiste leitura pela callback injetada e delega ações contextuais ao composition root, sem regras financeiras. Ver [[specs/alertas-cockpit]]. |
 | `transaction-kind.js` | Predicados de tipo de lançamento. |
 | `labels.js` | Labels de domínio usados pela interface. |
 | `month-picker.js` | Popover reutilizável de seleção de mês. |
@@ -344,10 +345,11 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | `global_search.py` | Busca histórica autenticada e paginada em lançamentos de contas/cartões, isolada por usuário e executada sob demanda pela Command Palette. |
 | `http_routes.py` | Tabela declarativa e resolução de rotas, independente do transporte HTTP. Ver [[specs/desconcentracao-arquitetura-v2]]. |
 | `cockpit.py` | Agregações de domínio do resumo mensal do Cockpit com `SUM`, `COUNT` e `GROUP BY` no SQLite, fora do adaptador HTTP e sem materializar lançamentos detalhados. |
+| `cockpit_notifications.py` | Motor desacoplado de notificações financeiras: compila limites, saldo projetado, contas/faturas vencidas, maturidades e eventos semanais; cruza informativos com `notification_reads` sem depender do snapshot mensal ou de rede para maturidades. Ver [[specs/alertas-cockpit]]. |
 | `open_debts.py` | Leitura consistente e agregação de parcelas em aberto, por usuário e moeda, compartilhada entre `/api/cockpit` (`open_debts`) e Relatórios. Conciliação liquida parcela de conta; registro de pagamento encerra fatura. Inclui vencidas, sem reconstrução histórica, rede ou escrita. |
 | `balance_projections.py` | Saldos conciliados/projetados e reservas de faturas; a projeção detalhada atende o Extrato, enquanto o Cockpit usa uma consolidação por moeda agregada diretamente no SQLite, sem materializar históricos. |
 | `portfolio.py` | API pública e composição do Portfólio; mantém CRUD, adaptação dos provedores e aplicação de cotações de mercado/fundos. Delega transporte/cache, valorização por data e série histórica. Resgates e encerramentos preparam posições fora da escrita e revalidam entradas locais na transação, sem recotação. Ver [[investimentos-portfolio]]. |
-| `portfolio_positions.py` | Identidade, auxiliares de lotes/FIFO e leitura única das entradas locais para a tela e consumidores internos; histórico de resgates por conexão recebida. Não contém o CRUD completo nem consultas externas. |
+| `portfolio_positions.py` | Identidade, auxiliares de lotes/FIFO e leituras locais compartilhadas: entradas da carteira e vencimentos abertos de renda fixa filtrados no SQLite; histórico de resgates por conexão recebida. Não contém CRUD completo nem consultas externas. |
 | `portfolio_quotes.py` | Transporte HTTP/JSON, cache SQLite, caches em memória de cotações/câmbio, locks, TTL, expurgo/LRU e fallback vencido. Dependências injetadas sem importar a fachada; normalização de provedores permanece em `portfolio.py`. |
 | `portfolio_valuation.py` | `PositionValuation`: valor por data de renda fixa/poupança, impostos, custódia, aniversários, variação diária e fatores mensais compartilhados. Sem SQL/HTTP; recebe provedores e relógio na composição. |
 | `portfolio_returns.py` | `PortfolioReturns`: série mensal por moeda, baseline e benchmarks CDI/IPCA; recebe valorização por data e carregador opcional da carteira, sem duplicar juros/impostos. Caches de fatores locais à chamada. |
@@ -371,7 +373,7 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | `secure_config.py` | Armazenamento criptografado da configuração SMTP local, segredos de IA e chaves de integrações por usuário em `secure_configs`, com compatibilidade para arquivos `.enc` legados. Ver [[recuperacao-senha]], [[tendencias-saude-financeira]], [[specs/preferencias-abas]]. |
 | `version_check.py` | Consulta a landing page oficial por nova versão, compara com a versão local e mantém cache de 1h. Ver [[alerta-nova-versao]]. |
 | `outbound_json.py` | Fronteira compartilhada para leitura limitada de JSON externo; valida tamanho declarado e efetivo antes de decodificar, com limites por integração. Ver [[specs/seguranca-transporte-externo]]. |
-| `calendar.py` | Cálculo da aba **Calendário** do Cockpit: contas a receber/pagar atrasadas e vencimentos de renda fixa em 30 e 60 dias. Ver [[specs/cockpit-calendario]]. |
+| `calendar.py` | Cálculo offline da aba **Calendário** do Cockpit: contas a receber/pagar atrasadas e vencimentos de renda fixa em 30 e 60 dias, sem montar ou valorar a carteira. Ver [[specs/cockpit-calendario]]. |
 | `simulations.py` | Validação e projeção comparativa, sem persistência, de cenários hipotéticos do Efeito Borboleta. Ver [[efeito-borboleta]]. |
 | `reports.py` | Relatório por tag agregado no SQLite e demonstrativo mensal com KPIs, média diária, ranking, distribuição, composição, percentuais, série diária e detalhes separados por moeda nativa. Reutiliza `open_debts.py`; autenticação/adaptação HTTP ficam em `app.py`. Evolução de categoria permanece em `categories.py`. Ver [[relatorios]]. |
 
@@ -547,7 +549,7 @@ Ver [[investimentos-portfolio]].
 7. Lançamentos de cartão entram em relatórios e limites pela competência da fatura.
 8. `GET /api/reports/category-evolution` retorna séries mensais por categoria/subcategoria para o drawer de evolução, com `periodo` igual a `3m`, `6m`, `12m`, `ytd` ou `all`. `categories.py` preserva a leitura/competência; `reports.build_evolution_presentation` acrescenta `total_cents`, `trend_percent` (nullable) e `forecast` (12 pontos SMA), mantendo `evolution` compatível. Frontend apenas seleciona o horizonte e formata/desenha.
 9. O consolidado `currency_totals` do Cockpit usa três consultas agregadas e limitadas ao usuário/competência: saldos por conta, faturas do mês por cartão e reservas conciliadas ainda não pagas. A rota não chama os leitores detalhados de lançamentos, compras ou pagamentos e não constrói o mapa de datas da projeção do Extrato.
-10. A Central de Notificações do Cockpit expõe `GET /api/cockpit/notifications` compilando no backend os alertas críticos (limites excedidos, saldo negativo projetado, contas/faturas vencidas) e informativos periódicos (dividendos e vencimentos da semana), mantendo o frontend em `web/` puramente de apresentação para os indicadores de abas e o flyout global em camada superior de sobreposição (evitando problemas de z-index/clipping). `POST /api/cockpit/notifications/mark-seen` permite registrar leitura de informativos por usuário. Ver [[specs/alertas-cockpit]].
+10. A Central de Notificações do Cockpit expõe `GET /api/cockpit/notifications` compilando no backend os alertas críticos (limites excedidos, saldo negativo projetado, contas/faturas vencidas) e informativos periódicos (dividendos e vencimentos da semana), mantendo o frontend em `web/` puramente de apresentação para os indicadores de abas e o flyout global em camada superior de sobreposição (evitando problemas de z-index/clipping). `POST /api/cockpit/notifications/mark-seen` registra leitura de informativos por usuário; o `app.js` traduz somente os metadados de ação em navegação contextual para Limites, Extrato, Cartões, Calendário ou Portfólio.
 
 Ver [[relatorios]], [[limites-gastos]], [[specs/cockpit-calendario]], [[specs/alertas-cockpit]].
 
@@ -595,6 +597,16 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 - [[adr/0014-desconcentracao-fachadas-e-roteamento]] — Fachadas compatíveis, roteamento declarativo e módulos internos menores para a fundação v2.
 
 ## Changelog
+
+- `3.93` — 2026-09-03 — Calendário e notificações compartilham leitura SQLite de vencimentos abertos em `portfolio_positions.py`; o endpoint do Calendário deixa de montar e cotar a carteira, eliminando acesso externo de Poupança/SELIC/TR nesse fluxo.
+- `3.92` — 2026-09-03 — Central de Notificações conclui ações contextuais e marcação persistente de informativos; o flyout mantém erros operacionais visíveis e o composition root traduz rotas sem incorporar regras financeiras. Testes de integração cobrem autenticação, isolamento por usuário e fatura vencida.
+- `3.91` — 2026-09-03 — Cockpit integra indicadores acessíveis de críticos/informativos e botão condensado responsivo ao flyout global, usando endpoint dedicado com cache local curto e deduplicação; banner de versão permanece independente.
+
+- `3.90` — 2026-09-03 — Criado `notification-flyout.js` como overlay global acessível e responsivo, ainda desacoplado dos indicadores e da navegação do Cockpit previstos nos próximos passos.
+
+- `3.89` — 2026-09-03 — Implementadas no roteador e no adaptador HTTP as rotas autenticadas `GET /api/cockpit/notifications` e `POST /api/cockpit/notifications/mark-seen`, preservando validação de origem e isolamento das leituras por usuário.
+
+- `3.88` — 2026-09-03 — Criado `cockpit_notifications.py` para agregação independente das notificações críticas e informativas, com leitura local de maturidades e persistência de visualização desacoplada das futuras rotas HTTP.
 
 - `3.87` — 2026-09-03 — Registradas as rotas `GET /api/cockpit/notifications` e `POST /api/cockpit/notifications/mark-seen` e o fluxo de montagem centralizada de notificações críticas e informativas do Cockpit com flyout desacoplado em camada global. Ver [[specs/alertas-cockpit]].
 - `3.86` — 2026-09-03 — Adicionada fronteira `financeiro/ai_endpoint_security.py` para proteger endpoints configuráveis de IA contra SSRF, com DNS pinning, validação da URL final e variáveis de ambiente `AI_ALLOW_PRIVATE_ENDPOINTS`, `AI_ALLOWED_LOCAL_HOSTS` e `AI_ALLOWED_LOCAL_ENDPOINTS` para operadores.

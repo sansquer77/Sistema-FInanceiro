@@ -2,8 +2,8 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 4.24
-atualizado: 2026-09-01
+versao: 4.25
+atualizado: 2026-09-03
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
   - "[[arquitetura]]"
@@ -15,7 +15,7 @@ aliases: ["Modularização Frontend", "ES Modules"]
 # Modularização do Frontend
 
 > [!info] Status
-> **implementado** · área: `frontend` · atualizado em 2026-09-01 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]], [[../qualidade-codigo]]
+> **implementado** · área: `frontend` · atualizado em 2026-09-03 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]], [[../qualidade-codigo]]
 
 ## Problema
 
@@ -41,6 +41,7 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `money-utils.js` | Formatação e parsing numérico/monetário. |
 | `dom-utils.js` | Helpers de formulário, mensagens e empty state. |
 | `chart-adapter.js` | Ciclo de vida, tokens, movimento reduzido e fallback dos gráficos ApexCharts locais. |
+| `notification-flyout.js` | Diálogo global acessível de alertas do Cockpit, com abas, ações delegadas, persistência de leitura injetada e restauração de foco. |
 | `transaction-kind.js` | Predicados de tipo de lançamento. |
 | `labels.js` | Labels de domínio usados pela interface. |
 | `month-picker.js` | Popover reutilizável de seleção de mês. |
@@ -268,6 +269,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Changelog
 
+- `4.25` — 2026-09-03 — Registrado `notification-flyout.js` como overlay global do Cockpit; ações contextuais permanecem no composition root e o módulo não incorpora regras financeiras.
 - `4.24` — 2026-09-01 — Busca Global deixa de depender das fatias mensais residentes e consulta lançamentos históricos sob demanda, com limite, debounce e proteção contra respostas obsoletas.
 
 - `4.23` — 2026-09-01 — Loader inicial e atualização do Cockpit deixam de baixar históricos integrais; Relatórios passam a carregar e descartar recortes mensais isolados por request id.

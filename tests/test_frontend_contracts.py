@@ -413,7 +413,9 @@ class FrontendModuleContractTest(unittest.TestCase):
 
         self.assertIn('class="summary-strip executive-summary-strip"', index)
         self.assertIn('class="cockpit-priority-alerts"', index)
-        self.assertLess(index.index('id="cockpitLimitAlert"'), index.index('class="summary-strip executive-summary-strip"'))
+        self.assertLess(index.index('id="cockpitVersionAlert"'), index.index('class="summary-strip executive-summary-strip"'))
+        self.assertIn('id="cockpitCriticalNotifications"', index)
+        self.assertIn('id="cockpitInformationalNotifications"', index)
         for section in ("planning", "debts", "top-expenses", "top-income"):
             self.assertIn(f'data-cockpit-section="{section}"', index)
         self.assertIn(".dashboard-main:has(#cockpitView:not([hidden])) > .topbar", styles)

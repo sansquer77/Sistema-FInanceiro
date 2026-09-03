@@ -2,7 +2,7 @@
 tipo: spec
 area: cockpit
 status: em-implementacao
-versao: 0.3
+versao: 0.8
 atualizado: 2026-09-03
 relacionados:
   - "[[cockpit-calendario]]"
@@ -19,7 +19,7 @@ aliases: ["Alertas e Notificações do Cockpit", "Alertas Cockpit", "Central de 
 # Alertas e Notificações do Cockpit
 
 > [!info] Status
-> **em implementação** · versão: `0.3` · área: `cockpit` · atualizado em 2026-09-03 · relacionados: [[cockpit-calendario]], [[limites-gastos]], [[cartoes]], [[lancamentos]], [[investimentos-portfolio]], [[arquitetura]], [[requisitos]]
+> **em implementação** · versão: `0.8` · área: `cockpit` · atualizado em 2026-09-03 · relacionados: [[cockpit-calendario]], [[limites-gastos]], [[cartoes]], [[lancamentos]], [[investimentos-portfolio]], [[arquitetura]], [[requisitos]]
 
 ### Problema
 
@@ -226,15 +226,20 @@ Restrição de unicidade: `PRIMARY KEY (user_id, notification_id)`.
 ### Plano de implementação
 
 - [x] Passo 1 — Schema: criar a tabela `notification_reads` de forma idempotente em `financeiro/database.py` com `PRIMARY KEY (user_id, notification_id)`. Fecha: critério 11.
-- [ ] Passo 2 — Backend: criar o motor de agregação de notificações em `financeiro/cockpit_notifications.py` (ou dentro de `financeiro/cockpit.py`), compilando limites excedidos, saldo negativo projetado, contas vencidas e eventos da semana, cruzando com `notification_reads`. Fecha: critérios 1, 3, 4, 5, 6, 11.
-- [ ] Passo 3 — Backend: expor o endpoint exclusivo autenticado `GET /api/cockpit/notifications` e a rota `POST /api/cockpit/notifications/mark-seen` em `financeiro/http_routes.py`. Fecha: critérios 6, 10, 11.
-- [ ] Passo 4 — Frontend: criar o componente de flyout global acessível e desacoplado de empilhamentos em `web/modules/notification-flyout.js` (ou utilitário de overlay), respeitando ARIA e tecla Escape. Fecha: critérios 2, 8, 9.
-- [ ] Passo 5 — Frontend: integrar os botões de Alertas Críticos e Informativos na barra de abas do Cockpit (`web/modules/cockpit-view.js` e `web/index.html`), mantendo o banner de nova versão independente e suportando modo condensado responsivo. Fecha: critérios 1, 2, 5, 7, 12.
-- [ ] Passo 6 — Frontend: implementar a navegação contextual das ações de cada card de notificação e o fluxo de marcar informativos como lidos. Fecha: critérios 2, 6.
-- [ ] Passo 7 — Testes automatizados: criar testes unitários e de integração em `tests/test_cockpit_notifications.py` cobrindo cálculo de alertas, persistência na `notification_reads`, tolerância a falhas de cotação e controle de autenticação. Fecha: critérios 1, 3, 4, 10, 11, 12.
+- [x] Passo 2 — Backend: criar o motor de agregação de notificações em `financeiro/cockpit_notifications.py` (ou dentro de `financeiro/cockpit.py`), compilando limites excedidos, saldo negativo projetado, contas vencidas e eventos da semana, cruzando com `notification_reads`. Fecha: critérios 1, 3, 4, 5, 6, 11.
+- [x] Passo 3 — Backend: expor o endpoint exclusivo autenticado `GET /api/cockpit/notifications` e a rota `POST /api/cockpit/notifications/mark-seen` em `financeiro/http_routes.py`. Fecha: critérios 6, 10, 11.
+- [x] Passo 4 — Frontend: criar o componente de flyout global acessível e desacoplado de empilhamentos em `web/modules/notification-flyout.js` (ou utilitário de overlay), respeitando ARIA e tecla Escape. Fecha: critérios 2, 8, 9.
+- [x] Passo 5 — Frontend: integrar os botões de Alertas Críticos e Informativos na barra de abas do Cockpit (`web/modules/cockpit-view.js` e `web/index.html`), mantendo o banner de nova versão independente e suportando modo condensado responsivo. Fecha: critérios 1, 2, 5, 7, 12.
+- [x] Passo 6 — Frontend: implementar a navegação contextual das ações de cada card de notificação e o fluxo de marcar informativos como lidos. Fecha: critérios 2, 6.
+- [x] Passo 7 — Testes automatizados: criar testes unitários e de integração em `tests/test_cockpit_notifications.py` cobrindo cálculo de alertas, persistência na `notification_reads`, tolerância a falhas de cotação e controle de autenticação. Fecha: critérios 1, 3, 4, 10, 11, 12.
 
 ### Changelog
 
+- `0.8` — 2026-09-03 — Passos 6 e 7 concluídos: ações dos cards navegam com competência e entidade de contexto para Limites, Extrato, Cartões, Calendário ou Portfólio; informativos são marcados via API e atualizam o badge sem sumir da semana. Testes cobrem fatura vencida, isolamento entre usuários, autenticação, limites de payload, banner independente e contrato de navegação.
+- `0.7` — 2026-09-03 — Passo 5 concluído: indicadores críticos e informativos integrados à barra do Cockpit com contadores e rótulos acessíveis; modo estreito usa botão combinado com prioridade visual para críticos, carregamento dedicado deduplicado e cache curto. Faixas financeiras legadas deixam o topo do painel, preservando o banner de versão.
+- `0.6` — 2026-09-03 — Passo 4 concluído: componente `notification-flyout.js` cria um diálogo global seguro e acessível, com abas de severidade, estados vazios, fechamento por botão/backdrop/Escape e restauração de foco; estilos responsivos adicionados sem acoplamento à barra do Cockpit.
+- `0.5` — 2026-09-03 — Passo 3 concluído: rotas autenticadas de consulta e marcação de informativos registradas em `http_routes.py` e implementadas no adaptador HTTP, com validação de origem, payload limitado pelo domínio e isolamento por usuário.
+- `0.4` — 2026-09-03 — Passo 2 concluído: `cockpit_notifications.py` centraliza limites excedidos, saldo negativo projetado, contas/faturas vencidas, vencimentos de renda fixa e eventos semanais desacoplados, preservando informativos vistos em `notification_reads` e evitando rede na leitura local de maturidades.
 - `0.3` — 2026-09-03 — Passo 1 concluído: criada a tabela `notification_reads` de forma idempotente em `financeiro/database.py` com chave primária composta `(user_id, notification_id)`, cascata por usuário e testes unitários de integridade.
 - `0.2` — 2026-09-03 — Resolvidas as pendências de arquitetura: persistência de leitura via tabela SQLite `notification_reads`, permanência do banner independente de nova versão no painel e rota exclusiva `GET /api/cockpit/notifications`.
 - `0.1` — 2026-09-03 — Especificação inicial da reformulação dos alertas do Cockpit em dois indicadores (Alertas Críticos e Informativos) com flyout global desacoplado de empilhamentos, backend centralizado e suporte responsivo.

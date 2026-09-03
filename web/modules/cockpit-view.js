@@ -4,6 +4,7 @@ import { registerFinancialHealthView } from "./financial-health-view.js";
 import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";
 import { stateMarkup } from "./dom-utils.js";
 import { renderChart } from "./chart-adapter.js";
+import { createNotificationFlyout } from "./notification-flyout.js";
 
 const COCKPIT_DISCLOSURE_KEY = "sf-cockpit-disclosures-v1";
 
@@ -32,6 +33,7 @@ export function registerCockpitView({
   goToPortfolio,
   onNavigateToTransaction,
   onNavigateToPortfolio,
+  onNotificationAction,
   formatDate,
 }) {
   const {
@@ -56,6 +58,12 @@ export function registerCockpitView({
     cockpitVersionAlert,
     cockpitVersionAlertVersion,
     cockpitVersionAlertDismiss,
+    cockpitCriticalNotifications,
+    cockpitInformationalNotifications,
+    cockpitCombinedNotifications,
+    cockpitCriticalNotificationCount,
+    cockpitInformationalNotificationCount,
+    cockpitCombinedNotificationCount,
     cockpitCalendarPanel,
     cockpitCalendarMeta,
     consultorTabs,
@@ -79,6 +87,13 @@ export function registerCockpitView({
   } = elements;
   let versionAlertDismissed = false;
   let activeChartBreakdownClose = null;
+  let notifications = { critical: [], informational: [], critical_count: 0, informational_count: 0 };
+  let notificationsLoadedAt = 0;
+  let notificationsInFlight = null;
+  const notificationFlyout = createNotificationFlyout({
+    onAction: (action, item) => onNotificationAction?.(action, item),
+    onMarkSeen: markNotificationsSeen,
+  });
   const cockpitDisclosures = Array.from(document.querySelectorAll("[data-cockpit-section]"));
 
   const trendsView = registerTrendsView({
@@ -141,6 +156,9 @@ export function registerCockpitView({
     versionAlertDismissed = true;
     renderVersionAlert();
   });
+  cockpitCriticalNotifications?.addEventListener("click", () => openNotifications("critical", cockpitCriticalNotifications));
+  cockpitInformationalNotifications?.addEventListener("click", () => openNotifications("informational", cockpitInformationalNotifications));
+  cockpitCombinedNotifications?.addEventListener("click", () => openNotifications("critical", cockpitCombinedNotifications));
   initializeCockpitDisclosures();
 
   function initializeCockpitDisclosures() {
@@ -172,6 +190,7 @@ export function registerCockpitView({
     renderCockpitTabs();
     renderCockpitMonthLabel();
     renderVersionAlert();
+    loadNotifications();
     const totals = getCurrencyTotals();
     const monthTotals = state.cockpit?.month_totals || getCurrentMonthTotals();
     monthIncome.textContent = formatMoney(monthTotals.income, "BRL");
@@ -195,6 +214,57 @@ export function registerCockpitView({
     if (activeCockpitTab() === "calendar") {
       consultorView.renderCalendar();
     }
+  }
+
+  async function loadNotifications({ force = false } = {}) {
+    if (!force && Date.now() - notificationsLoadedAt < 30000) return notifications;
+    if (notificationsInFlight) return notificationsInFlight;
+    notificationsInFlight = api("/api/cockpit/notifications")
+      .then((result) => {
+        notifications = result || notifications;
+        notificationsLoadedAt = Date.now();
+        renderNotificationIndicators();
+        return notifications;
+      })
+      .catch(() => notifications)
+      .finally(() => { notificationsInFlight = null; });
+    return notificationsInFlight;
+  }
+
+  async function openNotifications(section, trigger) {
+    await loadNotifications({ force: true });
+    notificationFlyout.open(notifications, { section, trigger });
+  }
+
+  function renderNotificationIndicators() {
+    const criticalCount = Number(notifications.critical_count || 0);
+    const informationalCount = Number(notifications.informational_count || 0);
+    updateNotificationButton(cockpitCriticalNotifications, cockpitCriticalNotificationCount, criticalCount, "alerta crítico", "alertas críticos");
+    updateNotificationButton(cockpitInformationalNotifications, cockpitInformationalNotificationCount, informationalCount, "informativo novo", "informativos novos");
+    updateNotificationButton(cockpitCombinedNotifications, cockpitCombinedNotificationCount, criticalCount + informationalCount, "notificação financeira", "notificações financeiras");
+    cockpitCombinedNotifications?.classList.toggle("has-critical", criticalCount > 0);
+    cockpitCombinedNotifications?.classList.toggle("has-informational", criticalCount === 0 && informationalCount > 0);
+  }
+
+  function updateNotificationButton(button, badge, count, singular, plural) {
+    if (!button || !badge) return;
+    badge.textContent = String(count);
+    button.classList.toggle("has-items", count > 0);
+    button.setAttribute("aria-label", count ? `${count} ${count === 1 ? singular : plural}` : `Nenhum ${plural}`);
+  }
+
+  async function markNotificationsSeen(notificationIds) {
+    await api("/api/cockpit/notifications/mark-seen", {
+      method: "POST",
+      body: { notification_ids: notificationIds },
+    });
+    const ids = new Set(notificationIds);
+    notifications.informational = (notifications.informational || []).map((item) => (
+      ids.has(item.id) ? { ...item, seen: true } : item
+    ));
+    notifications.informational_count = notifications.informational.filter((item) => !item.seen).length;
+    notificationsLoadedAt = Date.now();
+    renderNotificationIndicators();
   }
 
   function renderVersionAlert() {

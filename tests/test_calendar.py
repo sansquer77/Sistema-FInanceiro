@@ -170,8 +170,10 @@ class CalendarCoreTest(IsolatedDatabaseTest):
         self.create_fixed_income_position(user["id"], account["id"], "CDB 60 dias", today + timedelta(days=60))
         self.create_fixed_income_position(user["id"], account["id"], "CDB 61 dias", today + timedelta(days=61))
 
-        with mock.patch("financeiro.portfolio.read_json_url", side_effect=RuntimeError("offline")):
+        with mock.patch("financeiro.portfolio.read_json_url", side_effect=RuntimeError("offline")) as read_json:
             payload = get_cockpit_calendar(user["id"], reference_date=today)
+
+        read_json.assert_not_called()
 
         self.assertEqual(len(payload["maturity_30_days"]), 1)
         self.assertEqual(payload["maturity_30_days"][0]["asset_name"], "CDB 30 dias")
@@ -198,8 +200,10 @@ class CalendarCoreTest(IsolatedDatabaseTest):
         self.create_fixed_income_position(user["id"], account["id"], "Poupança", today + timedelta(days=15), asset_type="savings")
         self.create_fixed_income_position(user["id"], account["id"], "Previdência", today + timedelta(days=15), asset_type="private_pension")
 
-        with mock.patch("financeiro.portfolio.read_json_url", side_effect=RuntimeError("offline")):
+        with mock.patch("financeiro.portfolio.read_json_url", side_effect=RuntimeError("offline")) as read_json:
             payload = get_cockpit_calendar(user["id"], reference_date=today)
+
+        read_json.assert_not_called()
 
         self.assertEqual(payload["maturity_30_days"], [])
         self.assertEqual(payload["maturity_60_days"], [])
@@ -395,6 +399,19 @@ class CalendarRouteTest(IsolatedDatabaseTest):
         self.assertIn("maturity_60_days", payload)
         self.assertIn("ia_ativa", payload)
         self.assertIs(payload["ia_ativa"], False)
+
+    def test_route_does_not_assemble_or_quote_the_portfolio(self) -> None:
+        user = create_user("Alice", "alice@example.com", "strong-password")
+        handler = object.__new__(app.AppHandler)
+        handler.headers = {"Host": "sistema-financeiro.localhost:8020"}
+        handler.send_json = mock.Mock()
+        with (
+            mock.patch.object(app.AppHandler, "validate_read_source", return_value=True),
+            mock.patch.object(app.AppHandler, "require_user", return_value=user),
+            mock.patch("app.current_portfolio_positions") as positions,
+        ):
+            handler.handle_cockpit_calendar()
+        positions.assert_not_called()
 
     def test_route_exposes_ai_active_flag_when_enabled(self) -> None:
         user = create_user("Alice", "alice@example.com", "strong-password")

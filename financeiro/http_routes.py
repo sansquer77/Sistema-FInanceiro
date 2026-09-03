@@ -30,6 +30,7 @@ EXACT_ROUTES: dict[str, dict[str, str]] = {
         "/api/global-search": "handle_global_search",
         "/api/cockpit": "handle_cockpit",
         "/api/cockpit/calendar": "handle_cockpit_calendar",
+        "/api/cockpit/notifications": "handle_cockpit_notifications",
         "/api/financial-health-score": "handle_financial_health_score",
         "/api/financial-health-score/history": "handle_financial_health_score_history",
         "/api/financial-health-trends": "handle_financial_health_trends",
@@ -68,6 +69,7 @@ EXACT_ROUTES: dict[str, dict[str, str]] = {
         "/api/consultor/config": "handle_save_consultor_config",
         "/api/consultor/perfil-complementar": "handle_save_consultor_complementary_profile",
         "/api/consultor/analyze": "handle_consultor_analyze",
+        "/api/cockpit/notifications/mark-seen": "handle_mark_cockpit_notifications_seen",
     },
     "PUT": {
         "/api/portfolio/value": "handle_update_portfolio_value",

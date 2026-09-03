@@ -28,6 +28,7 @@ from financeiro.accounts import (
 from financeiro.app_metadata import APP_NAME, APP_VERSION, app_info
 from financeiro.cockpit import cockpit_payload
 from financeiro.cockpit import build_cockpit_summary
+from financeiro.cockpit_notifications import build_cockpit_notifications, mark_informational_seen
 from financeiro.open_debts import get_open_debts
 from financeiro.global_search import GlobalSearchError, search_global
 from financeiro.reports import build_statement_report, build_evolution_presentation, build_report_overview
@@ -512,15 +513,33 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_json(result)
 
     def handle_cockpit_calendar(self) -> None:
-        # spec: cockpit-calendario v0.8 — critérios 17 e 18
+        # spec: cockpit-calendario v0.9 — critérios 17 e 18
         if not self.validate_read_source():
             return
         user = self.require_user()
-        # Otimização: calcula o portfólio uma única vez por requisição.
-        positions = current_portfolio_positions(user["id"], force_refresh=False)
-        payload = get_cockpit_calendar(user["id"], portfolio_positions=positions)
+        payload = get_cockpit_calendar(user["id"])
         payload["ia_ativa"] = ai_summary_enabled(user["id"])
         self.send_json(payload)
+
+    def handle_cockpit_notifications(self) -> None:
+        # spec: cockpit/alertas-cockpit v0.8 — critérios 6, 10 e 11
+        if not self.validate_read_source():
+            return
+        user = self.require_user()
+        self.send_json(build_cockpit_notifications(user["id"]))
+
+    def handle_mark_cockpit_notifications_seen(self) -> None:
+        # spec: cockpit/alertas-cockpit v0.8 — critérios 6 e 11
+        user = self.require_user()
+        payload = self.read_json()
+        notification_ids = payload.get("notification_ids") if isinstance(payload, dict) else None
+        if not isinstance(notification_ids, list):
+            raise ApiError("Lista de notificações inválida.", HTTPStatus.BAD_REQUEST)
+        try:
+            marked_count = mark_informational_seen(user["id"], notification_ids)
+        except ValueError as exc:
+            raise ApiError(str(exc), HTTPStatus.BAD_REQUEST) from None
+        self.send_json({"status": "ok", "marked_count": marked_count})
 
     def handle_financial_health_score(self) -> None:
         # spec: score-saude-financeira v3.6 — critério 15

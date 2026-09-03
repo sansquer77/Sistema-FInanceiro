@@ -1407,6 +1407,64 @@ textarea:focus {
   min-width: 0;
 }
 
+.cockpit-notification-indicators {
+  display: flex;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.cockpit-notification-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 5px 9px;
+  border: 1px solid var(--outline, var(--line));
+  border-radius: 999px;
+  color: var(--muted);
+  background: var(--panel);
+  font: inherit;
+  font-size: .78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cockpit-notification-button b {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  color: var(--muted);
+  background: var(--surface-high);
+  font-size: .7rem;
+}
+
+.cockpit-notification-button.critical.has-items {
+  border-color: var(--danger-border, var(--error));
+  color: var(--danger-text-strong, var(--error));
+  background: var(--danger-surface);
+}
+
+.cockpit-notification-button.critical.has-items b {
+  color: var(--on-error, #fff);
+  background: var(--error);
+}
+
+.cockpit-notification-button.informational.has-items {
+  border-color: var(--warning, #d59b00);
+  color: var(--warning-text, #765500);
+  background: var(--warning-surface, #fff5d6);
+}
+
+.cockpit-notification-button.informational.has-items b {
+  color: #241a00;
+  background: var(--warning, #e8ad16);
+}
+
+.cockpit-notification-button.combined { display: none; }
+
 .cockpit-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -5205,6 +5263,19 @@ form[aria-busy="true"] .form-actions {
   #cockpitView .cockpit-toolbar {
     top: 74px;
   }
+  .cockpit-notification-button.critical,
+  .cockpit-notification-button.informational { display: none; }
+  .cockpit-notification-button.combined { display: inline-flex; }
+  .cockpit-notification-button.combined.has-items {
+    border-color: var(--warning, #d59b00);
+    color: var(--ink);
+    background: var(--warning-surface, #fff5d6);
+  }
+  .cockpit-notification-button.combined.has-critical {
+    border-color: var(--danger-border, var(--error));
+    color: var(--danger-text-strong, var(--error));
+    background: var(--danger-surface);
+  }
   .portfolio-return-drawer .drawer-content {
     width: 100%;
     max-width: 100%;
@@ -8682,3 +8753,24 @@ form[aria-busy="true"] .form-actions {
     overflow: visible;
   }
 }
+/* spec: cockpit/alertas-cockpit v0.8 — flyout global de notificações */
+.notification-flyout { width:min(520px,calc(100vw - 32px)); max-height:calc(100vh - 32px); margin:auto 16px auto auto; padding:0; border:1px solid var(--outline-variant); border-radius:18px; color:var(--on-surface); background:var(--surface-container); box-shadow:var(--drawer-shadow); }
+.notification-flyout::backdrop { background:var(--modal-overlay); }
+.notification-flyout-surface { display:grid; grid-template-rows:auto auto minmax(120px,1fr) auto; max-height:calc(100vh - 32px); }
+.notification-flyout-header,.notification-flyout-tabs,.notification-flyout-footer { display:flex; align-items:center; gap:8px; padding:14px 16px; }
+.notification-flyout-header { justify-content:space-between; border-bottom:1px solid var(--outline-variant); }
+.notification-flyout-header h2,.notification-flyout-item h3,.notification-flyout-item p { margin:0; }
+.notification-flyout-close { width:36px; height:36px; border:0; border-radius:50%; color:inherit; background:transparent; font-size:1.5rem; cursor:pointer; }
+.notification-flyout-close:hover,.notification-flyout-close:focus-visible,.notification-flyout-tab[aria-selected="true"] { background:var(--surface-container-high); }
+.notification-flyout-tab { flex:1; min-height:40px; border:0; border-radius:10px; color:var(--on-surface-variant); background:transparent; font-weight:700; cursor:pointer; }
+.notification-flyout-tab[aria-selected="true"] { color:var(--on-surface); }
+.notification-flyout-body { overflow:auto; padding:4px 16px 16px; }
+.notification-flyout-list { display:grid; gap:10px; }
+.notification-flyout-item { display:grid; gap:6px; padding:14px; border:1px solid var(--outline-variant); border-left-width:4px; border-radius:12px; background:var(--surface); }
+.notification-flyout-item.notification-critical { border-left-color:var(--error); }
+.notification-flyout-item.notification-informational { border-left-color:var(--warning,#d59b00); }
+.notification-flyout-item[data-seen="true"] { opacity:.72; }
+.notification-flyout-item p,.notification-flyout-item time,.notification-flyout-empty { color:var(--on-surface-variant); }
+.notification-flyout-action { justify-self:start; }
+.notification-flyout-footer { justify-content:flex-end; border-top:1px solid var(--outline-variant); }
+@media (max-width:640px) { .notification-flyout { width:calc(100vw - 16px); max-height:calc(100vh - 16px); margin:auto; } }

@@ -239,6 +239,17 @@
               <button class="cockpit-tab" type="button" role="tab" aria-selected="false" aria-controls="trendsPanel" data-cockpit-tab="trends" tabindex="-1">Tendências</button>
               <button class="cockpit-tab" type="button" role="tab" aria-selected="false" aria-controls="financialHealthPanel" data-cockpit-tab="health" tabindex="-1">Saúde</button>
             </div>
+            <div class="cockpit-notification-indicators" aria-label="Notificações financeiras">
+              <button class="cockpit-notification-button critical" id="cockpitCriticalNotifications" type="button" aria-haspopup="dialog" aria-controls="cockpitNotificationFlyout" aria-expanded="false" aria-label="Nenhum alerta crítico">
+                <span aria-hidden="true">⚠</span><span class="notification-label">Alertas</span><b id="cockpitCriticalNotificationCount">0</b>
+              </button>
+              <button class="cockpit-notification-button informational" id="cockpitInformationalNotifications" type="button" aria-haspopup="dialog" aria-controls="cockpitNotificationFlyout" aria-expanded="false" aria-label="Nenhum informativo novo">
+                <span aria-hidden="true">●</span><span class="notification-label">Informativos</span><b id="cockpitInformationalNotificationCount">0</b>
+              </button>
+              <button class="cockpit-notification-button combined" id="cockpitCombinedNotifications" type="button" aria-haspopup="dialog" aria-controls="cockpitNotificationFlyout" aria-expanded="false" aria-label="Nenhuma notificação financeira">
+                <span aria-hidden="true">🔔</span><span class="notification-label">Notificações</span><b id="cockpitCombinedNotificationCount">0</b>
+              </button>
+            </div>
             <div class="month-navigator cockpit-month">
               <button class="ghost small-button month-icon-button" type="button" id="previousCockpitMonthButton" aria-label="Mês anterior" title="Mês anterior">‹</button>
               <button class="month-label" type="button" id="cockpitMonthLabel" aria-haspopup="dialog"></button>
@@ -261,8 +272,6 @@
               </a>
               <button class="version-alert-dismiss" type="button" id="cockpitVersionAlertDismiss" aria-label="Dispensar alerta de nova versão">×</button>
             </section>
-            <section class="cockpit-alert limit-alert" id="cockpitLimitAlert" hidden></section>
-            <section class="cockpit-alert portfolio-maturity-alert" id="cockpitPortfolioMaturityAlert" hidden></section>
             </div>
 
             <section class="summary-strip executive-summary-strip" aria-label="Indicadores executivos do mês">

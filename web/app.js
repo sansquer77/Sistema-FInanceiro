@@ -407,6 +407,12 @@ const cockpitPortfolioMaturityAlert = document.querySelector("#cockpitPortfolioM
 const cockpitVersionAlert = document.querySelector("#cockpitVersionAlert");
 const cockpitVersionAlertVersion = document.querySelector("#cockpitVersionAlertVersion");
 const cockpitVersionAlertDismiss = document.querySelector("#cockpitVersionAlertDismiss");
+const cockpitCriticalNotifications = document.querySelector("#cockpitCriticalNotifications");
+const cockpitInformationalNotifications = document.querySelector("#cockpitInformationalNotifications");
+const cockpitCombinedNotifications = document.querySelector("#cockpitCombinedNotifications");
+const cockpitCriticalNotificationCount = document.querySelector("#cockpitCriticalNotificationCount");
+const cockpitInformationalNotificationCount = document.querySelector("#cockpitInformationalNotificationCount");
+const cockpitCombinedNotificationCount = document.querySelector("#cockpitCombinedNotificationCount");
 const cockpitCalendarPanel = document.querySelector("#cockpitCalendarPanel");
 const cockpitCalendarMeta = document.querySelector("#cockpitCalendarMeta");
 const consultorTabs = document.querySelectorAll("[data-consultor-tab]");
@@ -750,6 +756,12 @@ const cockpitView = registerCockpitView({
     cockpitVersionAlert,
     cockpitVersionAlertVersion,
     cockpitVersionAlertDismiss,
+    cockpitCriticalNotifications,
+    cockpitInformationalNotifications,
+    cockpitCombinedNotifications,
+    cockpitCriticalNotificationCount,
+    cockpitInformationalNotificationCount,
+    cockpitCombinedNotificationCount,
     cockpitCalendarPanel,
     cockpitCalendarMeta,
     consultorTabs,
@@ -794,7 +806,7 @@ const cockpitView = registerCockpitView({
   portfolioMaturityAlerts: () => portfolioView.portfolioMaturityAlerts(),
   goToPortfolio: () => showModule("portfolio"),
   onNavigateToTransaction: (transactionId, accountId, date) => {
-    // spec: cockpit-calendario v0.8 — critério 17
+    // spec: cockpit-calendario v0.9 — critério 17
     state.transactionHighlightId = String(transactionId);
     if (accountId && state.accounts.some((account) => String(account.id) === String(accountId))) {
       state.selectedAccountId = String(accountId);
@@ -813,6 +825,35 @@ const cockpitView = registerCockpitView({
   onNavigateToPortfolio: (positionId) => {
     state.portfolioHighlightId = String(positionId);
     showModule("portfolio");
+  },
+  onNotificationAction: async (action) => {
+    const params = action?.params || {};
+    if (action?.route === "limits") {
+      if (isValidMonthValue(params.month)) state.limitMonth = params.month;
+      await loadSpendingLimits();
+      showModule("limits");
+      return;
+    }
+    if (action?.route === "transactions") {
+      if (isValidMonthValue(params.month)) state.transactionMonth = params.month;
+      if (params.account_id) state.selectedAccountId = String(params.account_id);
+      showModule("transactions");
+      return;
+    }
+    if (action?.route === "cards") {
+      if (isValidMonthValue(params.month)) state.cardInvoiceMonth = params.month;
+      if (params.card_id) state.selectedCreditCardId = String(params.card_id);
+      showModule("cardLaunches");
+      return;
+    }
+    if (action?.route === "calendar") {
+      state.cockpitTab = "calendar";
+      showModule("cockpit");
+      return;
+    }
+    if (action?.route === "portfolio") {
+      showModule("portfolio");
+    }
   },
 });
 

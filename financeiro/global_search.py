@@ -24,7 +24,7 @@ def search_global(user_id: int, query: object, *, limit: int = 24, offset: int =
     raw_pattern = f"%{escape_like(raw_query)}%"
     safe_limit = min(max(int(limit), 1), 50)
     safe_offset = max(int(offset), 0)
-    # spec: frontend/frontend-modularizacao v4.24 — busca histórica sob demanda,
+    # spec: frontend/frontend-modularizacao v4.25 — busca histórica sob demanda,
     # limitada e isolada pelo usuário, sem materializar históricos no estado global.
     with get_connection() as conn:
         rows = conn.execute(

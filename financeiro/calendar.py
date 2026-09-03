@@ -5,7 +5,7 @@ from datetime import date
 from http import HTTPStatus
 
 from financeiro.database import get_connection, row_to_dict
-from financeiro.portfolio import current_portfolio_positions
+from financeiro.portfolio_positions import load_open_fixed_income_maturities
 
 
 class CalendarError(Exception):
@@ -20,7 +20,7 @@ def get_cockpit_calendar(
     reference_date: date | None = None,
     portfolio_positions: list[dict] | None = None,
 ) -> dict:
-    # spec: cockpit-calendario v0.8 — critérios 3, 4, 7, 8, 9, 10, 11, 12, 13, 14 e 15
+    # spec: cockpit-calendario v0.9 — critérios 3, 4, 7, 8, 9, 10, 11, 12, 13, 14 e 15
     # (consolida contas a receber/pagar atrasadas e vencimentos de renda fixa
     #  em 30 e 60 dias a partir da data de referência do servidor)
     reference_date = reference_date or date.today()
@@ -45,7 +45,7 @@ def get_cockpit_calendar(
 
 
 def _fetch_overdue_transactions(user_id: int, reference_date: date, transaction_type: str) -> list[dict]:
-    # spec: cockpit-calendario v0.8 — critérios 3 e 4 (receitas/despesas atrasadas)
+    # spec: cockpit-calendario v0.9 — critérios 3 e 4 (receitas/despesas atrasadas)
     # (somente lançamentos de conta; data anterior à referência; não conciliados;
     #  transferências, investimentos e pagamentos de fatura excluídos)
     with get_connection() as conn:
@@ -108,11 +108,12 @@ def _fetch_fixed_income_maturities(
     reference_date: date,
     portfolio_positions: list[dict] | None = None,
 ) -> tuple[list[dict], list[dict]]:
-    # spec: cockpit-calendario v0.8 — critérios 7, 8, 9, 10, 11, 12, 13, 14 e 15
+    # spec: cockpit-calendario v0.9 — critérios 7, 8, 9, 10, 11, 12, 13, 14 e 15
     # (somente posições abertas de renda fixa; exclui encerradas, poupança, ações,
     #  fundos, cripto, previdência e outros tipos; janelas de 30 e 60 dias sem sobreposição)
     if portfolio_positions is None:
-        positions = current_portfolio_positions(user_id)
+        with get_connection() as conn:
+            positions = load_open_fixed_income_maturities(conn, user_id)
     else:
         positions = portfolio_positions
     maturity_30_days: list[dict] = []
@@ -158,7 +159,7 @@ def _build_totals_by_currency(
     maturity_30_days: list[dict],
     maturity_60_days: list[dict],
 ) -> list[dict]:
-    # spec: cockpit-calendario v0.8 — seção "Dados" (totals_by_currency opcional)
+    # spec: cockpit-calendario v0.9 — seção "Dados" (totals_by_currency opcional)
     totals: dict[str, dict[str, int]] = defaultdict(
         lambda: {
             "overdue_receivables_cents": 0,
