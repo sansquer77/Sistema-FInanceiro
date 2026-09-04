@@ -1520,6 +1520,13 @@ textarea:focus {
   transition: opacity 160ms ease-out, transform 160ms ease-out;
 }
 
+/* Mantém os helps dos KPIs acima do topbar sticky quando o balão sobe. */
+#cockpitView .cockpit-tab-panel:has(.inline-help-icon:hover),
+#cockpitView .cockpit-tab-panel:has(.inline-help-icon:focus-visible) {
+  position: relative;
+  z-index: 31;
+}
+
 #cockpitView.is-refreshing .cockpit-tab-panel:not([hidden]) {
   opacity: 0.58;
   transform: translateY(2px);
@@ -5375,7 +5382,7 @@ form[aria-busy="true"] .form-actions {
 }
 
 .portfolio-events-grid {
-  min-width: 1080px;
+  min-width: 980px;
   border: 1px solid var(--line);
   border-radius: 12px;
   overflow: hidden;
@@ -5384,7 +5391,14 @@ form[aria-busy="true"] .form-actions {
 .portfolio-events-grid-header,
 .portfolio-events-grid-row {
   display: grid;
-  grid-template-columns: 105px 125px minmax(150px, 1.25fr) minmax(150px, 1.2fr) 120px minmax(145px, 1fr) minmax(180px, 1.2fr);
+  grid-template-columns:
+    minmax(95px, 0.75fr)
+    minmax(115px, 0.9fr)
+    minmax(145px, 1fr)
+    minmax(155px, 1.05fr)
+    minmax(130px, 0.9fr)
+    minmax(170px, 1.1fr)
+    minmax(145px, 0.85fr);
   align-items: center;
   column-gap: 12px;
   min-height: 64px;
@@ -5416,6 +5430,19 @@ form[aria-busy="true"] .form-actions {
   border-top: 1px solid var(--line);
 }
 
+.portfolio-events-grid-header > span:nth-child(1),
+.portfolio-events-grid-header > span:nth-child(2),
+.portfolio-events-grid-row > span:nth-child(1),
+.portfolio-events-grid-row > span:nth-child(2),
+.portfolio-events-grid-header > span:nth-child(7),
+.portfolio-events-grid-row > span:nth-child(7) {
+  text-align: center;
+}
+
+.portfolio-events-grid-header > span:nth-child(6) {
+  text-align: right;
+}
+
 .portfolio-events-list:not(.virtual-list) .portfolio-events-grid-row:first-child {
   border-top: 0;
 }
@@ -5436,14 +5463,26 @@ form[aria-busy="true"] .form-actions {
   color: var(--muted);
 }
 
+.portfolio-event-empty {
+  text-align: center;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.portfolio-events-grid-row .portfolio-event-empty {
+  text-align: center;
+  color: var(--muted);
+  font-weight: 500;
+}
+
 .portfolio-event-confirmation {
   display: inline-flex;
   padding: 4px 8px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--surface-low);
-  color: var(--muted);
-  font-size: 0.72rem;
+  color: var(--ink);
+  font-size: 0.75rem;
   font-weight: 700;
   white-space: nowrap;
 }
@@ -5642,10 +5681,8 @@ form[aria-busy="true"] .form-actions {
 
 .portfolio-footnote {
   margin: 10px 0 0;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--surface-low);
+  padding: 8px 2px 0;
+  border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: 12px;
   line-height: 1.45;

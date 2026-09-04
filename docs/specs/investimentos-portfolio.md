@@ -2,7 +2,7 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.54
+versao: 2.59
 atualizado: 2026-09-04
 relacionados:
   - "[[contas-correntes]]"
@@ -100,7 +100,7 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 - USDC, USDT, DAI, FDUSD, PYUSD, TUSD, USDP e USDE cadastrados anteriormente como `crypto` são classificados como Stablecoin na leitura, sem migração destrutiva; novas posições e aportes conhecidos persistem como `stablecoin`.
 - Ativos internacionais cujo ticker operacional precisa de sufixo de bolsa podem usar alias explícito do provedor; `VWRA` em carteira USD resolve para `VWRA.L` (London Stock Exchange, listagem USD) no Yahoo Finance.
 - A quantidade exibida em posições, origens e posições encerradas é normalizada com **até 2 casas decimais** (arredondamento `half-up`), independentemente da precisão cadastrada ou retornada pela cotação, para preservar o layout das tabelas.
-- A aba **Eventos** consulta sob demanda os próximos proventos anunciados pelo Yahoo Finance somente para ações, ETFs e BDRs ainda presentes na carteira, em uma janela do mês atual mais dois meses. Os resultados são agrupados por mês e informam Data ex, data de pagamento quando fornecida, ativo, carteira(s), valor por cota/ação, moeda no próprio valor e nível de confirmação; a fonte aparece em nota de rodapé e o app não presume datas ausentes.
+- A aba **Eventos** consulta sob demanda os próximos proventos anunciados somente para ações, ETFs e BDRs ainda presentes na carteira, em uma janela do mês atual mais dois meses. Para ativos brasileiros, usa a API pública da B3 como fonte primária; para ativos internacionais, usa a API pública da Nasdaq (sem chave) e Yahoo Finance como fallback. O cache é diário por ativo para capturar alterações sem repetir consultas no mesmo dia. Os resultados são agrupados por mês e informam Data ex, data de pagamento quando fornecida, ativo, carteira(s), valor por cota/ação e nível de confirmação; a fonte fica restrita à nota de rodapé: “Dados obtidos de fontes públicas; sempre validar com seu Banco/Corretora”.
 - Como o provedor não distingue de forma confiável dividendos de juros sobre capital próprio, o evento é apresentado como `Dividendo/JCP`; o app não atribui natureza fiscal definitiva nem o apresenta como comunicado oficial do emissor.
 - A aba não multiplica o provento pela quantidade atual ou histórica e não estima valor total a receber. Falhas de um ativo não impedem os demais resultados e nenhuma consulta é feita antes de a aba ser aberta.
 
@@ -126,7 +126,7 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 - A opção de registrar crédito deve ficar desmarcada por padrão para evitar duplicidade com resgates ou créditos já lançados.
 
 **Estrutura em abas:**
-- A tela Portfólio é dividida em **cinco abas** (padrão de pílulas do design system): **Posição** (Resumo da carteira, formulário de ativo e posição atual), **Análise** (consolidações Por classe, Por indexador, Por moeda e Por carteira), **Metas**, **Eventos** (proventos históricos detectados) e **Histórico** (posições encerradas).
+- A tela Portfólio é dividida em **cinco abas** (padrão de pílulas do design system): **Posição** (Resumo da carteira, formulário de ativo e posição atual), **Análise** (consolidações Por classe, Por indexador, Por moeda e Por carteira), **Metas**, **Eventos** (proventos futuros anunciados) e **Histórico** (posições encerradas).
 - Apenas o painel da aba ativa fica visível; a navegação preserva o estado das demais abas e não altera filtros nem dados.
 
 ## API e dados
@@ -182,6 +182,7 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - [x] Carregar e renderizar a aba Eventos somente no primeiro acesso ou após mudança da carteira, mantendo fonte e confirmação visíveis.
 - [x] Limitar a consulta de eventos usada pelo Cockpit à semana corrente, validar os campos externos e virtualizar/desmontar a apresentação extensa da aba Eventos.
 - [x] Consultar `calendarEvents` com sessão Yahoo, exibir somente a janela futura de três meses, agrupar por competência, associar carteiras e mover a fonte para nota de rodapé.
+- [x] Consultar B3 para ativos brasileiros e Nasdaq para internacionais, com Yahoo como fallback, cache diário e parsers monetários sem ponto flutuante.
 
 ## Critérios de aceite
 
@@ -264,17 +265,23 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado um resgate ou encerramento, quando a transação de escrita está aberta, então nenhuma consulta externa de cotação, indexador ou câmbio é executada.
 - Dado que os dados locais da carteira mudaram durante a obtenção das cotações, quando a escrita é iniciada, então a operação retorna conflito HTTP 409 sem gravar resgate, encerramento ou crédito e orienta tentar novamente.
 - Dado que os dados locais não mudaram, quando a operação é confirmada, então FIFO, custos, valores e crédito opt-in mantêm o comportamento atual, mesmo que o cache expire durante a confirmação.
-- Dado ações, ETFs ou BDRs abertos na carteira, quando o usuário abre a aba **Eventos**, então o app consulta sob demanda e lista os proventos históricos detectados desde a primeira aquisição, informando data, ativo, valor por cota/ação, moeda, fonte e nível de confirmação.
-- Dado um evento retornado pelo Yahoo Finance, quando exibido, então sua natureza aparece como `Dividendo/JCP` e o nível `Detectado pelo provedor`, sem afirmar confirmação oficial do emissor.
+- Dado ações, ETFs ou BDRs abertos na carteira, quando o usuário abre a aba **Eventos**, então o app consulta sob demanda e lista os eventos anunciados na janela futura, preservando os campos Data ex, Pagamento, Ativo, Carteira, Evento, Valor por cota/ação e Confirmação.
+- Dado um ativo brasileiro elegível, quando a aba consulta eventos, então usa B3 primeiro e Yahoo Finance como fallback; para ativo internacional usa Nasdaq primeiro e Yahoo Finance como fallback.
 - Dado qualquer quantidade atual ou histórica da posição, quando os eventos são apresentados, então o app não calcula nem exibe valor total estimado a receber.
 - Dado falha de consulta para um ativo, quando outros ativos possuem eventos válidos, então os resultados disponíveis continuam visíveis e a indisponibilidade parcial é informada sem bloquear a aba.
 - Dado o usuário navegando pelas demais abas do Portfólio, quando **Eventos** ainda não foi aberta, então nenhuma chamada ao endpoint de eventos ou ao provedor externo é realizada.
 - Dado o calendário de proventos retornado pelo provedor, quando a aba **Eventos** é exibida, então somente eventos futuros do mês atual e dos dois meses seguintes são listados, agrupados por mês; a data principal é identificada como **Data ex** e a **Data de pagamento** aparece somente quando informada pelo provedor, usando `Não informada` nos demais casos.
 - Dado um evento sem valor unitário anunciado pelo calendário, quando exibido, então o valor aparece como `Não informado`, sem utilizar dividend rate ou qualquer estimativa.
 - Dado um evento associado a uma ou mais posições, quando exibido, então as carteiras são apresentadas na linha e a moeda permanece no valor unitário formatado.
+- Dado que o provedor não anuncia eventos na janela futura ou não disponibiliza calendário para um ativo, quando a aba é exibida, então a interface apresenta um estado vazio neutro e não rotula o ativo como erro ou indisponibilidade.
 - Dado mais de 200 eventos históricos, quando a listagem é apresentada, então somente a janela visível e uma pequena margem são materializadas no DOM; ao sair da aba Eventos, a apresentação é desmontada e os dados válidos permanecem em memória para reconstrução sem nova consulta.
 - Dado o Cockpit solicitando informativos de proventos, quando a consulta externa é montada, então o período começa no primeiro dia da semana corrente e eventos fora dessa janela são descartados antes da agregação.
 - Dado um evento externo com valor excessivo, data inválida ou timestamp fora do período solicitado, quando o payload é interpretado, então somente esse evento é descartado e os demais ativos/resultados continuam disponíveis.
+- Dado consultas repetidas ao mesmo ativo no mesmo dia, quando não há atualização forçada, então B3, Nasdaq e Yahoo reutilizam o cache diário sem nova requisição externa.
+- Dado valor monetário retornado por B3 ou Nasdaq, quando normalizado, então o backend usa `Decimal` e micros inteiros, sem cálculo por ponto flutuante.
+- Dado a aba Eventos com qualquer combinação de fontes, quando a lista é exibida, então a nota apresenta somente “Dados obtidos de fontes públicas; sempre validar com seu Banco/Corretora.”.
+- Dado um evento obtido pela cadeia de provedores, quando exibido na coluna Fonte, então o selo identifica diretamente `B3`, `Nasdaq` ou `Yahoo Finance`; o nível de detecção permanece disponível no texto acessível do selo.
+- Dado um evento cuja Data ex já ocorreu dentro do mês atual e cujo pagamento ainda é futuro, quando a aba Eventos é carregada, então o evento permanece na janela mensal e não cai no fallback apenas por ser anterior ao dia corrente.
 
 ## Plano de implementação — transações sem rede
 
@@ -292,6 +299,11 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 
 ## Changelog
 
+- `2.59` — 2026-09-04 — A janela da aba Eventos passa a começar no primeiro dia do mês atual, preservando eventos B3 com Data ex já ocorrida no mês e pagamento futuro.
+- `2.58` — 2026-09-04 — A coluna Fonte identifica explicitamente B3, Nasdaq ou Yahoo Finance; grade, alinhamentos, badge, rodapé e texto introdutório da aba Eventos foram refinados para melhor leitura.
+- `2.57` — 2026-09-04 — Implementada a cadeia B3/Nasdaq com fallback Yahoo, cache diário, normalização monetária segura e nota de rodapé unificada, sem alterar as colunas da aba Eventos.
+- `2.56` — 2026-09-04 — Eventos passam a prever B3 para ativos brasileiros, Nasdaq para internacionais, fallback Yahoo, cache diário e nota de rodapé única com orientação de validação.
+- `2.55` — 2026-09-04 — A aba deixa de exibir avisos de “indisponível” que confundiam ausência de anúncio futuro com erro; o estado vazio passa a ser neutro e orientado a eventos anunciados.
 - `2.54` — 2026-09-04 — Eventos passam a consultar `calendarEvents` com sessão Yahoo, mostrar somente os próximos três meses agrupados, associar carteiras e mover a fonte para nota de rodapé; valores unitários ausentes não são estimados.
 - `2.53` — 2026-09-04 — Eventos passam a distinguir Data ex de Data de pagamento opcional, virtualizam listas extensas e desmontam o DOM ao trocar de aba; parser externo valida tamanho/faixa e o Cockpit consulta somente a semana corrente.
 - `2.52` — 2026-09-04 — Adicionada aba Eventos com proventos históricos de ações/ETFs/BDRs consultados sob demanda, valor por cota/ação, fonte e confirmação do provedor, sem estimativa de valor total.

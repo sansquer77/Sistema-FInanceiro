@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import base64
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+import json
+import re
 from urllib.parse import quote
 
 
 EVENT_MEMORY_TTL_SECONDS = 24 * 60 * 60
-EVENT_CALENDAR_TTL_SECONDS = 6 * 60 * 60
+EVENT_CALENDAR_TTL_SECONDS = 24 * 60 * 60
 EVENT_MAX_WORKERS = 4
 MICRO_SCALE = Decimal("1000000")
 MAX_PROVIDER_NUMBER_LENGTH = 64
@@ -18,6 +21,24 @@ YAHOO_EVENTS_URL = (
     "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
     "?period1={period1}&period2={period2}&interval=3mo&events=div"
 )
+B3_EVENTS_URL = (
+    "https://sistemaswebb3-listados.b3.com.br/listedCompaniesProxy/CompanyCall/"
+    "GetListedSupplementCompany/{params}"
+)
+NASDAQ_DIVIDENDS_URL = "https://api.nasdaq.com/api/quote/{symbol}/dividends?assetclass={asset_class}"
+B3_HEADERS = {
+    "Accept": "application/json, text/plain, */*",
+    "Origin": "https://www.b3.com.br",
+    "Referer": "https://sistemaswebb3-listados.b3.com.br/",
+    "User-Agent": "Mozilla/5.0",
+}
+NASDAQ_HEADERS = {
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Origin": "https://www.nasdaq.com",
+    "Referer": "https://www.nasdaq.com/",
+    "User-Agent": "Mozilla/5.0",
+}
 
 
 def build_event_assets(positions: list[dict], symbol_resolver) -> list[dict]:
@@ -65,11 +86,11 @@ def get_events(
     force_refresh: bool = False,
     start_date: date | None = None,
 ) -> dict:
-    # spec: investimentos/investimentos-portfolio v2.54 — critérios 80 a 91
+    # spec: investimentos/investimentos-portfolio v2.59 — critérios 80 a 97
     reference_date = today or date.today()
     month_start = reference_date.replace(day=1)
     window_end = _add_months(month_start, 3) - timedelta(days=1)
-    requested_start = min(start_date, reference_date) if start_date else reference_date
+    requested_start = min(start_date, reference_date) if start_date else month_start
     if not assets:
         return {"events": [], "unavailable": [], "as_of": reference_date.isoformat()}
 
@@ -95,11 +116,22 @@ def get_events(
             if failure:
                 unavailable.append(failure)
 
-    events.sort(key=lambda item: (item["date"], item["asset_identifier"], item["amount_per_share_micros"]), reverse=True)
+    events.sort(key=lambda item: (item["date"], item["asset_identifier"], item["amount_per_share_micros"] or -1), reverse=True)
     return {"events": events, "unavailable": unavailable, "as_of": reference_date.isoformat()}
 
 
 def _fetch_asset_events(asset, *, cached_json, cached_calendar, error_type, reference_date, force_refresh, requested_start, window_end):
+    provider_events = _fetch_primary_provider_events(
+        asset,
+        cached_json=cached_json,
+        error_type=error_type,
+        reference_date=reference_date,
+        force_refresh=force_refresh,
+        requested_start=requested_start,
+        window_end=window_end,
+    )
+    if provider_events:
+        return provider_events, None
     if cached_calendar is not None:
         symbol = asset["symbol"]
         cache_key = f"yahoo-calendar:{symbol}:{reference_date.strftime('%Y-%m')}"
@@ -138,6 +170,184 @@ def _fetch_asset_events(asset, *, cached_json, cached_calendar, error_type, refe
             "asset_name": asset["asset_name"],
             "message": "Eventos indisponíveis no momento.",
         }
+
+
+def _fetch_primary_provider_events(asset, *, cached_json, error_type, reference_date, force_refresh, requested_start, window_end):
+    if _is_brazilian_asset(asset):
+        company = _b3_issuing_company(asset["asset_identifier"])
+        if not company:
+            return []
+        params = base64.b64encode(json.dumps(
+            {"issuingCompany": company, "language": "pt-br"}, separators=(",", ":")
+        ).encode("utf-8")).decode("ascii")
+        url = B3_EVENTS_URL.format(params=quote(params, safe=""))
+        try:
+            payload = cached_json(
+                url, "Eventos B3 temporariamente indisponiveis.",
+                f"b3-events:{company}", EVENT_CALENDAR_TTL_SECONDS,
+                force_refresh=force_refresh, headers=B3_HEADERS,
+            )
+            return parse_b3_events(payload, asset, minimum_date=requested_start, maximum_date=window_end)
+        except error_type:
+            return []
+
+    symbol = str(asset["symbol"]).split(".", 1)[0].upper()
+    for asset_class in ("stocks", "etf"):
+        url = NASDAQ_DIVIDENDS_URL.format(symbol=quote(symbol, safe=""), asset_class=asset_class)
+        try:
+            payload = cached_json(
+                url, "Eventos Nasdaq temporariamente indisponiveis.",
+                f"nasdaq-events:{symbol}:{asset_class}", EVENT_CALENDAR_TTL_SECONDS,
+                force_refresh=force_refresh, headers=NASDAQ_HEADERS,
+            )
+        except error_type:
+            continue
+        parsed = parse_nasdaq_events(payload, asset, minimum_date=requested_start, maximum_date=window_end)
+        if parsed:
+            return parsed
+    return []
+
+
+def parse_b3_events(payload: object, asset: dict, *, minimum_date: date, maximum_date: date) -> list[dict]:
+    companies = payload if isinstance(payload, list) else []
+    dividends = companies[0].get("cashDividends") if companies and isinstance(companies[0], dict) else []
+    if not isinstance(dividends, list):
+        return []
+    parsed = []
+    seen = set()
+    for raw in dividends:
+        if not isinstance(raw, dict) or not _b3_share_type_matches(asset["asset_identifier"], raw.get("assetIssued")):
+            continue
+        last_date_prior = _parse_provider_date(raw.get("lastDatePrior"), "%d/%m/%Y")
+        event_date = _next_weekday(last_date_prior) if last_date_prior else None
+        payment_date = _parse_provider_date(raw.get("paymentDate"), "%d/%m/%Y")
+        amount_micros = _decimal_to_micros(raw.get("rate"), decimal_comma=True)
+        if not event_date or not (minimum_date <= event_date <= maximum_date):
+            continue
+        identity = (event_date, payment_date, amount_micros, str(raw.get("label") or ""))
+        if identity in seen:
+            continue
+        seen.add(identity)
+        label = _b3_event_label(raw.get("label"))
+        parsed.append(_event_record(
+            asset, event_date, payment_date, amount_micros,
+            event_type="dividend_or_jcp", event_label=label,
+            source="B3", confirmation_label="Anunciado · B3",
+        ))
+    return parsed
+
+
+def parse_nasdaq_events(payload: object, asset: dict, *, minimum_date: date, maximum_date: date) -> list[dict]:
+    try:
+        rows = payload["data"]["dividends"]["rows"]
+    except (KeyError, TypeError):
+        return []
+    if not isinstance(rows, list):
+        return []
+    parsed = []
+    seen = set()
+    for raw in rows:
+        if not isinstance(raw, dict):
+            continue
+        event_date = _parse_provider_date(raw.get("exOrEffDate"), "%m/%d/%Y")
+        payment_date = _parse_provider_date(raw.get("paymentDate"), "%m/%d/%Y")
+        amount_micros = _decimal_to_micros(raw.get("amount"))
+        if not event_date or not (minimum_date <= event_date <= maximum_date):
+            continue
+        identity = (event_date, payment_date, amount_micros)
+        if identity in seen:
+            continue
+        seen.add(identity)
+        parsed.append(_event_record(
+            asset, event_date, payment_date, amount_micros,
+            event_type="dividend", event_label="Dividendo",
+            source="Nasdaq", confirmation_label="Detectado · Nasdaq",
+            currency=str(raw.get("currency") or asset.get("currency") or "USD").upper(),
+        ))
+    return parsed
+
+
+def _event_record(asset, event_date, payment_date, amount_micros, *, event_type, event_label, source, confirmation_label, currency=None):
+    return {
+        "date": event_date.isoformat(),
+        "payment_date": payment_date.isoformat() if payment_date else None,
+        "event_type": event_type,
+        "event_label": event_label,
+        "asset_identifier": asset["asset_identifier"],
+        "asset_name": asset["asset_name"],
+        "currency": currency or asset["currency"],
+        "portfolio_names": asset.get("portfolio_names", []),
+        "amount_per_share_micros": amount_micros,
+        "source": source,
+        "confirmation_level": "provider_detected",
+        "confirmation_label": confirmation_label,
+    }
+
+
+def _is_brazilian_asset(asset: dict) -> bool:
+    return str(asset.get("symbol") or "").upper().endswith(".SA")
+
+
+def _b3_issuing_company(identifier: object) -> str | None:
+    match = re.fullmatch(r"([A-Z]{4})\d{1,2}", str(identifier or "").strip().upper())
+    return match.group(1) if match else None
+
+
+def _b3_share_type_matches(identifier: object, isin: object) -> bool:
+    text = str(identifier or "").upper()
+    isin_text = str(isin or "").upper()
+    if text.endswith("3"):
+        return "NOR" in isin_text
+    if text[-1:] in {"4", "5", "6", "7", "8"}:
+        return "NPR" in isin_text
+    return True
+
+
+def _parse_provider_date(value: object, date_format: str) -> date | None:
+    text = str(value or "").strip()
+    if not text or text.upper() == "N/A" or len(text) > MAX_PROVIDER_NUMBER_LENGTH:
+        return None
+    try:
+        parsed = datetime.strptime(text, date_format).date()
+    except ValueError:
+        return None
+    return parsed if MIN_PROVIDER_DATE <= parsed <= MAX_PROVIDER_DATE else None
+
+
+def _next_weekday(value: date) -> date:
+    result = value + timedelta(days=1)
+    while result.weekday() >= 5:
+        result += timedelta(days=1)
+    return result
+
+
+def _decimal_to_micros(value: object, *, decimal_comma: bool = False) -> int | None:
+    text = str(value or "").strip().replace("$", "").replace(" ", "")
+    if decimal_comma:
+        text = text.replace(".", "").replace(",", ".")
+    else:
+        text = text.replace(",", "")
+    if not text or len(text) > MAX_PROVIDER_NUMBER_LENGTH:
+        return None
+    try:
+        amount = Decimal(text)
+        micros = int((amount * MICRO_SCALE).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    except (InvalidOperation, ValueError):
+        return None
+    return micros if amount.is_finite() and amount > 0 and 0 < micros <= MAX_SAFE_MICROS else None
+
+
+def _b3_event_label(value: object) -> str:
+    normalized = str(value or "").strip().upper()
+    if "JRS CAP" in normalized or "JUROS" in normalized:
+        return "JCP"
+    if "DIVIDENDO" in normalized:
+        return "Dividendo"
+    if "RENDIMENTO" in normalized:
+        return "Rendimento"
+    if "BONIF" in normalized:
+        return "Bonificação"
+    return "Provento"
 
 
 def parse_yahoo_events(
@@ -200,7 +410,7 @@ def parse_yahoo_events(
             "amount_per_share_micros": amount_micros,
             "source": "Yahoo Finance",
             "confirmation_level": "provider_detected",
-            "confirmation_label": "Detectado pelo provedor",
+            "confirmation_label": "Detectado · Yahoo Finance",
         })
     return parsed
 
@@ -236,7 +446,7 @@ def parse_yahoo_calendar_events(payload: object, asset: dict, *, minimum_date: d
             "amount_per_share_micros": None,
             "source": "Yahoo Finance",
             "confirmation_level": "provider_detected",
-            "confirmation_label": "Detectado pelo provedor",
+            "confirmation_label": "Detectado · Yahoo Finance",
         })
     return parsed
 

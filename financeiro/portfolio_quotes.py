@@ -4,6 +4,9 @@ from collections import OrderedDict
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 import json
+import ssl
+import time
+from threading import Lock
 from threading import Lock
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
@@ -20,6 +23,10 @@ YAHOO_CALENDAR_URL = "https://query2.finance.yahoo.com/v10/finance/quoteSummary/
 YAHOO_COOKIE_URL = "https://fc.yahoo.com"
 YAHOO_CRUMB_URL = "https://query1.finance.yahoo.com/v1/test/getcrumb"
 YAHOO_AUTH_MAX_BYTES = 4 * 1024
+YAHOO_SESSION_TTL_SECONDS = 10 * 60
+_YAHOO_SESSION = None
+_YAHOO_SESSION_EXPIRES = 0.0
+_YAHOO_SESSION_LOCK = Lock()
 
 
 def bcb_range_ttl_seconds(end_date: date, today: date) -> int:
@@ -218,11 +225,10 @@ def read_json_url(url: str, message: str, headers: dict | None = None, *, opener
 def read_yahoo_calendar_json(symbol: str, message: str, *, opener=urlopen, error_type) -> dict:
     """Consulta calendarEvents com sessão Yahoo (cookie + crumb) e limite de leitura."""
     try:
-        cookie = _yahoo_cookie(opener)
-        crumb = _yahoo_crumb(cookie, opener)
+        cookie, crumb = _yahoo_session(opener)
         url = YAHOO_CALENDAR_URL.format(symbol=quote(symbol, safe=""), crumb=quote(crumb, safe=""))
-        request = Request(url, headers={"User-Agent": "SistemaFinanceiro/2.0", "Cookie": cookie})
-        with opener(request, timeout=6) as response:
+        request = Request(url, headers={"User-Agent": "Mozilla/5.0", "Cookie": cookie})
+        with _open_yahoo(opener, request) as response:
             payload = read_limited_json(response, max_bytes=MAX_QUOTE_JSON_BYTES)
         return payload if isinstance(payload, dict) else {}
     except (HTTPError, URLError, TimeoutError, OSError, OutboundJsonError, ValueError) as exc:
@@ -231,7 +237,7 @@ def read_yahoo_calendar_json(symbol: str, message: str, *, opener=urlopen, error
 
 def _yahoo_cookie(opener) -> str:
     try:
-        response = opener(Request(YAHOO_COOKIE_URL, headers={"User-Agent": "SistemaFinanceiro/2.0"}), timeout=6)
+        response = _open_yahoo(opener, Request(YAHOO_COOKIE_URL, headers={"User-Agent": "Mozilla/5.0"}))
     except HTTPError as exc:
         response = exc
     try:
@@ -252,8 +258,8 @@ def _yahoo_cookie(opener) -> str:
 
 
 def _yahoo_crumb(cookie: str, opener) -> str:
-    request = Request(YAHOO_CRUMB_URL, headers={"User-Agent": "SistemaFinanceiro/2.0", "Cookie": cookie})
-    with opener(request, timeout=6) as response:
+    request = Request(YAHOO_CRUMB_URL, headers={"User-Agent": "Mozilla/5.0", "Cookie": cookie})
+    with _open_yahoo(opener, request) as response:
         body = response.read(YAHOO_AUTH_MAX_BYTES + 1)
     if not isinstance(body, (bytes, bytearray)) or len(body) > YAHOO_AUTH_MAX_BYTES:
         raise ValueError("Credencial Yahoo excede o limite permitido.")
@@ -261,3 +267,26 @@ def _yahoo_crumb(cookie: str, opener) -> str:
     if not crumb or len(crumb) > YAHOO_AUTH_MAX_BYTES or any(char in crumb for char in "\r\n"):
         raise ValueError("Credencial Yahoo inválida.")
     return crumb
+
+
+def _yahoo_session(opener) -> tuple[str, str]:
+    global _YAHOO_SESSION, _YAHOO_SESSION_EXPIRES
+    now = time.monotonic()
+    with _YAHOO_SESSION_LOCK:
+        if _YAHOO_SESSION and now < _YAHOO_SESSION_EXPIRES:
+            return _YAHOO_SESSION
+        cookie = _yahoo_cookie(opener)
+        crumb = _yahoo_crumb(cookie, opener)
+        _YAHOO_SESSION = (cookie, crumb)
+        _YAHOO_SESSION_EXPIRES = now + YAHOO_SESSION_TTL_SECONDS
+        return _YAHOO_SESSION
+
+
+def _open_yahoo(opener, request):
+    try:
+        import certifi  # type: ignore
+
+        context = ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        context = ssl.create_default_context()
+    return opener(request, timeout=6, context=context)

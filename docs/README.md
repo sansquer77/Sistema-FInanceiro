@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 12.20
+versao: 12.21
 atualizado: 2026-09-04
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -148,6 +148,7 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `12.21` — 2026-09-04 — [[specs/investimentos-portfolio]] v2.55 elimina o aviso ambíguo de indisponibilidade na aba Eventos e usa estado vazio neutro para ausência de anúncios futuros ou calendários não publicados.
 - `12.20` — 2026-09-04 — [[specs/investimentos-portfolio]] v2.54 transforma Eventos em agenda futura mensal com carteiras associadas, fonte em nota de rodapé e sessão Yahoo `calendarEvents`; [[specs/alertas-cockpit]] v1.2 reutiliza a janela limitada.
 - `12.19` — 2026-09-04 — [[specs/investimentos-portfolio]] v2.53 e [[specs/alertas-cockpit]] v1.1 limitam a consulta semanal de proventos no Cockpit, endurecem o parser e virtualizam/desmontam a aba Eventos, distinguindo Data ex de pagamento opcional.
 - `12.18` — 2026-09-04 — Fundação da versão 2.0.0 encerrada: [[specs/frontend-fundacao-v2]] e [[specs/alertas-cockpit]] alcançam v1.0 implementada; eventos semanais passam a alimentar os Informativos do Cockpit.

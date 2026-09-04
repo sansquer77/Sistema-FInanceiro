@@ -37,7 +37,7 @@ class PortfolioEventsTest(unittest.TestCase):
         }, {"asset_identifier": "PETR4", "asset_name": "Petrobras", "currency": "BRL"})
         self.assertEqual(events[0]["amount_per_share_micros"], 357891)
         self.assertEqual(events[0]["event_label"], "Dividendo/JCP")
-        self.assertEqual(events[0]["confirmation_label"], "Detectado pelo provedor")
+        self.assertEqual(events[0]["confirmation_label"], "Detectado · Yahoo Finance")
         self.assertIsNone(events[0]["payment_date"])
         self.assertNotIn("estimated", events[0])
         self.assertNotIn("total", events[0])
@@ -45,7 +45,7 @@ class PortfolioEventsTest(unittest.TestCase):
     def test_failure_is_partial_and_cache_receives_bounded_period(self):
         calls = []
 
-        def cached_json(url, message, cache_key, ttl, force_refresh=False):
+        def cached_json(url, message, cache_key, ttl, force_refresh=False, headers=None):
             calls.append((url, cache_key, ttl, force_refresh))
             if "FAIL3" in url:
                 raise ProviderError(message)
@@ -63,10 +63,110 @@ class PortfolioEventsTest(unittest.TestCase):
                                               start_date=date(2026, 9, 1))
         self.assertEqual(len(result["events"]), 1)
         self.assertEqual(result["unavailable"][0]["asset_identifier"], "FAIL3")
-        self.assertEqual(len(calls), 2)
+        yahoo_calls = [call for call in calls if "query1.finance.yahoo.com" in call[0]]
+        self.assertEqual(len(yahoo_calls), 2)
         self.assertTrue(all(call[3] for call in calls))
-        self.assertTrue(all("period1=" in call[0] and "period2=" in call[0] for call in calls))
-        self.assertTrue(all(call[1].endswith(":2026-09-01") for call in calls))
+        self.assertTrue(all("period1=" in call[0] and "period2=" in call[0] for call in yahoo_calls))
+        self.assertTrue(all(call[1].endswith(":2026-09-01") for call in yahoo_calls))
+
+    def test_b3_future_dividends_are_filtered_by_share_type_and_normalized(self):
+        payload = [{"cashDividends": [
+            {"assetIssued": "BRPETRACNOR9", "lastDatePrior": "18/09/2026", "paymentDate": "25/09/2026", "rate": "0,47156696000", "label": "DIVIDENDO"},
+            {"assetIssued": "BRPETRACNPR6", "lastDatePrior": "18/09/2026", "paymentDate": "25/09/2026", "rate": "0,67407131000", "label": "JRS CAP PROPRIO"},
+        ]}]
+        events = portfolio_events.parse_b3_events(
+            payload,
+            {"asset_identifier": "PETR4", "asset_name": "Petrobras", "currency": "BRL", "portfolio_names": ["Carteira"]},
+            minimum_date=date(2026, 9, 1), maximum_date=date(2026, 11, 30),
+        )
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["date"], "2026-09-21")
+        self.assertEqual(events[0]["payment_date"], "2026-09-25")
+        self.assertEqual(events[0]["amount_per_share_micros"], 674071)
+        self.assertEqual(events[0]["event_label"], "JCP")
+        self.assertEqual(events[0]["source"], "B3")
+        self.assertEqual(events[0]["confirmation_label"], "Anunciado · B3")
+
+    def test_nasdaq_future_dividend_uses_decimal_without_float(self):
+        payload = {"data": {"dividends": {"rows": [{
+            "exOrEffDate": "10/15/2026", "paymentDate": "10/20/2026",
+            "amount": "$1.009719", "currency": "USD",
+        }]}}}
+        events = portfolio_events.parse_nasdaq_events(
+            payload,
+            {"asset_identifier": "ACWI", "asset_name": "ACWI", "currency": "USD", "portfolio_names": ["Exterior"]},
+            minimum_date=date(2026, 9, 1), maximum_date=date(2026, 11, 30),
+        )
+        self.assertEqual(events[0]["amount_per_share_micros"], 1_009_719)
+        self.assertEqual(events[0]["payment_date"], "2026-10-20")
+        self.assertEqual(events[0]["source"], "Nasdaq")
+        self.assertEqual(events[0]["confirmation_label"], "Detectado · Nasdaq")
+
+    def test_b3_is_primary_for_brazilian_asset_and_uses_daily_cache(self):
+        calls = []
+
+        def cached_json(url, message, cache_key, ttl, force_refresh=False, headers=None):
+            calls.append((url, cache_key, ttl, headers))
+            return [{"cashDividends": [{
+                "assetIssued": "BRPETRACNPR6", "lastDatePrior": "30/09/2026",
+                "paymentDate": "15/10/2026", "rate": "0,50", "label": "DIVIDENDO",
+            }]}]
+
+        result = portfolio_events.get_events(
+            [{"symbol": "PETR4.SA", "asset_identifier": "PETR4", "asset_name": "Petrobras", "currency": "BRL", "acquired_at": "2025-01-01", "portfolio_names": ["Carteira"]}],
+            cached_json=cached_json,
+            cached_calendar=lambda *args, **kwargs: self.fail("Yahoo não deve ser consultado quando a B3 retorna evento"),
+            error_type=ProviderError,
+            today=date(2026, 9, 4),
+        )
+        self.assertEqual(result["events"][0]["source"], "B3")
+        self.assertEqual(calls[0][1], "b3-events:PETR")
+        self.assertEqual(calls[0][2], 24 * 60 * 60)
+        self.assertIn("Origin", calls[0][3])
+
+    def test_b3_event_from_earlier_in_current_month_does_not_fall_back(self):
+        calls = []
+
+        def cached_json(url, message, cache_key, ttl, force_refresh=False, headers=None):
+            calls.append(cache_key)
+            return [{"cashDividends": [{
+                "assetIssued": "BRITUBACNPR1", "lastDatePrior": "31/08/2026",
+                "paymentDate": "01/10/2026", "rate": "0,01818200000",
+                "label": "JRS CAP PROPRIO",
+            }]}]
+
+        result = portfolio_events.get_events(
+            [{"symbol": "ITUB4.SA", "asset_identifier": "ITUB4", "asset_name": "Itaú Unibanco", "currency": "BRL", "acquired_at": "2025-01-01", "portfolio_names": ["Personnalité"]}],
+            cached_json=cached_json,
+            cached_calendar=lambda *args, **kwargs: self.fail("Yahoo não deve receber evento B3 do mês vigente"),
+            error_type=ProviderError,
+            today=date(2026, 9, 4),
+        )
+        self.assertEqual(calls, ["b3-events:ITUB"])
+        self.assertEqual(result["events"][0]["date"], "2026-09-01")
+        self.assertEqual(result["events"][0]["payment_date"], "2026-10-01")
+        self.assertEqual(result["events"][0]["amount_per_share_micros"], 18_182)
+        self.assertEqual(result["events"][0]["source"], "B3")
+
+    def test_nasdaq_is_primary_for_international_asset(self):
+        calls = []
+
+        def cached_json(url, message, cache_key, ttl, force_refresh=False, headers=None):
+            calls.append((url, cache_key))
+            return {"data": {"dividends": {"rows": [{
+                "exOrEffDate": "10/15/2026", "paymentDate": "10/20/2026",
+                "amount": "$0.75", "currency": "USD",
+            }]}}}
+
+        result = portfolio_events.get_events(
+            [{"symbol": "ACWI", "asset_identifier": "ACWI", "asset_name": "ACWI", "currency": "USD", "acquired_at": "2025-01-01", "portfolio_names": ["Exterior"]}],
+            cached_json=cached_json,
+            cached_calendar=lambda *args, **kwargs: self.fail("Yahoo não deve ser consultado quando a Nasdaq retorna evento"),
+            error_type=ProviderError,
+            today=date(2026, 9, 4),
+        )
+        self.assertEqual(result["events"][0]["source"], "Nasdaq")
+        self.assertEqual(calls, [(portfolio_events.NASDAQ_DIVIDENDS_URL.format(symbol="ACWI", asset_class="stocks"), "nasdaq-events:ACWI:stocks")])
 
     def test_payment_date_is_optional_and_kept_only_when_valid(self):
         event_timestamp = int(datetime(2026, 8, 20, tzinfo=timezone.utc).timestamp())

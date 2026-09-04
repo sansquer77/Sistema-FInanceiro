@@ -74,14 +74,8 @@ export function createPortfolioEvents({ state, container, refreshButton, api, es
       return;
     }
     const events = payload.events || [];
-    const unavailable = payload.unavailable || [];
-    const notice = unavailable.length ? `
-      <p class="portfolio-events-warning" role="status">
-        ${unavailable.length} ativo(s) com eventos temporariamente indisponíveis: ${unavailable.map((item) => escapeHtml(item.asset_identifier)).join(", ")}.
-      </p>
-    ` : "";
     if (!events.length) {
-      container.innerHTML = `${notice}${stateMarkup("Nenhum provento histórico foi detectado para os ativos atuais desde a primeira aquisição.", { kind: "empty", compact: false })}`;
+      container.innerHTML = stateMarkup("Nenhum evento futuro foi anunciado para os ativos atuais nesta janela.", { kind: "empty", compact: false });
       return;
     }
     const groups = new Map();
@@ -90,7 +84,7 @@ export function createPortfolioEvents({ state, container, refreshButton, api, es
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(event);
     });
-    container.innerHTML = `${notice}<div class="portfolio-events-scroll">${[...groups].map(([month, rows], index) => `
+    container.innerHTML = `<div class="portfolio-events-scroll">${[...groups].map(([month, rows], index) => `
       <section class="portfolio-events-month" aria-labelledby="portfolio-events-month-${index}">
         <h3 id="portfolio-events-month-${index}">${formatMonth(month)}</h3>
         <div class="portfolio-events-grid" role="table" aria-label="Eventos de ${escapeHtml(formatMonth(month))}" aria-rowcount="${rows.length}">
@@ -98,12 +92,12 @@ export function createPortfolioEvents({ state, container, refreshButton, api, es
             <span role="columnheader">Data ex</span><span role="columnheader">Pagamento</span>
             <span role="columnheader">Ativo</span><span role="columnheader">Carteira</span>
             <span role="columnheader">Evento</span><span role="columnheader">Valor por cota/ação</span>
-            <span role="columnheader">Confirmação</span>
+            <span role="columnheader">Fonte</span>
           </div>
           <div class="portfolio-events-list" role="rowgroup" data-month-index="${index}"></div>
         </div>
       </section>`).join("")}</div>
-      <p class="portfolio-footnote">Fonte: Yahoo Finance. A data principal é a Data ex; o app não estima o valor total e não substitui comunicados oficiais do emissor.</p>
+      <p class="portfolio-footnote">Dados obtidos de fontes públicas; sempre validar com seu Banco/Corretora.</p>
     `;
     [...groups.values()].forEach((rows, index) => renderCollectionRows(container.querySelector(`[data-month-index="${index}"]`), rows, {
       threshold: 60, rowHeight: 64, viewportHeight: 560, renderItem: eventRow,
@@ -112,16 +106,18 @@ export function createPortfolioEvents({ state, container, refreshButton, api, es
 
   function eventRow(event) {
     const paymentDate = event.payment_date ? formatDate(event.payment_date) : "Não informada";
-    const amount = event.amount_per_share_micros == null ? `Não informado (${escapeHtml(event.currency || "BRL")})` : formatUnitAmount(event.amount_per_share_micros, event.currency);
+    const amount = event.amount_per_share_micros == null ? "Não informado" : formatUnitAmount(event.amount_per_share_micros, event.currency);
     const portfolios = (event.portfolio_names || []).join(", ") || "Carteira não informada";
+    const source = event.source || "Fonte pública";
+    const sourceDescription = event.confirmation_label || `Evento detectado por ${source}`;
     return `<div class="portfolio-events-grid-row" role="row">
       <span role="cell">${formatDate(event.date)}</span>
-      <span role="cell" class="portfolio-event-payment-date">${paymentDate}</span>
+      <span role="cell" class="portfolio-event-payment-date${event.payment_date ? "" : " portfolio-event-empty"}">${paymentDate}</span>
       <span role="cell" class="portfolio-event-asset"><strong>${escapeHtml(event.asset_identifier)}</strong><small>${escapeHtml(event.asset_name)}</small></span>
       <span role="cell">${escapeHtml(portfolios)}</span>
       <span role="cell">${escapeHtml(event.event_label)}</span>
-      <span role="cell" class="money-cell">${amount}</span>
-      <span role="cell"><span class="portfolio-event-confirmation">${escapeHtml(event.confirmation_label)}</span></span>
+      <span role="cell" class="money-cell${event.amount_per_share_micros == null ? " portfolio-event-empty" : ""}">${amount}</span>
+      <span role="cell"><span class="portfolio-event-confirmation" title="${escapeHtml(sourceDescription)}" aria-label="${escapeHtml(sourceDescription)}">${escapeHtml(source)}</span></span>
     </div>`;
   }
 
