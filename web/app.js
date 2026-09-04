@@ -255,6 +255,8 @@ const portfolioCurrencyList = document.querySelector("#portfolioCurrencyList");
 const portfolioAccountList = document.querySelector("#portfolioAccountList");
 const portfolioPositions = document.querySelector("#portfolioPositions");
 const portfolioHistory = document.querySelector("#portfolioHistory");
+const portfolioEvents = document.querySelector("#portfolioEvents");
+const refreshPortfolioEventsButton = document.querySelector("#refreshPortfolioEventsButton");
 const portfolioGoalsForm = document.querySelector("#portfolioGoalsForm");
 const portfolioGoalsFields = document.querySelector("#portfolioGoalsFields");
 const portfolioGoalsTotal = document.querySelector("#portfolioGoalsTotal");
@@ -1184,6 +1186,8 @@ const portfolioView = registerPortfolioView({
     portfolioAccountList,
     portfolioPositions,
     portfolioHistory,
+    portfolioEvents,
+    refreshPortfolioEventsButton,
     portfolioGoalsForm,
     portfolioGoalsFields,
     portfolioGoalsTotal,

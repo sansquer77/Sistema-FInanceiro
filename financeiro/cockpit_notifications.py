@@ -27,7 +27,7 @@ def build_cockpit_notifications(
     reference_date = reference_date or date.today()
     month = reference_date.strftime("%Y-%m")
 
-    # spec: cockpit/alertas-cockpit v0.9 — critérios 1, 3, 4, 5, 6 e 11
+    # spec: cockpit/alertas-cockpit v1.0 — critérios 1, 3, 4, 5, 6 e 11
     critical = _limit_notifications(limits_loader(user_id, month), month)
     critical.extend(_negative_balance_notifications(totals_loader(user_id, month), month))
 
@@ -181,7 +181,7 @@ def _portfolio_event_notifications(rows: Iterable[dict], reference_date: date) -
     week_end = week_start + timedelta(days=6)
     result = []
     for row in rows:
-        event_date_text = str(row.get("payment_date") or row.get("event_date") or "")
+        event_date_text = str(row.get("payment_date") or row.get("event_date") or row.get("date") or "")
         try:
             event_date = date.fromisoformat(event_date_text)
         except ValueError:

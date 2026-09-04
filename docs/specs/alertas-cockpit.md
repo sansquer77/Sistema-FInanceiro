@@ -1,9 +1,9 @@
 ---
 tipo: spec
 area: cockpit
-status: em-implementacao
-versao: 0.9
-atualizado: 2026-09-03
+status: implementado
+versao: 1.0
+atualizado: 2026-09-04
 relacionados:
   - "[[cockpit-calendario]]"
   - "[[limites-gastos]]"
@@ -12,14 +12,14 @@ relacionados:
   - "[[investimentos-portfolio]]"
   - "[[arquitetura]]"
   - "[[requisitos]]"
-tags: [spec, "area/cockpit", "status/em-implementacao"]
+tags: [spec, "area/cockpit", "status/implementado"]
 aliases: ["Alertas e Notificações do Cockpit", "Alertas Cockpit", "Central de Notificações do Cockpit"]
 ---
 
 # Alertas e Notificações do Cockpit
 
 > [!info] Status
-> **em implementação** · versão: `0.8` · área: `cockpit` · atualizado em 2026-09-03 · relacionados: [[cockpit-calendario]], [[limites-gastos]], [[cartoes]], [[lancamentos]], [[investimentos-portfolio]], [[arquitetura]], [[requisitos]]
+> **implementado** · versão: `1.0` · área: `cockpit` · atualizado em 2026-09-04 · relacionados: [[cockpit-calendario]], [[limites-gastos]], [[cartoes]], [[lancamentos]], [[investimentos-portfolio]], [[arquitetura]], [[requisitos]]
 
 ### Problema
 
@@ -134,7 +134,7 @@ Restrição de unicidade: `PRIMARY KEY (user_id, notification_id)`.
   - **Restrição de criticidade**: A cor vermelha **nunca** deve ser utilizada para indisponibilidade temporária de APIs externas (ex.: cotações Yahoo/CoinGecko/PTAX offline), falhas passageiras de rede ou avisos meramente informativos.
 - **Informativos (Amarelo)**:
   - Destinados a acontecimentos, novidades e eventos com vigência semanal/temporal sem necessidade de correção imediata:
-    1. **Dividendos e proventos**: proventos de ativos do portfólio anunciados ou com pagamento previsto na semana corrente.
+    1. **Dividendos e proventos**: eventos de ativos do portfólio detectados pelo provedor na semana corrente, sem estimativa de valor total.
     2. **Vencimentos futuros**: investimentos de renda fixa com data de vencimento nos próximos dias da semana ou quinzena.
     3. **Alterações relevantes sem ação urgente**: eventos cadastrados no calendário para os próximos 7 dias.
   - O amarelo significa atenção e consciência situacional, **não** falha nem erro.
@@ -203,7 +203,7 @@ Restrição de unicidade: `PRIMARY KEY (user_id, notification_id)`.
 - Dado que existem contas a pagar com data anterior à atual não conciliadas e faturas de cartão em atraso, quando o usuário clica no indicador de Alertas Críticos, então o flyout global abre no topo da viewport listando esses itens com título, data e botões de ação ("Ver limites" / "Ver extrato" / "Ver cartões").
 - Dado que o usuário abriu e fechou o flyout de Alertas Críticos sem alterar suas contas ou limites, quando o Cockpit for reconsultado, então o indicador vermelho e a contagem permanecem ativos inalterados até a efetiva resolução no sistema.
 - Dado que uma falha transitória de rede ou indisponibilidade externa de cotações de mercado ocorre, quando o backend monta as notificações, então nenhum alerta crítico vermelho é emitido por essa indisponibilidade temporária.
-- Dado que há proventos previstos para a semana corrente na carteira do usuário, quando ele consulta o Cockpit, então o indicador de Informativos exibe a cor amarela e contador correspondente.
+- Dado que há proventos detectados na semana corrente para a carteira do usuário, quando ele consulta o Cockpit, então o indicador de Informativos exibe a cor amarela e contador correspondente.
 - Dado que o usuário visualiza a lista de Informativos no flyout e aciona a opção de marcar como vistos, quando o flyout é fechado, então o badge amarelo perde o destaque de novidade, mas os itens continuam acessíveis para consulta na listagem durante a semana.
 - Dado que o usuário acessa o sistema a partir de uma viewport estreita (mobile), quando o Cockpit é renderizado, então os indicadores ao lado das abas se condensam em um botão único de Notificações, cujo clique abre o flyout preservando internamente as seções separadas de Críticos e Informativos.
 - Dado que o flyout está aberto sobre o Cockpit e o usuário pressiona a tecla `Escape` ou clica fora da área do diálogo, quando o evento é disparado, então o flyout fecha imediatamente e o foco retorna ao botão que o acionou.
@@ -234,6 +234,8 @@ Restrição de unicidade: `PRIMARY KEY (user_id, notification_id)`.
 - [x] Passo 7 — Testes automatizados: criar testes unitários e de integração em `tests/test_cockpit_notifications.py` cobrindo cálculo de alertas, persistência na `notification_reads`, tolerância a falhas de cotação e controle de autenticação. Fecha: critérios 1, 3, 4, 10, 11, 12.
 
 ### Changelog
+
+- `1.0` — 2026-09-04 — Implementação concluída: a rota de notificações passa os eventos históricos da carteira ao agregador; ocorrências detectadas na semana alimentam Informativos e falhas externas permanecem não bloqueantes.
 
 - `0.9` — 2026-09-03 — Corrigido contraste do badge de Alertas Críticos no menu de notificações: pílula passa a usar `--danger-pill-surface` e `--danger-pill-text`, garantindo número escuro sobre fundo claro e alinhamento visual com o badge de Informativos.
 - `0.8` — 2026-09-03 — Passos 6 e 7 concluídos: ações dos cards navegam com competência e entidade de contexto para Limites, Extrato, Cartões, Calendário ou Portfólio; informativos são marcados via API e atualizam o badge sem sumir da semana. Testes cobrem fatura vencida, isolamento entre usuários, autenticação, limites de payload, banner independente e contrato de navegação.

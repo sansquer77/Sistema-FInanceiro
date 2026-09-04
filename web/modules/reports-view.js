@@ -4,7 +4,7 @@ import { api, fetchAllListed } from "./api.js";
 import { stateMarkup } from "./dom-utils.js";
 import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";
 import { renderChart } from "./chart-adapter.js";
-import { renderVirtualList } from "./virtual-list.js";
+import { destroyVirtualLists, renderVirtualList } from "./virtual-list.js";
 
 export function registerReportsView({
   state,
@@ -20,6 +20,9 @@ export function registerReportsView({
   chartColor,
 }) {
   let tagsRequestId = 0;
+  let reportRankingSequence = 0;
+  let pendingReportRankings = [];
+  const activeReportRankings = new Map();
   const {
     reportMonthLabel,
     previousReportMonthButton,
@@ -57,6 +60,9 @@ export function registerReportsView({
   reportContent.addEventListener("click", handleReportContentClick);
 
   function renderReports() {
+    destroyVirtualLists(reportContent);
+    activeReportRankings.clear();
+    pendingReportRankings = [];
     statement.invalidate();
     if (state.reportTab !== "tags") tagsRequestId += 1;
     reportMonthLabel.textContent = formatMonthShortLabel(state.reportMonth);
@@ -187,7 +193,7 @@ export function registerReportsView({
     reportContent.innerHTML = sections.map(([title, type]) => (
       reportRankedSection(title, groupReportItems(items.filter((item) => item.reportType === type), "category"), `Nenhum item em ${title.toLowerCase()} neste mês.`)
     )).join("");
-    virtualizeReportLists();
+    mountReportRankings();
   }
 
   function renderSubcategoriesReport(items) {
@@ -199,7 +205,7 @@ export function registerReportsView({
     reportContent.innerHTML = sections.map(([title, type]) => (
       reportRankedSection(title, groupReportItems(items.filter((item) => item.reportType === type), "subcategory"), `Nenhuma subcategoria em ${title.toLowerCase()} neste mês.`)
     )).join("");
-    virtualizeReportLists();
+    mountReportRankings();
   }
 
   async function renderTagsReport() {
@@ -371,6 +377,7 @@ export function registerReportsView({
       </div>
       ${reportRankedSection("Movimentação por categoria", rows, "Nenhum lançamento nesta conta no mês.")}
     `;
+    mountReportRankings();
   }
 
   function reportRankedSection(title, rows, emptyText) {
@@ -378,20 +385,43 @@ export function registerReportsView({
       mergeMoneyTotals(sum, row.totals);
       return sum;
     }, new Map());
-    const content = rows.length ? rows.map((row, index) => {
-      const percent = reportRowPercent(row, total);
-      const barPercent = percent ?? 0;
-      const evolutionButton = row.type !== "account" && row.categoryId ? `
+    let content;
+    let rankingId = "";
+    if (!rows.length) {
+      content = stateMarkup(emptyText, { kind: "empty" });
+    } else if (rows.length > 200) {
+      rankingId = `report-ranking-${++reportRankingSequence}`;
+      pendingReportRankings.push({ id: rankingId, rows, total });
+      content = "";
+    } else {
+      content = rows.map((row, index) => reportRankedRow(row, index, total)).join("");
+    }
+    return `
+      <section class="report-section">
+        <div class="section-heading">
+          <h2>${escapeHtml(title)}</h2>
+          <strong>${formatMoneyTotals(total)}</strong>
+        </div>
+        <div class="report-rank-list"${rankingId ? ` data-report-ranking-id="${rankingId}"` : ""}>${content}</div>
+      </section>
+    `;
+  }
+
+  function reportRankedRow(row, index, total, { expanded = false, deferDetail = false } = {}) {
+    const percent = reportRowPercent(row, total);
+    const barPercent = percent ?? 0;
+    const evolutionButton = row.type !== "account" && row.categoryId ? `
         <button class="report-rank-evolution-btn" type="button" aria-label="Ver evolução de ${escapeHtml(row.label)}" title="Evolução temporal" data-evolution-category="${escapeHtml(row.categoryId || "")}" data-evolution-subcategory="${escapeHtml(row.subcategoryId || "")}" data-evolution-name="${escapeHtml(row.label)}" data-evolution-color="${chartColor(index)}">
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
       ` : "";
-      return `
-        <article class="report-rank-row" data-report-row>
+    const detail = deferDetail && !expanded ? "" : reportItemDetails(row.items);
+    return `
+        <article class="report-rank-row" data-report-row data-report-row-index="${index}">
           <div class="report-rank-main">
             <div>
               <div class="report-rank-title-line">
-                <button class="report-rank-toggle" type="button" data-report-toggle aria-expanded="false">
+                <button class="report-rank-toggle" type="button" data-report-toggle aria-expanded="${expanded}">
                   <i style="background:${chartColor(index)}"></i>
                   <span>${escapeHtml(row.label)}</span>
                 </button>
@@ -399,36 +429,46 @@ export function registerReportsView({
               </div>
               <span>${row.count} lançamento(s)</span>
             </div>
-            <button class="report-rank-value" type="button" data-report-toggle aria-expanded="false">
+            <button class="report-rank-value" type="button" data-report-toggle aria-expanded="${expanded}">
               <strong>${formatMoneyTotals(row.totals)}</strong>
               <span>${percent === null ? "Multimoeda" : formatPercent(percent)}</span>
             </button>
           </div>
           <div class="report-bar"><span style="width:${Math.max(barPercent * 100, 2)}%; background:${chartColor(index)}"></span></div>
-          <div class="report-detail" data-report-detail hidden>${reportItemDetails(row.items)}</div>
+          <div class="report-detail" data-report-detail${expanded ? "" : " hidden"}>${detail}</div>
         </article>
       `;
-    }).join("") : stateMarkup(emptyText, { kind: "empty" });
-    return `
-      <section class="report-section">
-        <div class="section-heading">
-          <h2>${escapeHtml(title)}</h2>
-          <strong>${formatMoneyTotals(total)}</strong>
-        </div>
-        <div class="report-rank-list" data-virtualize-report>${content}</div>
-      </section>
-    `;
   }
 
-  function virtualizeReportLists() {
-    reportContent.querySelectorAll("[data-virtualize-report]").forEach((list) => {
-      if (list.children.length <= 200) return;
-      const items = [...list.children].map((item) => item.outerHTML);
-      renderVirtualList(list, items, {
-        rowHeight: 106,
-        renderItem: (item) => item,
-      });
+  function mountReportRankings() {
+    activeReportRankings.clear();
+    pendingReportRankings.forEach((ranking) => {
+      const list = reportContent.querySelector(`[data-report-ranking-id="${ranking.id}"]`);
+      if (!list) return;
+      activeReportRankings.set(ranking.id, ranking);
+      mountReportRanking(list, ranking);
     });
+    pendingReportRankings = [];
+  }
+
+  function mountReportRanking(list, ranking, initialIndex = 0) {
+    renderVirtualList(list, ranking.rows, {
+      rowHeight: 106,
+      initialIndex,
+      renderItem: (row, index) => reportRankedRow(row, index, ranking.total, { deferDetail: true }),
+    });
+  }
+
+  function expandReportRanking(list, ranking, expandedIndex) {
+    destroyVirtualLists(list);
+    list.classList.remove("virtual-list");
+    list.removeAttribute("aria-rowcount");
+    list.style.removeProperty("--virtual-row-height");
+    list.innerHTML = ranking.rows.map((row, index) => reportRankedRow(row, index, ranking.total, {
+      expanded: index === expandedIndex,
+      deferDetail: true,
+    })).join("");
+    list.querySelector(`[data-report-row-index="${expandedIndex}"]`)?.scrollIntoView({ block: "nearest" });
   }
 
   function reportItemsForMonth(month) {
@@ -681,6 +721,14 @@ export function registerReportsView({
       return;
     }
     const expanded = detail.hidden;
+    const list = row.closest("[data-report-ranking-id]");
+    const ranking = list ? activeReportRankings.get(list.dataset.reportRankingId) : null;
+    if (ranking) {
+      const index = Number(row.dataset.reportRowIndex);
+      if (expanded) expandReportRanking(list, ranking, index);
+      else mountReportRanking(list, ranking, index);
+      return;
+    }
     detail.hidden = !expanded;
     row.querySelectorAll("[data-report-toggle]").forEach((entry) => {
       entry.setAttribute("aria-expanded", String(expanded));

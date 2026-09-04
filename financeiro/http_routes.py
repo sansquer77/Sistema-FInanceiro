@@ -40,6 +40,7 @@ EXACT_ROUTES: dict[str, dict[str, str]] = {
         "/api/consultor/perfil-complementar": "handle_consultor_complementary_profile",
         "/api/consultor/history": "handle_consultor_history",
         "/api/portfolio": "handle_portfolio",
+        "/api/portfolio/events": "handle_portfolio_events",
         "/api/portfolio/returns": "handle_portfolio_returns",
         "/api/portfolio/fund-quote": "handle_portfolio_fund_quote",
         "/api/reports/tags": "handle_tag_report",

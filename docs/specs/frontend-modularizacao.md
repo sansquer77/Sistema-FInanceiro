@@ -2,7 +2,7 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 4.28
+versao: 4.30
 atualizado: 2026-09-04
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
@@ -15,7 +15,7 @@ aliases: ["Modularização Frontend", "ES Modules"]
 # Modularização do Frontend
 
 > [!info] Status
-> **implementado** · área: `frontend` · atualizado em 2026-09-03 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]], [[../qualidade-codigo]]
+> **implementado** · área: `frontend` · atualizado em 2026-09-04 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]], [[../qualidade-codigo]]
 
 ## Problema
 
@@ -68,7 +68,7 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `user-admin-view.js` | Preferência visual, troca de email/senha, config. SMTP, limpeza e exclusão. |
 | `classifications-view.js` | Categorias, subcategorias e tags. |
 | `limits-view.js` | Limites de gastos e índice de consumo. |
-| `reports-view.js` | Fachada compatível e coordenação de Relatórios; demais abas legadas mantêm renderização/agregações existentes. |
+| `reports-view.js` | Fachada compatível e coordenação de Relatórios; rankings extensos entregam dados diretamente ao virtualizador e montam detalhes sob demanda. |
 | `report-statement.js` | Filtros, consulta, modelo e impressão do demonstrativo; sem cálculos financeiros locais. |
 | `report-evolution.js` | Drawer, consulta, apresentação e ciclo de vida do gráfico de evolução; sem SMA/fallback local. |
 | `imports-view.js` | Upload, download de modelo e resultado da importação. |
@@ -78,8 +78,9 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `consultor-view.js` | Aba Consultor/Calendário do Cockpit: vencimentos, atrasos e plano próximo. |
 | `accounts-view.js` | Contas: cadastro, edição, arquivamento e restauração. |
 | `cards-view.js` | Cartões: cadastro, faturas, busca/filtro da fatura, pagamento e conciliação. |
-| `portfolio-view.js` | Fachada/coordenador da tela de Portfólio, carregamento, abas e integração dos submódulos. |
+| `portfolio-view.js` | Fachada/coordenador da tela de Portfólio, carregamento, abas, agrupamento e fábricas de linha reutilizadas pela janela virtual. |
 | `portfolio-chart.js` | Renderização e ciclo de vida do gráfico de rentabilidade do Portfólio. |
+| `portfolio-events.js` | Carregamento sob demanda, cache de sessão e apresentação dos eventos históricos do Portfólio, sem estimativa financeira. |
 | `portfolio-grouping.js` | Identidade estável de agrupamentos visuais; cálculos e consolidações pertencem ao backend. |
 | `portfolio-preview.js` | Coordenação das prévias no servidor: debounce, requisição em andamento, bloqueio de confirmação e descarte de respostas obsoletas, sem regras financeiras. |
 | `portfolio-form.js` | Payloads e normalizações de entrada dos formulários e ações do Portfólio. |
@@ -218,7 +219,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Dado o boot ou uma troca de mês do Cockpit, quando os dados auxiliares são atualizados, então somente a competência necessária de contas/cartões é carregada e nenhum endpoint de pagamentos ou histórico integral é percorrido.
 - Dado um termo com ao menos dois caracteres na Busca Global, quando o usuário digita, então lançamentos de contas e cartões de qualquer competência são consultados sob demanda, limitados e pagináveis, sem carregar históricos completos no estado global; respostas de termos anteriores são descartadas.
 - Dado o usuário alternando o mês de Relatórios, quando a resposta anterior chega depois, então ela é descartada e o estado mantém somente o recorte da competência atual.
-- Dado o usuário abrindo o Portfólio, quando a tela carrega, então a aba **Posição** renderiza primeiro; **Análise**, **Histórico** e rentabilidade detalhada são renderizados/carregados sob demanda no primeiro acesso.
+- Dado o usuário abrindo o Portfólio, quando a tela carrega, então a aba **Posição** renderiza primeiro; **Análise**, **Eventos**, **Histórico** e rentabilidade detalhada são renderizados/carregados sob demanda no primeiro acesso.
 - Dado o usuário alterando o agrupamento ou colapsando/expandindo grupos no Portfólio, quando a tela já tem dados carregados, então apenas a lista de posições é renderizada novamente.
 - Dado a interface carregando scripts de terceiros não essenciais, quando o HTML é parseado, então esses scripts não bloqueiam a inicialização do app (`async`/`defer` quando aplicável).
 - Dado uma área estrutural de layout como o dashboard principal, quando o menu lateral alterna estado, então a UI não anima propriedades caras como `grid-template-columns`.
@@ -271,6 +272,8 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Changelog
 
+- `4.30` — 2026-09-04 — Adicionado `portfolio-events.js` para carregar e apresentar sob demanda os eventos históricos da carteira, com cache de sessão e sem cálculos financeiros no frontend.
+- `4.29` — 2026-09-04 — Relatórios remove DOM/`outerHTML` intermediário dos rankings virtualizados e preserva detalhes sob demanda; Portfólio elimina a segunda construção das fábricas de linha antes da janela visível.
 - `4.28` — 2026-09-04 — Atualizado `virtual-list.js` para refletir uso também em Faturas (`cards-view.js`) e Histórico de Operações (`operation-history-view.js`).
 - `4.27` — 2026-09-04 — Adicionado `command-palette.js` como Command Palette nativa em ES Modules para navegação, preferências e busca, sem regras de domínio e sem consulta à rede.
 - `4.26` — 2026-09-04 — Adicionado `input-mask.js` como adaptador local sobre IMask para campos monetários e de data, preservando parsers e formato brasileiro enviado ao backend.

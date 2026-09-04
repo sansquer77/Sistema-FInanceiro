@@ -119,6 +119,7 @@ class CockpitNotificationsTest(unittest.TestCase):
         with (
             mock.patch.object(app.AppHandler, "validate_read_source", return_value=True),
             mock.patch.object(app.AppHandler, "require_user", return_value=self.user) as require_user,
+            mock.patch("app.get_portfolio_events", return_value={"events": []}),
             mock.patch("app.build_cockpit_notifications", return_value={"critical": [], "informational": []}),
         ):
             handler.handle_cockpit_notifications()
@@ -130,11 +131,13 @@ class CockpitNotificationsTest(unittest.TestCase):
         with (
             mock.patch.object(app.AppHandler, "validate_read_source", return_value=True),
             mock.patch.object(app.AppHandler, "require_user", side_effect=app.ApiError("Não autenticado", 401)),
+            mock.patch("app.get_portfolio_events") as events,
             mock.patch("app.build_cockpit_notifications") as build,
         ):
             with self.assertRaises(app.ApiError):
                 handler.handle_cockpit_notifications()
         build.assert_not_called()
+        events.assert_not_called()
 
     def test_mark_seen_route_validates_payload_and_isolates_user(self):
         handler = object.__new__(app.AppHandler)

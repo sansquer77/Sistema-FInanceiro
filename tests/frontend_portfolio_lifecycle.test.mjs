@@ -47,6 +47,15 @@ test('expanded source rows also defer copies and HTML until visible', () => {
   assert.equal(rendered, 10);
 });
 
+test('portfolio reuses the row factories collected before mounting virtual groups', () => {
+  const renderer = source.slice(
+    source.indexOf('  function renderPortfolioPositions('),
+    source.indexOf('  function portfolioTreasuryNote('),
+  );
+  assert.match(renderer, /virtualGroups\.set\(groupIndex, positionRows\)/);
+  assert.doesNotMatch(renderer, /const rows = portfolioPositionRows\(group\.positions\)/);
+});
+
 test('failed loads are latched before cockpit can request again', () => {
   assert.ok(source.includes('state.portfolioError = portfolioErrorMessage'));
   const cockpit = readFileSync(new URL('../web/modules/cockpit-view.js', import.meta.url), 'utf8');

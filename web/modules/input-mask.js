@@ -1,4 +1,4 @@
-// spec: frontend-fundacao-v2 v0.15 — critérios 5 e 6
+// spec: frontend-fundacao-v2 v1.0 — critérios 5 e 6
 // Adaptador de máscaras de entrada. IMask é acessado como global vendorizado;
 // este módulo isola views dos detalhes da biblioteca e garante que o valor
 // submetido permaneça compatível com os parsers existentes (formato brasileiro

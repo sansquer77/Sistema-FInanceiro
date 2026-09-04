@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.93
-atualizado: 2026-09-03
+versao: 3.95
+atualizado: 2026-09-04
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -89,7 +89,7 @@ Os assets normalizados do catálogo ficam em `web/assets/banks/` e `web/assets/b
 | `user-admin-view.js` | Preferências de usuário, tema, SMTP, IA, Mais Retorno, ativação/perfil do Consultor, limpeza e exclusão. |
 | `classifications-view.js` | Categorias, subcategorias e tags. |
 | `limits-view.js` | Limites de gastos e índice de consumo. |
-| `reports-view.js` | Fachada compatível e coordenação de Relatórios: compõe subviews uma vez, delega demonstrativo/evolução e mantém as demais abas legadas. |
+| `reports-view.js` | Fachada compatível e coordenação de Relatórios: compõe subviews uma vez, delega demonstrativo/evolução e monta rankings extensos diretamente pela janela virtual, com detalhe sob demanda. |
 | `report-statement.js` | Controles, consulta assíncrona, estados e apresentação imprimível do demonstrativo; consome agregações Python sem regra financeira local. |
 | `report-evolution.js` | Drawer, consulta, formatação e ciclo de vida do ApexCharts da evolução; descarta respostas obsoletas, destrói instância ao fechar e não calcula SMA/fallback. |
 | `imports-view.js` | Upload, download de modelo e resultado da importação. |
@@ -99,7 +99,7 @@ Os assets normalizados do catálogo ficam em `web/assets/banks/` e `web/assets/b
 | `consultor-view.js` | Aba **Consultor** do Cockpit: seletor fechado de análises, execução sob demanda, período condicional para ralos, histórico, vencimentos e atrasos, com renderização de tabelas markdown nas respostas. |
 | `accounts-view.js` | Contas: cadastro, edição, arquivamento, restauração. |
 | `cards-view.js` | Cartões: cadastro, faturas, pagamento, conciliação. |
-| `portfolio-view.js` | Ativos: posições, histórico, resgate e encerramento; libera gráficos, overlays e DOM dinâmico ao sair e remonta a apresentação do estado ao entrar. |
+| `portfolio-view.js` | Ativos: posições, histórico, resgate e encerramento; libera gráficos, overlays e DOM dinâmico ao sair, reutiliza fábricas de linha agrupadas e formata somente a janela virtual visível. |
 | `portfolio-lifecycle.js` | Política de reaproveitamento do snapshot e limpeza seletiva do DOM dinâmico do Portfólio. |
 | `transactions-view.js` | Lançamentos: formulário, recorrência, parcelas, câmbio. |
 | `transaction-balance-chart.js` | Renderização ApexCharts da evolução mensal de saldos do Extrato. |
@@ -245,6 +245,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | Método | Rota |
 |---|---|
 | `GET` | `/api/portfolio` |
+| `GET` | `/api/portfolio/events` |
 | `GET` | `/api/portfolio/returns` |
 | `GET` | `/api/portfolio/fund-quote?cnpj={cnpj}` |
 | `POST` | `/api/portfolio/positions` |
@@ -358,6 +359,7 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | `portfolio.py` | API pública e composição do Portfólio; mantém CRUD, adaptação dos provedores e aplicação de cotações de mercado/fundos. Delega transporte/cache, valorização por data e série histórica. Resgates e encerramentos preparam posições fora da escrita e revalidam entradas locais na transação, sem recotação. Ver [[investimentos-portfolio]]. |
 | `portfolio_positions.py` | Identidade, auxiliares de lotes/FIFO e leituras locais compartilhadas: entradas da carteira e vencimentos abertos de renda fixa filtrados no SQLite; histórico de resgates por conexão recebida. Não contém CRUD completo nem consultas externas. |
 | `portfolio_quotes.py` | Transporte HTTP/JSON, cache SQLite, caches em memória de cotações/câmbio, locks, TTL, expurgo/LRU e fallback vencido. Dependências injetadas sem importar a fachada; normalização de provedores permanece em `portfolio.py`. |
+| `portfolio_events.py` | Deduplicação dos ativos elegíveis, consulta paralela e parsing dos proventos históricos detectados pelo Yahoo Finance; usa transporte/cache injetados e não calcula valor total estimado. |
 | `portfolio_valuation.py` | `PositionValuation`: valor por data de renda fixa/poupança, impostos, custódia, aniversários, variação diária e fatores mensais compartilhados. Sem SQL/HTTP; recebe provedores e relógio na composição. |
 | `portfolio_returns.py` | `PortfolioReturns`: série mensal por moeda, baseline e benchmarks CDI/IPCA; recebe valorização por data e carregador opcional da carteira, sem duplicar juros/impostos. Caches de fatores locais à chamada. |
 | `portfolio_calculations.py` | Agregações, normalizações e cálculos puros do Portfólio. |
@@ -540,7 +542,7 @@ Ver [[cartoes]].
 6. Resgates usam FIFO; encerramentos movem posições para histórico.
 7. Ativos em moeda estrangeira exibidos na moeda da carteira; conversão via lançamentos de câmbio.
 8. Consolidações do Portfólio mantêm valores exibidos na moeda original, mas expõem valor atual normalizado em BRL para a escala das barras visuais, usando cotação do fechamento anterior quando a moeda não é BRL.
-9. A UI do Portfólio carrega a aba **Posição** primeiro; Análise, Histórico e rentabilidade detalhada são renderizados/carregados sob demanda.
+9. A UI do Portfólio carrega a aba **Posição** primeiro; Análise, Eventos, Histórico e rentabilidade detalhada são renderizados/carregados sob demanda. Eventos usa rota própria, somente para posições abertas de renda variável, sem repetir a valorização da carteira.
 10. Renda fixa e Poupança exibem variação do dia calculada como a diferença do valor na curva entre hoje e o dia anterior (base limitada à data de aquisição), reutilizando `fixed_income_value_as_of`/`savings_value_as_of` com cache de fatores compartilhado; dias sem taxa publicada produzem variação zero em pós-fixados.
 
 Ver [[investimentos-portfolio]].
@@ -605,6 +607,8 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.95` — 2026-09-04 — Nova rota `GET /api/portfolio/events` e módulo `portfolio_events.py` consultam proventos históricos sob demanda, depois de fechar o snapshot SQLite; `portfolio-events.js` mantém a apresentação isolada e não estima valor total. Eventos da semana alimentam os Informativos do Cockpit com falha externa não bloqueante.
+- `3.94` — 2026-09-04 — Rankings extensos de Relatórios passam dados brutos diretamente ao virtualizador, sem DOM/`outerHTML` intermediário, e produzem detalhes apenas na expansão; Portfólio reutiliza as fábricas de linha da primeira passagem e mantém agrupamento/expansão.
 - `3.93` — 2026-09-03 — Calendário e notificações compartilham leitura SQLite de vencimentos abertos em `portfolio_positions.py`; o endpoint do Calendário deixa de montar e cotar a carteira, eliminando acesso externo de Poupança/SELIC/TR nesse fluxo.
 - `3.92` — 2026-09-03 — Central de Notificações conclui ações contextuais e marcação persistente de informativos; o flyout mantém erros operacionais visíveis e o composition root traduz rotas sem incorporar regras financeiras. Testes de integração cobrem autenticação, isolamento por usuário e fatura vencida.
 - `3.91` — 2026-09-03 — Cockpit integra indicadores acessíveis de críticos/informativos e botão condensado responsivo ao flyout global, usando endpoint dedicado com cache local curto e deduplicação; banner de versão permanece independente.

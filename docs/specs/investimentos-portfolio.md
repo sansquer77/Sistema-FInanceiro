@@ -2,8 +2,8 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.51
-atualizado: 2026-08-31
+versao: 2.52
+atualizado: 2026-09-04
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -16,7 +16,7 @@ aliases: ["Investimentos", "Portfólio"]
 # Investimentos e Portfólio
 
 > [!info] Status
-> **implementado** · área: `investimentos` · atualizado em 2026-08-31 · relacionados: [[contas-correntes]], [[lancamentos]], [[relatorios]]
+> **implementado** · área: `investimentos` · atualizado em 2026-09-04 · relacionados: [[contas-correntes]], [[lancamentos]], [[relatorios]]
 
 ## Problema
 
@@ -100,6 +100,9 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 - USDC, USDT, DAI, FDUSD, PYUSD, TUSD, USDP e USDE cadastrados anteriormente como `crypto` são classificados como Stablecoin na leitura, sem migração destrutiva; novas posições e aportes conhecidos persistem como `stablecoin`.
 - Ativos internacionais cujo ticker operacional precisa de sufixo de bolsa podem usar alias explícito do provedor; `VWRA` em carteira USD resolve para `VWRA.L` (London Stock Exchange, listagem USD) no Yahoo Finance.
 - A quantidade exibida em posições, origens e posições encerradas é normalizada com **até 2 casas decimais** (arredondamento `half-up`), independentemente da precisão cadastrada ou retornada pela cotação, para preservar o layout das tabelas.
+- A aba **Eventos** consulta sob demanda os proventos históricos detectados pelo Yahoo Finance somente para ações, ETFs e BDRs ainda presentes na carteira. Cada ocorrência informa data, ativo, valor por cota/ação, moeda, fonte e nível de confirmação.
+- Como o provedor não distingue de forma confiável dividendos de juros sobre capital próprio, o evento é apresentado como `Dividendo/JCP`; o app não atribui natureza fiscal definitiva nem o apresenta como comunicado oficial do emissor.
+- A aba não multiplica o provento pela quantidade atual ou histórica e não estima valor total a receber. Falhas de um ativo não impedem os demais resultados e nenhuma consulta é feita antes de a aba ser aberta.
 
 **Fundos (`fund`):**
 - Cotas dos fundos de investimento buscadas via **API Mais Retorno** quando a integração estiver ativada em Preferências (aba APIs — ver [[preferencias-abas]]), a posição tiver **CNPJ** preenchido e a carteira for em **BRL**.
@@ -123,7 +126,7 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 - A opção de registrar crédito deve ficar desmarcada por padrão para evitar duplicidade com resgates ou créditos já lançados.
 
 **Estrutura em abas:**
-- A tela Portfólio é dividida em **três abas** (padrão de pílulas do design system): **Posição** (Resumo da carteira, formulário de ativo e posição atual), **Análise** (consolidações Por classe, Por indexador, Por moeda e Por carteira) e **Histórico** (posições encerradas).
+- A tela Portfólio é dividida em **cinco abas** (padrão de pílulas do design system): **Posição** (Resumo da carteira, formulário de ativo e posição atual), **Análise** (consolidações Por classe, Por indexador, Por moeda e Por carteira), **Metas**, **Eventos** (proventos históricos detectados) e **Histórico** (posições encerradas).
 - Apenas o painel da aba ativa fica visível; a navegação preserva o estado das demais abas e não altera filtros nem dados.
 
 ## API e dados
@@ -135,6 +138,7 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 |---|---|
 | `GET` | `/api/portfolio` |
 | `GET` | `/api/portfolio/returns` |
+| `GET` | `/api/portfolio/events` |
 | `GET` | `/api/portfolio/fund-quote?cnpj={cnpj}` |
 | `POST` | `/api/portfolio/positions` |
 | `PUT` | `/api/portfolio/positions/{id}` |
@@ -174,6 +178,8 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - [x] Criar a aba Metas e comparar atual versus planejado no gráfico Por Classe.
 - [x] Separar a meta de Renda Variável em BRL e USD, preservando metas existentes.
 - [x] Usar a meta específica de Renda Variável em USD na comparação da Análise e no Consultor.
+- [x] Criar consulta isolada de eventos históricos de renda variável, com cache limitado, falha parcial por ativo e sem estimativa de valor total.
+- [x] Carregar e renderizar a aba Eventos somente no primeiro acesso ou após mudança da carteira, mantendo fonte e confirmação visíveis.
 
 ## Critérios de aceite
 
@@ -218,7 +224,7 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado uma posição de fundo sem integração ativada, sem CNPJ ou em carteira não-BRL, quando o Portfólio é carregado, então a posição mantém o valor de custo com status `Cotacao manual pendente` e nenhuma chamada à API Mais Retorno é feita.
 - Dado uma posição de fundo com a API Mais Retorno indisponível, quando o Portfólio é carregado, então a posição mantém o valor de custo com status amigável e o restante do portfólio segue funcionando.
 - Dado posições com quantidade de alta precisão (ex.: `94,65389`), quando o Portfólio é exibido, então a quantidade aparece com no máximo 2 casas decimais para preservar o layout das tabelas.
-- Dado o módulo Portfólio aberto, quando o usuário navega entre as abas **Posição**, **Análise** e **Histórico**, então apenas o painel da aba ativa é exibido e os dados das demais abas permanecem preservados.
+- Dado o módulo Portfólio aberto, quando o usuário navega entre **Posição**, **Análise**, **Metas**, **Eventos** e **Histórico**, então apenas o painel da aba ativa é exibido e os dados das demais abas permanecem preservados.
 - Dado um ativo de renda fixa com taxa cadastrada, quando listado no Portfólio, então a variação do dia é a diferença entre o valor líquido na curva de hoje e o do dia anterior, zerada no dia da aquisição.
 - Dado um ativo de renda fixa pós-fixado em dia sem taxa publicada (fim de semana/feriado), quando listado no Portfólio, então a variação do dia exibe zero, sem crescimento artificial do indexador.
 - Dado um ativo de Poupança com aniversários cadastrados, quando listado no Portfólio, então a variação do dia reflete a diferença de valor entre hoje e o dia anterior, concentrada no mês do aniversário.
@@ -256,6 +262,11 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado um resgate ou encerramento, quando a transação de escrita está aberta, então nenhuma consulta externa de cotação, indexador ou câmbio é executada.
 - Dado que os dados locais da carteira mudaram durante a obtenção das cotações, quando a escrita é iniciada, então a operação retorna conflito HTTP 409 sem gravar resgate, encerramento ou crédito e orienta tentar novamente.
 - Dado que os dados locais não mudaram, quando a operação é confirmada, então FIFO, custos, valores e crédito opt-in mantêm o comportamento atual, mesmo que o cache expire durante a confirmação.
+- Dado ações, ETFs ou BDRs abertos na carteira, quando o usuário abre a aba **Eventos**, então o app consulta sob demanda e lista os proventos históricos detectados desde a primeira aquisição, informando data, ativo, valor por cota/ação, moeda, fonte e nível de confirmação.
+- Dado um evento retornado pelo Yahoo Finance, quando exibido, então sua natureza aparece como `Dividendo/JCP` e o nível `Detectado pelo provedor`, sem afirmar confirmação oficial do emissor.
+- Dado qualquer quantidade atual ou histórica da posição, quando os eventos são apresentados, então o app não calcula nem exibe valor total estimado a receber.
+- Dado falha de consulta para um ativo, quando outros ativos possuem eventos válidos, então os resultados disponíveis continuam visíveis e a indisponibilidade parcial é informada sem bloquear a aba.
+- Dado o usuário navegando pelas demais abas do Portfólio, quando **Eventos** ainda não foi aberta, então nenhuma chamada ao endpoint de eventos ou ao provedor externo é realizada.
 
 ## Plano de implementação — transações sem rede
 
@@ -273,6 +284,7 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 
 ## Changelog
 
+- `2.52` — 2026-09-04 — Adicionada aba Eventos com proventos históricos de ações/ETFs/BDRs consultados sob demanda, valor por cota/ação, fonte e confirmação do provedor, sem estimativa de valor total.
 - `2.51` — 2026-08-31 — Correção de compatibilidade do snapshot do Portfólio, bloqueio de recargas em cascata após falha e renderização preguiçosa das linhas virtualizadas.
 
 - `2.50` — 2026-08-31 — Retirados cálculos financeiros residuais do frontend: resultados, agregados, metas, composição e prévias calculados no backend. Grupos com moedas distintas usam valores convertidos em BRL; nenhuma soma entre moedas nativas distintas. Prévia com debounce, confirmação bloqueada enquanto pendente e proteção contra respostas obsoletas; testes Python e JavaScript adicionados.

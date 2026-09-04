@@ -2,7 +2,7 @@
 tipo: spec
 area: distribuicao
 status: implementado
-versao: 2.5
+versao: 2.6
 atualizado: 2026-09-04
 relacionados:
   - "[[sdd]]"
@@ -171,9 +171,9 @@ Arquivos e diretorios afetados:
 
 ## Changelog
 
-- `2.4` — 2026-08-30 — Pacotes futuros da v2 passam a exigir dependências browser locais, inventário com versão/origem/SHA-256/licença e ausência de CDN, `node_modules` e ferramentas de build. Ver [[adr/0013-dependencias-frontend-v2]].
+- `2.6` — 2026-09-04 — Revisada a consistência documental após a validação sintática dos workflows das três plataformas; consolidado o histórico duplicado da versão 2.4.
 - `2.5` — 2026-09-04 — Workflows GitHub Actions de macOS, Windows e Linux passam a validar a presença das dependências browser vendorizadas (`web/vendor/imask/` e `web/vendor/apexcharts/`) no runtime PyInstaller antes da publicação.
-- `2.4` — 2026-08-30 — Especificado que pacotes oficiais são gerados exclusivamente pelos workflows do GitHub Actions; templates locais em `Sistema Financeiro - Distribuicao/` não armazenam runtimes ou zips finais.
+- `2.4` — 2026-08-30 — Pacotes oficiais passam a ser gerados exclusivamente pelos workflows do GitHub Actions; templates locais não armazenam runtimes ou zips finais e os pacotes da v2 exigem dependências browser locais com inventário de versão, origem, SHA-256 e licença. Ver [[adr/0013-dependencias-frontend-v2]].
 - `2.3` — 2026-08-09 — Pacotes e instaladores passam a tratar `secure/` como runtime local sensível, fora dos zips, preservado em atualizações junto com `data/`; documentada migração compatível de segredos para `secure_configs`.
 - `2.2` — 2026-08-04 — Pasta `Sistema Financeiro - Distribuicao/` passa a ser tratada como template enxuto versionado, removendo runtimes PyInstaller, zips, staging Linux, `.DS_Store` e árvore fonte antiga dos pacotes.
 - `2.1` — 2026-08-04 — Workflows de pacotes passam a nomear zips e artifacts como `SO - versão do app` e publicar os assets em GitHub Releases para consumo pela Landing Page.

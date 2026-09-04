@@ -1,4 +1,4 @@
-// spec: frontend-fundacao-v2 v0.17 — critérios 7 a 11
+// spec: frontend-fundacao-v2 v1.0 — critérios 7 a 11
 // Command Palette nativa em ES Modules. Delega ações existentes e nunca executa
 // operações destrutivas diretamente. Não envia consulta à rede.
 

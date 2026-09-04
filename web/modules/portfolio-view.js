@@ -7,6 +7,7 @@ import * as portfolioForm from "./portfolio-form.js";
 import { canReusePortfolioSnapshot, clearPortfolioPresentation, hasPortfolioPresentation, PORTFOLIO_COMPATIBILITY_ERROR } from "./portfolio-lifecycle.js";
 import { renderVirtualList, destroyVirtualLists } from "./virtual-list.js";
 import { createPortfolioPreview } from "./portfolio-preview.js";
+import { createPortfolioEvents } from "./portfolio-events.js";
 
 export function registerPortfolioView({
   state,
@@ -85,6 +86,8 @@ export function registerPortfolioView({
     portfolioAccountList,
     portfolioPositions,
     portfolioHistory,
+    portfolioEvents,
+    refreshPortfolioEventsButton,
     portfolioGoalsForm,
     portfolioGoalsFields,
     portfolioGoalsTotal,
@@ -96,6 +99,7 @@ export function registerPortfolioView({
     position: document.querySelector("#portfolioPositionPanel"),
     analysis: document.querySelector("#portfolioAnalysisPanel"),
     goals: document.querySelector("#portfolioGoalsPanel"),
+    events: document.querySelector("#portfolioEventsPanel"),
     history: document.querySelector("#portfolioHistoryPanel"),
   };
   const portfolioRoot = document.querySelector("#portfolioView");
@@ -105,6 +109,14 @@ export function registerPortfolioView({
     api,
     formatPercentValue,
     chartColor,
+  });
+  const portfolioEventsView = createPortfolioEvents({
+    state,
+    container: portfolioEvents,
+    refreshButton: refreshPortfolioEventsButton,
+    api,
+    escapeHtml,
+    formatDate,
   });
   // O drawer precisa ser filho direto do body para não herdar o contexto de
   // empilhamento criado pelos painéis sticky do Portfólio.
@@ -237,6 +249,7 @@ export function registerPortfolioView({
     }
     if (options.refreshMessage || options.force) {
       state.portfolioReturns = null;
+      portfolioEventsView.invalidate();
     }
 
     state.portfolioLoading = false;
@@ -252,6 +265,7 @@ export function registerPortfolioView({
     state.portfolioDirty = true;
     state.portfolioLoadedAt = 0;
     state.portfolioReturns = null;
+    portfolioEventsView.invalidate();
   }
 
   async function onEnter() {
@@ -264,6 +278,7 @@ export function registerPortfolioView({
     portfolioPreview.clear();
     portfolioChart.closeReturns();
     closePortfolioGroupDrawer();
+    portfolioEventsView.clearPresentation();
     clearPortfolioPresentation(portfolioTypeList, portfolioIndexerList, portfolioCurrencyList,
       portfolioAccountList, portfolioPositions, portfolioHistory, portfolioGoalsFields);
   }
@@ -317,7 +332,7 @@ export function registerPortfolioView({
   function resetPortfolioAssetForm() {
     portfolioAssetForm.reset();
     portfolioAssetForm.elements.id.value = "";
-    // spec: investimentos-portfolio v2.51 — criterio 48
+    // spec: investimentos-portfolio v2.52 — criterio 48
     portfolioAssetForm.elements.exchange_rate_to_brl.value = "";
     portfolioAssetFormTitle.textContent = "Ativo em carteira";
     deletePortfolioAssetButton.hidden = true;
@@ -693,6 +708,8 @@ export function registerPortfolioView({
       renderPortfolioHistory(portfolio.history || [], portfolio.redemption_history || []);
     } else if (activeTab === "goals") {
       renderPortfolioGoals(portfolio.allocation_goals || []);
+    } else if (activeTab === "events") {
+      portfolioEventsView.load();
     } else {
       renderPortfolioPositions(portfolio.positions || []);
       renderHighlightedPortfolioPosition();
@@ -933,8 +950,6 @@ export function registerPortfolioView({
     }
   }
 
-
-
   function renderPortfolioPositions(positions) {
     if (!hasPortfolioPresentation(state.portfolio)) {
       renderPortfolio();
@@ -947,11 +962,13 @@ export function registerPortfolioView({
     }
     const grouped = groupPortfolioPositions(positions);
     const hasTreasuryDirect = positions.some((position) => isTreasuryDirectPosition(position));
+    const virtualGroups = new Map();
     portfolioPositions.innerHTML = `${grouped.map((group, groupIndex) => {
       const collapsed = state.portfolioCollapsedGroups.has(group.key);
       if (collapsed) return group.label ? portfolioGroupHeader(group, true) : "";
       const positionRows = portfolioPositionRows(group.positions);
       const virtualRows = positionRows.length > 200;
+      if (virtualRows) virtualGroups.set(groupIndex, positionRows);
       return `
       ${group.label ? portfolioGroupHeader(group, collapsed) : ""}
       <div class="report-table-wrap ${collapsed ? "portfolio-group-collapsed" : ""}">
@@ -977,10 +994,9 @@ export function registerPortfolioView({
       </div>
     `;
     }).join("")}${hasTreasuryDirect ? portfolioTreasuryNote() : ""}`;
-    grouped.forEach((group, groupIndex) => {
+    virtualGroups.forEach((rows, groupIndex) => {
       const list = portfolioPositions.querySelector(`[data-portfolio-virtual-group="${groupIndex}"]`);
       if (!list) return;
-      const rows = portfolioPositionRows(group.positions);
       renderVirtualList(list, rows, {
         rowHeight: 74,
         renderItem: (row) => {
@@ -1382,7 +1398,7 @@ export function registerPortfolioView({
     `;
   }
 
-  // spec: investimentos-portfolio v2.51 — criterio 47
+  // spec: investimentos-portfolio v2.52 — criterio 47
   function portfolioEmergencyShieldIcon() {
     return '<svg class="portfolio-emergency-shield" viewBox="0 0 24 24" width="12" height="12" role="img" aria-label="Reserva de emergência" title="Reserva de emergência" fill="currentColor"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5l8-3z"/></svg>';
   }

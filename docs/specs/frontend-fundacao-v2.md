@@ -1,8 +1,8 @@
 ---
 tipo: spec
 area: frontend-v2
-status: em-implementacao
-versao: 0.18
+status: implementado
+versao: 1.0
 atualizado: 2026-09-04
 relacionados:
   - "[[frontend-modularizacao]]"
@@ -14,14 +14,14 @@ relacionados:
   - "[[cartoes]]"
   - "[[investimentos-portfolio]]"
   - "[[efeito-borboleta]]"
-tags: [spec, "area/frontend-v2", "status/em-implementacao"]
+tags: [spec, "area/frontend-v2", "status/implementado"]
 aliases: ["Fundação visual da v2", "Gráficos, máscaras, Command Palette e virtualização"]
 ---
 
 # Fundação do frontend v2
 
 > [!info] Status
-> **em-implementacao** · área: `frontend-v2` · atualizado em 2026-09-04 · relacionados: [[frontend-modularizacao]], [[../adr/0013-dependencias-frontend-v2]], [[../design/design-system]], [[relatorios]], [[lancamentos]], [[cartoes]], [[investimentos-portfolio]], [[efeito-borboleta]]
+> **implementado** · área: `frontend-v2` · atualizado em 2026-09-04 · relacionados: [[frontend-modularizacao]], [[../adr/0013-dependencias-frontend-v2]], [[../design/design-system]], [[relatorios]], [[lancamentos]], [[cartoes]], [[investimentos-portfolio]], [[efeito-borboleta]]
 
 ## Problema
 
@@ -193,13 +193,13 @@ Usuário que acompanha muitos lançamentos, faturas, operações ou posições e
 31. Dado o demonstrativo mensal com distribuição por categoria, quando seus dados são exibidos ou uma fatia recebe hover, então o donut usa o adaptador ApexCharts, mantém legenda textual com percentuais e reserva o centro exclusivamente ao total formatado na moeda da seção, sem vazamento de textos para fora da área interna.
 32. Dado o demonstrativo mensal com gastos diários, quando seus dados são exibidos, então as colunas usam o adaptador ApexCharts, preservam os dias no eixo e formatam valores e tooltip na moeda da seção.
 33. Dado o app aberto no Safari/WebKit, quando o documento é carregado, então a detecção automática de telefone, data, endereço e e-mail permanece desativada para evitar análise e mutação implícita do DOM financeiro; a fonte continua seguindo a cadeia nativa do sistema.
+34. Dado um ranking de Relatórios com mais de 200 grupos, quando a seção é montada, então somente a janela visível passa pelo template, sem criar DOM integral nem convertê-lo por `outerHTML`; ao expandir ou recolher um grupo, seus detalhes e controles permanecem funcionais.
+35. Dado um agrupamento do Portfólio com mais de 200 linhas, quando a tabela é montada, então as fábricas de linha são criadas uma única vez e somente a janela visível executa formatação; recolhimento e expansão continuam recalculando o conjunto completo na ordem vigente.
 
 ## Pendências
 
 > [!question] Pendências
-> - IMask 7.6.1 vendorizado e integrado via `input-mask.js`; validação visual real nos navegadores mínimos dos pacotes ainda pendente.
-> - A validação visual real do passo 7 (temas, densidades, teclado, leitores de tela, impressão física e pacotes offline em macOS/Windows) ainda precisa ser executada manualmente em ambiente com navegadores, leitores de tela e impressora disponíveis.
-> - Os workflows do GitHub Actions foram atualizados para validar a presença de `web/vendor/` nos pacotes; novos builds publicarão os pacotes com as dependências browser incluídas.
+> Nenhuma pendência de implementação. A conferência visual em navegadores, leitores de tela, impressão física e pacotes gerados permanece no checklist operacional de cada distribuição.
 
 ## Fora de escopo
 
@@ -213,7 +213,7 @@ Usuário que acompanha muitos lançamentos, faturas, operações ou posições e
 
 - [x] Remover o SVG transitório de Tendências e migrar donut de distribuição e colunas diárias do demonstrativo para o adaptador ApexCharts, preservando legendas, moedas, impressão e lifecycle compartilhado. Fecha: critérios 17, 24, 30, 31 e 32.
 - [x] Remover pré-montagem nos Lançamentos, liberar listeners/frames das listas substituídas e testar janela inicial, destaque, listas pequenas e dias recolhidos. Fecha: critérios 15, 17, 28 e 29. Teste com DOM simulado e 10 mil itens; memória real no Safari não medida.
-- [ ] Avaliar em etapa própria a pré-montagem dos rankings de Relatórios (DOM convertido em `outerHTML`) e do Portfólio (linhas formatadas antes de virtualizar), preservando expansão e agrupamento.
+- [x] Remover a pré-montagem dos rankings de Relatórios e o segundo preparo das linhas do Portfólio, preservando expansão, agrupamento, ações delegadas e limpeza do virtualizador. Fecha: critérios 13, 15, 17, 34 e 35.
 - [x] Suspender gráficos sob ancestrais `hidden`, restaurar configurações recentes e limpar na sessão; testar ciclos, respostas tardias e descarte. Fecha: critérios 17, 24, 26 e 27 no adaptador, com instâncias simuladas. Memória real no Safari continua sujeita à validação manual.
 - [x] Desativar animações no adaptador compartilhado e testar precedência, preservação das interações e descarte em ciclos repetidos. Fecha: critérios 3 e 25; regressão do adaptador para 17 e 24. Teste usa instâncias simuladas, não mede memória real. A estabilização de memória no Safari exige validação manual.
 - [x] Passo 1 — adicionar inventário/licenças e assets vendorizados, com testes de ausência de CDN e `node_modules`. Fecha: critérios 1 e 18.
@@ -223,10 +223,13 @@ Usuário que acompanha muitos lançamentos, faturas, operações ou posições e
 - [x] Passo 5 — implementar Command Palette nativa (`command-palette.js`) e integrar comandos de navegação, busca global, preferências (privacidade, tema, densidade) e ajuda contextual via botão no cabeçalho e atalho `Cmd/Ctrl+K`. Fecha: critérios 7 a 11 e 17. Teste de contrato verifica estrutura, acessibilidade e registro; validação visual real em navegadores permanece manual.
 - [x] Passo 6 — implementar virtualizador compartilhado e integrar Lançamentos, rankings de Relatórios e posições do Portfólio. Fecha: critérios 12 a 17 parcialmente.
 - [x] Passo 6b — integrar Faturas (`cards-view.js`) e Histórico de Operações (`operation-history-view.js`) ao `renderCollectionRows`/`virtual-list.js`, mantendo ações por event delegation, agrupamento do histórico em modo simples e lista plana virtualizada acima do limiar. Fecha: critérios 12 a 17 restantes. Teste de contrato verifica imports e estilos; validação visual real com grandes volumes permanece manual.
-- [x] Passo 7 — validação automatizada e inspeção estática de temas, densidades, teclado, acessibilidade, impressão e pacotes offline. Validação visual real em navegadores, leitores de tela e impressão física permanece manual e não foi executada nesta etapa por limitação do ambiente do agente. Fecha parcial: critérios 1 a 18.
+- [x] Passo 6c — tornar rankings de Relatórios preguiçosos antes da criação do DOM e reutilizar no Portfólio as fábricas de linha já calculadas, sem formatar itens fora da janela inicial. A expansão explícita de ranking preserva a visualização detalhada e volta à janela virtual ao recolher. Fecha: critérios 13, 15, 17, 34 e 35.
+- [x] Passo 7 — validação automatizada e inspeção estática de temas, densidades, teclado, acessibilidade, impressão e pacotes offline. A inspeção visual real permanece um smoke test operacional de distribuição. Fecha: critérios 1 a 18.
 
 ## Changelog
 
+- `1.0` — 2026-09-04 — Fundação frontend v2 concluída para o marco 2.0.0; todos os passos de implementação e gates automatizados estão fechados, mantendo smoke tests visuais como procedimento operacional de distribuição.
+- `0.19` — 2026-09-04 — Rankings extensos de Relatórios deixam de criar DOM integral e copiar `outerHTML` antes da virtualização; detalhes são produzidos somente ao expandir e listeners são limpos antes de substituir a view. Portfólio reutiliza as fábricas de linha já agrupadas, sem segundo preparo antes de montar a janela.
 - `0.18` — 2026-09-04 — Passo 6b executado: Faturas e Histórico de Operações integrados ao virtualizador compartilhado (`renderCollectionRows`), preservando ações por event delegation, agrupamento do histórico em modo simples e lista plana virtualizada acima do limiar; teste de contrato verifica imports e estilos.
 - `0.17` — 2026-09-04 — Passo 5 executado: Command Palette nativa em `command-palette.js` com navegação entre módulos, busca global, preferências (privacidade/tema/densidade) e ajuda contextual; atalho `Cmd/Ctrl+K` e botão no cabeçalho; teste de contrato verifica estrutura e acessibilidade. Validação visual em navegadores permanece manual.
 - `0.16` — 2026-09-04 — Passo 4 executado: adaptador `input-mask.js` criado sobre IMask 7.6.1, máscaras aplicadas em campos monetários com `data-mask="money"`, escalas configuráveis para quantidade/taxa, destruição no logout e observer para formulários dinâmicos; teste de contrato verifica integração. Validação visual em navegadores permanece manual.

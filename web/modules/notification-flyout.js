@@ -1,4 +1,4 @@
-// spec: cockpit/alertas-cockpit v0.9 — critérios 2, 6, 8 e 9
+// spec: cockpit/alertas-cockpit v1.0 — critérios 2, 6, 8 e 9
 const META = {
   critical: { title: "Alertas críticos", empty: "Nenhum alerta crítico pendente. Suas contas e limites estão em dia." },
   informational: { title: "Informativos", empty: "Nenhum novo evento ou provento registrado para esta semana." },

@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 12.11
-atualizado: 2026-09-03
+versao: 12.18
+atualizado: 2026-09-04
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -71,6 +71,8 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[specs/manutencao-cache-cotacoes]] | ✅ implementado | Persistência |
 | [[specs/utilitarios-dominio]] | ✅ implementado | Arquitetura |
 | [[specs/desconcentracao-arquitetura-v2]] | ✅ implementado | Arquitetura v2 |
+| [[specs/alertas-cockpit]] | ✅ implementado | Cockpit |
+| [[specs/frontend-fundacao-v2]] | ✅ implementado | Frontend v2 |
 
 ---
 
@@ -80,8 +82,6 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 
 | Spec | Status | Área |
 |---|---|---|
-| [[specs/alertas-cockpit]] | 🚧 em implementação | Cockpit |
-| [[specs/frontend-fundacao-v2]] | 🚧 em implementação | Frontend v2 |
 | [[specs/open-finance]] | 📝 rascunho | Open Finance |
 | [[specs/consolidacao-familiar]] | 📝 rascunho | Consolidação Familiar |
 | [[specs/imposto-renda]] | ❌ depreciado — custo de manter regras fiscais atualizadas não compensa para uso familiar | Investimentos |
@@ -148,14 +148,16 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `12.18` — 2026-09-04 — Fundação da versão 2.0.0 encerrada: [[specs/frontend-fundacao-v2]] e [[specs/alertas-cockpit]] alcançam v1.0 implementada; eventos semanais passam a alimentar os Informativos do Cockpit.
+- `12.17` — 2026-09-04 — [[specs/investimentos-portfolio]] v2.52 conclui a fundação da versão 2.0.0 com a aba Eventos: proventos históricos detectados, fonte e confirmação, sem estimativa de valor total.
+- `12.16` — 2026-09-04 — [[specs/frontend-fundacao-v2]] v0.19 conclui a remoção da pré-montagem integral dos rankings de Relatórios e do preparo duplicado das linhas virtuais do Portfólio.
+- `12.15` — 2026-09-04 — Workflows GitHub Actions de distribuição (macOS/Windows/Linux) atualizados para validar dependências browser vendorizadas (`web/vendor/imask/`, `web/vendor/apexcharts/`) antes da publicação. [[distribuição]] v2.6.
+- `12.14` — 2026-09-04 — [[specs/frontend-fundacao-v2]] v0.18: Faturas e Histórico de Operações integrados ao virtualizador compartilhado (`virtual-list.js`); teste de contrato verifica imports e estilos.
+- `12.13` — 2026-09-04 — [[specs/frontend-fundacao-v2]] v0.17 e [[adr/0013-dependencias-frontend-v2]] v1.4: Command Palette nativa (`command-palette.js`) com navegação, preferências, busca e ajuda via `Cmd/Ctrl+K`; teste de contrato verifica estrutura e acessibilidade.
+- `12.12` — 2026-09-04 — [[specs/frontend-fundacao-v2]] v0.16 e [[adr/0013-dependencias-frontend-v2]] v1.3: IMask 7.6.1 vendorizado e integrado via `web/modules/input-mask.js`; máscaras monetárias aplicadas em formulários preservando parsers e formato brasileiro. [[arquitetura]] e [[specs/frontend-modularizacao]] sincronizadas.
 - `12.11` — 2026-09-03 — Indexada [[specs/alertas-cockpit]] em rascunho para a reformulação dos alertas do Cockpit em indicadores dedicados (críticos e informativos) com flyout global.
 - `12.10` — 2026-09-03 — Indexada [[specs/seguranca-ai-ssrf]] e [[adr/0015-ssrf-ai-endpoints]] para proteção SSRF de endpoints de IA configuráveis.
-
 - `12.9` — 2026-09-03 — Indexada [[specs/seguranca-transporte-externo]] para TLS verificado e leitura JSON externa limitada.
-- `12.12` — 2026-09-04 — Workflows GitHub Actions de distribuição (macOS/Windows/Linux) atualizados para validar dependências browser vendorizadas (`web/vendor/imask/`, `web/vendor/apexcharts/`) antes da publicação. [[docs/distribuição]] v2.5.
-- `12.11` — 2026-09-04 — [[specs/frontend-fundacao-v2]] v0.18: Faturas e Histórico de Operações integrados ao virtualizador compartilhado (`virtual-list.js`); teste de contrato verifica imports e estilos.
-- `12.10` — 2026-09-04 — [[specs/frontend-fundacao-v2]] v0.17 e [[adr/0013-dependencias-frontend-v2]] v1.4: Command Palette nativa (`command-palette.js`) com navegação, preferências, busca e ajuda via `Cmd/Ctrl+K`; teste de contrato verifica estrutura e acessibilidade.
-- `12.9` — 2026-09-04 — [[specs/frontend-fundacao-v2]] v0.16 e [[adr/0013-dependencias-frontend-v2]] v1.3: IMask 7.6.1 vendorizado e integrado via `web/modules/input-mask.js`; máscaras monetárias aplicadas em formulários preservando parsers e formato brasileiro. [[arquitetura]] e [[specs/frontend-modularizacao]] sincronizadas.
 - `12.8` — 2026-08-31 — Indexada [[specs/bank-logos]] e sincronizadas [[arquitetura]] e [[qualidade-codigo]] com o catálogo compartilhado e o gate automatizado de qualidade.
 - `12.7` — 2026-08-30 — Preferências, Histórico, Extrato e Simulações passam a evitar recargas redundantes com invalidação segura e deduplicação de requisições.
 - `12.6` — 2026-08-30 — Portfólio passa a liberar recursos de apresentação ao sair e a reaproveitar snapshot recente sem recarga redundante; specs e arquitetura sincronizadas.

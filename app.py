@@ -104,7 +104,7 @@ from financeiro.financial_health import (
 from financeiro.imports import import_legacy_transactions, import_system_template, system_import_template
 from financeiro.http_routes import dispatch_route
 from financeiro.operation_logs import create_operation_log, get_operation_log, list_operation_logs
-from financeiro.portfolio import close_position, create_opening_position, current_portfolio_positions, delete_opening_position, delete_position_value_override, fetch_fund_quote_for_user, get_portfolio, get_portfolio_returns, redeem_position, save_allocation_goals, update_opening_position, update_position_value_override
+from financeiro.portfolio import close_position, create_opening_position, current_portfolio_positions, delete_opening_position, delete_position_value_override, fetch_fund_quote_for_user, get_portfolio, get_portfolio_events, get_portfolio_returns, redeem_position, save_allocation_goals, update_opening_position, update_position_value_override
 from financeiro.portfolio import PortfolioError
 from financeiro.reports import build_tag_report
 from financeiro.secure_config import (
@@ -522,14 +522,18 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_json(payload)
 
     def handle_cockpit_notifications(self) -> None:
-        # spec: cockpit/alertas-cockpit v0.9 — critérios 6, 10 e 11
+        # spec: cockpit/alertas-cockpit v1.0 — critérios 5, 6, 10 e 11
         if not self.validate_read_source():
             return
         user = self.require_user()
-        self.send_json(build_cockpit_notifications(user["id"]))
+        try:
+            portfolio_events = get_portfolio_events(user["id"]).get("events") or []
+        except PortfolioError:
+            portfolio_events = []
+        self.send_json(build_cockpit_notifications(user["id"], portfolio_events=portfolio_events))
 
     def handle_mark_cockpit_notifications_seen(self) -> None:
-        # spec: cockpit/alertas-cockpit v0.9 — critérios 6 e 11
+        # spec: cockpit/alertas-cockpit v1.0 — critérios 6 e 11
         user = self.require_user()
         payload = self.read_json()
         notification_ids = payload.get("notification_ids") if isinstance(payload, dict) else None
@@ -829,6 +833,12 @@ class AppHandler(BaseHTTPRequestHandler):
         # Otimização: reutiliza as posições já calculadas por get_portfolio.
         portfolio = get_portfolio(user["id"], force_refresh=force_refresh)
         self.send_json(get_portfolio_returns(user["id"], force_refresh=force_refresh, positions=portfolio.get("positions") or []))
+
+    def handle_portfolio_events(self) -> None:
+        user = self.require_user()
+        query = parse_qs(urlsplit(self.path).query)
+        force_refresh = (query.get("refresh") or [""])[0].lower() in {"1", "true", "yes", "sim"}
+        self.send_json(get_portfolio_events(user["id"], force_refresh=force_refresh))
 
     def handle_portfolio_fund_quote(self) -> None:
         # spec: lancamentos v3.24 — criterio cota-fundo-lancamento

@@ -972,6 +972,7 @@
             <button class="portfolio-tab active" type="button" role="tab" aria-selected="true" aria-controls="portfolioPositionPanel" data-portfolio-tab="position">Posição</button>
             <button class="portfolio-tab" type="button" role="tab" aria-selected="false" aria-controls="portfolioAnalysisPanel" data-portfolio-tab="analysis" tabindex="-1">Análise</button>
             <button class="portfolio-tab" type="button" role="tab" aria-selected="false" aria-controls="portfolioGoalsPanel" data-portfolio-tab="goals" tabindex="-1">Metas</button>
+            <button class="portfolio-tab" type="button" role="tab" aria-selected="false" aria-controls="portfolioEventsPanel" data-portfolio-tab="events" tabindex="-1">Eventos</button>
             <button class="portfolio-tab" type="button" role="tab" aria-selected="false" aria-controls="portfolioHistoryPanel" data-portfolio-tab="history" tabindex="-1">Histórico</button>
           </div>
 
@@ -1272,6 +1273,19 @@
                 </div>
               </form>
               <p class="message" id="portfolioGoalsMessage" role="alert"></p>
+            </section>
+          </section>
+
+          <section class="portfolio-tab-panel" id="portfolioEventsPanel" role="tabpanel" data-portfolio-panel="events" hidden>
+            <section class="panel report-content-panel">
+              <div class="section-heading">
+                <div>
+                  <h2>Eventos da carteira</h2>
+                  <p class="muted-copy">Dividendos e JCP históricos detectados para ações, ETFs e BDRs atuais.</p>
+                </div>
+                <button class="ghost small-button" type="button" id="refreshPortfolioEventsButton">Atualizar eventos</button>
+              </div>
+              <div id="portfolioEvents" aria-live="polite"></div>
             </section>
           </section>
 

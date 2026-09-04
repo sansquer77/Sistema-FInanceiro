@@ -133,8 +133,13 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("renderCollectionRows(rowsContainer, items", transactions)
         self.assertIn("destroyVirtualLists(container)", transactions)
         self.assertIn('DEFAULT_THRESHOLD = 200', virtualizer)
-        self.assertIn('list.children.length <= 200', reports)
+        self.assertIn("pendingReportRankings.push", reports)
+        self.assertIn("renderItem: (row, index) => reportRankedRow", reports)
+        self.assertIn("else mountReportRanking(list, ranking, index)", reports)
+        self.assertNotIn(".outerHTML", reports)
         self.assertIn('positionRows.length > 200', portfolio)
+        self.assertIn("virtualGroups.set(groupIndex, positionRows)", portfolio)
+        self.assertNotIn("const rows = portfolioPositionRows(group.positions)", portfolio)
 
     def test_portfolio_analysis_flyout_avoids_persistent_webkit_layers(self) -> None:
         portfolio = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
@@ -159,6 +164,18 @@ class FrontendModuleContractTest(unittest.TestCase):
         overlay_rule = overlay_rule[:overlay_rule.index("}")]
         self.assertIn("-webkit-backdrop-filter: none", overlay_rule)
         self.assertIn("backdrop-filter: none", overlay_rule)
+
+    def test_portfolio_events_are_lazy_and_do_not_estimate_total(self) -> None:
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        facade = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
+        events = (MODULE_ROOT / "portfolio-events.js").read_text(encoding="utf-8")
+        self.assertIn('data-portfolio-tab="events"', index)
+        self.assertIn('activeTab === "events"', facade)
+        self.assertIn("portfolioEventsView.load()", facade)
+        self.assertIn("/api/portfolio/events", events)
+        self.assertIn("amount_per_share_micros", events)
+        self.assertNotIn("position.quantity", events)
+        self.assertNotIn("estimated_total", events)
 
     def test_apexcharts_overlays_races_and_history_bounds_are_guarded(self) -> None:
         portfolio = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
