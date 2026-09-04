@@ -429,7 +429,7 @@ CREATE TABLE IF NOT EXISTS secure_configs (
 """
 
 
-CONSULTOR_SCHEMA_SQL = """
+CONSULTOR_TABLES_SQL = """
 CREATE TABLE IF NOT EXISTS consultor_settings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -441,9 +441,6 @@ CREATE TABLE IF NOT EXISTS consultor_settings (
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (user_id)
 );
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_consultor_settings_user
-ON consultor_settings (user_id);
 
 CREATE TABLE IF NOT EXISTS consultor_analyses (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -465,6 +462,12 @@ CREATE TABLE IF NOT EXISTS consultor_perfil_complementar (
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (user_id)
 );
+"""
+
+
+CONSULTOR_INDEXES_SQL = """
+CREATE UNIQUE INDEX IF NOT EXISTS idx_consultor_settings_user
+ON consultor_settings (user_id);
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_consultor_perfil_complementar_user
 ON consultor_perfil_complementar (user_id);
@@ -639,7 +642,7 @@ PERFORMANCE_INDEXES = (
 )
 
 
-BASELINE_BLOCKS = (
+TABLES_BLOCKS = (
     AUTH_SCHEMA_SQL,
     ACCOUNTS_SCHEMA_SQL,
     CARDS_SCHEMA_SQL,
@@ -650,21 +653,39 @@ BASELINE_BLOCKS = (
     CACHE_SCHEMA_SQL,
     AUDIT_SCHEMA_SQL,
     CONFIG_SCHEMA_SQL,
-    CONSULTOR_SCHEMA_SQL,
+    CONSULTOR_TABLES_SQL,
     NOTIFICATIONS_SCHEMA_SQL,
+)
+
+
+INDEXES_BLOCKS = (
+    CONSULTOR_INDEXES_SQL,
     INDEX_SCHEMA_SQL,
 )
 
 
-BASELINE_SCHEMA_SQL = "\n".join(BASELINE_BLOCKS)
+BASELINE_TABLES_SQL = "\n".join(TABLES_BLOCKS)
+BASELINE_INDEXES_SQL = "\n".join(INDEXES_BLOCKS)
+BASELINE_SCHEMA_SQL = BASELINE_TABLES_SQL + "\n" + BASELINE_INDEXES_SQL
+
+
+def create_baseline_tables(conn: sqlite3.Connection) -> None:
+    """Apply only the table and constraint definitions of the v2 baseline.
+
+    Indexes that may depend on columns added during legacy compatibility
+    normalization are created separately by create_baseline_indexes().
+    """
+    conn.executescript(BASELINE_TABLES_SQL)
+
+
+def create_baseline_indexes(conn: sqlite3.Connection) -> None:
+    """Apply all baseline indexes, including performance indexes."""
+    conn.executescript(BASELINE_INDEXES_SQL)
+    for statement in PERFORMANCE_INDEXES:
+        conn.execute(statement)
 
 
 def create_baseline_schema(conn: sqlite3.Connection) -> None:
     """Apply the canonical v2 baseline schema to an empty connection."""
-    conn.executescript(BASELINE_SCHEMA_SQL)
-    ensure_baseline_indexes(conn)
-
-
-def ensure_baseline_indexes(conn: sqlite3.Connection) -> None:
-    for statement in PERFORMANCE_INDEXES:
-        conn.execute(statement)
+    create_baseline_tables(conn)
+    create_baseline_indexes(conn)

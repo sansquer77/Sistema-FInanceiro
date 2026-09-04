@@ -328,7 +328,12 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 
 | Módulo | Responsabilidade |
 |---|---|
-| `database.py` | Conexão SQLite, schema e migrações idempotentes. |
+| `database.py` | Fachada pública: fábrica de conexões (`get_connection`), inicialização (`initialize_database`) e helpers transversais (`row_to_dict`). Não contém mais SQL de schema, migração física nem manutenção de cache. |
+| `database_config.py` | Constantes transversais de configuração SQLite, como `SQLITE_BUSY_TIMEOUT_MS`. |
+| `database_maintenance.py` | Rotinas operacionais do `quote_cache`: poda de entradas expiradas e compactação condicional. Ver [[specs/manutencao-cache-cotacoes]]. |
+| `database_compatibility.py` | Normalizações históricas do schema legado 1.x aplicadas apenas à cópia de trabalho da migração. |
+| `database_schema.py` | Descrição canônica do baseline v2: tabelas, constraints e índices. Oferece `create_baseline_schema`, `create_baseline_tables` e `create_baseline_indexes`. |
+| `database_migrations.py` | Orquestração física e recuperável da migração legada: cópia, compatibilização, `VACUUM INTO`, validação e promoção. |
 | `money.py` | Conversões monetárias puras, escala de centavos, arredondamento e divisão exata de parcelas. Ver [[specs/utilitarios-dominio]]. |
 | `calendar_rules.py` | Normalização ISO e aritmética pura de datas, meses e fins de mês. Ver [[specs/utilitarios-dominio]]. |
 | `identifiers.py` | Parsing puro de identificadores inteiros positivos obrigatórios e opcionais. Ver [[specs/utilitarios-dominio]]. |
@@ -664,6 +669,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 - `3.55` — 2026-08-30 — Projeções de saldos/faturas migram de `app.js` para `balance_projections.py` e `portfolio-view.js` passa a coordenar módulos dedicados de gráfico, agrupamento e formulário.
 - `3.54` — 2026-08-30 — Roteamento declarativo e fronteiras internas de Portfólio/Cockpit reduzem concentração sem alterar contratos públicos. Ver [[specs/desconcentracao-arquitetura-v2]] e [[adr/0014-desconcentracao-fachadas-e-roteamento]].
 - `3.53` — 2026-08-30 — Documentados os utilitários puros de dinheiro, calendário, identificadores e recorrência compartilhados pelo núcleo. Ver [[specs/utilitarios-dominio]].
+- `3.63` — 2026-09-03 — Migração legada dividida em fases (tabelas → compatibilização → índices) em `financeiro/database_migrations.py`; adicionado `database_config.py` para constantes SQLite e teste com fixture legado genuíno. Ver [[specs/migracao-banco-v2]].
 - `3.62` — 2026-09-03 — Orquestração física e recuperável da migração legada extraída para `financeiro/database_migrations.py`; `database.py` passa a ser apenas ponto de entrada público e fábrica de conexões. Ver [[specs/migracao-banco-v2]].
 - `3.61` — 2026-09-03 — Descrição canônica do baseline v2 extraída para `financeiro/database_schema.py`; `database.py` e `database_compatibility.py` passam a consumir schema, índices e versão do novo módulo. Ver [[specs/migracao-banco-v2]].
 - `3.60` — 2026-09-03 — Compatibilizações históricas de schema segregadas de `database.py` para `database_compatibility.py`; migração legada aplica `normalize_legacy_schema` apenas na cópia de trabalho. Ver [[specs/migracao-banco-v2]].

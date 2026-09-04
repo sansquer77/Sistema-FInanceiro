@@ -2,7 +2,7 @@
 tipo: spec
 area: migracao-dados
 status: implementado
-versao: 1.4
+versao: 1.5
 atualizado: 2026-09-03
 relacionados:
   - "[[../arquitetura]]"
@@ -68,16 +68,23 @@ Usuário existente que atualiza o aplicativo para a linha v2 e usuário novo que
   ```python
   SCHEMA_VERSION = 20000
 
+  def create_baseline_tables(conn: sqlite3.Connection) -> None:
+      ...
+
+  def create_baseline_indexes(conn: sqlite3.Connection) -> None:
+      ...
+
   def create_baseline_schema(conn: sqlite3.Connection) -> None:
       ...
   ```
+  A separação entre `create_baseline_tables` e `create_baseline_indexes` é obrigatória para a migração legada: a compatibilização (`normalize_legacy_schema`) deve rodar depois da criação das tabelas e antes da criação dos índices, porque índices de baseline podem referenciar colunas que só existirão após a normalização.
 - `financeiro/database_compatibility.py` concentra as compatibilizações históricas aplicadas à cópia do banco legado, oferecendo o ponto de entrada ordenado:
   ```python
   def normalize_legacy_schema(conn: sqlite3.Connection) -> None:
       ...
   ```
   Esse módulo não abre banco, não cria backups, não renomeia arquivos, não define o baseline novo e não é executado em bancos v2 já promovidos.
-- `financeiro/database_migrations.py` orquestra a transformação física e recuperável do banco legado: leitura/escrita de `PRAGMA user_version`, decisão entre banco novo/v2/legado, cópia de trabalho, checkpoint, backup via API SQLite, normalização, `VACUUM INTO`, validações, promoção, preservação do legado como `finance-v1.bkp`, restauração em caso de falha e limpeza de artefatos. Oferece:
+- `financeiro/database_migrations.py` orquestra a transformação física e recuperável do banco legado: leitura/escrita de `PRAGMA user_version`, decisão entre banco novo/v2/legado, cópia de trabalho, checkpoint, backup via API SQLite, criação das tabelas baseline, normalização, criação dos índices baseline, `VACUUM INTO`, validações, promoção, preservação do legado como `finance-v1.bkp`, restauração em caso de falha e limpeza de artefatos. Oferece:
   ```python
   @dataclass(frozen=True)
   class MigrationPaths:
@@ -128,9 +135,11 @@ Usuário existente que atualiza o aplicativo para a linha v2 e usuário novo que
 - [x] Passo 5 — segregar as compatibilizações históricas para `financeiro/database_compatibility.py`, mantendo `database.py` responsável apenas pela criação do baseline v2, pela orquestração da migração e pela promoção. Fecha: critérios 1 a 12.
 - [x] Passo 6 — extrair a descrição canônica do baseline v2 para `financeiro/database_schema.py`, eliminando SQL de criação de `database.py` e `database_compatibility.py`. Fecha: critérios 1 a 12.
 - [x] Passo 7 — extrair a orquestração física e recuperável da migração legada para `financeiro/database_migrations.py`, recebendo caminhos e uma fábrica de conexões. Fecha: critérios 1 a 12.
+- [x] Passo 8 — separar a criação do baseline em tabelas (`create_baseline_tables`) e índices (`create_baseline_indexes`), aplicando a ordem tabelas → compatibilização → índices na migração legada, e adicionar teste com fixture legado genuíno. Fecha: critérios 1 a 12.
 
 ## Changelog
 
+- `1.5` — 2026-09-03 — Migração legada separada em três fases: criação das tabelas baseline, normalização de compatibilidade e criação dos índices baseline; adicionado teste com fixture legado genuíno.
 - `1.4` — 2026-09-03 — Orquestração física e recuperável da migração legada extraída para `financeiro/database_migrations.py`; `database.py` passa a ser apenas o ponto de entrada público e a fábrica de conexões.
 - `1.3` — 2026-09-03 — Descrição canônica do baseline v2 extraída para `financeiro/database_schema.py`; `database.py` e `database_compatibility.py` passam a consumir `SCHEMA_VERSION`, `PERFORMANCE_INDEXES` e `create_baseline_schema` do novo módulo.
 - `1.2` — 2026-09-03 — Compatibilizações históricas de schema segregadas de `database.py` para `database_compatibility.py`; baseline v2 consolidado em `database.py` e normalização legada aplicada apenas na cópia de trabalho antes da promoção.

@@ -6,14 +6,14 @@ from contextlib import closing
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from financeiro.database_config import SQLITE_BUSY_TIMEOUT_MS
+
 # spec: persistencia/manutencao-cache-cotacoes v1.1 — critérios 1 a 8
 QUOTE_CACHE_STALE_RETENTION_DAYS = 30
 QUOTE_CACHE_MAX_ENTRIES = 1500
 QUOTE_CACHE_MAX_ENTRIES_PER_PROVIDER = 1000
 QUOTE_CACHE_VACUUM_MIN_FREE_BYTES = 1024 * 1024
 QUOTE_CACHE_VACUUM_MIN_FREE_RATIO = 0.20
-
-SQLITE_BUSY_TIMEOUT_MS = 5000
 
 
 def maintain_quote_cache(

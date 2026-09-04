@@ -5,6 +5,7 @@ import sqlite3
 import sys
 from pathlib import Path
 
+from financeiro.database_config import SQLITE_BUSY_TIMEOUT_MS
 from financeiro.database_maintenance import maintain_quote_cache
 from financeiro.database_migrations import (
     DatabaseMigrationError,
@@ -18,7 +19,6 @@ from financeiro.database_schema import SCHEMA_VERSION, create_baseline_schema
 ROOT = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parents[1]
 DATA_DIR = Path(os.environ.get("SISTEMA_FINANCEIRO_DATA_DIR", ROOT / "data"))
 DB_PATH = DATA_DIR / "finance.db"
-SQLITE_BUSY_TIMEOUT_MS = 5000
 LEGACY_BACKUP_NAME = "finance-v1.bkp"
 MIGRATION_WORK_NAME = ".finance-v2-migration-work.db"
 MIGRATION_CANDIDATE_NAME = ".finance-v2-migration-candidate.db"

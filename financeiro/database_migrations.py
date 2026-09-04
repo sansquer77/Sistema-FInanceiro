@@ -8,9 +8,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from financeiro.database_compatibility import normalize_legacy_schema
-from financeiro.database_schema import SCHEMA_VERSION, create_baseline_schema
-
-SQLITE_BUSY_TIMEOUT_MS = 5000
+from financeiro.database_config import SQLITE_BUSY_TIMEOUT_MS
+from financeiro.database_schema import (
+    create_baseline_indexes,
+    create_baseline_tables,
+)
 
 
 class DatabaseMigrationError(RuntimeError):
@@ -58,7 +60,7 @@ def migrate_legacy_database(
     The operation is recoverable: the original active file is preserved as the
     backup, and failures before promotion keep the legacy database in place.
     """
-    # spec: migracao-dados/migracao-banco-v2 v1.4 — critérios 3, 4, 7, 8 e 11
+    # spec: migracao-dados/migracao-banco-v2 v1.5 — critérios 3, 4, 7, 8 e 11
     if paths.backup.exists():
         raise DatabaseMigrationError(
             f"A migracao foi bloqueada porque {paths.backup.name} ja existe. "
@@ -71,9 +73,11 @@ def migrate_legacy_database(
         _checkpoint_database(paths.active)
         _copy_database(paths.active, paths.work)
         with connection_factory(paths.work) as conn:
-            create_baseline_schema(conn)
+            create_baseline_tables(conn)
         with connection_factory(paths.work) as conn:
             normalize_legacy_schema(conn)
+        with connection_factory(paths.work) as conn:
+            create_baseline_indexes(conn)
         set_schema_version(paths.work, target_version, connection_factory=connection_factory)
         _validate_database(paths.work, target_version)
         _vacuum_into(paths.work, paths.candidate)

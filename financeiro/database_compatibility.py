@@ -14,7 +14,7 @@ def normalize_legacy_schema(conn: sqlite3.Connection) -> None:
     the candidate is promoted. It never opens connections, creates backups,
     renames files or sets the schema version.
     """
-    # spec: migracao-dados/migracao-banco-v2 v1.4 — critérios 3, 4, 7, 8 e 11
+    # spec: migracao-dados/migracao-banco-v2 v1.5 — critérios 3, 4, 7, 8 e 11
     # Order matters: later steps may depend on tables/columns ensured earlier.
     ensure_column(conn, "transactions", "category_id", "INTEGER REFERENCES categories(id)")
     ensure_column(conn, "transactions", "subcategory_id", "INTEGER REFERENCES subcategories(id)")
@@ -72,6 +72,28 @@ def normalize_legacy_schema(conn: sqlite3.Connection) -> None:
     ensure_notification_reads(conn)
 
     migrate_category_unique_constraint(conn)
+
+    # A recriação de transactions depende de colunas que podem não existir em
+    # bancos v1 antigos; garantimos todas antes de reconstruir a tabela.
+    ensure_column(conn, "transactions", "destination_amount_cents", "INTEGER NOT NULL DEFAULT 0")
+    ensure_column(conn, "transactions", "exchange_rate_micros", "INTEGER NOT NULL DEFAULT 1000000")
+    ensure_column(conn, "transactions", "transfer_exchange_rate_micros", "INTEGER NOT NULL DEFAULT 0")
+    ensure_column(conn, "transactions", "amount_brl_cents", "INTEGER NOT NULL DEFAULT 0")
+    ensure_column(conn, "transactions", "destination_account_id", "INTEGER REFERENCES checking_accounts(id)")
+    ensure_column(conn, "transactions", "category_id", "INTEGER REFERENCES categories(id)")
+    ensure_column(conn, "transactions", "subcategory_id", "INTEGER REFERENCES subcategories(id)")
+    ensure_column(conn, "transactions", "tag_id", "INTEGER REFERENCES tags(id)")
+    ensure_column(conn, "transactions", "series_id", "TEXT")
+    ensure_column(conn, "transactions", "series_kind", "TEXT NOT NULL DEFAULT 'single'")
+    ensure_column(conn, "transactions", "installment_index", "INTEGER")
+    ensure_column(conn, "transactions", "installment_count", "INTEGER")
+    ensure_column(conn, "transactions", "recurrence_frequency", "TEXT")
+    ensure_column(conn, "transactions", "use_average", "INTEGER NOT NULL DEFAULT 0")
+    ensure_column(conn, "transactions", "normalized_description", "TEXT")
+    ensure_column(conn, "transactions", "reconciled_at", "TEXT")
+    ensure_column(conn, "transactions", "notes", "TEXT")
+    ensure_column(conn, "transactions", "archived_at", "TEXT")
+    ensure_column(conn, "transactions", "updated_at", "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP")
     migrate_transaction_type_constraint(conn)
     migrate_transaction_tags(conn)
     migrate_transaction_brl_values(conn)
@@ -201,6 +223,8 @@ def migrate_transaction_type_constraint(conn: sqlite3.Connection) -> None:
                 installment_index INTEGER,
                 installment_count INTEGER,
                 recurrence_frequency TEXT,
+                use_average INTEGER NOT NULL DEFAULT 0 CHECK (use_average IN (0, 1)),
+                normalized_description TEXT,
                 reconciled_at TEXT,
                 notes TEXT,
                 archived_at TEXT,
@@ -213,14 +237,14 @@ def migrate_transaction_type_constraint(conn: sqlite3.Connection) -> None:
                 exchange_rate_micros, transfer_exchange_rate_micros, amount_brl_cents, date,
                 account_id, destination_account_id, category_id, subcategory_id, tag_id,
                 series_id, series_kind, installment_index, installment_count, recurrence_frequency,
-                reconciled_at, notes, archived_at, created_at, updated_at
+                use_average, normalized_description, reconciled_at, notes, archived_at, created_at, updated_at
             )
             SELECT
                 id, user_id, type, description, amount_cents, destination_amount_cents,
                 exchange_rate_micros, transfer_exchange_rate_micros, amount_brl_cents, date,
                 account_id, destination_account_id, category_id, subcategory_id, tag_id,
                 series_id, series_kind, installment_index, installment_count, recurrence_frequency,
-                reconciled_at, notes, archived_at, created_at, updated_at
+                use_average, normalized_description, reconciled_at, notes, archived_at, created_at, updated_at
             FROM transactions;
 
             DROP TABLE transactions;
@@ -245,6 +269,12 @@ def backfill_normalized_descriptions(conn: sqlite3.Connection) -> None:
     from financeiro.classification_suggestions import normalize_description
 
     for table in ("transactions", "credit_card_transactions"):
+        table_exists = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+            (table,),
+        ).fetchone()
+        if not table_exists:
+            continue
         rows = conn.execute(
             f"SELECT id, description FROM {table} WHERE normalized_description IS NULL"
         ).fetchall()

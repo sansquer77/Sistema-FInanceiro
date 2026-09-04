@@ -134,6 +134,44 @@ class DatabaseV2MigrationTest(unittest.TestCase):
         self.assertEqual(self.schema_version(database.DB_PATH), 0)
         self.assertFalse(self.backup_path.exists())
 
+    def test_genuine_legacy_database_migrates_with_compatibility(self) -> None:
+        self.create_genuine_legacy_database()
+
+        database.initialize_database()
+
+        self.assertTrue(database.DB_PATH.exists())
+        self.assertTrue(self.backup_path.exists())
+        self.assertEqual(self.schema_version(database.DB_PATH), database.SCHEMA_VERSION)
+
+        with closing(sqlite3.connect(database.DB_PATH)) as conn:
+            # sessions.token foi migrado para sessions.token_hash
+            columns = {row[1] for row in conn.execute("PRAGMA table_info(sessions)")}
+            self.assertIn("token_hash", columns)
+            self.assertNotIn("token", columns)
+            self.assertEqual(
+                conn.execute(
+                    "SELECT token_hash FROM sessions WHERE user_id = 1"
+                ).fetchone()[0],
+                "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae",
+            )
+
+            # transactions ganhou colunas novas
+            tx_columns = {row[1] for row in conn.execute("PRAGMA table_info(transactions)")}
+            self.assertIn("category_id", tx_columns)
+            self.assertIn("subcategory_id", tx_columns)
+            self.assertIn("tag_id", tx_columns)
+            self.assertIn("amount_brl_cents", tx_columns)
+
+            # consultor_analyses ganhou created_date
+            consultor_columns = {row[1] for row in conn.execute("PRAGMA table_info(consultor_analyses)")}
+            self.assertIn("created_date", consultor_columns)
+
+            # categorias ganhou constraint UNIQUE (user_id, group_type, name)
+            table_sql = conn.execute(
+                "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'categories'"
+            ).fetchone()[0]
+            self.assertIn("UNIQUE (user_id, group_type, name)", table_sql)
+
     @property
     def backup_path(self) -> Path:
         return database.DATA_DIR / database.LEGACY_BACKUP_NAME
@@ -150,6 +188,87 @@ class DatabaseV2MigrationTest(unittest.TestCase):
                 VALUES (?, 'ai', ?)
                 """,
                 (user_id, '{"ciphertext":"segredo-criptografado"}'),
+            )
+            conn.execute("PRAGMA user_version = 0")
+            conn.commit()
+
+    def create_genuine_legacy_database(self) -> None:
+        """Create a v1-like database with old tables, columns and constraints."""
+        database.DATA_DIR.mkdir(parents=True, exist_ok=True)
+        with closing(sqlite3.connect(database.DB_PATH)) as conn:
+            conn.executescript(
+                """
+                CREATE TABLE users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    email TEXT NOT NULL UNIQUE,
+                    password_hash TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE TABLE sessions (
+                    token TEXT PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE TABLE checking_accounts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    name TEXT NOT NULL,
+                    bank_name TEXT NOT NULL,
+                    initial_balance_cents INTEGER NOT NULL DEFAULT 0,
+                    current_balance_cents INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE TABLE categories (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    name TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE TABLE transactions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    type TEXT NOT NULL CHECK (type IN ('income', 'expense', 'transfer')),
+                    description TEXT NOT NULL,
+                    amount_cents INTEGER NOT NULL,
+                    date TEXT NOT NULL,
+                    account_id INTEGER NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE TABLE consultor_analyses (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    analysis_id TEXT NOT NULL,
+                    analysis_output TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                """
+            )
+            conn.execute(
+                "INSERT INTO users (name, email, password_hash) VALUES ('Ana', 'ana@example.com', 'hash')"
+            )
+            conn.execute("INSERT INTO sessions (token, user_id) VALUES ('foo', 1)")
+            conn.execute(
+                "INSERT INTO checking_accounts (id, user_id, name, bank_name) VALUES (1, 1, 'Conta principal', 'Banco')"
+            )
+            conn.execute(
+                "INSERT INTO categories (id, user_id, name) VALUES (1, 1, 'Moradia')"
+            )
+            conn.execute(
+                """
+                INSERT INTO transactions (user_id, type, description, amount_cents, date, account_id)
+                VALUES (1, 'expense', 'Aluguel', 100000, '2024-01-05', 1)
+                """
+            )
+            conn.execute(
+                "INSERT INTO consultor_analyses (user_id, analysis_id, analysis_output) VALUES (1, 'abc', '{}')"
             )
             conn.execute("PRAGMA user_version = 0")
             conn.commit()

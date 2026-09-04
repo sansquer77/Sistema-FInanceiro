@@ -9,7 +9,6 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 
 REVIEWED_OVERSIZED_MODULES = {
     "financeiro/credit_cards.py": 1258,
-    "financeiro/database.py": 1310,
     "financeiro/imports.py": 1270,
     "financeiro/portfolio.py": 2759,
     "financeiro/transactions.py": 1334,
