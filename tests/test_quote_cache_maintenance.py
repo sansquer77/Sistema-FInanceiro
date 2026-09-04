@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest import mock
 
 from financeiro import database
+from financeiro import database_maintenance
 
 
 class QuoteCacheMaintenanceTest(unittest.TestCase):
@@ -26,12 +27,21 @@ class QuoteCacheMaintenanceTest(unittest.TestCase):
         database.DB_PATH = self.original_db_path
         self.tempdir.cleanup()
 
+    def _connection_factory(self, path: Path) -> sqlite3.Connection:
+        conn = sqlite3.connect(path)
+        conn.row_factory = sqlite3.Row
+        return conn
+
     def test_prunes_only_entries_older_than_stale_retention(self) -> None:
         self.insert_cache("bcb:old", self.now - timedelta(days=31), self.now - timedelta(days=40))
         self.insert_cache("bcb:recent-stale", self.now - timedelta(days=29), self.now - timedelta(days=30))
         self.insert_cache("bcb:valid", self.now + timedelta(hours=1), self.now)
 
-        result = database.maintain_quote_cache(now=self.now)
+        result = database_maintenance.maintain_quote_cache(
+            database.DB_PATH,
+            connection_factory=self._connection_factory,
+            now=self.now,
+        )
 
         self.assertEqual(result["deleted"], 1)
         self.assertEqual(self.keys(), {"bcb:recent-stale", "bcb:valid"})
@@ -45,8 +55,12 @@ class QuoteCacheMaintenanceTest(unittest.TestCase):
             )
         self.insert_cache("bcb:valid", self.now + timedelta(days=1), self.now - timedelta(days=10))
 
-        with mock.patch.object(database, "QUOTE_CACHE_MAX_ENTRIES_PER_PROVIDER", 3):
-            result = database.maintain_quote_cache(now=self.now)
+        with mock.patch.object(database_maintenance, "QUOTE_CACHE_MAX_ENTRIES_PER_PROVIDER", 3):
+            result = database_maintenance.maintain_quote_cache(
+                database.DB_PATH,
+                connection_factory=self._connection_factory,
+                now=self.now,
+            )
 
         self.assertEqual(result["deleted"], 3)
         self.assertEqual(self.keys(), {"bcb:valid", "bcb:0", "bcb:1"})
@@ -59,8 +73,12 @@ class QuoteCacheMaintenanceTest(unittest.TestCase):
                 self.now - timedelta(hours=index),
             )
 
-        with mock.patch.object(database, "QUOTE_CACHE_MAX_ENTRIES", 3):
-            result = database.maintain_quote_cache(now=self.now)
+        with mock.patch.object(database_maintenance, "QUOTE_CACHE_MAX_ENTRIES", 3):
+            result = database_maintenance.maintain_quote_cache(
+                database.DB_PATH,
+                connection_factory=self._connection_factory,
+                now=self.now,
+            )
 
         self.assertEqual(result["deleted"], 1)
         self.assertEqual(len(self.keys()), 3)
@@ -70,17 +88,27 @@ class QuoteCacheMaintenanceTest(unittest.TestCase):
         self.insert_cache("bcb:old", self.now - timedelta(days=31), self.now - timedelta(days=40), "x" * 20000)
 
         with (
-            mock.patch.object(database, "QUOTE_CACHE_VACUUM_MIN_FREE_BYTES", 0),
-            mock.patch.object(database, "QUOTE_CACHE_VACUUM_MIN_FREE_RATIO", 0),
+            mock.patch.object(database_maintenance, "QUOTE_CACHE_VACUUM_MIN_FREE_BYTES", 0),
+            mock.patch.object(database_maintenance, "QUOTE_CACHE_VACUUM_MIN_FREE_RATIO", 0),
         ):
-            result = database.maintain_quote_cache(now=self.now)
+            result = database_maintenance.maintain_quote_cache(
+                database.DB_PATH,
+                connection_factory=self._connection_factory,
+                now=self.now,
+            )
 
         self.assertTrue(result["vacuumed"])
         self.assertEqual(self.keys(), set())
 
     def test_database_error_during_cache_maintenance_is_non_blocking(self) -> None:
-        with mock.patch.object(database, "get_connection", side_effect=sqlite3.OperationalError("falha")):
-            result = database.maintain_quote_cache(now=self.now)
+        def failing_factory(path: Path) -> sqlite3.Connection:
+            raise sqlite3.OperationalError("falha")
+
+        result = database_maintenance.maintain_quote_cache(
+            database.DB_PATH,
+            connection_factory=failing_factory,
+            now=self.now,
+        )
 
         self.assertEqual(result["deleted"], 0)
         self.assertFalse(result["vacuumed"])

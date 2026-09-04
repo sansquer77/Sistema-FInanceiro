@@ -2,8 +2,8 @@
 tipo: spec
 area: persistencia
 status: implementado
-versao: 1.0
-atualizado: 2026-08-30
+versao: 1.1
+atualizado: 2026-09-03
 relacionados:
   - "[[migracao-banco-v2]]"
   - "[[investimentos-portfolio]]"
@@ -56,7 +56,19 @@ Usuário que utiliza Portfólio, rentabilidade e Consultor e espera que o banco 
 
 - Nenhuma rota nova.
 - Nenhuma tabela ou coluna nova.
-- `financeiro/database.py` executa poda e compactação controlada durante a inicialização.
+- `financeiro/database_maintenance.py` concentra as rotinas operacionais de poda e compactação do `quote_cache`, sem conhecer `DB_PATH` global nem participar da criação/migração do schema.
+- API pública:
+  ```python
+  def maintain_quote_cache(
+      db_path: Path,
+      *,
+      connection_factory: Callable[[Path], sqlite3.Connection],
+      now: datetime | None = None,
+  ) -> dict:
+      ...
+  ```
+  A factory recebe o caminho do banco e devolve uma conexão gerenciável (ex.: `get_connection`).
+- `financeiro/database.py` apenas orquestra a chamada durante a inicialização, passando `connection_factory=get_connection`.
 
 ## Critérios de aceite
 
@@ -77,12 +89,14 @@ Usuário que utiliza Portfólio, rentabilidade e Consultor e espera que o banco 
 
 ## Plano de implementação
 
-- [x] Passo 1 — implementar retenção e limites em `financeiro/database.py`. Fecha: critérios 1 a 5 e 8.
+- [x] Passo 1 — implementar retenção e limites. Fecha: critérios 1 a 5 e 8.
 - [x] Passo 2 — implementar limiar de compactação física. Fecha: critérios 6 a 8.
 - [x] Passo 3 — adicionar testes isolados e medir o banco de homologação. Fecha: critérios 1 a 8.
+- [x] Passo 4 — segregar rotinas operacionais para `financeiro/database_maintenance.py`, mantendo `database.py` responsável apenas pela criação/migração do schema e pela orquestração da chamada. Fecha: critérios 1 a 8.
 
 ## Changelog
 
+- `1.1` — 2026-09-03 — Rotinas operacionais de manutenção do `quote_cache` segregadas para `financeiro/database_maintenance.py`; `database.py` continua orquestrando a chamada na inicialização, mas não conhece mais os detalhes de retenção, poda e compactação.
 - `1.0` — 2026-08-30 — Implementadas poda automática, retenção stale de 30 dias, limites por provedor/global e compactação física condicionada; homologação reduzida de 7,04 MB para 2,84 MB.
 - `0.1` — 2026-08-30 — Definida política de retenção, limites e compactação controlada do cache persistente de cotações.
 

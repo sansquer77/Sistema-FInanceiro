@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest import mock
 
 from financeiro import database
+from financeiro import database_migrations
 
 
 class DatabaseV2MigrationTest(unittest.TestCase):
@@ -27,16 +28,16 @@ class DatabaseV2MigrationTest(unittest.TestCase):
         database.initialize_database()
 
         self.assertTrue(database.DB_PATH.exists())
-        self.assertEqual(self.schema_version(database.DB_PATH), database.V2_SCHEMA_VERSION)
+        self.assertEqual(self.schema_version(database.DB_PATH), database.SCHEMA_VERSION)
         self.assertFalse(self.backup_path.exists())
 
     def test_reopening_v2_database_skips_schema_compatibility(self) -> None:
         database.initialize_database()
 
-        with mock.patch.object(database, "_initialize_schema") as initialize_schema:
+        with mock.patch.object(database, "create_database") as create_database:
             database.initialize_database()
 
-        initialize_schema.assert_not_called()
+        create_database.assert_not_called()
         self.assertFalse(self.backup_path.exists())
 
     def test_schema_version_is_read_from_path_with_spaces(self) -> None:
@@ -48,7 +49,7 @@ class DatabaseV2MigrationTest(unittest.TestCase):
             conn.execute("PRAGMA user_version = 0")
             conn.commit()
 
-        self.assertEqual(database._read_schema_version(spaced_db), 0)
+        self.assertEqual(database_migrations.read_schema_version(spaced_db), 0)
 
     def test_legacy_database_is_preserved_and_promoted_under_stable_name(self) -> None:
         self.create_legacy_database()
@@ -57,7 +58,7 @@ class DatabaseV2MigrationTest(unittest.TestCase):
 
         self.assertTrue(database.DB_PATH.exists())
         self.assertTrue(self.backup_path.exists())
-        self.assertEqual(self.schema_version(database.DB_PATH), database.V2_SCHEMA_VERSION)
+        self.assertEqual(self.schema_version(database.DB_PATH), database.SCHEMA_VERSION)
         self.assertEqual(self.schema_version(self.backup_path), 0)
         with closing(sqlite3.connect(database.DB_PATH)) as conn:
             self.assertEqual(conn.execute("SELECT COUNT(*) FROM users").fetchone()[0], 1)
@@ -101,9 +102,9 @@ class DatabaseV2MigrationTest(unittest.TestCase):
         self.create_legacy_database()
 
         with mock.patch.object(
-            database,
+            database_migrations,
             "_validate_database",
-            side_effect=database.DatabaseMigrationError("falha simulada"),
+            side_effect=database_migrations.DatabaseMigrationError("falha simulada"),
         ):
             with self.assertRaises(database.DatabaseMigrationError):
                 database.initialize_database()
@@ -138,7 +139,7 @@ class DatabaseV2MigrationTest(unittest.TestCase):
         return database.DATA_DIR / database.LEGACY_BACKUP_NAME
 
     def create_legacy_database(self) -> None:
-        database._initialize_schema(database.DB_PATH)
+        database.create_database(database.DB_PATH)
         with closing(sqlite3.connect(database.DB_PATH)) as conn:
             user_id = conn.execute(
                 "INSERT INTO users (name, email, password_hash) VALUES ('Ana', 'ana@example.com', 'hash')"

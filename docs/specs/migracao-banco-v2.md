@@ -2,8 +2,8 @@
 tipo: spec
 area: migracao-dados
 status: implementado
-versao: 1.1
-atualizado: 2026-08-30
+versao: 1.4
+atualizado: 2026-09-03
 relacionados:
   - "[[../arquitetura]]"
   - "[[importacao-dados]]"
@@ -63,7 +63,37 @@ Usuário existente que atualiza o aplicativo para a linha v2 e usuário novo que
 
 - Não cria rota HTTP.
 - O fluxo ocorre antes de o servidor começar a aceitar requisições.
-- `financeiro/database.py` passa a separar inicialização pública, construção/normalização do schema e validação/promoção do banco.
+- `financeiro/database.py` fica apenas com a inicialização pública (`initialize_database`), a fábrica de conexões (`get_connection`) e helpers transversais (`row_to_dict`).
+- `financeiro/database_schema.py` descreve canonicamente o baseline v2: tabelas, constraints, chaves estrangeiras, índices obrigatórios e `PERFORMANCE_INDEXES`. Oferece:
+  ```python
+  SCHEMA_VERSION = 20000
+
+  def create_baseline_schema(conn: sqlite3.Connection) -> None:
+      ...
+  ```
+- `financeiro/database_compatibility.py` concentra as compatibilizações históricas aplicadas à cópia do banco legado, oferecendo o ponto de entrada ordenado:
+  ```python
+  def normalize_legacy_schema(conn: sqlite3.Connection) -> None:
+      ...
+  ```
+  Esse módulo não abre banco, não cria backups, não renomeia arquivos, não define o baseline novo e não é executado em bancos v2 já promovidos.
+- `financeiro/database_migrations.py` orquestra a transformação física e recuperável do banco legado: leitura/escrita de `PRAGMA user_version`, decisão entre banco novo/v2/legado, cópia de trabalho, checkpoint, backup via API SQLite, normalização, `VACUUM INTO`, validações, promoção, preservação do legado como `finance-v1.bkp`, restauração em caso de falha e limpeza de artefatos. Oferece:
+  ```python
+  @dataclass(frozen=True)
+  class MigrationPaths:
+      active: Path
+      backup: Path
+      work: Path
+      candidate: Path
+
+  def migrate_legacy_database(
+      paths: MigrationPaths,
+      *,
+      target_version: int,
+      connection_factory: Callable[[Path], sqlite3.Connection],
+  ) -> None:
+      ...
+  ```
 - O schema funcional inicial da v2 permanece equivalente ao schema final da versão 1.x; melhorias estruturais adicionais exigem specs e migrações v2 próprias.
 
 ## Critérios de aceite
@@ -95,9 +125,15 @@ Usuário existente que atualiza o aplicativo para a linha v2 e usuário novo que
 - [x] Passo 2 — criar cópia de trabalho, candidato compacto, validações e promoção com backup. Fecha: critérios 3, 4, 5, 6, 7, 8 e 11.
 - [x] Passo 3 — garantir idempotência nas reaberturas e preservação de arquivos externos. Fecha: critérios 10 e regras de segurança.
 - [x] Passo 4 — adicionar testes automatizados usando apenas diretórios e bancos temporários. Fecha: critérios 1 a 12.
+- [x] Passo 5 — segregar as compatibilizações históricas para `financeiro/database_compatibility.py`, mantendo `database.py` responsável apenas pela criação do baseline v2, pela orquestração da migração e pela promoção. Fecha: critérios 1 a 12.
+- [x] Passo 6 — extrair a descrição canônica do baseline v2 para `financeiro/database_schema.py`, eliminando SQL de criação de `database.py` e `database_compatibility.py`. Fecha: critérios 1 a 12.
+- [x] Passo 7 — extrair a orquestração física e recuperável da migração legada para `financeiro/database_migrations.py`, recebendo caminhos e uma fábrica de conexões. Fecha: critérios 1 a 12.
 
 ## Changelog
 
+- `1.4` — 2026-09-03 — Orquestração física e recuperável da migração legada extraída para `financeiro/database_migrations.py`; `database.py` passa a ser apenas o ponto de entrada público e a fábrica de conexões.
+- `1.3` — 2026-09-03 — Descrição canônica do baseline v2 extraída para `financeiro/database_schema.py`; `database.py` e `database_compatibility.py` passam a consumir `SCHEMA_VERSION`, `PERFORMANCE_INDEXES` e `create_baseline_schema` do novo módulo.
+- `1.2` — 2026-09-03 — Compatibilizações históricas de schema segregadas de `database.py` para `database_compatibility.py`; baseline v2 consolidado em `database.py` e normalização legada aplicada apenas na cópia de trabalho antes da promoção.
 - `1.1` — 2026-08-30 — Corrigida a leitura de `user_version` em bancos WAL localizados em caminhos com espaços, como a pasta de homologação v2.0.
 - `1.0` — 2026-08-30 — Implementado o baseline de schema `20000`, a detecção automática na abertura, a migração por cópia normalizada/compactada, as validações e a promoção recuperável com `finance-v1.bkp`.
 - `0.1` — 2026-08-30 — Especificado o migrador automático da linha 1.x para o baseline v2, com backup `finance-v1.bkp`, manutenção do nome ativo `finance.db`, validação e promoção recuperável.
