@@ -34,3 +34,8 @@ export function setDensity(density) {
   }
   return normalizedDensity;
 }
+
+export function toggleDensity() {
+  const nextDensity = storedDensity() === DENSITIES.COMPACT ? DENSITIES.COMFORTABLE : DENSITIES.COMPACT;
+  return setDensity(nextDensity);
+}

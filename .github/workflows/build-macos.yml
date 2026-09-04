@@ -100,6 +100,16 @@ jobs:
 
           unzip -Z1 "$ZIP_PATH" | grep -E 'MacOS/Aplicativo/SistemaFinanceiro/SistemaFinanceiro$'
 
+      - name: Validar dependencias browser vendorizadas
+        run: |
+          ZIP_PATH="Sistema Financeiro - Distribuicao/MacOS/${{ steps.app-version.outputs.asset_name }}"
+          for vendor in imask apexcharts; do
+            if ! unzip -Z1 "$ZIP_PATH" | grep -qE "MacOS/Aplicativo/SistemaFinanceiro/.*/web/vendor/${vendor}/"; then
+              echo "Dependencia browser vendorizada ausente no runtime: ${vendor}"
+              exit 1
+            fi
+          done
+
       - name: Publicar artifact
         uses: actions/upload-artifact@v7
         with:

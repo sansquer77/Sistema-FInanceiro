@@ -2,8 +2,8 @@
 tipo: spec
 area: frontend-v2
 status: em-implementacao
-versao: 0.14
-atualizado: 2026-09-03
+versao: 0.18
+atualizado: 2026-09-04
 relacionados:
   - "[[frontend-modularizacao]]"
   - "[[../adr/0002-modularizacao-frontend]]"
@@ -21,7 +21,7 @@ aliases: ["Fundação visual da v2", "Gráficos, máscaras, Command Palette e vi
 # Fundação do frontend v2
 
 > [!info] Status
-> **em-implementacao** · área: `frontend-v2` · atualizado em 2026-09-03 · relacionados: [[frontend-modularizacao]], [[../adr/0013-dependencias-frontend-v2]], [[../design/design-system]], [[relatorios]], [[lancamentos]], [[cartoes]], [[investimentos-portfolio]], [[efeito-borboleta]]
+> **em-implementacao** · área: `frontend-v2` · atualizado em 2026-09-04 · relacionados: [[frontend-modularizacao]], [[../adr/0013-dependencias-frontend-v2]], [[../design/design-system]], [[relatorios]], [[lancamentos]], [[cartoes]], [[investimentos-portfolio]], [[efeito-borboleta]]
 
 ## Problema
 
@@ -197,7 +197,9 @@ Usuário que acompanha muitos lançamentos, faturas, operações ou posições e
 ## Pendências
 
 > [!question] Pendências
-> Nenhuma pendência funcional conhecida. A versão exata do IMask será fixada na implementação após validação de compatibilidade nos navegadores mínimos dos pacotes.
+> - IMask 7.6.1 vendorizado e integrado via `input-mask.js`; validação visual real nos navegadores mínimos dos pacotes ainda pendente.
+> - A validação visual real do passo 7 (temas, densidades, teclado, leitores de tela, impressão física e pacotes offline em macOS/Windows) ainda precisa ser executada manualmente em ambiente com navegadores, leitores de tela e impressora disponíveis.
+> - Os workflows do GitHub Actions foram atualizados para validar a presença de `web/vendor/` nos pacotes; novos builds publicarão os pacotes com as dependências browser incluídas.
 
 ## Fora de escopo
 
@@ -217,14 +219,18 @@ Usuário que acompanha muitos lançamentos, faturas, operações ou posições e
 - [x] Passo 1 — adicionar inventário/licenças e assets vendorizados, com testes de ausência de CDN e `node_modules`. Fecha: critérios 1 e 18.
 - [x] Passo 2 — criar adaptador ApexCharts com tokens, formatadores, lifecycle, fallback e acessibilidade; migrar um gráfico piloto. Fecha: critérios 1 a 4 e 17.
 - [x] Passo 3 — migrar progressivamente gráficos de Lançamentos, Cartões, Cockpit/Relatórios, Portfólio e Efeito Borboleta, com testes de equivalência por fluxo. Fecha: critérios 2 a 4.
-- [ ] Passo 4 — criar adaptador IMask e aplicar por tipo de campo, preservando parsers e validação backend. Fecha: critérios 5, 6 e 17.
-- [ ] Passo 5 — implementar Command Palette nativa e integrar comandos existentes/ajuda. Fecha: critérios 7 a 11 e 17.
+- [x] Passo 4 — criar adaptador IMask 7.6.1 (`input-mask.js`) e aplicar `data-mask="money"` nos campos monetários (inclusive quantidades e taxas com escala/sinal configuráveis), preservando parsers e validação backend. Fecha: critérios 5, 6 e 17. Teste de contrato verifica carregamento, escopo e formato; validação visual real em navegadores permanece manual.
+- [x] Passo 5 — implementar Command Palette nativa (`command-palette.js`) e integrar comandos de navegação, busca global, preferências (privacidade, tema, densidade) e ajuda contextual via botão no cabeçalho e atalho `Cmd/Ctrl+K`. Fecha: critérios 7 a 11 e 17. Teste de contrato verifica estrutura, acessibilidade e registro; validação visual real em navegadores permanece manual.
 - [x] Passo 6 — implementar virtualizador compartilhado e integrar Lançamentos, rankings de Relatórios e posições do Portfólio. Fecha: critérios 12 a 17 parcialmente.
-- [ ] Passo 6b — integrar Faturas e Histórico de Operações sem perder semântica de tabela, ações e foco. Fecha: critérios 12 a 17 restantes.
-- [ ] Passo 7 — validar visualmente temas, densidades, teclado, leitores de tela, impressão e pacotes offline nas plataformas suportadas. Fecha: critérios 1 a 18.
+- [x] Passo 6b — integrar Faturas (`cards-view.js`) e Histórico de Operações (`operation-history-view.js`) ao `renderCollectionRows`/`virtual-list.js`, mantendo ações por event delegation, agrupamento do histórico em modo simples e lista plana virtualizada acima do limiar. Fecha: critérios 12 a 17 restantes. Teste de contrato verifica imports e estilos; validação visual real com grandes volumes permanece manual.
+- [x] Passo 7 — validação automatizada e inspeção estática de temas, densidades, teclado, acessibilidade, impressão e pacotes offline. Validação visual real em navegadores, leitores de tela e impressão física permanece manual e não foi executada nesta etapa por limitação do ambiente do agente. Fecha parcial: critérios 1 a 18.
 
 ## Changelog
 
+- `0.18` — 2026-09-04 — Passo 6b executado: Faturas e Histórico de Operações integrados ao virtualizador compartilhado (`renderCollectionRows`), preservando ações por event delegation, agrupamento do histórico em modo simples e lista plana virtualizada acima do limiar; teste de contrato verifica imports e estilos.
+- `0.17` — 2026-09-04 — Passo 5 executado: Command Palette nativa em `command-palette.js` com navegação entre módulos, busca global, preferências (privacidade/tema/densidade) e ajuda contextual; atalho `Cmd/Ctrl+K` e botão no cabeçalho; teste de contrato verifica estrutura e acessibilidade. Validação visual em navegadores permanece manual.
+- `0.16` — 2026-09-04 — Passo 4 executado: adaptador `input-mask.js` criado sobre IMask 7.6.1, máscaras aplicadas em campos monetários com `data-mask="money"`, escalas configuráveis para quantidade/taxa, destruição no logout e observer para formulários dinâmicos; teste de contrato verifica integração. Validação visual em navegadores permanece manual.
+- `0.15` — 2026-09-04 — Passo 7 parcialmente executado: verificação automatizada de assets vendorizados, hash SHA-256, ausência de CDN, contratos de frontend, temas, densidades, teclado, acessibilidade e impressão; validação visual real e em pacotes de distribuição permanece manual.
 - `0.14` — 2026-09-03 — Documento passa a desativar a detecção automática de telefone, data, endereço e e-mail do Safari/WebKit; cadeia tipográfica do sistema preservada e contenção CSS não aplicada.
 
 - `0.13` — 2026-09-01 — Corrigida a exibição do total central do donut: os elementos internos exigidos pelo ApexCharts permanecem ativos, mas seus formatadores ficam fixos no rótulo e total da seção, sem troca pela categoria em hover.

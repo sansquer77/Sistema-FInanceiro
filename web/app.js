@@ -55,8 +55,8 @@ import {
   togglePrivacyMode,
   updatePrivacyToggleButton,
 } from "./modules/privacy-utils.js";
-import { applyTheme, setTheme, storedTheme } from "./modules/theme-utils.js";
-import { applyDensity, setDensity, storedDensity } from "./modules/density-utils.js";
+import { applyTheme, setTheme, storedTheme, toggleTheme } from "./modules/theme-utils.js";
+import { applyDensity, setDensity, storedDensity, toggleDensity } from "./modules/density-utils.js";
 import { registerAuthView } from "./modules/auth-view.js";
 import { registerUserAdminView } from "./modules/user-admin-view.js";
 import { registerClassificationsView } from "./modules/classifications-view.js";
@@ -72,8 +72,10 @@ import { registerSimulationsView } from "./modules/simulations-view.js";
 import { registerOperationHistoryView } from "./modules/operation-history-view.js";
 import { registerInstructionsView } from "./modules/instructions-view.js";
 import { registerGlobalSearch } from "./modules/global-search.js";
+import { registerCommandPalette } from "./modules/command-palette.js";
 import { initializeOverlayUX } from "./modules/overlay-utils.js";
 import { initializeDataUX } from "./modules/data-ux.js";
+import { applyMasks, destroyMasks } from "./modules/input-mask.js";
 import { createAppState, resetSessionData } from "./modules/app-state.js";
 import { createAppDataLoader } from "./modules/app-data-loader.js";
 
@@ -83,6 +85,7 @@ applyPrivacyMode();
 initializeFormUX();
 initializeOverlayUX();
 initializeDataUX();
+applyMasks();
 
 const decisionModal = createDecisionModal();
 
@@ -470,6 +473,12 @@ const globalSearchDialog = document.querySelector("#globalSearchDialog");
 const globalSearchInput = document.querySelector("#globalSearchInput");
 const globalSearchResults = document.querySelector("#globalSearchResults");
 const globalSearchClose = document.querySelector("#globalSearchClose");
+const commandPaletteTrigger = document.querySelector("#commandPaletteTrigger");
+const commandPaletteDialog = document.querySelector("#commandPaletteDialog");
+const commandPaletteInput = document.querySelector("#commandPaletteInput");
+const commandPaletteResults = document.querySelector("#commandPaletteResults");
+const commandPaletteClose = document.querySelector("#commandPaletteClose");
+const commandPaletteCount = document.querySelector("#commandPaletteCount");
 const navButtons = document.querySelectorAll("[data-view]");
 const moduleViews = {
   cockpit: document.querySelector("#cockpitView"),
@@ -582,6 +591,32 @@ registerGlobalSearch({
   escapeHtml,
   api,
   onNavigate: showModule,
+});
+
+registerCommandPalette({
+  state,
+  elements: {
+    trigger: commandPaletteTrigger,
+    dialog: commandPaletteDialog,
+    input: commandPaletteInput,
+    results: commandPaletteResults,
+    closeButton: commandPaletteClose,
+    count: commandPaletteCount,
+  },
+  viewTitles,
+  normalizeSearch,
+  escapeHtml,
+  onNavigate: showModule,
+  actions: {
+    openGlobalSearch: () => globalSearchTrigger?.click(),
+    getPrivacyMode: () => document.documentElement.dataset.privacy === "enabled",
+    togglePrivacy: () => privacyToggleButton?.click(),
+    getTheme: () => storedTheme(),
+    toggleTheme: () => toggleTheme(),
+    getDensity: () => storedDensity(),
+    toggleDensity: () => toggleDensity(),
+    openContextualHelp: () => contextualHelpButton?.click(),
+  },
 });
 
 const classificationsView = registerClassificationsView({
@@ -1212,6 +1247,14 @@ document.addEventListener("keydown", (event) => {
   const mode = togglePrivacyMode();
   updatePrivacyToggleButton(privacyToggleButton, mode);
 });
+document.addEventListener("keydown", (event) => {
+  const isPaletteKey = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k";
+  if (!isPaletteKey || isTypingTarget(event.target)) {
+    return;
+  }
+  event.preventDefault();
+  commandPaletteTrigger?.click();
+});
 updatePrivacyToggleButton(privacyToggleButton, document.documentElement.dataset.privacy);
 observePrivacyMoneyValues(document.body);
 
@@ -1361,6 +1404,7 @@ async function loadLatestVersion() {
 
 function resetSessionState() {
   destroyAllCharts();
+  destroyMasks();
   resetSessionData(state, { currentMonth: currentMonthValue() });
   operationHistoryView.resetCache();
   userAdminViewController.resetPreferencesCache();

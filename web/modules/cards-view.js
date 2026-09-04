@@ -7,6 +7,7 @@ import {
 } from "./chart-adapter.js";
 import { renderBankLogo, renderCardNetworkLogo, attachBankLogoFallbacks } from "./bank-logos.js";
 import { createClassificationSuggestion } from "./classification-suggestion.js";
+import { renderCollectionRows } from "./virtual-list.js";
 
 export function registerCardsView({
   state,
@@ -698,6 +699,7 @@ export function registerCardsView({
   }
 
   function renderCardInvoiceList(card) {
+    renderCollectionRows(cardInvoiceList, [], { renderItem: () => "" });
     cardInvoiceList.innerHTML = "";
     if (state.cardInvoicePayments.length) {
       const payment = state.cardInvoicePayments[0];
@@ -724,39 +726,47 @@ export function registerCardsView({
       cardInvoiceList.append(emptyState("Nenhum lançamento encontrado para este filtro."));
       return;
     }
-    transactions.forEach((transaction) => {
-      const item = document.createElement("article");
-      item.className = `card-invoice-row ${transaction.type === "income" ? "positive" : "negative"}`;
-      const sign = transaction.type === "income" ? "+" : "-";
-      const isReconciled = Boolean(transaction.reconciled_at);
-      item.innerHTML = `
-        <div class="invoice-entry-main">
-          <strong>${escapeHtml(transaction.description)}</strong>
-          <div class="account-meta invoice-entry-meta">
-            <span>${formatDate(transaction.date)}</span>
-            <span>${cardTransactionTypeLabel(transaction.type)}</span>
-            ${transactionSeriesLabel(transaction) ? `<span>${transactionSeriesLabel(transaction)}</span>` : ""}
-            ${transaction.tags && transaction.tags.length ? `<span>${transaction.tags.map((tag) => `#${escapeHtml(tag)}`).join(" ")}</span>` : ""}
-          </div>
-        </div>
-        <div class="invoice-entry-category">
-          ${transaction.category_name ? escapeHtml(cardCategoryPath(transaction)) : "Sem categoria"}
-        </div>
-        <div class="transaction-amount invoice-entry-amount">
-          <strong>${sign}${formatMoney(transaction.amount, card.currency)}</strong>
-        </div>
-        ${state.cardInvoicePayments.length ? "" : `
-          <div class="transaction-actions invoice-entry-actions">
-            ${launchActionButton("arrow-left", "Mover para a fatura anterior", `data-card-move-id="${transaction.id}" data-card-move-direction="previous"`)}
-            ${launchActionButton("arrow-right", "Mover para a próxima fatura", `data-card-move-id="${transaction.id}" data-card-move-direction="next"`)}
-            ${launchActionButton("edit", "Editar lançamento", `data-card-edit-id="${transaction.id}"`)}
-            ${launchActionButton("check", isReconciled ? "Desmarcar conciliação" : "Marcar como conciliado", `data-card-reconcile-id="${transaction.id}" data-reconciled="${isReconciled}"`, `reconcile-button ${isReconciled ? "active" : ""}`)}
-            ${launchActionButton("trash", "Excluir lançamento", `data-card-transaction-id="${transaction.id}"`, "danger-action")}
-          </div>
-        `}
-      `;
-      cardInvoiceList.append(item);
+    const transactionsContainer = document.createElement("div");
+    transactionsContainer.className = "card-invoice-transactions";
+    cardInvoiceList.append(transactionsContainer);
+    renderCollectionRows(transactionsContainer, transactions, {
+      rowHeight: 72,
+      renderItem: (transaction) => renderCardInvoiceTransaction(card, transaction),
     });
+  }
+
+  function renderCardInvoiceTransaction(card, transaction) {
+    const item = document.createElement("article");
+    item.className = `card-invoice-row ${transaction.type === "income" ? "positive" : "negative"}`;
+    const sign = transaction.type === "income" ? "+" : "-";
+    const isReconciled = Boolean(transaction.reconciled_at);
+    item.innerHTML = `
+      <div class="invoice-entry-main">
+        <strong>${escapeHtml(transaction.description)}</strong>
+        <div class="account-meta invoice-entry-meta">
+          <span>${formatDate(transaction.date)}</span>
+          <span>${cardTransactionTypeLabel(transaction.type)}</span>
+          ${transactionSeriesLabel(transaction) ? `<span>${transactionSeriesLabel(transaction)}</span>` : ""}
+          ${transaction.tags && transaction.tags.length ? `<span>${transaction.tags.map((tag) => `#${escapeHtml(tag)}`).join(" ")}</span>` : ""}
+        </div>
+      </div>
+      <div class="invoice-entry-category">
+        ${transaction.category_name ? escapeHtml(cardCategoryPath(transaction)) : "Sem categoria"}
+      </div>
+      <div class="transaction-amount invoice-entry-amount">
+        <strong>${sign}${formatMoney(transaction.amount, card.currency)}</strong>
+      </div>
+      ${state.cardInvoicePayments.length ? "" : `
+        <div class="transaction-actions invoice-entry-actions">
+          ${launchActionButton("arrow-left", "Mover para a fatura anterior", `data-card-move-id="${transaction.id}" data-card-move-direction="previous"`)}
+          ${launchActionButton("arrow-right", "Mover para a próxima fatura", `data-card-move-id="${transaction.id}" data-card-move-direction="next"`)}
+          ${launchActionButton("edit", "Editar lançamento", `data-card-edit-id="${transaction.id}"`)}
+          ${launchActionButton("check", isReconciled ? "Desmarcar conciliação" : "Marcar como conciliado", `data-card-reconcile-id="${transaction.id}" data-reconciled="${isReconciled}"`, `reconcile-button ${isReconciled ? "active" : ""}`)}
+          ${launchActionButton("trash", "Excluir lançamento", `data-card-transaction-id="${transaction.id}"`, "danger-action")}
+        </div>
+      `}
+    `;
+    return item;
   }
 
   function renderCardInvoiceFilters() {

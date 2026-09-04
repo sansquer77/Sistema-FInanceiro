@@ -1,6 +1,7 @@
 import { api } from "./api.js";
 import { escapeHtml, formData, setMessage, stateMarkup } from "./dom-utils.js";
 import { createLoadPolicy } from "./load-policy.js";
+import { destroyVirtualLists, renderCollectionRows } from "./virtual-list.js";
 
 const MODULE_LABELS = {
   accounts: "Contas",
@@ -75,6 +76,7 @@ export function registerOperationHistoryView({ state, elements, formatDate }) {
     if (reset) {
       offset = 0;
       currentLogs = [];
+      destroyVirtualLists(operationHistoryList);
       operationHistoryList.innerHTML = "";
     }
     operationHistoryLoadMoreButton.disabled = true;
@@ -122,6 +124,7 @@ export function registerOperationHistoryView({ state, elements, formatDate }) {
     offset = 0;
     currentLogs = [];
     hasMore = false;
+    destroyVirtualLists(operationHistoryList);
     operationHistoryList.replaceChildren();
   }
 
@@ -132,14 +135,28 @@ export function registerOperationHistoryView({ state, elements, formatDate }) {
       return;
     }
     const grouped = groupLogs(currentLogs, operationHistoryGroupBy.value);
-    operationHistoryList.innerHTML = grouped.map((group) => `
-      <section class="operation-log-group">
-        <h3>${escapeHtml(group.label)}</h3>
-        <div class="operation-log-list">
-          ${group.logs.map(renderLog).join("")}
-        </div>
-      </section>
-    `).join("");
+    const flatItems = grouped.flatMap((group) => [
+      { kind: "group", label: group.label },
+      ...group.logs.map((log) => ({ kind: "log", log })),
+    ]);
+    const shouldVirtualize = flatItems.length > 200;
+    if (shouldVirtualize) {
+      renderCollectionRows(operationHistoryList, flatItems, {
+        rowHeight: 80,
+        renderItem: (item) => item.kind === "group"
+          ? `<section class="operation-log-group virtual" aria-label="${escapeHtml(item.label)}"><h3>${escapeHtml(item.label)}</h3></section>`
+          : renderLog(item.log),
+      });
+    } else {
+      operationHistoryList.innerHTML = grouped.map((group) => `
+        <section class="operation-log-group">
+          <h3>${escapeHtml(group.label)}</h3>
+          <div class="operation-log-list">
+            ${group.logs.map(renderLog).join("")}
+          </div>
+        </section>
+      `).join("");
+    }
   }
 
   function renderLog(log) {

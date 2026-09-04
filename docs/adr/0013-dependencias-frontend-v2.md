@@ -2,8 +2,8 @@
 tipo: adr
 area: frontend-v2
 status: implementado
-versao: 1.2
-atualizado: 2026-08-31
+versao: 1.4
+atualizado: 2026-09-04
 relacionados:
   - "[[0002-modularizacao-frontend]]"
   - "[[0008-licenca-apache-2-0]]"
@@ -17,7 +17,7 @@ aliases: ["Dependências do frontend v2", "ApexCharts, IMask e Command Palette"]
 # ADR-0013 — Dependências e primitives do frontend v2
 
 > [!info] Status
-> **implementado** · área: `frontend-v2` · atualizado em 2026-08-31 · relacionados: [[0002-modularizacao-frontend]], [[0008-licenca-apache-2-0]], [[../specs/frontend-fundacao-v2]], [[../distribuição]], [[../design/design-system]]
+> **implementado** · área: `frontend-v2` · atualizado em 2026-09-04 · relacionados: [[0002-modularizacao-frontend]], [[0008-licenca-apache-2-0]], [[../specs/frontend-fundacao-v2]], [[../distribuição]], [[../design/design-system]]
 
 ## Contexto
 
@@ -44,15 +44,16 @@ Esta medida não comprova a resolução dos recarregamentos. Além do descarte d
 
 ### IMask
 
-- Adotar **IMask** em versão exata fixada no momento da implementação, sob licença MIT validada e registrada no inventário de terceiros.
-- O artefato browser será vendorizado localmente, sem CDN e sem instalar runtime Node no app.
-- Um adaptador único será responsável por máscaras monetárias e de data, ciclo de vida e extração do valor não mascarado.
+- Adotar **IMask 7.6.1**, versão fixada e validada nesta decisão sob licença MIT.
+- O artefato browser será vendorizado em `web/vendor/imask/7.6.1/`, sem CDN e sem instalar runtime Node no app.
+- O adaptador único `input-mask.js` isola views da biblioteca, aplica máscaras monetárias e de data, gerencia ciclo de vida e garante que o valor submetido permaneça compatível com os parsers existentes (formato brasileiro para moeda).
 - Máscara é assistência de entrada, nunca regra de negócio: o backend continua validando valores e datas.
 
 ### Command Palette
 
 - Incorporar o **contrato de experiência associado ao cmdk** — busca incremental, agrupamento, seleção por teclado, estado vazio e abertura por `Cmd+K`/`Ctrl+K` — mas **não incorporar o pacote React `cmdk`**.
-- Implementar a palette como ES Module nativo, reutilizando diálogo, confinamento de foco, normalização de busca e navegação já existentes.
+- Implementar a palette como ES Module nativo em `web/modules/command-palette.js`, reutilizando `<dialog>`, `role="dialog"`, `role="listbox"`, `aria-activedescendant`, foco confinado e restauração ao elemento anterior.
+- Comandos navegam para views, abrem a busca global (`/`), alternam preferências locais (privacidade, tema, densidade) e abrem ajuda contextual; ações destrutivas abrem os modais de confirmação existentes em vez de executar diretamente.
 - O comando `/` permanece reservado à busca global atual; `Cmd+K`/`Ctrl+K` abre a nova palette.
 - Adotar literalmente `cmdk` exigiria React e um bundle especial, contrariando [[0002-modularizacao-frontend]]; essa alternativa só pode ser reaberta por novo ADR que justifique a mudança de stack.
 
@@ -99,6 +100,8 @@ Esta medida não comprova a resolução dos recarregamentos. Além do descarte d
 
 ## Changelog
 
+- `1.4` — 2026-09-04 — Command Palette nativa implementada em `web/modules/command-palette.js` com contrato de experiência cmdk (busca, agrupamento, teclado, foco) sem React; comandos delegam a ações existentes e não executam operações destrutivas diretamente.
+- `1.3` — 2026-09-04 — IMask fixado na versão 7.6.1, vendorizado em `web/vendor/imask/7.6.1/` e integrado via `web/modules/input-mask.js`; adaptador preserva formato brasileiro enviado ao backend e gerencia ciclo de vida em formulários dinâmicos/logout.
 - `1.2` — 2026-08-31 — Suspensão/restauração centralizada por `hidden`, com limpeza de configurações na remoção e no reset da sessão.
 - `1.1` — 2026-08-31 — Desativação global de animações como mitigação de renderização/memória, preservando interações e explicitando limites da limpeza de telas ocultas.
 - `1.0` — 2026-08-30 — Definidos ApexCharts 4.7.0 MIT e IMask vendorizados, Command Palette nativa com contrato cmdk e virtualização compartilhada sem dependência.

@@ -62,6 +62,8 @@ O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Co
 | `money-utils.js` | Formatação e parsing numérico/monetário. |
 | `dom-utils.js` | Helpers de formulário, mensagens, empty state e escaping. |
 | `chart-adapter.js` | Fronteira única para ApexCharts: animações desativadas, suspensão sob `hidden`, retomada com última configuração local, descarte de desconectados e limpeza completa na sessão. |
+| `input-mask.js` | Adaptador local sobre IMask 7.6.1 para campos monetários e de data; preserva parsers e formato brasileiro enviado ao backend, gerencia ciclo de vida em formulários dinâmicos e logout. |
+| `command-palette.js` | Command Palette nativa em ES Modules; comandos de navegação, preferências e busca delegam a ações existentes, sem regras de domínio e sem consulta à rede. |
 | `notification-flyout.js` | Diálogo global acessível para alertas críticos e informativos do Cockpit; anexado ao `body`, restaura foco, persiste leitura pela callback injetada e delega ações contextuais ao composition root, sem regras financeiras. Ver [[specs/alertas-cockpit]]. |
 | `transaction-kind.js` | Predicados de tipo de lançamento. |
 | `labels.js` | Labels de domínio usados pela interface. |
@@ -77,7 +79,7 @@ O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Co
 
 Os assets normalizados do catálogo ficam em `web/assets/banks/` e `web/assets/bandeiras/`, com nomes ASCII minúsculos. Contas e Cartões reutilizam o mesmo resolvedor; Cartões também exibem a bandeira quando catalogada.
 
-**Fundação da v2 em implementação:** os gráficos existentes já usam ApexCharts 4.7.0 vendorizado por meio de `chart-adapter.js`; [[specs/frontend-fundacao-v2]] mantém planejados o adaptador IMask, uma Command Palette em ES Modules com experiência equivalente ao padrão cmdk e um virtualizador compartilhado de listas de altura fixa. O pacote React `cmdk` não integra a arquitetura; o frontend continua sem framework, bundler ou download de CDN. Ver [[adr/0013-dependencias-frontend-v2]].
+**Fundação da v2 em implementação:** os gráficos existentes já usam ApexCharts 4.7.0 vendorizado por meio de `chart-adapter.js`; máscaras monetárias usam IMask 7.6.1 vendorizado por meio de `input-mask.js`; a Command Palette nativa (`command-palette.js`) oferece experiência equivalente ao padrão cmdk sem React. [[specs/frontend-fundacao-v2]] mantém planejada a integração de Faturas/Histórico de Operações ao virtualizador compartilhado de listas de altura fixa. O frontend continua sem framework, bundler ou download de CDN. Ver [[adr/0013-dependencias-frontend-v2]].
 
 **Views funcionais já extraídas:**
 
@@ -671,6 +673,10 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 - `3.53` — 2026-08-30 — Documentados os utilitários puros de dinheiro, calendário, identificadores e recorrência compartilhados pelo núcleo. Ver [[specs/utilitarios-dominio]].
 - `3.64` — 2026-09-04 — `financeiro/trends.py` passa a detectar limites de gastos ultrapassados em 3 meses consecutivos e a emitir achado estruturado `limite_recorrente` sugerindo revisão do valor. Ver [[specs/tendencias-saude-financeira]].
 - `3.63` — 2026-09-03 — Migração legada dividida em fases (tabelas → compatibilização → índices) em `financeiro/database_migrations.py`; adicionado `database_config.py` para constantes SQLite e teste com fixture legado genuíno. Ver [[specs/migracao-banco-v2]].
+- `3.66` — 2026-09-04 — Workflows GitHub Actions de distribuição validam presença de `web/vendor/imask/` e `web/vendor/apexcharts/` no runtime PyInstaller antes da publicação; pendência de pacotes sem `web/vendor/` resolvida. Ver [[docs/distribuição]].
+- `3.65` — 2026-09-04 — Faturas (`cards-view.js`) e Histórico de Operações (`operation-history-view.js`) integrados ao virtualizador compartilhado (`virtual-list.js`), mantendo ações por event delegation e limpeza de listeners. Ver [[specs/frontend-fundacao-v2]].
+- `3.64` — 2026-09-04 — Command Palette nativa (`command-palette.js`) integrada ao `index.html` e `app.js` com atalho `Cmd/Ctrl+K`, botão no cabeçalho, comandos de navegação/preferências/busca/ajuda e teste de contrato. Ver [[specs/frontend-fundacao-v2]] e [[adr/0013-dependencias-frontend-v2]].
+- `3.63` — 2026-09-04 — IMask 7.6.1 vendorizado e integrado via `web/modules/input-mask.js`; máscaras aplicadas em campos monetários do `index.html` preservando parsers e formato brasileiro, com ciclo de vida em boot, formulários dinâmicos e logout. Ver [[specs/frontend-fundacao-v2]] e [[adr/0013-dependencias-frontend-v2]].
 - `3.62` — 2026-09-03 — Orquestração física e recuperável da migração legada extraída para `financeiro/database_migrations.py`; `database.py` passa a ser apenas ponto de entrada público e fábrica de conexões. Ver [[specs/migracao-banco-v2]].
 - `3.61` — 2026-09-03 — Descrição canônica do baseline v2 extraída para `financeiro/database_schema.py`; `database.py` e `database_compatibility.py` passam a consumir schema, índices e versão do novo módulo. Ver [[specs/migracao-banco-v2]].
 - `3.60` — 2026-09-03 — Compatibilizações históricas de schema segregadas de `database.py` para `database_compatibility.py`; migração legada aplica `normalize_legacy_schema` apenas na cópia de trabalho. Ver [[specs/migracao-banco-v2]].

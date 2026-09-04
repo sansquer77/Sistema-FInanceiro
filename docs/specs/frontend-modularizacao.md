@@ -2,8 +2,8 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 4.25
-atualizado: 2026-09-03
+versao: 4.28
+atualizado: 2026-09-04
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
   - "[[arquitetura]]"
@@ -53,10 +53,12 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `density-utils.js` | Preferência visual local de densidade e aplicação de `data-density` no documento. |
 | `overlay-utils.js` | Semântica, foco e teclado compartilhados por drawers e overlays persistentes. |
 | `data-ux.js` | Ordenação local, contagem de linhas e chips removíveis para tabelas e filtros. |
-| `virtual-list.js` | Janela visível com overscan para coleções extensas de altura fixa. |
+| `virtual-list.js` | Janela visível com overscan para coleções extensas de altura fixa; usado em Lançamentos, Relatórios, Portfólio, Faturas e Histórico de Operações. |
 | `asset-autocomplete.js` | Sugestões de ativos existentes por `datalist`, preenchimento de metadados e preservação da digitação livre. |
 | `instructions-content.js` | Conteúdo estático, offline e versionado da central de ajuda. |
 | `bank-logos.js` | Catálogo compartilhado de logos de instituições financeiras com normalização de nomes e fallback visual. |
+| `input-mask.js` | Adaptador local sobre IMask para campos monetários e de data, preservando parsers e formato brasileiro enviado ao backend. |
+| `command-palette.js` | Command Palette nativa em ES Modules: comandos de navegação, preferências e busca, sem regras de domínio e sem consulta à rede. |
 
 ## Views funcionais
 
@@ -269,6 +271,9 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Changelog
 
+- `4.28` — 2026-09-04 — Atualizado `virtual-list.js` para refletir uso também em Faturas (`cards-view.js`) e Histórico de Operações (`operation-history-view.js`).
+- `4.27` — 2026-09-04 — Adicionado `command-palette.js` como Command Palette nativa em ES Modules para navegação, preferências e busca, sem regras de domínio e sem consulta à rede.
+- `4.26` — 2026-09-04 — Adicionado `input-mask.js` como adaptador local sobre IMask para campos monetários e de data, preservando parsers e formato brasileiro enviado ao backend.
 - `4.25` — 2026-09-03 — Registrado `notification-flyout.js` como overlay global do Cockpit; ações contextuais permanecem no composition root e o módulo não incorpora regras financeiras.
 - `4.24` — 2026-09-01 — Busca Global deixa de depender das fatias mensais residentes e consulta lançamentos históricos sob demanda, com limite, debounce e proteção contra respostas obsoletas.
 

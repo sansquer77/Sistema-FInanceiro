@@ -152,6 +152,10 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 - `12.10` — 2026-09-03 — Indexada [[specs/seguranca-ai-ssrf]] e [[adr/0015-ssrf-ai-endpoints]] para proteção SSRF de endpoints de IA configuráveis.
 
 - `12.9` — 2026-09-03 — Indexada [[specs/seguranca-transporte-externo]] para TLS verificado e leitura JSON externa limitada.
+- `12.12` — 2026-09-04 — Workflows GitHub Actions de distribuição (macOS/Windows/Linux) atualizados para validar dependências browser vendorizadas (`web/vendor/imask/`, `web/vendor/apexcharts/`) antes da publicação. [[docs/distribuição]] v2.5.
+- `12.11` — 2026-09-04 — [[specs/frontend-fundacao-v2]] v0.18: Faturas e Histórico de Operações integrados ao virtualizador compartilhado (`virtual-list.js`); teste de contrato verifica imports e estilos.
+- `12.10` — 2026-09-04 — [[specs/frontend-fundacao-v2]] v0.17 e [[adr/0013-dependencias-frontend-v2]] v1.4: Command Palette nativa (`command-palette.js`) com navegação, preferências, busca e ajuda via `Cmd/Ctrl+K`; teste de contrato verifica estrutura e acessibilidade.
+- `12.9` — 2026-09-04 — [[specs/frontend-fundacao-v2]] v0.16 e [[adr/0013-dependencias-frontend-v2]] v1.3: IMask 7.6.1 vendorizado e integrado via `web/modules/input-mask.js`; máscaras monetárias aplicadas em formulários preservando parsers e formato brasileiro. [[arquitetura]] e [[specs/frontend-modularizacao]] sincronizadas.
 - `12.8` — 2026-08-31 — Indexada [[specs/bank-logos]] e sincronizadas [[arquitetura]] e [[qualidade-codigo]] com o catálogo compartilhado e o gate automatizado de qualidade.
 - `12.7` — 2026-08-30 — Preferências, Histórico, Extrato e Simulações passam a evitar recargas redundantes com invalidação segura e deduplicação de requisições.
 - `12.6` — 2026-08-30 — Portfólio passa a liberar recursos de apresentação ao sair e a reaproveitar snapshot recente sem recarga redundante; specs e arquitetura sincronizadas.

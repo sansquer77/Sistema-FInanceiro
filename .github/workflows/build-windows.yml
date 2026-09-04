@@ -125,6 +125,15 @@ jobs:
             exit 1
           }
 
+          $vendors = @("imask", "apexcharts")
+          foreach ($vendor in $vendors) {
+            $hasVendor = $items | Select-String "Windows/Aplicativo/SistemaFinanceiro/.*/web/vendor/$vendor/"
+            if (-not $hasVendor) {
+              Write-Error "Dependencia browser vendorizada ausente no runtime: $vendor"
+              exit 1
+            }
+          }
+
       - name: Publicar artifact
         uses: actions/upload-artifact@v7
         with:

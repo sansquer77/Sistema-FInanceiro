@@ -451,6 +451,81 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn(".form-actions .danger", styles)
         self.assertIn("margin-inline-start: auto", styles)
 
+    def test_input_masks_are_applied_to_money_and_date_fields(self) -> None:
+        import re
+
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        app_source = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+        mask_source = (MODULE_ROOT / "input-mask.js").read_text(encoding="utf-8")
+
+        self.assertIn('src="/vendor/imask/7.6.1/imask.min.js', index)
+        money_inputs = (
+            ("amount", False),
+            ("investment_amount", False),
+            ("investment_unit_price", False),
+            ("investment_brokerage_fee", False),
+            ("investment_exchange_fee", False),
+            ("investment_tax", False),
+            ("investment_other_costs", False),
+            ("destination_amount", False),
+            ("transfer_exchange_rate", False),
+            ("limit_amount", False),
+            ("total_cost", False),
+            ("unit_price", False),
+        )
+        for name, _ in money_inputs:
+            match = re.search(rf'<input[^>]*name="{re.escape(name)}"[^>]*>', index)
+            self.assertIsNotNone(match, name)
+            self.assertIn('data-mask="money"', match.group(0), name)
+
+        self.assertIn('data-mask="money" data-mask-scale="6" data-mask-signed="false"', index)
+        self.assertIn('data-mask="money" data-mask-scale="4" data-mask-signed="false"', index)
+        self.assertIn('applyMasks();', app_source)
+        self.assertIn('destroyMasks();', app_source)
+        self.assertIn('applyMoneyMask', mask_source)
+        self.assertIn('applyDateMask', mask_source)
+        self.assertIn('thousandsSeparator: "."', mask_source)
+        self.assertIn('radix: ","', mask_source)
+
+    def test_command_palette_is_registered_and_accessible(self) -> None:
+        import re
+
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        app_source = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+        palette_source = (MODULE_ROOT / "command-palette.js").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn('id="commandPaletteDialog"', index)
+        self.assertIn('id="commandPaletteInput"', index)
+        self.assertIn('id="commandPaletteResults"', index)
+        self.assertIn('id="commandPaletteTrigger"', index)
+        dialog_tag = index[index.index('id="commandPaletteDialog"') - 40:index.index('id="commandPaletteDialog"')]
+        self.assertIn('<dialog', dialog_tag)
+        self.assertIn('aria-controls="commandPaletteDialog"', index[index.index('id="commandPaletteTrigger"'):index.index('id="commandPaletteTrigger"') + 160])
+        self.assertIn('registerCommandPalette', app_source)
+        self.assertIn('commandPaletteTrigger?.click()', app_source)
+        self.assertIn('event.key.toLowerCase() === "k"', app_source)
+        self.assertIn('.command-palette-dialog', styles)
+        self.assertIn('.command-palette-results', styles)
+        self.assertIn('role="listbox"', index[index.index('id="commandPaletteResults"'):index.index('id="commandPaletteResults"') + 120])
+        self.assertIn('aria-activedescendant', palette_source)
+        self.assertIn('data-command-palette-index', palette_source)
+
+    def test_virtualization_is_used_for_card_invoices_and_operation_history(self) -> None:
+        cards_source = (MODULE_ROOT / "cards-view.js").read_text(encoding="utf-8")
+        history_source = (MODULE_ROOT / "operation-history-view.js").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+        virtual_list_source = (MODULE_ROOT / "virtual-list.js").read_text(encoding="utf-8")
+        self.assertIn('import { renderCollectionRows } from "./virtual-list.js"', cards_source)
+        self.assertIn('import { destroyVirtualLists, renderCollectionRows } from "./virtual-list.js"', history_source)
+        self.assertIn("renderCollectionRows(transactionsContainer", cards_source)
+        self.assertIn("renderCollectionRows(operationHistoryList", history_source)
+        self.assertIn(".card-invoice-transactions.virtual-list", styles)
+        self.assertIn(".operation-history-list.virtual-list", styles)
+        self.assertIn("aria-rowcount", virtual_list_source)
+        self.assertIn("aria-rowindex", virtual_list_source)
+
     def test_header_tables_and_filters_share_global_layout_contracts(self) -> None:
         index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
         styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")

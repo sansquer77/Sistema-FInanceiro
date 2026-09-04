@@ -224,6 +224,9 @@
               </div>
             </div>
             <div class="topbar-actions">
+              <button class="command-palette-trigger" id="commandPaletteTrigger" type="button" aria-haspopup="dialog" aria-controls="commandPaletteDialog">
+                <span>Comandos</span><kbd>⌘K</kbd>
+              </button>
               <button class="global-search-trigger" id="globalSearchTrigger" type="button" aria-haspopup="dialog" aria-controls="globalSearchDialog">
                 <span>Buscar em todo o app</span><kbd>/</kbd>
               </button>
@@ -655,7 +658,7 @@
                   <input name="description" type="text" placeholder="Ex.: mercado, estorno, assinatura..." required>
                 </label>
                 <label>Valor
-                  <input name="amount" type="text" inputmode="decimal" placeholder="0,00" required>
+                  <input name="amount" type="text" inputmode="decimal" placeholder="0,00" data-mask="money" required>
                 </label>
                 <div class="field-row">
                   <label>Repetição
@@ -757,12 +760,12 @@
                 </label>
                 <div class="field-row" id="investmentAmountRow" hidden>
                   <label>Valor investido
-                    <input name="investment_amount" id="investmentAmount" type="text" inputmode="decimal" placeholder="0,00">
+                    <input name="investment_amount" id="investmentAmount" type="text" inputmode="decimal" placeholder="0,00" data-mask="money">
                   </label>
                 </div>
                 <div class="field-row" id="transactionAmountRow">
                   <label>Valor
-                    <input name="amount" id="transactionAmount" type="text" inputmode="decimal" placeholder="0,00" required>
+                    <input name="amount" id="transactionAmount" type="text" inputmode="decimal" placeholder="0,00" data-mask="money" required>
                   </label>
                 </div>
                 <div class="field-row" id="transactionCategoryRow">
@@ -825,7 +828,7 @@
                     </div>
                     <div class="field-row">
                       <label><span id="investmentFixedIncomeRateLabel">Taxa</span>
-                        <input name="investment_fixed_income_rate" id="investmentFixedIncomeRate" type="text" inputmode="decimal" placeholder="Ex.: 6,50">
+                        <input name="investment_fixed_income_rate" id="investmentFixedIncomeRate" type="text" inputmode="decimal" placeholder="Ex.: 6,50" data-mask="money" data-mask-scale="4" data-mask-signed="false">
                       </label>
                       <label>Vencimento
                         <input name="investment_fixed_income_maturity_date" id="investmentFixedIncomeMaturityDate" type="date">
@@ -835,10 +838,10 @@
                   </div>
                   <div class="field-row" id="investmentPricingFields">
                     <label>Quantidade
-                      <input name="investment_quantity" id="investmentQuantity" type="text" inputmode="decimal" placeholder="0,000000">
+                      <input name="investment_quantity" id="investmentQuantity" type="text" inputmode="decimal" placeholder="0,000000" data-mask="money" data-mask-scale="6" data-mask-signed="false">
                     </label>
                     <label>Preço unitário
-                      <input name="investment_unit_price" id="investmentUnitPrice" type="text" inputmode="decimal" placeholder="0,00">
+                      <input name="investment_unit_price" id="investmentUnitPrice" type="text" inputmode="decimal" placeholder="0,00" data-mask="money">
                     </label>
                   </div>
                   <div class="field-row" id="investmentEmergencyReserveFields" hidden>
@@ -848,18 +851,18 @@
                   </div>
                   <div class="field-row" id="investmentTradingCostFields">
                     <label>Tx. corretagem
-                      <input name="investment_brokerage_fee" type="text" inputmode="decimal" placeholder="0,00">
+                      <input name="investment_brokerage_fee" type="text" inputmode="decimal" placeholder="0,00" data-mask="money">
                     </label>
                     <label>Tx. emolumentos
-                      <input name="investment_exchange_fee" type="text" inputmode="decimal" placeholder="0,00">
+                      <input name="investment_exchange_fee" type="text" inputmode="decimal" placeholder="0,00" data-mask="money">
                     </label>
                   </div>
                   <div class="field-row" id="investmentTaxCostFields">
                     <label>Impostos
-                      <input name="investment_tax" type="text" inputmode="decimal" placeholder="0,00">
+                      <input name="investment_tax" type="text" inputmode="decimal" placeholder="0,00" data-mask="money">
                     </label>
                     <label>Outros custos
-                      <input name="investment_other_costs" type="text" inputmode="decimal" placeholder="0,00">
+                      <input name="investment_other_costs" type="text" inputmode="decimal" placeholder="0,00" data-mask="money">
                     </label>
                   </div>
                 </div>
@@ -896,10 +899,10 @@
                 </label>
                 <div class="field-row" id="exchangeTransferFields" hidden>
                   <label>Valor no destino
-                    <input name="destination_amount" id="destinationAmount" type="text" inputmode="decimal" placeholder="0,00">
+                    <input name="destination_amount" id="destinationAmount" type="text" inputmode="decimal" placeholder="0,00" data-mask="money">
                   </label>
                   <label>Cotação do câmbio
-                    <input name="transfer_exchange_rate" id="transferExchangeRate" type="text" inputmode="decimal" placeholder="Ex.: 0,180000">
+                    <input name="transfer_exchange_rate" id="transferExchangeRate" type="text" inputmode="decimal" placeholder="Ex.: 0,180000" data-mask="money" data-mask-scale="6" data-mask-signed="false">
                   </label>
                 </div>
                 <label id="exchangeRateLabel" hidden>
@@ -1090,7 +1093,7 @@
                   </select>
                 </label>
                 <label>Custo total
-                  <input name="total_cost" type="text" inputmode="decimal" placeholder="0,00" required>
+                  <input name="total_cost" type="text" inputmode="decimal" placeholder="0,00" data-mask="money" required>
                 </label>
               </div>
               <div class="field-row">
@@ -1169,7 +1172,7 @@
                     </select>
                   </label>
                   <label><span id="portfolioFixedIncomeRateLabel">Taxa</span>
-                    <input name="fixed_income_rate" id="portfolioFixedIncomeRate" type="text" inputmode="decimal" placeholder="Ex.: 14,00">
+                    <input name="fixed_income_rate" id="portfolioFixedIncomeRate" type="text" inputmode="decimal" placeholder="Ex.: 14,00" data-mask="money" data-mask-scale="4" data-mask-signed="false">
                   </label>
                 </div>
                 <p class="fixed-income-preview" id="portfolioFixedIncomePreview" aria-live="polite" hidden></p>
@@ -1189,10 +1192,10 @@
               </div>
               <div class="field-row" id="portfolioPricingFields">
                 <label>Quantidade
-                  <input name="quantity" type="text" inputmode="decimal" placeholder="0,000000">
+                  <input name="quantity" type="text" inputmode="decimal" placeholder="0,000000" data-mask="money" data-mask-scale="6" data-mask-signed="false">
                 </label>
                 <label>Preço médio
-                  <input name="unit_price" type="text" inputmode="decimal" placeholder="0,00">
+                  <input name="unit_price" type="text" inputmode="decimal" placeholder="0,00" data-mask="money">
                 </label>
               </div>
               <input name="exchange_rate_to_brl" type="hidden" value="1,000000">
@@ -1322,7 +1325,7 @@
                   <select name="subcategory_id" id="limitSubcategory"></select>
                 </label>
                 <label>Limite mensal
-                  <input name="limit_amount" type="text" inputmode="decimal" placeholder="0,00" required>
+                  <input name="limit_amount" type="text" inputmode="decimal" placeholder="0,00" data-mask="money" required>
                 </label>
                 <label>Observações
                   <textarea name="notes" rows="3"></textarea>
@@ -1366,7 +1369,7 @@
                       </select>
                     </label>
                     <label>Valor
-                      <input name="amount" id="simulationAmount" type="text" inputmode="decimal" placeholder="0,00" required>
+                      <input name="amount" id="simulationAmount" type="text" inputmode="decimal" placeholder="0,00" data-mask="money" required>
                     </label>
                   </div>
                   <div class="field-row">
@@ -2137,6 +2140,21 @@
       </label>
       <div class="global-search-results" id="globalSearchResults" role="listbox" aria-label="Resultados da busca"></div>
     </dialog>
+    <dialog class="command-palette-dialog" id="commandPaletteDialog" aria-labelledby="commandPaletteTitle">
+      <div class="command-palette-heading">
+        <div>
+          <p class="eyebrow">Command Palette</p>
+          <h2 id="commandPaletteTitle">Comandos rápidos</h2>
+        </div>
+        <button class="ghost small-button" id="commandPaletteClose" type="button" aria-label="Fechar palette">Fechar</button>
+      </div>
+      <label class="command-palette-field">Buscar comando
+        <input id="commandPaletteInput" type="search" autocomplete="off" placeholder="Digite um módulo, ação ou preferência…" aria-controls="commandPaletteResults">
+      </label>
+      <div class="command-palette-meta" aria-live="polite"><span id="commandPaletteCount"></span><kbd>Esc</kbd> fecha</div>
+      <div class="command-palette-results" id="commandPaletteResults" role="listbox" aria-label="Comandos"></div>
+    </dialog>
+    <script src="/vendor/imask/7.6.1/imask.min.js?v=7.6.1"></script>
     <script src="/vendor/apexcharts/4.7.0/apexcharts.min.js?v=4.7.0"></script>
     <script type="module" src="/app.js?v=165"></script>
   </body>
