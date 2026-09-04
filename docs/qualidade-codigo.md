@@ -98,6 +98,7 @@ Os limites numéricos da seção "Sinais de alerta" são verificados pelo teste 
 
 ## Changelog
 
+- `1.16` — 2026-09-04 — Limite revisado de `financeiro/trends.py` elevado para 1.350 linhas após adição da detecção de limites recorrentemente ultrapassados em [[specs/tendencias-saude-financeira]].
 - `1.15` — 2026-09-03 — `financeiro/database.py` reduzido de 1.332 para 97 linhas após segregação em `database_config.py`, `database_maintenance.py`, `database_compatibility.py`, `database_schema.py` e `database_migrations.py`; removida sua exceção no gate de tamanho de módulos.
 - `1.14` — 2026-08-31 — Instituído gate cumulativo para remoção de código morto e registrada a primeira limpeza evidenciada de imports/atribuição sem consumidores; reexports de compatibilidade do Consultor foram explicitamente preservados.
 

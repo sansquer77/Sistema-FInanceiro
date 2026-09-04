@@ -198,6 +198,94 @@ class TrendsCalculationTest(unittest.TestCase):
         self.assertTrue(limit_finding)
         self.assertIn("acima do limite", limit_finding[0]["titulo"].lower())
 
+    def test_recurring_limit_overrun_detected_for_three_consecutive_months(self) -> None:
+        # spec: tendencias-saude-financeira v2.24 — critério de limite recorrente
+        user = create_user("T3C", "t3c@example.com", "strong-password")
+        with database.get_connection() as conn:
+            account_id = conn.execute(
+                """
+                INSERT INTO checking_accounts (
+                    user_id, name, bank_name, account_type, currency,
+                    initial_balance_cents, current_balance_cents
+                ) VALUES (?, 'Conta', 'Banco', 'liquidity', 'BRL', 0, 0)
+                """,
+                (user["id"],),
+            ).lastrowid
+            category_id = conn.execute(
+                "INSERT INTO categories (user_id, name, group_type) VALUES (?, 'Mercado', 'expense')",
+                (user["id"],),
+            ).lastrowid
+            conn.executemany(
+                """
+                INSERT INTO transactions (
+                    user_id, type, description, normalized_description, amount_cents,
+                    amount_brl_cents, date, account_id, category_id, series_kind
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    (user["id"], "income", "Salário", "salario", 1_000_000, 1_000_000, "2026-07-05", account_id, None, "recurring"),
+                    (user["id"], "expense", "Mercado maio", "mercado maio", 500_000, 500_000, "2026-05-10", account_id, category_id, "single"),
+                    (user["id"], "expense", "Mercado junho", "mercado junho", 550_000, 550_000, "2026-06-10", account_id, category_id, "single"),
+                    (user["id"], "expense", "Mercado julho", "mercado julho", 600_000, 600_000, "2026-07-10", account_id, category_id, "single"),
+                ],
+            )
+            for month in ("2026-05", "2026-06", "2026-07"):
+                conn.execute(
+                    "INSERT INTO spending_limits (user_id, month, category_id, limit_amount_cents) VALUES (?, ?, ?, 400000)",
+                    (user["id"], month, category_id),
+                )
+
+        result = calculate_trends(user["id"], "2026-07")
+        overruns = [f for f in result["achados"] if f["tipo"] == "limite_recorrente"]
+        self.assertEqual(len(overruns), 1)
+        finding = overruns[0]
+        self.assertEqual(finding["severidade"], "atencao")
+        self.assertIn("Mercado", finding["titulo"])
+        self.assertIn("3 meses seguidos", finding["titulo"])
+        self.assertEqual(finding["limite_cents"], 400_000)
+        self.assertEqual(finding["media_ultrapassagem_cents"], 150_000)
+        self.assertEqual(len(finding["meses"]), 3)
+
+    def test_recurring_limit_overrun_not_detected_with_only_two_months(self) -> None:
+        # spec: tendencias-saude-financeira v2.24 — critério de limite recorrente
+        user = create_user("T3D", "t3d@example.com", "strong-password")
+        with database.get_connection() as conn:
+            account_id = conn.execute(
+                """
+                INSERT INTO checking_accounts (
+                    user_id, name, bank_name, account_type, currency,
+                    initial_balance_cents, current_balance_cents
+                ) VALUES (?, 'Conta', 'Banco', 'liquidity', 'BRL', 0, 0)
+                """,
+                (user["id"],),
+            ).lastrowid
+            category_id = conn.execute(
+                "INSERT INTO categories (user_id, name, group_type) VALUES (?, 'Mercado', 'expense')",
+                (user["id"],),
+            ).lastrowid
+            conn.executemany(
+                """
+                INSERT INTO transactions (
+                    user_id, type, description, normalized_description, amount_cents,
+                    amount_brl_cents, date, account_id, category_id, series_kind
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    (user["id"], "income", "Salário", "salario", 1_000_000, 1_000_000, "2026-07-05", account_id, None, "recurring"),
+                    (user["id"], "expense", "Mercado junho", "mercado junho", 550_000, 550_000, "2026-06-10", account_id, category_id, "single"),
+                    (user["id"], "expense", "Mercado julho", "mercado julho", 600_000, 600_000, "2026-07-10", account_id, category_id, "single"),
+                ],
+            )
+            for month in ("2026-06", "2026-07"):
+                conn.execute(
+                    "INSERT INTO spending_limits (user_id, month, category_id, limit_amount_cents) VALUES (?, ?, ?, 400000)",
+                    (user["id"], month, category_id),
+                )
+
+        result = calculate_trends(user["id"], "2026-07")
+        overruns = [f for f in result["achados"] if f["tipo"] == "limite_recorrente"]
+        self.assertEqual(len(overruns), 0)
+
     def test_cash_opportunity_uses_projected_end_of_month_balance(self) -> None:
         # spec: tendencias-saude-financeira v2.23 — critério 54
         user = create_user("T3B", "t3b@example.com", "strong-password")

@@ -82,6 +82,7 @@ def calculate_trends(user_id: int, month: object | None = None, currency: str = 
         acceleration = detect_installment_acceleration(conn, user_id, normalized_month)
         subscriptions = detect_recurring_subscriptions(conn, user_id, normalized_month)
         cash_opportunity = detect_cash_opportunity(conn, user_id, normalized_month)
+        limit_overruns = detect_recurring_limit_overruns(conn, user_id, normalized_month)
         findings = build_findings(
             normalized_month,
             month_summary,
@@ -91,6 +92,7 @@ def calculate_trends(user_id: int, month: object | None = None, currency: str = 
             acceleration,
             subscriptions,
             cash_opportunity,
+            limit_overruns,
             previous_months,
             confidence,
         )
@@ -442,6 +444,63 @@ def detect_cash_opportunity(conn, user_id: int, month: str) -> dict | None:
         "despesas_planejadas_cents": planned_expenses_cents,
         "multiplicador": round(ratio, 2),
     }
+
+
+def detect_recurring_limit_overruns(conn, user_id: int, month: str) -> list[dict]:
+    """
+    spec: tendencias-saude-financeira v2.24 — critério de limite recorrente
+    Identifica limites de gastos ultrapassados nos 3 meses consecutivos
+    anteriores ao mês consultado (incluindo-o). Para cada limite vigente,
+    compara o realizado mensal da categoria/subcategoria com o limite.
+    """
+    limits = fetch_effective_limits(conn, user_id, month)
+    if not limits:
+        return []
+
+    months = trailing_months(month, 3)
+    if len(months) < 3:
+        return []
+
+    results = []
+    for limit in limits:
+        category_id = limit["category_id"]
+        subcategory_id = limit["subcategory_id"]
+        limit_cents = int(limit["limit_amount_cents"] or 0)
+        if limit_cents <= 0:
+            continue
+
+        overruns = []
+        for candidate_month in months:
+            expenses = fetch_expenses_by_limit_key(conn, user_id, candidate_month)
+            if subcategory_id:
+                actual = expenses.get((category_id, subcategory_id), 0)
+            else:
+                actual = sum(
+                    value
+                    for (expense_category_id, _), value in expenses.items()
+                    if expense_category_id == category_id
+                )
+            if actual > limit_cents:
+                overruns.append({
+                    "month": candidate_month,
+                    "realizado_cents": actual,
+                    "diferenca_cents": actual - limit_cents,
+                    "percentual_usado": percent_of(actual, limit_cents),
+                })
+
+        if len(overruns) == 3:
+            average_overrun = average_cents([o["diferenca_cents"] for o in overruns])
+            results.append({
+                "category_id": category_id,
+                "subcategory_id": subcategory_id,
+                "category_name": limit["category_name"],
+                "subcategory_name": limit.get("subcategory_name"),
+                "limite_cents": limit_cents,
+                "media_ultrapassagem_cents": average_overrun,
+                "meses": overruns,
+            })
+
+    return results
 
 
 def detect_point_events(conn, user_id: int, month: str) -> list[dict]:
@@ -861,13 +920,15 @@ def build_findings(
     acceleration: list[dict],
     subscriptions: list[dict],
     cash_opportunity: dict | None,
+    limit_overruns: list[dict],
     previous_months: list[str],
     confidence: str,
 ) -> list[dict]:
     """
     spec: tendencias-saude-financeira v2.23 — critérios 6, 7, 13, 22 e 29
+    spec: tendencias-saude-financeira v2.24 — critério de limite recorrente
     Lista achados estruturados: variação de receita/despesa, limites excedidos,
-    eventos pontuais e assinaturas/serviços recorrentes.
+    limites recorrentemente ultrapassados, eventos pontuais e assinaturas/serviços recorrentes.
     """
     findings = []
     income_delta = month_summary["income_cents"] - comparison["income_cents"]
@@ -953,6 +1014,30 @@ def build_findings(
                 "valor_cents": row["diferenca_cents"],
                 "referencia": "limite_mensal",
             })
+
+    # spec: tendencias-saude-financeira v2.24 — critério de limite recorrente
+    for overrun in limit_overruns:
+        label = overrun["subcategory_name"] or overrun["category_name"]
+        months_text = ", ".join(
+            f"{o['month']}: {format_cents(o['realizado_cents'])}"
+            for o in overrun["meses"]
+        )
+        findings.append({
+            "tipo": "limite_recorrente",
+            "severidade": "atencao",
+            "titulo": f"{label}: limite ultrapassado 3 meses seguidos",
+            "descricao": (
+                f"O limite de {label} ({format_cents(overrun['limite_cents'])}) foi ultrapassado "
+                f"nos últimos 3 meses. A média de ultrapassagem foi {format_cents(overrun['media_ultrapassagem_cents'])}. "
+                f"Pode ser hora de revisar o valor do limite, já que o padrão de consumo parece ter mudado. "
+                f"Realizado: {months_text}."
+            ),
+            "valor_cents": overrun["media_ultrapassagem_cents"],
+            "referencia": "limite_recorrente",
+            "limite_cents": overrun["limite_cents"],
+            "media_ultrapassagem_cents": overrun["media_ultrapassagem_cents"],
+            "meses": overrun["meses"],
+        })
 
     for event in group_point_events(point_events):
         count = event["count"]
