@@ -2,7 +2,7 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.52
+versao: 2.54
 atualizado: 2026-09-04
 relacionados:
   - "[[contas-correntes]]"
@@ -100,7 +100,7 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 - USDC, USDT, DAI, FDUSD, PYUSD, TUSD, USDP e USDE cadastrados anteriormente como `crypto` são classificados como Stablecoin na leitura, sem migração destrutiva; novas posições e aportes conhecidos persistem como `stablecoin`.
 - Ativos internacionais cujo ticker operacional precisa de sufixo de bolsa podem usar alias explícito do provedor; `VWRA` em carteira USD resolve para `VWRA.L` (London Stock Exchange, listagem USD) no Yahoo Finance.
 - A quantidade exibida em posições, origens e posições encerradas é normalizada com **até 2 casas decimais** (arredondamento `half-up`), independentemente da precisão cadastrada ou retornada pela cotação, para preservar o layout das tabelas.
-- A aba **Eventos** consulta sob demanda os proventos históricos detectados pelo Yahoo Finance somente para ações, ETFs e BDRs ainda presentes na carteira. Cada ocorrência informa data, ativo, valor por cota/ação, moeda, fonte e nível de confirmação.
+- A aba **Eventos** consulta sob demanda os próximos proventos anunciados pelo Yahoo Finance somente para ações, ETFs e BDRs ainda presentes na carteira, em uma janela do mês atual mais dois meses. Os resultados são agrupados por mês e informam Data ex, data de pagamento quando fornecida, ativo, carteira(s), valor por cota/ação, moeda no próprio valor e nível de confirmação; a fonte aparece em nota de rodapé e o app não presume datas ausentes.
 - Como o provedor não distingue de forma confiável dividendos de juros sobre capital próprio, o evento é apresentado como `Dividendo/JCP`; o app não atribui natureza fiscal definitiva nem o apresenta como comunicado oficial do emissor.
 - A aba não multiplica o provento pela quantidade atual ou histórica e não estima valor total a receber. Falhas de um ativo não impedem os demais resultados e nenhuma consulta é feita antes de a aba ser aberta.
 
@@ -180,6 +180,8 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - [x] Usar a meta específica de Renda Variável em USD na comparação da Análise e no Consultor.
 - [x] Criar consulta isolada de eventos históricos de renda variável, com cache limitado, falha parcial por ativo e sem estimativa de valor total.
 - [x] Carregar e renderizar a aba Eventos somente no primeiro acesso ou após mudança da carteira, mantendo fonte e confirmação visíveis.
+- [x] Limitar a consulta de eventos usada pelo Cockpit à semana corrente, validar os campos externos e virtualizar/desmontar a apresentação extensa da aba Eventos.
+- [x] Consultar `calendarEvents` com sessão Yahoo, exibir somente a janela futura de três meses, agrupar por competência, associar carteiras e mover a fonte para nota de rodapé.
 
 ## Critérios de aceite
 
@@ -267,6 +269,12 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado qualquer quantidade atual ou histórica da posição, quando os eventos são apresentados, então o app não calcula nem exibe valor total estimado a receber.
 - Dado falha de consulta para um ativo, quando outros ativos possuem eventos válidos, então os resultados disponíveis continuam visíveis e a indisponibilidade parcial é informada sem bloquear a aba.
 - Dado o usuário navegando pelas demais abas do Portfólio, quando **Eventos** ainda não foi aberta, então nenhuma chamada ao endpoint de eventos ou ao provedor externo é realizada.
+- Dado o calendário de proventos retornado pelo provedor, quando a aba **Eventos** é exibida, então somente eventos futuros do mês atual e dos dois meses seguintes são listados, agrupados por mês; a data principal é identificada como **Data ex** e a **Data de pagamento** aparece somente quando informada pelo provedor, usando `Não informada` nos demais casos.
+- Dado um evento sem valor unitário anunciado pelo calendário, quando exibido, então o valor aparece como `Não informado`, sem utilizar dividend rate ou qualquer estimativa.
+- Dado um evento associado a uma ou mais posições, quando exibido, então as carteiras são apresentadas na linha e a moeda permanece no valor unitário formatado.
+- Dado mais de 200 eventos históricos, quando a listagem é apresentada, então somente a janela visível e uma pequena margem são materializadas no DOM; ao sair da aba Eventos, a apresentação é desmontada e os dados válidos permanecem em memória para reconstrução sem nova consulta.
+- Dado o Cockpit solicitando informativos de proventos, quando a consulta externa é montada, então o período começa no primeiro dia da semana corrente e eventos fora dessa janela são descartados antes da agregação.
+- Dado um evento externo com valor excessivo, data inválida ou timestamp fora do período solicitado, quando o payload é interpretado, então somente esse evento é descartado e os demais ativos/resultados continuam disponíveis.
 
 ## Plano de implementação — transações sem rede
 
@@ -284,6 +292,8 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 
 ## Changelog
 
+- `2.54` — 2026-09-04 — Eventos passam a consultar `calendarEvents` com sessão Yahoo, mostrar somente os próximos três meses agrupados, associar carteiras e mover a fonte para nota de rodapé; valores unitários ausentes não são estimados.
+- `2.53` — 2026-09-04 — Eventos passam a distinguir Data ex de Data de pagamento opcional, virtualizam listas extensas e desmontam o DOM ao trocar de aba; parser externo valida tamanho/faixa e o Cockpit consulta somente a semana corrente.
 - `2.52` — 2026-09-04 — Adicionada aba Eventos com proventos históricos de ações/ETFs/BDRs consultados sob demanda, valor por cota/ação, fonte e confirmação do provedor, sem estimativa de valor total.
 - `2.51` — 2026-08-31 — Correção de compatibilidade do snapshot do Portfólio, bloqueio de recargas em cascata após falha e renderização preguiçosa das linhas virtualizadas.
 

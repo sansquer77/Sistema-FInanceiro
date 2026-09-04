@@ -8,7 +8,7 @@ import os
 import re
 import sqlite3
 import sys
-from datetime import date
+from datetime import date, timedelta
 from email.utils import formatdate, parsedate_to_datetime
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -522,18 +522,20 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_json(payload)
 
     def handle_cockpit_notifications(self) -> None:
-        # spec: cockpit/alertas-cockpit v1.0 — critérios 5, 6, 10 e 11
+        # spec: cockpit/alertas-cockpit v1.2 — critérios 5, 6, 10 e 11
         if not self.validate_read_source():
             return
         user = self.require_user()
         try:
-            portfolio_events = get_portfolio_events(user["id"]).get("events") or []
+            today = date.today()
+            week_start = today - timedelta(days=today.weekday())
+            portfolio_events = get_portfolio_events(user["id"], start_date=week_start).get("events") or []
         except PortfolioError:
             portfolio_events = []
         self.send_json(build_cockpit_notifications(user["id"], portfolio_events=portfolio_events))
 
     def handle_mark_cockpit_notifications_seen(self) -> None:
-        # spec: cockpit/alertas-cockpit v1.0 — critérios 6 e 11
+        # spec: cockpit/alertas-cockpit v1.1 — critérios 6 e 11
         user = self.require_user()
         payload = self.read_json()
         notification_ids = payload.get("notification_ids") if isinstance(payload, dict) else None

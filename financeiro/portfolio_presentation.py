@@ -26,7 +26,7 @@ def asset_key(position):
 
 
 def decorate_position(position):
-    # spec: investimentos-portfolio v2.52 — resultados por moeda, sem cálculo no cliente
+    # spec: investimentos-portfolio v2.53 — resultados por moeda, sem cálculo no cliente
     current = int(position['current_value_cents'])
     cost = cents(position.get('total_cost'))
     day = cents(position.get('day_result'))

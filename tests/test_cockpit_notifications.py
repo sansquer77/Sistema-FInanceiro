@@ -119,11 +119,14 @@ class CockpitNotificationsTest(unittest.TestCase):
         with (
             mock.patch.object(app.AppHandler, "validate_read_source", return_value=True),
             mock.patch.object(app.AppHandler, "require_user", return_value=self.user) as require_user,
-            mock.patch("app.get_portfolio_events", return_value={"events": []}),
+            mock.patch("app.get_portfolio_events", return_value={"events": []}) as events,
             mock.patch("app.build_cockpit_notifications", return_value={"critical": [], "informational": []}),
+            mock.patch("app.date") as current_date,
         ):
+            current_date.today.return_value = self.today
             handler.handle_cockpit_notifications()
         require_user.assert_called_once_with()
+        events.assert_called_once_with(self.user["id"], start_date=date(2026, 8, 31))
         handler.send_json.assert_called_once_with({"critical": [], "informational": []})
 
     def test_get_route_does_not_build_payload_when_authentication_fails(self):

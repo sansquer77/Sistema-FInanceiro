@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.95
+versao: 3.97
 atualizado: 2026-09-04
 relacionados:
   - "[[requisitos]]"
@@ -19,7 +19,7 @@ tags: [arquitetura, meta]
 # Arquitetura
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-09-03 · relacionados: [[requisitos]], [[qualidade-codigo]], [[specs/bank-logos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
+> **implementado** · área: `meta` · atualizado em 2026-09-04 · relacionados: [[requisitos]], [[qualidade-codigo]], [[specs/bank-logos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
 
 ## Visão geral
 
@@ -542,8 +542,9 @@ Ver [[cartoes]].
 6. Resgates usam FIFO; encerramentos movem posições para histórico.
 7. Ativos em moeda estrangeira exibidos na moeda da carteira; conversão via lançamentos de câmbio.
 8. Consolidações do Portfólio mantêm valores exibidos na moeda original, mas expõem valor atual normalizado em BRL para a escala das barras visuais, usando cotação do fechamento anterior quando a moeda não é BRL.
-9. A UI do Portfólio carrega a aba **Posição** primeiro; Análise, Eventos, Histórico e rentabilidade detalhada são renderizados/carregados sob demanda. Eventos usa rota própria, somente para posições abertas de renda variável, sem repetir a valorização da carteira.
-10. Renda fixa e Poupança exibem variação do dia calculada como a diferença do valor na curva entre hoje e o dia anterior (base limitada à data de aquisição), reutilizando `fixed_income_value_as_of`/`savings_value_as_of` com cache de fatores compartilhado; dias sem taxa publicada produzem variação zero em pós-fixados.
+9. A UI do Portfólio carrega a aba **Posição** primeiro; Análise, Eventos, Histórico e rentabilidade detalhada são renderizados/carregados sob demanda. Eventos usa rota própria, somente para posições abertas de renda variável, sem repetir a valorização da carteira; a agenda futura cobre o mês atual e os dois seguintes, é agrupada por competência, virtualizada quando extensa e desmontada ao trocar de aba. A data principal é Data ex e a data de pagamento é opcional, exibida somente quando fornecida pelo provedor.
+10. A central de Informativos reutiliza o calendário futuro de Eventos e filtra somente a semana corrente; nenhuma chamada carrega histórico desde a primeira aquisição.
+11. Renda fixa e Poupança exibem variação do dia calculada como a diferença do valor na curva entre hoje e o dia anterior (base limitada à data de aquisição), reutilizando `fixed_income_value_as_of`/`savings_value_as_of` com cache de fatores compartilhado; dias sem taxa publicada produzem variação zero em pós-fixados.
 
 Ver [[investimentos-portfolio]].
 
@@ -607,6 +608,8 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `3.97` — 2026-09-04 — Eventos usa `calendarEvents` autenticado por sessão Yahoo para a janela futura de três meses, agrupa por mês, associa carteiras e mantém a fonte em nota de rodapé; o Cockpit reutiliza a mesma leitura e filtra a semana.
+- `3.96` — 2026-09-04 — Eventos distingue Data ex e pagamento opcional, valida escalares externos e virtualiza/desmonta históricos extensos; o Cockpit limita a consulta de proventos à semana corrente.
 - `3.95` — 2026-09-04 — Nova rota `GET /api/portfolio/events` e módulo `portfolio_events.py` consultam proventos históricos sob demanda, depois de fechar o snapshot SQLite; `portfolio-events.js` mantém a apresentação isolada e não estima valor total. Eventos da semana alimentam os Informativos do Cockpit com falha externa não bloqueante.
 - `3.94` — 2026-09-04 — Rankings extensos de Relatórios passam dados brutos diretamente ao virtualizador, sem DOM/`outerHTML` intermediário, e produzem detalhes apenas na expansão; Portfólio reutiliza as fábricas de linha da primeira passagem e mantém agrupamento/expansão.
 - `3.93` — 2026-09-03 — Calendário e notificações compartilham leitura SQLite de vencimentos abertos em `portfolio_positions.py`; o endpoint do Calendário deixa de montar e cotar a carteira, eliminando acesso externo de Poupança/SELIC/TR nesse fluxo.

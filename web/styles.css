@@ -5370,15 +5370,70 @@ form[aria-busy="true"] .form-actions {
   border-top: 1px solid var(--line);
 }
 
-.portfolio-events-table {
-  min-width: 820px;
+.portfolio-events-scroll {
+  overflow-x: auto;
 }
 
-.portfolio-events-table td:nth-child(2) span {
+.portfolio-events-grid {
+  min-width: 1080px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.portfolio-events-grid-header,
+.portfolio-events-grid-row {
+  display: grid;
+  grid-template-columns: 105px 125px minmax(150px, 1.25fr) minmax(150px, 1.2fr) 120px minmax(145px, 1fr) minmax(180px, 1.2fr);
+  align-items: center;
+  column-gap: 12px;
+  min-height: 64px;
+  padding: 8px 14px;
+}
+
+.portfolio-events-month + .portfolio-events-month {
+  margin-top: 20px;
+}
+
+.portfolio-events-month h3 {
+  margin: 0 0 8px;
+  color: var(--ink);
+  font-size: 0.9rem;
+  text-transform: capitalize;
+}
+
+.portfolio-events-grid-header {
+  min-height: 42px;
+  background: var(--surface-low);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.portfolio-events-grid-row {
+  border-top: 1px solid var(--line);
+}
+
+.portfolio-events-list:not(.virtual-list) .portfolio-events-grid-row:first-child {
+  border-top: 0;
+}
+
+.portfolio-events-list.virtual-list {
+  height: min(70vh, 560px);
+  overflow-y: auto;
+}
+
+.portfolio-event-asset small {
   display: block;
   margin-top: 2px;
   color: var(--muted);
   font-size: 0.75rem;
+}
+
+.portfolio-event-payment-date {
+  color: var(--muted);
 }
 
 .portfolio-event-confirmation {
@@ -8816,7 +8871,7 @@ form[aria-busy="true"] .form-actions {
     overflow: visible;
   }
 }
-/* spec: cockpit/alertas-cockpit v1.0 — flyout global de notificações */
+/* spec: cockpit/alertas-cockpit v1.1 — flyout global de notificações */
 .notification-flyout { width:min(520px,calc(100vw - 32px)); max-height:calc(100vh - 32px); margin:auto 16px auto auto; padding:0; border:1px solid var(--outline-variant); border-radius:18px; color:var(--on-surface); background:var(--surface-container); box-shadow:var(--drawer-shadow); }
 .notification-flyout::backdrop { background:var(--modal-overlay); }
 .notification-flyout-surface { display:grid; grid-template-rows:auto auto minmax(120px,1fr) auto; max-height:calc(100vh - 32px); }

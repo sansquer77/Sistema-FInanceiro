@@ -121,10 +121,11 @@ class PortfolioTransactionBoundaryTest(unittest.TestCase):
 
     def test_events_close_the_local_snapshot_before_external_lookup(self):
         self.network_calls = 0
-        result = portfolio.get_portfolio_events(self.user["id"], force_refresh=True)
+        with patch.object(portfolio, "cached_yahoo_calendar", side_effect=portfolio.PortfolioError("offline")):
+            result = portfolio.get_portfolio_events(self.user["id"], force_refresh=True)
         self.assertEqual(result["events"], [])
         self.assertEqual(result["unavailable"][0]["asset_identifier"], "TEST3")
-        self.assertEqual(self.network_calls, 1)
+        self.assertEqual(self.network_calls, 0)
         self.assertEqual(self.connections, [])
 
     def test_histories_preserve_order_names_and_user_isolation(self):

@@ -467,7 +467,7 @@ def ensure_consultor_schema(conn: sqlite3.Connection) -> None:
 
 
 def ensure_notification_reads(conn: sqlite3.Connection) -> None:
-    # spec: cockpit/alertas-cockpit v1.0 — critério 11
+    # spec: cockpit/alertas-cockpit v1.1 — critério 11
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS notification_reads (

@@ -2,7 +2,7 @@
 tipo: spec
 area: cockpit
 status: implementado
-versao: 1.0
+versao: 1.2
 atualizado: 2026-09-04
 relacionados:
   - "[[cockpit-calendario]]"
@@ -19,7 +19,7 @@ aliases: ["Alertas e Notificações do Cockpit", "Alertas Cockpit", "Central de 
 # Alertas e Notificações do Cockpit
 
 > [!info] Status
-> **implementado** · versão: `1.0` · área: `cockpit` · atualizado em 2026-09-04 · relacionados: [[cockpit-calendario]], [[limites-gastos]], [[cartoes]], [[lancamentos]], [[investimentos-portfolio]], [[arquitetura]], [[requisitos]]
+> **implementado** · versão: `1.2` · área: `cockpit` · atualizado em 2026-09-04 · relacionados: [[cockpit-calendario]], [[limites-gastos]], [[cartoes]], [[lancamentos]], [[investimentos-portfolio]], [[arquitetura]], [[requisitos]]
 
 ### Problema
 
@@ -235,6 +235,8 @@ Restrição de unicidade: `PRIMARY KEY (user_id, notification_id)`.
 
 ### Changelog
 
+- `1.2` — 2026-09-04 — Informativos de proventos passam a usar o calendário futuro compartilhado da aba Eventos, mantendo a filtragem da semana corrente.
+- `1.1` — 2026-09-04 — A consulta externa de proventos do Cockpit fica limitada à semana corrente, sem carregar o histórico completo usado pela aba Eventos.
 - `1.0` — 2026-09-04 — Implementação concluída: a rota de notificações passa os eventos históricos da carteira ao agregador; ocorrências detectadas na semana alimentam Informativos e falhas externas permanecem não bloqueantes.
 
 - `0.9` — 2026-09-03 — Corrigido contraste do badge de Alertas Críticos no menu de notificações: pílula passa a usar `--danger-pill-surface` e `--danger-pill-text`, garantindo número escuro sobre fundo claro e alinhamento visual com o badge de Informativos.

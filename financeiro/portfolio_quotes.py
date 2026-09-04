@@ -6,6 +6,7 @@ from decimal import Decimal
 import json
 from threading import Lock
 from urllib.error import HTTPError, URLError
+from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 from financeiro.outbound_json import MAX_QUOTE_JSON_BYTES, OutboundJsonError, read_limited_json
@@ -14,6 +15,11 @@ MARKET_QUOTE_TTL_SECONDS = 6 * 60 * 60
 INDEXER_QUOTE_TTL_SECONDS = 24 * 60 * 60
 QUOTE_MEMORY_CACHE_MAX_ENTRIES = 512
 FX_MEMORY_CACHE_MAX_ENTRIES = 128
+YAHOO_CALENDAR_TTL_SECONDS = 6 * 60 * 60
+YAHOO_CALENDAR_URL = "https://query2.finance.yahoo.com/v10/finance/quoteSummary/{symbol}?modules=calendarEvents&crumb={crumb}"
+YAHOO_COOKIE_URL = "https://fc.yahoo.com"
+YAHOO_CRUMB_URL = "https://query1.finance.yahoo.com/v1/test/getcrumb"
+YAHOO_AUTH_MAX_BYTES = 4 * 1024
 
 
 def bcb_range_ttl_seconds(end_date: date, today: date) -> int:
@@ -84,6 +90,25 @@ class QuoteCache:
                 return persistent_payload
         try:
             payload = self.read_json(url, message, headers=headers)
+            self.store_cached_payload(cache_key, payload, now + timedelta(seconds=ttl_seconds))
+            return payload
+        except self.error_type:
+            stale_payload = self.get_persistent_cached_payload(cache_key, now, allow_stale=True)
+            if stale_payload is not None:
+                return stale_payload
+            raise
+
+    def cached_loader(self, cache_key: str, message: str, ttl_seconds: int, loader, force_refresh: bool = False):
+        now = self.clock()
+        if not force_refresh:
+            memory_payload = self.get_memory_cached_payload(cache_key, now)
+            if memory_payload is not None:
+                return memory_payload
+            persistent_payload = self.get_persistent_cached_payload(cache_key, now)
+            if persistent_payload is not None:
+                return persistent_payload
+        try:
+            payload = loader()
             self.store_cached_payload(cache_key, payload, now + timedelta(seconds=ttl_seconds))
             return payload
         except self.error_type:
@@ -188,3 +213,51 @@ def read_json_url(url: str, message: str, headers: dict | None = None, *, opener
             return read_limited_json(response, max_bytes=MAX_QUOTE_JSON_BYTES)
     except (HTTPError, URLError, TimeoutError, OutboundJsonError) as exc:
         raise error_type(message) from exc
+
+
+def read_yahoo_calendar_json(symbol: str, message: str, *, opener=urlopen, error_type) -> dict:
+    """Consulta calendarEvents com sessão Yahoo (cookie + crumb) e limite de leitura."""
+    try:
+        cookie = _yahoo_cookie(opener)
+        crumb = _yahoo_crumb(cookie, opener)
+        url = YAHOO_CALENDAR_URL.format(symbol=quote(symbol, safe=""), crumb=quote(crumb, safe=""))
+        request = Request(url, headers={"User-Agent": "SistemaFinanceiro/2.0", "Cookie": cookie})
+        with opener(request, timeout=6) as response:
+            payload = read_limited_json(response, max_bytes=MAX_QUOTE_JSON_BYTES)
+        return payload if isinstance(payload, dict) else {}
+    except (HTTPError, URLError, TimeoutError, OSError, OutboundJsonError, ValueError) as exc:
+        raise error_type(message) from exc
+
+
+def _yahoo_cookie(opener) -> str:
+    try:
+        response = opener(Request(YAHOO_COOKIE_URL, headers={"User-Agent": "SistemaFinanceiro/2.0"}), timeout=6)
+    except HTTPError as exc:
+        response = exc
+    try:
+        headers = getattr(response, "headers", None)
+        values = headers.get_all("Set-Cookie") if headers is not None and hasattr(headers, "get_all") else []
+        pairs = []
+        for value in values or []:
+            pair = str(value).split(";", 1)[0].strip()
+            if "=" in pair:
+                pairs.append(pair)
+        if not pairs:
+            raise ValueError("Sessão Yahoo sem cookie.")
+        return "; ".join(pairs)
+    finally:
+        close = getattr(response, "close", None)
+        if close:
+            close()
+
+
+def _yahoo_crumb(cookie: str, opener) -> str:
+    request = Request(YAHOO_CRUMB_URL, headers={"User-Agent": "SistemaFinanceiro/2.0", "Cookie": cookie})
+    with opener(request, timeout=6) as response:
+        body = response.read(YAHOO_AUTH_MAX_BYTES + 1)
+    if not isinstance(body, (bytes, bytearray)) or len(body) > YAHOO_AUTH_MAX_BYTES:
+        raise ValueError("Credencial Yahoo excede o limite permitido.")
+    crumb = bytes(body).decode("utf-8").strip()
+    if not crumb or len(crumb) > YAHOO_AUTH_MAX_BYTES or any(char in crumb for char in "\r\n"):
+        raise ValueError("Credencial Yahoo inválida.")
+    return crumb

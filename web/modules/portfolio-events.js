@@ -1,4 +1,5 @@
 import { stateMarkup } from "./dom-utils.js";
+import { destroyVirtualLists, renderCollectionRows } from "./virtual-list.js";
 
 const EVENTS_TTL_MS = 30 * 60 * 1000;
 
@@ -61,6 +62,7 @@ export function createPortfolioEvents({ state, container, refreshButton, api, es
 
   function render() {
     if (!container) return;
+    destroyVirtualLists(container);
     const eligible = (state.portfolio?.positions || []).some((position) => position.asset_type === "stock");
     if (!eligible) {
       container.innerHTML = stateMarkup("Adicione uma ação, ETF ou BDR para consultar eventos históricos.", { kind: "empty", compact: false });
@@ -82,26 +84,51 @@ export function createPortfolioEvents({ state, container, refreshButton, api, es
       container.innerHTML = `${notice}${stateMarkup("Nenhum provento histórico foi detectado para os ativos atuais desde a primeira aquisição.", { kind: "empty", compact: false })}`;
       return;
     }
-    container.innerHTML = `${notice}
-      <div class="report-table-wrap">
-        <table class="report-table portfolio-events-table">
-          <thead><tr><th>Data</th><th>Ativo</th><th>Evento</th><th>Valor por cota/ação</th><th>Fonte</th><th>Confirmação</th></tr></thead>
-          <tbody>${events.map(eventRow).join("")}</tbody>
-        </table>
-      </div>
-      <p class="portfolio-footnote">Eventos detectados pelo provedor. O app não estima o valor total e não substitui comunicados oficiais do emissor.</p>
+    const groups = new Map();
+    events.forEach((event) => {
+      const key = String(event.date || event.payment_date || "").slice(0, 7) || "Sem competência";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(event);
+    });
+    container.innerHTML = `${notice}<div class="portfolio-events-scroll">${[...groups].map(([month, rows], index) => `
+      <section class="portfolio-events-month" aria-labelledby="portfolio-events-month-${index}">
+        <h3 id="portfolio-events-month-${index}">${formatMonth(month)}</h3>
+        <div class="portfolio-events-grid" role="table" aria-label="Eventos de ${escapeHtml(formatMonth(month))}" aria-rowcount="${rows.length}">
+          <div class="portfolio-events-grid-header" role="row">
+            <span role="columnheader">Data ex</span><span role="columnheader">Pagamento</span>
+            <span role="columnheader">Ativo</span><span role="columnheader">Carteira</span>
+            <span role="columnheader">Evento</span><span role="columnheader">Valor por cota/ação</span>
+            <span role="columnheader">Confirmação</span>
+          </div>
+          <div class="portfolio-events-list" role="rowgroup" data-month-index="${index}"></div>
+        </div>
+      </section>`).join("")}</div>
+      <p class="portfolio-footnote">Fonte: Yahoo Finance. A data principal é a Data ex; o app não estima o valor total e não substitui comunicados oficiais do emissor.</p>
     `;
+    [...groups.values()].forEach((rows, index) => renderCollectionRows(container.querySelector(`[data-month-index="${index}"]`), rows, {
+      threshold: 60, rowHeight: 64, viewportHeight: 560, renderItem: eventRow,
+    }));
   }
 
   function eventRow(event) {
-    return `<tr>
-      <td>${formatDate(event.date)}</td>
-      <td><strong>${escapeHtml(event.asset_identifier)}</strong><span>${escapeHtml(event.asset_name)}</span></td>
-      <td>${escapeHtml(event.event_label)}</td>
-      <td class="money-cell">${formatUnitAmount(event.amount_per_share_micros, event.currency)}</td>
-      <td>${escapeHtml(event.source)}</td>
-      <td><span class="portfolio-event-confirmation">${escapeHtml(event.confirmation_label)}</span></td>
-    </tr>`;
+    const paymentDate = event.payment_date ? formatDate(event.payment_date) : "Não informada";
+    const amount = event.amount_per_share_micros == null ? `Não informado (${escapeHtml(event.currency || "BRL")})` : formatUnitAmount(event.amount_per_share_micros, event.currency);
+    const portfolios = (event.portfolio_names || []).join(", ") || "Carteira não informada";
+    return `<div class="portfolio-events-grid-row" role="row">
+      <span role="cell">${formatDate(event.date)}</span>
+      <span role="cell" class="portfolio-event-payment-date">${paymentDate}</span>
+      <span role="cell" class="portfolio-event-asset"><strong>${escapeHtml(event.asset_identifier)}</strong><small>${escapeHtml(event.asset_name)}</small></span>
+      <span role="cell">${escapeHtml(portfolios)}</span>
+      <span role="cell">${escapeHtml(event.event_label)}</span>
+      <span role="cell" class="money-cell">${amount}</span>
+      <span role="cell"><span class="portfolio-event-confirmation">${escapeHtml(event.confirmation_label)}</span></span>
+    </div>`;
+  }
+
+  function formatMonth(value) {
+    if (!/^\d{4}-\d{2}$/.test(value)) return value;
+    const [year, month] = value.split("-").map(Number);
+    return new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" });
   }
 
   function formatUnitAmount(amountMicros, currency) {
@@ -123,6 +150,7 @@ export function createPortfolioEvents({ state, container, refreshButton, api, es
     requestId += 1;
     state.portfolioEventsLoading = false;
     if (refreshButton) refreshButton.disabled = false;
+    destroyVirtualLists(container);
     container?.replaceChildren();
     container?.setAttribute("aria-busy", "false");
   }

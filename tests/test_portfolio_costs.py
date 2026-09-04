@@ -60,7 +60,7 @@ class PortfolioCostTest(unittest.TestCase):
         self.assertEqual(positions, [])
 
     def test_treasury_direct_custody_fee_is_estimated_with_selic_exemption(self) -> None:
-        # spec: investimentos/investimentos-portfolio v2.52 — critério 25
+        # spec: investimentos/investimentos-portfolio v2.53 — critério 25
         prefixado = {
             "asset_identifier": "Tesouro Prefixado",
             "asset_name": "TESOURO PREFIXADO 2027",
