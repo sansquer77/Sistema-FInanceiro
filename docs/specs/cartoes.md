@@ -2,8 +2,8 @@
 tipo: spec
 area: cartoes
 status: implementado
-versao: 2.15
-atualizado: 2026-08-20
+versao: 2.22
+atualizado: 2026-09-05
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -18,7 +18,7 @@ aliases: ["Cartões de Crédito", "Faturas"]
 # Cartões de Crédito
 
 > [!info] Status
-> **implementado** · área: `cartoes` · atualizado em 2026-08-20 · relacionados: [[contas-correntes]], [[lancamentos]], [[limites-gastos]], [[relatorios]]
+> **implementado** · versão: `2.22` · área: `cartoes` · atualizado em 2026-09-05 · relacionados: [[contas-correntes]], [[lancamentos]], [[limites-gastos]], [[relatorios]]
 
 ## Problema
 
@@ -119,13 +119,14 @@ Qualquer usuário autenticado localmente que utilize cartões de crédito para d
 - Faturas pagas parcialmente não são abatidas novamente no saldo previsto da conta preferencial; o residual entra pelo vencimento da fatura seguinte, conforme a regra de faturas não pagas com lançamentos conciliados.
 - Valores de lançamentos de cartão usam o mesmo tamanho de fonte compacto dos lançamentos de conta para melhorar a densidade de leitura.
 - Valores financeiros extensos no gráfico de faturas devem se adaptar ao espaço disponível reduzindo a tipografia, sem aumentar a área do gráfico nem truncar centavos.
-- O gráfico de evolução de faturas deve usar cards mensais compactos na faixa superior e curva suave em SVG nativo abaixo, com mês atual destacado, meses futuros atenuados e linha futura pontilhada, sem dependências externas de gráfico ou CSS.
-- O gráfico de evolução de faturas pode exibir uma linha horizontal de referência com a média aritmética dos valores absolutos das 5 faturas em tela (2 anteriores, atual e 2 futuras), no mesmo estilo das linhas atuais (contínua, token `--chart-average-line`: branca no tema escuro, cinza no claro) e na mesma escala vertical do gráfico, com o valor da média em texto compacto ao final (lado direito) da linha.
+- O gráfico de evolução de faturas deve usar cards mensais compactos na faixa superior e ApexCharts abaixo, com mês atual destacado, meses futuros atenuados, linha futura pontilhada na mesma cor da linha realizada e preenchimento vertical contínuo sob toda a série, no padrão da Evolução de Relatórios.
+- O gráfico de evolução de faturas pode exibir uma linha horizontal de referência com a média aritmética dos valores absolutos das 5 faturas em tela (2 anteriores, atual e 2 futuras), contínua, com 2 px e token de alto contraste `--chart-average-line` (branco no tema escuro, cinza no claro), na mesma escala vertical do gráfico e com o valor da média em texto compacto ao final.
 - O seletor mensal da fatura deve usar botões compactos por ícone para mês anterior, mês atual e próximo mês, preservando rótulos acessíveis.
 - O rótulo do mês no seletor mensal da fatura deve usar o formato compacto `MM/AAAA`.
 - Campos do formulário de lançamento no cartão devem manter altura e alinhamento consistentes dentro da mesma linha; linhas com apenas um campo visível devem ocupar a largura completa para evitar lacunas visuais.
 - O formulário de Lançamentos de Cartões deve exibir ação `Cancelar` também durante novo cadastro, em variante discreta, permitindo limpar a entrada atual e retornar ao estado inicial sem depender de salvar ou navegar.
 - As listagens completas de lançamentos e pagamentos de cartão (`GET /api/credit-card-transactions` e `GET /api/credit-card-payments`) são paginadas por `limit` (padrão 2000, máximo 5000) e `offset`, respondendo `has_more`; o frontend percorre as páginas até receber uma página menor que `limit`.
+- Ao entrar em Lançamentos de Cartões, o frontend carrega apenas os detalhes da fatura selecionada. O histórico visual recebe do backend cinco totais mensais agregados (duas competências anteriores, a atual e duas posteriores), sem carregar linhas históricas de compras ou pagamentos.
 
 ## API e dados
 
@@ -172,7 +173,7 @@ Tabelas: `credit_cards`, `credit_card_transactions`, `credit_card_payments`, `cr
 - Dado lançamentos recorrentes de cartão, quando listados no Cockpit, aparecem pela competência da fatura.
 - Dado uma fatura conciliada e não paga com conta preferencial configurada, quando a conta exibe saldo previsto, então a fatura é considerada pelo vencimento sem duplicar faturas já pagas.
 - Dado o gráfico de faturas com valores extensos, quando exibido em telas de 14 polegadas ou menores, então os valores cabem nos cartões mensais por ajuste responsivo de tipografia e de largura mínima dos cartões, mantendo o tamanho atual da área e sem truncar centavos.
-- Dado o usuário visualizando o gráfico de evolução de faturas, quando há meses passados, atual e futuros, então os cards mensais aparecem compactos acima da curva, o mês atual fica destacado e os meses futuros aparecem com linha pontilhada/atenuada sem usar bibliotecas externas.
+- Dado o usuário visualizando o gráfico de evolução de faturas, quando há meses passados, atual e futuros, então os cards mensais aparecem compactos acima da curva, o mês atual fica destacado e os meses futuros aparecem com linha pontilhada/atenuada na mesma cor e área contínua do ApexCharts.
 - Dado o usuário visualizando o seletor mensal da fatura, quando os botões de navegação aparecem, então usam ícones compactos com rótulo acessível em vez de palavras longas.
 - Dado o usuário visualizando o seletor mensal da fatura, quando o mês é exibido, então o rótulo usa o formato `MM/AAAA`.
 - Dado qualquer tipo de lançamento no cartão, quando campos condicionais de parcela ou recorrência são exibidos ou ocultados, então os campos visíveis mantêm altura/alinhamento consistentes e linhas unitárias ocupam a largura completa.
@@ -199,8 +200,19 @@ Tabelas: `credit_cards`, `credit_card_transactions`, `credit_card_payments`, `cr
 - Dado uma série recorrente de cartão sendo editada com a flag de média alterada (marcada ou desmarcada), quando o usuário salva, então o sistema não exibe o modal de escopo e aplica a alteração automaticamente às ocorrências futuras não conciliadas — ao marcar, persiste a marcação e recalcula pela média; ao desmarcar, mantém o valor informado sem recálculo e remove a marcação.
 - Dado o usuário visualizando o gráfico de evolução de faturas, quando há valores nas 5 faturas em tela, então uma linha horizontal de referência é desenhada na altura da média aritmética dos valores absolutos dessas faturas, no mesmo estilo das linhas atuais (contínua, `--chart-average-line`: branca no tema escuro, cinza no claro) e na mesma escala vertical do gráfico.
 - Dado o usuário visualizando o gráfico de evolução de faturas, quando a linha de referência da média é exibida, então o valor da média formatado na moeda do cartão aparece em texto compacto ao final (lado direito) da linha.
+- Dado qualquer volume de histórico de cartões, quando o usuário entra em Lançamentos de Cartões ou troca de fatura, então são transferidos somente os lançamentos e pagamentos da competência ativa e cinco totais mensais agregados para o gráfico, sem percorrer as listagens históricas completas.
 
 ## Changelog
+
+- `2.22` — 2026-09-05 — Reforçada a presença do degradê contínuo sob a evolução das faturas no tema claro, preservando contraste da curva e da linha de média.
+- `2.21` — 2026-09-05 — Evolução de faturas passa a compartilhar o preenchimento vertical contínuo da Evolução de Relatórios; realizado e previsão permanecem na mesma cor, com previsão pontilhada, e a referência da média ganha linha contínua de 2 px e rótulo mais legível.
+- `2.20` — 2026-09-04 — Área do gráfico passou a ser uma camada contínua sob as duas séries, sem quebra visual na transição para a previsão.
+- `2.19` — 2026-09-04 — Corrigido o erro `[object HTMLElement]` na lista da fatura e ajustado o gráfico para uma única paleta azul com degradê invertido.
+- `2.18` — 2026-09-04 — Histórico de faturas usa preenchimento degradê horizontal sob as linhas do ApexCharts para melhorar a percepção de evolução.
+
+- `2.17` — 2026-09-03 — A tela de Lançamentos de Cartões deixa de baixar compras e pagamentos históricos completos; a fatura ativa passa a fornecer detalhes da competência e um resumo agregado limitado a cinco meses para o gráfico.
+
+- `2.16` — 2026-09-01 — `GET /api/credit-card-transactions` aceita filtro `month` por competência antes da paginação; carga inicial e Relatórios deixam de percorrer todo o histórico de cartões e pagamentos.
 
 - `2.15` — 2026-08-20 — Modal de escopo em série recorrente de cartão com média ativa passa a explicar que a escolha **Apenas este lançamento** não recalcula os próximos, enquanto **Este e os próximos** os recalcula pela média; sem mudança na regra de cálculo ou no escopo aplicado.
 - `2.14` — 2026-08-17 — Modal de escopo restaurado em edições de séries recorrentes de cartão: o sistema pula o modal **somente** quando a flag de média é alterada na edição (marcada em série sem a marcação ou desmarcada em série que a tinha); com a flag inalterada — ativa ou inativa — o modal `Apenas este lançamento` / `Este e os próximos` volta a aparecer; escolhendo os próximos em série com a flag ativa, os valores futuros continuam recalculados pela média; escolhendo apenas este, a cascata não ocorre.

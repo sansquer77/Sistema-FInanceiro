@@ -2,8 +2,8 @@
 tipo: spec
 area: seguranca
 status: implementado
-versao: 1.4
-atualizado: 2026-08-28
+versao: 1.6
+atualizado: 2026-09-01
 relacionados:
   - "[[recuperacao-senha]]"
   - "[[adr/0005-smtp-criptografado-local]]"
@@ -15,7 +15,7 @@ aliases: ["Segurança", "Autenticação"]
 # Segurança de Autenticação
 
 > [!info] Status
-> **implementado** · área: `seguranca` · atualizado em 2026-08-28 · relacionados: [[recuperacao-senha]], [[arquitetura]]
+> **implementado** · área: `seguranca` · atualizado em 2026-09-01 · relacionados: [[recuperacao-senha]], [[arquitetura]]
 
 ## Problema
 
@@ -35,6 +35,7 @@ Usuários locais do Sistema Financeiro que protegem dados financeiros sensíveis
 6. Requisições mutáveis são aceitas apenas a partir dos hosts e origens locais esperados.
 7. Ao trocar ou recuperar a senha, todas as sessões do usuário são revogadas e ele precisa entrar novamente.
 8. A sessão expira definitivamente 30 dias após sua criação.
+9. O cadastro público reserva uma tentativa persistente por origem antes do trabalho de criação do usuário.
 
 ## Dados
 
@@ -49,6 +50,7 @@ Usuários locais do Sistema Financeiro que protegem dados financeiros sensíveis
 ## Regras
 
 - Login bloqueia temporariamente após **5 falhas**.
+- Cadastro público permite no máximo **5 tentativas por origem em 60 minutos**; tentativas inválidas também consomem o orçamento, e outra origem mantém seu próprio orçamento.
 - Pedido de recuperação bloqueia temporariamente após **3 pedidos** na janela.
 - Confirmação de token bloqueia temporariamente após **5 falhas**.
 - Erros de login não revelam se o e-mail existe.
@@ -66,7 +68,7 @@ Usuários locais do Sistema Financeiro que protegem dados financeiros sensíveis
 - Hosts adicionais podem ser definidos em `APP_ALLOWED_HOSTS` como CSV; valores sem porta também aceitam `APP_PORT`.
 - Origens adicionais podem ser definidas em `APP_ALLOWED_ORIGINS` como CSV; valores sem esquema assumem `http://` e valores sem porta assumem `APP_PORT`.
 - Respostas JSON e arquivos estáticos enviam headers defensivos:
-  - `Content-Security-Policy: frame-ancestors 'none'`
+  - `Content-Security-Policy` restritivo, permitindo scripts e imagens apenas de origens controladas; exceção explícita para o widget voluntário de contribuição no `Buy Me a Coffee` (`https://cdnjs.buymeacoffee.com` e `https://cdn.buymeacoffee.com`).
   - `X-Content-Type-Options: nosniff`
   - `Referrer-Policy: same-origin`
   - `Permissions-Policy` restritiva.
@@ -80,12 +82,15 @@ Rotas afetadas:
 | Método | Rota |
 |---|---|
 | `POST` | `/api/login` |
+| `POST` | `/api/register` |
 | `POST` | `/api/password-reset/request` |
 | `POST` | `/api/password-reset/confirm` |
 
 ## Critérios de aceite
 
 - Dado 5 senhas erradas para um usuário existente, quando a próxima tentativa é feita, retorna `429 Too Many Requests`.
+- Dadas 5 tentativas de cadastro da mesma origem, válidas ou inválidas, quando uma nova tentativa é feita dentro da janela, retorna `429 Too Many Requests` antes de criar usuário.
+- Dada uma origem diferente ainda dentro de seu orçamento, quando realiza um cadastro válido, o usuário é criado normalmente.
 - Dado pedidos de recuperação excedendo o limite, quando o próximo pedido chega, retorna `429 Too Many Requests`.
 - Dado `APP_URL` HTTP, quando o cookie é gerado, não contém `Secure`.
 - Dado `APP_URL` HTTPS, quando o cookie é gerado, contém `Secure`.
@@ -111,6 +116,8 @@ Rotas afetadas:
 
 ## Changelog
 
+- `1.6` — 2026-09-01 — Cadastro público passa a reservar orçamento persistente por origem, limitando cinco tentativas em 60 minutos antes da criação do usuário; abusos inválidos também consomem a janela.
+- `1.5` — 2026-08-30 — CSP ajustado para permitir o widget voluntário de contribuição do Buy Me a Coffee (`cdnjs.buymeacoffee.com` para scripts e `cdn.buymeacoffee.com` para imagens).
 - `1.4` — 2026-08-28 — O despacho de rotas `GET` de perfil, contas, cartões e lançamentos passa a exigir caminho exato, impedindo colisões por prefixo; adicionada cobertura automatizada positiva e negativa.
 - `1.3` — 2026-07-10 — Adicionada expiração absoluta de 30 dias e alerta não bloqueante para exposição em LAN sem HTTPS; HTTP local permanece permitido.
 - `1.2` — 2026-07-10 — Tokens de sessão passam a ser armazenados com hash, `Origin` torna-se obrigatório em mutações e troca/recuperação de senha revoga todas as sessões.

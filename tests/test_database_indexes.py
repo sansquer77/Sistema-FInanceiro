@@ -7,6 +7,7 @@ from pathlib import Path
 
 from financeiro import database
 from financeiro.database import get_connection, initialize_database
+from financeiro.portfolio_snapshots import list_snapshots, upsert_snapshots
 
 
 class DatabaseIndexTest(unittest.TestCase):
@@ -38,6 +39,69 @@ class DatabaseIndexTest(unittest.TestCase):
         self.assertIn("idx_credit_card_transactions_user_series_invoice_date", card_transaction_indexes)
         self.assertIn("idx_credit_card_payments_user_card_invoice", card_payment_indexes)
         self.assertIn("idx_credit_card_payments_user_date", card_payment_indexes)
+
+    def test_initialize_database_creates_monthly_portfolio_snapshot_schema_idempotently(self) -> None:
+        initialize_database()
+        initialize_database()
+
+        with get_connection() as conn:
+            columns = column_names(conn, "investment_monthly_snapshots")
+            indexes = index_names(conn, "investment_monthly_snapshots")
+
+        self.assertEqual(
+            {
+                "id", "user_id", "snapshot_month", "as_of_date", "account_id", "currency",
+                "asset_type", "asset_identifier", "asset_name", "quantity_micros", "unit_price_cents",
+                "market_value_cents", "cost_basis_cents", "contribution_cents", "redemption_cents",
+                "dividend_cents", "quote_source", "valuation_status", "created_at", "updated_at",
+            },
+            columns,
+        )
+        self.assertIn("idx_investment_monthly_snapshots_user_month", indexes)
+        self.assertIn("idx_investment_monthly_snapshots_user_asset", indexes)
+
+    def test_initialize_database_reconciles_additive_tables_in_current_v2_database(self) -> None:
+        initialize_database()
+        with get_connection() as conn:
+            conn.execute("DROP TABLE investment_monthly_snapshots")
+            conn.execute("DROP TABLE notification_reads")
+
+        self.assertEqual(database.read_schema_version(database.DB_PATH), database.SCHEMA_VERSION)
+
+        initialize_database()
+
+        with get_connection() as conn:
+            self.assertTrue(column_names(conn, "investment_monthly_snapshots"))
+            self.assertEqual(
+                {"user_id", "notification_id", "seen_at"},
+                column_names(conn, "notification_reads"),
+            )
+
+    def test_portfolio_snapshot_repository_is_idempotent_and_filters_competence(self) -> None:
+        initialize_database()
+        with get_connection() as conn:
+            user_id = conn.execute(
+                "INSERT INTO users (name, email, password_hash) VALUES ('Ana', 'ana@example.com', 'hash') RETURNING id"
+            ).fetchone()["id"]
+            account_id = conn.execute(
+                """INSERT INTO checking_accounts (user_id, name, bank_name, account_type, currency)
+                   VALUES (?, 'Carteira', 'Banco', 'investment', 'BRL') RETURNING id""",
+                (user_id,),
+            ).fetchone()["id"]
+            snapshot = {
+                "user_id": user_id, "snapshot_month": "2026-08", "as_of_date": "2026-08-31",
+                "account_id": account_id, "currency": "brl", "asset_type": "stock",
+                "asset_identifier": "ITUB4", "asset_name": "Itaú", "market_value_cents": 12345,
+                "cost_basis_cents": 12000, "quote_source": "b3", "valuation_status": "observed",
+            }
+            self.assertEqual(upsert_snapshots(conn, [snapshot]), 1)
+            snapshot["market_value_cents"] = 13000
+            self.assertEqual(upsert_snapshots(conn, [snapshot]), 1)
+            rows = list_snapshots(conn, user_id, snapshot_month="2026-08", currency="BRL")
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["market_value_cents"], 13000)
+        self.assertEqual(rows[0]["valuation_status"], "observed")
 
     def test_initialize_database_creates_consultor_schema(self) -> None:
         initialize_database()
@@ -168,6 +232,56 @@ class DatabaseIndexTest(unittest.TestCase):
         self.assertEqual(settings_count, 0)
         self.assertEqual(analyses_count, 0)
         self.assertEqual(perfil_count, 0)
+
+    def test_initialize_database_creates_notification_reads_schema(self) -> None:
+        # spec: cockpit/alertas-cockpit v1.1 — critério 11
+        initialize_database()
+        initialize_database()
+
+        with get_connection() as conn:
+            columns = column_names(conn, "notification_reads")
+
+        self.assertEqual({"user_id", "notification_id", "seen_at"}, columns)
+
+    def test_notification_reads_enforces_composite_pk_and_cascade(self) -> None:
+        # spec: cockpit/alertas-cockpit v1.1 — critério 11
+        initialize_database()
+
+        with get_connection() as conn:
+            user_id = conn.execute(
+                """
+                INSERT INTO users (name, email, password_hash)
+                VALUES ('Carlos', 'carlos@example.com', 'hash')
+                RETURNING id
+                """
+            ).fetchone()["id"]
+
+            conn.execute(
+                """
+                INSERT INTO notification_reads (user_id, notification_id, seen_at)
+                VALUES (?, 'dividend_week:ITUB4:2026-09-05', '2026-09-03T12:00:00Z')
+                """,
+                (user_id,),
+            )
+
+            # Duplicatas do par (user_id, notification_id) devem falhar pela PK composta
+            with self.assertRaises(sqlite3.IntegrityError):
+                conn.execute(
+                    """
+                    INSERT INTO notification_reads (user_id, notification_id, seen_at)
+                    VALUES (?, 'dividend_week:ITUB4:2026-09-05', '2026-09-03T13:00:00Z')
+                    """,
+                    (user_id,),
+                )
+
+            # Exclusão do usuário deve remover registros em cascata
+            conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            reads_count = conn.execute(
+                "SELECT COUNT(*) FROM notification_reads WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()[0]
+
+        self.assertEqual(reads_count, 0)
 
     def test_get_connection_closes_after_context_exit(self) -> None:
         initialize_database()

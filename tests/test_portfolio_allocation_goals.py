@@ -26,7 +26,7 @@ class PortfolioAllocationGoalsTest(unittest.TestCase):
         self.tempdir.cleanup()
 
     def test_saves_goals_that_total_one_hundred_percent(self) -> None:
-        # spec: investimentos/investimentos-portfolio v2.43 — critérios 62-66
+        # spec: investimentos/investimentos-portfolio v2.53 — critérios 62-66
         result = save_allocation_goals(self.user["id"], {"goals": [
             {"asset_type": "fixed_income", "target_percent": "60"},
             {"asset_type": "stock", "target_percent": "30"},
@@ -36,7 +36,19 @@ class PortfolioAllocationGoalsTest(unittest.TestCase):
         self.assertEqual(goals["fixed_income"], "60")
         self.assertEqual(goals["stock"], "30")
         self.assertEqual(goals["stablecoin"], "10")
-        self.assertEqual(len(get_allocation_goals(self.user["id"])), 8)
+        self.assertEqual(len(get_allocation_goals(self.user["id"])), 9)
+
+    def test_saves_separate_usd_variable_income_goal(self) -> None:
+        result = save_allocation_goals(self.user["id"], {"goals": [
+            {"asset_type": "fixed_income", "target_percent": "50"},
+            {"asset_type": "stock", "target_percent": "20"},
+            {"asset_type": "stock_usd", "target_percent": "20"},
+            {"asset_type": "stablecoin", "target_percent": "10"},
+        ]})
+        goals = {goal["asset_type"]: goal for goal in result["allocation_goals"]}
+        self.assertEqual(goals["stock"]["label"], "Renda variável")
+        self.assertEqual(goals["stock_usd"]["label"], "Renda variável - USD")
+        self.assertEqual(goals["stock_usd"]["target_percent"], "20")
 
     def test_rejects_goal_total_different_from_one_hundred_percent(self) -> None:
         with self.assertRaisesRegex(PortfolioError, "exatamente 100%"):

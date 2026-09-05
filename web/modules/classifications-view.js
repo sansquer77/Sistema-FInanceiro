@@ -1,3 +1,30 @@
+export function normalizeClassificationSearch(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLocaleLowerCase("pt-BR");
+}
+
+export function filterClassificationItems(items, query, { includeSubcategories = false } = {}) {
+  const normalizedQuery = normalizeClassificationSearch(query);
+  if (!normalizedQuery) return items;
+  return items.flatMap((item) => {
+    const itemMatches = normalizeClassificationSearch(item.name).includes(normalizedQuery);
+    if (!includeSubcategories) return itemMatches ? [item] : [];
+    const subcategories = item.subcategories || [];
+    const matchingSubcategories = subcategories.filter((subcategory) => (
+      normalizeClassificationSearch(subcategory.name).includes(normalizedQuery)
+    ));
+    if (!itemMatches && matchingSubcategories.length === 0) return [];
+    return [{
+      ...item,
+      subcategories: itemMatches ? subcategories : matchingSubcategories,
+      searchMatchedSubcategory: !itemMatches && matchingSubcategories.length > 0,
+    }];
+  });
+}
+
 export function registerClassificationsView({
   state,
   elements,
@@ -19,12 +46,19 @@ export function registerClassificationsView({
     tagMessage,
     categoryList,
     tagList,
+    categorySearch,
+    tagSearch,
+    categoryListSummary,
+    tagListSummary,
   } = elements;
+  const expandedCategories = new Set();
 
   categoryForm.addEventListener("submit", handleCategorySubmit);
   categoryGroup.addEventListener("change", handleCategoryGroupChange);
   subcategoryForm.addEventListener("submit", handleSubcategorySubmit);
   tagForm.addEventListener("submit", handleTagSubmit);
+  categorySearch.addEventListener("input", renderFilteredLists);
+  tagSearch.addEventListener("input", renderFilteredLists);
 
   async function loadClassifications() {
     const [categoriesResponse, tagsResponse] = await Promise.all([
@@ -141,8 +175,18 @@ export function registerClassificationsView({
 
   function renderClassifications() {
     renderSubcategoryOptions();
-    renderClassificationList(categoryList, filteredClassificationCategories(), "categories");
-    renderClassificationList(tagList, state.tags, "tags");
+    renderFilteredLists();
+  }
+
+  function renderFilteredLists() {
+    const categoryItems = filterClassificationItems(
+      filteredClassificationCategories(), categorySearch.value, { includeSubcategories: true },
+    );
+    const tagItems = filterClassificationItems(state.tags, tagSearch.value);
+    renderClassificationList(categoryList, categoryItems, "categories", Boolean(categorySearch.value.trim()));
+    renderClassificationList(tagList, tagItems, "tags", Boolean(tagSearch.value.trim()));
+    categoryListSummary.textContent = listSummary(categoryItems.length, "categoria", "categorias");
+    tagListSummary.textContent = listSummary(tagItems.length, "tag", "tags");
   }
 
   function renderSubcategoryOptions() {
@@ -158,10 +202,13 @@ export function registerClassificationsView({
     return state.categories.filter((category) => category.group_type === categoryGroup.value);
   }
 
-  function renderClassificationList(container, items, type) {
+  function renderClassificationList(container, items, type, hasSearch) {
     container.innerHTML = "";
     if (items.length === 0) {
-      container.append(emptyState(type === "categories" ? "Nenhuma categoria cadastrada." : "Nenhuma tag cadastrada."));
+      const label = type === "categories" ? "categoria ou subcategoria" : "tag";
+      container.append(emptyState(
+        hasSearch ? `Nenhuma ${label} corresponde à busca.` : `Nenhuma ${label} cadastrada.`,
+      ));
       return;
     }
     items.forEach((item) => {
@@ -169,37 +216,89 @@ export function registerClassificationsView({
       row.className = "classification-item";
       const subcategories = type === "categories" ? item.subcategories || [] : [];
       row.innerHTML = `
-        <div>
+        <div class="classification-item-copy">
           <strong>${escapeHtml(item.name)}</strong>
           <span>${type === "categories" ? `${classificationGroupLabel(item.group_type)} · ` : ""}${item.transaction_count} lançamento(s)</span>
         </div>
-        <div class="card-actions">
-          <button class="ghost small-button" type="button" data-action="rename">Renomear</button>
-          <button class="danger small-button" type="button" data-action="delete">Excluir</button>
-        </div>
+        ${actionMenuMarkup(item.name, "")}
         ${subcategories.length ? `
-          <div class="subcategory-list">
+          <details class="subcategory-disclosure" ${expandedCategories.has(String(item.id)) || item.searchMatchedSubcategory ? "open" : ""}>
+            <summary>${subcategories.length} ${subcategories.length === 1 ? "subcategoria" : "subcategorias"}</summary>
+            <div class="subcategory-list">
             ${subcategories.map((subcategory) => `
               <div class="subcategory-item" data-subcategory-id="${subcategory.id}">
                 <span>${escapeHtml(subcategory.name)} · ${subcategory.transaction_count} lançamento(s)</span>
-                <div class="card-actions">
-                  <button class="ghost small-button" type="button" data-action="rename-subcategory">Renomear</button>
-                  <button class="danger small-button" type="button" data-action="delete-subcategory">Excluir</button>
-                </div>
+                ${actionMenuMarkup(subcategory.name, "-subcategory")}
               </div>
             `).join("")}
-          </div>
+            </div>
+          </details>
         ` : ""}
       `;
-      row.querySelector('[data-action="rename"]').addEventListener("click", () => renameClassification(type, item));
-      row.querySelector('[data-action="delete"]').addEventListener("click", () => deleteClassification(type, item));
+      const disclosure = row.querySelector(".subcategory-disclosure");
+      disclosure?.addEventListener("toggle", () => {
+        if (disclosure.open) expandedCategories.add(String(item.id));
+        else expandedCategories.delete(String(item.id));
+      });
+      bindAction(row, '[data-action="rename"]', () => renameClassification(type, item));
+      bindAction(row, '[data-action="delete"]', () => deleteClassification(type, item));
       row.querySelectorAll("[data-subcategory-id]").forEach((element) => {
         const subcategory = subcategories.find((entry) => String(entry.id) === element.dataset.subcategoryId);
-        element.querySelector('[data-action="rename-subcategory"]').addEventListener("click", () => renameSubcategory(subcategory));
-        element.querySelector('[data-action="delete-subcategory"]').addEventListener("click", () => deleteSubcategory(subcategory));
+        bindAction(element, '[data-action="rename-subcategory"]', () => renameSubcategory(subcategory));
+        bindAction(element, '[data-action="delete-subcategory"]', () => deleteSubcategory(subcategory));
       });
+      row.querySelectorAll(".classification-actions-menu").forEach(setupActionMenuKeyboard);
       container.append(row);
     });
+  }
+
+  function bindAction(container, selector, action) {
+    const button = container.querySelector(selector);
+    button.addEventListener("click", () => {
+      button.closest(".classification-actions-menu").open = false;
+      action();
+    });
+  }
+
+  function setupActionMenuKeyboard(menu) {
+    menu.addEventListener("toggle", () => {
+      if (!menu.open) return;
+      document.querySelectorAll(".classification-actions-menu[open]").forEach((otherMenu) => {
+        if (otherMenu !== menu) otherMenu.open = false;
+      });
+    });
+    menu.addEventListener("keydown", (event) => {
+      const buttons = [...menu.querySelectorAll('[role="menuitem"]')];
+      const index = buttons.indexOf(document.activeElement);
+      if (event.key === "Escape") {
+        event.preventDefault();
+        menu.open = false;
+        menu.querySelector("summary").focus();
+      } else if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+        event.preventDefault();
+        const nextIndex = event.key === "Home" ? 0
+          : event.key === "End" ? buttons.length - 1
+            : event.key === "ArrowUp" ? (index <= 0 ? buttons.length - 1 : index - 1)
+              : (index + 1) % buttons.length;
+        buttons[nextIndex]?.focus();
+      }
+    });
+  }
+
+  function actionMenuMarkup(name, suffix) {
+    return `
+      <details class="classification-actions-menu">
+        <summary aria-label="Mais ações para ${escapeHtml(name)}" title="Mais ações">•••</summary>
+        <div class="classification-actions-popover" role="menu" aria-label="Ações para ${escapeHtml(name)}">
+          <button type="button" role="menuitem" data-action="rename${suffix}">Renomear</button>
+          <button type="button" role="menuitem" class="danger-text" data-action="delete${suffix}">Excluir</button>
+        </div>
+      </details>
+    `;
+  }
+
+  function listSummary(count, singular, plural) {
+    return `${count} ${count === 1 ? singular : plural}`;
   }
 
   return {

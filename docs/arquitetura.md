@@ -2,12 +2,15 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 3.48
-atualizado: 2026-08-29
+versao: 4.5
+atualizado: 2026-09-05
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
   - "[[glossario]]"
+  - "[[qualidade-codigo]]"
+  - "[[specs/bank-logos]]"
+  - "[[specs/alertas-cockpit]]"
   - "[[adr/0001-stack-local-sem-framework]]"
   - "[[adr/0002-modularizacao-frontend]]"
 tags: [arquitetura, meta]
@@ -16,14 +19,16 @@ tags: [arquitetura, meta]
 # Arquitetura
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-08-28 · relacionados: [[requisitos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
+> **implementado** · área: `meta` · atualizado em 2026-09-04 · relacionados: [[requisitos]], [[qualidade-codigo]], [[specs/bank-logos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
 
 ## Visão geral
 
 O Sistema Financeiro é um app local composto por servidor HTTP em Python, banco SQLite e interface web estática. Roda em macOS sem dependências externas para operação financeira básica.
 
+Na inicialização, bancos já marcados com a versão corrente recebem novamente o baseline aditivo idempotente antes de o servidor aceitar requisições. Isso incorpora tabelas e índices compatíveis adicionados durante a evolução da v2 sem exigir uma nova migração destrutiva ou alterar dados existentes.
+
 ```text
-app.py              Servidor HTTP, roteamento da API e arquivos estáticos
+app.py              Adaptador HTTP, autenticação e arquivos estáticos
 financeiro/         Regras de domínio, persistência e integrações locais
 web/                Interface do usuário em HTML, CSS e JavaScript
 data/               Arquivos de runtime criados localmente (não versionados)
@@ -32,6 +37,8 @@ docs/               Requisitos, arquitetura, specs e referências
 ```
 
 O servidor HTTP revalida arquivos estáticos com `ETag` e `Last-Modified`; arquivos não versionados usam `Cache-Control: no-cache` para permitir `304 Not Modified` sem cache agressivo. Respostas JSON acima de 1 KB podem ser comprimidas com gzip quando o cliente envia `Accept-Encoding: gzip`.
+
+As fronteiras de responsabilidade e os sinais de alerta para crescimento de módulos estão consolidados em [[qualidade-codigo]]. Além da revisão manual, `tests/test_code_quality.py` aplica um gate automatizado aos limites e às fronteiras arquiteturais verificáveis.
 
 O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Cockpit > Consultor**. Em Preferências, o usuário configura a IA geral, ativa o Consultor, aceita o consentimento de acesso aos dados e pode preencher/remover o Perfil Complementar criptografado. No Cockpit, a aba Consultor exibe os indicadores de atrasos/vencimentos, a subaba **Análises** com catálogo fechado de 9 análises em seletor (incluindo o card `evolucao_score_tempo` com seletor de 6/12 meses), botão único **Gerar** e a subaba **Histórico** com filtro textual. O módulo não possui prompt livre: cada execução envia apenas o contexto minimizado da análise escolhida e persiste somente respostas bem-sucedidas.
 
@@ -45,7 +52,7 @@ O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Co
 |---|---|
 | `index.html` | Estrutura das telas. |
 | `styles.css` | Aparência e responsividade conforme [[design/design-system]]. |
-| `app.js` | Ponto de entrada, estado geral e orquestração dos módulos de tela. |
+| `app.js` | Composition root: seleciona DOM, registra views, injeta dependências e controla boot, sessão visual e navegação. |
 | `web/modules/` | Módulos ES nativos sem etapa de build. |
 
 **Módulos utilitários já extraídos:**
@@ -56,6 +63,10 @@ O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Co
 | `date-utils.js` | Datas locais, meses e exibição de datas. |
 | `money-utils.js` | Formatação e parsing numérico/monetário. |
 | `dom-utils.js` | Helpers de formulário, mensagens, empty state e escaping. |
+| `chart-adapter.js` | Fronteira única para ApexCharts: animações desativadas, suspensão sob `hidden`, retomada com última configuração local, descarte de desconectados e limpeza completa na sessão. |
+| `input-mask.js` | Adaptador local sobre IMask 7.6.1 para campos monetários e de data; preserva parsers e formato brasileiro enviado ao backend, gerencia ciclo de vida em formulários dinâmicos e logout. |
+| `command-palette.js` | Command Palette nativa em ES Modules; comandos de navegação, preferências e busca delegam a ações existentes, sem regras de domínio e sem consulta à rede. |
+| `notification-flyout.js` | Diálogo global acessível para alertas críticos e informativos do Cockpit; anexado ao `body`, restaura foco, persiste leitura pela callback injetada e delega ações contextuais ao composition root, sem regras financeiras. Ver [[specs/alertas-cockpit]]. |
 | `transaction-kind.js` | Predicados de tipo de lançamento. |
 | `labels.js` | Labels de domínio usados pela interface. |
 | `month-picker.js` | Popover reutilizável de seleção de mês. |
@@ -64,6 +75,13 @@ O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Co
 | `theme-utils.js` | Persistência local e aplicação do tema visual. |
 | `privacy-utils.js` | Persistência local e aplicação do modo de ocultação de valores. |
 | `instructions-content.js` | Conteúdo estático, offline e versionado da central de ajuda. Ver [[instrucoes-app]]. |
+| `app-state.js` | Fábrica do estado inicial e reset puro dos dados de sessão, sem singleton, DOM ou API. |
+| `app-data-loader.js` | Coordenação dos carregamentos compartilhados por dependências explícitas e acesso tardio às views; o boot e o Cockpit mantêm somente recortes mensais, sem históricos integrais ou pagamentos globais. |
+| `bank-logos.js` | Catálogo e resolvedor compartilhado de logos de instituições e bandeiras, com normalização, aliases e fallback visual. Ver [[specs/bank-logos]]. |
+
+Os assets normalizados do catálogo ficam em `web/assets/banks/` e `web/assets/bandeiras/`, com nomes ASCII minúsculos. Contas e Cartões reutilizam o mesmo resolvedor; Cartões também exibem a bandeira quando catalogada.
+
+**Fundação da v2 em implementação:** os gráficos existentes já usam ApexCharts 4.7.0 vendorizado por meio de `chart-adapter.js`; máscaras monetárias usam IMask 7.6.1 vendorizado por meio de `input-mask.js`; a Command Palette nativa (`command-palette.js`) oferece experiência equivalente ao padrão cmdk sem React. [[specs/frontend-fundacao-v2]] mantém planejada a integração de Faturas/Histórico de Operações ao virtualizador compartilhado de listas de altura fixa. O frontend continua sem framework, bundler ou download de CDN. Ver [[adr/0013-dependencias-frontend-v2]].
 
 **Views funcionais já extraídas:**
 
@@ -73,7 +91,9 @@ O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Co
 | `user-admin-view.js` | Preferências de usuário, tema, SMTP, IA, Mais Retorno, ativação/perfil do Consultor, limpeza e exclusão. |
 | `classifications-view.js` | Categorias, subcategorias e tags. |
 | `limits-view.js` | Limites de gastos e índice de consumo. |
-| `reports-view.js` | Filtros, abas, agrupamentos e tabelas. |
+| `reports-view.js` | Fachada compatível e coordenação de Relatórios: compõe subviews uma vez, delega demonstrativo/evolução e monta rankings extensos diretamente pela janela virtual, com detalhe sob demanda. |
+| `report-statement.js` | Controles, consulta assíncrona, estados e apresentação imprimível do demonstrativo; consome agregações Python sem regra financeira local. |
+| `report-evolution.js` | Drawer, consulta, formatação e ciclo de vida do ApexCharts da evolução; descarta respostas obsoletas, destrói instância ao fechar e não calcula SMA/fallback. |
 | `imports-view.js` | Upload, download de modelo e resultado da importação. |
 | `cockpit-view.js` | Resumo, saldos, planejamento, dívidas, portfólio e alertas; registra sub-views de Calendário, Tendências e Saúde Financeira. |
 | `financial-health-view.js` | Aba **Saúde Financeira** do Cockpit: score/gauge, pilares, Paz Financeira e consolidado do diagnóstico. |
@@ -81,10 +101,20 @@ O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Co
 | `consultor-view.js` | Aba **Consultor** do Cockpit: seletor fechado de análises, execução sob demanda, período condicional para ralos, histórico, vencimentos e atrasos, com renderização de tabelas markdown nas respostas. |
 | `accounts-view.js` | Contas: cadastro, edição, arquivamento, restauração. |
 | `cards-view.js` | Cartões: cadastro, faturas, pagamento, conciliação. |
-| `portfolio-view.js` | Ativos: posições, histórico, resgate, encerramento. |
+| `portfolio-view.js` | Ativos: posições, histórico, resgate e encerramento; libera gráficos, overlays e DOM dinâmico ao sair, reutiliza fábricas de linha agrupadas e formata somente a janela virtual visível. |
+| `portfolio-lifecycle.js` | Política de reaproveitamento do snapshot e limpeza seletiva do DOM dinâmico do Portfólio. |
 | `transactions-view.js` | Lançamentos: formulário, recorrência, parcelas, câmbio. |
+| `transaction-balance-chart.js` | Renderização ApexCharts da evolução mensal de saldos do Extrato. |
+| `transaction-list.js` | Coordenação de busca, filtros e renderização da lista mensal. |
+| `transaction-form.js` | Comportamento base do formulário e prévia cambial fornecida pelo backend. |
+| `transaction-investment-form.js` | Campos, estado condicional e assistência próprios dos aportes. |
+| `classification-suggestion.js` | Sugestão local compartilhada pelos formulários de Contas e Cartões. |
 | `operation-history-view.js` | Histórico de Operações: filtros, busca, agrupamentos e paginação. |
 | `simulations-view.js` | Efeito Borboleta: formulário e renderização das projeções calculadas pelo backend. |
+| `load-policy.js` | Política compartilhada de cache curto, invalidação, chave contextual e deduplicação de requisições em andamento. |
+| `transaction-slice-loader.js` | Coordena lançamentos/projeção por conta+mês com até quatro snapshots recentes e requisições independentes por chave; revisão invalida respostas anteriores a mutações/logout. |
+| `transaction-reconciliation.js` | Aplica a resposta confirmada à lista imediatamente, protege clique duplicado e recarrega saldos sem aguardar Cockpit ou histórico global. |
+| `transaction-refresh.js` | Confirmação imediata de salvar/excluir, recarga prioritária da fatia e atualização auxiliar de contas/histórico protegida por revisão e sessão. Cockpit é invalidado para a próxima entrada. |
 | `instructions-view.js` | Central de ajuda: busca, grupos, tópicos expansíveis, links internos e botões contextuais `?` no header. Ver [[instrucoes-app]]. |
 
 > [!tip] Regra de fronteira
@@ -110,6 +140,9 @@ Responsabilidades:
 | `APP_URL` | URL pública esperada do app; entra na lista de origens/hosts permitidos e define cookie `Secure` quando usa HTTPS. |
 | `APP_ALLOWED_HOSTS` | CSV de hosts adicionais aceitos. Entradas sem porta também aceitam a porta padrão configurada. |
 | `APP_ALLOWED_ORIGINS` | CSV de origens adicionais aceitas. Entradas sem esquema assumem `http://`; entradas sem porta assumem `APP_PORT`. |
+| `AI_ALLOW_PRIVATE_ENDPOINTS` | Quando `true`, permite que a URL base de IA resolva para IPs privados/loopback/link-local. Padrão: rejeitado. Exige também uma allowlist explícita. |
+| `AI_ALLOWED_LOCAL_HOSTS` | CSV opcional de hostnames locais permitidos além da validação de IP (exige `AI_ALLOW_PRIVATE_ENDPOINTS=true`). |
+| `AI_ALLOWED_LOCAL_ENDPOINTS` | CSV opcional de endpoints locais no formato `host:port` ou `ip:port` (exige `AI_ALLOW_PRIVATE_ENDPOINTS=true`). Preferencialmente com porta, para não abrir toda a rede local. |
 
 O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pacotes usa `APP_HOST=0.0.0.0`, detecta o IP local e preenche `APP_URL`, `APP_ALLOWED_HOSTS` e `APP_ALLOWED_ORIGINS`; esse modo é adequado apenas para redes confiáveis. Quando essa exposição usa HTTP, a inicialização emite um alerta não bloqueante. Acesso remoto deve ficar atrás de reverse-proxy com HTTPS.
 
@@ -120,7 +153,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `GET` | `/api/app-info` | Metadados públicos do app, incluindo nome e versão atual. |
 | `GET` | `/api/latest-version` | Versão local e versão mais recente publicada no site oficial, com indicação de atualização disponível. |
 | `GET` | `/api/me` | Dados do usuário autenticado. |
-| `POST` | `/api/register` | Cadastro de novo usuário. |
+| `POST` | `/api/register` | Cadastro de novo usuário, limitado persistentemente por origem antes da criação. |
 | `POST` | `/api/login` | Login com e-mail e senha. |
 | `POST` | `/api/logout` | Encerra a sessão. |
 | `POST` | `/api/password-reset/request` | Solicita código de recuperação. |
@@ -152,7 +185,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `PUT` | `/api/transactions/{id}` |
 | `DELETE` | `/api/transactions/{id}` |
 | `PUT` | `/api/transactions/{id}/reconciliation` |
-| `GET` | `/api/exchange-rate` |
+| `GET` | `/api/exchange-rate?currency={origem}&target_currency={destino}&date={data}&amount={valor}&transfer_rate={cotacao_opcional}` |
 | `GET` | `/api/classification-suggestion?description={texto}&group_type={grupo}` |
 
 #### Rotas — Cartões de Crédito → [[cartoes]]
@@ -195,6 +228,14 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `PUT` | `/api/spending-limits/{id}` |
 | `DELETE` | `/api/spending-limits/{id}` |
 
+`GET /api/spending-limits?month=AAAA-MM` inclui o consumo da competência agregado por categoria/subcategoria no SQLite, sem depender das listas detalhadas do frontend.
+
+#### Rota — Busca Global → [[specs/frontend-modularizacao]]
+
+| Método | Rota |
+|---|---|
+| `GET` | `/api/global-search?q={termo}&limit={1-50}&offset={n}` |
+
 #### Rotas — Simulações → [[efeito-borboleta]]
 
 | Método | Rota |
@@ -206,12 +247,14 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | Método | Rota |
 |---|---|
 | `GET` | `/api/portfolio` |
+| `GET` | `/api/portfolio/events` |
 | `GET` | `/api/portfolio/returns` |
 | `GET` | `/api/portfolio/fund-quote?cnpj={cnpj}` |
 | `POST` | `/api/portfolio/positions` |
 | `PUT` | `/api/portfolio/positions/{id}` |
 | `DELETE` | `/api/portfolio/positions/{id}` |
 | `POST` | `/api/portfolio/redeem` |
+| `POST` | `/api/portfolio/preview` (prévia analítica autenticada, sem gravação) |
 | `POST` | `/api/portfolio/close` |
 | `PUT` | `/api/portfolio/value` |
 | `DELETE` | `/api/portfolio/value` |
@@ -223,7 +266,12 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 |---|---|
 | `GET` | `/api/cockpit?month=AAAA-MM` |
 | `GET` | `/api/cockpit/calendar` |
+| `GET` | `/api/cockpit/notifications` |
+| `POST` | `/api/cockpit/notifications/mark-seen` |
 | `GET` | `/api/reports/tags?month=AAAA-MM` |
+| `GET` | `/api/reports/overview?month=AAAA-MM` |
+| `GET` | `/api/reports/open-debts?month=AAAA-MM&account_ids=1,2&card_ids=3&currency=BRL` |
+| `GET` | `/api/reports/statement?month=AAAA-MM&account_ids=1,2&card_ids=3&currency=BRL` |
 | `GET` | `/api/reports/category-evolution?category_id={id}&subcategory_id={id}&period={periodo}` |
 
 #### Rotas — Tendências e IA → [[tendencias-saude-financeira]]
@@ -281,29 +329,66 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 
 ### Núcleo da aplicação (`financeiro/`)
 
+Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py` trata centavos e arredondamento; `calendar_rules.py`, datas e meses; `identifiers.py`, IDs positivos; e `recurrence.py`, frequências e avanço de ocorrências. Eles não acessam SQLite nem conhecem erros dos módulos consumidores. Ver [[specs/utilitarios-dominio]].
+
 | Módulo | Responsabilidade |
 |---|---|
-| `database.py` | Conexão SQLite, schema e migrações idempotentes. |
+| `database.py` | Fachada pública: fábrica de conexões (`get_connection`), inicialização (`initialize_database`) e helpers transversais (`row_to_dict`). Não contém mais SQL de schema, migração física nem manutenção de cache. |
+| `database_config.py` | Constantes transversais de configuração SQLite, como `SQLITE_BUSY_TIMEOUT_MS`. |
+| `database_maintenance.py` | Rotinas operacionais do `quote_cache`: poda de entradas expiradas e compactação condicional. Ver [[specs/manutencao-cache-cotacoes]]. |
+| `database_compatibility.py` | Normalizações históricas do schema legado 1.x aplicadas apenas à cópia de trabalho da migração. |
+| `database_schema.py` | Descrição canônica do baseline v2 e da versão atual: tabelas, constraints e índices. Oferece `create_baseline_schema`, `create_baseline_tables` e `create_baseline_indexes`. |
+| `database_migrations.py` | Orquestração física e recuperável da migração legada e registro/aplicação transacional das migrações incrementais pós-baseline. |
+| `money.py` | Conversões monetárias puras, escala de centavos, arredondamento e divisão exata de parcelas. Ver [[specs/utilitarios-dominio]]. |
+| `calendar_rules.py` | Normalização ISO e aritmética pura de datas, meses e fins de mês. Ver [[specs/utilitarios-dominio]]. |
+| `identifiers.py` | Parsing puro de identificadores inteiros positivos obrigatórios e opcionais. Ver [[specs/utilitarios-dominio]]. |
+| `recurrence.py` | Vocabulário compartilhado de séries/frequências e cálculo das ocorrências. Ver [[specs/utilitarios-dominio]]. |
 | `auth.py` | Usuários, hashes, sessões, recuperação de senha. Ver [[seguranca-autenticacao]], [[recuperacao-senha]]. |
 | `accounts.py` | Contas-correntes, saldos e arquivamento. Ver [[contas-correntes]]. |
 | `transactions.py` | Lançamentos, transferências, tags, câmbio, recorrência/parcelamento e conciliação. Ver [[lancamentos]]. |
+| `exchange_rates.py` | Cálculo decimal da prévia cambial entre moedas e do valor de destino. Ver [[lancamentos]]. |
 | `categories.py` | Categorias, subcategorias, tags e bloqueios de exclusão. Ver [[categorias-tags-gestao]]. |
 | `classification_suggestions.py` | Normalização de descrições e sugestão local por histórico exato indexado. Ver [[classificacao-assistida]]. |
 | `credit_cards.py` | Cartões, faturas mensais, transações e pagamentos. Ver [[cartoes]]. |
-| `spending_limits.py` | Metas e orçamentos mensais. Ver [[limites-gastos]]. |
-| `portfolio.py` | Consolidação de investimentos, precificação, impostos e metadado de reserva de emergência. Ver [[investimentos-portfolio]]. |
+| `credit_card_invoice.py` | Consulta agregada e serialização do recorte de fatura/histórico visual limitado. Ver [[cartoes]]. |
+| `spending_limits.py` | Metas recorrentes e consumo mensal agregado por categoria/subcategoria, incluindo competência de faturas e exclusão do pagamento agregado. Ver [[limites-gastos]]. |
+| `global_search.py` | Busca histórica autenticada e paginada em lançamentos de contas/cartões, isolada por usuário e executada sob demanda pela Command Palette. |
+| `http_routes.py` | Tabela declarativa e resolução de rotas, independente do transporte HTTP. Ver [[specs/desconcentracao-arquitetura-v2]]. |
+| `cockpit.py` | Agregações de domínio do resumo mensal do Cockpit com `SUM`, `COUNT` e `GROUP BY` no SQLite, fora do adaptador HTTP e sem materializar lançamentos detalhados. |
+| `cockpit_notifications.py` | Motor desacoplado de notificações financeiras: compila limites, saldo projetado, contas/faturas vencidas, maturidades e eventos semanais; cruza informativos com `notification_reads` sem depender do snapshot mensal ou de rede para maturidades. Ver [[specs/alertas-cockpit]]. |
+| `open_debts.py` | Leitura consistente e agregação de parcelas em aberto, por usuário e moeda, compartilhada entre `/api/cockpit` (`open_debts`) e Relatórios. Conciliação liquida parcela de conta; registro de pagamento encerra fatura. Inclui vencidas, sem reconstrução histórica, rede ou escrita. |
+| `balance_projections.py` | Saldos conciliados/projetados e reservas de faturas; a projeção detalhada atende o Extrato, enquanto o Cockpit usa uma consolidação por moeda agregada diretamente no SQLite, sem materializar históricos. |
+| `portfolio.py` | API pública e composição do Portfólio; mantém CRUD, adaptação dos provedores e aplicação de cotações de mercado/fundos. Delega transporte/cache, valorização por data e série histórica. Resgates e encerramentos preparam posições fora da escrita e revalidam entradas locais na transação, sem recotação. Ver [[investimentos-portfolio]]. |
+| `portfolio_positions.py` | Identidade, auxiliares de lotes/FIFO e leituras locais compartilhadas: entradas da carteira e vencimentos abertos de renda fixa filtrados no SQLite; histórico de resgates por conexão recebida. Não contém CRUD completo nem consultas externas. |
+| `portfolio_quotes.py` | Transporte HTTPS/JSON com contexto TLS verificado compartilhado, cache SQLite, caches em memória de cotações/câmbio, locks, TTL, expurgo/LRU e fallback vencido. Erros de certificado falham de forma segura, sem retry que desative validação. Dependências injetadas sem importar a fachada; normalização de provedores permanece em `portfolio.py`. |
+| `portfolio_events.py` | Deduplicação dos ativos elegíveis, consulta e parsing de eventos futuros; usa B3 para proventos e eventos societários de ativos brasileiros, Nasdaq para internacionais e Yahoo Finance como fallback, com transporte/cache injetados e sem cálculo de valor total estimado. |
+| `market_calendar.py` | Download limitado e TLS-verificado da planilha nacional ANBIMA, parsing pelo leitor XLS interno, atualização anual transacional e consulta do calendário local de dias sem liquidação; não usa BrasilAPI. |
+| `portfolio_valuation.py` | `PositionValuation`: valor por data de renda fixa/poupança, impostos, custódia, aniversários, variação diária e fatores mensais compartilhados. Sem SQL/HTTP; recebe provedores e relógio na composição. |
+| `portfolio_returns.py` | `PortfolioReturns`: série mensal por moeda, baseline e benchmarks CDI/IPCA; recebe valorização por data e carregador opcional da carteira, sem duplicar juros/impostos. Caches de fatores locais à chamada. |
+| `portfolio_snapshots.py` | Repositório idempotente de snapshots mensais por ativo; somente SQLite, sem cálculo financeiro ou chamadas externas. |
+| `portfolio_calculations.py` | Agregações, normalizações e cálculos puros do Portfólio. |
+| `portfolio_presentation.py` | Modelos financeiros de leitura para posições/fontes, agregados, cabeçalhos, composição e metas; prévias de resgate e soma de metas. Centavos/Decimal, sem SQL ou rede. |
 | `financial_health.py` | Núcleo analítico do Score de Saúde Financeira: cálculo atômico dos pilares, lista `pilares`, Paz Financeira e função de histórico com validação de `months` (1-36). Ver [[score-saude-financeira]]. |
 | `trends.py` | Núcleo local de Tendências e Achados: série mensal, Budget x Realizado, achados estruturados, eventos pontuais, assinaturas/serviços recorrentes, confiança e resumo determinístico. Ver [[tendencias-saude-financeira]]. |
-| `ai_summary.py` | Reescrita opcional do resumo por IA com payload minimizado, timeout curto e fallback para resumo local. Ver [[tendencias-saude-financeira]]. |
-| `consultor.py` | Domínio do Consultor: catálogo fechado de 9 análises, validações de enums, prompts estritos, persona, disclaimer, configuração por usuário, Perfil Complementar criptografado, contexto minimizado por card (incluindo série histórica dos 5 pilares do Score para o card `evolucao_score_tempo`), metadados de cotações herdados do Portfólio, executor de IA via `user_ai_settings`, pós-processamento de respostas, quota/cooldown de resiliência e expurgo de histórico por privacidade. Ver [[specs/consultor]]. |
+| `ai_endpoint_security.py` | Fronteira anti-SSRF para endpoints de IA configuráveis: validação de esquema, hostname, IP resolvido, bloqueio de redirecionamentos e opt-in por env para endpoints privados. Ver [[specs/seguranca-ai-ssrf]], [[adr/0015-ssrf-ai-endpoints]]. |
+| `ai_summary.py` | Reescrita opcional do resumo por IA com payload minimizado, timeout curto e fallback para resumo local. Valida o endpoint via `ai_endpoint_security` antes de cada chamada. Ver [[tendencias-saude-financeira]]. |
+| `consultor.py` | Fachada pública, composição dos contextos, execução e pós-processamento das respostas; reexports compatíveis de catálogo, configurações, contexto e histórico. Ver [[specs/consultor]]. |
+| `consultor_settings.py` | Configuração, consentimento, sincronização com IA geral e perfil complementar criptografado por usuário; delega expurgo ao histórico. |
+| `consultor_catalog.py` | Catálogo fechado, perfis educacionais, períodos, validações de seleção, prompts e estrutura de resposta; sem persistência ou transporte. |
+| `consultor_errors.py` | Definição única de `ConsultorError`, reexportada pela fachada e compartilhada por catálogo/configurações sem importações circulares. |
+| `consultor_provider.py` | Mensagens minimizadas, payloads dos provedores e transporte HTTP; dependências injetáveis e erros traduzidos pela fachada. Valida o endpoint via `ai_endpoint_security` e bloqueia redirecionamentos. Sem acesso ao SQLite. |
+| `consultor_context.py` | Builders dos nove contextos, agregação e compactação dos dados e formatação monetária de borda; reutiliza serviços de domínio e posições recebidas. Não acessa configuração, histórico ou transporte de IA. A fachada valida a seleção via catálogo e enriquece o contexto com perfis via configurações; reexporta os builders. |
+| `consultor_history.py` | Persistência/listagem/expurgo das análises, quota diária e cooldown de falhas, isolados do executor e da configuração. Ver [[specs/consultor]]. |
 | `imports.py` | Leitura de arquivos externos legados e planilhas modelo. Ver [[importacao-dados]]. |
+| `xlsx_security.py` | Fronteira defensiva dos pacotes XLSX: valida o contêiner ZIP, limita expansão e compressão, normaliza caminhos internos e faz leituras limitadas antes do parsing XML, sem persistência. Ver [[importacao-dados]]. |
 | `operation_logs.py` | Auditoria funcional das operações do usuário. Ver [[historico-operacoes]]. |
 | `emailer.py` | Envio SMTP do código de recuperação de senha. Ver [[recuperacao-senha]]. |
 | `secure_config.py` | Armazenamento criptografado da configuração SMTP local, segredos de IA e chaves de integrações por usuário em `secure_configs`, com compatibilidade para arquivos `.enc` legados. Ver [[recuperacao-senha]], [[tendencias-saude-financeira]], [[specs/preferencias-abas]]. |
 | `version_check.py` | Consulta a landing page oficial por nova versão, compara com a versão local e mantém cache de 1h. Ver [[alerta-nova-versao]]. |
-| `calendar.py` | Cálculo da aba **Calendário** do Cockpit: contas a receber/pagar atrasadas e vencimentos de renda fixa em 30 e 60 dias. Ver [[specs/cockpit-calendario]]. |
+| `outbound_json.py` | Fronteira compartilhada para leitura limitada de JSON externo; valida tamanho declarado e efetivo antes de decodificar, com limites por integração. Ver [[specs/seguranca-transporte-externo]]. |
+| `calendar.py` | Cálculo offline da aba **Calendário** do Cockpit: contas a receber/pagar atrasadas e vencimentos de renda fixa em 30 e 60 dias, sem montar ou valorar a carteira. Ver [[specs/cockpit-calendario]]. |
 | `simulations.py` | Validação e projeção comparativa, sem persistência, de cenários hipotéticos do Efeito Borboleta. Ver [[efeito-borboleta]]. |
-| `reports.py` | Agregações de relatórios por tag e por evolução de categoria/subcategoria, normalizadas em BRL quando necessário. Ver [[relatorios]]. |
+| `reports.py` | Relatório por tag agregado no SQLite e demonstrativo mensal com KPIs, média diária, ranking, distribuição, composição, percentuais, série diária e detalhes separados por moeda nativa. Reutiliza `open_debts.py`; autenticação/adaptação HTTP ficam em `app.py`. Evolução de categoria permanece em `categories.py`. Ver [[relatorios]]. |
 
 ---
 
@@ -311,12 +396,19 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 
 Banco local em `data/finance.db`, criado automaticamente na inicialização. Arquivos de `data/` são runtime local e **não devem ser versionados**.
 
-Conexões SQLite são abertas com `journal_mode=WAL`, `busy_timeout` curto e `foreign_keys=ON`. Escritas que dependem de leituras prévias de saldo/fatura usam transações imediatas para serializar a janela crítica; operações potencialmente demoradas, como envio SMTP, cotação externa, consolidação de portfólio e importações em lote, não devem manter uma conexão aberta além do trecho estritamente necessário de leitura ou gravação.
+O cache regenerável `quote_cache` recebe manutenção na inicialização por `financeiro/database_maintenance.py`: respostas expiradas há mais de 30 dias são removidas, com limites de 1.000 entradas por provedor e 1.500 no total. Se a limpeza liberar ao menos 1 MiB e 20% das páginas, o banco executa `VACUUM`; abaixo disso, o SQLite apenas reutiliza as páginas livres. Falhas nessa manutenção não bloqueiam a abertura e nenhuma tabela financeira é afetada. `financeiro/database.py` orquestra a chamada, mas não conhece os detalhes de retenção, poda e compactação. Ver [[specs/manutencao-cache-cotacoes]].
+
+O arquivo SQLite recebe `journal_mode=WAL` uma vez no ciclo de inicialização; conexões de domínio não renegociam esse modo persistente. Cada conexão usa `busy_timeout` curto, `foreign_keys=ON` e `synchronous=FULL`. Escritas que dependem de leituras prévias de saldo/fatura usam transações imediatas para serializar a janela crítica; operações potencialmente demoradas, como envio SMTP, cotação externa, consolidação de portfólio e importações em lote, não devem manter uma conexão aberta além do trecho estritamente necessário de leitura ou gravação. Depois de criação ou migração, `PRAGMA optimize=0x10002` permite ao SQLite criar ou atualizar estatísticas do planner de forma controlada.
+
+### Baseline e migração para a linha v2
+
+O baseline inicial da v2 usa `PRAGMA user_version = 20000`; a evolução operacional do SQLite inaugura a versão incremental `20001`. A tabela `schema_migrations` registra baseline e passos posteriores, enquanto `user_version` seleciona e ordena as migrações. Banco ausente é criado diretamente na versão atual; banco `20000` avança transacionalmente para `20001`; versões futuras ou intermediárias desconhecidas são recusadas. Um `finance.db` com `user_version = 0` continua tratado como legado: na abertura, `financeiro/database_migrations.py` orquestra a cópia de trabalho, as compatibilizações históricas via `financeiro/database_compatibility.py::normalize_legacy_schema`, o candidato compacto por `VACUUM INTO`, as validações de integridade/chaves estrangeiras/versão/contagens e a promoção recuperável. O original passa a `data/finance-v1.bkp`, que nunca é sobrescrito, enquanto o candidato mantém o nome ativo `data/finance.db`. Falhas anteriores à promoção preservam o nome original; falha na segunda renomeação tenta restaurá-lo. Ver [[specs/migracao-banco-v2]] e [[adr/0012-fundacao-v2-contrato-e-migracao-de-dados]].
 
 ### Tabelas
 
 | Tabela | Módulo responsável |
 |---|---|
+| `schema_migrations` | `database_migrations.py` — histórico idempotente do baseline e das migrações incrementais aplicadas. |
 | `users` | `auth.py` |
 | `sessions` | `auth.py` |
 | `password_resets` | `auth.py` |
@@ -337,12 +429,16 @@ Conexões SQLite são abertas com `journal_mode=WAL`, `busy_timeout` curto e `fo
 | `investment_redemptions` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
 | `investment_closed_positions` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
 | `investment_value_overrides` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
-| `quote_cache` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
+| `investment_monthly_snapshots` | `portfolio_returns.py` — snapshots mensais por ativo para rentabilidade; leitura agregada por moeda. Ver [[specs/rentabilidade-portfolio]], [[adr/0017-snapshots-rentabilidade-portfolio]]. |
+| `quote_cache` | `portfolio_quotes.py` — Ver [[investimentos-portfolio]]. |
+| `market_holidays` | `market_calendar.py` — calendário nacional ANBIMA atual, sem histórico de versões. Ver [[investimentos-portfolio]], [[adr/0016-calendario-mercado-anbima]]. |
+| `market_calendar_state` | `market_calendar.py` — controle da fonte, última tentativa/importação, ano verificado, hash e quantidade de feriados. |
 | `user_ai_settings` | `secure_config.py` — metadados não secretos de configuração opcional de IA por usuário; segredo fica em `secure_configs`. Ver [[tendencias-saude-financeira]]. |
 | `secure_configs` | `secure_config.py` — envelopes criptografados por usuário para SMTP, IA e Mais Retorno; `source_path` indica arquivo legado migrado quando aplicável. Ver [[specs/preferencias-abas]], [[adr/0010-segredos-criptografados-sqlite]]. |
 | `consultor_settings` | `database.py` — configuração do Consultor por usuário (`consultor_enabled`, `investor_profile`, `data_access_consent`). Ver [[specs/consultor]]. |
 | `consultor_analyses` | `database.py` — histórico de execuções bem-sucedidas do Consultor, indexado por usuário, data e `analysis_id` para leitura e quota diária. Ver [[specs/consultor]]. |
 | `consultor_perfil_complementar` | `database.py` — payload criptografado do Perfil Complementar por usuário (`payload_enc`, `schema_version`). Ver [[specs/consultor]]. |
+| `notification_reads` | `database.py` — registro de leitura de informativos do Cockpit por usuário (`user_id`, `notification_id`, `seen_at`). Ver [[specs/alertas-cockpit]]. |
 
 `transactions` e `credit_card_transactions` persistem `normalized_description` para a classificação assistida. Ambas também mantêm valor normalizado em BRL (`amount_brl_cents`); em moedas estrangeiras sem cotação manual, a normalização usa a última PTAX de venda disponível até a data do lançamento. Bancos existentes são retroalimentados de forma idempotente durante a inicialização.
 
@@ -368,6 +464,8 @@ A chave mestra padrão de `secure_config.py` fica fora de `data/`, em `secure/co
 - `idx_investment_opening_positions_user`
 - `idx_investment_redemptions_source`
 - `idx_investment_value_overrides_user`
+- `idx_investment_monthly_snapshots_user_month`
+- `idx_investment_monthly_snapshots_user_asset`
 - `idx_investment_closed_positions_user`
 - `idx_investment_closed_positions_user_closed`
 - `idx_credit_card_transactions_card_month`
@@ -454,8 +552,9 @@ Ver [[cartoes]].
 6. Resgates usam FIFO; encerramentos movem posições para histórico.
 7. Ativos em moeda estrangeira exibidos na moeda da carteira; conversão via lançamentos de câmbio.
 8. Consolidações do Portfólio mantêm valores exibidos na moeda original, mas expõem valor atual normalizado em BRL para a escala das barras visuais, usando cotação do fechamento anterior quando a moeda não é BRL.
-9. A UI do Portfólio carrega a aba **Posição** primeiro; Análise, Histórico e rentabilidade detalhada são renderizados/carregados sob demanda.
-10. Renda fixa e Poupança exibem variação do dia calculada como a diferença do valor na curva entre hoje e o dia anterior (base limitada à data de aquisição), reutilizando `fixed_income_value_as_of`/`savings_value_as_of` com cache de fatores compartilhado; dias sem taxa publicada produzem variação zero em pós-fixados.
+9. A UI do Portfólio carrega a aba **Posição** primeiro; Análise, Eventos, Histórico e rentabilidade detalhada são renderizados/carregados sob demanda. Eventos usa rota própria, somente para posições abertas de renda variável, sem repetir a valorização da carteira; a agenda futura cobre o mês atual e os dois seguintes, é agrupada por competência, virtualizada quando extensa e desmontada ao trocar de aba. Para a B3, inclui proventos, bonificações, desdobramentos e grupamentos compatíveis com a espécie do ativo. A Data ex derivada de `lastDatePrior` avança pelo calendário nacional ANBIMA persistido localmente; a data de pagamento é opcional. Ausência de anúncio ou calendário resulta em estado vazio neutro, sem aviso de erro.
+10. A central de Informativos reutiliza o calendário futuro de Eventos e filtra somente a semana corrente; nenhuma chamada carrega histórico desde a primeira aquisição.
+11. Renda fixa e Poupança exibem variação do dia calculada como a diferença do valor na curva entre hoje e o dia anterior (base limitada à data de aquisição), reutilizando `fixed_income_value_as_of`/`savings_value_as_of` com cache de fatores compartilhado; dias sem taxa publicada produzem variação zero em pós-fixados.
 
 Ver [[investimentos-portfolio]].
 
@@ -468,9 +567,11 @@ Ver [[investimentos-portfolio]].
 5. Faturas de cartão de crédito continuam visíveis no Cockpit pelo mês de competência mesmo após pagamento; o pagamento agregado em conta-corrente permanece excluído das despesas analíticas.
 6. Relatórios no frontend agrupam por categoria, subcategoria, conta, tag e fluxo diário.
 7. Lançamentos de cartão entram em relatórios e limites pela competência da fatura.
-8. `GET /api/reports/category-evolution` retorna séries mensais por categoria/subcategoria para o drawer de evolução, com `periodo` igual a `3m`, `6m`, `12m`, `ytd` ou `all`.
+8. `GET /api/reports/category-evolution` retorna séries mensais por categoria/subcategoria para o drawer de evolução, com `periodo` igual a `3m`, `6m`, `12m`, `ytd` ou `all`. `categories.py` preserva a leitura/competência; `reports.build_evolution_presentation` acrescenta `total_cents`, `trend_percent` (nullable) e `forecast` (12 pontos SMA), mantendo `evolution` compatível. Frontend apenas seleciona o horizonte e formata/desenha.
+9. O consolidado `currency_totals` do Cockpit usa três consultas agregadas e limitadas ao usuário/competência: saldos por conta, faturas do mês por cartão e reservas conciliadas ainda não pagas. A rota não chama os leitores detalhados de lançamentos, compras ou pagamentos e não constrói o mapa de datas da projeção do Extrato.
+10. A Central de Notificações do Cockpit expõe `GET /api/cockpit/notifications` compilando no backend os alertas críticos (limites excedidos, saldo negativo projetado, contas/faturas vencidas) e informativos periódicos (dividendos e vencimentos da semana), mantendo o frontend em `web/` puramente de apresentação para os indicadores de abas e o flyout global em camada superior de sobreposição (evitando problemas de z-index/clipping). `POST /api/cockpit/notifications/mark-seen` registra leitura de informativos por usuário; o `app.js` traduz somente os metadados de ação em navegação contextual para Limites, Extrato, Cartões, Calendário ou Portfólio.
 
-Ver [[relatorios]], [[limites-gastos]], [[specs/cockpit-calendario]].
+Ver [[relatorios]], [[limites-gastos]], [[specs/cockpit-calendario]], [[specs/alertas-cockpit]].
 
 ### Importação de Arquivos
 
@@ -513,9 +614,102 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 - [[adr/0004-importador-xls-sem-dependencia]] — Parser `.xls` implementado sem pacote externo para reduzir requisitos de instalação.
 - [[adr/0005-smtp-criptografado-local]] — Configuração SMTP criptografada no próprio ambiente; pacotes distribuíveis nunca incluem credenciais.
 - [[adr/0006-classificacao-assistida-local]] — Correspondência exata normalizada como MVP local; ML local reservado para V2.
+- [[adr/0014-desconcentracao-fachadas-e-roteamento]] — Fachadas compatíveis, roteamento declarativo e módulos internos menores para a fundação v2.
 
 ## Changelog
 
+- `4.5` — 2026-09-05 — Persistência passa a usar `synchronous=FULL`, WAL configurado somente na inicialização, estatísticas via `PRAGMA optimize` e migração incremental rastreável `20000` → `20001` em `schema_migrations`.
+- `4.4` — 2026-09-04 — Inicialização reconcilia o baseline aditivo idempotente também em bancos já marcados como v2, antes de atender requisições.
+- `4.3` — 2026-09-04 — Registrada `investment_monthly_snapshots` e seus índices para a futura rentabilidade baseada em snapshots por ativo, conforme ADR-0017.
+- `4.2` — 2026-09-04 — Adicionado `market_calendar.py` e tabelas locais para importar o calendário ANBIMA com atualização anual transacional e aplicá-lo às datas derivadas dos eventos B3.
+- `4.1` — 2026-09-04 — Transporte de B3, Nasdaq e Yahoo compartilha contexto TLS verificado com falha segura; parser B3 passa a abranger bonificações, desdobramentos e grupamentos.
+- `4.0` — 2026-09-04 — Cadeia de eventos implementada com B3/Nasdaq como fontes primárias, Yahoo como fallback, cache diário e normalização segura no núcleo Python.
+- `3.99` — 2026-09-04 — Documentada a estratégia de fontes da aba Eventos: B3 para ativos brasileiros, Nasdaq para internacionais e Yahoo Finance como fallback, com cache diário.
+- `3.98` — 2026-09-04 — Aba Eventos usa estado vazio neutro quando não há anúncio futuro ou calendário do provedor, evitando sinalizar ETFs acumuladores e divulgações ainda não publicadas como erro.
+- `3.97` — 2026-09-04 — Eventos usa `calendarEvents` autenticado por sessão Yahoo para a janela futura de três meses, agrupa por mês, associa carteiras e mantém a fonte em nota de rodapé; o Cockpit reutiliza a mesma leitura e filtra a semana.
+- `3.96` — 2026-09-04 — Eventos distingue Data ex e pagamento opcional, valida escalares externos e virtualiza/desmonta históricos extensos; o Cockpit limita a consulta de proventos à semana corrente.
+- `3.95` — 2026-09-04 — Nova rota `GET /api/portfolio/events` e módulo `portfolio_events.py` consultam proventos históricos sob demanda, depois de fechar o snapshot SQLite; `portfolio-events.js` mantém a apresentação isolada e não estima valor total. Eventos da semana alimentam os Informativos do Cockpit com falha externa não bloqueante.
+- `3.94` — 2026-09-04 — Rankings extensos de Relatórios passam dados brutos diretamente ao virtualizador, sem DOM/`outerHTML` intermediário, e produzem detalhes apenas na expansão; Portfólio reutiliza as fábricas de linha da primeira passagem e mantém agrupamento/expansão.
+- `3.93` — 2026-09-03 — Calendário e notificações compartilham leitura SQLite de vencimentos abertos em `portfolio_positions.py`; o endpoint do Calendário deixa de montar e cotar a carteira, eliminando acesso externo de Poupança/SELIC/TR nesse fluxo.
+- `3.92` — 2026-09-03 — Central de Notificações conclui ações contextuais e marcação persistente de informativos; o flyout mantém erros operacionais visíveis e o composition root traduz rotas sem incorporar regras financeiras. Testes de integração cobrem autenticação, isolamento por usuário e fatura vencida.
+- `3.91` — 2026-09-03 — Cockpit integra indicadores acessíveis de críticos/informativos e botão condensado responsivo ao flyout global, usando endpoint dedicado com cache local curto e deduplicação; banner de versão permanece independente.
+
+- `3.90` — 2026-09-03 — Criado `notification-flyout.js` como overlay global acessível e responsivo, ainda desacoplado dos indicadores e da navegação do Cockpit previstos nos próximos passos.
+
+- `3.89` — 2026-09-03 — Implementadas no roteador e no adaptador HTTP as rotas autenticadas `GET /api/cockpit/notifications` e `POST /api/cockpit/notifications/mark-seen`, preservando validação de origem e isolamento das leituras por usuário.
+
+- `3.88` — 2026-09-03 — Criado `cockpit_notifications.py` para agregação independente das notificações críticas e informativas, com leitura local de maturidades e persistência de visualização desacoplada das futuras rotas HTTP.
+
+- `3.87` — 2026-09-03 — Registradas as rotas `GET /api/cockpit/notifications` e `POST /api/cockpit/notifications/mark-seen` e o fluxo de montagem centralizada de notificações críticas e informativas do Cockpit com flyout desacoplado em camada global. Ver [[specs/alertas-cockpit]].
+- `3.86` — 2026-09-03 — Adicionada fronteira `financeiro/ai_endpoint_security.py` para proteger endpoints configuráveis de IA contra SSRF, com DNS pinning, validação da URL final e variáveis de ambiente `AI_ALLOW_PRIVATE_ENDPOINTS`, `AI_ALLOWED_LOCAL_HOSTS` e `AI_ALLOWED_LOCAL_ENDPOINTS` para operadores.
+
+- `3.85` — 2026-09-03 — Transporte externo passa a falhar fechado em erros TLS de cotações e centraliza leitura JSON limitada para cotações, PTAX, IA, Consultor e versão.
+
+- `3.84` — 2026-09-03 — Lançamentos de Cartões carregam apenas a fatura ativa e cinco totais mensais agregados por `credit_card_invoice.py`; o relatório mensal de tags separa o SQL com competência para preservar o uso dos índices temporais.
+
+- `3.83` — 2026-09-03 — `GET /api/transactions` com `month + account_id` passa a retornar intervalo mensal estrito; saldos acumulados do Extrato permanecem sob autoridade de `/api/balance-projection`.
+
+- `3.82` — 2026-09-01 — Limites recebem consumo mensal agregado no SQLite e a Busca Global passa a consultar lançamentos históricos sob demanda pela nova rota paginada `/api/global-search`, sem restaurar históricos no estado global.
+
+- `3.81` — 2026-09-01 — `/api/cockpit` deixa de montar a projeção detalhada a partir de três históricos completos; `currency_totals` passa a vir de agregações SQLite específicas, preservando o contrato financeiro e mantendo a projeção completa restrita ao Extrato.
+
+- `3.80` — 2026-09-01 — Boot e troca mensal do Cockpit passam a carregar somente recortes mensais; Relatórios isolam seu recorte por competência; Cockpit e Tags usam agregações SQL em vez de leitores detalhados.
+
+- `3.79` — 2026-09-01 — Cadastro público passa pela contenção persistente de `auth.py`, com orçamento independente por endereço de origem antes do hash de senha e das escritas de criação. Ver [[specs/seguranca-autenticacao]] v1.6.
+
+- `3.78` — 2026-09-01 — Extraída a fronteira defensiva `financeiro/xlsx_security.py` para validar pacotes XLSX e limitar membros, expansão, compressão e caminhos antes do parsing XML e de qualquer escrita financeira. Ver [[specs/importacao-dados]] v1.6.
+
+- `3.77` — 2026-08-31 — Apresentação de demonstrativo e evolução extraída de `reports-view.js`; fachada preservada como composition root local e módulos possuem ciclo de vida assíncrono independente.
+
+- `3.76` — 2026-08-31 — Total, tendência e SMA da evolução calculados por `reports.py`; payload aditivo e erro explícito substituem fallback financeiro local.
+
+- `3.75` — 2026-08-31 — Agregações do demonstrativo transferidas a `reports.py` e expostas por `/api/reports/statement`; frontend mantém desenho/impressão, sem fallback financeiro para este relatório.
+
+- `3.74` — 2026-08-31 — Serviço compartilhado de parcelas em aberto e endpoint de Relatórios; frontend deixa de classificar liquidação e somar este indicador. Sem alteração de schema ou do score de saúde financeira.
+
+- `3.73` — 2026-08-31 — Resultados, composição, alocação e prévias residuais do Portfólio centralizados em Python. `portfolio-preview.js` coordena debounce e respostas obsoletas; a view somente apresenta valores. `POST /api/portfolio/preview` é analítico, autenticado e não invalida caches de mutação.
+
+- `3.72` — 2026-08-31 — Separados motores de valorização por data e rentabilidade histórica, com fachada compatível e dependências explícitas. Sem novas rotas, tabelas ou regras financeiras.
+
+- `3.71` — 2026-08-31 — Transporte e estado/políticas de cache transferidos para `portfolio_quotes.py`. Fachada mantém wrappers e aliases dos objetos públicos; SQLite fechado antes de HTTP. Sem novas rotas, tabelas ou mudança nas políticas de cotação.
+- `3.70` — 2026-08-31 — Observador compartilhado acompanha `hidden` para destruir gráficos de telas/abas/drawers ocultos e restaurar somente a apresentação ao retornar. Reset de sessão descarta instâncias e configurações; nenhuma consulta nova ou mudança de contrato financeiro.
+- `3.69` — 2026-08-31 — Tela do Portfólio e preparo interno compartilham `load_position_inputs` e `assemble_portfolio_positions`. Snapshot fechado antes de cotar e aplicar overrides; histórico mantém nomes e ordem. Removidas consultas e montagem paralelas da fachada, sem alteração de rotas ou schema.
+- `3.68` — 2026-08-31 — Salvamento de lançamentos não aguarda recargas globais para mostrar a resposta confirmada. Projeções acumulam lotes cronológicos e eventos de vencimento de faturas, sem percorrer integralmente o histórico a cada data. Nenhuma rota ou tabela nova.
+- `3.67` — 2026-08-31 — Conciliação com atualização imediata; cache limitado e concorrência por seleção no Extrato; projeção por conta filtra lançamentos/cartões irrelevantes antes de calcular. Apoio restrito a link local na tela Sobre, sem widget global.
+
+- `3.66` — 2026-08-31 — Documentada confirmação sem rede com comparação otimista das entradas locais; mudanças concorrentes retornam 409 sem escrita financeira. Corrigida descrição das responsabilidades ainda concentradas no Portfólio.
+
+- `3.65` — 2026-08-31 — Concluída separação de configurações e catálogo do Consultor; exceção compartilhada em módulo mínimo e API pública preservada por reexports. Fachada sem SQL, com execução e pós-processamento mantidos.
+
+- `3.64` — 2026-08-31 — Extraídos os builders e helpers de contexto para `consultor_context.py`, sem dependência circular nem alteração dos payloads; composição dos perfis preservada na fachada.
+
+- `3.63` — 2026-08-31 — Extraído o adaptador `consultor_provider.py`, preservando funções públicas e mocks do transporte em `consultor.py`.
+
+- `3.62` — 2026-08-31 — Histórico, quota diária e cooldown do Consultor extraídos para `consultor_history.py`; `consultor.py` preserva sua API pública por wrappers explícitos.
+- `3.61` — 2026-08-31 — `transactions-view.js` torna-se fachada compatível sobre módulos de gráfico, lista, formulário base/investimento e classificação compartilhada; a prévia cambial passa a `financeiro/exchange_rates.py`.
+- `3.60` — 2026-08-31 — Documentados `bank-logos.js`, os catálogos de assets compartilhados por Contas/Cartões e o gate automatizado efetivamente aplicado por `tests/test_code_quality.py`.
+- `3.59` — 2026-08-30 — Carregamentos de Preferências, Histórico, Extrato e Simulações adotam política compartilhada `dirty + loadedAt + in-flight`, invalidada centralmente após mutações HTTP.
+- `3.58` — 2026-08-30 — Portfólio adota ciclo seletivo `onEnter()`/`onLeave()`, snapshot fresco por 30 segundos e invalidação imediata após mutações para reduzir memória e chamadas redundantes.
+- `3.57` — 2026-08-30 — Documentada a extração de `app-state.js` e `app-data-loader.js`, preservando `app.js` como composition root e as regras financeiras no núcleo Python.
+
+- `3.56` — 2026-08-30 — [[qualidade-codigo]] incorporada como referência implementada de fronteiras de responsabilidade, sinais de alerta e prevenção de regressões arquiteturais.
+- `3.55` — 2026-08-30 — Projeções de saldos/faturas migram de `app.js` para `balance_projections.py` e `portfolio-view.js` passa a coordenar módulos dedicados de gráfico, agrupamento e formulário.
+- `3.54` — 2026-08-30 — Roteamento declarativo e fronteiras internas de Portfólio/Cockpit reduzem concentração sem alterar contratos públicos. Ver [[specs/desconcentracao-arquitetura-v2]] e [[adr/0014-desconcentracao-fachadas-e-roteamento]].
+- `3.53` — 2026-08-30 — Documentados os utilitários puros de dinheiro, calendário, identificadores e recorrência compartilhados pelo núcleo. Ver [[specs/utilitarios-dominio]].
+- `3.64` — 2026-09-04 — `financeiro/trends.py` passa a detectar limites de gastos ultrapassados em 3 meses consecutivos e a emitir achado estruturado `limite_recorrente` sugerindo revisão do valor. Ver [[specs/tendencias-saude-financeira]].
+- `3.63` — 2026-09-03 — Migração legada dividida em fases (tabelas → compatibilização → índices) em `financeiro/database_migrations.py`; adicionado `database_config.py` para constantes SQLite e teste com fixture legado genuíno. Ver [[specs/migracao-banco-v2]].
+- `3.66` — 2026-09-04 — Workflows GitHub Actions de distribuição validam presença de `web/vendor/imask/` e `web/vendor/apexcharts/` no runtime PyInstaller antes da publicação; pendência de pacotes sem `web/vendor/` resolvida. Ver [[docs/distribuição]].
+- `3.65` — 2026-09-04 — Faturas (`cards-view.js`) e Histórico de Operações (`operation-history-view.js`) integrados ao virtualizador compartilhado (`virtual-list.js`), mantendo ações por event delegation e limpeza de listeners. Ver [[specs/frontend-fundacao-v2]].
+- `3.64` — 2026-09-04 — Command Palette nativa (`command-palette.js`) integrada ao `index.html` e `app.js` com atalho `Cmd/Ctrl+K`, botão no cabeçalho, comandos de navegação/preferências/busca/ajuda e teste de contrato. Ver [[specs/frontend-fundacao-v2]] e [[adr/0013-dependencias-frontend-v2]].
+- `3.63` — 2026-09-04 — IMask 7.6.1 vendorizado e integrado via `web/modules/input-mask.js`; máscaras aplicadas em campos monetários do `index.html` preservando parsers e formato brasileiro, com ciclo de vida em boot, formulários dinâmicos e logout. Ver [[specs/frontend-fundacao-v2]] e [[adr/0013-dependencias-frontend-v2]].
+- `3.62` — 2026-09-03 — Orquestração física e recuperável da migração legada extraída para `financeiro/database_migrations.py`; `database.py` passa a ser apenas ponto de entrada público e fábrica de conexões. Ver [[specs/migracao-banco-v2]].
+- `3.61` — 2026-09-03 — Descrição canônica do baseline v2 extraída para `financeiro/database_schema.py`; `database.py` e `database_compatibility.py` passam a consumir schema, índices e versão do novo módulo. Ver [[specs/migracao-banco-v2]].
+- `3.60` — 2026-09-03 — Compatibilizações históricas de schema segregadas de `database.py` para `database_compatibility.py`; migração legada aplica `normalize_legacy_schema` apenas na cópia de trabalho. Ver [[specs/migracao-banco-v2]].
+- `3.59` — 2026-09-03 — Rotinas operacionais de manutenção do `quote_cache` segregadas de `database.py` para `database_maintenance.py`, desacoplando schema/migração da poda e compactação. Ver [[specs/manutencao-cache-cotacoes]].
+- `3.52` — 2026-08-30 — Documentada manutenção automática do `quote_cache` com retenção stale, limites e `VACUUM` condicionado. Ver [[specs/manutencao-cache-cotacoes]].
+- `3.51` — 2026-08-30 — ApexCharts 4.7.0 incorporado localmente e isolado por `chart-adapter.js`; gráficos atuais migrados sem alterar contratos de dados.
+- `3.50` — 2026-08-30 — Documentada a fundação planejada do frontend v2: ApexCharts 4.7.0/IMask locais, Command Palette nativa por `Cmd/Ctrl+K` e virtualização compartilhada, mantendo ES Modules sem build step. Ver [[specs/frontend-fundacao-v2]] e [[adr/0013-dependencias-frontend-v2]].
+- `3.49` — 2026-08-30 — Persistência passa a usar baseline v2 `user_version = 20000` e migração automática, validada e recuperável do legado, preservando `finance-v1.bkp` e mantendo `finance.db` como banco ativo. Ver [[specs/migracao-banco-v2]].
 - `3.48` — 2026-08-29 — Metas de alocação passam a integrar o contexto minimizado dos cards `alocacao_perfil` e `analise_carteira`; auditoria aceita a entidade `portfolio_allocation_goals`.
 - `3.47` — 2026-08-29 — Adicionada persistência `portfolio_allocation_goals` e rota `PUT /api/portfolio/allocation-goals`; consolidação por classe usa valores normalizados em BRL para atual versus meta.
 - `3.46` — 2026-08-29 — Adicionada `investment_redemption_summaries` para preservar o snapshot financeiro de cada resgate e alimentar a aba Histórico sem recálculo retroativo.

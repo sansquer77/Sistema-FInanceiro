@@ -13,14 +13,17 @@ from urllib.request import Request, urlopen
 from financeiro.accounts import cents_to_money, empty_to_none, money_to_cents, recompute_account_balance
 from financeiro.categories import ClassificationError, get_or_create_category, get_or_create_subcategory, get_or_create_tag, normalize_name
 from financeiro.classification_suggestions import normalize_description
+from financeiro.calendar_rules import add_months, month_end_date, normalize_iso_date
 from financeiro.database import begin_immediate, get_connection, row_to_dict
+from financeiro.identifiers import positive_int_id
+from financeiro.money import split_cents, split_optional_cents
+from financeiro.outbound_json import MAX_EXCHANGE_RATE_JSON_BYTES, OutboundJsonError, read_limited_json
+from financeiro.recurrence import RECURRENCE_FREQUENCIES, SERIES_KINDS, add_recurrence
 
 TRANSACTION_TYPES = {"income", "expense", "transfer", "investment"}
 INVESTMENT_ASSET_TYPES = {"stock", "crypto", "stablecoin", "fund", "fixed_income", "private_pension", "savings", "other"}
 STABLECOIN_ASSETS = {"USDC", "USDT", "DAI", "FDUSD", "PYUSD", "TUSD", "USDP", "USDE"}
 FIXED_INCOME_MODES = {"pre", "post", "hybrid"}
-SERIES_KINDS = {"single", "installment", "recurring"}
-RECURRENCE_FREQUENCIES = {"weekly", "monthly", "quarterly", "semiannual", "annual"}
 EXCHANGE_RATE_SCALE = Decimal("1000000")
 PTAX_RATE_URL = (
     "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/"
@@ -47,15 +50,10 @@ def list_transactions(
     params: list[object] = [user_id]
     if month:
         normalized_month = normalize_month_filter(month)
-        if account_id:
-            # spec: lancamentos v3.25 — a fatia de mes+conta mantem todo o historico
-            # ate o fim do mes (sem limite inferior) porque o extrato calcula saldos
-            # acumulados partindo do saldo inicial da conta (ver web/app.js getBalanceUntil)
-            filters.append("transactions.date <= ?")
-            params.append(month_end_date(normalized_month))
-        else:
-            filters.append("transactions.date >= ? AND transactions.date <= ?")
-            params.extend([f"{normalized_month}-01", month_end_date(normalized_month)])
+        # spec: lancamentos/lancamentos v3.35 — a lista da conta transporta
+        # somente a competência; saldos acumulados vêm de balance-projection.
+        filters.append("transactions.date >= ? AND transactions.date <= ?")
+        params.extend([f"{normalized_month}-01", month_end_date(normalized_month)])
     if account_id:
         filters.append("(transactions.account_id = ? OR transactions.destination_account_id = ?)")
         params.extend([account_id, account_id])
@@ -137,11 +135,6 @@ def normalize_month_filter(value: str) -> str:
     except ValueError as exc:
         raise TransactionError("Informe um mes valido.") from exc
     return parsed.strftime("%Y-%m")
-
-
-def month_end_date(month: str) -> str:
-    year, month_number = map(int, month.split("-"))
-    return date(year, month_number, days_in_month(year, month_number)).isoformat()
 
 
 MAX_LIST_LIMIT = 5000
@@ -269,7 +262,6 @@ def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
             ensure_transfer_accounts(source, destination)
             normalize_transfer_amounts(transaction, source, destination)
         exchange_rate_micros = resolve_exchange_rate_micros(source["currency"], transaction["date"], transaction["exchange_rate"])
-        amount_brl_cents = convert_to_brl_cents(transaction["amount_cents"], exchange_rate_micros)
         category_id, subcategory_id = resolve_transaction_category(conn, user_id, transaction, destination)
         tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
         series_id = existing["series_id"]
@@ -295,7 +287,7 @@ def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
             additional_occurrences = occurrences[1:]
             series_id = str(uuid4())
 
-        # spec: lancamentos v3.25 — criterios 46, 56, 57 e 60
+        # spec: lancamentos v3.35 — criterios 46, 56, 57 e 60
         # (a cascata automatica so ocorre quando a flag de media muda no
         #  salvamento — ativada agora ou desmarcada — ou quando o usuario
         #  escolhe futuro no modal; serie com flag ativa mas inalterada e
@@ -362,10 +354,10 @@ def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
 
 
 def update_future_series_transactions(conn, user_id: int, existing, transaction: dict, force_apply_to_future: bool = False) -> None:
-    # spec: lancamentos v3.25 — criterios 56, 57, 59 e 60
+    # spec: lancamentos v3.35 — criterios 56, 57, 59 e 60
     # (series recorrentes com use_average ativo no salvamento recalculam
     #  valores futuros pela media; demais series mantem apply_to_future)
-    # spec: lancamentos v3.25 — criterio 7 (apply_to_future)
+    # spec: lancamentos v3.35 — criterio 7 (apply_to_future)
     # (propaga apenas para ocorrencias futuras nao conciliadas da mesma serie;
     #  o delta de data e reaplicado, nao a data absoluta, para preservar o espacamento)
     if not existing["series_id"]:
@@ -403,7 +395,7 @@ def update_future_series_transactions(conn, user_id: int, existing, transaction:
         transaction["exchange_rate"],
     )
     category_id, subcategory_id = resolve_transaction_category(conn, user_id, transaction, destination)
-    # spec: lancamentos v3.25 — criterios 56, 57 e 59
+    # spec: lancamentos v3.35 — criterios 56, 57 e 59
     # (quando use_average estiver ativo no salvamento, recalcula o valor da serie pela media)
     if force_apply_to_future and existing["series_kind"] == "recurring":
         average_amount = average_amount_for_recurring_description(
@@ -509,7 +501,7 @@ def insert_additional_series_occurrences(
     tag_ids: list[int],
     series_id: str,
 ) -> None:
-    # spec: lancamentos v3.25 — critério 47
+    # spec: lancamentos v3.35 — critério 47
     # (editar um lançamento avulso para parcelado/recorrente reaproveita a
     # ocorrência atual como primeira parcela e cria somente as próximas)
     for occurrence in occurrences:
@@ -556,7 +548,7 @@ def preserve_existing_series_metadata(transaction: dict, existing, data: dict) -
     transaction["installment_count"] = existing["installment_count"]
     transaction["recurrence_frequency"] = existing["recurrence_frequency"]
     transaction["recurrence_count"] = existing["installment_count"]
-    # spec: lancamentos v3.25 — criterio 52
+    # spec: lancamentos v3.35 — criterio 52
     # (a flag de media so e herdada da serie quando o payload nao a envia;
     #  ao editar um recorrente, o frontend envia o estado do checkbox explicitamente)
     if "use_average" not in data:
@@ -592,7 +584,7 @@ def delete_transaction(user_id: int, transaction_id: str, apply_to_future: bool 
 
 
 def future_transactions_to_delete(conn, user_id: int, transaction, apply_to_future: bool):
-    # spec: lancamentos v3.25 — criterio 6 (scope=future)
+    # spec: lancamentos v3.35 — criterio 6 (scope=future)
     # (so remove ocorrencias futuras ainda nao conciliadas da mesma serie;
     #  uma vez conciliada, a ocorrencia fica fora do alcance da exclusao em cascata)
     if not apply_to_future or not transaction["series_id"]:
@@ -697,7 +689,7 @@ def normalize_series_payload(data: dict) -> dict:
         recurrence_frequency = str(data.get("recurrence_frequency", "")).strip().lower()
         if recurrence_frequency not in RECURRENCE_FREQUENCIES:
             raise TransactionError("Informe a frequencia da recorrencia.")
-        # spec: lancamentos v3.25 — critérios 24 e 25
+        # spec: lancamentos v3.35 — critérios 24 e 25
         # (recorrentes usam 120 ocorrencias automaticamente quando o campo nao e enviado;
         #  o campo nao e mais exibido no formulario, mas a API mantem compatibilidade)
         raw_count = str(data.get("recurrence_count") or "").strip()
@@ -790,7 +782,7 @@ def normalize_investment_asset_hint(category: str, subcategory: str, asset_ident
 
 
 def normalize_investment_emergency_reserve_eligible(data: dict, asset_type: str) -> int:
-    # spec: investimentos/investimentos-portfolio v2.43 — critérios 21 e 23
+    # spec: investimentos/investimentos-portfolio v2.53 — critérios 21 e 23
     if asset_type not in {"fixed_income", "savings"}:
         return 0
     return 1 if str(data.get("investment_emergency_reserve_eligible") or "").strip().lower() in {"1", "true", "on", "yes"} else 0
@@ -837,7 +829,7 @@ def average_amount_for_recurring_description(
     subcategory_id: int | None,
     max_date: str | None = None,
 ) -> int | None:
-    # spec: lancamentos v3.25 — critério 27
+    # spec: lancamentos v3.35 — critério 27
     # (media dos ultimos 12 lancamentos anteriores ou na data de corte; ao recalcular
     #  uma serie, os lancamentos futuros da propria serie nao devem influenciar a media)
     normalized = normalize_description(description)
@@ -886,7 +878,7 @@ def average_amount_for_recurring_description(
 
 
 def build_transaction_occurrences(transaction: dict) -> list[dict]:
-    # spec: lancamentos v3.25 — regra de parcelamento/recorrencia (secao "Regras de negocio")
+    # spec: lancamentos v3.35 — regra de parcelamento/recorrencia (secao "Regras de negocio")
     # (parcelado: valor informado e o TOTAL, dividido entre as parcelas via split_cents;
     #  recorrente: cada ocorrencia mantem o valor informado integralmente — nao dividir)
     start_date = date.fromisoformat(transaction["date"])
@@ -933,57 +925,16 @@ def build_transaction_occurrences(transaction: dict) -> list[dict]:
     }]
 
 
-def split_cents(total_cents: int, count: int) -> list[int]:
-    base, remainder = divmod(total_cents, count)
-    return [base + (1 if index < remainder else 0) for index in range(count)]
-
-
-def split_optional_cents(total_cents: int | None, count: int) -> list[int | None]:
-    if total_cents is None:
-        return [None for _ in range(count)]
-    return split_cents(total_cents, count)
-
-
-def add_recurrence(start_date: date, frequency: str, index: int) -> date:
-    if frequency == "weekly":
-        return start_date + timedelta(days=7 * index)
-    months = {
-        "monthly": 1,
-        "quarterly": 3,
-        "semiannual": 6,
-        "annual": 12,
-    }[frequency]
-    return add_months(start_date, months * index)
-
-
-def add_months(start_date: date, months: int) -> date:
-    target_month = start_date.month - 1 + months
-    year = start_date.year + target_month // 12
-    month = target_month % 12 + 1
-    day = min(start_date.day, days_in_month(year, month))
-    return date(year, month, day)
-
-
-def days_in_month(year: int, month: int) -> int:
-    if month == 12:
-        return 31
-    return (date(year, month + 1, 1) - timedelta(days=1)).day
-
-
 def normalize_id(value: object, message: str) -> int:
     try:
-        normalized = int(str(value or "").strip())
+        return positive_int_id(value)
     except ValueError as exc:
         raise TransactionError(message) from exc
-    if normalized <= 0:
-        raise TransactionError(message)
-    return normalized
 
 
 def normalize_date(value: object) -> str:
-    raw = str(value or "").strip()
     try:
-        return date.fromisoformat(raw).isoformat()
+        return normalize_iso_date(value)
     except ValueError as exc:
         raise TransactionError("Informe uma data valida.") from exc
 
@@ -993,7 +944,7 @@ def normalize_optional_date(value: object) -> str | None:
     if not raw:
         return None
     try:
-        return date.fromisoformat(raw).isoformat()
+        return normalize_iso_date(raw)
     except ValueError as exc:
         raise TransactionError("Informe uma data valida.") from exc
 
@@ -1021,8 +972,8 @@ def get_exchange_rate_to_brl(currency: str, transaction_date: str | None = None)
     request = Request(url, headers={"User-Agent": "SistemaFinanceiro/0.1"})
     try:
         with urlopen(request, timeout=5) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
+            payload = read_limited_json(response, max_bytes=MAX_EXCHANGE_RATE_JSON_BYTES)
+    except (HTTPError, URLError, TimeoutError, OutboundJsonError) as exc:
         raise TransactionError("Nao foi possivel consultar a PTAX. Informe a cotacao manualmente.") from exc
     try:
         quotes = payload.get("value") or []
@@ -1264,7 +1215,7 @@ def fetch_transaction(conn, user_id: int, transaction_id: int) -> dict:
 
 def format_transaction(transaction: dict) -> dict:
     investment_operation = extract_investment_operation(transaction)
-    # spec: relatorios/relatorios v2.16 — criterio 6
+    # spec: relatorios/relatorios v2.23 — criterio 6
     # (pagamento de fatura reduz saldo, mas fica fora de analises de despesa
     #  para nao duplicar os lancamentos detalhados do cartao)
     transaction["is_credit_card_payment"] = bool(transaction.pop("credit_card_payment_id", None))

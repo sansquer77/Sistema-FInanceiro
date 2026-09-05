@@ -2,8 +2,8 @@
 tipo: spec
 area: usuario
 status: implementado
-versao: 0.8
-atualizado: 2026-08-09
+versao: 0.10
+atualizado: 2026-08-30
 relacionados:
   - "[[investimentos-portfolio]]"
   - "[[tendencias-saude-financeira]]"
@@ -106,6 +106,8 @@ Qualquer usuário autenticado que precise configurar perfil, integrações opcio
 
 ## Changelog
 
+- `0.10` — 2026-08-30 — Cinco consultas de configuração passam a compartilhar ciclo de carga, snapshot de 30 segundos, invalidação após gravações e reset de sessão.
+- `0.9` — 2026-08-30 — Iniciada coordenação dos cinco carregamentos de configuração com cache curto, invalidação e deduplicação em andamento.
 - `0.8` — 2026-08-09 — Segredos de SMTP, IA e Mais Retorno passam a ser persistidos como envelopes criptografados em `secure_configs`; arquivos `.enc` e `data/email_config.key` continuam compatíveis e são copiados/migrados no primeiro uso.
 - `0.7` — 2026-08-09 — Tag de status sincronizada com o frontmatter, callout e MoC.
 - `0.6` — 2026-08-08 — Cotas de fundos resilientes a fins de semana/feriados: data atual vazia dispara consulta retroativa de 7 dias usando a última cota publicada.

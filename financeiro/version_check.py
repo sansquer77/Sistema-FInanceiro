@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-import json
 import os
 import re
 import ssl
 import threading
 import urllib.error
 import urllib.request
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any
 
 from financeiro.app_metadata import APP_VERSION
+from financeiro.outbound_json import MAX_VERSION_JSON_BYTES, OutboundJsonError, read_limited_json
 
 # spec: alerta-nova-versao v1.2 — regras de cache, timeout e fallback TLS
 _LANDING_LATEST_VERSION_URL = os.environ.get(
@@ -64,9 +64,8 @@ def _fetch_latest_release() -> dict[str, Any] | None:
             timeout=_REQUEST_TIMEOUT_SECONDS,
             context=context,
         ) as response:
-            body = response.read().decode("utf-8")
-            return json.loads(body)
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError):
+            return read_limited_json(response, max_bytes=MAX_VERSION_JSON_BYTES)
+    except (urllib.error.URLError, TimeoutError, OutboundJsonError, OSError):
         return None
 
 

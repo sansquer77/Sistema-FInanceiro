@@ -24,11 +24,18 @@ export function registerImportsView({
   importForm.addEventListener("submit", handleImportSubmit);
   importTarget.addEventListener("change", renderImportTargets);
   downloadImportTemplateButton.addEventListener("click", downloadImportTemplate);
+  importResult.innerHTML = stateMarkup("Baixe o modelo, preencha os lançamentos e selecione o arquivo para começar.", {
+    kind: "info",
+    title: "Pronto para importar",
+  });
 
   async function handleImportSubmit(event) {
     event.preventDefault();
     setMessage(importMessage, "");
-    importResult.innerHTML = "";
+    importResult.innerHTML = stateMarkup("Validando o arquivo e importando os lançamentos.", {
+      kind: "loading",
+      title: "Importando",
+    });
     const target = importTarget.value;
     if (target === "account" && state.accounts.length === 0) {
       setMessage(importMessage, "Cadastre uma conta antes de importar lançamentos.", "error");
@@ -52,6 +59,7 @@ export function registerImportsView({
       setMessage(importMessage, `${response.imported} lançamento(s) importado(s).`, "success");
     } catch (error) {
       setMessage(importMessage, error.message, "error");
+      importResult.innerHTML = stateMarkup(error.message, { kind: "error", title: "Não foi possível importar" });
     } finally {
       setFormBusy(importForm, false);
     }

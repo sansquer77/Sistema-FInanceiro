@@ -2,19 +2,20 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 4.3
-atualizado: 2026-08-29
+versao: 4.32
+atualizado: 2026-09-04
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
   - "[[arquitetura]]"
-tags: [spec, "area/frontend"]
+  - "[[../qualidade-codigo]]"
+tags: [spec, "area/frontend", "status/implementado"]
 aliases: ["Modularização Frontend", "ES Modules"]
 ---
 
 # Modularização do Frontend
 
 > [!info] Status
-> **implementado** · área: `frontend` · atualizado em 2026-08-29 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]]
+> **implementado** · área: `frontend` · atualizado em 2026-09-04 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]], [[../qualidade-codigo]]
 
 ## Problema
 
@@ -39,6 +40,8 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `date-utils.js` | Datas locais, meses e exibição. |
 | `money-utils.js` | Formatação e parsing numérico/monetário. |
 | `dom-utils.js` | Helpers de formulário, mensagens e empty state. |
+| `chart-adapter.js` | Ciclo de vida, tokens, movimento reduzido e fallback dos gráficos ApexCharts locais. |
+| `notification-flyout.js` | Diálogo global acessível de alertas do Cockpit, com abas, ações delegadas, persistência de leitura injetada e restauração de foco. |
 | `transaction-kind.js` | Predicados de tipo de lançamento. |
 | `labels.js` | Labels de domínio usados pela interface. |
 | `month-picker.js` | Popover reutilizável de seleção de mês. |
@@ -46,12 +49,16 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `theme-utils.js` | Preferência visual local e aplicação de tema no `documentElement`. |
 | `privacy-utils.js` | Preferência visual local de privacidade, aplicação de `data-privacy` e marcação visual de valores monetários. |
 | `tab-utils.js` | Transição progressiva e navegação roving por teclado compartilhadas por conjuntos de abas. |
-| `global-search.js` | Busca local transversal em módulos e dados já carregados, com navegação contextual. |
+| `global-search.js` | Busca transversal: módulos e cadastros leves vêm do estado local; lançamentos históricos são consultados sob demanda no backend, com debounce e descarte de respostas obsoletas. |
 | `density-utils.js` | Preferência visual local de densidade e aplicação de `data-density` no documento. |
 | `overlay-utils.js` | Semântica, foco e teclado compartilhados por drawers e overlays persistentes. |
 | `data-ux.js` | Ordenação local, contagem de linhas e chips removíveis para tabelas e filtros. |
+| `virtual-list.js` | Janela visível com overscan para coleções extensas de altura fixa; usado em Lançamentos, Relatórios, Portfólio, Faturas e Histórico de Operações. |
 | `asset-autocomplete.js` | Sugestões de ativos existentes por `datalist`, preenchimento de metadados e preservação da digitação livre. |
 | `instructions-content.js` | Conteúdo estático, offline e versionado da central de ajuda. |
+| `bank-logos.js` | Catálogo compartilhado de logos de instituições financeiras com normalização de nomes e fallback visual. |
+| `input-mask.js` | Adaptador local sobre IMask para campos monetários e de data, preservando parsers e formato brasileiro enviado ao backend. |
+| `command-palette.js` | Command Palette nativa em ES Modules: comandos de navegação, preferências e busca, sem regras de domínio e sem consulta à rede. |
 
 ## Views funcionais
 
@@ -61,7 +68,9 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `user-admin-view.js` | Preferência visual, troca de email/senha, config. SMTP, limpeza e exclusão. |
 | `classifications-view.js` | Categorias, subcategorias e tags. |
 | `limits-view.js` | Limites de gastos e índice de consumo. |
-| `reports-view.js` | Filtros, abas, agrupamentos e tabelas. |
+| `reports-view.js` | Fachada compatível e coordenação de Relatórios; rankings extensos entregam dados diretamente ao virtualizador e montam detalhes sob demanda. |
+| `report-statement.js` | Filtros, consulta, modelo e impressão do demonstrativo; sem cálculos financeiros locais. |
+| `report-evolution.js` | Drawer, consulta, apresentação e ciclo de vida do gráfico de evolução; sem SMA/fallback local. |
 | `imports-view.js` | Upload, download de modelo e resultado da importação. |
 | `cockpit-view.js` | Resumo, saldos, planejamento, dívidas, portfólio e alertas. |
 | `financial-health-view.js` | Aba Saúde Financeira do Cockpit: score/gauge, pilares, Paz Financeira e recomendações. |
@@ -69,8 +78,25 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `consultor-view.js` | Aba Consultor/Calendário do Cockpit: vencimentos, atrasos e plano próximo. |
 | `accounts-view.js` | Contas: cadastro, edição, arquivamento e restauração. |
 | `cards-view.js` | Cartões: cadastro, faturas, busca/filtro da fatura, pagamento e conciliação. |
-| `portfolio-view.js` | Ativos: posições, consolidações com escala BRL, histórico, resgate e encerramento. |
-| `transactions-view.js` | Lançamentos: formulário, recorrência, parcelas e câmbio. |
+| `portfolio-view.js` | Fachada/coordenador da tela de Portfólio, carregamento, abas, agrupamento e fábricas de linha reutilizadas pela janela virtual. |
+| `portfolio-chart.js` | Renderização e ciclo de vida do gráfico de rentabilidade do Portfólio. |
+| `portfolio-events.js` | Carregamento sob demanda, cache de sessão e apresentação dos eventos históricos do Portfólio, sem estimativa financeira. |
+| `portfolio-grouping.js` | Identidade estável de agrupamentos visuais; cálculos e consolidações pertencem ao backend. |
+| `portfolio-preview.js` | Coordenação das prévias no servidor: debounce, requisição em andamento, bloqueio de confirmação e descarte de respostas obsoletas, sem regras financeiras. |
+| `portfolio-form.js` | Payloads e normalizações de entrada dos formulários e ações do Portfólio. |
+| `portfolio-lifecycle.js` | Política pura de frescor do snapshot e limpeza seletiva da apresentação do Portfólio. |
+| `app-state.js` | Fábrica do estado inicial e reset puro dos dados de sessão, sem DOM, API ou views. |
+| `app-data-loader.js` | Coordenação dos carregamentos compartilhados, com serviços, views e ações recebidos explicitamente. |
+| `load-policy.js` | Política compartilhada de snapshot recente, invalidação e promessa em andamento. |
+| `transaction-slice-loader.js` | Cache limitado por conta+mês, requisições concorrentes por chave, invalidação e proteção contra respostas antigas no Extrato. |
+| `transaction-reconciliation.js` | Estado ocupado, aplicação imediata da resposta confirmada e atualização independente dos saldos após conciliar. |
+| `transaction-refresh.js` | Aplica confirmação de edição/criação/exclusão, revalida a fatia e atualiza dados auxiliares sem bloquear a tela; descarta respostas de revisões/sessões anteriores. |
+| `transaction-balance-chart.js` | Apresentação e ciclo de vida do gráfico mensal de saldos do Extrato. |
+| `classification-suggestion.js` | Classificação assistida reutilizável pelos formulários de Contas e Cartões. |
+| `transaction-list.js` | Busca, filtros, agrupamento diário e renderização da lista do Extrato. |
+| `transaction-form.js` | Fluxo base do formulário, séries, contas, categorias e câmbio assistido pelo backend. |
+| `transaction-investment-form.js` | Campos e assistência específicos do aporte de investimento. |
+| `transactions-view.js` | Fachada compatível de Lançamentos; compõe lista, gráfico, formulário base/investimento e carregador. |
 | `operation-history-view.js` | Histórico de Operações: filtros, busca, agrupamentos e paginação incremental. |
 | `simulations-view.js` | Efeito Borboleta: formulário de cenário hipotético e projeções retornadas pelo backend. |
 | `instructions-view.js` | Central de ajuda: busca, grupos, tópicos expansíveis e navegação contextual. |
@@ -95,7 +121,12 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Não introduzir framework, bundler ou dependências de frontend.
 - Módulos têm nomes em inglês e funções pequenas.
 - Regras financeiras permanecem no domínio Python; o frontend apenas formata e orquestra.
+- A raiz `app.js` segue as fronteiras e os sinais de alerta de [[../qualidade-codigo]].
 - Novos módulos recebem dependências explicitamente via contrato de fábrica.
+- `app.js` permanece o composition root: seleciona DOM, registra views, injeta dependências, controla boot, autenticação visual e navegação.
+- `app-state.js` não exporta singleton nem chama formulários/views; cria o estado e limpa somente dados de sessão.
+- `app-data-loader.js` usa acesso tardio às views injetadas para evitar imports circulares e não se torna autoridade de regras financeiras.
+- Views pesadas podem expor `onEnter()`/`onLeave()`; o composition root aciona esse ciclo sem conhecer detalhes internos de desmontagem.
 - Cores de UI e gráficos devem vir de tokens CSS compartilhados; literais ficam restritos a marcas/logos externos.
 - Tema visual é uma preferência local: `theme-utils.js` aplica `data-theme` no elemento raiz e persiste em `localStorage`.
 - Modo privacidade é uma preferência local: `privacy-utils.js` aplica `data-privacy` no elemento raiz, persiste em `localStorage` e não altera dados, cálculos ou chamadas de API.
@@ -133,6 +164,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Estados localizados usam o helper compartilhado de `dom-utils.js` com quatro tipos explícitos: `loading`, `error`, `empty` e `info`; carregamento anuncia `aria-busy`, erro usa `role="alert"` e vazio oferece orientação contextual sempre que houver próxima ação conhecida.
 - Nenhum módulo deve representar falha ou carregamento apenas por texto neutro em `.empty-state`; ícone, título, mensagem e semântica acessível vêm do mesmo componente.
 - Overlays compartilham foco inicial, confinamento de Tab, fechamento por Escape, restauração de foco e atributos `role="dialog"`/`aria-modal`.
+- A Busca global expõe descrição para tecnologia assistiva, relaciona campo e resultados por `aria-controls`, anuncia alterações do listbox e mantém o conteúdo do diálogo disponível na árvore AX do WebKit.
 - Sucessos operacionais usam toast não bloqueante; erros permanecem junto à operação que falhou.
 - Cabeçalhos de cards usam ações agrupadas e podem anunciar a última atualização com horário local.
 - Tabelas de dados oferecem ordenação local por coluna, primeira coluna sticky, contagem de linhas e filtros ativos removíveis quando os controles pertencem a `.filter-toolbar`.
@@ -141,7 +173,24 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Plano de implementação
 
+- [x] Extrair demonstrativo e evolução para fábricas com dependências explícitas, preservando o contrato `registerReportsView`/`renderReports`.
+- [x] Manter isolamento das respostas assíncronas e destruir o gráfico ao fechar; preservar eventos, filtros e impressão sem registros duplicados nas renderizações.
+- [x] Adaptar testes aos módulos extraídos e validar composição real das fábricas.
+
+- [x] Extrair o gráfico de saldo sem alterar sua apresentação ou navegação mensal.
+- [x] Compartilhar a classificação assistida entre Lançamentos de Contas e Cartões.
+- [x] Extrair busca, filtros, agrupamento e renderização da lista mensal.
+- [x] Separar o formulário base dos campos e assistências próprios de investimento.
+- [x] Remover cálculos cambiais financeiros do JavaScript, consumindo valores derivados pelo backend.
+- [x] Preservar `transactions-view.js` como fachada compatível com o composition root atual.
+- [x] Atualizar contratos automatizados e executar a suíte completa.
+
+- [x] Extrair fábrica/reset puro de estado para `app-state.js` sem dependência de DOM.
+- [x] Extrair carregamentos coordenados para `app-data-loader.js` com dependências explícitas e views tardias.
+- [x] Preservar `boot()`, sessão visual, navegação e composição em `app.js`.
+- [x] Atualizar contratos automatizados e validar todos os fluxos existentes.
 - [x] Unificar semântica e teclado de modais, dialogs e drawers.
+- [x] Reforçar semântica, confinamento e restauração de foco da Busca global, com cobertura automatizada; validação manual no VoiceOver permanece recomendada.
 - [x] Centralizar toasts de sucesso e manter erros inline.
 - [x] Padronizar cabeçalhos de cards e última atualização.
 - [x] Enriquecer tabelas, filtros e paginação incremental.
@@ -150,7 +199,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## API e dados
 
-- Nenhum endpoint novo.
+- `GET /api/balance-projection?month=YYYY-MM&account_id={id}` entrega saldos conciliados/projetados por data calculados no núcleo Python.
 - Nenhuma tabela nova.
 - `index.html` carrega `app.js` como `type="module"`.
 
@@ -169,7 +218,10 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Dado o usuário acessando um desses itens, quando a tela abre, então o título da página usa o mesmo nome desambiguado do menu.
 - Dado um navegador com suporte a View Transitions API, quando o usuário alterna módulos pelo menu lateral, então a troca visual acontece com transição curta e sem bloquear os carregamentos da tela.
 - Dado o dashboard carregado com dados do Cockpit para o mês atual, quando o usuário navega para Cockpit novamente sem alterar mês ou dados, então a UI reaproveita o snapshot em memória e não dispara nova busca completa dos endpoints pesados.
-- Dado o usuário abrindo o Portfólio, quando a tela carrega, então a aba **Posição** renderiza primeiro; **Análise**, **Histórico** e rentabilidade detalhada são renderizados/carregados sob demanda no primeiro acesso.
+- Dado o boot ou uma troca de mês do Cockpit, quando os dados auxiliares são atualizados, então somente a competência necessária de contas/cartões é carregada e nenhum endpoint de pagamentos ou histórico integral é percorrido.
+- Dado um termo com ao menos dois caracteres na Busca Global, quando o usuário digita, então lançamentos de contas e cartões de qualquer competência são consultados sob demanda, limitados e pagináveis, sem carregar históricos completos no estado global; respostas de termos anteriores são descartadas.
+- Dado o usuário alternando o mês de Relatórios, quando a resposta anterior chega depois, então ela é descartada e o estado mantém somente o recorte da competência atual.
+- Dado o usuário abrindo o Portfólio, quando a tela carrega, então a aba **Posição** renderiza primeiro; **Análise**, **Eventos**, **Histórico** e rentabilidade detalhada são renderizados/carregados sob demanda no primeiro acesso.
 - Dado o usuário alterando o agrupamento ou colapsando/expandindo grupos no Portfólio, quando a tela já tem dados carregados, então apenas a lista de posições é renderizada novamente.
 - Dado a interface carregando scripts de terceiros não essenciais, quando o HTML é parseado, então esses scripts não bloqueiam a inicialização do app (`async`/`defer` quando aplicável).
 - Dado uma área estrutural de layout como o dashboard principal, quando o menu lateral alterna estado, então a UI não anima propriedades caras como `grid-template-columns`.
@@ -222,6 +274,39 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Changelog
 
+- `4.31` — 2026-09-04 — Busca global reforçada com `role="dialog"`, `aria-modal`, descrição, relação campo/resultados, foco confinado e restauração segura.
+- `4.30` — 2026-09-04 — Adicionado `portfolio-events.js` para carregar e apresentar sob demanda os eventos históricos da carteira, com cache de sessão e sem cálculos financeiros no frontend.
+- `4.29` — 2026-09-04 — Relatórios remove DOM/`outerHTML` intermediário dos rankings virtualizados e preserva detalhes sob demanda; Portfólio elimina a segunda construção das fábricas de linha antes da janela visível.
+- `4.28` — 2026-09-04 — Atualizado `virtual-list.js` para refletir uso também em Faturas (`cards-view.js`) e Histórico de Operações (`operation-history-view.js`).
+- `4.27` — 2026-09-04 — Adicionado `command-palette.js` como Command Palette nativa em ES Modules para navegação, preferências e busca, sem regras de domínio e sem consulta à rede.
+- `4.26` — 2026-09-04 — Adicionado `input-mask.js` como adaptador local sobre IMask para campos monetários e de data, preservando parsers e formato brasileiro enviado ao backend.
+- `4.25` — 2026-09-03 — Registrado `notification-flyout.js` como overlay global do Cockpit; ações contextuais permanecem no composition root e o módulo não incorpora regras financeiras.
+- `4.24` — 2026-09-01 — Busca Global deixa de depender das fatias mensais residentes e consulta lançamentos históricos sob demanda, com limite, debounce e proteção contra respostas obsoletas.
+
+- `4.23` — 2026-09-01 — Loader inicial e atualização do Cockpit deixam de baixar históricos integrais; Relatórios passam a carregar e descartar recortes mensais isolados por request id.
+
+- `4.22` — 2026-08-31 — Extração da apresentação de demonstrativo/evolução e coordenação pela fachada compatível de Relatórios.
+
+- `4.21` — 2026-08-31 — Cálculos residuais do Portfólio movidos para Python; views recebem resultados, composição, metas e agregados. Prévias editáveis usam coordenador assíncrono e a participação por moeda do resumo do Cockpit vem do backend.
+
+- `4.20` — 2026-08-31 — Documentada a coordenação de atualização após salvar lançamentos, separada de recargas auxiliares.
+- `4.19` — 2026-08-31 — Fatias do Extrato ganham cache limitado e concorrência por chave; conciliação isolada atualiza a linha antes das recargas secundárias.
+
+- `4.18` — 2026-08-31 — Concluída a decomposição de Lançamentos; a fachada preserva o contrato público e Cartões reutiliza a classificação assistida compartilhada.
+- `4.17` — 2026-08-31 — Iniciada a decomposição de `transactions-view.js` em gráfico, classificação compartilhada, lista e formulários especializados, preservando a fachada pública atual.
+- `4.16` — 2026-08-31 — Removidos coordenadas e geradores de path SVG sem consumidores do Extrato; teste impede reintrodução do legado após a migração para ApexCharts.
+- `4.15` — 2026-08-31 — Iniciada remoção dos resíduos SVG sem consumidores em `transactions-view.js`, preservando o gráfico ApexCharts vigente.
+- `4.14` — 2026-08-30 — Política `dirty + loadedAt + in-flight` concluída em Preferências, Histórico, Extrato e Simulações, com chave contextual, proteção contra corrida e reset de sessão.
+- `4.13` — 2026-08-30 — Iniciada política compartilhada `dirty + loadedAt + in-flight` para carregamentos de views.
+- `4.12` — 2026-08-30 — Adicionado `bank-logos.js` como catálogo compartilhado de logos de instituições financeiras, usado em Contas e Cartões.
+- `4.11` — 2026-08-30 — Adicionado `virtual-list.js` para virtualização progressiva de listas extensas de Portfólio, Lançamentos e Relatórios.
+- `4.10` — 2026-08-30 — Concluído o primeiro contrato `onEnter()`/`onLeave()` no Portfólio, acionado pelo composition root e coberto por testes de fronteira.
+- `4.9` — 2026-08-30 — Iniciado ciclo de vida seletivo para liberar DOM e recursos gráficos de views pesadas sem descartar seu estado de dados.
+- `4.8` — 2026-08-30 — Concluída a extração de estado e carregamentos coordenados, com contratos automatizados para preservar as fronteiras do composition root.
+- `4.7` — 2026-08-30 — Iniciada extração de estado puro e carregadores coordenados, preservando `app.js` como composition root.
+- `4.6` — 2026-08-30 — Vinculada à spec implementada [[../qualidade-codigo]], que formaliza a distinção entre raiz de composição e views coesas.
+- `4.5` — 2026-08-30 — `portfolio-view.js` passa a coordenar módulos dedicados de gráfico, agrupamento e formulário; projeções de saldos/faturas deixam `app.js` e passam ao contrato Python `/api/balance-projection`.
+- `4.4` — 2026-08-30 — Registrado `chart-adapter.js` como fronteira compartilhada entre as views e o ApexCharts 4.7.0 vendorizado.
 - `4.3` — 2026-08-29 — Autocomplete de ativos compartilhado entre Portfólio e Lançamentos; modal de decisão passa a aceitar atualização derivada de campos durante a digitação.
 - `4.2` — 2026-08-29 — Resumo pré-salvamento torna-se expansível, recolhido em lançamentos à vista e aberto automaticamente nos modos parcelado e recorrente.
 - `4.1` — 2026-08-29 — Resumo pré-salvamento passa a iniciar vazio e ignorar controles condicionais ocultos ou desabilitados.
@@ -256,6 +341,10 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - `1.7` — 2026-07-09 — `operation-history-view.js` registrado como view funcional do Histórico de Operações.
 - `1.8` — 2026-07-20 — `decision-modal.js` registrado como helper reutilizável para decisões e formulários curtos.
 - `1.9` — 2026-07-24 — Tela estática Sobre documentada como view simples roteada por `app.js`.
+
+## Changelog
+
+- `4.32` — 2026-09-04 — Barra do Histórico de Operações ganhou distribuição responsiva; abas de Relatórios atualizam `aria-labelledby` conforme a seleção; Sobre ganhou grade de leitura mais equilibrada.
 
 ## Relacionados
 

@@ -1,8 +1,10 @@
 let unauthorizedHandler = null;
 let unauthorizedHandled = false;
+let mutationHandler = null;
 
-export function configureApi({ onUnauthorized } = {}) {
+export function configureApi({ onUnauthorized, onMutation } = {}) {
   unauthorizedHandler = typeof onUnauthorized === "function" ? onUnauthorized : null;
+  mutationHandler = typeof onMutation === "function" ? onMutation : null;
   unauthorizedHandled = false;
 }
 
@@ -24,6 +26,7 @@ export async function api(path, options = {}) {
     throw new Error(payload.error || `Erro ${response.status}: ${response.statusText || "falha na requisicao"}.`);
   }
   resetUnauthorizedStateOnAuthSuccess(path);
+  notifyMutation(path, options.method);
   return payload;
 }
 
@@ -43,7 +46,15 @@ export async function upload(path, body) {
     handleUnauthorized(response, path, {});
     throw new Error(payload.error || `Erro ${response.status}: ${response.statusText || "falha na requisicao"}.`);
   }
+  notifyMutation(path, "POST");
   return payload;
+}
+
+function notifyMutation(path, method = "GET") {
+  // Analytical preview has no mutations and must not invalidate loaded views.
+  if (path === "/api/portfolio/preview") return;
+  const normalizedMethod = String(method || "GET").toUpperCase();
+  if (normalizedMethod !== "GET" && mutationHandler) mutationHandler(path, normalizedMethod);
 }
 
 const PAGE_SIZE = 2000;

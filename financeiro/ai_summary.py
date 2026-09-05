@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import json
-import os
 import ssl
 from urllib.parse import quote
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import Request
 
-from financeiro import database
+from financeiro.ai_endpoint_security import (
+    AIEndpointSecurityError,
+    ai_urlopen,
+    validate_ai_base_url,
+)
+from financeiro.outbound_json import MAX_AI_JSON_BYTES, OutboundJsonError, read_limited_json
+
 from financeiro.secure_config import (
     SecureConfigError,
     ai_settings_status,
@@ -31,7 +36,7 @@ SYSTEM_PROMPT = (
 
 def generate_ai_summary(user_id: int, trends_payload: dict) -> str | None:
     """
-    spec: tendencias-saude-financeira v2.22 — critérios 12, 13, 14, 16 e 17
+    spec: tendencias-saude-financeira v2.23 — critérios 12, 13, 14, 16 e 17
     Reescreve o resumo local com IA, usando payload minimizado, timeout curto e
     fallback imediato para None quando a IA estiver indisponível ou retornar conteúdo inválido.
     """
@@ -41,7 +46,7 @@ def generate_ai_summary(user_id: int, trends_payload: dict) -> str | None:
 
     api_key = ""
     if settings["has_api_key"]:
-        # spec: tendencias-saude-financeira v2.22 — critério 28
+        # spec: tendencias-saude-financeira v2.23 — critério 28
         # O segredo nunca deve transitar na API; aqui é usado apenas para a requisição externa.
         full = load_ai_settings(user_id)
         api_key = str(full.get("api_key") or "").strip()
@@ -49,6 +54,11 @@ def generate_ai_summary(user_id: int, trends_payload: dict) -> str | None:
     base_url = str(settings["base_url"] or "").rstrip("/")
     model = str(settings["model"] or "").strip()
     if not base_url or not model:
+        return None
+
+    try:
+        base_url = validate_ai_base_url(base_url)
+    except AIEndpointSecurityError:
         return None
 
     minimized = minimize_trends_payload(trends_payload)
@@ -61,14 +71,14 @@ def generate_ai_summary(user_id: int, trends_payload: dict) -> str | None:
         method="POST",
     )
 
-    # spec: tendencias-saude-financeira v2.22 — critério 16
+    # spec: tendencias-saude-financeira v2.23 — critério 16
     # Nenhuma chamada de IA pode manter conexão SQLite aberta durante a requisição externa.
     # (a conexão já foi fechada antes de chamar esta função)
     timeout = int(settings.get("timeout_seconds") or SUMMARY_TIMEOUT_SECONDS)
     try:
-        with urlopen(request, timeout=timeout, context=ai_ssl_context()) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError):
+        with ai_urlopen(request, timeout=timeout, context=ai_ssl_context()) as response:
+            payload = read_limited_json(response, max_bytes=MAX_AI_JSON_BYTES)
+    except (HTTPError, URLError, TimeoutError, OutboundJsonError, OSError, AIEndpointSecurityError):
         return None
 
     return extract_summary_text(payload, provider=str(settings.get("provider") or "custom"))
@@ -89,7 +99,7 @@ def build_ai_request(settings: dict, api_key: str, minimized_payload: dict) -> d
     temperature = float(settings.get("temperature") or DEFAULT_TEMPERATURE)
     max_tokens = int(settings.get("max_tokens") or MAX_SUMMARY_TOKENS)
     if provider == "google":
-        # spec: tendencias-saude-financeira v2.22 — critérios 12, 24 e 32
+        # spec: tendencias-saude-financeira v2.23 — critérios 12, 24 e 32
         # Google/Gemini não usa o contrato OpenAI-compatible; usa generateContent.
         gemini_model = model.removeprefix("models/")
         headers = {"Content-Type": "application/json"}
@@ -113,7 +123,7 @@ def build_ai_request(settings: dict, api_key: str, minimized_payload: dict) -> d
             },
         }
     if provider == "anthropic":
-        # spec: tendencias-saude-financeira v2.22 — critérios 12, 24 e 32
+        # spec: tendencias-saude-financeira v2.23 — critérios 12, 24 e 32
         # Anthropic/Claude usa a Messages API nativa, não Chat Completions.
         headers = {
             "Content-Type": "application/json",

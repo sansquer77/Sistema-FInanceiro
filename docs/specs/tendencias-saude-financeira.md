@@ -2,8 +2,8 @@
 tipo: spec
 area: tendencias-saude-financeira
 status: implementado
-versao: 2.22
-atualizado: 2026-08-11
+versao: 2.24
+atualizado: 2026-09-04
 relacionados:
   - "[[score-saude-financeira]]"
   - "[[relatorios]]"
@@ -20,7 +20,7 @@ aliases: ["Tendências de Saúde Financeira", "Achados Financeiros", "Insights F
 # Tendências e Achados de Saúde Financeira
 
 > [!info] Status
-> **implementado** · área: `tendencias-saude-financeira` · atualizado em 2026-08-11 · relacionados: [[score-saude-financeira]], [[relatorios]], [[lancamentos]], [[cartoes]]
+> **implementado** · área: `tendencias-saude-financeira` · atualizado em 2026-08-31 · relacionados: [[score-saude-financeira]], [[relatorios]], [[lancamentos]], [[cartoes]]
 
 ## Problema
 
@@ -142,6 +142,9 @@ Usuário autenticado que consulta o Cockpit e deseja entender, em linguagem simp
 - O sistema deve identificar despesas recorrentes mensais na categoria `Assinaturas e Serviços` e suas subcategorias, agregando o custo mensal por subcategoria para sinalizar o peso relativo no orçamento.
 - O achado de assinaturas e serviços deve ser explicativo e não prescritivo, apontando o valor mensal por subcategoria e sugerindo que o usuário avalie o uso, sem recomendar cancelamento ou classificar a despesa como problema.
 - Lançamentos de cartão de crédito recorrentes mensais na categoria `Assinaturas e Serviços` também devem entrar na agregação, pela competência da fatura (`invoice_month`).
+- Quando um mesmo limite de gastos for ultrapassado nos 3 meses consecutivos anteriores ao mês consultado (incluindo-o), o sistema deve sinalizar um achado estruturado do tipo `limite_recorrente`, sugerindo ao usuário revisar o valor do limite, pois o padrão de consumo pode ter mudado. O achado deve indicar a categoria/subcategoria, o limite vigente e a média de ultrapassagem nos 3 meses, sem recomendar valores específicos.
+- A detecção de limite recorrente deve comparar o realizado mensal da categoria/subcategoria com o limite vigente no mês consultado, reaproveitando a mesma chave de agregação usada na tabela **Budget x Realizado**.
+- Limite recorrente só deve ser sinalizado quando houver ultrapassagem em todos os 3 meses consecutivos; 2 meses ou meses intercalados não geram o achado.
 
 ## API e dados
 
@@ -258,6 +261,10 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 - Dado um usuário com histórico curto, quando visualiza **Tendências e achados**, então o aviso **Histórico curto** aparece fora dos cards de achados, como texto de seção.
 - Dado um usuário em tela estreita ou intermediária, quando visualiza a aba **Tendências**, então **Tendências e achados**, **Budget x Realizado** e os cards de confiança aparecem em fluxo vertical usando a largura disponível.
 - Dado um usuário com saldo previsto no fim do mês em contas de liquidez/carteira igual ou acima de 2x as despesas planejadas, quando consulta a aba **Tendências**, então o resumo exibe um aviso explicativo de oportunidade de revisar o caixa usando o saldo previsto que considera lançamentos futuros e faturas abertas dos cartões vinculados.
+- Dado um usuário com limite de gastos ultrapassado nos últimos 3 meses consecutivos para uma mesma categoria/subcategoria, quando consulta a aba **Tendências**, então o sistema exibe um achado estruturado do tipo `limite_recorrente` sugerindo revisar o valor do limite, indicando a categoria/subcategoria, o limite vigente e a média de ultrapassagem nos 3 meses.
+- Dado um usuário com limite de gastos ultrapassado em apenas 2 dos últimos 3 meses, quando consulta a aba **Tendências**, então não é exibido o achado de limite recorrente.
+
+- Dado o gráfico de Tendências em tema claro ou escuro, quando o tooltip é exibido ou o tema muda, então texto, cabeçalho e indicadores dos eixos mantêm cores de texto e superfície do tema ativo, sem alterar as cores das séries. Contrato CSS automatizado; aparência no Safari requer validação manual.
 
 ## Pendências
 
@@ -278,6 +285,7 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 
 ## Plano de implementação
 
+- [x] Ajustar contraste do tooltip e dos indicadores dos eixos com tokens reativos ao tema; testar os seletores e preservar séries. Fecha: critério adicional de contraste. Teste estrutural aprovado; aparência no Safari pendente de validação manual.
 - [x] Passo 1 — Atualizar specs afetadas e resolver pendências obrigatórias antes de codificar. Fecha: critérios 1 a 28.
 - [x] Passo 2 — Criar armazenamento local criptografado de configuração de IA por usuário, seguindo o padrão de segurança aplicável. Fecha: critérios 17, 18, 19, 21, 23, 27 e 28.
 - [x] Passo 3 — Implementar núcleo local de cálculo de tendências em Python, com série mensal, Budget x Realizado, achados estruturados em centavos inteiros, eventos pontuais, assinaturas e serviços recorrentes, oportunidade de caixa e confiança. Fecha: critérios 1, 3, 4, 5, 6, 7, 8, 9, 13, 22, 25, 26, 27, 28, 29 e 54.
@@ -286,9 +294,12 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 - [x] Passo 6 — Adicionar aba **Tendências** no Cockpit, com gráfico mês a mês, tabela Budget x Realizado e bloco **Tendências e achados**, preservando identidade visual e leitura local sem IA. Fecha: critérios 1, 2, 3, 4, 5, 6, 7, 10, 20, 21, 25, 26, 27 e 28.
 - [x] Passo 7 — Implementar reescrita automática opcional por IA com payload minimizado, timeout curto e fallback local. Fecha: critérios 12, 13, 14, 16 e 17.
 - [x] Passo 8 — Criar testes automatizados para núcleo local, segurança de preferências, fallback de IA e isolamento por usuário. Fecha: critérios 1 a 28.
+- [x] Passo 9 — Detectar limites de gastos ultrapassados em 3 meses consecutivos e exibir achado estruturado `limite_recorrente` sugerindo revisão do valor. Fecha: novos critérios de limite recorrente.
 
 ## Changelog
 
+- `2.24` — 2026-09-04 — Adicionada detecção de limites de gastos ultrapassados em 3 meses consecutivos, gerando achado estruturado `limite_recorrente` que sugere revisar o valor do limite.
+- `2.23` — 2026-08-31 — Corrigido o contraste do tooltip de Tendências com tokens dos temas claro e escuro, incluindo cabeçalho e indicadores dos eixos; contrato CSS coberto por teste automatizado.
 - `2.22` — 2026-08-11 — Versionamento da app registrado: PATCH `1.4.0` → `1.4.1` aplicado em `financeiro/app_metadata.py` junto com a melhoria desta spec (v2.21), documentado no changelog do MoC.
 - `2.21` — 2026-08-11 — Tendências passa a sinalizar oportunidade de revisar caixa quando o saldo previsto no fim do mês em contas de liquidez/carteira fica igual ou acima de 2x as despesas planejadas.
 - `2.20` — 2026-08-10 — Card **Despesas** da aba Tendências ganha indicador discreto de fonte, explicando contas por data, cartões por competência e exclusão de pagamentos de fatura.

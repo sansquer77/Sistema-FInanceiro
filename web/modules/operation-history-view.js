@@ -1,5 +1,7 @@
 import { api } from "./api.js";
 import { escapeHtml, formData, setMessage, stateMarkup } from "./dom-utils.js";
+import { createLoadPolicy } from "./load-policy.js";
+import { destroyVirtualLists, renderCollectionRows } from "./virtual-list.js";
 
 const MODULE_LABELS = {
   accounts: "Contas",
@@ -49,15 +51,23 @@ export function registerOperationHistoryView({ state, elements, formatDate }) {
   let loading = false;
   let currentLogs = [];
   let hasMore = false;
+  const loadPolicy = createLoadPolicy();
 
   operationHistoryForm.addEventListener("submit", (event) => {
     event.preventDefault();
-    loadOperationLogs({ reset: true });
+    loadOperationLogs({ reset: true, force: true });
   });
   operationHistoryLoadMoreButton.addEventListener("click", () => loadOperationLogs({ reset: false }));
   operationHistoryGroupBy.addEventListener("change", renderLogs);
 
-  async function loadOperationLogs({ reset = true } = {}) {
+  async function loadOperationLogs({ reset = true, force = false, revalidate = false, bypassPolicy = false } = {}) {
+    if (reset && !bypassPolicy) {
+      const key = JSON.stringify(formData(operationHistoryForm));
+      return loadPolicy.run(
+        () => loadOperationLogs({ reset: true, bypassPolicy: true }),
+        { force, key: revalidate ? key : `forced:${key}` },
+      );
+    }
     if (loading) {
       return;
     }
@@ -66,6 +76,7 @@ export function registerOperationHistoryView({ state, elements, formatDate }) {
     if (reset) {
       offset = 0;
       currentLogs = [];
+      destroyVirtualLists(operationHistoryList);
       operationHistoryList.innerHTML = "";
     }
     operationHistoryLoadMoreButton.disabled = true;
@@ -108,6 +119,15 @@ export function registerOperationHistoryView({ state, elements, formatDate }) {
     operationHistoryCard.value = state.creditCards.some((card) => String(card.id) === cardValue) ? cardValue : "";
   }
 
+  function resetCache() {
+    loadPolicy.reset();
+    offset = 0;
+    currentLogs = [];
+    hasMore = false;
+    destroyVirtualLists(operationHistoryList);
+    operationHistoryList.replaceChildren();
+  }
+
   function renderLogs() {
     operationHistoryCount.textContent = `Exibindo ${currentLogs.length} ${currentLogs.length === 1 ? "operação" : "operações"}${hasMore ? "; há mais resultados" : ""}.`;
     if (!currentLogs.length) {
@@ -115,14 +135,28 @@ export function registerOperationHistoryView({ state, elements, formatDate }) {
       return;
     }
     const grouped = groupLogs(currentLogs, operationHistoryGroupBy.value);
-    operationHistoryList.innerHTML = grouped.map((group) => `
-      <section class="operation-log-group">
-        <h3>${escapeHtml(group.label)}</h3>
-        <div class="operation-log-list">
-          ${group.logs.map(renderLog).join("")}
-        </div>
-      </section>
-    `).join("");
+    const flatItems = grouped.flatMap((group) => [
+      { kind: "group", label: group.label },
+      ...group.logs.map((log) => ({ kind: "log", log })),
+    ]);
+    const shouldVirtualize = flatItems.length > 200;
+    if (shouldVirtualize) {
+      renderCollectionRows(operationHistoryList, flatItems, {
+        rowHeight: 80,
+        renderItem: (item) => item.kind === "group"
+          ? `<section class="operation-log-group virtual" aria-label="${escapeHtml(item.label)}"><h3>${escapeHtml(item.label)}</h3></section>`
+          : renderLog(item.log),
+      });
+    } else {
+      operationHistoryList.innerHTML = grouped.map((group) => `
+        <section class="operation-log-group">
+          <h3>${escapeHtml(group.label)}</h3>
+          <div class="operation-log-list">
+            ${group.logs.map(renderLog).join("")}
+          </div>
+        </section>
+      `).join("");
+    }
   }
 
   function renderLog(log) {
@@ -193,6 +227,8 @@ export function registerOperationHistoryView({ state, elements, formatDate }) {
 
   return {
     loadOperationLogs,
+    markDirty: loadPolicy.markDirty,
+    resetCache,
     renderFilters,
   };
 }

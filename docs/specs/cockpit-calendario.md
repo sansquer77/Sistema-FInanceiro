@@ -2,8 +2,8 @@
 tipo: spec
 area: cockpit
 status: implementado
-versao: 0.8
-atualizado: 2026-08-09
+versao: 0.9
+atualizado: 2026-09-03
 relacionados:
   - "[[relatorios]]"
   - "[[lancamentos]]"
@@ -17,7 +17,7 @@ aliases: ["Calendário do Cockpit", "Aba Calendário"]
 # Calendário do Cockpit
 
 > [!info] Status
-> **implementado** · área: `cockpit` · atualizado em 2026-08-09 · relacionados: [[relatorios]], [[lancamentos]], [[investimentos-portfolio]], [[cartoes]]
+> **implementado** · área: `cockpit` · atualizado em 2026-09-03 · relacionados: [[relatorios]], [[lancamentos]], [[investimentos-portfolio]], [[cartoes]]
 
 ## Problema
 
@@ -73,7 +73,7 @@ Campos de cada item de vencimento de investimento:
 | `asset_name` | texto | Nome do ativo. |
 | `asset_identifier` | texto | Ticker ou código, quando houver. |
 | `maturity_date` | `AAAA-MM-DD` | Data de vencimento. |
-| `current_value_cents` | inteiro | Valor atual estimado em centavos. |
+| `current_value_cents` | inteiro | Custo remanescente local em centavos, usado como referência sem consultar cotações externas. |
 | `currency` | texto | Moeda da carteira. |
 | `account_id` | inteiro | Identificador da carteira. |
 | `account_name` | texto | Nome da carteira. |
@@ -121,6 +121,8 @@ Campos de cada item de vencimento de investimento:
 - Consideram apenas posições abertas de renda fixa (`fixed_income`).
 - Usam a data de vencimento cadastrada (`fixed_income_maturity_date`).
 - Posições encerradas ou sem vencimento cadastrado não entram.
+- A leitura de vencimentos filtra as posições diretamente no SQLite e não monta, valora ou atualiza a carteira completa.
+- O Calendário funciona integralmente offline e não consulta SELIC, TR ou qualquer outra cotação externa.
 - Poupança, ações, fundos, cripto, previdência e outros tipos não entram neste card.
 - **Card 30 dias**: vencimentos de `reference_date` até `reference_date + 30 dias`, inclusive.
 - **Card 60 dias**: vencimentos de `reference_date + 31 dias` até `reference_date + 60 dias`, inclusive.
@@ -158,8 +160,8 @@ Tabelas consultadas:
 - `transactions` — lançamentos de conta (receitas e despesas atrasadas não conciliadas).
 - `checking_accounts` — nome e moeda da conta.
 - `investment_opening_positions` — posições iniciais de renda fixa com vencimento.
-- `investment_operations` — operações de aporte de renda fixa (para cálculo de valor atual, se necessário).
-- `investment_value_overrides` — valores atuais informados manualmente.
+- `investment_operations` — operações de aporte de renda fixa e respectivo custo local.
+- `investment_redemptions` — baixas que determinam custo e quantidade remanescentes da posição aberta.
 
 A nova rota deve ser autenticada e validar `Host`/`Origin` conforme as regras de segurança do app.
 
@@ -212,6 +214,7 @@ A nova rota deve ser autenticada e validar `Host`/`Origin` conforme as regras de
 
 ## Changelog
 
+- `0.9` — 2026-09-03 — Vencimentos passam a usar leitura local compartilhada, filtrada no SQLite e baseada no custo remanescente; Calendário deixa de montar/valorar a carteira e não dispara consultas externas de SELIC/TR ou cotações.
 - `0.8` — 2026-08-09 — Spec promovida para **implementado** na documentação do app.
 - `0.7` — 2026-08-07 — Títulos dos cards inferiores alinhados ao rótulo das regras de layout: passam de "Vencimentos em 30/60 dias" para **"Investimentos com vencimento em 30/60 dias"**, deixando explícito que os cards tratam de investimentos de renda fixa (e não de contas a pagar). Também explicita que títulos do Tesouro Direto entram nos cards por serem classificados como renda fixa com vencimento cadastrado.
 - `0.6` — 2026-08-07 — Ajustado o cabeçalho da aba: novo subtítulo "Apoio no acompanhamento das suas contas" e, quando `ia_ativa` é verdadeiro, indicador de IA idêntico ao da aba **Tendências** (payload `ia_ativa` exposto pela rota). Explicitado que o clique em item navega ao lançamento com destaque sem abrir o formulário de edição.

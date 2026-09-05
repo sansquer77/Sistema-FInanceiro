@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 2.9
-atualizado: 2026-08-29
+versao: 3.10
+atualizado: 2026-09-04
 relacionados:
   - "[[arquitetura]]"
   - "[[visao-produto]]"
@@ -14,7 +14,7 @@ tags: [produto, meta]
 # Requisitos
 
 > [!info] Status
-> **implementado** (escopo vivo) · área: `meta` · atualizado em 2026-08-22 · relacionados: [[arquitetura]], [[visao-produto]]
+> **implementado** (escopo vivo) · área: `meta` · atualizado em 2026-09-04 · relacionados: [[arquitetura]], [[visao-produto]]
 
 ## Objetivo
 
@@ -32,7 +32,7 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 - **Recorrência e Parcelamento**: suporte a séries de lançamentos periódicos ou parcelados com acompanhamento de índice de parcelas e conciliação bancária (`reconciled_at`). Ver [[lancamentos]].
 - **Cartões de Crédito**: cadastro de cartões com limite, emissor, bandeira, fechamento, vencimento e conta preferencial de pagamento. Lançamentos de despesas e receitas no cartão por fatura mensal (formato `AAAA-MM`), conciliação de lançamentos, compras parceladas/recorrentes, movimentação entre faturas e fluxo de pagamento de fatura (integral ou parcial, com saldo residual lançado na fatura seguinte) integrado às contas-correntes. Ver [[cartoes]].
 - **Limites de Gastos (Metas/Budgets)**: estabelecimento de limites de despesas mensais por categoria e subcategoria. Ver [[limites-gastos]].
-- **Portfólio de Investimentos**: posições iniciais (`opening positions`) e operações de investimento, autocomplete de ativos já utilizados, resgates por quantidade com baixa FIFO, histórico imutável de resultado realizado e metas percentuais por classe comparadas à alocação atual normalizada em BRL. Suporte a ações/ETFs/BDRs (`stock`), cripto volátil (`crypto`), stablecoins (`stablecoin`), fundos (`fund`), renda fixa (`fixed_income`), previdência privada (`private_pension`), poupança (`savings`) e outros (`other`). Ver [[investimentos-portfolio]].
+- **Portfólio de Investimentos**: posições iniciais (`opening positions`) e operações de investimento, autocomplete de ativos já utilizados, resgates por quantidade com baixa FIFO, histórico imutável de resultado realizado, metas percentuais por classe e agenda futura de eventos de ações/ETFs/BDRs consultada em B3/Nasdaq com fallback Yahoo e cache diário. A agenda inclui proventos, bonificações, desdobramentos e grupamentos informados pela B3, com Data ex ajustada pelo calendário nacional ANBIMA local, pagamento opcional fornecido pelo provedor, carteiras associadas, fonte explícita e sem estimativa de provento total ou conversão monetária de fatores societários. Ausência de anúncio futuro ou calendário não é apresentada como erro. Suporte a ações/ETFs/BDRs (`stock`), cripto volátil (`crypto`), stablecoins (`stablecoin`), fundos (`fund`), renda fixa (`fixed_income`), previdência privada (`private_pension`), poupança (`savings`) e outros (`other`). Ver [[investimentos-portfolio]].
 - **Precificação e Validação de Ativos**:
   - Integração com Yahoo Finance (ações e fundos) e CoinGecko/Yahoo (criptoativos) para cotações automáticas.
   - Integração com o Sistema Gerenciador de Séries Temporais (SGS) do Banco Central para obter CDI, SELIC, IPCA, IGP-M e TR para o cálculo do rendimento acumulado de renda fixa (com fallback local seguro).
@@ -40,7 +40,7 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
   - Ver [[investimentos-portfolio]].
 - **Categorias e Tags**: cadastro, edição, listagem e exclusão de categorias (tipo receita, despesa, investimento), subcategorias e múltiplos marcadores (tags) por transação. Ver [[categorias-tags-gestao]].
 - **Classificação Assistida**: sugestão local de categoria e subcategoria por correspondência exata normalizada com o histórico do próprio usuário, sem dependência de internet. Ver [[classificacao-assistida]].
-- **Cockpit e Relatórios**: resumo financeiro mensal com seletor de mês, saldos por moeda, planejamento recorrente, dívidas parceladas, portfólio por tipo, maiores receitas/despesas, relatórios por categoria, subcategoria, conta, tag e fluxo diário. Ver [[relatorios]] e [[arquitetura]].
+- **Cockpit e Relatórios**: resumo financeiro mensal com seletor de mês, saldos por moeda, planejamento recorrente, dívidas parceladas, portfólio por tipo, maiores receitas/despesas, relatórios por categoria, subcategoria, conta, tag e fluxo diário. Alertas do Cockpit organizados em indicadores dedicados (críticos e informativos) via flyout global. Ver [[specs/alertas-cockpit]], [[relatorios]] e [[arquitetura]].
 - **Importação de Dados**:
   - Leitura e importação de extratos externos em formato `.csv` ou `.xls`.
   - Importação de lançamentos por meio de planilhas de modelo do sistema (`.xlsx`) para contas e cartões.
@@ -48,7 +48,7 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 - **Histórico de Operações**: auditoria funcional somente leitura com filtros, busca, agrupamentos e rastreio de lotes por `operation_batch_id`. Ver [[historico-operacoes]].
 - **Consultor**: análises pré-formatadas por IA na aba Consultor do Cockpit, mediante IA geral configurada, ativação explícita e consentimento de acesso aos dados financeiros do usuário. Usa catálogo fechado em seletor, contexto minimizado, Perfil Complementar criptografado em SQLite, histórico por usuário e expurgo automático quando IA/Consultor/consentimento são desabilitados. Ver [[specs/consultor]].
 - **Sobre o app**: tela informativa no grupo Usuário com objetivo, funcionalidades, tecnologias, contato e infraestrutura mínima. Ver [[sobre-app]].
-- **Interface web estática**: painéis locais em `web/`, sem dependências externas de frontend. Ver [[arquitetura]] e [[adr/0001-stack-local-sem-framework]].
+- **Interface web estática**: painéis locais em `web/`, sem framework ou build step; dependências browser aprovadas são fixadas, auditadas e distribuídas localmente para manter operação offline. Ver [[arquitetura]], [[adr/0002-modularizacao-frontend]] e [[adr/0013-dependencias-frontend-v2]].
 - **Distribuição desktop**: pacotes macOS e Windows com instaladores, modo local e launchers opcionais para rede local confiável. Ver [[distribuição]].
 - **Licenciamento open source**: código-fonte e distribuição pública sob Apache License 2.0. Ver [[adr/0008-licenca-apache-2-0]].
 
@@ -57,6 +57,14 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 - Open Finance, sincronização em nuvem ou integrações bancárias automáticas diretas.
 - Multiusuário concorrente em rede; o modo LAN é apenas exposição local controlada para redes confiáveis, sem transformar o app em serviço multiusuário.
 - Suporte formal, SLA, consultoria, garantia de funcionamento ou compromisso de atendimento a usuários.
+
+## Escopo planejado da fundação v2
+
+- **Gráficos compartilhados**: migrar progressivamente os gráficos para um adaptador ApexCharts local, preservando tokens, acessibilidade, tabelas alternativas e semântica financeira.
+- **Máscaras de entrada**: IMask local para dinheiro e datas adequadas, sem substituir validação do backend nem alterar contratos monetários.
+- **Command Palette**: lançador nativo por `Cmd+K`/`Ctrl+K`, com experiência equivalente ao padrão cmdk e sem introduzir React.
+- **Virtualização**: listas extensas renderizam apenas a janela visível e overscan, mantendo altura total por espaçadores e preservando filtros, ordenação, foco e acessibilidade.
+- Ver [[specs/frontend-fundacao-v2]] e [[adr/0013-dependencias-frontend-v2]].
 
 ## Regras funcionais
 
@@ -98,12 +106,16 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 - Detalhes completos de bloqueio de tentativas, cookies e headers defensivos em [[seguranca-autenticacao]] e [[recuperacao-senha]].
 - Exposição em LAN deve configurar `APP_URL`, `APP_ALLOWED_HOSTS` e `APP_ALLOWED_ORIGINS`; acesso remoto deve usar reverse-proxy com HTTPS.
 - Exposição em LAN via HTTP deve gerar alerta de segurança sem impedir a inicialização; HTTP local continua permitido.
+- URLs configuráveis de IA devem ser validadas contra SSRF antes de cada requisição e no salvamento: esquema permitido, hostname resolvido, bloqueio de IPs privados/loopback/link-local por padrão, bloqueio de redirecionamentos, DNS pinning no transporte, validação da URL final e opt-in controlado pelo operador via `AI_ALLOW_PRIVATE_ENDPOINTS`/`AI_ALLOWED_LOCAL_HOSTS`/`AI_ALLOWED_LOCAL_ENDPOINTS`. Ver [[specs/seguranca-ai-ssrf]] e [[adr/0015-ssrf-ai-endpoints]].
 
 ## Requisitos não funcionais
 
 - O app deve rodar localmente em macOS com Python 3 e bibliotecas padrão (ou extensões mínimas offline).
 - Pacotes distribuídos devem oferecer modo local por padrão e modo rede/LAN apenas por launcher explícito.
 - O frontend deve continuar simples, responsivo e sem build step.
+- Dependências browser devem ser vendorizadas em versão exata, acompanhadas de licença, origem e hash, sem download por CDN em runtime.
+- Listas extensas devem evitar crescimento ilimitado do DOM quando a virtualização for aplicável.
+- Respostas regeneráveis de provedores de mercado devem ter retenção e limites explícitos, sem crescimento ilimitado do `quote_cache`; compactação física não pode ocorrer indiscriminadamente em toda abertura.
 - Valores monetários devem ser persistidos em centavos.
 - O banco SQLite deve ser criado automaticamente em `data/finance.db`.
 - O SQLite deve operar com WAL e espera curta por locks para tolerar uso local compartilhado leve, sem transformar o app em sistema multiusuário em rede.
@@ -121,6 +133,18 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 
 ## Changelog
 
+- `3.10` — 2026-09-04 — Data ex derivada de eventos B3 passa a usar calendário nacional ANBIMA persistido localmente e atualizado anualmente sem fonte alternativa.
+- `3.9` — 2026-09-04 — Agenda B3 passa a incluir bonificações, desdobramentos e grupamentos, mantendo fonte explícita e sem converter fatores societários em valores monetários.
+- `3.8` — 2026-09-04 — Agenda de eventos passa a usar B3 para ativos brasileiros, Nasdaq para internacionais e Yahoo como fallback, com cache diário e sem novas credenciais.
+- `3.7` — 2026-09-04 — Eventos do Portfólio usa estado vazio neutro quando não há anúncio futuro ou calendário disponível, sem induzir o usuário a interpretar ETFs acumuladores como falha.
+- `3.6` — 2026-09-04 — Eventos do Portfólio passa a exibir agenda futura agrupada, carteiras associadas e fonte em nota de rodapé; o Cockpit reutiliza a leitura de calendário limitada à semana.
+- `3.5` — 2026-09-04 — Eventos do Portfólio distingue Data ex de pagamento opcional e o Cockpit limita a consulta externa de proventos à semana corrente.
+- `3.4` — 2026-09-04 — Portfólio passa a incluir eventos históricos detectados de ações, ETFs e BDRs, com valor unitário, fonte e nível de confirmação, sem estimativa de valor total.
+- `3.3` — 2026-09-03 — Incluída especificação dos Alertas e Notificações do Cockpit com indicadores dedicados (críticos e informativos), flyout global e backend centralizado. Ver [[specs/alertas-cockpit]].
+- `3.2` — 2026-09-03 — Adicionada regra de segurança para validação anti-SSRF de endpoints configuráveis de IA, com DNS pinning, validação da URL final, allowlist por host:port e opt-in por env para provedores locais. Ver [[specs/seguranca-ai-ssrf]] e [[adr/0015-ssrf-ai-endpoints]].
+
+- `3.1` — 2026-08-30 — Cache persistente de cotações passa a exigir retenção, limites e compactação física condicionada. Ver [[specs/manutencao-cache-cotacoes]].
+- `3.0` — 2026-08-30 — Fundação planejada da v2 passa a incluir ApexCharts local, IMask, Command Palette nativa por `Cmd/Ctrl+K` e virtualização de listas longas; dependências browser deixam de ser proibidas de forma absoluta e passam a exigir versão, licença, hash e operação offline.
 - `2.9` — 2026-08-29 — Portfólio passa a permitir metas percentuais por classe e comparação da alocação planejada versus atual.
 - `2.8` — 2026-08-29 — Histórico do Portfólio passa a preservar ganho/perda realizado, custo FIFO e posição remanescente de cada resgate.
 - `2.7` — 2026-08-29 — Portfólio passa a incluir reutilização assistida de ativos e resgate quantitativo com baixa FIFO e crédito líquido.

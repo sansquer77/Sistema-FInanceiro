@@ -2,8 +2,8 @@
 tipo: spec
 area: relatorios
 status: implementado
-versao: 2.16
-atualizado: 2026-08-28
+versao: 2.24
+atualizado: 2026-09-05
 relacionados:
   - "[[lancamentos]]"
   - "[[cartoes]]"
@@ -17,7 +17,7 @@ aliases: ["Relatórios", "Cockpit"]
 # Relatórios
 
 > [!info] Status
-> **implementado** · área: `relatorios` · atualizado em 2026-08-28 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[limites-gastos]]
+> **implementado** · versão: `2.24` · área: `relatorios` · atualizado em 2026-09-05 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[limites-gastos]]
 
 ## Problema
 
@@ -56,6 +56,8 @@ Qualquer usuário autenticado localmente que queira analisar seus gastos e recei
 - O relatório de subcategorias agrupa por `Categoria / Subcategoria`.
 - O relatório de tags considera lançamentos de contas e cartões com tag, mesmo quando não houver subcategoria.
 - O relatório de tags agrupa por tag e exibe, para cada uma, quatro totais separados por moeda: **Receitas**, **Despesas**, **Saldo** (receitas menos despesas) e **Investimentos**.
+- O relatório de tags consolida `SUM` e `COUNT` por tag, moeda e tipo diretamente no SQLite; não materializa lançamentos detalhados para executar a agregação.
+- Quando uma competência é informada, o relatório de tags aplica diretamente o intervalo de datas nas contas e a igualdade de `invoice_month` nos cartões, permitindo o uso dos índices temporais; a consulta sem competência usa um caminho SQL separado, sem predicados opcionais com `OR`.
 - Um lançamento com múltiplas tags contribui com o mesmo valor para o total de cada uma das tags.
 - Investimentos e aportes aparecem na linha própria de Investimentos do relatório de tags e não são misturados com despesas.
 - Transferências, câmbio e pagamentos de fatura não entram no relatório de tags.
@@ -71,25 +73,36 @@ Qualquer usuário autenticado localmente que queira analisar seus gastos e recei
 - O Cockpit deve ter um seletor de mês no topo do módulo, compartilhado pelas abas internas que dependem de competência mensal, começando por **Situação do mês**, **Calendário**, **Tendências** e **Saúde Financeira**.
 - O seletor de mês do Cockpit deve seguir o mesmo padrão visual dos seletores mensais de Lançamentos, com botões compactos por ícone para mês anterior, mês atual e próximo mês.
 - Rótulos de seletores mensais devem usar o formato compacto `MM/AAAA` para manter largura visual estável.
-- Ao trocar o mês do Cockpit, a aba **Situação do mês** deve recalcular KPIs, maiores receitas/despesas, limites, planejamento, dívidas e totais por moeda com base no mês selecionado.
+- Ao trocar o mês do Cockpit, a aba **Situação do mês** deve recalcular KPIs, maiores receitas/despesas, limites, planejamento e totais por moeda com base no mês selecionado. Parcelas em aberto representam o estado atual de liquidação, não uma fotografia histórica; apenas o componente mensal usa a competência selecionada.
+- KPIs, rankings e planejamento do Cockpit são agregados no SQLite por mês, tipo, categoria e moeda, sem transportar linhas detalhadas até o agregador Python ou recarregar todo o histórico no navegador.
+- Os saldos operacionais por moeda do Cockpit são calculados por agregações SQLite de contas, faturas e pagamentos. A rota não chama leitores de históricos detalhados nem monta a projeção completa usada pelo Extrato.
 - O mês inicial do Cockpit deve ser o mês corrente.
 - A leitura do Cockpit para meses passados deve funcionar como fotografia analítica do período, sem esconder despesas de cartão apenas porque a fatura foi paga posteriormente.
 - Faturas de cartão devem impactar o Cockpit pela competência da fatura (`invoice_month`) do mês selecionado, preservando o valor da fatura daquele mês tanto em leituras previstas quanto conciliadas quando aplicável.
 - Faturas pagas devem continuar aparecendo nos totais analíticos do mês de competência por meio dos lançamentos detalhados do cartão; o pagamento agregado gerado na conta permanece excluído das despesas analíticas para evitar duplicidade.
 - O status de pagamento da fatura afeta o saldo operacional da conta de pagamento na data do pagamento, mas não altera retroativamente o consumo analítico do mês da fatura.
+- No saldo operacional previsto por moeda do Cockpit, uma fatura paga não produz impacto adicional na linha do cartão: seu pagamento já está refletido no lançamento da conta pagadora. Faturas ainda não pagas continuam reservadas uma única vez, pela conta preferencial quando compatível ou diretamente pelo cartão nos demais casos.
 - Os rótulos do Cockpit devem deixar claro quando os valores representam o mês selecionado, usando textos como `Saldo previsto em Julho/2026`, `Saldo conciliado em Julho/2026` ou equivalente, para reduzir ambiguidade com o saldo atual.
 - Quando o usuário selecionar mês futuro, o Cockpit deve priorizar planejamento, recorrências, parcelas futuras e faturas previstas; dados realizados inexistentes devem aparecer como zero ou estado vazio, sem simular lançamentos não existentes fora das regras já cadastradas.
 - Quando o gráfico **Maiores despesas do mês** exibir a linha agregada `Outros`, essa linha deve permitir abrir um detalhamento com as categorias/subcategorias ocultas no agrupamento e seus respectivos valores. A linha deve exibir, ao lado do rótulo, o indicador `i` discreto (mesmo padrão dos KPIs Taxa de poupança/Aportes do mês) sinalizando que a linha abre o detalhamento em pop-up.
 - Percentuais são calculados contra o total da seção.
 - Relatório **detalhado** mostra lançamentos individuais.
 - Relatório **sintético** mostra apenas agregados.
-- A evolução temporal usa `category_id`, `subcategory_id` opcional e período para retornar uma série mensal; o frontend pode aplicar média móvel e projeção visual sem persistir esses cálculos.
-- O demonstrativo mensal usa os mesmos dados analíticos carregados para Relatórios e Cockpit, respeitando a exclusão de pagamentos de fatura para evitar duplicidade.
+- A evolução temporal usa `category_id`, `subcategory_id` opcional e período para retornar a série mensal em BRL, total, variação percentual entre primeiro e último ponto e projeção SMA de até 12 meses, calculados no Python. A variação é indisponível se há menos de dois pontos ou o primeiro é zero. A SMA usa até três últimos pontos, incorpora cada previsão na janela seguinte e arredonda para centavos a cada passo (empates para cima, preservando a regra anterior). Os horizontes de 3/6/12 meses e a alternância da projeção apenas selecionam dados já calculados.
+- Na falha da evolução, esta versão usa erro explícito: limpa gráfico, total e modelo anterior, sem recalcular pelo histórico local, sem reaproveitar outra categoria/período e sem retry automático. Respostas atrasadas após trocar filtro ou fechar o drawer são descartadas. O fechamento destrói o gráfico e libera os dados do drawer.
+- O demonstrativo mensal é calculado no Python a partir dos dados persistidos, respeitando a exclusão de pagamentos de fatura para evitar duplicidade. O navegador recebe seções por moeda, KPIs, rankings, percentuais, composição, série diária e detalhes prontos; não recalcula esses valores nem usa o histórico global em memória como fallback.
+- A média diária divide as despesas pelos dias transcorridos no mês corrente, por todos os dias em meses anteriores e por um em meses futuros, preservando a regra vigente; o valor exibido é arredondado para centavos. O relógio de referência é o do servidor local.
+- Distribuição por categoria apresenta as cinco maiores e agrupa as restantes em Outros. Percentuais da composição de cada origem usam o total de despesas da seção/moeda, não o subtotal da origem. O detalhamento é ordenado por data crescente e valor decrescente.
+- No histograma diário, a seleção continua por competência da fatura, mas a posição é pela data original do lançamento. Compras de outro mês permanecem nos KPIs/composição/detalhes sem serem deslocadas artificialmente para um dia do mês selecionado. A escala considera os totais por data de todos os itens selecionados, preservando a apresentação vigente.
 - O demonstrativo pode ser gerado para uma ou mais contas ativas, um ou mais cartões ativos ou a visão consolidada de contas e cartões ativos.
 - O usuário pode escolher uma moeda específica cadastrada ou todas as moedas. Quando a visão consolidada usa todas as moedas e há movimentações em mais de uma moeda, o demonstrativo deve gerar seções independentes por moeda, funcionando como múltiplos relatórios no mesmo documento impresso/exportado.
 - O demonstrativo deve separar despesas oriundas de conta-corrente e despesas em cartão de crédito nas leituras sintéticas e na composição.
 - O detalhamento do demonstrativo deve indicar explicitamente a origem de cada lançamento, incluindo nome da conta ou do cartão.
-- O resumo executivo do demonstrativo deve incluir endividamento atual, seguindo a mesma regra do Cockpit para compras parceladas em aberto.
+- O resumo executivo do demonstrativo e o Cockpit exibem **Parcelas em aberto (estado atual)**, calculadas pelo mesmo serviço Python. Inclui despesas parceladas (`series_kind=installment` ou índice/quantidade de parcelas positivos), ativas e de contas/cartões ativos, sem somar moedas distintas.
+- Em contas, parcela conciliada é liquidada; parcela não conciliada continua aberta mesmo vencida ou anterior ao mês escolhido. Em cartões, conciliação não liquida a dívida: a existência de pagamento da fatura a encerra, independentemente da data de compra ou do mês escolhido. Pagamentos agregados em conta nunca entram novamente.
+- A competência é `date[:7]` em contas e `invoice_month` em cartões. O mês consultado identifica as parcelas daquela competência, mas o estoque aberto inclui competências anteriores e futuras. O estado é o atualmente registrado, não uma reconstrução de pagamentos/conciliações passadas. Atraso usa a data atual do servidor e o vencimento do cartão, limitado ao último dia do mês.
+- Pagamento parcial encerra a fatura original e gera saldo avulso na próxima fatura. Sem vínculo estruturado desse saldo com cada compra, o indicador de **parcelas** não o redistribui nem o identifica por descrição. Não representa a dívida total/rotativa; parcelas futuras continuam incluídas até suas respectivas faturas serem pagas.
+- Filtros de contas/cartões/moeda são aplicados no backend com isolamento por usuário. Seleção vazia mantém o comportamento de todas as contas/cartões ativos. Falha de consulta não produz zero fictício nem recálculo local; impressão aguarda uma resposta válida.
 - Valores monetários do demonstrativo devem usar números tabulares, alinhamento à direita quando em tabela e tamanho de fonte equivalente ao texto descritivo, para manter densidade sem pesar visualmente.
 - O demonstrativo deve priorizar impressão/exportação: cabeçalho minimalista com logo, título do mês, escopo, moeda base e data/hora de emissão; KPIs de saídas, média diária, saídas em conta, despesas em cartão, endividamento atual, maior categoria e maior lançamento; gráficos simples para categoria e gastos por dia; tabela de composição por categoria/subcategoria separada por origem; detalhamento com zebra e valores à direita; rodapé com nome do app e página; tipografia e espaçamentos mais densos para papel sem prejudicar leitura.
 
@@ -98,6 +111,10 @@ Qualquer usuário autenticado localmente que queira analisar seus gastos e recei
 | Método | Rota |
 |---|---|
 | `GET` | `/api/cockpit?month=AAAA-MM` |
+| `GET` | `/api/reports/overview?month=AAAA-MM` |
+| `GET` | `/api/reports/tags?month=AAAA-MM` |
+| `GET` | `/api/reports/open-debts?month=AAAA-MM&account_ids=1,2&card_ids=3&currency=BRL` |
+| `GET` | `/api/reports/statement?month=AAAA-MM&account_ids=1,2&card_ids=3&currency=BRL` |
 | `GET` | `/api/reports/category-evolution?category_id={id}&subcategory_id={id}&period={periodo}` |
 
 Dados de origem: `transactions`, `credit_card_transactions`, `categories`, `subcategories`, `tags`, `transaction_tags`, `credit_card_transaction_tags`, `checking_accounts`.
@@ -120,12 +137,24 @@ O ponto crítico é cartão de crédito: a fatura pertence ao mês de competênc
 
 ## Plano de implementação
 
+- [x] Entregar total, tendência e SMA pelo backend preservando a série de competência existente e o contrato `evolution`.
+- [x] Remover agregação e projeção local, limpar instâncias/dados na troca ou fechamento e mostrar erro explícito nas falhas.
+- [x] Testar série vazia/zero, arredondamento recursivo, horizontes e descarte de respostas obsoletas.
+
+- [x] Montar demonstrativo mensal no Python com filtros de proprietários ativos, competência, moedas e exclusão de pagamentos, reutilizando o serviço de parcelas abertas.
+- [x] Transferir KPIs, agrupamentos, percentuais, ranking, série diária e ordenação de detalhes; manter JS apenas como consumidor do modelo, sem fallback financeiro.
+- [x] Testar filtros, moedas, precisão, competências e impressão bloqueada durante consulta/falha; verificar remoção dos agregadores do demonstrativo no JS.
+
+- [x] Centralizar leitura, elegibilidade, pagamento, atraso e agregação por moeda em `open_debts.py`, sem rede ou escrita.
+- [x] Compartilhar o serviço entre Cockpit e demonstrativo, remover os dois classificadores JS e proteger carregamento/erro/impressão contra respostas obsoletas.
+- [x] Testar competência de fatura, conciliação distinta por origem, pagamentos integral/parcial, vencidas, filtros, isolamento e centavos; registrar dívida técnica de SMA/fallback separadamente.
+
 - [x] Identificar pagamentos de fatura em lançamentos de conta pelo vínculo `credit_card_payments.transaction_id`.
 - [x] Excluir esses lançamentos apenas das visões analíticas, preservando o impacto no saldo da conta.
 - [x] Atualizar Cockpit, Relatórios, evolução de categoria e limites para usar a regra analítica sem duplicidade.
 - [x] Cobrir a regra com testes automatizados onde a agregação acontece no backend e validar manualmente as telas.
 - [x] Criar aba de demonstrativos no módulo de Relatórios.
-- [x] Reaproveitar dados carregados de contas, cartões e relatórios para montar escopos conta/cartão/consolidado sem nova rota.
+- [x] Reaproveitar dados carregados para composição do demonstrativo; parcelas em aberto são consultadas no serviço Python compartilhado, conforme contrato atual.
 - [x] Gerar layout imprimível com cabeçalho, KPIs, gráficos simples, composição, detalhamento e rodapé.
 - [x] Validar sintaxe dos módulos frontend alterados.
 - [x] Permitir seleção múltipla de contas e cartões para demonstrativos específicos.
@@ -141,6 +170,8 @@ O ponto crítico é cartão de crédito: a fatura pertence ao mês de competênc
 - [x] Revisar agregações do Cockpit para garantir que faturas de cartão pagas continuem consideradas por `invoice_month`.
 - [x] Revisar rótulos de saldo para explicitar o mês selecionado e evitar ambiguidade com saldo atual.
 - [x] Criar testes automatizados para Cockpit mensal, especialmente fatura paga em mês selecionado e exclusão do pagamento agregado.
+- [x] Separar o consolidado de saldos por moeda da projeção detalhada do Extrato e calculá-lo por agregações SQLite.
+- [x] Caracterizar o contrato financeiro anterior e provar que `/api/cockpit` não chama leitores de históricos detalhados.
 
 ## Critérios de aceite
 
@@ -153,6 +184,7 @@ O ponto crítico é cartão de crédito: a fatura pertence ao mês de competênc
 - Dado um lançamento de investimento com tag, quando o relatório de tags é exibido, então o valor aparece na linha Investimentos da tag e não soma às Despesas.
 - Dado uma tag com despesas em BRL e receitas em USD, quando o relatório de tags é exibido, então cada moeda mantém seus próprios totais e o Saldo é calculado dentro de cada moeda.
 - Dado uma transferência entre contas com tag, quando o relatório de tags é exibido, então o lançamento não aparece no relatório.
+- Dado uma competência no relatório de tags, quando a agregação é consultada, então o plano do SQLite usa os índices de usuário e data/competência das duas origens, sem predicado opcional `IS NULL OR`.
 - Dado uma fatura paga no mês, quando relatórios e Cockpit somam despesas do período, então o pagamento da fatura não é somado como despesa analítica e apenas as despesas detalhadas do cartão entram no total.
 - Dado movimentações em múltiplas moedas, quando exibidas, os totais são separados por moeda.
 - Dado um planejamento mensal com lançamentos em moedas distintas, quando o Cockpit é exibido, cada seção apresenta subtotal e itens por moeda, sem rotular valores estrangeiros como reais.
@@ -169,7 +201,7 @@ O ponto crítico é cartão de crédito: a fatura pertence ao mês de competênc
 - Dado o usuário navegando para outro mês no Cockpit, quando aciona o botão de mês atual, então o Cockpit retorna ao mês corrente.
 - Dado o usuário visualizando seletores mensais, quando os botões de navegação aparecem, então usam ícones compactos com rótulo acessível em vez de palavras longas.
 - Dado o usuário visualizando o seletor mensal, quando o mês é exibido, então o rótulo usa o formato `MM/AAAA`.
-- Dado o usuário selecionando outro mês no Cockpit, quando a aba **Situação do mês** é exibida, então KPIs, saldos, limites, planejamento, dívidas e gráficos refletem o mês selecionado.
+- Dado o usuário selecionando outro mês no Cockpit, quando a aba **Situação do mês** é exibida, então KPIs, saldos, limites, planejamento e gráficos refletem o mês selecionado; parcelas em aberto mantêm o estado atual de liquidação explicitado no rótulo.
 - Dado o usuário selecionando outro mês no Cockpit, quando alterna para **Saúde Financeira**, então o score é calculado para o mesmo mês selecionado.
 - Dado uma fatura de cartão pertencente ao mês selecionado, quando ela já tiver sido paga, então o Cockpit continua considerando os lançamentos detalhados do cartão como despesa analítica daquele mês.
 - Dado uma fatura de cartão paga por lançamento em conta-corrente, quando o Cockpit calcula despesas analíticas do mês, então o pagamento agregado da fatura permanece excluído para evitar duplicidade.
@@ -179,9 +211,49 @@ O ponto crítico é cartão de crédito: a fatura pertence ao mês de competênc
 - Dado o usuário visualizando **Maiores despesas do mês** com a linha `Outros`, quando clica nessa linha, então um pop-up mostra as categorias/subcategorias que compõem `Outros`, com valor de cada item e total agregado, sem alterar os totais do Cockpit.
 - Dado o usuário abrindo o gráfico de evolução de uma categoria/subcategoria, quando o drawer é exibido, então a área do gráfico é aproximadamente 20% maior que o tamanho anterior.
 - Dado o gráfico de evolução exibido, quando há pontos de dados históricos ou projeção SMA, então cada ponto exibe o respectivo valor formatado, mesmo quando a linha de tendência está ativada.
+- Dado uma fatura paga por uma conta em BRL, quando o Cockpit calcula o saldo previsto após a data do pagamento, então considera somente o débito registrado na conta e não subtrai novamente a mesma fatura pela linha do cartão.
+- Dado qualquer volume de histórico, quando `/api/cockpit` consolida saldos por moeda, então usa agregações SQLite e não materializa listas detalhadas de lançamentos, compras ou pagamentos; contas e cartões preservam os mesmos valores do contrato anterior.
+
+### Critérios complementares — dívida aberta
+
+- Parcela de conta não conciliada e vencida continua aberta; conciliada sai do estoque, inclusive se futura.
+- Compra parcelada conciliada no cartão continua aberta até o pagamento da fatura; pagamento não duplica a dívida pela conta pagadora.
+- Compra antiga com fatura de outra competência usa `invoice_month`; seleção de mês não simula um estado histórico de liquidação.
+- Pagamento parcial exclui as parcelas da fatura encerrada, preserva parcelas futuras e não classifica o saldo avulso como parcelamento.
+- Contas/cartões de outro usuário, arquivados ou fora dos filtros não contribuem; moedas têm totais independentes em centavos.
+- Relatórios e Cockpit usam o mesmo serviço; resposta atrasada de outro filtro não substitui o demonstrativo atual, e falha bloqueia impressão sem repetir a consulta automaticamente.
+
+Validação automatizada: `tests/test_open_debts.py` cobre o domínio e o compartilhamento dos handlers; `tests/frontend_open_debts.test.mjs` cobre respostas obsoletas, troca de abas e falha sem impressão ou retry automático. A conferência visual no Safari e a impressão física permanecem manuais, não executadas nesta etapa. A suíte geral apresentou uma falha independente deste escopo: limite de linhas revisado de `portfolio-view.js` (1.668 versus 1.663).
+
+### Validação do demonstrativo calculado no servidor
+
+- Dadas despesas em BRL e USD, quando o demonstrativo é consultado, então cada seção mantém seus próprios totais em centavos, sem conversão ou soma multimoeda.
+- Dados filtros de contas/cartões/moeda, quando aplicados, então KPIs, gráficos e detalhes recebem o mesmo recorte; seleção vazia significa todos os proprietários ativos daquele tipo.
+- Dada compra de cartão de outro mês com fatura na competência selecionada, quando a fatura está paga, então o consumo continua no demonstrativo sem somar o pagamento em conta; o histograma preserva a data original.
+- Dadas categorias e origens distintas, quando agregadas, então top cinco/Outros, média diária, percentuais da seção e detalhes ordenados são entregues pelo Python.
+- Dada falha, payload incompatível ou resposta obsoleta, quando o demonstrativo aguarda dados, então não calcula fallback nem libera impressão de dados inválidos; resposta vazia válida mostra estado vazio.
+
+Cobertura: `tests/test_statement_report.py` e `tests/frontend_open_debts.test.mjs`. Conferência visual no Safari e impressão física permanecem manuais, não executadas nesta etapa. Agregações das demais abas permanecem dívida técnica separada; evolução não usa mais cálculo/fallback local.
 
 ## Changelog
 
+<!-- Validação automatizada desta etapa: tests/test_evolution_presentation.py e tests/frontend_evolution.test.mjs. Validação visual no Safari não executada. -->
+
+- `2.24` — 2026-09-05 — Reforçada a opacidade do degradê compartilhado da Evolução para preservar sua leitura no tema claro e manter consistência com Contas e Cartões.
+- `2.23` — 2026-09-03 — Relatório de tags passa a usar consultas distintas com e sem competência; o caminho mensal aplica predicados temporais diretos e utiliza os índices de data e `invoice_month`.
+
+- `2.22` — 2026-09-01 — Saldo operacional por moeda do Cockpit passa a ser agregado diretamente no SQLite, sem carregar históricos detalhados nem executar a projeção completa do Extrato; contrato anterior preservado por teste de caracterização.
+
+- `2.21` — 2026-09-01 — Cockpit e relatório de tags passam a usar `SUM`, `COUNT` e `GROUP BY` no SQLite; o navegador carrega somente recortes mensais e Relatórios mantém cache isolado por competência.
+
+- `2.20` — 2026-08-31 — Total, tendência e SMA da evolução no Python; erro explícito substitui recálculo local, com descarte do modelo e gráfico anteriores.
+
+- `2.19` — 2026-08-31 — Demonstrativo mensal passa a receber agregações e detalhes do Python; contrato de filtros, moedas, média diária, distribuição e datas do histograma explicitado.
+
+
+- `2.18` — 2026-08-31 — Definido contrato compartilhado de parcelas em aberto, distinguindo conciliação e pagamento, incluindo vencidas e preservando moedas. Removida autorização de cálculos financeiros em JS; SMA/fallback legados registrados como migração pendente.
+
+- `2.17` — 2026-08-30 — Corrigida a composição do saldo previsto do Cockpit para que faturas já pagas não sejam novamente subtraídas pela linha do cartão após o débito ter sido registrado na conta pagadora.
 - `2.16` — 2026-08-28 — Consolidada a correção do relatório de subcategorias: nomes são normalizados antes do agrupamento, linhas sem subcategoria preservam o sentinela `null` até a API, a evolução filtra `subcategory_id IS NULL` e contas/cartões são somados pelos valores normalizados em BRL. Adicionados testes de regressão do filtro nulo, competência de fatura e conversão monetária.
 - `2.15` — 2026-08-26 — API de evolução de categoria (`/api/reports/category-evolution`) passou a aceitar `subcategory_id=null|none|-1` para filtrar por `subcategory_id IS NULL`.
 - `2.14` — 2026-08-26 — Registrada a investigação da regressão no agrupamento do relatório de subcategorias, consolidada e validada na versão 2.16.

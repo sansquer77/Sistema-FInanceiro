@@ -17,6 +17,8 @@ from financeiro.accounts import recompute_account_balance
 from financeiro.categories import ClassificationError, get_or_create_category, get_or_create_subcategory, get_or_create_tag, normalize_name
 from financeiro.classification_suggestions import normalize_description
 from financeiro.credit_cards import create_credit_card_transaction_with_conn
+from financeiro.identifiers import positive_int_id
+from financeiro.money import decimal_to_cents
 from financeiro.transactions import (
     convert_to_brl_cents,
     create_transaction_with_conn,
@@ -26,8 +28,19 @@ from financeiro.transactions import (
     resolve_exchange_rate_micros,
 )
 from financeiro.database import begin_immediate, get_connection, row_to_dict
+from financeiro.xlsx_security import (
+    XlsxSecurityError,
+    normalize_xlsx_worksheet_target,
+    read_xlsx_member,
+    validate_xlsx_archive,
+    validate_xlsx_file,
+)
 
 OLE_MAGIC = bytes.fromhex("D0CF11E0A1B11AE1")
+MAX_XLSX_ROWS = 20_000
+MAX_XLSX_CELLS = 250_000
+MAX_XLSX_COLUMNS = 256
+MAX_XLSX_SHARED_STRINGS = 100_000
 SYSTEM_IMPORT_ACCOUNT_HEADERS = [
     "data",
     "tipo",
@@ -333,7 +346,7 @@ def normalize_system_account_row(row: dict, account_id: object) -> dict:
     if payload["type"] == "transfer":
         payload["category"] = ""
         payload["subcategory"] = ""
-        # spec: importacao-dados v1.5 — regras de repetição
+        # spec: importacao-dados v1.6 — regras de repetição
         # (transferencias e cambio sao sempre avulsos, mesmo se a linha trouxer repeticao)
         payload["series_kind"] = "single"
         payload["installment_count"] = None
@@ -359,7 +372,7 @@ def normalize_system_card_row(row: dict, card_id: object) -> dict:
 
 
 def normalize_system_series(row: dict) -> dict:
-    # spec: importacao-dados v1.5 — regras de repetição
+    # spec: importacao-dados v1.6 — regras de repetição
     # (avulso padrao; parcelado exige parcelas 2-120; recorrente exige frequencia;
     #  media so se aplica a recorrentes)
     series_kind = SERIES_KIND_ALIASES.get(normalize_key(row.get("repeticao") or row.get("series_kind")), "single")
@@ -565,22 +578,38 @@ def xlsx_column_name(index: int) -> str:
 
 
 def parse_xlsx_rows(file_bytes: bytes, sheet_name: str) -> list[list[str]]:
+    # spec: importacao-dados v1.6 — limites de segurança do contêiner e da worksheet
     try:
+        validate_xlsx_file(file_bytes)
         with zipfile.ZipFile(BytesIO(file_bytes)) as archive:
+            validate_xlsx_archive(archive)
             shared_strings = xlsx_shared_strings(archive)
             date_style_indexes = xlsx_date_style_indexes(archive)
             date_base = date(1904, 1, 1) if xlsx_uses_1904_date_system(archive) else date(1899, 12, 30)
             sheet_path = xlsx_sheet_path(archive, sheet_name)
-            root = ElementTree.fromstring(archive.read(sheet_path))
-    except (KeyError, zipfile.BadZipFile, ElementTree.ParseError) as exc:
+            root = ElementTree.fromstring(read_xlsx_member(archive, sheet_path))
+    except ImportError:
+        raise
+    except XlsxSecurityError as exc:
+        raise ImportError(exc.message, exc.status) from exc
+    except (KeyError, zipfile.BadZipFile, zipfile.LargeZipFile, ElementTree.ParseError,
+            RuntimeError, NotImplementedError, OverflowError, ValueError) as exc:
         raise ImportError("Modelo XLSX invalido.") from exc
     ns = {"main": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
     parsed_rows = []
-    for row_node in root.findall(".//main:sheetData/main:row", ns):
+    cell_count = 0
+    for row_node in root.iterfind(".//main:sheetData/main:row", ns):
+        if len(parsed_rows) >= MAX_XLSX_ROWS:
+            raise xlsx_complexity_error()
         row_values = []
-        for cell_node in row_node.findall("main:c", ns):
+        for cell_node in row_node.iterfind("main:c", ns):
+            cell_count += 1
+            if cell_count > MAX_XLSX_CELLS:
+                raise xlsx_complexity_error()
             cell_ref = cell_node.attrib.get("r", "")
             column = xlsx_column_index(cell_ref)
+            if column > MAX_XLSX_COLUMNS:
+                raise xlsx_complexity_error()
             while len(row_values) < column - 1:
                 row_values.append("")
             row_values.append(xlsx_cell_text(cell_node, shared_strings, ns, date_style_indexes, date_base))
@@ -588,50 +617,55 @@ def parse_xlsx_rows(file_bytes: bytes, sheet_name: str) -> list[list[str]]:
     return parsed_rows
 
 
+def xlsx_complexity_error() -> ImportError:
+    return ImportError(
+        "Modelo XLSX excede os limites seguros de importacao.",
+        HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+    )
+
+
 def xlsx_shared_strings(archive: zipfile.ZipFile) -> list[str]:
     try:
-        root = ElementTree.fromstring(archive.read("xl/sharedStrings.xml"))
+        root = ElementTree.fromstring(read_xlsx_member(archive, "xl/sharedStrings.xml"))
     except KeyError:
         return []
     ns = {"main": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
     strings = []
     for item in root.findall("main:si", ns):
+        if len(strings) >= MAX_XLSX_SHARED_STRINGS:
+            raise xlsx_complexity_error()
         text_parts = [node.text or "" for node in item.findall(".//main:t", ns)]
         strings.append("".join(text_parts))
     return strings
 
 
 def xlsx_sheet_path(archive: zipfile.ZipFile, desired_name: str) -> str:
-    workbook_root = ElementTree.fromstring(archive.read("xl/workbook.xml"))
-    rels_root = ElementTree.fromstring(archive.read("xl/_rels/workbook.xml.rels"))
+    workbook_root = ElementTree.fromstring(read_xlsx_member(archive, "xl/workbook.xml"))
+    rels_root = ElementTree.fromstring(read_xlsx_member(archive, "xl/_rels/workbook.xml.rels"))
     main_ns = {"main": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
     rel_ns = {"rel": "http://schemas.openxmlformats.org/package/2006/relationships"}
-    relation_targets = {
-        rel.attrib["Id"]: rel.attrib["Target"]
-        for rel in rels_root.findall("rel:Relationship", rel_ns)
-    }
+    relation_targets = {}
+    for rel in rels_root.findall("rel:Relationship", rel_ns):
+        if rel.attrib.get("TargetMode", "Internal") != "Internal":
+            continue
+        if not rel.attrib.get("Type", "").endswith("/worksheet"):
+            continue
+        relation_targets[rel.attrib["Id"]] = rel.attrib["Target"]
     desired_key = normalize_key(desired_name)
     first_relation_id = None
     for sheet in workbook_root.findall("main:sheets/main:sheet", main_ns):
         relation_id = sheet.attrib.get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id")
         first_relation_id = first_relation_id or relation_id
         if normalize_key(sheet.attrib.get("name")) == desired_key:
-            return xlsx_normalize_target(relation_targets[relation_id])
+            return normalize_xlsx_worksheet_target(relation_targets[relation_id])
     if first_relation_id:
-        return xlsx_normalize_target(relation_targets[first_relation_id])
+        return normalize_xlsx_worksheet_target(relation_targets[first_relation_id])
     raise ImportError("Aba de lancamentos nao encontrada no modelo.")
-
-
-def xlsx_normalize_target(target: str) -> str:
-    target = target.lstrip("/")
-    if target.startswith("xl/"):
-        return target
-    return f"xl/{target}"
 
 
 def xlsx_date_style_indexes(archive: zipfile.ZipFile) -> set[int]:
     try:
-        root = ElementTree.fromstring(archive.read("xl/styles.xml"))
+        root = ElementTree.fromstring(read_xlsx_member(archive, "xl/styles.xml"))
     except (KeyError, ElementTree.ParseError):
         return set()
     ns = {"main": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
@@ -660,7 +694,7 @@ def xlsx_date_style_indexes(archive: zipfile.ZipFile) -> set[int]:
 
 def xlsx_uses_1904_date_system(archive: zipfile.ZipFile) -> bool:
     try:
-        root = ElementTree.fromstring(archive.read("xl/workbook.xml"))
+        root = ElementTree.fromstring(read_xlsx_member(archive, "xl/workbook.xml"))
     except (KeyError, ElementTree.ParseError):
         return False
     ns = {"main": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
@@ -711,6 +745,8 @@ def xlsx_column_index(cell_ref: str) -> int:
     letters = "".join(char for char in cell_ref if char.isalpha()).upper()
     if not letters:
         return 1
+    if len(letters) > 3:
+        raise xlsx_complexity_error()
     index = 0
     for char in letters:
         index = index * 26 + (ord(char) - 64)
@@ -1018,12 +1054,9 @@ def normalize_category_parts(category_value: object, subcategory_value: object) 
 
 def normalize_account_id(value: object) -> int:
     try:
-        account_id = int(str(value or "").strip())
+        return positive_int_id(value)
     except ValueError as exc:
         raise ImportError("Informe a conta que recebera a importacao.") from exc
-    if account_id <= 0:
-        raise ImportError("Informe a conta que recebera a importacao.")
-    return account_id
 
 
 def normalize_import_date(value: object) -> str:
@@ -1065,7 +1098,7 @@ def normalize_amount(value: object) -> Decimal:
 
 
 def money_decimal_to_cents(value: Decimal) -> int:
-    return int((value * Decimal(100)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    return decimal_to_cents(value)
 
 
 def find_header_index(rows: list[list[object]]) -> int:

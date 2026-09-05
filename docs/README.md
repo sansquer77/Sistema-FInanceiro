@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 11.95
-atualizado: 2026-08-30
+versao: 12.46
+atualizado: 2026-09-05
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -27,6 +27,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[visao-produto]] | Direção de produto, princípios de experiência e estado atual dos módulos. |
 | [[roadmap]] | Sequência de evolução, status por módulo e próximas prioridades. |
 | [[glossario]] | Vocabulário de domínio com links para as specs onde cada conceito é definido. |
+| [[qualidade-codigo]] | Fronteiras de responsabilidade, sinais de alerta e regras de organização do código. |
 | [[distribuição]] | Regras de geração, limpeza, instalação e validação dos pacotes macOS e Windows. |
 | [[templates/spec-template]] | Template obrigatório para criar novos documentos. |
 
@@ -48,10 +49,13 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[specs/historico-operacoes]] | ✅ implementado | Auditoria |
 | [[specs/recuperacao-senha]] | ✅ implementado | Segurança |
 | [[specs/seguranca-autenticacao]] | ✅ implementado | Segurança |
+| [[specs/seguranca-transporte-externo]] | ✅ implementado | Segurança |
+| [[specs/seguranca-ai-ssrf]] | ✅ implementado | Segurança |
 | [[specs/sobre-app]] | ✅ implementado | Usuário |
 | [[specs/instrucoes-app]] | ✅ implementado | Usuário |
 | [[specs/preferencias-abas]] | ✅ implementado | Usuário |
 | [[specs/frontend-modularizacao]] | ✅ implementado | Frontend |
+| [[specs/bank-logos]] | ✅ implementado | Frontend |
 | [[specs/tendencias-saude-financeira]] | ✅ implementado | Diagnóstico |
 | [[specs/score-saude-financeira]] | ✅ implementado | Diagnóstico |
 | [[specs/consultor]] | ✅ implementado | Consultor |
@@ -63,6 +67,12 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[specs/Update Server]] | ✅ implementado | Distribuição |
 | [[distribuição]] | ✅ implementado | Distribuição |
 | [[specs/landing-page]] | ✅ implementado | Institucional |
+| [[specs/migracao-banco-v2]] | ✅ implementado | Migração de dados |
+| [[specs/manutencao-cache-cotacoes]] | ✅ implementado | Persistência |
+| [[specs/utilitarios-dominio]] | ✅ implementado | Arquitetura |
+| [[specs/desconcentracao-arquitetura-v2]] | ✅ implementado | Arquitetura v2 |
+| [[specs/alertas-cockpit]] | ✅ implementado | Cockpit |
+| [[specs/frontend-fundacao-v2]] | ✅ implementado | Frontend v2 |
 
 ---
 
@@ -73,6 +83,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | Spec | Status | Área |
 |---|---|---|
 | [[specs/open-finance]] | 📝 rascunho | Open Finance |
+| [[specs/backup-restauracao]] | 📝 rascunho | Backup e restauração |
 | [[specs/consolidacao-familiar]] | 📝 rascunho | Consolidação Familiar |
 | [[specs/imposto-renda]] | ❌ depreciado — custo de manter regras fiscais atualizadas não compensa para uso familiar | Investimentos |
 | [[specs/exportacao-dados]] | ❌ depreciado — arquivo SQLite já acessível por leitor genérico ou agente de IA | Exportação |
@@ -94,6 +105,12 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[adr/0009-mais-retorno-cotas-opt-in]] | Cotas de fundos via API Mais Retorno em integração opt-in. |
 | [[adr/0010-segredos-criptografados-sqlite]] | Segredos de SMTP, IA e integrações em SQLite criptografado, com chave fora de `data/`. |
 | [[adr/0011-criptografia-snapshots-familiares]] | Rascunho da criptografia transportável dos snapshots familiares com `cryptography`, `scrypt` e `AES-256-GCM`. |
+| [[adr/0012-fundacao-v2-contrato-e-migracao-de-dados]] | Fundação da linha 2.x com contrato congelado, schema-base canônico e migração controlada do banco 1.x para um novo banco 2.x. |
+| [[adr/0013-dependencias-frontend-v2]] | ApexCharts 4.7.0 e IMask vendorizados, Command Palette nativa no padrão cmdk e virtualização compartilhada sem framework. |
+| [[adr/0014-desconcentracao-fachadas-e-roteamento]] | Fachadas compatíveis, roteamento declarativo e responsabilidades internas menores na fundação v2. |
+| [[adr/0015-ssrf-ai-endpoints]] | Validação de endpoints configuráveis de IA contra SSRF, com opt-in por env para provedores locais. |
+| [[adr/0016-calendario-mercado-anbima]] | Calendário nacional ANBIMA persistido localmente como fonte única para dias úteis derivados de eventos B3. |
+| [[adr/0018-backup-completo-criptografado]] | Rascunho do pacote completo de backup com container ZIP e payload criptografado autenticado. |
 
 ---
 
@@ -134,7 +151,59 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
-- `11.95` — 2026-08-30 — [[specs/rentabilidade-portfolio]] v1.8 mantém o drawer do gráfico acima do cabeçalho sticky por meio do nível global de overlays.
+- `12.46` — 2026-09-05 — Reforçado no tema claro o degradê vertical compartilhado pelos gráficos de Contas, Cartões e Evolução de Relatórios, preservando término suave e leitura das linhas.
+- `12.45` — 2026-09-05 — Gráficos de saldo de Contas e evolução de Faturas passam a compartilhar com a Evolução de Relatórios a área vertical contínua do ApexCharts e a mesma família cromática entre realizado e previsão.
+- `12.44` — 2026-09-05 — [[specs/migracao-banco-v2]] v1.6 e [[adr/0003-sqlite-fonte-de-verdade]] v1.2 definem migrações incrementais rastreáveis, WAL apenas na inicialização, durabilidade `FULL` e estatísticas do planner via `PRAGMA optimize`.
+- `12.43` — 2026-09-05 — Criados [[specs/backup-restauracao]] e [[adr/0018-backup-completo-criptografado]], ambos em rascunho, para backup completo, restauração validada, retenção e senha criptografada em Preferências.
+- `12.42` — 2026-09-05 — [[specs/open-finance]] v0.8 corrigida para refletir o suporte já existente a múltiplas tags por lançamento e seus separadores de entrada.
+- `12.41` — 2026-09-05 — [[specs/open-finance]] v0.7 permanece em rascunho e documenta staging com descrição bruta/normalizada, memória local de classificação e tags de projeto; Pluggy segue como candidato enquanto não houver provedor gratuito e simples para o usuário padrão.
+- `12.40` — 2026-09-04 — Snapshots de rentabilidade passam a consolidar corretamente múltiplos lotes do mesmo ativo antes da persistência.
+- `12.39` — 2026-09-04 — Corrigido o baseline da primeira captura de rentabilidade para não interpretar todo o estoque histórico como aporte do mês corrente.
+- `12.38` — 2026-09-04 — Corrigida a reconciliação de tabelas aditivas em bancos v2 existentes, incluindo snapshots de rentabilidade e leitura de notificações.
+- `12.37` — 2026-09-04 — Rentabilidade conclui captura antes da resposta, classificação rigorosa da cobertura e aplicação dos fluxos mensais persistidos.
+- `12.36` — 2026-09-04 — [[specs/rentabilidade-portfolio]] v2.5 e [[adr/0017-snapshots-rentabilidade-portfolio]] v1.0 concluem snapshots mensais, cobertura explícita e flyover agregado por moeda.
+- `12.35` — 2026-09-04 — Contrato de rentabilidade ampliado com cobertura de snapshots, sem alteração das séries agregadas consumidas pelo frontend.
+- `12.34` — 2026-09-04 — Rentabilidade passa a priorizar snapshots mensais persistidos, mantendo fallback aproximado para competências ainda sem cobertura.
+- `12.33` — 2026-09-04 — Camada de valorização passou a fornecer metadados de origem/status para a futura captura de snapshots, mantendo fallback aproximado.
+- `12.32` — 2026-09-04 — [[specs/rentabilidade-portfolio]] v2.0 entra em implementação e [[adr/0017-snapshots-rentabilidade-portfolio]] define snapshots mensais por ativo com apresentação agregada por moeda.
+- `12.31` — 2026-09-04 — Rentabilidade do Portfólio passa a usar o ano civil corrente completo, com explicação explícita para aportes, aproximações e meses futuros.
+- `12.30` — 2026-09-04 — Preenchimento dos gráficos de Contas e Cartões centralizado em uma camada contínua, eliminando a quebra de cor entre saldo atual e previsto.
+- `12.29` — 2026-09-04 — Corrigida a renderização DOM das listas de cartões e invertido o degradê dos gráficos de contas/cartões para uma única paleta azul.
+- `12.28` — 2026-09-04 — Gráficos de saldo de Contas e faturas de Cartões ganharam área degradê horizontal sob as linhas, sem alterar séries ou dados.
+- `12.27` — 2026-09-04 — Fechamento dos achados UX P2/P3: Histórico responsivo, ARIA de Relatórios, microcopy do Cockpit, densidade de Sobre e atenção preventiva em Limites.
+- `12.26` — 2026-09-04 — [[specs/importacao-dados]] v1.7 e [[specs/efeito-borboleta]] v1.9 adotam estados iniciais semânticos e ocultam resultados dependentes até haver dados válidos.
+- `12.25` — 2026-09-04 — [[specs/frontend-modularizacao]] v4.31 reforça a acessibilidade da Busca global no WebKit com semântica modal, foco confinado e restauração segura.
+- `12.24` — 2026-09-04 — [[specs/categorias-tags-gestao]] v1.2 reduz a densidade de listas extensas com busca local, subcategorias recolhíveis e menus contextuais acessíveis.
+- `12.23` — 2026-09-04 — [[specs/investimentos-portfolio]] v2.61 e [[adr/0016-calendario-mercado-anbima]] adotam calendário ANBIMA local para datas derivadas de eventos B3, sem fallback BrasilAPI.
+- `12.22` — 2026-09-04 — [[specs/investimentos-portfolio]] v2.60 inclui eventos societários B3, corrige a documentação da coluna Fonte e compartilha TLS verificado entre os provedores da agenda.
+- `12.21` — 2026-09-04 — [[specs/investimentos-portfolio]] v2.55 elimina o aviso ambíguo de indisponibilidade na aba Eventos e usa estado vazio neutro para ausência de anúncios futuros ou calendários não publicados.
+- `12.20` — 2026-09-04 — [[specs/investimentos-portfolio]] v2.54 transforma Eventos em agenda futura mensal com carteiras associadas, fonte em nota de rodapé e sessão Yahoo `calendarEvents`; [[specs/alertas-cockpit]] v1.2 reutiliza a janela limitada.
+- `12.19` — 2026-09-04 — [[specs/investimentos-portfolio]] v2.53 e [[specs/alertas-cockpit]] v1.1 limitam a consulta semanal de proventos no Cockpit, endurecem o parser e virtualizam/desmontam a aba Eventos, distinguindo Data ex de pagamento opcional.
+- `12.18` — 2026-09-04 — Fundação da versão 2.0.0 encerrada: [[specs/frontend-fundacao-v2]] e [[specs/alertas-cockpit]] alcançam v1.0 implementada; eventos semanais passam a alimentar os Informativos do Cockpit.
+- `12.17` — 2026-09-04 — [[specs/investimentos-portfolio]] v2.52 conclui a fundação da versão 2.0.0 com a aba Eventos: proventos históricos detectados, fonte e confirmação, sem estimativa de valor total.
+- `12.16` — 2026-09-04 — [[specs/frontend-fundacao-v2]] v0.19 conclui a remoção da pré-montagem integral dos rankings de Relatórios e do preparo duplicado das linhas virtuais do Portfólio.
+- `12.15` — 2026-09-04 — Workflows GitHub Actions de distribuição (macOS/Windows/Linux) atualizados para validar dependências browser vendorizadas (`web/vendor/imask/`, `web/vendor/apexcharts/`) antes da publicação. [[distribuição]] v2.6.
+- `12.14` — 2026-09-04 — [[specs/frontend-fundacao-v2]] v0.18: Faturas e Histórico de Operações integrados ao virtualizador compartilhado (`virtual-list.js`); teste de contrato verifica imports e estilos.
+- `12.13` — 2026-09-04 — [[specs/frontend-fundacao-v2]] v0.17 e [[adr/0013-dependencias-frontend-v2]] v1.4: Command Palette nativa (`command-palette.js`) com navegação, preferências, busca e ajuda via `Cmd/Ctrl+K`; teste de contrato verifica estrutura e acessibilidade.
+- `12.12` — 2026-09-04 — [[specs/frontend-fundacao-v2]] v0.16 e [[adr/0013-dependencias-frontend-v2]] v1.3: IMask 7.6.1 vendorizado e integrado via `web/modules/input-mask.js`; máscaras monetárias aplicadas em formulários preservando parsers e formato brasileiro. [[arquitetura]] e [[specs/frontend-modularizacao]] sincronizadas.
+- `12.11` — 2026-09-03 — Indexada [[specs/alertas-cockpit]] em rascunho para a reformulação dos alertas do Cockpit em indicadores dedicados (críticos e informativos) com flyout global.
+- `12.10` — 2026-09-03 — Indexada [[specs/seguranca-ai-ssrf]] e [[adr/0015-ssrf-ai-endpoints]] para proteção SSRF de endpoints de IA configuráveis.
+- `12.9` — 2026-09-03 — Indexada [[specs/seguranca-transporte-externo]] para TLS verificado e leitura JSON externa limitada.
+- `12.8` — 2026-08-31 — Indexada [[specs/bank-logos]] e sincronizadas [[arquitetura]] e [[qualidade-codigo]] com o catálogo compartilhado e o gate automatizado de qualidade.
+- `12.7` — 2026-08-30 — Preferências, Histórico, Extrato e Simulações passam a evitar recargas redundantes com invalidação segura e deduplicação de requisições.
+- `12.6` — 2026-08-30 — Portfólio passa a liberar recursos de apresentação ao sair e a reaproveitar snapshot recente sem recarga redundante; specs e arquitetura sincronizadas.
+- `12.5` — 2026-08-30 — Atualizadas [[arquitetura]] e [[specs/frontend-modularizacao]] para registrar estado e carregamentos coordenados como serviços de aplicação separados do composition root.
+
+- `12.4` — 2026-08-30 — Incorporada [[qualidade-codigo]] como referência implementada para fronteiras de responsabilidade e prevenção de regressões arquiteturais.
+- `12.3` — 2026-08-30 — Portfólio frontend modularizado e projeções financeiras movidas ao núcleo Python por contrato de leitura dedicado.
+- `12.2` — 2026-08-30 — Implementada a desconcentração inicial da arquitetura v2, com roteamento declarativo e módulos internos de Portfólio/Cockpit. Ver [[specs/desconcentracao-arquitetura-v2]] e [[adr/0014-desconcentracao-fachadas-e-roteamento]].
+- `12.1` — 2026-08-30 — Extraídos utilitários conceituais compartilhados de dinheiro, calendário, identificadores e recorrência. Ver [[specs/utilitarios-dominio]].
+- `12.0` — 2026-08-30 — Implementada [[specs/manutencao-cache-cotacoes]] com retenção de 30 dias, limites e compactação controlada do cache regenerável de mercado.
+- `11.99` — 2026-08-30 — Fundação frontend v2 iniciada com ApexCharts 4.7.0 local, adaptador compartilhado e migração dos gráficos existentes sem mudança de dados ou finalidade.
+- `11.98` — 2026-08-30 — Criada [[specs/frontend-fundacao-v2]] v0.1 e [[adr/0013-dependencias-frontend-v2]] v1.0 para gráficos com ApexCharts MIT vendorizado, máscaras IMask, Command Palette nativa por `Cmd/Ctrl+K` e virtualização de listas extensas.
+- `11.97` — 2026-08-30 — Implementada [[specs/migracao-banco-v2]] v1.0; [[arquitetura]] v3.49 e [[adr/0012-fundacao-v2-contrato-e-migracao-de-dados]] v0.2 documentam o baseline `20000`, o backup `finance-v1.bkp` e a promoção validada do novo `finance.db`.
+- `11.96` — 2026-08-30 — Criada [[specs/migracao-banco-v2]] v0.1 para a migração automática e recuperável do banco 1.x ao baseline v2, preservando `finance-v1.bkp` e mantendo `finance.db` como nome do banco ativo.
+- `11.95` — 2026-08-30 — [[adr/0012-fundacao-v2-contrato-e-migracao-de-dados]] define o congelamento do contrato atual, a modernização incremental e a migração controlada para um banco canônico da linha 2.x, como fundação para Open Finance e Consolidação Familiar sem antecipar automaticamente a versão `2.0.0`.
 - `11.94` — 2026-08-29 — Versão `1.8.2`: corrige a auditoria do salvamento de Metas e integra a comparação definida/real/referência do perfil ao Consultor.
 - `11.93` — 2026-08-29 — [[arquitetura]] v3.48 documenta a integração das Metas com o Consultor e a entidade de auditoria correspondente.
 - `11.92` — 2026-08-29 — [[specs/investimentos-portfolio]] v2.43 corrige a auditoria das Metas; [[specs/consultor]] v2.0 compara alocação definida, real e faixa de referência do perfil.

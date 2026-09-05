@@ -2,8 +2,8 @@
 tipo: spec
 area: contas
 status: implementado
-versao: 1.3
-atualizado: 2026-08-07
+versao: 1.6
+atualizado: 2026-09-04
 relacionados:
   - "[[lancamentos]]"
   - "[[cartoes]]"
@@ -87,6 +87,10 @@ Tabela: `checking_accounts`.
 - Dado uma conta com lançamentos futuros, quando listada, o saldo armazenado reflete apenas lançamentos com data até hoje e é igual ao saldo efetivo (criar/editar/excluir um lançamento futuro não altera o saldo na data de hoje).
 
 ## Changelog
+
+- `1.6` — 2026-09-04 — Área do gráfico passou a ser uma camada contínua sob as duas séries, sem quebra visual na transição para o saldo previsto.
+- `1.5` — 2026-09-04 — Corrigido o renderer de listas para preservar elementos DOM e ajustado o gráfico de saldo para uma única paleta azul com degradê invertido.
+- `1.4` — 2026-09-04 — Histórico de saldos usa preenchimento degradê horizontal sob as linhas do ApexCharts para reforçar a leitura visual da série.
 
 - `1.3` — 2026-08-07 — Saldo atual passa a ser sempre efetivo (lançamentos com data > hoje não movem o saldo); `current_balance_cents` armazenado é reconciliado após criar, editar, excluir, cascata de série, importação, resgate/encerramento de investimentos e ajuste de saldo inicial.
 - `1.2` — 2026-07-05 — Saldo previsto passa a considerar faturas conciliadas e não pagas de cartões vinculados como conta preferencial, pelo mês de vencimento.

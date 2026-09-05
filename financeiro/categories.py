@@ -4,6 +4,7 @@ from http import HTTPStatus
 
 from financeiro.database import get_connection
 from financeiro.database import row_to_dict
+from financeiro.identifiers import positive_int_id
 
 GROUP_TYPES = {"income", "expense", "investment"}
 GROUP_ALIASES = {
@@ -573,12 +574,9 @@ def normalize_group_type(value: object, required: bool = True) -> str | None:
 
 def normalize_item_id(value: object, message: str) -> int:
     try:
-        normalized = int(str(value or "").strip())
+        return positive_int_id(value)
     except ValueError as exc:
         raise ClassificationError(message) from exc
-    if normalized <= 0:
-        raise ClassificationError(message)
-    return normalized
 
 
 def ensure_allowed_table(table: str) -> None:
@@ -854,7 +852,7 @@ def get_category_evolution(user_id: int, category_id: int, subcategory_id: int |
             WITH combined AS (
                 SELECT
                     strftime('%Y-%m', date) AS period_month,
-                    -- spec: relatorios/relatorios v2.16 — criterio 14
+                    -- spec: relatorios/relatorios v2.23 — criterio 14
                     -- A evolucao combina contas/cartoes em BRL para nao somar centavos
                     -- nominais de moedas diferentes e rotular o resultado como reais.
                     transactions.amount_brl_cents AS amount_cents
@@ -866,7 +864,7 @@ def get_category_evolution(user_id: int, category_id: int, subcategory_id: int |
                   AND transactions.category_id = ?
                   {subcat_filter_t}
                   AND transactions.archived_at IS NULL
-                  -- spec: relatorios/relatorios v2.16 — criterio 6
+                  -- spec: relatorios/relatorios v2.23 — criterio 6
                   -- pagamento de fatura fica fora da evolucao para nao duplicar
                   -- os lancamentos detalhados do cartao.
                   AND credit_card_payments.id IS NULL

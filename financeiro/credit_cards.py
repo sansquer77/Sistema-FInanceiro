@@ -1,16 +1,22 @@
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 from http import HTTPStatus
-import re
 import sqlite3
 from uuid import uuid4
 
 from financeiro.accounts import SUPPORTED_CURRENCIES, cents_to_money, empty_to_none, money_to_cents
 from financeiro.categories import get_or_create_category, get_or_create_subcategory, get_or_create_tag, normalize_name
 from financeiro.classification_suggestions import normalize_description
+from financeiro.credit_card_invoice import format_card_payment, load_invoice_history
+from financeiro.calendar_rules import add_months, days_in_month, normalize_iso_date, normalize_iso_month, shift_month
 from financeiro.database import begin_immediate, get_connection, row_to_dict
+from financeiro.identifiers import positive_int_id
+from financeiro.money import split_cents
 from financeiro.operation_logs import create_operation_log_with_conn
+from financeiro.recurrence import RECURRENCE_FREQUENCIES as CARD_RECURRENCE_FREQUENCIES
+from financeiro.recurrence import SERIES_KINDS as CARD_SERIES_KINDS
+from financeiro.recurrence import add_recurrence
 from financeiro.transactions import (
     average_amount_for_recurring_description,
     convert_to_brl_cents,
@@ -19,14 +25,9 @@ from financeiro.transactions import (
     normalize_flag,
     normalize_optional_tags,
     resolve_exchange_rate_micros,
-    split_cents,
 )
 
 CARD_TRANSACTION_TYPES = {"income", "expense"}
-CARD_SERIES_KINDS = {"single", "installment", "recurring"}
-CARD_RECURRENCE_FREQUENCIES = {"weekly", "monthly", "quarterly", "semiannual", "annual"}
-MONTH_PATTERN = re.compile(r"^\d{4}-\d{2}$")
-
 class CreditCardError(Exception):
     def __init__(self, message: str, status: HTTPStatus = HTTPStatus.BAD_REQUEST) -> None:
         self.message = message
@@ -106,6 +107,7 @@ def list_credit_card_invoice(user_id: int, card_id: object, month: object) -> di
             """,
             (user_id, normalized_card_id, normalized_month),
         ).fetchall()
+        history = load_invoice_history(conn, user_id, normalized_card_id, normalized_month)
     transactions = [format_card_transaction(row_to_dict(row), card["currency"]) for row in rows]
     payments = [format_card_payment(row_to_dict(row), card["currency"]) for row in payment_rows]
     return {
@@ -113,6 +115,7 @@ def list_credit_card_invoice(user_id: int, card_id: object, month: object) -> di
         "month": normalized_month,
         "transactions": transactions,
         "payments": payments,
+        "history": history,
     }
 
 
@@ -320,7 +323,7 @@ def update_credit_card_transaction(user_id: int, transaction_id: str, data: dict
         ).fetchone()
         if not existing:
             raise CreditCardError("Lancamento do cartao nao encontrado.", HTTPStatus.NOT_FOUND)
-        # spec: cartoes v2.15 — criterio 33
+        # spec: cartoes v2.17 — criterio 33
         # (a flag de media so e herdada da serie quando o payload nao a envia;
         #  ao editar um recorrente, o frontend envia o estado do checkbox explicitamente)
         if "use_average" not in data:
@@ -363,7 +366,7 @@ def update_credit_card_transaction(user_id: int, transaction_id: str, data: dict
             ),
         )
         replace_credit_card_transaction_tags(conn, normalized_id, tag_ids)
-        # spec: cartoes v2.15 — criterios 24, 34, 35 e 40
+        # spec: cartoes v2.17 — criterios 24, 34, 35 e 40
         # (a cascata automatica so ocorre quando a flag de media muda no
         #  salvamento — ativada agora ou desmarcada — ou quando o usuario
         #  escolhe futuro no modal; serie com flag ativa mas inalterada e
@@ -407,7 +410,7 @@ def move_credit_card_transaction_invoice(user_id: int, transaction_id: str, dire
             """,
             (target_month, normalized_id, user_id),
         )
-        # spec: tendencias-saude-financeira v2.22 — critério 13
+        # spec: tendencias-saude-financeira v2.23 — critério 13
         # (registra movimento de fatura para detecção posterior de antecipação
         #  de parcelas no núcleo de tendências)
         create_operation_log_with_conn(
@@ -442,7 +445,7 @@ def update_future_card_series(
     tag_ids: list[int],
     force_apply_to_future: bool = False,
 ) -> None:
-    # spec: cartoes v2.15 — criterios 34, 35, 39 e 40
+    # spec: cartoes v2.17 — criterios 34, 35, 39 e 40
     # (series recorrentes com use_average ativo no salvamento recalculam
     #  valores futuros pela media; demais series mantem apply_to_future)
     if not existing["series_id"]:
@@ -463,7 +466,7 @@ def update_future_card_series(
         """,
         (user_id, existing["series_id"], existing["id"], future_marker),
     ).fetchall()
-    # spec: cartoes v2.15 — criterios 34, 35 e 39
+    # spec: cartoes v2.17 — criterios 34, 35 e 39
     # (quando use_average estiver ativo no salvamento, recalcula o valor da serie pela media)
     if force_apply_to_future and existing["series_kind"] == "recurring":
         average_amount = average_amount_for_recurring_description(
@@ -605,7 +608,7 @@ def set_credit_card_transaction_reconciled(user_id: int, transaction_id: str, re
 
 
 def pay_credit_card_invoice(user_id: int, data: dict) -> dict:
-    # spec: cartoes v2.15 — criterios 7 e 169
+    # spec: cartoes v2.17 — criterios 7 e 169
     # (pagamento integral debita o saldo total da fatura; pagamento parcial
     #  debita apenas o valor informado e o saldo restante e lancado na proxima
     #  fatura aberta como despesa "Saldo da fatura MM/AAAA" na categoria Emprestimos)
@@ -643,7 +646,7 @@ def pay_credit_card_invoice(user_id: int, data: dict) -> dict:
             amount_cents = invoice_balance_cents(conn, user_id, card_id, invoice_month)
             if amount_cents <= 0:
                 raise CreditCardError("Nao ha valor em aberto para pagar nesta fatura.")
-            # spec: cartoes v2.15 — criterios 169 e 170
+            # spec: cartoes v2.17 — criterios 169 e 170
             raw_amount = str(data.get("amount") or "").strip()
             if raw_amount:
                 try:
@@ -676,7 +679,7 @@ def pay_credit_card_invoice(user_id: int, data: dict) -> dict:
                     ),
                 },
             )
-            # spec: relatorios/relatorios v2.16 — criterio 6
+            # spec: relatorios/relatorios v2.23 — criterio 6
             # (o retorno imediato tambem precisa identificar o pagamento agregado;
             #  o vinculo persistente sera gravado logo abaixo em credit_card_payments)
             payment_transaction["is_credit_card_payment"] = True
@@ -701,7 +704,7 @@ def pay_credit_card_invoice(user_id: int, data: dict) -> dict:
             )
             carried_transaction = None
             if is_partial:
-                # spec: cartoes v2.15 — criterio 169
+                # spec: cartoes v2.17 — criterio 169
                 # (saldo restante vira despesa na proxima fatura aberta, categoria
                 #  Emprestimos, descricao padrao "Saldo da fatura MM/AAAA")
                 remainder_cents = amount_cents - paid_cents
@@ -922,7 +925,7 @@ def normalize_card_repeat_count(value: object, series_kind: str) -> int | None:
     raw = str(value or "").strip()
     if not raw and series_kind == "installment":
         return None
-    # spec: cartoes v2.15 — critérios 21 e 22
+    # spec: cartoes v2.17 — critérios 21 e 22
     # (recorrentes usam 120 ocorrencias automaticamente quando o campo nao e enviado;
     #  o campo nao e mais exibido no formulario, mas a API mantem compatibilidade)
     if series_kind == "recurring":
@@ -1010,26 +1013,8 @@ def build_card_transaction_occurrences(transaction: dict) -> list[dict]:
     ]
 
 
-def add_recurrence(start_date: date, frequency: str, index: int) -> date:
-    if frequency == "weekly":
-        return start_date + timedelta(days=7 * index)
-    months = {
-        "monthly": 1,
-        "quarterly": 3,
-        "semiannual": 6,
-        "annual": 12,
-    }[frequency]
-    return add_months(start_date, months * index)
-
-
-def shift_month(value: str, delta: int) -> str:
-    year, month = value.split("-")
-    shifted = add_months(date(int(year), int(month), 1), delta)
-    return f"{shifted.year}-{shifted.month:02d}"
-
-
 def invoice_month_for_transaction_date(card, transaction_date: str) -> str:
-    # spec: cartoes v2.15 — secao "Regras": fatura calculada pela data do
+    # spec: cartoes v2.17 — secao "Regras": fatura calculada pela data do
     # lancamento e pelo dia de fechamento (apos o fechamento, entra na proxima)
     parsed_date = date.fromisoformat(transaction_date)
     base_month = f"{parsed_date.year}-{parsed_date.month:02d}"
@@ -1045,7 +1030,7 @@ def open_invoice_month_for_transaction_date(conn, user_id: int, card, transactio
 
 
 def first_open_invoice_month(conn, user_id: int, card_id: int, invoice_month: str) -> str:
-    # spec: cartoes v2.15 — criterio 2 (secao "Regras": fatura calculada ja paga
+    # spec: cartoes v2.17 — criterio 2 (secao "Regras": fatura calculada ja paga
     # deve avancar automaticamente para a proxima fatura aberta, sem perder o lancamento)
     candidate = invoice_month
     for _ in range(240):
@@ -1053,20 +1038,6 @@ def first_open_invoice_month(conn, user_id: int, card_id: int, invoice_month: st
             return candidate
         candidate = shift_month(candidate, 1)
     raise CreditCardError("Nao foi encontrada uma fatura aberta para este cartao.", HTTPStatus.CONFLICT)
-
-
-def add_months(start_date: date, months: int) -> date:
-    target_month = start_date.month - 1 + months
-    year = start_date.year + target_month // 12
-    month = target_month % 12 + 1
-    day = min(start_date.day, days_in_month(year, month))
-    return date(year, month, day)
-
-
-def days_in_month(year: int, month: int) -> int:
-    if month == 12:
-        return 31
-    return (date(year, month + 1, 1) - date.resolution).day
 
 
 def normalize_day(value: object, message: str) -> int:
@@ -1080,21 +1051,19 @@ def normalize_day(value: object, message: str) -> int:
 
 
 def normalize_date(value: object) -> str:
-    raw = str(value or "").strip()
     try:
-        return date.fromisoformat(raw).isoformat()
+        return normalize_iso_date(value)
     except ValueError as exc:
         raise CreditCardError("Data invalida.") from exc
 
 
 def normalize_month(value: object) -> str:
     raw = str(value or "").strip()
-    if not MONTH_PATTERN.match(raw):
-        raise CreditCardError("Informe a fatura no formato AAAA-MM.")
-    month = int(raw[-2:])
-    if month < 1 or month > 12:
-        raise CreditCardError("Informe uma fatura valida.")
-    return raw
+    try:
+        return normalize_iso_month(raw)
+    except ValueError as exc:
+        message = "Informe a fatura no formato AAAA-MM." if len(raw) != 7 else "Informe uma fatura valida."
+        raise CreditCardError(message) from exc
 
 
 def normalize_optional_name(value: object) -> str | None:
@@ -1106,12 +1075,9 @@ def normalize_optional_name(value: object) -> str | None:
 
 def normalize_card_id(value: object) -> int:
     try:
-        normalized = int(str(value or "").strip())
+        return positive_int_id(value)
     except ValueError as exc:
         raise CreditCardError("Cartao nao encontrado.", HTTPStatus.NOT_FOUND) from exc
-    if normalized <= 0:
-        raise CreditCardError("Cartao nao encontrado.", HTTPStatus.NOT_FOUND)
-    return normalized
 
 
 def normalize_optional_card_id(value: object) -> int | None:
@@ -1207,7 +1173,7 @@ def invoice_balance_cents(conn, user_id: int, card_id: int, invoice_month: str) 
 
 
 def ensure_invoice_is_open(conn, user_id: int, card_id: int, invoice_month: str) -> None:
-    # spec: cartoes v2.15 — secao "Regras": nao e permitido adicionar/editar
+    # spec: cartoes v2.17 — secao "Regras": nao e permitido adicionar/editar
     # lancamentos diretamente em fatura ja paga (fechada)
     row = conn.execute(
         """
@@ -1287,9 +1253,3 @@ def replace_credit_card_transaction_tags(conn, transaction_id: int, tag_ids: lis
         "INSERT OR IGNORE INTO credit_card_transaction_tags (credit_card_transaction_id, tag_id) VALUES (?, ?)",
         [(transaction_id, tag_id) for tag_id in tag_ids],
     )
-
-
-def format_card_payment(payment: dict, currency: str) -> dict:
-    payment["amount"] = cents_to_money(payment.pop("amount_cents"))
-    payment["card_currency"] = currency
-    return payment

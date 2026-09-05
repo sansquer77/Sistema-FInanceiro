@@ -1,5 +1,6 @@
-// spec: tendencias-saude-financeira v2.22 — critérios 1, 2, 3, 4, 5, 6, 7, 10, 12, 13, 14, 16, 17, 20, 21, 25, 26, 27, 28, 32, 33 e 34
+// spec: tendencias-saude-financeira v2.23 — critérios 1, 2, 3, 4, 5, 6, 7, 10, 12, 13, 14, 16, 17, 20, 21, 25, 26, 27, 28, 32, 33 e 34
 import { stateMarkup } from "./dom-utils.js";
+import { chartToken, renderChart } from "./chart-adapter.js";
 export function registerTrendsView({
   elements,
   api,
@@ -121,6 +122,32 @@ export function registerTrendsView({
       ${renderBudgetActualTable()}
       ${renderConfidenceNotes()}
     `;
+    renderTrendsApexChart();
+  }
+
+  function renderTrendsApexChart() {
+    const chartElement = trendsContent.querySelector(".trends-apex-chart");
+    if (!chartElement) return;
+    const rows = filterMonthlySeries(currentData.serie_mensal || []);
+    renderChart(chartElement, {
+      chart: { type: "line", height: 260, stacked: false },
+      series: [
+        { name: "Receitas", type: "column", data: rows.map((row) => Number(row.income_cents || 0)) },
+        { name: "Despesas", type: "column", data: rows.map((row) => Number(row.expense_cents || 0)) },
+        { name: "Saldo líquido", type: "line", data: rows.map((row) => Number(row.balance_cents || 0)) },
+      ],
+      colors: [
+        chartToken("--positive", "#36b37e"),
+        chartToken("--danger", "#ff7452"),
+        chartToken("--accent", "#5f7fff"),
+      ],
+      stroke: { width: [0, 0, 3], curve: "smooth" },
+      plotOptions: { bar: { borderRadius: 4, columnWidth: "52%" } },
+      xaxis: { categories: rows.map((row) => row.month.slice(5, 7) + "/" + row.month.slice(2, 4)) },
+      yaxis: { labels: { formatter: formatCompactSignedMoney } },
+      tooltip: { y: { formatter: formatCompactSignedMoney } },
+      legend: { show: false },
+    });
   }
 
   function renderMeta() {
@@ -182,39 +209,10 @@ export function registerTrendsView({
   }
 
   function renderSeriesChart() {
-    const series = currentData.serie_mensal || [];
-    const filteredSeries = filterMonthlySeries(series);
-    const months = filteredSeries.map((item) => item.month);
+    const filteredSeries = filterMonthlySeries(currentData.serie_mensal || []);
     if (filteredSeries.length === 0) {
       return "";
     }
-    const incomes = filteredSeries.map((item) => Number(item.income_cents || 0));
-    const expenses = filteredSeries.map((item) => Number(item.expense_cents || 0));
-    const balances = filteredSeries.map((item) => Number(item.balance_cents || 0));
-    const rawMaxValue = Math.max(
-      1,
-      ...incomes,
-      ...expenses,
-      ...balances,
-    );
-    const rawMinValue = Math.min(0, ...balances);
-    const maxValue = niceAxisMax(rawMaxValue);
-    const minValue = rawMinValue < 0 ? niceAxisMin(rawMinValue, maxValue) : 0;
-    const range = Math.max(1, maxValue - minValue);
-    const width = 700;
-    const height = 260;
-    const padding = { top: 24, right: 16, bottom: 56, left: 72 };
-    const chartWidth = width - padding.left - padding.right;
-    const chartHeight = height - padding.top - padding.bottom;
-    const stepX = chartWidth / Math.max(1, months.length);
-    const groupWidth = Math.max(26, Math.min(58, stepX * 0.58));
-    const barGap = Math.max(3, groupWidth * 0.12);
-    const barWidth = (groupWidth - barGap) / 2;
-    const xCenter = (index) => padding.left + stepX * index + stepX / 2;
-    const yFor = (value) => padding.top + chartHeight - ((value - minValue) / range) * chartHeight;
-    const zeroY = yFor(0);
-    const linePoints = balances.map((value, index) => `${xCenter(index)},${yFor(value)}`).join(" ");
-    const yTicks = buildTicks(minValue, maxValue);
     const insight = monthlyChartInsight(filteredSeries);
     return `
       <section class="trends-chart-section">
@@ -228,63 +226,7 @@ export function registerTrendsView({
           </div>
         </div>
         <div class="trends-chart mixed">
-          <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Gráfico de evolução de receitas, despesas e saldo">
-            <g class="trends-grid-lines">
-              ${yTicks.map((value) => {
-                const y = yFor(value);
-                return `<line x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" stroke="currentColor" stroke-opacity="0.15" />`;
-              }).join("")}
-            </g>
-            <g class="trends-axis-y">
-              ${yTicks.map((value) => {
-                const y = yFor(value);
-                return `<text x="${padding.left - 8}" y="${y + 3}" text-anchor="end" font-size="8.5">${escapeHtml(formatCompactSignedMoney(value))}</text>`;
-              }).join("")}
-            </g>
-            <g class="trends-axis-x">
-              ${months.map((month, index) => {
-                const x = xCenter(index);
-                const label = month.slice(5, 7) + "/" + month.slice(2, 4);
-                return `<text x="${x}" y="${height - padding.bottom + 26}" text-anchor="middle" font-size="10">${escapeHtml(label)}</text>`;
-              }).join("")}
-            </g>
-            <line class="trends-zero-line" x1="${padding.left}" y1="${zeroY}" x2="${width - padding.right}" y2="${zeroY}" />
-            <g class="trends-month-shading">
-              ${filteredSeries.map((item, index) => {
-                const income = Number(item.income_cents || 0);
-                const expense = Number(item.expense_cents || 0);
-                const x = padding.left + stepX * index + stepX * 0.08;
-                return `<rect class="${income >= expense ? "surplus" : "deficit"}" x="${x}" y="${padding.top}" width="${stepX * 0.84}" height="${chartHeight}" rx="8" />`;
-              }).join("")}
-            </g>
-            <g class="trends-bars">
-              ${filteredSeries.map((item, index) => {
-                const income = Number(item.income_cents || 0);
-                const expense = Number(item.expense_cents || 0);
-                const balance = Number(item.balance_cents || 0);
-                const center = xCenter(index);
-                const incomeHeight = Math.max(0, zeroY - yFor(income));
-                const expenseHeight = Math.max(0, zeroY - yFor(expense));
-                const incomeX = center - groupWidth / 2;
-                const expenseX = incomeX + barWidth + barGap;
-                const tooltip = monthlyTooltip(item, income, expense, balance);
-                return `
-                  <g class="trends-month-group">
-                    <title>${escapeHtml(tooltip)}</title>
-                    <rect class="income" x="${incomeX}" y="${zeroY - incomeHeight}" width="${barWidth}" height="${incomeHeight}" rx="3" />
-                    <rect class="expense" x="${expenseX}" y="${zeroY - expenseHeight}" width="${barWidth}" height="${expenseHeight}" rx="3" />
-                  </g>
-                `;
-              }).join("")}
-            </g>
-            <g class="trends-balance-line">
-              <polyline fill="none" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" points="${linePoints}" />
-              ${balances.map((value, index) => {
-                const tooltip = monthlyTooltip(filteredSeries[index], incomes[index], expenses[index], value);
-                return `<circle cx="${xCenter(index)}" cy="${yFor(value)}" r="4"><title>${escapeHtml(tooltip)}</title></circle>`;
-              }).join("")}
-            </g>
-          </svg>
+          <div class="trends-apex-chart" role="img" aria-label="Gráfico de evolução de receitas, despesas e saldo"></div>
           <div class="trends-chart-legend">
             <span class="income"><i></i> Receitas</span>
             <span class="expense"><i></i> Despesas</span>
@@ -315,34 +257,6 @@ export function registerTrendsView({
     return normalized.slice(Math.max(0, normalized.length - count));
   }
 
-  function buildTicks(minValue, maxValue) {
-    if (minValue >= 0) {
-      return [maxValue, maxValue * 0.5, 0];
-    }
-    return [maxValue, maxValue * 0.5, 0, minValue];
-  }
-
-  function niceAxisMax(value) {
-    return niceCeil(Math.max(1, value) * 1.08);
-  }
-
-  function niceAxisMin(value, maxValue) {
-    const min = -niceCeil(Math.abs(value) * 1.25);
-    const minimumVisibleNegative = -Math.max(niceCeil(maxValue * 0.12), niceCeil(Math.abs(value) * 1.25));
-    return Math.min(min, minimumVisibleNegative);
-  }
-
-  function niceCeil(value) {
-    if (value <= 0) {
-      return 0;
-    }
-    const exponent = Math.floor(Math.log10(value));
-    const base = 10 ** exponent;
-    const normalized = value / base;
-    const step = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
-    return step * base;
-  }
-
   function formatSignedMoney(cents) {
     const value = Number(cents || 0);
     if (value < 0) {
@@ -365,18 +279,6 @@ export function registerTrendsView({
       return `${sign}R$ ${(abs / 100_000).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} mil`;
     }
     return `${sign}${formatMoney(abs / 100, "BRL")}`;
-  }
-
-  function monthlyTooltip(item, income, expense, balance) {
-    const monthLabel = formatMonthLabel(item.month);
-    const margin = income > 0 ? (balance / income) : 0;
-    const marginText = income > 0 ? ` (${formatPercent(margin)})` : "";
-    return [
-      `📅 ${monthLabel}`,
-      `🟢 Receitas: ${formatMoney(income / 100, "BRL")}`,
-      `🔴 Despesas: ${formatMoney(expense / 100, "BRL")}`,
-      `🔵 Saldo: ${formatSignedMoney(balance)}${marginText}`,
-    ].join("\n");
   }
 
   function monthlyChartInsight(series) {

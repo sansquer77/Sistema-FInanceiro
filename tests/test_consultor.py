@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 import tempfile
+import os
 import contextlib
 from datetime import datetime, timedelta
 from http import HTTPStatus
@@ -437,7 +438,7 @@ class ConsultorContextTest(unittest.TestCase):
         return stack
 
     def test_score_context_uses_only_score_aggregate(self) -> None:
-        with mock.patch("financeiro.financial_health.calculate_financial_health_score", return_value=score_payload()), self.profile_context():
+        with mock.patch("financeiro.portfolio.current_portfolio_positions", return_value=[]), mock.patch("financeiro.financial_health.calculate_financial_health_score", return_value=score_payload()), self.profile_context():
             context = build_analysis_context(7, "score_saude_financeira", month="2026-08")
 
         self.assertEqual(context["analysis_id"], "score_saude_financeira")
@@ -446,7 +447,7 @@ class ConsultorContextTest(unittest.TestCase):
         self.assertNotIn("transactions", context)
 
     def test_score_context_includes_investor_and_complementary_profile(self) -> None:
-        with mock.patch("financeiro.financial_health.calculate_financial_health_score", return_value=score_payload()), self.profile_context(complementary={"idade": 45, "horizonte_investimento_principal": "longo_prazo"}):
+        with mock.patch("financeiro.portfolio.current_portfolio_positions", return_value=[]), mock.patch("financeiro.financial_health.calculate_financial_health_score", return_value=score_payload()), self.profile_context(complementary={"idade": 45, "horizonte_investimento_principal": "longo_prazo"}):
             context = build_analysis_context(7, "score_saude_financeira", month="2026-08")
 
         self.assertEqual(context["investor_profile"], "Moderado")
@@ -464,7 +465,7 @@ class ConsultorContextTest(unittest.TestCase):
                 "confianca": "intermediaria",
             },
         )
-        with mock.patch("financeiro.financial_health.calculate_financial_health_score", return_value=payload), self.profile_context():
+        with mock.patch("financeiro.portfolio.current_portfolio_positions", return_value=[]), mock.patch("financeiro.financial_health.calculate_financial_health_score", return_value=payload), self.profile_context():
             context = build_analysis_context(7, "sustentabilidade_padrao_vida", month="2026-08")
 
         self.assertEqual(context["income_display"], "R$ 20.000,00")
@@ -657,7 +658,7 @@ class ConsultorContextTest(unittest.TestCase):
         self.assertIn("tolerancia a perdas", prompt)
 
     def test_maturities_context_uses_calendar_maturities_not_full_portfolio(self) -> None:
-        with mock.patch("financeiro.calendar.get_cockpit_calendar", return_value=calendar_payload()), mock.patch("financeiro.trends.calculate_trends", return_value=trends_payload()), mock.patch("financeiro.financial_health.calculate_financial_health_score", return_value=score_payload()), self.profile_context():
+        with mock.patch("financeiro.portfolio.current_portfolio_positions", return_value=[]), mock.patch("financeiro.calendar.get_cockpit_calendar", return_value=calendar_payload()), mock.patch("financeiro.trends.calculate_trends", return_value=trends_payload()), mock.patch("financeiro.financial_health.calculate_financial_health_score", return_value=score_payload()), self.profile_context():
             context = build_analysis_context(7, "destino_vencimentos")
 
         self.assertEqual(len(context["maturity_assets"]), 2)
@@ -675,11 +676,15 @@ class ConsultorAIExecutorTest(unittest.TestCase):
         database.DATA_DIR = Path(self.tempdir.name)
         database.DB_PATH = database.DATA_DIR / "test-consultor-ai.db"
         database.initialize_database()
+        os.environ["AI_ALLOW_PRIVATE_ENDPOINTS"] = "true"
+        os.environ["AI_ALLOWED_LOCAL_ENDPOINTS"] = "127.0.0.1:1234"
 
     def tearDown(self) -> None:
         database.DATA_DIR = self.original_data_dir
         database.DB_PATH = self.original_db_path
         self.tempdir.cleanup()
+        os.environ.pop("AI_ALLOW_PRIVATE_ENDPOINTS", None)
+        os.environ.pop("AI_ALLOWED_LOCAL_ENDPOINTS", None)
 
     def test_execute_uses_existing_ai_settings_and_caps_tokens(self) -> None:
         user = create_user("Queli", "queli@example.com", "strong-password")
@@ -854,12 +859,12 @@ class ConsultorAIExecutorTest(unittest.TestCase):
     def test_provider_network_errors_are_standardized(self) -> None:
         messages = build_ai_messages("Prompt seguro", {"analysis_id": "score_saude_financeira"})
 
-        with mock.patch("financeiro.consultor.urlopen", side_effect=TimeoutError("timed out")):
+        with mock.patch("financeiro.consultor.ai_urlopen", side_effect=TimeoutError("timed out")):
             with self.assertRaisesRegex(ConsultorError, "indisponivel"):
                 call_consultor_ai_provider(
                     {
                         "provider": "openai",
-                        "base_url": "https://api.openai.com/v1",
+                        "base_url": "http://127.0.0.1:1234",
                         "model": "gpt-test",
                         "api_key": "sk-test",
                         "auth_type": "bearer",
@@ -873,14 +878,14 @@ class ConsultorAIExecutorTest(unittest.TestCase):
         messages = build_ai_messages("Prompt seguro", {"analysis_id": "score_saude_financeira"})
 
         with mock.patch("financeiro.consultor.extract_summary_text", return_value=""):
-            with mock.patch("financeiro.consultor.urlopen") as urlopen_mock:
+            with mock.patch("financeiro.consultor.ai_urlopen") as urlopen_mock:
                 urlopen_mock.return_value.__enter__.return_value.read.return_value = b'{"choices":[]}'
 
                 with self.assertRaisesRegex(ConsultorError, "indisponivel"):
                     call_consultor_ai_provider(
                         {
                             "provider": "openai",
-                            "base_url": "https://api.openai.com/v1",
+                            "base_url": "http://127.0.0.1:1234",
                             "model": "gpt-test",
                             "api_key": "sk-test",
                             "auth_type": "bearer",

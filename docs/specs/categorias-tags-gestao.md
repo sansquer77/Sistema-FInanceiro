@@ -2,8 +2,8 @@
 tipo: spec
 area: classificacao
 status: implementado
-versao: 1.1
-atualizado: 2026-06-30
+versao: 1.2
+atualizado: 2026-09-04
 relacionados:
   - "[[lancamentos]]"
   - "[[importacao-dados]]"
@@ -17,7 +17,7 @@ aliases: ["Categorias e Tags", "Classificações"]
 # Categorias e Tags
 
 > [!info] Status
-> **implementado** · área: `classificacao` · atualizado em 2026-06-30 · relacionados: [[lancamentos]], [[importacao-dados]], [[relatorios]], [[limites-gastos]]
+> **implementado** · área: `classificacao` · atualizado em 2026-09-04 · relacionados: [[lancamentos]], [[importacao-dados]], [[relatorios]], [[limites-gastos]]
 
 ## Problema
 
@@ -56,6 +56,10 @@ Qualquer usuário autenticado localmente que classifique seus lançamentos por n
 - Importações podem criar automaticamente categorias, subcategorias e tags inexistentes para o usuário autenticado. Ver [[importacao-dados]].
 - Tags informadas em uma mesma célula devem ser separadas quando houver separadores suportados (vírgula, ponto-e-vírgula).
 - Categorias e subcategorias podem alimentar a evolução temporal dos relatórios por meio de séries mensais. Ver [[relatorios]].
+- A busca de Categorias e de Tags é local aos dados já carregados, ignora acentos e não dispara nova consulta ao backend.
+- A busca de Categorias considera tanto o nome da categoria quanto o de suas subcategorias; quando uma subcategoria corresponde, seu grupo é aberto para revelar o resultado.
+- Subcategorias permanecem recolhidas por categoria até abertura explícita, preservada enquanto a tela estiver montada.
+- Renomear e excluir são ações secundárias agrupadas em um menu contextual acessível por item, sem alterar as proteções de domínio existentes.
 
 ## API e dados
 
@@ -78,9 +82,23 @@ Tabelas: `categories`, `subcategories`, `tags`, `transaction_tags`, `credit_card
 - Dado uma tentativa de excluir item em uso, quando executada, a operação é bloqueada com mensagem clara.
 - Dado um lançamento manual, quando criado com múltiplas tags separadas por vírgula, todas as tags são vinculadas.
 - Dado um lançamento importado, quando processado, todas as tags reconhecidas são persistidas.
+- Dado um termo com ou sem acentos, quando digitado na busca de Categorias ou Tags, então somente itens carregados cujo nome corresponda permanecem visíveis, sem requisição adicional.
+- Dado um termo que corresponda apenas a uma subcategoria, quando o filtro é aplicado, então a categoria pai permanece visível e a lista correspondente é aberta.
+- Dado uma categoria com subcategorias sem filtro ativo, quando a lista é apresentada, então suas subcategorias começam recolhidas e podem ser abertas por teclado ou ponteiro.
+- Dado uma categoria, subcategoria ou tag, quando o usuário abre Mais ações, então Renomear e Excluir ficam disponíveis com nomes acessíveis e mantêm o comportamento atual.
+- Dado uma busca sem correspondência, quando a lista é atualizada, então um estado vazio informa que nenhum resultado foi encontrado sem confundir com ausência de cadastros.
+
+## Plano de implementação
+
+- [x] Adicionar buscas locais independentes e contadores acessíveis no HTML da tela. Fecha: critérios 6 e 10.
+- [x] Implementar filtro puro normalizado, incluindo correspondência de subcategorias. Fecha: critérios 6 e 7.
+- [x] Tornar subcategorias recolhíveis e preservar expansão durante a sessão da view. Fecha: critérios 7 e 8.
+- [x] Compactar ações secundárias em menu contextual nativo. Fecha: critério 9.
+- [x] Cobrir contratos de filtro, ausência de rede e estrutura acessível com testes automatizados. Fecha: critérios 6 a 10.
 
 ## Changelog
 
+- `1.2` — 2026-09-04 — Categorias e Tags ganham busca local normalizada, subcategorias recolhíveis e menus contextuais de ações para reduzir carga visual em listas extensas.
 - `1.1` — 2026-06-30 — Relação com evolução temporal de categorias/subcategorias documentada.
 - `1.0` — 2026-06-29 — Frontmatter e critérios formalizados.
 

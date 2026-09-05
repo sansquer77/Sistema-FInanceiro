@@ -36,3 +36,8 @@ export function setTheme(theme) {
   }
   return normalizedTheme;
 }
+
+export function toggleTheme() {
+  const nextTheme = storedTheme() === THEMES.DARK ? THEMES.LIGHT : THEMES.DARK;
+  return setTheme(nextTheme);
+}

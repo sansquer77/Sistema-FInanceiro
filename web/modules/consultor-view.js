@@ -1,4 +1,4 @@
-// spec: cockpit-calendario v0.8 — critérios 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17 e 18
+// spec: cockpit-calendario v0.9 — critérios 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17 e 18
 // spec: consultor/consultor v1.7 — view de análises, histórico e integração com o calendário
 import { stateMarkup } from "./dom-utils.js";
 export function registerConsultorView({

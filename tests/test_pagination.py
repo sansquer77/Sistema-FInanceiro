@@ -116,7 +116,7 @@ class ListPaginationTest(unittest.TestCase):
         self.assertEqual(len(payload["transactions"]), 3)
         self.assertTrue(payload["has_more"])
 
-    def test_month_account_slice_keeps_history_for_cumulative_balance(self) -> None:
+    def test_month_account_slice_returns_only_requested_competence(self) -> None:
         user = create_user("Alice", "alice@example.com", "correct-password")
         account = self._account(user["id"])
         create_transaction(user["id"], {
@@ -137,8 +137,8 @@ class ListPaginationTest(unittest.TestCase):
         })
 
         rows = list_transactions(user["id"], month="2026-01", account_id=account["id"])
-        self.assertEqual(len(rows), 2)
-        self.assertIn("2025-12-05", [row["date"] for row in rows])
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["date"], "2026-01-10")
 
     def test_transactions_endpoint_clamps_oversized_limit(self) -> None:
         user = create_user("Alice", "alice@example.com", "correct-password")
@@ -174,6 +174,23 @@ class ListPaginationTest(unittest.TestCase):
 
         self.assertEqual(len(payload["transactions"]), 2)
         self.assertTrue(payload["has_more"])
+
+    def test_credit_card_transactions_endpoint_filters_invoice_month_before_pagination(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = self._account(user["id"])
+        card = self._card(user["id"], account["id"])
+        for month in ("2026-01", "2026-02"):
+            create_credit_card_transaction(user["id"], {
+                "credit_card_id": str(card["id"]), "type": "expense", "description": month,
+                "amount": "10,00", "date": f"{month}-05", "invoice_month": month, "category": "Mercado",
+            })
+
+        with self._context(user):
+            handler = self._handler("/api/credit-card-transactions?month=2026-02&limit=2000")
+            handler.handle_list_credit_card_transactions()
+            payload = handler.send_json.call_args[0][0]
+
+        self.assertEqual([row["invoice_month"] for row in payload["transactions"]], ["2026-02"])
 
     def test_credit_card_payments_endpoint_paginates(self) -> None:
         user = create_user("Alice", "alice@example.com", "correct-password")

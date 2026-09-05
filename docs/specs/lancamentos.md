@@ -2,8 +2,8 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 3.25
-atualizado: 2026-08-29
+versao: 3.37
+atualizado: 2026-09-05
 relacionados:
   - "[[contas-correntes]]"
   - "[[categorias-tags-gestao]]"
@@ -17,7 +17,7 @@ aliases: ["Lançamentos", "Transações"]
 # Lançamentos
 
 > [!info] Status
-> **implementado** · área: `lancamentos` · atualizado em 2026-08-29 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]]
+> **implementado** · versão: `3.37` · área: `lancamentos` · atualizado em 2026-09-05 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]]
 
 ## Problema
 
@@ -63,6 +63,7 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 - **Investimento**: reduz a liquidez da conta quando for aporte e pode criar/atualizar a posição no portfólio. Ver [[investimentos-portfolio]].
 - **Transferência**: reduz saldo da origem, aumenta saldo do destino. Exige contas diferentes com a mesma moeda.
 - **Câmbio**: movimentação entre contas de moedas diferentes; registra valor de origem, valor de destino e cotação ajustável.
+- A prévia cambial entre duas contas é calculada no backend com precisão decimal; a interface apenas apresenta a cotação e o valor de destino devolvidos pela API.
 - Lançamentos em conta de moeda estrangeira normalizam o valor em BRL pela cotação informada manualmente; quando ela não for informada, o sistema consulta a última PTAX de venda disponível até a data do lançamento. Se a PTAX estiver indisponível, o usuário deve informar a cotação manualmente.
 - Valor deve ser maior que zero.
 - Categoria é obrigatória para receitas, despesas e investimentos. Transferências e câmbio não exigem categoria.
@@ -122,8 +123,8 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 - No formulário de investimento de Lançamentos de Contas, aportes de Renda Fixa ou Poupança devem exibir marcador compacto `Usar este aporte como reserva de emergência`, persistindo essa decisão na operação de investimento. A marcação não aparece nem é enviada para outros tipos de ativo.
 - O formulário de investimento deve se adaptar ao ativo selecionado para reduzir dúvidas: quando o aporte for Poupança, campos de quantidade, preço unitário, renda fixa, CNPJ, corretagem, emolumentos, impostos e outros custos ficam ocultos/desabilitados, pois não são aplicáveis.
 - No formulário de investimento em **Fundos de Investimentos** ou **Previdência Privada**, o usuário pode informar CNPJ opcionalmente e buscar a cota pela **Mais Retorno**; a busca preenche **Preço unitário** como assistência editável e não salva dados automaticamente.
-- A listagem completa de lançamentos (`GET /api/transactions`) é paginada por `limit` (padrão 2000, máximo 5000) e `offset`, respondendo `has_more`; o frontend percorre as páginas até receber uma página menor que `limit`.
-- Com `month` e `account_id` juntos, a listagem retorna todo o histórico da conta até o fim do mês informado (sem limite inferior de data) — o extrato usa essa fatia para calcular saldos previsto/conciliado a partir do saldo inicial da conta; o intervalo estrito do mês (`>= primeira data do mês`) aplica-se apenas à listagem sem conta.
+- A listagem (`GET /api/transactions`) é paginada por `limit` (padrão 2000, máximo 5000) e `offset`, respondendo `has_more`; a carga inicial e os Relatórios solicitam apenas a competência mensal necessária, enquanto fluxos explicitamente históricos podem percorrer páginas sob demanda.
+- Com `month` e `account_id` juntos, a listagem retorna apenas lançamentos cuja data pertence à competência informada. Saldos previsto/conciliado, inclusive o acumulado anterior, vêm de `/api/balance-projection` e não exigem transportar o histórico da conta ao navegador.
 
 ## API e dados
 
@@ -134,7 +135,7 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 | `PUT` | `/api/transactions/{id}` |
 | `DELETE` | `/api/transactions/{id}` |
 | `PUT` | `/api/transactions/{id}/reconciliation` |
-| `GET` | `/api/exchange-rate` |
+| `GET` | `/api/exchange-rate` (aceita origem, destino, data, valor e cotação manual opcional para prévia) |
 | `GET` | `/api/classification-suggestion` |
 | `GET` | `/api/portfolio/fund-quote?cnpj={cnpj}` |
 
@@ -166,7 +167,7 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dado um cabeçalho diário, quando acionado, então alterna o conteúdo do dia e informa o estado por `aria-expanded`.
 - Dado um grupo diário longo, quando a página é rolada dentro dele, então o cabeçalho da data permanece brevemente visível.
 - Dado o gráfico de histórico/projeção de saldos, quando exibido, então cada cartão mensal mostra o mês no topo e não exibe marcadores `Previsto` ou `Conciliado` dentro da área do gráfico.
-- Dado o gráfico de histórico/projeção de saldos em Lançamentos de Contas, quando há meses passados, atual e futuros, então ele usa o mesmo padrão visual do gráfico de faturas com cards mensais compactos, curva SVG suave e projeção futura atenuada/pontilhada.
+- Dado o gráfico de histórico/projeção de saldos em Lançamentos de Contas, quando há meses passados, atual e futuros, então ele usa ApexCharts no mesmo padrão visual da Evolução de Relatórios: cards mensais compactos, curva realizada suave, projeção futura pontilhada na mesma cor e preenchimento vertical contínuo sob toda a série.
 - Dado o gráfico de histórico/projeção de saldos com valores extensos, quando exibido em qualquer tamanho de tela, então os valores cabem nos cartões mensais por ajuste responsivo de tipografia e de largura mínima dos cartões, mantendo o tamanho atual da área e sem truncar centavos.
 - Dado o usuário visualizando o seletor mensal de Lançamentos de Contas, quando os botões de navegação aparecem, então usam ícones compactos com rótulo acessível em vez de palavras longas.
 - Dado o usuário visualizando o seletor mensal de Lançamentos de Contas, quando o mês é exibido, então o rótulo usa o formato `MM/AAAA`.
@@ -203,8 +204,45 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dado uma série recorrente com `use_average` ativo, quando o usuário edita uma ocorrência sem alterar a flag de média e escolhe `Este e os próximos`, então a alteração é aplicada às ocorrências futuras não conciliadas e seus valores são recalculados pela média.
 - Dado uma série recorrente sendo editada com a flag de média alterada (marcada ou desmarcada), quando o usuário salva, então o sistema não exibe o modal de escopo e aplica a alteração automaticamente às ocorrências futuras não conciliadas — ao marcar, persiste a marcação e recalcula pela média; ao desmarcar, mantém o valor informado sem recálculo e remove a marcação.
 
+- Dada uma conciliação confirmada, quando a resposta chega, então status, contadores e filtro são atualizados sem sair da tela.
+- Dada uma carga anterior em andamento, quando há mutação ou troca de conta, então a resposta anterior não substitui dados atuais nem bloqueia a nova seleção.
+- Dada uma conta recentemente visitada, quando selecionada novamente sem mutações, então a fatia é restaurada do cache limitado; logout e mutações invalidam o reaproveitamento.
+- Dada falha de gravação ou carregamento, quando ocorre, então há mensagem amigável e nenhum sucesso ou saldo é inventado.
+- Dada uma edição confirmada, quando a resposta de gravação chega, então o valor devolvido aparece na lista antes de concluir as recargas.
+- Dada uma gravação confirmada, quando uma recarga posterior falha, então a mensagem informa que a operação foi salva e a atualização falhou.
+- Dada uma edição/exclusão de série, quando a fatia é revalidada, então a lista apresenta as ocorrências devolvidas pelo backend sem depender da recarga global.
+- Dada uma recarga auxiliar em andamento, quando há nova mutação ou troca de sessão, então sua resposta antiga não substitui os dados atuais.
+- Dado o mesmo histórico financeiro, quando a projeção otimizada é calculada, então todos os saldos e indicadores de reserva correspondem ao cálculo de referência, inclusive em transferências e faturas pagas.
+- Dado um mês recente em cache, quando o usuário retorna a ele, então o app reaproveita a fatia válida; uma resposta de outro mês não substitui o selecionado.
+- Dado uma conta com lançamentos em competências anteriores, quando o Extrato consulta `month` e `account_id`, então recebe apenas as linhas do mês solicitado e preserva os saldos acumulados fornecidos pela projeção backend.
+
+## Plano de implementação desta correção
+
+- [x] Exibir a ocorrência confirmada após salvar, sem aguardar recargas globais; distinguir falha de gravação de falha de atualização após sucesso.
+- [x] Revalidar a fatia para refletir séries/exclusões e atualizar dados auxiliares sem bloquear o formulário, descartando respostas obsoletas.
+- [x] Reduzir percursos repetidos na projeção de saldos e faturas; testar equivalência com os cálculos anteriores e custo por volume.
+- [x] Implementar os comportamentos descritos sem alterar regras financeiras.
+- [x] Testar sucesso, falha, concorrência e contratos de apresentação aplicáveis.
+
 ## Changelog
 
+- `3.37` — 2026-09-05 — Reforçada a presença do degradê contínuo sob o gráfico de saldos no tema claro, mantendo a linha e o término da área legíveis sem criar bloco opaco.
+- `3.36` — 2026-09-05 — Gráfico de saldo passa a compartilhar com a Evolução de Relatórios o preenchimento vertical contínuo do ApexCharts; realizado e previsão usam a mesma família cromática, preservando a linha futura pontilhada.
+
+- `3.35` — 2026-09-03 — A fatia `month + account_id` passa a usar intervalo mensal estrito; o Extrato preserva saldos acumulados exclusivamente pelo contrato `/api/balance-projection`, sem transportar o histórico anterior.
+
+- `3.34` — 2026-09-01 — Carga inicial deixa de percorrer todo o histórico e mantém apenas o recorte mensal necessário; Relatórios carregam competência própria sem reutilizar um histórico global integral.
+
+- `3.33` — 2026-08-31 — Correção visual no campo de busca do Extrato de Contas: remove o ícone nativo duplicado do `input[type="search"]` e centraliza o botão explícito de limpar, evitando dois ícones "×" desalinhados.
+- `3.32` — 2026-08-31 — Complemento implementado: edição com resposta imediata, atualização auxiliar desacoplada e projeções sem releitura integral a cada data. Testes automatizados de apresentação, concorrência e equivalência financeira; percepção de fluidez no Safari ainda requer validação no ambiente do usuário.
+- `3.31` — 2026-08-31 — Correções concluídas: conciliação aplica resposta confirmada sem recarga global, troca de conta independente por chave e cache limitado. Projeção filtra dados da conta no backend. Validados por testes de concorrência, apresentação e projeção.
+
+- `3.30` — 2026-08-31 — Especificadas correções de resposta visual, carregamento e escopo do apoio, conforme regras acima.
+
+- `3.29` — 2026-08-31 — Prévia cambial concluída no backend com precisão decimal e cobertura para cotação cruzada e manual; o frontend apenas apresenta o resultado.
+- `3.28` — 2026-08-31 — Iniciada a transferência da prévia cambial residual do formulário para o backend, mantendo cotação e valor de destino editáveis.
+- `3.27` — 2026-08-30 — Fatia do Extrato e projeção passam a compartilhar cache por conta+mês, requisição em andamento e invalidação após mutações.
+- `3.26` — 2026-08-30 — Iniciado reaproveitamento da fatia mensal por conta enquanto fresca, com invalidação após mutações.
 - `3.25` — 2026-08-29 — Campo de ativo em lançamentos de investimento sugere posições já cadastradas, preenche o nome ao selecionar e preserva a criação livre de novos códigos.
 - `3.24` — 2026-08-20 — Modal de escopo em série recorrente com média ativa passa a explicar que a escolha **Apenas este lançamento** não recalcula os próximos, enquanto **Este e os próximos** os recalcula pela média; sem mudança na regra de cálculo ou no escopo aplicado.
 - `3.23` — 2026-08-17 — Modal de escopo restaurado em edições de séries recorrentes: o sistema pula o modal **somente** quando a flag de média é alterada na edição (marcada em série sem a marcação ou desmarcada em série que a tinha); com a flag inalterada — ativa ou inativa — o modal `Apenas este lançamento` / `Este e os próximos` volta a aparecer; escolhendo os próximos em série com a flag ativa, os valores futuros continuam recalculados pela média; escolhendo apenas este, a cascata não ocorre.

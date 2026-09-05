@@ -40,6 +40,8 @@ Sistema Financeiro - Distribuicao/Windows/Aplicativo/web/assets/banks/
 # Local runtime data
 data/*
 !data/.gitkeep
+secure/
 
 # Local databases
 *.db
+financeiro/__pycache__/database.cpython-313.pyc

@@ -2,8 +2,8 @@
 tipo: spec
 area: historico-operacoes
 status: implementado
-versao: 1.2
-atualizado: 2026-07-09
+versao: 1.4
+atualizado: 2026-08-30
 relacionados:
   - "[[sdd]]"
   - "[[templates/spec-template|Template de spec]]"
@@ -190,6 +190,8 @@ O menu lateral inclui **Histórico** no grupo Gestão, com ícone de histórico/
 
 ## Changelog
 
+- `1.4` — 2026-08-30 — Concluído cache curto por filtros, compartilhamento de requisição em andamento, invalidação global após mutações e reset entre sessões.
+- `1.3` — 2026-08-30 — Iniciada política de snapshot recente, invalidação após mutações e compartilhamento de requisição em andamento.
 - `1.2` — 2026-07-09 — Atualizações de lançamentos passam a registrar e exibir resumo antes/depois dos campos alterados.
 - `1.1` — 2026-07-09 — Exibição do usuário responsável adicionada ao Histórico de Operações, sem registro de IP.
 - `1.0` — 2026-07-09 — Histórico de Operações implementado com tabela, índices, API, menu, filtros, busca, agrupamentos, paginação e registros nas operações principais.

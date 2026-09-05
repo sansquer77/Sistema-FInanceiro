@@ -8,9 +8,8 @@ import os
 import re
 import sqlite3
 import sys
-from datetime import date
+from datetime import date, timedelta
 from email.utils import formatdate, parsedate_to_datetime
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -27,10 +26,16 @@ from financeiro.accounts import (
     update_checking_account,
 )
 from financeiro.app_metadata import APP_NAME, APP_VERSION, app_info
+from financeiro.cockpit import cockpit_payload
+from financeiro.cockpit import build_cockpit_summary
+from financeiro.cockpit_notifications import build_cockpit_notifications, mark_informational_seen
+from financeiro.open_debts import get_open_debts
+from financeiro.global_search import GlobalSearchError, search_global
+from financeiro.reports import build_statement_report, build_evolution_presentation, build_report_overview
 from financeiro.auth import (
     clear_user_launches,
+    create_public_user,
     create_session,
-    create_user,
     delete_user_account,
     get_current_user,
     login_user,
@@ -40,6 +45,7 @@ from financeiro.auth import (
     update_user_email,
     update_user_password,
 )
+from financeiro.balance_projections import build_balance_projection, build_currency_totals_for_user
 from financeiro.calendar import get_cockpit_calendar
 from financeiro.categories import (
     create_category,
@@ -87,8 +93,8 @@ from financeiro.credit_cards import (
     update_credit_card_transaction,
     update_credit_card,
 )
-from financeiro.database import initialize_database
-from financeiro.database import get_connection
+from financeiro.database import DB_PATH, get_connection, initialize_database
+from financeiro.market_calendar import refresh_anbima_calendar_if_due
 from financeiro.ai_summary import ai_summary_enabled, generate_ai_summary
 from financeiro.financial_health import (
     FinancialHealthError,
@@ -96,8 +102,9 @@ from financeiro.financial_health import (
     calculate_financial_health_score_history,
 )
 from financeiro.imports import import_legacy_transactions, import_system_template, system_import_template
+from financeiro.http_routes import dispatch_route
 from financeiro.operation_logs import create_operation_log, get_operation_log, list_operation_logs
-from financeiro.portfolio import close_position, create_opening_position, current_portfolio_positions, delete_opening_position, delete_position_value_override, fetch_fund_quote_for_user, get_portfolio, get_portfolio_returns, redeem_position, save_allocation_goals, update_opening_position, update_position_value_override
+from financeiro.portfolio import close_position, create_opening_position, current_portfolio_positions, delete_opening_position, delete_position_value_override, fetch_fund_quote_for_user, get_portfolio, get_portfolio_events, get_portfolio_returns, redeem_position, save_allocation_goals, update_opening_position, update_position_value_override
 from financeiro.portfolio import PortfolioError
 from financeiro.reports import build_tag_report
 from financeiro.secure_config import (
@@ -109,12 +116,14 @@ from financeiro.secure_config import (
     save_email_config,
     save_mais_retorno_settings,
 )
+from financeiro.exchange_rates import calculate_exchange_preview
 from financeiro.simulations import simulate_butterfly_effect
 from financeiro.trends import TrendsError, calculate_trends
 from financeiro.spending_limits import (
     create_spending_limit,
     delete_spending_limit,
     list_spending_limits,
+    list_spending_limits_with_consumption,
     update_spending_limit,
 )
 from financeiro.transactions import (
@@ -154,9 +163,9 @@ SESSION_COOKIE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60
 SECURITY_HEADERS = {
     "Content-Security-Policy": (
         "default-src 'self'; "
-        "script-src 'self'; "
+        "script-src 'self' https://cdnjs.buymeacoffee.com 'sha256-7eeb3904b2089033e0669fa55596d106417dfbc163981cd0e15665e2393faaa9'; "
         "style-src 'self' 'unsafe-inline'; "
-        "img-src 'self' data: blob:; "
+        "img-src 'self' data: blob: https://cdn.buymeacoffee.com; "
         "font-src 'self' data:; "
         "connect-src 'self'; "
         "base-uri 'self'; "
@@ -251,107 +260,10 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         path = self.route_path()
-        if path == "/api/app-info":
-            self.handle_app_info()
-            return
-        if path == "/api/latest-version":
-            self.handle_latest_version()
-            return
-        if path == "/api/me":
-            self.handle_me()
-            return
-        if path == "/api/checking-accounts":
-            self.handle_list_accounts()
-            return
-        if path == "/api/credit-cards":
-            self.handle_list_credit_cards()
-            return
-        if path == "/api/credit-card-invoice":
-            self.handle_list_credit_card_invoice()
-            return
-        if path == "/api/credit-card-transactions":
-            self.handle_list_credit_card_transactions()
-            return
-        if path == "/api/credit-card-payments":
-            self.handle_list_credit_card_payments()
-            return
-        if path == "/api/transactions":
-            self.handle_list_transactions()
-            return
-        if path == "/api/exchange-rate":
-            self.handle_exchange_rate()
-            return
-        if path == "/api/classification-suggestion":
-            self.handle_classification_suggestion()
-            return
-        if path == "/api/email-config":
-            self.handle_email_config_status()
-            return
-        if path == "/api/import/template":
-            self.handle_import_template_download()
-            return
-        if path == "/api/categories":
-            self.handle_list_categories()
-            return
-        if path == "/api/tags":
-            self.handle_list_tags()
-            return
-        if path == "/api/spending-limits":
-            self.handle_list_spending_limits()
-            return
         if path == "/api/simulations/butterfly-effect":
             self.send_json({"error": "Metodo nao permitido."}, HTTPStatus.METHOD_NOT_ALLOWED)
             return
-        if path == "/api/cockpit":
-            self.handle_cockpit()
-            return
-        if path == "/api/cockpit/calendar":
-            self.handle_cockpit_calendar()
-            return
-        if path == "/api/financial-health-score":
-            self.handle_financial_health_score()
-            return
-        if path == "/api/financial-health-score/history":
-            self.handle_financial_health_score_history()
-            return
-        if path == "/api/financial-health-trends":
-            self.handle_financial_health_trends()
-            return
-        if path == "/api/ai-settings":
-            self.handle_ai_settings_status()
-            return
-        if path == "/api/mais-retorno-config":
-            self.handle_mais_retorno_config_status()
-            return
-        if path == "/api/consultor/config":
-            self.handle_consultor_config()
-            return
-        if path == "/api/consultor/perfil-complementar":
-            self.handle_consultor_complementary_profile()
-            return
-        if path == "/api/consultor/history":
-            self.handle_consultor_history()
-            return
-        if path == "/api/portfolio":
-            self.handle_portfolio()
-            return
-        if path == "/api/portfolio/returns":
-            self.handle_portfolio_returns()
-            return
-        if path == "/api/portfolio/fund-quote":
-            self.handle_portfolio_fund_quote()
-            return
-        if path == "/api/reports/tags":
-            self.handle_tag_report()
-            return
-        if path == "/api/reports/category-evolution":
-            self.handle_category_evolution()
-            return
-        if path == "/api/operation-logs":
-            self.handle_list_operation_logs()
-            return
-        if path.startswith("/api/operation-logs/"):
-            self.handle_operation_log_detail()
+        if dispatch_route(self, "GET", path):
             return
         self.serve_static()
 
@@ -359,95 +271,7 @@ class AppHandler(BaseHTTPRequestHandler):
         if not self.validate_mutation_source():
             return
         path = self.route_path()
-        if path == "/api/register":
-            self.handle_register()
-            return
-        if path == "/api/login":
-            self.handle_login()
-            return
-        if path == "/api/password-reset/request":
-            self.handle_password_reset_request()
-            return
-        if path == "/api/password-reset/confirm":
-            self.handle_password_reset_confirm()
-            return
-        if path == "/api/logout":
-            self.handle_logout()
-            return
-        if path == "/api/me/email":
-            self.handle_update_email()
-            return
-        if path == "/api/me/password":
-            self.handle_update_password()
-            return
-        if path == "/api/me/clear-launches":
-            self.handle_clear_launches()
-            return
-        if path == "/api/email-config":
-            self.handle_save_email_config()
-            return
-        if path.startswith("/api/checking-accounts/") and path.endswith("/restore"):
-            self.handle_restore_account()
-            return
-        if path.startswith("/api/credit-cards/") and path.endswith("/restore"):
-            self.handle_restore_credit_card()
-            return
-        if path == "/api/checking-accounts":
-            self.handle_create_account()
-            return
-        if path == "/api/credit-cards":
-            self.handle_create_credit_card()
-            return
-        if path == "/api/credit-card-transactions":
-            self.handle_create_credit_card_transaction()
-            return
-        if path == "/api/credit-card-invoice/pay":
-            self.handle_pay_credit_card_invoice()
-            return
-        if path == "/api/transactions":
-            self.handle_create_transaction()
-            return
-        if path == "/api/portfolio/positions":
-            self.handle_create_portfolio_position()
-            return
-        if path == "/api/portfolio/redeem":
-            self.handle_redeem_portfolio_position()
-            return
-        if path == "/api/portfolio/close":
-            self.handle_close_portfolio_position()
-            return
-        if path == "/api/import/legacy-transactions":
-            self.handle_import_legacy_transactions()
-            return
-        if path == "/api/import/system-template":
-            self.handle_import_system_template()
-            return
-        if path == "/api/categories":
-            self.handle_create_category()
-            return
-        if path == "/api/subcategories":
-            self.handle_create_subcategory()
-            return
-        if path == "/api/tags":
-            self.handle_create_tag()
-            return
-        if path == "/api/spending-limits":
-            self.handle_create_spending_limit()
-            return
-        if path == "/api/simulations/butterfly-effect":
-            self.handle_simulate_butterfly_effect()
-            return
-        if path == "/api/financial-health-trends/ai-summary":
-            self.handle_ai_summary()
-            return
-        if path == "/api/consultor/config":
-            self.handle_save_consultor_config()
-            return
-        if path == "/api/consultor/perfil-complementar":
-            self.handle_save_consultor_complementary_profile()
-            return
-        if path == "/api/consultor/analyze":
-            self.handle_consultor_analyze()
+        if dispatch_route(self, "POST", path):
             return
         self.send_json({"error": "Rota nao encontrada."}, HTTPStatus.NOT_FOUND)
 
@@ -455,53 +279,7 @@ class AppHandler(BaseHTTPRequestHandler):
         if not self.validate_mutation_source():
             return
         path = self.route_path()
-        if path.startswith("/api/transactions/") and path.endswith("/reconciliation"):
-            self.handle_reconcile_transaction()
-            return
-        if path.startswith("/api/credit-card-transactions/") and path.endswith("/reconciliation"):
-            self.handle_reconcile_credit_card_transaction()
-            return
-        if path.startswith("/api/credit-card-transactions/") and path.endswith("/invoice"):
-            self.handle_move_credit_card_transaction_invoice()
-            return
-        if path.startswith("/api/credit-card-transactions/"):
-            self.handle_update_credit_card_transaction()
-            return
-        if path.startswith("/api/transactions/"):
-            self.handle_update_transaction()
-            return
-        if path.startswith("/api/portfolio/positions/"):
-            self.handle_update_portfolio_position()
-            return
-        if path == "/api/portfolio/value":
-            self.handle_update_portfolio_value()
-            return
-        if path == "/api/portfolio/allocation-goals":
-            self.handle_save_portfolio_allocation_goals()
-            return
-        if path.startswith("/api/checking-accounts/"):
-            self.handle_update_account()
-            return
-        if path.startswith("/api/credit-cards/"):
-            self.handle_update_credit_card()
-            return
-        if path.startswith("/api/categories/"):
-            self.handle_update_category()
-            return
-        if path.startswith("/api/subcategories/"):
-            self.handle_update_subcategory()
-            return
-        if path.startswith("/api/tags/"):
-            self.handle_update_tag()
-            return
-        if path.startswith("/api/spending-limits/"):
-            self.handle_update_spending_limit()
-            return
-        if path == "/api/ai-settings":
-            self.handle_save_ai_settings()
-            return
-        if path == "/api/mais-retorno-config":
-            self.handle_save_mais_retorno_config()
+        if dispatch_route(self, "PUT", path):
             return
         self.send_json({"error": "Rota nao encontrada."}, HTTPStatus.NOT_FOUND)
 
@@ -509,44 +287,7 @@ class AppHandler(BaseHTTPRequestHandler):
         if not self.validate_mutation_source():
             return
         path = self.route_path()
-        if path == "/api/me":
-            self.handle_delete_user()
-            return
-        if path.startswith("/api/categories/"):
-            self.handle_delete_category()
-            return
-        if path.startswith("/api/subcategories/"):
-            self.handle_delete_subcategory()
-            return
-        if path.startswith("/api/tags/"):
-            self.handle_delete_tag()
-            return
-        if path.startswith("/api/spending-limits/"):
-            self.handle_delete_spending_limit()
-            return
-        if path.startswith("/api/portfolio/positions/"):
-            self.handle_delete_portfolio_position()
-            return
-        if path == "/api/portfolio/value":
-            self.handle_delete_portfolio_value_override()
-            return
-        if path.startswith("/api/checking-accounts/"):
-            self.handle_archive_account()
-            return
-        if path.startswith("/api/credit-cards/"):
-            self.handle_archive_credit_card()
-            return
-        if path.startswith("/api/credit-card-transactions/"):
-            self.handle_delete_credit_card_transaction()
-            return
-        if path.startswith("/api/transactions/"):
-            self.handle_delete_transaction()
-            return
-        if path == "/api/consultor/perfil-complementar":
-            self.handle_delete_consultor_complementary_profile()
-            return
-        if path == "/api/consultor/history":
-            self.handle_delete_consultor_history()
+        if dispatch_route(self, "DELETE", path):
             return
         self.send_json({"error": "Rota nao encontrada."}, HTTPStatus.NOT_FOUND)
 
@@ -562,7 +303,12 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def handle_register(self) -> None:
         data = self.read_json()
-        user = create_user(data.get("name", ""), data.get("email", ""), data.get("password", ""))
+        user = create_public_user(
+            data.get("name", ""),
+            data.get("email", ""),
+            data.get("password", ""),
+            source_key=self.client_source_key(),
+        )
         token = create_session(user["id"])
         self.send_json({"user": user}, headers=self.session_cookie(token), status=HTTPStatus.CREATED)
 
@@ -660,8 +406,12 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def handle_list_credit_card_transactions(self) -> None:
         user = self.require_user()
+        query = parse_qs(urlsplit(self.path).query)
+        month = (query.get("month") or [None])[0]
         limit, offset = self.pagination_params()
-        transactions = list_credit_card_transactions(user["id"], limit=limit + 1, offset=offset)
+        transactions = list_credit_card_transactions(
+            user["id"], invoice_month=month, limit=limit + 1, offset=offset,
+        )
         self.send_json(
             {
                 "transactions": transactions[:limit],
@@ -710,24 +460,92 @@ class AppHandler(BaseHTTPRequestHandler):
             }
         )
 
+    def handle_balance_projection(self) -> None:
+        user = self.require_user()
+        query = parse_qs(urlsplit(self.path).query)
+        month = (query.get("month") or [date.today().strftime("%Y-%m")])[0]
+        account_id = (query.get("account_id") or [None])[0]
+        try:
+            normalized_account_id = int(account_id) if account_id else None
+            date.fromisoformat(f"{month}-01")
+        except (TypeError, ValueError) as exc:
+            raise ApiError("Periodo ou conta invalidos.") from exc
+        self.send_json(build_balance_projection(
+            accounts=list_checking_accounts(user["id"]),
+            transactions=list_transactions(user["id"]),
+            cards=list_credit_cards(user["id"]),
+            card_transactions=list_credit_card_transactions(user["id"]),
+            card_payments=list_credit_card_payments(user["id"]),
+            month=month,
+            account_id=normalized_account_id,
+        ))
+
     def handle_cockpit(self) -> None:
         user = self.require_user()
         query = parse_qs(urlsplit(self.path).query)
         month = (query.get("month") or [date.today().strftime("%Y-%m")])[0]
-        transactions = list_transactions(user["id"], month=month)
-        card_transactions = list_credit_card_transactions(user["id"], invoice_month=month)
-        self.send_json(cockpit_payload([*transactions, *card_transactions]))
+        try:
+            payload = build_cockpit_summary(user["id"], month)
+        except ValueError as exc:
+            raise ApiError(str(exc), HTTPStatus.BAD_REQUEST) from None
+        payload["currency_totals"] = build_currency_totals_for_user(user["id"], month)
+        payload["open_debts"] = get_open_debts(user["id"], month)
+        self.send_json(payload)
+
+    def handle_open_debts(self) -> None:
+        user = self.require_user()
+        query = parse_qs(urlsplit(self.path).query)
+        try:
+            result = get_open_debts(user['id'], **{key: query[key][0] for key in ('month', 'account_ids', 'card_ids', 'currency') if key in query})
+        except ValueError as exc:
+            raise ApiError(str(exc), HTTPStatus.BAD_REQUEST) from None
+        self.send_json(result)
+
+    def handle_statement_report(self) -> None:
+        user = self.require_user()
+        query = parse_qs(urlsplit(self.path).query)
+        try:
+            result = build_statement_report(user['id'], **{
+                key: query[key][0] for key in ('month', 'account_ids', 'card_ids', 'currency') if key in query
+            })
+        except ValueError as exc:
+            raise ApiError(str(exc), HTTPStatus.BAD_REQUEST) from None
+        self.send_json(result)
 
     def handle_cockpit_calendar(self) -> None:
-        # spec: cockpit-calendario v0.8 — critérios 17 e 18
+        # spec: cockpit-calendario v0.9 — critérios 17 e 18
         if not self.validate_read_source():
             return
         user = self.require_user()
-        # Otimização: calcula o portfólio uma única vez por requisição.
-        positions = current_portfolio_positions(user["id"], force_refresh=False)
-        payload = get_cockpit_calendar(user["id"], portfolio_positions=positions)
+        payload = get_cockpit_calendar(user["id"])
         payload["ia_ativa"] = ai_summary_enabled(user["id"])
         self.send_json(payload)
+
+    def handle_cockpit_notifications(self) -> None:
+        # spec: cockpit/alertas-cockpit v1.2 — critérios 5, 6, 10 e 11
+        if not self.validate_read_source():
+            return
+        user = self.require_user()
+        try:
+            today = date.today()
+            week_start = today - timedelta(days=today.weekday())
+            portfolio_events = get_portfolio_events(user["id"], start_date=week_start).get("events") or []
+        except PortfolioError:
+            portfolio_events = []
+        self.send_json(build_cockpit_notifications(user["id"], portfolio_events=portfolio_events))
+
+    def handle_mark_cockpit_notifications_seen(self) -> None:
+        # spec: cockpit/alertas-cockpit v1.1 — critérios 6 e 11
+        user = self.require_user()
+        payload = self.read_json()
+        notification_ids = payload.get("notification_ids") if isinstance(payload, dict) else None
+        if not isinstance(notification_ids, list):
+            raise ApiError("Lista de notificações inválida.", HTTPStatus.BAD_REQUEST)
+        try:
+            marked_count = mark_informational_seen(user["id"], notification_ids)
+        except ValueError as exc:
+            raise ApiError(str(exc), HTTPStatus.BAD_REQUEST) from None
+        self.send_json({"status": "ok", "marked_count": marked_count})
 
     def handle_financial_health_score(self) -> None:
         # spec: score-saude-financeira v3.6 — critério 15
@@ -905,8 +723,14 @@ class AppHandler(BaseHTTPRequestHandler):
         query = parse_qs(urlsplit(self.path).query)
         currency = (query.get("currency") or ["BRL"])[0]
         transaction_date = (query.get("date") or [None])[0]
-        rate = get_exchange_rate_to_brl(currency, transaction_date)
-        self.send_json({"currency": currency.upper(), "date": transaction_date, "rate": f"{rate:.6f}"})
+        target_currency = (query.get("target_currency") or ["BRL"])[0]
+        amount = (query.get("amount") or [None])[0]
+        transfer_rate = (query.get("transfer_rate") or [None])[0]
+        if target_currency.upper() == "BRL" and amount is None and transfer_rate is None:
+            rate = get_exchange_rate_to_brl(currency, transaction_date)
+            self.send_json({"currency": currency.upper(), "date": transaction_date, "rate": f"{rate:.6f}"})
+            return
+        self.send_json(calculate_exchange_preview(currency, target_currency, transaction_date, amount, transfer_rate))
 
     def handle_classification_suggestion(self) -> None:
         user = self.require_user()
@@ -926,6 +750,15 @@ class AppHandler(BaseHTTPRequestHandler):
         query = parse_qs(urlsplit(self.path).query)
         month = (query.get("month") or [None])[0]
         self.send_json(build_tag_report(user["id"], month))
+
+    def handle_report_overview(self) -> None:
+        user = self.require_user()
+        query = parse_qs(urlsplit(self.path).query)
+        month = (query.get("month") or [date.today().strftime("%Y-%m")])[0]
+        try:
+            self.send_json(build_report_overview(user["id"], month))
+        except ValueError as exc:
+            raise ApiError(str(exc), HTTPStatus.BAD_REQUEST) from None
 
     def handle_category_evolution(self) -> None:
         user = self.require_user()
@@ -948,7 +781,7 @@ class AppHandler(BaseHTTPRequestHandler):
             subcategory_id = None
 
         evolution = get_category_evolution(user["id"], category_id, subcategory_id, period)
-        self.send_json({"evolution": evolution})
+        self.send_json(build_evolution_presentation(evolution))
 
     def handle_list_tags(self) -> None:
         user = self.require_user()
@@ -958,7 +791,20 @@ class AppHandler(BaseHTTPRequestHandler):
         user = self.require_user()
         query = parse_qs(urlsplit(self.path).query)
         month = (query.get("month") or [None])[0]
-        self.send_json({"limits": list_spending_limits(user["id"], month)})
+        self.send_json({"limits": list_spending_limits_with_consumption(user["id"], month)})
+
+    def handle_global_search(self) -> None:
+        user = self.require_user()
+        query = parse_qs(urlsplit(self.path).query)
+        term = (query.get("q") or [""])[0]
+        try:
+            limit = int((query.get("limit") or ["24"])[0])
+            offset = int((query.get("offset") or ["0"])[0])
+            self.send_json(search_global(user["id"], term, limit=limit, offset=offset))
+        except (GlobalSearchError, ValueError) as exc:
+            message = exc.message if isinstance(exc, GlobalSearchError) else "Paginação inválida."
+            status = exc.status if isinstance(exc, GlobalSearchError) else HTTPStatus.BAD_REQUEST
+            raise ApiError(message, status) from None
 
     def handle_list_operation_logs(self) -> None:
         user = self.require_user()
@@ -989,6 +835,12 @@ class AppHandler(BaseHTTPRequestHandler):
         # Otimização: reutiliza as posições já calculadas por get_portfolio.
         portfolio = get_portfolio(user["id"], force_refresh=force_refresh)
         self.send_json(get_portfolio_returns(user["id"], force_refresh=force_refresh, positions=portfolio.get("positions") or []))
+
+    def handle_portfolio_events(self) -> None:
+        user = self.require_user()
+        query = parse_qs(urlsplit(self.path).query)
+        force_refresh = (query.get("refresh") or [""])[0].lower() in {"1", "true", "yes", "sim"}
+        self.send_json(get_portfolio_events(user["id"], force_refresh=force_refresh))
 
     def handle_portfolio_fund_quote(self) -> None:
         # spec: lancamentos v3.24 — criterio cota-fundo-lancamento
@@ -1035,6 +887,11 @@ class AppHandler(BaseHTTPRequestHandler):
         result = delete_opening_position(user["id"], position_id)
         self.record_operation(user["id"], "portfolio", "delete", "portfolio_position", "Posicao de portfolio excluida", position_id)
         self.send_json(result)
+
+    def handle_portfolio_preview(self) -> None:
+        self.require_user()
+        from financeiro.portfolio import preview_portfolio
+        self.send_json(preview_portfolio(self.read_json()))
 
     def handle_redeem_portfolio_position(self) -> None:
         user = self.require_user()
@@ -1769,137 +1626,9 @@ def audit_value(value: object) -> str:
     return str(value)
 
 
-def cockpit_payload(transactions: list[dict]) -> dict:
-    totals_cents = {"income": 0, "expense": 0, "investment": 0}
-    category_rows = {"income": {}, "expense": {}, "investment": {}}
-    planning = {
-        "income": {},
-        "expense": {},
-        "investment": {},
-    }
-    for transaction in transactions:
-        if is_credit_card_payment_transaction(transaction):
-            continue
-        report_type = cockpit_transaction_type(transaction)
-        if not report_type:
-            continue
-        amount_cents = money_value_to_cents(transaction.get("amount_brl") or transaction.get("amount") or 0)
-        totals_cents[report_type] += amount_cents
-        label = cockpit_category_label(transaction)
-        add_cockpit_group(category_rows[report_type], label, amount_cents)
-        if transaction.get("series_kind") == "recurring" or (report_type == "investment" and transaction.get("series_kind") != "single"):
-            currency = cockpit_transaction_currency(transaction)
-            original_amount_cents = money_value_to_cents(transaction.get("amount") or 0)
-            add_cockpit_group(planning[report_type], label, original_amount_cents, currency)
-    income_cents = totals_cents["income"]
-    savings_rate = (
-        float(Decimal(totals_cents["investment"]) / Decimal(income_cents))
-        if income_cents > 0
-        else 0.0
-    )
-    return {
-        "month_totals": {
-            report_type: cents_to_value(cents)
-            for report_type, cents in totals_cents.items()
-        } | {"savings_rate": savings_rate},
-        "top_income": ranked_cockpit_rows(category_rows["income"], 3),
-        "top_expenses": ranked_cockpit_rows(category_rows["expense"], 5),
-        "planning": {
-            "income": ranked_cockpit_rows(planning["income"]),
-            "investment": ranked_cockpit_rows(planning["investment"]),
-            "expense": ranked_cockpit_rows(planning["expense"]),
-        },
-    }
-
-
-def cents_to_value(cents: int) -> float:
-    return float(Decimal(cents) / Decimal(100))
-
-
-def money_value_to_cents(value: object) -> int:
-    raw = str(value or "0").strip()
-    try:
-        decimal = Decimal(raw).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    except InvalidOperation:
-        return 0
-    return int(decimal * Decimal(100))
-
-
-def is_credit_card_payment_transaction(transaction: dict) -> bool:
-    # spec: relatorios/relatorios v2.16 — critério 6
-    # (pagamento de fatura fica fora das analises mensais; a despesa detalhada
-    #  ja esta nos lancamentos do cartao pela competencia da fatura)
-    return bool(transaction.get("is_credit_card_payment"))
-
-
-def cockpit_transaction_type(transaction: dict) -> str:
-    if transaction.get("type") == "income":
-        return "income"
-    if transaction.get("type") == "expense":
-        return "expense"
-    if transaction.get("type") == "investment" or transaction.get("investment_operation"):
-        return "investment"
-    return ""
-
-
-def cockpit_category_label(transaction: dict) -> str:
-    category = transaction.get("category_name") or "Sem categoria"
-    subcategory = transaction.get("subcategory_name") or ""
-    return f"{category} / {subcategory}" if subcategory else category
-
-
-def cockpit_transaction_currency(transaction: dict) -> str:
-    return str(
-        transaction.get("account_currency")
-        or transaction.get("card_currency")
-        or "BRL"
-    ).upper()
-
-
-def add_cockpit_group(groups: dict, label: str, amount_cents: int, currency: str | None = None) -> None:
-    key = (currency, label) if currency else label
-    row = groups.setdefault(key, {"label": label, "total_cents": 0, "count": 0})
-    if currency:
-        row["currency"] = currency
-    row["total_cents"] += amount_cents
-    row["count"] += 1
-
-
-def _cockpit_row_public(row: dict) -> dict:
-    public_row: dict = {
-        "label": row["label"],
-        "total": cents_to_value(row["total_cents"]),
-        "count": row["count"],
-    }
-    if "currency" in row:
-        public_row["currency"] = row["currency"]
-    return public_row
-
-
-def ranked_cockpit_rows(groups: dict, limit: int | None = None) -> list[dict]:
-    rows = sorted(
-        groups.values(),
-        key=lambda row: (row.get("currency", ""), -row["total_cents"], row["label"]),
-    )
-    if limit and len(rows) > limit:
-        visible = [_cockpit_row_public(row) for row in rows[:limit]]
-        other_rows = rows[limit:]
-        other_total_cents = sum(row["total_cents"] for row in other_rows)
-        other_count = sum(row["count"] for row in other_rows)
-        if other_total_cents > 0:
-            # spec: relatorios/relatorios v2.16 — critério 28
-            visible.append({
-                "label": "Outros",
-                "total": cents_to_value(other_total_cents),
-                "count": other_count,
-                "items": [_cockpit_row_public(row) for row in other_rows],
-            })
-        return visible
-    return [_cockpit_row_public(row) for row in rows]
-
-
 def main() -> None:
     initialize_database()
+    refresh_anbima_calendar_if_due(DB_PATH, connection_factory=get_connection)
     server = ThreadingHTTPServer((HOST, PORT), AppHandler)
     print(f"Sistema Financeiro rodando em {PUBLIC_URL}")
     warning = insecure_lan_warning(HOST, PUBLIC_URL)

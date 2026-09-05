@@ -2,21 +2,21 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.43
-atualizado: 2026-08-29
+versao: 2.61
+atualizado: 2026-09-04
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
   - "[[relatorios]]"
   - "[[arquitetura]]"
-tags: [spec, "area/investimentos"]
+tags: [spec, "area/investimentos", "status/implementado"]
 aliases: ["Investimentos", "Portfólio"]
 ---
 
 # Investimentos e Portfólio
 
 > [!info] Status
-> **implementado** · área: `investimentos` · atualizado em 2026-08-29 · relacionados: [[contas-correntes]], [[lancamentos]], [[relatorios]]
+> **implementado** · área: `investimentos` · atualizado em 2026-09-04 · relacionados: [[contas-correntes]], [[lancamentos]], [[relatorios]]
 
 ## Problema
 
@@ -48,6 +48,8 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 | Outros | `other` |
 
 ## Regras
+
+- O flyout de composição da aba Análise deve sair completamente da árvore de renderização quando fechado e não pode usar `backdrop-filter` sobre a página do Portfólio, evitando superfícies de composição persistentes no WebKit/Safari.
 
 **Geral:**
 - Cada ativo é mantido e exibido na moeda da conta/carteira onde está custodiado.
@@ -98,6 +100,10 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 - USDC, USDT, DAI, FDUSD, PYUSD, TUSD, USDP e USDE cadastrados anteriormente como `crypto` são classificados como Stablecoin na leitura, sem migração destrutiva; novas posições e aportes conhecidos persistem como `stablecoin`.
 - Ativos internacionais cujo ticker operacional precisa de sufixo de bolsa podem usar alias explícito do provedor; `VWRA` em carteira USD resolve para `VWRA.L` (London Stock Exchange, listagem USD) no Yahoo Finance.
 - A quantidade exibida em posições, origens e posições encerradas é normalizada com **até 2 casas decimais** (arredondamento `half-up`), independentemente da precisão cadastrada ou retornada pela cotação, para preservar o layout das tabelas.
+- A aba **Eventos** consulta sob demanda os próximos eventos anunciados somente para ações, ETFs e BDRs ainda presentes na carteira, em uma janela do mês atual mais dois meses. Para ativos brasileiros, usa a API pública da B3 como fonte primária; para ativos internacionais, usa a API pública da Nasdaq (sem chave) e Yahoo Finance como fallback. O cache é diário por ativo para capturar alterações sem repetir consultas no mesmo dia. Os resultados são agrupados por mês e informam Data ex, data de pagamento quando fornecida, ativo, carteira(s), evento, valor por cota/ação e a fonte (`B3`, `Nasdaq` ou `Yahoo Finance`) na coluna própria. A nota de rodapé mantém apenas a orientação abrangente: “Dados obtidos de fontes públicas; sempre validar com seu Banco/Corretora”.
+- A B3 preserva a natureza divulgada para dividendos, JCP, rendimentos, bonificações, desdobramentos e grupamentos. Yahoo Finance continua exibindo `Dividendo/JCP` quando o payload de fallback não permite distinguir a natureza fiscal. Para eventos societários sem valor monetário unitário, o app não converte o fator em dinheiro nem estima benefício financeiro.
+- A Data ex derivada de `lastDatePrior` usa o calendário nacional ANBIMA persistido no SQLite. A planilha oficial é obtida na primeira execução e revalidada no máximo uma vez por ano; indisponibilidade externa preserva a última cópia válida, não bloqueia a abertura do app e não aciona outra fonte de feriados.
+- A aba não multiplica o provento pela quantidade atual ou histórica e não estima valor total a receber. Falhas de um ativo não impedem os demais resultados e nenhuma consulta é feita antes de a aba ser aberta.
 
 **Fundos (`fund`):**
 - Cotas dos fundos de investimento buscadas via **API Mais Retorno** quando a integração estiver ativada em Preferências (aba APIs — ver [[preferencias-abas]]), a posição tiver **CNPJ** preenchido e a carteira for em **BRL**.
@@ -121,15 +127,19 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 - A opção de registrar crédito deve ficar desmarcada por padrão para evitar duplicidade com resgates ou créditos já lançados.
 
 **Estrutura em abas:**
-- A tela Portfólio é dividida em **três abas** (padrão de pílulas do design system): **Posição** (Resumo da carteira, formulário de ativo e posição atual), **Análise** (consolidações Por classe, Por indexador, Por moeda e Por carteira) e **Histórico** (posições encerradas).
+- A tela Portfólio é dividida em **cinco abas** (padrão de pílulas do design system): **Posição** (Resumo da carteira, formulário de ativo e posição atual), **Análise** (consolidações Por classe, Por indexador, Por moeda e Por carteira), **Metas**, **Eventos** (proventos futuros anunciados) e **Histórico** (posições encerradas).
 - Apenas o painel da aba ativa fica visível; a navegação preserva o estado das demais abas e não altera filtros nem dados.
 
 ## API e dados
+
+- `GET /api/portfolio` mantém os campos anteriores e acrescenta `presentation` com agregados de ativos, cabeçalhos, composição e análise por moeda. Posições/fontes incluem resultado, percentual diário e cotação unitária sugerida para resgate, calculados em Python.
+- `POST /api/portfolio/preview` exige sessão e validação de origem, mas não grava dados nem consulta cotações. `kind=redemption` recebe quantidade, quantidade disponível de referência, cotação e taxas; devolve bruto, líquido, remanescente e erros por campo. `kind=goals` recebe metas e devolve soma e validade. A prévia não substitui validações de propriedade, disponibilidade ou limites na gravação.
 
 | Método | Rota |
 |---|---|
 | `GET` | `/api/portfolio` |
 | `GET` | `/api/portfolio/returns` |
+| `GET` | `/api/portfolio/events` |
 | `GET` | `/api/portfolio/fund-quote?cnpj={cnpj}` |
 | `POST` | `/api/portfolio/positions` |
 | `PUT` | `/api/portfolio/positions/{id}` |
@@ -142,6 +152,12 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emergency_reserve_eligible` para posições/aportes elegíveis), `investment_redemptions`, `investment_redemption_summaries` (snapshot por resgate com bruto, líquido, taxas, custo FIFO, resultado realizado e posição remanescente), `portfolio_allocation_goals`, `investment_closed_positions`, `investment_value_overrides`, `transactions`, `checking_accounts`, `quote_cache`. A configuração da integração Mais Retorno vive em `secure_configs` (ver [[preferencias-abas]]).
 
 ## Plano de implementação
+
+- [x] Rejeitar snapshots sem apresentação compatível antes de reutilizar/renderizar; informar necessidade de reiniciar servidor desatualizado sem retry automático em loop. Virtualização monta HTML somente das linhas visíveis e não materializa grupos recolhidos; cancelar listeners/frames ao substituir, sair ou trocar de aba. Testes com snapshot antigo, 10 mil posições e mil fontes; consumo real do Safari requer validação no ambiente do usuário.
+
+- [x] Centralizar resultados/percentuais de posições e fontes, agregações, composição e desvios de metas no núcleo Python; preservar moedas nativas, normalizando grupos mistos em BRL.
+- [x] Disponibilizar `POST /api/portfolio/preview` autenticado, sem gravação/rede externa, para prévias de resgate quantitativo e total de metas. Quantidades disponíveis recebidas são apenas referência visual; gravação revalida a posição real.
+- [x] Frontend renderiza os dados calculados; prévias pendentes bloqueiam confirmação e respostas antigas não substituem a edição atual. Contratos de centavos, moedas, limites e coordenação assíncrona automatizados; validação visual no Safari permanece manual.
 
 - [x] Atualizar rótulos e dicas dos campos de renda fixa no lançamento de investimento.
 - [x] Atualizar rótulos e dicas dos campos de renda fixa na posição inicial do Portfólio.
@@ -161,6 +177,15 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - [x] Exibir resgates parciais e posições encerradas em seções próprias da aba Histórico.
 - [x] Persistir metas percentuais por classe com soma obrigatória de 100%.
 - [x] Criar a aba Metas e comparar atual versus planejado no gráfico Por Classe.
+- [x] Separar a meta de Renda Variável em BRL e USD, preservando metas existentes.
+- [x] Usar a meta específica de Renda Variável em USD na comparação da Análise e no Consultor.
+- [x] Criar consulta isolada de eventos históricos de renda variável, com cache limitado, falha parcial por ativo e sem estimativa de valor total.
+- [x] Carregar e renderizar a aba Eventos somente no primeiro acesso ou após mudança da carteira, mantendo fonte e confirmação visíveis.
+- [x] Limitar a consulta de eventos usada pelo Cockpit à semana corrente, validar os campos externos e virtualizar/desmontar a apresentação extensa da aba Eventos.
+- [x] Consultar `calendarEvents` com sessão Yahoo, exibir somente a janela futura de três meses, agrupar por competência e associar carteiras.
+- [x] Consultar B3 para ativos brasileiros e Nasdaq para internacionais, com Yahoo como fallback, cache diário e parsers monetários sem ponto flutuante.
+- [x] Incluir bonificações, desdobramentos e grupamentos anunciados pela B3 sem interpretar o fator societário como valor monetário.
+- [x] Persistir o calendário nacional ANBIMA na primeira execução e usá-lo na derivação da Data ex, com atualização anual transacional e sem fallback BrasilAPI.
 
 ## Critérios de aceite
 
@@ -205,7 +230,7 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado uma posição de fundo sem integração ativada, sem CNPJ ou em carteira não-BRL, quando o Portfólio é carregado, então a posição mantém o valor de custo com status `Cotacao manual pendente` e nenhuma chamada à API Mais Retorno é feita.
 - Dado uma posição de fundo com a API Mais Retorno indisponível, quando o Portfólio é carregado, então a posição mantém o valor de custo com status amigável e o restante do portfólio segue funcionando.
 - Dado posições com quantidade de alta precisão (ex.: `94,65389`), quando o Portfólio é exibido, então a quantidade aparece com no máximo 2 casas decimais para preservar o layout das tabelas.
-- Dado o módulo Portfólio aberto, quando o usuário navega entre as abas **Posição**, **Análise** e **Histórico**, então apenas o painel da aba ativa é exibido e os dados das demais abas permanecem preservados.
+- Dado o módulo Portfólio aberto, quando o usuário navega entre **Posição**, **Análise**, **Metas**, **Eventos** e **Histórico**, então apenas o painel da aba ativa é exibido e os dados das demais abas permanecem preservados.
 - Dado um ativo de renda fixa com taxa cadastrada, quando listado no Portfólio, então a variação do dia é a diferença entre o valor líquido na curva de hoje e o do dia anterior, zerada no dia da aquisição.
 - Dado um ativo de renda fixa pós-fixado em dia sem taxa publicada (fim de semana/feriado), quando listado no Portfólio, então a variação do dia exibe zero, sem crescimento artificial do indexador.
 - Dado um ativo de Poupança com aniversários cadastrados, quando listado no Portfólio, então a variação do dia reflete a diferença de valor entre hoje e o dia anterior, concentrada no mês do aniversário.
@@ -230,12 +255,80 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado a aba Histórico aberta, quando há resgates parciais e/ou posições encerradas, então eles aparecem em seções distintas e o estado vazio orienta que ambos os eventos serão registrados ali.
 - Dado o usuário configurando metas por classe na aba Metas, quando salva, então os percentuais entre 0% e 100% são persistidos somente se a soma for exatamente 100%.
 - Dado metas salvas, quando a aba Análise é aberta, então o gráfico Por Classe compara participação atual e meta usando o valor atual normalizado em BRL.
+- Dado o usuário configurando metas, quando a aba Metas é exibida, então existe um campo `Renda variável - USD` separado de `Renda variável`.
+- Dado uma meta `Renda variável - USD` salva, quando a Análise é exibida, então a linha de Renda variável em USD usa essa meta e a linha em BRL usa a meta de Renda variável.
+- Dado metas antigas sem `Renda variável - USD`, quando são carregadas, então o novo campo aparece com 0% e a soma das metas existentes permanece válida.
+- Dado o flyout de composição da aba Análise fechado, quando o Safari processa a página, então o overlay e seu conteúdo não permanecem em uma camada fixa renderizada fora da tela.
+- Dado o usuário saindo do Portfólio, quando outra view se torna ativa, então gráficos, overlays e DOM dinâmico volumoso são desmontados, preservando dados, filtros e aba no estado da sessão.
+- Dado o usuário retornando ao Portfólio pouco depois de uma carga bem-sucedida, quando os dados não foram invalidados, então a apresentação é reconstruída do estado sem repetir imediatamente a mesma chamada ao backend.
+- Dado o flyout de composição aberto, quando o overlay cobre a página do Portfólio, então usa fundo sem filtro de desfoque para não criar uma superfície gráfica do tamanho da página subjacente.
 - Dado uma classe acima ou abaixo da meta, quando exibida no gráfico, então mostra o desvio em pontos percentuais e o valor absoluto correspondente em BRL.
 - Dado uma classe com meta positiva e nenhuma posição atual, quando a análise é exibida, então a classe permanece visível com participação atual de 0%.
 - Dado a carteira com ativos em moedas distintas, quando a alocação atual é calculada, então todas as classes usam `chart_current_brl` como base comparável, sem somar moedas nominais incompatíveis.
+- Dado um resgate ou encerramento, quando a transação de escrita está aberta, então nenhuma consulta externa de cotação, indexador ou câmbio é executada.
+- Dado que os dados locais da carteira mudaram durante a obtenção das cotações, quando a escrita é iniciada, então a operação retorna conflito HTTP 409 sem gravar resgate, encerramento ou crédito e orienta tentar novamente.
+- Dado que os dados locais não mudaram, quando a operação é confirmada, então FIFO, custos, valores e crédito opt-in mantêm o comportamento atual, mesmo que o cache expire durante a confirmação.
+- Dado ações, ETFs ou BDRs abertos na carteira, quando o usuário abre a aba **Eventos**, então o app consulta sob demanda e lista os eventos anunciados na janela futura, preservando os campos Data ex, Pagamento, Ativo, Carteira, Evento, Valor por cota/ação e Fonte; o nível de confirmação permanece no texto acessível do selo da fonte.
+- Dado um ativo brasileiro elegível, quando a aba consulta eventos, então usa B3 primeiro e Yahoo Finance como fallback; para ativo internacional usa Nasdaq primeiro e Yahoo Finance como fallback.
+- Dado qualquer quantidade atual ou histórica da posição, quando os eventos são apresentados, então o app não calcula nem exibe valor total estimado a receber.
+- Dado falha de consulta para um ativo, quando outros ativos possuem eventos válidos, então os resultados disponíveis continuam visíveis e a indisponibilidade parcial é informada sem bloquear a aba.
+- Dado o usuário navegando pelas demais abas do Portfólio, quando **Eventos** ainda não foi aberta, então nenhuma chamada ao endpoint de eventos ou ao provedor externo é realizada.
+- Dado o calendário de proventos retornado pelo provedor, quando a aba **Eventos** é exibida, então somente eventos futuros do mês atual e dos dois meses seguintes são listados, agrupados por mês; a data principal é identificada como **Data ex** e a **Data de pagamento** aparece somente quando informada pelo provedor, usando `Não informada` nos demais casos.
+- Dado um evento sem valor unitário anunciado pelo calendário, quando exibido, então o valor aparece como `Não informado`, sem utilizar dividend rate ou qualquer estimativa.
+- Dado um evento associado a uma ou mais posições, quando exibido, então as carteiras são apresentadas na linha e a moeda permanece no valor unitário formatado.
+- Dado que o provedor não anuncia eventos na janela futura ou não disponibiliza calendário para um ativo, quando a aba é exibida, então a interface apresenta um estado vazio neutro e não rotula o ativo como erro ou indisponibilidade.
+- Dado mais de 200 eventos históricos, quando a listagem é apresentada, então somente a janela visível e uma pequena margem são materializadas no DOM; ao sair da aba Eventos, a apresentação é desmontada e os dados válidos permanecem em memória para reconstrução sem nova consulta.
+- Dado o Cockpit solicitando informativos de proventos, quando a consulta externa é montada, então o período começa no primeiro dia da semana corrente e eventos fora dessa janela são descartados antes da agregação.
+- Dado um evento externo com valor excessivo, data inválida ou timestamp fora do período solicitado, quando o payload é interpretado, então somente esse evento é descartado e os demais ativos/resultados continuam disponíveis.
+- Dado consultas repetidas ao mesmo ativo no mesmo dia, quando não há atualização forçada, então B3, Nasdaq e Yahoo reutilizam o cache diário sem nova requisição externa.
+- Dado valor monetário retornado por B3 ou Nasdaq, quando normalizado, então o backend usa `Decimal` e micros inteiros, sem cálculo por ponto flutuante.
+- Dado a aba Eventos com qualquer combinação de fontes, quando a lista é exibida, então a nota apresenta somente “Dados obtidos de fontes públicas; sempre validar com seu Banco/Corretora.”.
+- Dado um evento obtido pela cadeia de provedores, quando exibido na coluna Fonte, então o selo identifica diretamente `B3`, `Nasdaq` ou `Yahoo Finance`; o nível de detecção permanece disponível no texto acessível do selo.
+- Dado um evento cuja Data ex já ocorreu dentro do mês atual e cujo pagamento ainda é futuro, quando a aba Eventos é carregada, então o evento permanece na janela mensal e não cai no fallback apenas por ser anterior ao dia corrente.
+- Dado que a B3 retorna uma bonificação, um desdobramento ou um grupamento compatível com a espécie do ativo, quando o evento está na janela mensal, então ele é listado com sua natureza, fonte B3 e valor unitário `Não informado`, sem converter o fator societário em dinheiro.
+- Dado `lastDatePrior` anterior a fim de semana ou feriado nacional ANBIMA, quando a Data ex é derivada, então o app avança até o próximo dia útil do calendário local.
+- Dado que o calendário ANBIMA ainda não foi importado, quando o app inicia com rede disponível, então baixa a planilha oficial com TLS verificado e limite de tamanho e persiste somente datas válidas no SQLite.
+- Dado que já existe um calendário ANBIMA válido, quando a atualização anual falha, então os registros existentes são preservados e a abertura do app continua normalmente.
+- Dado uma tentativa de atualização já realizada no dia, quando o app reinicia, então não repete a requisição externa no mesmo dia.
+
+## Plano de implementação — transações sem rede
+
+### Critérios complementares da apresentação financeira
+
+- Posições, fontes e agregados apresentam resultado e variação diária calculados em centavos/Decimal no backend, inclusive custo zero e quantidades fracionadas.
+- Cabeçalhos de grupos mistos somam valores convertidos em BRL; grupos homogêneos mantêm a moeda nativa. A composição exibe total e participação calculados sobre a mesma base BRL, inclusive valor zero.
+- Análise preserva metas distintas de renda variável BRL/USD e classes sem posição; participação, desvio percentual e monetário são calculados no servidor.
+- A prévia do resgate usa arredondamento de centavos e precisão de quantidade equivalentes à gravação; informa excesso de quantidade/taxas sem escrever dados.
+- Durante prévias pendentes ou com falha a confirmação fica bloqueada; edição rápida, fechamento e saída da view não aplicam respostas obsoletas. Prévia não invalida caches de dados como se fosse mutação.
+
+- [x] Ler entradas locais consistentes e obter cotações antes da escrita. Fecha: critério 77.
+- [x] Revalidar entradas pela conexão da transação; reutilizar posições preparadas ou cancelar por conflito. Fecha: critérios 78 e 79.
+- [x] Testar resgate/encerramento, alteração concorrente, rollback e ausência de rede/cache durante escrita. Fecha: critérios 77 a 79.
 
 ## Changelog
 
+- `2.61` — 2026-09-04 — Datas ex derivadas da B3 passam a usar calendário nacional ANBIMA local, importado de XLS oficial com TLS verificado, limite de tamanho, atualização anual transacional e sem fallback BrasilAPI.
+- `2.60` — 2026-09-04 — A spec reconhece a coluna Fonte existente, preserva a natureza informada pela B3 e inclui bonificações, desdobramentos e grupamentos sem estimativa monetária; B3/Nasdaq/Yahoo compartilham transporte TLS verificado com falha segura.
+- `2.59` — 2026-09-04 — A janela da aba Eventos passa a começar no primeiro dia do mês atual, preservando eventos B3 com Data ex já ocorrida no mês e pagamento futuro.
+- `2.58` — 2026-09-04 — A coluna Fonte identifica explicitamente B3, Nasdaq ou Yahoo Finance; grade, alinhamentos, badge, rodapé e texto introdutório da aba Eventos foram refinados para melhor leitura.
+- `2.57` — 2026-09-04 — Implementada a cadeia B3/Nasdaq com fallback Yahoo, cache diário, normalização monetária segura e nota de rodapé unificada, sem alterar as colunas da aba Eventos.
+- `2.56` — 2026-09-04 — Eventos passam a prever B3 para ativos brasileiros, Nasdaq para internacionais, fallback Yahoo, cache diário e nota de rodapé única com orientação de validação.
+- `2.55` — 2026-09-04 — A aba deixa de exibir avisos de “indisponível” que confundiam ausência de anúncio futuro com erro; o estado vazio passa a ser neutro e orientado a eventos anunciados.
+- `2.54` — 2026-09-04 — Eventos passam a consultar `calendarEvents` com sessão Yahoo, mostrar somente os próximos três meses agrupados, associar carteiras e mover a fonte para nota de rodapé; valores unitários ausentes não são estimados.
+- `2.53` — 2026-09-04 — Eventos passam a distinguir Data ex de Data de pagamento opcional, virtualizam listas extensas e desmontam o DOM ao trocar de aba; parser externo valida tamanho/faixa e o Cockpit consulta somente a semana corrente.
+- `2.52` — 2026-09-04 — Adicionada aba Eventos com proventos históricos de ações/ETFs/BDRs consultados sob demanda, valor por cota/ação, fonte e confirmação do provedor, sem estimativa de valor total.
+- `2.51` — 2026-08-31 — Correção de compatibilidade do snapshot do Portfólio, bloqueio de recargas em cascata após falha e renderização preguiçosa das linhas virtualizadas.
+
+- `2.50` — 2026-08-31 — Retirados cálculos financeiros residuais do frontend: resultados, agregados, metas, composição e prévias calculados no backend. Grupos com moedas distintas usam valores convertidos em BRL; nenhuma soma entre moedas nativas distintas. Prévia com debounce, confirmação bloqueada enquanto pendente e proteção contra respostas obsoletas; testes Python e JavaScript adicionados.
+
+- `2.49` — 2026-08-31 — Confirmação sem rede implementada com snapshots locais e conflito 409 antes de qualquer escrita financeira. Sete testes de fronteira adicionados; suíte completa com 426 testes aprovada. Mantidos FIFO e crédito opt-in, sem alteração de schema.
+
+- `2.48` — 2026-08-31 — Especificada confirmação de resgate/encerramento sem rede, com revalidação otimista dos dados locais antes da gravação.
+
+- `2.47` — 2026-08-30 — Implementado ciclo de saída/entrada que libera gráfico, overlays e DOM dinâmico, preserva o estado e evita revalidação redundante por 30 segundos ou durante requisição em andamento.
+- `2.46` — 2026-08-30 — Especificado ciclo de vida seletivo e reaproveitamento temporário do snapshot para reduzir memória e chamadas redundantes.
+- `2.45` — 2026-08-30 — Reduzido o uso de memória gráfica do flyout de composição: o componente fechado sai da renderização, libera o conteúdo e o overlay aberto não usa blur no Safari/WebKit.
+- `2.44` — 2026-08-30 — Em implementação: separa a meta de Renda Variável em USD e aplica a meta específica à linha USD da Análise.
 - `2.43` — 2026-08-29 — Corrige auditoria do salvamento de Metas e disponibiliza metas/participação/desvio para os cards Alocação vs. Perfil e Análise da Carteira do Consultor.
 - `2.42` — 2026-08-29 — Aba Metas passa a renderizar os campos dentro da transição de abas, após a ativação do painel, eliminando o painel vazio em navegadores com View Transitions API.
 - `2.41` — 2026-08-29 — Aba Metas permite planejar percentuais por classe; Análise > Por Classe compara atual versus planejado, desvio percentual e valor em BRL.

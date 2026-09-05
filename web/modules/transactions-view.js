@@ -1,5 +1,13 @@
-import { stateMarkup } from "./dom-utils.js";
+import { renderCollectionRows, destroyVirtualLists } from "./virtual-list.js";
 import { createAssetAutocomplete } from "./asset-autocomplete.js";
+import { createTransactionSliceLoader } from "./transaction-slice-loader.js";
+import { createTransactionReconciliation } from "./transaction-reconciliation.js";
+import { createTransactionRefresh } from "./transaction-refresh.js";
+import { createClassificationSuggestion } from "./classification-suggestion.js";
+import { createTransactionBalanceChart } from "./transaction-balance-chart.js";
+import { createTransactionList } from "./transaction-list.js";
+import { createTransactionInvestmentForm } from "./transaction-investment-form.js";
+import { createTransactionForm } from "./transaction-form.js";
 
 export function registerTransactionsView({
   state,
@@ -20,7 +28,6 @@ export function registerTransactionsView({
   formatShortMonthName,
   formatCategoryPath,
   moneyInputValue,
-  parseDecimalInput,
   todayLocalDateValue,
   monthEndDate,
   currentMonthValue,
@@ -35,19 +42,12 @@ export function registerTransactionsView({
   openMonthPicker,
   decisionModal,
   ensureSelectedAccount,
-  getBalanceUntil,
-  accountHasPreferredCardForecast,
-  loadCockpit,
   markPortfolioDirty,
   renderBaseViews,
   renderFinanceViews,
-  renderPortfolio,
   renderImportTargets,
 }) {
-  const balanceHistoryChartTop = 10;
-  const balanceHistoryChartBottom = 88;
-  const balanceHistoryChartBaseline = 94;
-  const balanceHistoryChartFlat = 49;
+  const transactionSliceLoader = createTransactionSliceLoader({ state, api, fetchAllListed, ensureSelectedAccount });
   const {
     transactionForm,
     transactionFormTitle,
@@ -108,15 +108,38 @@ export function registerTransactionsView({
     transactionStatusFilterButtons,
     transactionContextCount,
   } = elements;
-  let classificationSuggestionTimer = null;
-  let classificationSuggestionRequestId = 0;
-  let classificationSelectionTouched = false;
+  const reconciliation = createTransactionReconciliation({
+    state, api, markDirty: transactionSliceLoader.markDirty,
+    loadSlice: transactionSliceLoader.load, render: renderTransactions, markPortfolioDirty,
+    reportError: (message) => setMessage(transactionMessage, message, "error"),
+  });
   const expandedTransactionDays = new Map();
   const investmentAssetIdentifier = transactionForm.elements.investment_asset_identifier;
   const investmentAssetAutocomplete = createAssetAutocomplete({
     input: investmentAssetIdentifier,
     nameInput: transactionForm.elements.investment_asset_name,
     getPositions: () => state.portfolio?.positions || [],
+  });
+  const investmentForm = createTransactionInvestmentForm({
+    elements,
+    api,
+    decisionModal,
+    normalizeSearch,
+    moneyInputValue,
+    decimalInputValue,
+    formatDate,
+  });
+  const baseTransactionForm = createTransactionForm({ state, elements, api });
+  const classificationSuggestion = createClassificationSuggestion({
+    api,
+    form: transactionForm,
+    typeInput: transactionType,
+    categoryInput: transactionCategory,
+    subcategoryInput: transactionSubcategory,
+    messageElement: transactionClassificationSuggestion,
+    renderSubcategories: renderTransactionSubcategories,
+    afterApply: investmentForm.updateFieldState,
+    allowedTypes: ["expense", "income", "investment"],
   });
   investmentAssetIdentifier.addEventListener("focus", async () => {
     if (!state.portfolio || state.portfolioDirty) {
@@ -134,45 +157,25 @@ export function registerTransactionsView({
   transactionType.addEventListener("change", () => {
     applyWalletAccountRestrictions();
     updateTransactionTypeState();
-    scheduleClassificationSuggestion();
+    classificationSuggestion.schedule();
   });
   transactionAccount.addEventListener("change", handleTransactionAccountChange);
-  destinationAccount.addEventListener("change", updateTransferExchangeRateState);
-  fetchInvestmentFundQuoteButton?.addEventListener("click", fetchInvestmentFundQuote);
   investmentAmount.addEventListener("input", () => {
     if (transactionType.value === "investment") {
       transactionAmount.value = investmentAmount.value;
     }
   });
   transactionCategory.addEventListener("change", () => {
-    classificationSelectionTouched = true;
+    classificationSuggestion.markSelectionTouched();
     renderTransactionSubcategories();
     updateInvestmentFieldState();
   });
   transactionSubcategory.addEventListener("change", () => {
-    classificationSelectionTouched = true;
+    classificationSuggestion.markSelectionTouched();
     updateInvestmentFieldState();
   });
-  transactionForm.elements.description.addEventListener("input", scheduleClassificationSuggestion);
+  transactionForm.elements.description.addEventListener("input", classificationSuggestion.schedule);
   seriesKind.addEventListener("change", updateSeriesState);
-  transactionForm.elements.date.addEventListener("change", updateExchangeRateState);
-  transactionForm.elements.date.addEventListener("change", updateTransferExchangeRateState);
-  transactionForm.elements.amount.addEventListener("input", updateDestinationAmountFromRate);
-  transferExchangeRate.addEventListener("input", updateDestinationAmountFromRate);
-  investmentFixedIncomeMode.addEventListener("change", syncInvestmentFixedIncomeRateHint);
-  investmentFixedIncomeIndexer.addEventListener("change", syncInvestmentFixedIncomeRateHint);
-  investmentFixedIncomeRate.addEventListener("input", syncInvestmentFixedIncomeRateHint);
-  transactionForm.elements.investment_asset_identifier.addEventListener("input", syncInvestmentFixedIncomeRateHint);
-  transactionForm.elements.investment_asset_name.addEventListener("input", syncInvestmentFixedIncomeRateHint);
-  transactionForm.querySelectorAll("[data-mode-target='investment'][data-fixed-income-mode]").forEach((button) => {
-    button.addEventListener("click", () => {
-      investmentFixedIncomeMode.value = button.dataset.fixedIncomeMode || "";
-      investmentFixedIncomeMode.dispatchEvent(new Event("change", { bubbles: true }));
-    });
-  });
-  transactionForm.querySelectorAll("[data-mode-target='investment'][data-fixed-income-preset]").forEach((button) => {
-    button.addEventListener("click", () => applyInvestmentFixedIncomePreset(button.dataset.fixedIncomePreset || ""));
-  });
   previousMonthButton.addEventListener("click", () => shiftTransactionMonth(-1));
   todayMonthButton.addEventListener("click", () => setTransactionMonth(currentMonthValue()));
   transactionMonthLabel.addEventListener("click", (event) => {
@@ -180,116 +183,56 @@ export function registerTransactionsView({
     openMonthPicker(event.currentTarget, state.transactionMonth, setTransactionMonth);
   });
   nextMonthButton.addEventListener("click", () => shiftTransactionMonth(1));
-  transactionSearch.value = state.transactionSearch || "";
-  let searchDebounceTimer = null;
-  transactionSearch.addEventListener("input", () => {
-    state.transactionSearch = transactionSearch.value;
-    clearTimeout(searchDebounceTimer);
-    searchDebounceTimer = setTimeout(renderTransactions, 200);
-  });
-  clearTransactionSearchButton.addEventListener("click", () => {
-    state.transactionSearch = "";
-    transactionSearch.value = "";
-    clearTimeout(searchDebounceTimer);
-    renderTransactions();
-    transactionSearch.focus();
-  });
-  transactionStatusFilterButtons.forEach((button) => {
-    button.addEventListener("click", () => {
-      state.transactionStatusFilter = button.dataset.transactionStatusFilter || "all";
-      renderTransactions();
-    });
-  });
   transactionList.addEventListener("click", handleTransactionListClick);
-  if (transactionBalanceHistoryChart) {
-    transactionBalanceHistoryChart.addEventListener("click", handleBalanceHistoryClick);
-  }
   cancelTransactionEditButton.addEventListener("click", resetTransactionForm);
 
-  function scheduleClassificationSuggestion() {
-    clearTimeout(classificationSuggestionTimer);
-    const requestId = ++classificationSuggestionRequestId;
-    if (transactionClassificationSuggestion) {
-      transactionClassificationSuggestion.textContent = "";
-    }
-    if (
-      transactionForm.elements.id.value
-      || classificationSelectionTouched
-      || !["expense", "income", "investment"].includes(transactionType.value)
-      || transactionForm.elements.description.value.trim().length < 2
-    ) {
-      return;
-    }
-    classificationSuggestionTimer = setTimeout(() => {
-      applyClassificationSuggestion(requestId);
-    }, 300);
+  const loadTransactionSlice = transactionSliceLoader.load;
+
+  function getBalanceUntil(limitDate, _transactions = null, reconciledOnly = false) {
+    const row = state.balanceProjection?.balances?.[limitDate];
+    return new Map(Object.entries(row?.[reconciledOnly ? "reconciled" : "projected"] || {}));
   }
 
-  async function applyClassificationSuggestion(requestId) {
-    const description = transactionForm.elements.description.value.trim();
-    const groupType = transactionType.value;
-    try {
-      const response = await api(
-        `/api/classification-suggestion?description=${encodeURIComponent(description)}&group_type=${encodeURIComponent(groupType)}`,
-      );
-      if (
-        requestId !== classificationSuggestionRequestId
-        || classificationSelectionTouched
-        || transactionForm.elements.id.value
-        || description !== transactionForm.elements.description.value.trim()
-        || groupType !== transactionType.value
-        || !response.suggestion
-      ) {
-        return;
-      }
-      const suggestion = response.suggestion;
-      const categoryExists = Array.from(transactionCategory.options).some(
-        (option) => option.value === suggestion.category_name,
-      );
-      if (!categoryExists) {
-        return;
-      }
-      transactionCategory.value = suggestion.category_name;
-      renderTransactionSubcategories();
-      if (suggestion.subcategory_name) {
-        const subcategoryExists = Array.from(transactionSubcategory.options).some(
-          (option) => option.value === suggestion.subcategory_name,
-        );
-        if (subcategoryExists) {
-          transactionSubcategory.value = suggestion.subcategory_name;
-        }
-      }
-      updateInvestmentFieldState();
-      if (transactionClassificationSuggestion) {
-        const path = suggestion.subcategory_name
-          ? `${suggestion.category_name} › ${suggestion.subcategory_name}`
-          : suggestion.category_name;
-        transactionClassificationSuggestion.textContent = `Sugerido pelo histórico: ${path}`;
-      }
-    } catch {
-      // A classificação assistida nunca bloqueia o cadastro manual.
-    }
+  function accountHasPreferredCardForecast(account, limitDate) {
+    if (!account) return false;
+    return Boolean(state.balanceProjection?.preferred_card_forecasts?.[`${account.id}:${limitDate}`]);
   }
 
-  async function loadTransactionSlice() {
-    ensureSelectedAccount();
-    const requestId = ++state.transactionSliceRequestId;
-    const accountId = String(state.selectedAccountId || "");
-    const month = state.transactionMonth;
-    if (!state.selectedAccountId) {
-      state.accountTransactions = [];
-      return;
-    }
-    const response = await fetchAllListed(`/api/transactions?month=${encodeURIComponent(month)}&account_id=${encodeURIComponent(accountId)}`, "transactions");
-    if (
-      requestId !== state.transactionSliceRequestId
-      || month !== state.transactionMonth
-      || accountId !== String(state.selectedAccountId || "")
-    ) {
-      return;
-    }
-    state.accountTransactions = response;
-  }
+  const transactionBalanceChart = createTransactionBalanceChart({
+    state,
+    element: transactionBalanceHistoryChart,
+    formatMoney,
+    formatShortMonthName,
+    escapeHtml,
+    shiftMonth,
+    monthEndDate,
+    getBalanceUntil,
+    selectedAccountTransactions,
+    setTransactionMonth,
+  });
+
+  const transactionListView = createTransactionList({
+    state,
+    elements,
+    formatMonthShortLabel,
+    formatCurrencySummary,
+    todayLocalDateValue,
+    monthEndDate,
+    ensureSelectedAccount,
+    selectedAccountTransactions,
+    getBalanceUntil,
+    accountHasPreferredCardForecast,
+    balanceChart: transactionBalanceChart,
+    renderCollection: renderTransactionCollection,
+    matchesSearch: matchesTransactionSearch,
+  });
+
+  const refreshAfterTransactionChange = createTransactionRefresh({
+    state, api, fetchAllListed, loader: transactionSliceLoader,
+    render: renderTransactions, markPortfolioDirty,
+    renderAuxiliary: () => { renderBaseViews(); renderFinanceViews(); },
+    reportError: message => setMessage(transactionMessage, message, "error"),
+  });
 
   async function handleTransactionSubmit(event) {
     event.preventDefault();
@@ -324,18 +267,18 @@ export function registerTransactionsView({
           && Boolean(editingTransaction.use_average) !== useAverage.checked,
       );
       if (editingTransaction && editingTransaction.series_kind === "recurring" && useAverage) {
-        // spec: lancamentos v3.25 — critério 55
+        // spec: lancamentos v3.35 — critério 55
         // (ao editar recorrente, o estado do checkbox de média é enviado explicitamente)
         data.use_average = useAverage.checked ? "1" : "0";
       }
       if (isEditing && shouldAskFutureReplication(data.id)) {
         if (averageChanged) {
-          // spec: lancamentos v3.25 — critérios 56, 57 e 60
+          // spec: lancamentos v3.35 — critérios 56, 57 e 60
           // (flag de média alterada — marcada em série sem a marcação ou desmarcada
           //  em série que a tinha — não exibe modal e aplica em cascata)
           data.apply_to_future = true;
         } else {
-          // spec: lancamentos v3.25 — critérios 46 e 58
+          // spec: lancamentos v3.35 — critérios 46 e 58
           // (flag inalterada — ativa ou inativa — mantém o modal de escopo)
           const scope = await chooseSeriesEditScope("conta", Boolean(editingTransaction.use_average));
           if (!scope) {
@@ -350,9 +293,9 @@ export function registerTransactionsView({
       });
       state.transactionHighlightId = String(response.transaction?.id || data.id || "");
       resetTransactionForm();
-      await refreshAfterTransactionChange();
-      highlightSavedTransaction();
       setMessage(transactionMessage, isEditing ? "Lançamento atualizado." : "Lançamento salvo.", "success");
+      await refreshAfterTransactionChange({ transaction: response.transaction });
+      highlightSavedTransaction();
     } catch (error) {
       setMessage(transactionMessage, error.message, "error");
     } finally {
@@ -374,8 +317,8 @@ export function registerTransactionsView({
         return;
       }
       await api(`/api/transactions/${id}${scope}`, { method: "DELETE" });
-      await refreshAfterTransactionChange();
       setMessage(transactionMessage, "Lançamento excluído.", "success");
+      await refreshAfterTransactionChange({ deletedId: id });
     } catch (error) {
       setMessage(transactionMessage, error.message, "error");
     }
@@ -424,40 +367,11 @@ export function registerTransactionsView({
   }
 
   async function toggleTransactionReconciliation(id, reconciled) {
-    try {
-      await api(`/api/transactions/${id}/reconciliation`, {
-        method: "PUT",
-        body: { reconciled },
-      });
-      await refreshAfterTransactionChange();
-    } catch (error) {
-      setMessage(transactionMessage, error.message, "error");
-    }
-  }
-
-  async function refreshAfterTransactionChange() {
-    const [, accountsResponse, transactionsResponse] = await Promise.all([
-      loadTransactionSlice(),
-      api("/api/checking-accounts"),
-      fetchAllListed("/api/transactions", "transactions"),
-      loadCockpit(),
-    ]);
-    state.accounts = accountsResponse.accounts || [];
-    ensureSelectedAccount();
-    state.transactions = transactionsResponse || [];
-    markPortfolioDirty();
-    renderBaseViews();
-    renderFinanceViews();
-    renderPortfolio();
+    await reconciliation.toggle(id, reconciled);
   }
 
   function resetTransactionForm() {
-    classificationSelectionTouched = false;
-    classificationSuggestionRequestId += 1;
-    clearTimeout(classificationSuggestionTimer);
-    if (transactionClassificationSuggestion) {
-      transactionClassificationSuggestion.textContent = "";
-    }
+    classificationSuggestion.reset();
     const selectedAccountId = String(state.selectedAccountId || transactionAccount.value || "");
     transactionForm.reset();
     if (selectedAccountId && state.accounts.some((account) => String(account.id) === selectedAccountId)) {
@@ -541,50 +455,7 @@ export function registerTransactionsView({
   }
 
   function fillInvestmentOperation(operation) {
-    const fields = [
-      "investment_asset_identifier",
-      "investment_asset_name",
-      "investment_cnpj",
-      "investment_quantity",
-      "investment_unit_price",
-      "investment_brokerage_fee",
-      "investment_exchange_fee",
-      "investment_tax",
-      "investment_other_costs",
-      "investment_fixed_income_indexer",
-      "investment_fixed_income_rate",
-      "investment_fixed_income_maturity_date",
-    ];
-    for (const field of fields) {
-      if (transactionForm.elements[field]) {
-        transactionForm.elements[field].value = "";
-      }
-    }
-    transactionForm.elements.investment_fixed_income_mode.value = "";
-    if (transactionForm.elements.investment_emergency_reserve_eligible) {
-      transactionForm.elements.investment_emergency_reserve_eligible.checked = false;
-    }
-    if (!operation) {
-      updateInvestmentFieldState();
-      return;
-    }
-    transactionForm.elements.investment_asset_identifier.value = operation.asset_identifier || "";
-    transactionForm.elements.investment_asset_name.value = operation.asset_name || "";
-    transactionForm.elements.investment_cnpj.value = operation.cnpj || "";
-    transactionForm.elements.investment_quantity.value = decimalInputValue(operation.quantity);
-    transactionForm.elements.investment_unit_price.value = moneyInputValue(operation.unit_price);
-    transactionForm.elements.investment_brokerage_fee.value = moneyInputValue(operation.brokerage_fee);
-    transactionForm.elements.investment_exchange_fee.value = moneyInputValue(operation.exchange_fee);
-    transactionForm.elements.investment_tax.value = moneyInputValue(operation.tax);
-    transactionForm.elements.investment_other_costs.value = moneyInputValue(operation.other_costs);
-    transactionForm.elements.investment_fixed_income_mode.value = operation.fixed_income_mode || "";
-    transactionForm.elements.investment_fixed_income_indexer.value = operation.fixed_income_indexer || "";
-    transactionForm.elements.investment_fixed_income_rate.value = decimalInputValue(operation.fixed_income_rate);
-    transactionForm.elements.investment_fixed_income_maturity_date.value = operation.fixed_income_maturity_date || "";
-    if (transactionForm.elements.investment_emergency_reserve_eligible) {
-      transactionForm.elements.investment_emergency_reserve_eligible.checked = Boolean(operation.emergency_reserve_eligible);
-    }
-    updateInvestmentFieldState();
+    investmentForm.fill(operation);
   }
 
   function decimalInputValue(value) {
@@ -660,197 +531,7 @@ export function registerTransactionsView({
   }
 
   function renderTransactions() {
-    transactionMonthLabel.textContent = formatMonthShortLabel(state.transactionMonth);
-    ensureSelectedAccount();
-    if (state.selectedAccountId && transactionAccount.value !== state.selectedAccountId) {
-      transactionAccount.value = state.selectedAccountId;
-    }
-    const accountTransactions = selectedAccountTransactions(state.accountTransactions);
-    transactionSearch.value = state.transactionSearch || "";
-    clearTransactionSearchButton.hidden = !state.transactionSearch;
-    renderTransactionStatusFilters();
-    const monthTransactions = selectedAccountTransactions(accountTransactions)
-      .filter((transaction) => transaction.date.startsWith(state.transactionMonth));
-    const searchedTransactions = monthTransactions.filter(matchesTransactionSearch);
-    renderTransactionContextCount(searchedTransactions);
-    const visibleTransactions = searchedTransactions.filter(matchesTransactionStatusFilter);
-
-    currentBalanceSummary.textContent = formatCurrencySummary(getBalanceUntil(todayLocalDateValue(), accountTransactions, true));
-    const forecastLimitDate = monthEndDate(state.transactionMonth);
-    forecastBalanceSummary.textContent = formatCurrencySummary(getBalanceUntil(forecastLimitDate, accountTransactions, false));
-    if (forecastBalanceLabel) {
-      const account = state.accounts.find((entry) => String(entry.id) === String(state.selectedAccountId));
-      const forecastDetail = accountHasPreferredCardForecast(account, forecastLimitDate)
-        ? " Saldo do fim do mês (inclui despesas conciliadas de cartão)"
-        : " Saldo do fim do mês";
-      forecastBalanceLabel.innerHTML = `<span class="balance-kind-badge forecast"><span aria-hidden="true">○</span> Previsto</span>${forecastDetail}`;
-    }
-    renderBalanceHistory();
-    renderTransactionCollection(transactionList, visibleTransactions, false, accountTransactions);
-  }
-
-  function renderTransactionStatusFilters() {
-    transactionStatusFilterButtons.forEach((button) => {
-      const isActive = button.dataset.transactionStatusFilter === state.transactionStatusFilter;
-      button.classList.toggle("active", isActive);
-      button.setAttribute("aria-pressed", String(isActive));
-    });
-  }
-
-  function renderTransactionContextCount(transactions) {
-    const reconciled = transactions.filter((transaction) => transaction.reconciled_at).length;
-    const pending = transactions.length - reconciled;
-    const transactionLabel = transactions.length === 1 ? "lançamento" : "lançamentos";
-    const reconciledLabel = reconciled === 1 ? "conciliado" : "conciliados";
-    const pendingLabel = pending === 1 ? "pendente" : "pendentes";
-    transactionContextCount.textContent = `${transactions.length} ${transactionLabel} · ${reconciled} ${reconciledLabel} · ${pending} ${pendingLabel}`;
-  }
-
-  function matchesTransactionStatusFilter(transaction) {
-    if (state.transactionStatusFilter === "reconciled") {
-      return Boolean(transaction.reconciled_at);
-    }
-    if (state.transactionStatusFilter === "pending") {
-      return !transaction.reconciled_at;
-    }
-    return true;
-  }
-
-  function renderBalanceHistory() {
-    if (!transactionBalanceHistoryChart) {
-      return;
-    }
-    const account = state.accounts.find((entry) => String(entry.id) === String(state.selectedAccountId));
-    if (!account) {
-      transactionBalanceHistoryChart.innerHTML = stateMarkup("Selecione uma conta para visualizar a projeção de saldo.", { kind: "info" });
-      return;
-    }
-    const transactions = selectedAccountTransactions(state.transactions.length ? state.transactions : state.accountTransactions);
-    const rows = balanceHistoryRows(account, transactions);
-    const path = balanceHistoryPath(rows, "past");
-    const futurePath = balanceHistoryPath(rows, "future");
-    const areaPath = balanceHistoryAreaPath(rows);
-    const points = rows.map((row) => `
-      <span class="invoice-history-point ${row.isCurrent ? "current" : ""} ${row.offset > 0 ? "future" : ""}" style="left: ${row.x}%; top: ${row.y}%"></span>
-    `).join("");
-    transactionBalanceHistoryChart.innerHTML = `
-      <div class="invoice-history-rail" role="list">
-        ${rows.map((row) => {
-          const amountText = formatMoney(Math.abs(row.amount), row.currency);
-          return `
-          <button class="invoice-history-card ${row.isCurrent ? "current" : ""} ${row.offset > 0 ? "future" : ""}" type="button" data-transaction-balance-month="${escapeHtml(row.month)}" role="listitem" aria-current="${row.isCurrent ? "true" : "false"}">
-            <span>${escapeHtml(row.label)}</span>
-            <strong class="${chartAmountSizeClass(amountText)} ${row.amount < 0 ? "danger-text" : row.amount > 0 ? "positive-text" : ""}">${amountText}</strong>
-          </button>
-        `;
-        }).join("")}
-        <div class="invoice-history-plot" aria-hidden="true">
-          <svg class="invoice-history-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="accountBalanceHistoryAreaGradient" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.18"></stop>
-                <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"></stop>
-              </linearGradient>
-            </defs>
-            <path class="invoice-history-area account-balance-history-area" d="${areaPath}"></path>
-            <path class="invoice-history-line" d="${path}"></path>
-            <path class="invoice-history-line future" d="${futurePath}"></path>
-          </svg>
-          ${points}
-        </div>
-      </div>
-    `;
-  }
-
-  function chartAmountSizeClass(text) {
-    const length = String(text || "").replace(/\s/g, "").length;
-    if (length >= 18) {
-      return "chart-amount-xxs";
-    }
-    if (length >= 13) {
-      return "chart-amount-xs";
-    }
-    if (length >= 10) {
-      return "chart-amount-sm";
-    }
-    return "";
-  }
-
-  function balanceHistoryRows(account, transactions) {
-    const rawRows = [-1, 0, 1, 2, 3].map((offset) => {
-      const month = shiftMonth(state.transactionMonth, offset);
-      const balance = getBalanceUntil(monthEndDate(month), transactions, offset < 0);
-      const amount = balanceAmountForCurrency(balance, account.currency);
-      return {
-        offset,
-        month,
-        label: formatShortMonthName(month),
-        description: offset < 0 ? "Conciliado" : "Previsto",
-        amount,
-        currency: account.currency,
-        isCurrent: offset === 0,
-      };
-    });
-    const values = rawRows.map((row) => row.amount);
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const range = max - min;
-    const xPositions = [10, 30, 50, 70, 90];
-    return rawRows.map((row, index) => ({
-      ...row,
-      x: xPositions[index],
-      y: range === 0
-        ? balanceHistoryChartFlat
-        : balanceHistoryChartBottom - ((row.amount - min) / range) * (balanceHistoryChartBottom - balanceHistoryChartTop),
-    }));
-  }
-
-  function balanceAmountForCurrency(balance, currency) {
-    if (balance instanceof Map) {
-      if (balance.has(currency)) {
-        return Number(balance.get(currency) || 0);
-      }
-      return [...balance.values()].reduce((total, value) => total + Number(value || 0), 0);
-    }
-    return Number(balance || 0);
-  }
-
-  function balanceHistoryPath(rows, mode = "all") {
-    const visibleRows = mode === "future" ? rows.slice(1) : mode === "past" ? rows.slice(0, 2) : rows;
-    if (visibleRows.length < 2) {
-      return "";
-    }
-    return smoothBalancePath(visibleRows.map((row) => ({ x: row.x, y: row.y })));
-  }
-
-  function balanceHistoryAreaPath(rows) {
-    const points = rows.map((row) => ({ x: row.x, y: row.y }));
-    if (points.length < 2) {
-      return "";
-    }
-    const line = smoothBalancePath(points);
-    const first = points[0];
-    const last = points[points.length - 1];
-    return `${line} L ${last.x} ${balanceHistoryChartBaseline} L ${first.x} ${balanceHistoryChartBaseline} Z`;
-  }
-
-  function smoothBalancePath(points) {
-    return points.reduce((path, point, index) => {
-      if (index === 0) {
-        return `M ${point.x} ${point.y}`;
-      }
-      const previous = points[index - 1];
-      const midX = (previous.x + point.x) / 2;
-      return `${path} C ${midX} ${previous.y}, ${midX} ${point.y}, ${point.x} ${point.y}`;
-    }, "");
-  }
-
-  async function handleBalanceHistoryClick(event) {
-    const button = event.target.closest("[data-transaction-balance-month]");
-    if (!button) {
-      return;
-    }
-    await setTransactionMonth(button.dataset.transactionBalanceMonth);
+    transactionListView.render();
   }
 
   function selectedAccountTransactions(transactions = state.accountTransactions) {
@@ -864,6 +545,7 @@ export function registerTransactionsView({
   }
 
   function renderTransactionCollection(container, transactions, compact, balanceTransactions = transactions) {
+    destroyVirtualLists(container);
     container.innerHTML = "";
     if (transactions.length === 0) {
       const hasActiveFilter = Boolean(state.transactionSearch) || state.transactionStatusFilter !== "all";
@@ -886,7 +568,6 @@ export function registerTransactionsView({
         || containsHighlightedTransaction
         || isTransactionDayExpanded(dateKey, today);
       group.className = `transaction-group${compact ? "" : " collapsible-day"}${isExpanded ? "" : " is-collapsed"}`;
-      const rows = items.map((transaction) => transactionTemplate(transaction, compact)).join("");
       const heading = document.createElement("h3");
       if (compact) {
         heading.textContent = formatDate(dateKey);
@@ -903,12 +584,19 @@ export function registerTransactionsView({
       const content = document.createElement("div");
       content.className = "transaction-day-content";
       content.hidden = !isExpanded;
-      content.innerHTML = `<div class="transaction-rows">${rows}</div>`;
+      const rowsContainer = document.createElement("div");
+      rowsContainer.className = "transaction-rows";
+      content.append(rowsContainer);
       group.append(heading, content);
+      container.append(group);
+      renderCollectionRows(rowsContainer, items, {
+        expanded: isExpanded, virtual: !compact, rowHeight: 86,
+        initialIndex: items.findIndex(transaction => String(transaction.id) === state.transactionHighlightId),
+        renderItem: transaction => transactionTemplate(transaction, compact),
+      });
       if (!compact && isExpanded) {
         content.append(dailyBalance(dateKey, balanceTransactions));
       }
-      container.append(group);
     }
 
     if (!compact) {
@@ -922,11 +610,11 @@ export function registerTransactionsView({
       subtotalSection.innerHTML = `
         <div class="subtotal-row">
           <span>Saldo atual (Conciliado)</span>
-          <strong>${formatCurrencySummary(reconciledBalance)}</strong>
+          <strong>${state.balanceProjection ? formatCurrencySummary(reconciledBalance) : "—"}</strong>
         </div>
         <div class="subtotal-row">
           <span>Saldo previsto (Todos os lançamentos)</span>
-          <strong>${formatCurrencySummary(forecastBalance)}</strong>
+          <strong>${state.balanceProjection ? formatCurrencySummary(forecastBalance) : "—"}</strong>
         </div>
       `;
       container.append(subtotalSection);
@@ -1021,7 +709,7 @@ export function registerTransactionsView({
           ${compact ? "" : `
             <div class="transaction-actions">
               ${launchActionButton("edit", "Editar lançamento", `data-edit-transaction-id="${transaction.id}"`)}
-              ${launchActionButton("check", isReconciled ? "Desmarcar conciliação" : "Marcar como conciliado", `data-reconcile-id="${transaction.id}" data-reconciled="${isReconciled}"`, `reconcile-button ${isReconciled ? "active" : ""}`)}
+              ${launchActionButton("check", isReconciled ? "Desmarcar conciliação" : "Marcar como conciliado", `data-reconcile-id="${transaction.id}" data-reconciled="${isReconciled}" ${reconciliation.isPending(transaction.id) ? 'disabled aria-busy="true"' : ""}`, `reconcile-button ${isReconciled ? "active" : ""}`)}
               ${launchActionButton("trash", "Excluir lançamento", `data-transaction-id="${transaction.id}"`, "danger-action")}
             </div>
           `}
@@ -1069,7 +757,7 @@ export function registerTransactionsView({
     return `
       <div class="daily-balance-line">
         <span><span class="balance-kind-badge ${isReconciled ? "reconciled" : "forecast"}"><span aria-hidden="true">${isReconciled ? "✓" : "○"}</span> ${isReconciled ? "Conciliado" : "Previsto"}</span></span>
-        <strong class="${balanceClass}">${formatCurrencySummary(balance)}</strong>
+        <strong class="${balanceClass}">${state.balanceProjection ? formatCurrencySummary(balance) : "—"}</strong>
       </div>
     `;
   }
@@ -1147,11 +835,10 @@ export function registerTransactionsView({
     if (account) {
       state.selectedAccountId = account.id;
     }
-    await loadTransactionSlice();
     applyWalletAccountDefault();
     applyWalletAccountRestrictions();
     updateTransactionTypeState();
-    renderTransactions();
+    await loadSelectedTransactionSlice();
   }
 
   function applyWalletAccountDefault() {
@@ -1183,135 +870,7 @@ export function registerTransactionsView({
   }
 
   function updateInvestmentFieldState() {
-    const isInvestment = transactionType.value === "investment";
-    const cat = transactionCategory.value;
-    const isSavings = isInvestmentSavingsSelection();
-    const usesFundQuote = cat === "Fundos de Investimentos" || cat === "Previdência Privada";
-    const canBeEmergencyReserve = isInvestment && (cat === "Renda Fixa" || isSavings);
-    investmentFundFields.hidden = !isInvestment || !usesFundQuote;
-    if (fetchInvestmentFundQuoteButton) {
-      fetchInvestmentFundQuoteButton.disabled = investmentFundFields.hidden;
-    }
-    if (investmentFundQuoteHint && investmentFundFields.hidden) {
-      investmentFundQuoteHint.textContent = "";
-      investmentFundQuoteHint.className = "field-hint";
-    }
-    investmentFixedFields.hidden = !isInvestment || cat !== "Renda Fixa" || isSavings;
-    investmentPricingFields.hidden = isInvestment && (cat === "Renda Fixa" || isSavings);
-    if (investmentTradingCostFields) {
-      investmentTradingCostFields.hidden = !isInvestment || isSavings;
-    }
-    if (investmentTaxCostFields) {
-      investmentTaxCostFields.hidden = !isInvestment || isSavings;
-    }
-    if (investmentEmergencyReserveFields) {
-      investmentEmergencyReserveFields.hidden = !canBeEmergencyReserve;
-    }
-    for (const field of investmentOperationFields.querySelectorAll("input, select")) {
-      field.disabled = !isInvestment;
-    }
-    for (const field of investmentFundFields.querySelectorAll("input, select")) {
-      field.disabled = !isInvestment || investmentFundFields.hidden;
-    }
-    for (const field of investmentFixedFields.querySelectorAll("input, select")) {
-      field.disabled = !isInvestment || investmentFixedFields.hidden;
-    }
-    for (const field of investmentPricingFields.querySelectorAll("input, select")) {
-      field.disabled = investmentPricingFields.hidden;
-    }
-    if (investmentTradingCostFields) {
-      for (const field of investmentTradingCostFields.querySelectorAll("input, select")) {
-        field.disabled = investmentTradingCostFields.hidden;
-      }
-    }
-    if (investmentTaxCostFields) {
-      for (const field of investmentTaxCostFields.querySelectorAll("input, select")) {
-        field.disabled = investmentTaxCostFields.hidden;
-      }
-    }
-    if (investmentEmergencyReserveFields) {
-      for (const field of investmentEmergencyReserveFields.querySelectorAll("input")) {
-        field.disabled = !canBeEmergencyReserve;
-        if (!canBeEmergencyReserve) {
-          field.checked = false;
-        }
-      }
-    }
-    syncInvestmentFixedIncomeRateHint();
-    if (isSavings) {
-      transactionForm.elements.investment_asset_identifier.value = "POUPANCA";
-      if (!transactionForm.elements.investment_asset_name.value) {
-        transactionForm.elements.investment_asset_name.value = "Poupança";
-      }
-    } else if (transactionForm.elements.investment_asset_identifier.value === "POUPANCA") {
-      transactionForm.elements.investment_asset_identifier.value = "";
-    }
-    investmentAmount.required = isInvestment;
-    investmentAmount.disabled = !isInvestment;
-  }
-
-  async function fetchInvestmentFundQuote() {
-    const cnpjField = transactionForm.elements.investment_cnpj;
-    const unitPriceField = transactionForm.elements.investment_unit_price;
-    const cnpj = String(cnpjField?.value || "").trim();
-    if (!cnpj) {
-      setFundQuoteHint("Informe o CNPJ do fundo antes de buscar a cota.", "error");
-      cnpjField?.focus();
-      return;
-    }
-    if (unitPriceField?.value.trim()) {
-      const overwrite = await decisionModal.choose({
-        title: "Substituir preço unitário?",
-        message: "O campo Preço unitário já tem valor. Deseja substituir pela cota retornada pela Mais Retorno?",
-        actions: [
-          { value: "replace", label: "Substituir", variant: "primary" },
-          { value: null, label: "Manter atual", variant: "ghost" },
-        ],
-      });
-      if (!overwrite) {
-        return;
-      }
-    }
-    const previousLabel = fetchInvestmentFundQuoteButton?.textContent || "Buscar cota";
-    if (fetchInvestmentFundQuoteButton) {
-      fetchInvestmentFundQuoteButton.disabled = true;
-      fetchInvestmentFundQuoteButton.textContent = "Buscando...";
-    }
-    setFundQuoteHint("Consultando a Mais Retorno...");
-    try {
-      const quote = await api(`/api/portfolio/fund-quote?cnpj=${encodeURIComponent(cnpj)}`);
-      unitPriceField.value = moneyInputValue(quote.unit_price);
-      setFundQuoteHint(
-        `Cota de ${formatDate(quote.quote_date)} preenchida. Confira com o comprovante antes de salvar.`,
-        "success",
-      );
-    } catch (error) {
-      setFundQuoteHint(error.message || "Nao foi possivel buscar a cota do fundo.", "error");
-    } finally {
-      if (fetchInvestmentFundQuoteButton) {
-        fetchInvestmentFundQuoteButton.disabled = investmentFundFields.hidden;
-        fetchInvestmentFundQuoteButton.textContent = previousLabel;
-      }
-    }
-  }
-
-  function setFundQuoteHint(text, tone = "") {
-    if (!investmentFundQuoteHint) {
-      return;
-    }
-    investmentFundQuoteHint.textContent = text;
-    investmentFundQuoteHint.className = `field-hint ${tone}`.trim();
-  }
-
-  function isInvestmentSavingsSelection() {
-    if (transactionType.value !== "investment") {
-      return false;
-    }
-    return normalizeSearch([
-      transactionCategory.value,
-      transactionSubcategory.value,
-      transactionForm.elements.investment_asset_identifier.value,
-    ].join(" ")).includes("poupanca");
+    investmentForm.updateFieldState();
   }
 
   function updateSeriesState() {
@@ -1333,7 +892,7 @@ export function registerTransactionsView({
       recurrenceAverageFields.hidden = !isRecurring;
     }
     if (useAverage) {
-      // spec: lancamentos v3.25 — criterio 52
+      // spec: lancamentos v3.35 — criterio 52
       // (na edicao de um recorrente o checkbox de media fica habilitado;
       //  so a repeticao/frequencia permanecem travadas na serie)
       useAverage.disabled = !isRecurring;
@@ -1358,7 +917,17 @@ export function registerTransactionsView({
       return;
     }
     state.transactionMonth = month;
-    await loadTransactionSlice();
+    await loadSelectedTransactionSlice();
+  }
+
+  async function loadSelectedTransactionSlice() {
+    const request = loadTransactionSlice();
+    renderTransactions();
+    try {
+      await request;
+    } catch (error) {
+      setMessage(transactionMessage, error.message, "error");
+    }
     renderTransactions();
   }
 
@@ -1383,147 +952,15 @@ export function registerTransactionsView({
   }
 
   async function updateExchangeRateState() {
-    exchangeRateLabel.hidden = true;
-    exchangeRate.type = "hidden";
-    exchangeRate.disabled = false;
-    exchangeRate.placeholder = "";
-    exchangeRate.value = "1,000000";
-    const account = state.accounts.find((entry) => String(entry.id) === transactionAccount.value);
-    const dateValue = transactionForm.elements.date.value;
-    const isEditing = Boolean(transactionForm.elements.id.value);
-    if (isEditing || !account || account.currency === "BRL" || !dateValue) {
-      return;
-    }
-    try {
-      const rate = await exchangeRateToBrl(account.currency, dateValue);
-      exchangeRate.value = rate.toLocaleString("pt-BR", {
-        minimumFractionDigits: 6,
-        maximumFractionDigits: 6,
-      });
-    } catch {
-      exchangeRateLabelText.textContent = `Cotação (${account.currency} → BRL)`;
-      exchangeRate.type = "text";
-      exchangeRate.value = "";
-      exchangeRate.placeholder = "Informe a cotação manualmente (ex.: 5,900000)";
-      exchangeRateLabel.hidden = false;
-    }
+    return baseTransactionForm.updateExchangeRateState();
   }
 
   async function updateTransferExchangeRateState() {
-    if (transactionType.value !== "exchange") {
-      return;
-    }
-    const source = state.accounts.find((entry) => String(entry.id) === transactionAccount.value);
-    const destination = state.accounts.find((entry) => String(entry.id) === destinationAccount.value);
-    if (!source || !destination || source.currency === destination.currency || !transactionForm.elements.date.value) {
-      return;
-    }
-    transferExchangeRate.placeholder = "Buscando cotação...";
-    try {
-      const [sourceToBrl, destinationToBrl] = await Promise.all([
-        exchangeRateToBrl(source.currency, transactionForm.elements.date.value),
-        exchangeRateToBrl(destination.currency, transactionForm.elements.date.value),
-      ]);
-      const rate = sourceToBrl / destinationToBrl;
-      transferExchangeRate.value = rate.toLocaleString("pt-BR", {
-        minimumFractionDigits: 6,
-        maximumFractionDigits: 6,
-      });
-      updateDestinationAmountFromRate();
-    } catch (error) {
-      transferExchangeRate.placeholder = "Informe a cotação manual";
-    }
+    return baseTransactionForm.updateTransferExchangeRateState();
   }
 
-  function syncInvestmentFixedIncomeRateHint() {
-    const mode = investmentFixedIncomeMode.value;
-    if (mode === "pre") {
-      investmentFixedIncomeRateLabel.textContent = "Taxa Anual (% a.a.)";
-      investmentFixedIncomeRate.placeholder = "Ex.: 12,30 (para 12,30% a.a.)";
-    } else if (mode === "post") {
-      investmentFixedIncomeRateLabel.textContent = "Percentual do Indexador (%)";
-      investmentFixedIncomeRate.placeholder = "Ex.: 123 (deixe vazio para 100%)";
-    } else if (mode === "hybrid") {
-      investmentFixedIncomeRateLabel.textContent = "Taxa Adicional Anual (% a.a.)";
-      investmentFixedIncomeRate.placeholder = "Ex.: 6,50 (para IPCA + 6,50% a.a.)";
-    } else {
-      investmentFixedIncomeRateLabel.textContent = "Taxa";
-      investmentFixedIncomeRate.placeholder = "Ex.: 6,50";
-    }
-    syncFixedIncomeModeButtons(transactionForm, "investment", mode);
-    updateFixedIncomePreview({
-      mode,
-      indexer: investmentFixedIncomeIndexer.value,
-      rate: investmentFixedIncomeRate.value,
-      preview: investmentFixedIncomePreview,
-      fallbackAsset: transactionForm.elements.investment_asset_identifier.value || transactionForm.elements.investment_asset_name.value,
-    });
-  }
-
-  function applyInvestmentFixedIncomePreset(preset) {
-    const [mode, indexer, rate] = preset.split(":");
-    investmentFixedIncomeMode.value = mode || "";
-    investmentFixedIncomeIndexer.value = indexer || "";
-    investmentFixedIncomeRate.value = rate || "";
-    syncInvestmentFixedIncomeRateHint();
-  }
-
-  function syncFixedIncomeModeButtons(scope, target, mode) {
-    scope.querySelectorAll(`[data-mode-target='${target}'][data-fixed-income-mode]`).forEach((button) => {
-      const isActive = button.dataset.fixedIncomeMode === mode;
-      button.classList.toggle("active", isActive);
-      button.setAttribute("aria-pressed", isActive ? "true" : "false");
-    });
-  }
-
-  function updateFixedIncomePreview({ mode, indexer, rate, preview, fallbackAsset }) {
-    if (!preview) {
-      return;
-    }
-    const cleanRate = String(rate || "").trim();
-    const cleanIndexer = String(indexer || "").trim();
-    const assetLabel = String(fallbackAsset || "").trim() || "Título";
-    let text = "";
-    if (mode === "pre") {
-      text = cleanRate
-        ? `${assetLabel} configurado: pré-fixado a ${cleanRate}% a.a.`
-        : `${assetLabel} configurado: pré-fixado com taxa anual a informar.`;
-    } else if (mode === "post") {
-      const percent = cleanRate || "100";
-      text = cleanIndexer
-        ? `${assetLabel} configurado: ${percent}% do ${cleanIndexer}.`
-        : `${assetLabel} configurado: ${percent}% do indexador selecionado.`;
-    } else if (mode === "hybrid") {
-      const rateText = cleanRate ? ` + ${cleanRate}% a.a.` : " + taxa adicional a informar";
-      text = cleanIndexer
-        ? `${assetLabel} configurado: ${cleanIndexer}${rateText}.`
-        : `${assetLabel} configurado: indexador${rateText}.`;
-    }
-    preview.hidden = !text;
-    preview.textContent = text ? `✨ ${text}` : "";
-  }
-
-  async function exchangeRateToBrl(currency, dateValue) {
-    if (currency === "BRL") {
-      return 1;
-    }
-    const response = await api(`/api/exchange-rate?currency=${encodeURIComponent(currency)}&date=${encodeURIComponent(dateValue)}`);
-    return Number(response.rate);
-  }
-
-  function updateDestinationAmountFromRate() {
-    if (transactionType.value !== "exchange") {
-      return;
-    }
-    const amount = parseDecimalInput(transactionForm.elements.amount.value);
-    const rate = parseDecimalInput(transferExchangeRate.value);
-    if (!amount || !rate) {
-      return;
-    }
-    destinationAmount.value = (amount * rate).toLocaleString("pt-BR", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
+  async function updateDestinationAmountFromRate() {
+    return baseTransactionForm.updateDestinationAmountFromRate();
   }
 
   function groupTransactionsByDate(transactions) {
@@ -1549,6 +986,8 @@ export function registerTransactionsView({
 
   return {
     loadTransactionSlice,
+    markTransactionSliceDirty: transactionSliceLoader.markDirty,
+    resetTransactionSliceCache: transactionSliceLoader.reset,
     refreshAfterTransactionChange,
     resetTransactionForm,
     editTransaction,

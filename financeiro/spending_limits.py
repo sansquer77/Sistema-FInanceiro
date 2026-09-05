@@ -71,6 +71,74 @@ def list_spending_limits(user_id: int, month: object | None = None) -> list[dict
     return [format_spending_limit(row_to_dict(row)) for row in rows]
 
 
+def list_spending_limits_with_consumption(user_id: int, month: object | None) -> list[dict]:
+    """Return effective limits with monthly consumption aggregated by SQLite."""
+    normalized_month = normalize_month(month, required=False)
+    limits = list_spending_limits(user_id, normalized_month)
+    if not normalized_month or not limits:
+        return limits
+    month_start = f"{normalized_month}-01"
+    month_end = f"{normalized_month}-31"
+    # spec: limites/limites-gastos v1.3 — consumo independe das listas mensais
+    # residentes no frontend e exclui o débito agregado de pagamentos de fatura.
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            WITH expenses AS (
+                SELECT
+                    transactions.category_id,
+                    transactions.subcategory_id,
+                    transactions.amount_brl_cents AS amount_cents
+                FROM transactions
+                WHERE transactions.user_id = ?
+                    AND transactions.archived_at IS NULL
+                    AND transactions.type = 'expense'
+                    AND transactions.date BETWEEN ? AND ?
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM credit_card_payments
+                        WHERE credit_card_payments.user_id = transactions.user_id
+                            AND credit_card_payments.transaction_id = transactions.id
+                    )
+                UNION ALL
+                SELECT
+                    credit_card_transactions.category_id,
+                    credit_card_transactions.subcategory_id,
+                    credit_card_transactions.amount_brl_cents AS amount_cents
+                FROM credit_card_transactions
+                WHERE credit_card_transactions.user_id = ?
+                    AND credit_card_transactions.archived_at IS NULL
+                    AND credit_card_transactions.type = 'expense'
+                    AND credit_card_transactions.invoice_month = ?
+            )
+            SELECT category_id, subcategory_id, SUM(amount_cents) AS spent_cents
+            FROM expenses
+            WHERE category_id IS NOT NULL
+            GROUP BY category_id, subcategory_id
+            """,
+            (user_id, month_start, month_end, user_id, normalized_month),
+        ).fetchall()
+    category_totals: dict[int, int] = {}
+    subcategory_totals: dict[tuple[int, int], int] = {}
+    for row in rows:
+        category_id = int(row["category_id"])
+        spent_cents = int(row["spent_cents"] or 0)
+        category_totals[category_id] = category_totals.get(category_id, 0) + spent_cents
+        if row["subcategory_id"] is not None:
+            subcategory_totals[(category_id, int(row["subcategory_id"]))] = spent_cents
+    for limit in limits:
+        category_id = int(limit["category_id"])
+        subcategory_id = limit.get("subcategory_id")
+        spent_cents = (
+            subcategory_totals.get((category_id, int(subcategory_id)), 0)
+            if subcategory_id is not None
+            else category_totals.get(category_id, 0)
+        )
+        limit["spent_amount_cents"] = spent_cents
+        limit["spent_amount"] = cents_to_money(spent_cents)
+    return limits
+
+
 def create_spending_limit(user_id: int, data: dict) -> dict:
     spending_limit = normalize_spending_limit_payload(data)
     with get_connection() as conn:

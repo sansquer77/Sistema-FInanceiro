@@ -1,10 +1,19 @@
 import { stateMarkup } from "./dom-utils.js";
+import {
+  centeredMonthlyAxis,
+  centeredMonthlyPoints,
+  chartToken,
+  continuousAreaFill,
+  renderChart,
+} from "./chart-adapter.js";
+import { renderBankLogo, renderCardNetworkLogo, attachBankLogoFallbacks } from "./bank-logos.js";
+import { createClassificationSuggestion } from "./classification-suggestion.js";
+import { renderCollectionRows } from "./virtual-list.js";
 
 export function registerCardsView({
   state,
   elements,
   api,
-  fetchAllListed,
   formData,
   setFormBusy,
   setMessage,
@@ -77,9 +86,15 @@ export function registerCardsView({
     cardInvoiceList,
     cancelCardTransactionEditButton,
   } = elements;
-  let classificationSuggestionTimer = null;
-  let classificationSuggestionRequestId = 0;
-  let classificationSelectionTouched = false;
+  const classificationSuggestion = createClassificationSuggestion({
+    api,
+    form: cardTransactionForm,
+    typeInput: cardTransactionType,
+    categoryInput: cardTransactionCategory,
+    subcategoryInput: cardTransactionSubcategory,
+    messageElement: cardClassificationSuggestion,
+    renderSubcategories: renderCardTransactionSubcategories,
+  });
 
   creditCardForm.addEventListener("submit", handleCreditCardSubmit);
   creditCardForm.elements.currency.addEventListener("change", renderCreditCardPreferredPaymentAccounts);
@@ -114,90 +129,27 @@ export function registerCardsView({
   cardTransactionForm.addEventListener("submit", handleCardTransactionSubmit);
   cardTransactionType.addEventListener("change", () => {
     renderCardTransactionCategories();
-    scheduleClassificationSuggestion();
+    classificationSuggestion.schedule();
   });
   cardTransactionCategory.addEventListener("change", () => {
-    classificationSelectionTouched = true;
+    classificationSuggestion.markSelectionTouched();
     renderCardTransactionSubcategories();
   });
   cardTransactionSubcategory.addEventListener("change", () => {
-    classificationSelectionTouched = true;
+    classificationSuggestion.markSelectionTouched();
   });
-  cardTransactionForm.elements.description.addEventListener("input", scheduleClassificationSuggestion);
+  cardTransactionForm.elements.description.addEventListener("input", classificationSuggestion.schedule);
   cardSeriesKind.addEventListener("change", updateCardSeriesState);
   cancelCreditCardEditButton.addEventListener("click", resetCreditCardForm);
   cancelCardTransactionEditButton.addEventListener("click", resetCardTransactionForm);
 
-  function scheduleClassificationSuggestion() {
-    clearTimeout(classificationSuggestionTimer);
-    const requestId = ++classificationSuggestionRequestId;
-    if (cardClassificationSuggestion) {
-      cardClassificationSuggestion.textContent = "";
-    }
-    if (
-      cardTransactionForm.elements.id.value
-      || classificationSelectionTouched
-      || cardTransactionForm.elements.description.value.trim().length < 2
-    ) {
-      return;
-    }
-    classificationSuggestionTimer = setTimeout(() => {
-      applyClassificationSuggestion(requestId);
-    }, 300);
-  }
-
-  async function applyClassificationSuggestion(requestId) {
-    const description = cardTransactionForm.elements.description.value.trim();
-    const groupType = cardTransactionType.value;
-    try {
-      const response = await api(
-        `/api/classification-suggestion?description=${encodeURIComponent(description)}&group_type=${encodeURIComponent(groupType)}`,
-      );
-      if (
-        requestId !== classificationSuggestionRequestId
-        || classificationSelectionTouched
-        || cardTransactionForm.elements.id.value
-        || description !== cardTransactionForm.elements.description.value.trim()
-        || groupType !== cardTransactionType.value
-        || !response.suggestion
-      ) {
-        return;
-      }
-      const suggestion = response.suggestion;
-      const categoryExists = Array.from(cardTransactionCategory.options).some(
-        (option) => option.value === suggestion.category_name,
-      );
-      if (!categoryExists) {
-        return;
-      }
-      cardTransactionCategory.value = suggestion.category_name;
-      renderCardTransactionSubcategories();
-      if (suggestion.subcategory_name) {
-        const subcategoryExists = Array.from(cardTransactionSubcategory.options).some(
-          (option) => option.value === suggestion.subcategory_name,
-        );
-        if (subcategoryExists) {
-          cardTransactionSubcategory.value = suggestion.subcategory_name;
-        }
-      }
-      if (cardClassificationSuggestion) {
-        const path = suggestion.subcategory_name
-          ? `${suggestion.category_name} › ${suggestion.subcategory_name}`
-          : suggestion.category_name;
-        cardClassificationSuggestion.textContent = `Sugerido pelo histórico: ${path}`;
-      }
-    } catch {
-      // A classificação assistida nunca bloqueia o cadastro manual.
-    }
-  }
 
   async function loadCreditCards() {
     const response = await api("/api/credit-cards");
     state.creditCards = response.cards;
     ensureSelectedCreditCard();
-    await loadArchivedCreditCards();
-    await loadCardTransactions();
-    await loadCardInvoice();
+    await Promise.all([loadArchivedCreditCards(), loadCardInvoice()]);
+    state.cardDataLoaded = true;
   }
 
   async function loadArchivedCreditCards() {
@@ -212,6 +164,7 @@ export function registerCardsView({
     if (!state.selectedCreditCardId) {
       state.cardInvoiceTransactions = [];
       state.cardInvoicePayments = [];
+      state.cardInvoiceHistory = [];
       return;
     }
     const response = await api(`/api/credit-card-invoice?card_id=${encodeURIComponent(cardId)}&month=${encodeURIComponent(month)}`);
@@ -224,15 +177,7 @@ export function registerCardsView({
     }
     state.cardInvoiceTransactions = response.transactions || [];
     state.cardInvoicePayments = response.payments || [];
-  }
-
-  async function loadCardTransactions() {
-    const [transactionsResponse, paymentsResponse] = await Promise.all([
-      fetchAllListed("/api/credit-card-transactions", "transactions"),
-      fetchAllListed("/api/credit-card-payments", "payments"),
-    ]);
-    state.cardTransactions = transactionsResponse || [];
-    state.cardPayments = paymentsResponse || [];
+    state.cardInvoiceHistory = response.history || [];
   }
 
   function ensureSelectedCreditCard() {
@@ -284,25 +229,25 @@ export function registerCardsView({
     data.invoice_month = state.cardInvoiceMonth;
     const isEditing = Boolean(data.id);
     const editingCardTransaction = isEditing
-      ? state.cardTransactions.find((entry) => String(entry.id) === String(data.id))
+      ? state.cardInvoiceTransactions.find((entry) => String(entry.id) === String(data.id))
       : null;
     const averageChanged = Boolean(
       editingCardTransaction && editingCardTransaction.series_kind === "recurring" && cardUseAverage
         && Boolean(editingCardTransaction.use_average) !== cardUseAverage.checked,
     );
     if (editingCardTransaction && editingCardTransaction.series_kind === "recurring" && cardUseAverage) {
-      // spec: cartoes v2.15 — critério 33
+      // spec: cartoes v2.17 — critério 33
       // (ao editar recorrente, o estado do checkbox de média é enviado explicitamente)
       data.use_average = cardUseAverage.checked ? "1" : "0";
     }
     if (isEditing && shouldAskFutureCardReplication(data.id)) {
       if (averageChanged) {
-        // spec: cartoes v2.15 — critérios 34, 35 e 40
+        // spec: cartoes v2.17 — critérios 34, 35 e 40
         // (flag de média alterada — marcada em série sem a marcação ou desmarcada
         //  em série que a tinha — não exibe modal e aplica em cascata)
         data.apply_to_future = true;
       } else {
-        // spec: cartoes v2.15 — critérios 24 e 38
+        // spec: cartoes v2.17 — critérios 24 e 38
         // (flag inalterada — ativa ou inativa — mantém o modal de escopo)
         const scope = await chooseSeriesEditScope(Boolean(editingCardTransaction.use_average));
         if (!scope) {
@@ -346,7 +291,7 @@ export function registerCardsView({
   }
 
   async function handlePartialCardInvoicePayment() {
-    // spec: cartoes v2.15 — criterio 174
+    // spec: cartoes v2.17 — criterio 174
     setMessage(cardInvoiceMessage, "");
     const card = selectedCreditCard();
     const total = cardInvoiceOpenAmount();
@@ -416,7 +361,7 @@ export function registerCardsView({
 
   async function deleteCardTransaction(id) {
     try {
-      const scope = await deleteSeriesScope(id, state.cardTransactions, "cartão");
+      const scope = await deleteSeriesScope(id, state.cardInvoiceTransactions, "cartão");
       if (scope === null) {
         return;
       }
@@ -455,13 +400,12 @@ export function registerCardsView({
 
   async function refreshCardLaunches() {
     await loadCardInvoice();
-    await loadCardTransactions();
     renderCreditCards();
     onCardTransactionsChanged();
   }
 
   function shouldAskFutureCardReplication(transactionId) {
-    const transaction = state.cardTransactions.find((entry) => String(entry.id) === String(transactionId));
+    const transaction = state.cardInvoiceTransactions.find((entry) => String(entry.id) === String(transactionId));
     return Boolean(transaction && transaction.series_id && isInstallmentTransaction(transaction));
   }
 
@@ -506,12 +450,7 @@ export function registerCardsView({
   }
 
   function resetCardTransactionForm() {
-    classificationSelectionTouched = false;
-    classificationSuggestionRequestId += 1;
-    clearTimeout(classificationSuggestionTimer);
-    if (cardClassificationSuggestion) {
-      cardClassificationSuggestion.textContent = "";
-    }
+    classificationSuggestion.reset();
     cardTransactionForm.reset();
     cardTransactionForm.elements.id.value = "";
     cardTransactionForm.elements.date.value = todayLocalDateValue();
@@ -598,6 +537,7 @@ export function registerCardsView({
       state.creditCards.forEach((card) => {
         creditCardList.append(creditCardCard(card, "active"));
       });
+      attachBankLogoFallbacks(creditCardList);
     }
     renderArchivedCreditCards();
     renderCardInvoice();
@@ -612,6 +552,7 @@ export function registerCardsView({
     state.archivedCreditCards.forEach((card) => {
       archivedCreditCardList.append(creditCardCard(card, "archived"));
     });
+    attachBankLogoFallbacks(archivedCreditCardList);
   }
 
   function renderCardInvoice() {
@@ -759,6 +700,7 @@ export function registerCardsView({
   }
 
   function renderCardInvoiceList(card) {
+    renderCollectionRows(cardInvoiceList, [], { renderItem: () => "" });
     cardInvoiceList.innerHTML = "";
     if (state.cardInvoicePayments.length) {
       const payment = state.cardInvoicePayments[0];
@@ -785,39 +727,47 @@ export function registerCardsView({
       cardInvoiceList.append(emptyState("Nenhum lançamento encontrado para este filtro."));
       return;
     }
-    transactions.forEach((transaction) => {
-      const item = document.createElement("article");
-      item.className = `card-invoice-row ${transaction.type === "income" ? "positive" : "negative"}`;
-      const sign = transaction.type === "income" ? "+" : "-";
-      const isReconciled = Boolean(transaction.reconciled_at);
-      item.innerHTML = `
-        <div class="invoice-entry-main">
-          <strong>${escapeHtml(transaction.description)}</strong>
-          <div class="account-meta invoice-entry-meta">
-            <span>${formatDate(transaction.date)}</span>
-            <span>${cardTransactionTypeLabel(transaction.type)}</span>
-            ${transactionSeriesLabel(transaction) ? `<span>${transactionSeriesLabel(transaction)}</span>` : ""}
-            ${transaction.tags && transaction.tags.length ? `<span>${transaction.tags.map((tag) => `#${escapeHtml(tag)}`).join(" ")}</span>` : ""}
-          </div>
-        </div>
-        <div class="invoice-entry-category">
-          ${transaction.category_name ? escapeHtml(cardCategoryPath(transaction)) : "Sem categoria"}
-        </div>
-        <div class="transaction-amount invoice-entry-amount">
-          <strong>${sign}${formatMoney(transaction.amount, card.currency)}</strong>
-        </div>
-        ${state.cardInvoicePayments.length ? "" : `
-          <div class="transaction-actions invoice-entry-actions">
-            ${launchActionButton("arrow-left", "Mover para a fatura anterior", `data-card-move-id="${transaction.id}" data-card-move-direction="previous"`)}
-            ${launchActionButton("arrow-right", "Mover para a próxima fatura", `data-card-move-id="${transaction.id}" data-card-move-direction="next"`)}
-            ${launchActionButton("edit", "Editar lançamento", `data-card-edit-id="${transaction.id}"`)}
-            ${launchActionButton("check", isReconciled ? "Desmarcar conciliação" : "Marcar como conciliado", `data-card-reconcile-id="${transaction.id}" data-reconciled="${isReconciled}"`, `reconcile-button ${isReconciled ? "active" : ""}`)}
-            ${launchActionButton("trash", "Excluir lançamento", `data-card-transaction-id="${transaction.id}"`, "danger-action")}
-          </div>
-        `}
-      `;
-      cardInvoiceList.append(item);
+    const transactionsContainer = document.createElement("div");
+    transactionsContainer.className = "card-invoice-transactions";
+    cardInvoiceList.append(transactionsContainer);
+    renderCollectionRows(transactionsContainer, transactions, {
+      rowHeight: 72,
+      renderItem: (transaction) => renderCardInvoiceTransaction(card, transaction),
     });
+  }
+
+  function renderCardInvoiceTransaction(card, transaction) {
+    const item = document.createElement("article");
+    item.className = `card-invoice-row ${transaction.type === "income" ? "positive" : "negative"}`;
+    const sign = transaction.type === "income" ? "+" : "-";
+    const isReconciled = Boolean(transaction.reconciled_at);
+    item.innerHTML = `
+      <div class="invoice-entry-main">
+        <strong>${escapeHtml(transaction.description)}</strong>
+        <div class="account-meta invoice-entry-meta">
+          <span>${formatDate(transaction.date)}</span>
+          <span>${cardTransactionTypeLabel(transaction.type)}</span>
+          ${transactionSeriesLabel(transaction) ? `<span>${transactionSeriesLabel(transaction)}</span>` : ""}
+          ${transaction.tags && transaction.tags.length ? `<span>${transaction.tags.map((tag) => `#${escapeHtml(tag)}`).join(" ")}</span>` : ""}
+        </div>
+      </div>
+      <div class="invoice-entry-category">
+        ${transaction.category_name ? escapeHtml(cardCategoryPath(transaction)) : "Sem categoria"}
+      </div>
+      <div class="transaction-amount invoice-entry-amount">
+        <strong>${sign}${formatMoney(transaction.amount, card.currency)}</strong>
+      </div>
+      ${state.cardInvoicePayments.length ? "" : `
+        <div class="transaction-actions invoice-entry-actions">
+          ${launchActionButton("arrow-left", "Mover para a fatura anterior", `data-card-move-id="${transaction.id}" data-card-move-direction="previous"`)}
+          ${launchActionButton("arrow-right", "Mover para a próxima fatura", `data-card-move-id="${transaction.id}" data-card-move-direction="next"`)}
+          ${launchActionButton("edit", "Editar lançamento", `data-card-edit-id="${transaction.id}"`)}
+          ${launchActionButton("check", isReconciled ? "Desmarcar conciliação" : "Marcar como conciliado", `data-card-reconcile-id="${transaction.id}" data-reconciled="${isReconciled}"`, `reconcile-button ${isReconciled ? "active" : ""}`)}
+          ${launchActionButton("trash", "Excluir lançamento", `data-card-transaction-id="${transaction.id}"`, "danger-action")}
+        </div>
+      `}
+    `;
+    return item;
   }
 
   function renderCardInvoiceFilters() {
@@ -878,14 +828,8 @@ export function registerCardsView({
       return;
     }
     const rows = invoiceHistoryRows(card);
-    const path = invoiceHistoryPath(rows, "past");
-    const futurePath = invoiceHistoryPath(rows, "future");
-    const areaPath = invoiceHistoryAreaPath(rows);
     const average = invoiceHistoryAverage(rows);
     const averageLabel = formatMoney(average.amount, card.currency);
-    const points = rows.map((row) => `
-      <span class="invoice-history-point ${row.isCurrent ? "current" : ""} ${row.offset > 0 ? "future" : ""}" style="left: ${row.x}%; top: ${row.y}%"></span>
-    `).join("");
     cardInvoiceHistoryChart.innerHTML = `
       <div class="invoice-history-rail" role="list">
         ${rows.map((row) => {
@@ -898,23 +842,41 @@ export function registerCardsView({
         `;
         }).join("")}
         <div class="invoice-history-plot" aria-hidden="true">
-          <svg class="invoice-history-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="invoiceHistoryAreaGradient" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.18"></stop>
-                <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"></stop>
-              </linearGradient>
-            </defs>
-            <path class="invoice-history-area" d="${areaPath}"></path>
-            <path class="invoice-history-line" d="${path}"></path>
-            <path class="invoice-history-line future" d="${futurePath}"></path>
-            <path class="invoice-history-line average" d="M 10 ${average.y} L 90 ${average.y}"></path>
-          </svg>
-          <span class="invoice-history-average-label" style="left: calc(90% + 12px); top: ${average.y}%">${escapeHtml(averageLabel)}</span>
-          ${points}
+          <div class="invoice-history-apex"></div>
         </div>
       </div>
     `;
+    renderChart(cardInvoiceHistoryChart.querySelector(".invoice-history-apex"), {
+      chart: { type: "area", height: 92, sparkline: { enabled: true } },
+      series: [
+        { name: "Faturas", data: centeredMonthlyPoints(rows, (row) => row.offset <= 0 ? row.amount : null) },
+        { name: "Previsão", data: centeredMonthlyPoints(rows, (row) => row.offset >= 0 ? row.amount : null) },
+      ],
+      colors: [chartToken("--accent", "#5f7fff"), chartToken("--accent", "#5f7fff")],
+      stroke: { curve: "smooth", width: [3, 2], dashArray: [0, 5] },
+      fill: continuousAreaFill(),
+      markers: { size: 4 },
+      annotations: {
+        yaxis: [{
+          y: average.amount,
+          borderColor: chartToken("--chart-average-line", "#9aa3b8"),
+          borderWidth: 2,
+          strokeDashArray: 0,
+          label: {
+            borderColor: chartToken("--chart-average-line", "#9aa3b8"),
+            text: `Média ${averageLabel}`,
+            style: {
+              background: chartToken("--panel", "#ffffff"),
+              color: chartToken("--ink", "#111827"),
+              fontSize: "10px",
+              fontWeight: 600,
+            },
+          },
+        }],
+      },
+      xaxis: centeredMonthlyAxis(rows),
+      tooltip: { enabled: false },
+    });
   }
 
   function chartAmountSizeClass(text) {
@@ -952,16 +914,14 @@ export function registerCardsView({
   }
 
   function cardInvoiceMonthAmount(cardId, month) {
-    return state.cardTransactions.reduce((total, transaction) => {
-      if (String(transaction.credit_card_id) !== String(cardId) || transaction.invoice_month !== month) {
-        return total;
-      }
-      const amount = Number(transaction.amount || 0);
-      return total + (transaction.type === "expense" ? amount : -amount);
-    }, 0);
+    if (String(cardId) !== String(state.selectedCreditCardId)) {
+      return 0;
+    }
+    const summary = state.cardInvoiceHistory.find((entry) => entry.month === month);
+    return Number(summary?.amount || 0);
   }
 
-  // spec: cartoes v2.15 — criterios 36 e 37
+  // spec: cartoes v2.17 — criterios 36 e 37
   // (linha de referencia horizontal com a media dos valores absolutos das
   //  5 faturas em tela, na mesma escala vertical do grafico, com o valor
   //  da media em texto ao final da linha)
@@ -1086,15 +1046,23 @@ export function registerCardsView({
         <button class="ghost" type="button" data-action="edit">Editar</button>
         <button class="danger" type="button" data-action="archive">Arquivar</button>
       `;
+    const logoHtml = renderBankLogo({ name: card.issuer });
+    const networkLogoHtml = renderCardNetworkLogo({ name: card.network });
     item.innerHTML = `
-      <div>
-        <h3>${escapeHtml(card.name)}</h3>
-        <div class="account-meta">
-          <span>${escapeHtml(card.issuer)}</span>
-          ${card.network ? `<span>${escapeHtml(card.network)}</span>` : ""}
-          <span>${escapeHtml(card.currency)}</span>
-          <span>Fecha dia ${card.closing_day}</span>
-          <span>Vence dia ${card.due_day}</span>
+      <div class="account-card-info">
+        ${logoHtml}
+        <div>
+          <h3>${escapeHtml(card.name)}</h3>
+          <div class="account-meta">
+            <span>${escapeHtml(card.issuer)}</span>
+            ${card.network ? `<span>${escapeHtml(card.network)}</span>` : ""}
+            <span>${escapeHtml(card.currency)}</span>
+            <span>Fecha dia ${card.closing_day}</span>
+            <span>Vence dia ${card.due_day}</span>
+          </div>
+        </div>
+        <div class="card-network-logo" title="${escapeHtml(card.network || "Bandeira")}">
+          ${networkLogoHtml}
         </div>
       </div>
       <div class="balance">
@@ -1135,40 +1103,6 @@ export function registerCardsView({
     renderCreditCards();
   }
 
-  function cardReconciledBalance(cardId) {
-    const currentMonth = currentMonthValue();
-    const transactionTotal = state.cardTransactions.reduce((total, transaction) => {
-      if (String(transaction.credit_card_id) !== String(cardId) || !transaction.reconciled_at || transaction.invoice_month > currentMonth) {
-        return total;
-      }
-      const amount = Number(transaction.amount);
-      return total + (transaction.type === "expense" ? amount : -amount);
-    }, 0);
-    const paidTotal = state.cardPayments.reduce((total, payment) => (
-      String(payment.credit_card_id) === String(cardId) && payment.invoice_month <= currentMonth ? total + Number(payment.amount) : total
-    ), 0);
-    return transactionTotal - paidTotal;
-  }
-
-  function cardOpenBalance(cardId, untilInvoiceMonth = null) {
-    const transactionTotal = state.cardTransactions.reduce((total, transaction) => {
-      if (String(transaction.credit_card_id) !== String(cardId)) {
-        return total;
-      }
-      if (untilInvoiceMonth && transaction.invoice_month > untilInvoiceMonth) {
-        return total;
-      }
-      const amount = Number(transaction.amount);
-      return total + (transaction.type === "expense" ? amount : -amount);
-    }, 0);
-    const paidTotal = state.cardPayments.reduce((total, payment) => (
-      String(payment.credit_card_id) === String(cardId) && (!untilInvoiceMonth || payment.invoice_month <= untilInvoiceMonth)
-        ? total + Number(payment.amount)
-        : total
-    ), 0);
-    return transactionTotal - paidTotal;
-  }
-
   function creditCardCurrency(cardId) {
     const card = state.creditCards.find((entry) => String(entry.id) === String(cardId));
     return card ? card.currency : "BRL";
@@ -1178,7 +1112,6 @@ export function registerCardsView({
     loadCreditCards,
     loadArchivedCreditCards,
     loadCardInvoice,
-    loadCardTransactions,
     ensureSelectedCreditCard,
     renderCreditCards,
     renderCardInvoice,
@@ -1190,8 +1123,6 @@ export function registerCardsView({
     updateCardSeriesState,
     setCardInvoiceMonth,
     shiftCardInvoiceMonth,
-    cardReconciledBalance,
-    cardOpenBalance,
     creditCardCurrency,
   };
 }

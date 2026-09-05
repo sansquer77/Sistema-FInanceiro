@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="format-detection" content="telephone=no, date=no, address=no, email=no">
     <title>Sistema Financeiro</title>
     <link rel="icon" href="/assets/app-icon.png">
     <link rel="apple-touch-icon" href="/assets/app-icon.png">
@@ -32,7 +33,7 @@
         }
       })();
     </script>
-    <link rel="stylesheet" href="/styles.css?v=148">
+    <link rel="stylesheet" href="/styles.css?v=152">
   </head>
   <body>
     <main class="app-shell">
@@ -223,6 +224,9 @@
               </div>
             </div>
             <div class="topbar-actions">
+              <button class="command-palette-trigger" id="commandPaletteTrigger" type="button" aria-haspopup="dialog" aria-controls="commandPaletteDialog">
+                <span>Comandos</span><kbd>⌘K</kbd>
+              </button>
               <button class="global-search-trigger" id="globalSearchTrigger" type="button" aria-haspopup="dialog" aria-controls="globalSearchDialog">
                 <span>Buscar em todo o app</span><kbd>/</kbd>
               </button>
@@ -237,6 +241,17 @@
               <button class="cockpit-tab" type="button" role="tab" aria-selected="false" aria-controls="cockpitCalendarPanel" data-cockpit-tab="calendar" tabindex="-1">Consultor</button>
               <button class="cockpit-tab" type="button" role="tab" aria-selected="false" aria-controls="trendsPanel" data-cockpit-tab="trends" tabindex="-1">Tendências</button>
               <button class="cockpit-tab" type="button" role="tab" aria-selected="false" aria-controls="financialHealthPanel" data-cockpit-tab="health" tabindex="-1">Saúde</button>
+            </div>
+            <div class="cockpit-notification-indicators" aria-label="Notificações financeiras">
+              <button class="cockpit-notification-button critical" id="cockpitCriticalNotifications" type="button" aria-haspopup="dialog" aria-controls="cockpitNotificationFlyout" aria-expanded="false" aria-label="Nenhum alerta crítico">
+                <span aria-hidden="true">⚠</span><span class="notification-label">Alertas</span><b id="cockpitCriticalNotificationCount">0</b>
+              </button>
+              <button class="cockpit-notification-button informational" id="cockpitInformationalNotifications" type="button" aria-haspopup="dialog" aria-controls="cockpitNotificationFlyout" aria-expanded="false" aria-label="Nenhum informativo novo">
+                <span aria-hidden="true">●</span><span class="notification-label">Informativos</span><b id="cockpitInformationalNotificationCount">0</b>
+              </button>
+              <button class="cockpit-notification-button combined" id="cockpitCombinedNotifications" type="button" aria-haspopup="dialog" aria-controls="cockpitNotificationFlyout" aria-expanded="false" aria-label="Nenhuma notificação financeira">
+                <span aria-hidden="true">🔔</span><span class="notification-label">Notificações</span><b id="cockpitCombinedNotificationCount">0</b>
+              </button>
             </div>
             <div class="month-navigator cockpit-month">
               <button class="ghost small-button month-icon-button" type="button" id="previousCockpitMonthButton" aria-label="Mês anterior" title="Mês anterior">‹</button>
@@ -260,8 +275,6 @@
               </a>
               <button class="version-alert-dismiss" type="button" id="cockpitVersionAlertDismiss" aria-label="Dispensar alerta de nova versão">×</button>
             </section>
-            <section class="cockpit-alert limit-alert" id="cockpitLimitAlert" hidden></section>
-            <section class="cockpit-alert portfolio-maturity-alert" id="cockpitPortfolioMaturityAlert" hidden></section>
             </div>
 
             <section class="summary-strip executive-summary-strip" aria-label="Indicadores executivos do mês">
@@ -645,7 +658,7 @@
                   <input name="description" type="text" placeholder="Ex.: mercado, estorno, assinatura..." required>
                 </label>
                 <label>Valor
-                  <input name="amount" type="text" inputmode="decimal" placeholder="0,00" required>
+                  <input name="amount" type="text" inputmode="decimal" placeholder="0,00" data-mask="money" required>
                 </label>
                 <div class="field-row">
                   <label>Repetição
@@ -747,12 +760,12 @@
                 </label>
                 <div class="field-row" id="investmentAmountRow" hidden>
                   <label>Valor investido
-                    <input name="investment_amount" id="investmentAmount" type="text" inputmode="decimal" placeholder="0,00">
+                    <input name="investment_amount" id="investmentAmount" type="text" inputmode="decimal" placeholder="0,00" data-mask="money">
                   </label>
                 </div>
                 <div class="field-row" id="transactionAmountRow">
                   <label>Valor
-                    <input name="amount" id="transactionAmount" type="text" inputmode="decimal" placeholder="0,00" required>
+                    <input name="amount" id="transactionAmount" type="text" inputmode="decimal" placeholder="0,00" data-mask="money" required>
                   </label>
                 </div>
                 <div class="field-row" id="transactionCategoryRow">
@@ -815,7 +828,7 @@
                     </div>
                     <div class="field-row">
                       <label><span id="investmentFixedIncomeRateLabel">Taxa</span>
-                        <input name="investment_fixed_income_rate" id="investmentFixedIncomeRate" type="text" inputmode="decimal" placeholder="Ex.: 6,50">
+                        <input name="investment_fixed_income_rate" id="investmentFixedIncomeRate" type="text" inputmode="decimal" placeholder="Ex.: 6,50" data-mask="money" data-mask-scale="4" data-mask-signed="false">
                       </label>
                       <label>Vencimento
                         <input name="investment_fixed_income_maturity_date" id="investmentFixedIncomeMaturityDate" type="date">
@@ -825,10 +838,10 @@
                   </div>
                   <div class="field-row" id="investmentPricingFields">
                     <label>Quantidade
-                      <input name="investment_quantity" id="investmentQuantity" type="text" inputmode="decimal" placeholder="0,000000">
+                      <input name="investment_quantity" id="investmentQuantity" type="text" inputmode="decimal" placeholder="0,000000" data-mask="money" data-mask-scale="6" data-mask-signed="false">
                     </label>
                     <label>Preço unitário
-                      <input name="investment_unit_price" id="investmentUnitPrice" type="text" inputmode="decimal" placeholder="0,00">
+                      <input name="investment_unit_price" id="investmentUnitPrice" type="text" inputmode="decimal" placeholder="0,00" data-mask="money">
                     </label>
                   </div>
                   <div class="field-row" id="investmentEmergencyReserveFields" hidden>
@@ -838,18 +851,18 @@
                   </div>
                   <div class="field-row" id="investmentTradingCostFields">
                     <label>Tx. corretagem
-                      <input name="investment_brokerage_fee" type="text" inputmode="decimal" placeholder="0,00">
+                      <input name="investment_brokerage_fee" type="text" inputmode="decimal" placeholder="0,00" data-mask="money">
                     </label>
                     <label>Tx. emolumentos
-                      <input name="investment_exchange_fee" type="text" inputmode="decimal" placeholder="0,00">
+                      <input name="investment_exchange_fee" type="text" inputmode="decimal" placeholder="0,00" data-mask="money">
                     </label>
                   </div>
                   <div class="field-row" id="investmentTaxCostFields">
                     <label>Impostos
-                      <input name="investment_tax" type="text" inputmode="decimal" placeholder="0,00">
+                      <input name="investment_tax" type="text" inputmode="decimal" placeholder="0,00" data-mask="money">
                     </label>
                     <label>Outros custos
-                      <input name="investment_other_costs" type="text" inputmode="decimal" placeholder="0,00">
+                      <input name="investment_other_costs" type="text" inputmode="decimal" placeholder="0,00" data-mask="money">
                     </label>
                   </div>
                 </div>
@@ -886,10 +899,10 @@
                 </label>
                 <div class="field-row" id="exchangeTransferFields" hidden>
                   <label>Valor no destino
-                    <input name="destination_amount" id="destinationAmount" type="text" inputmode="decimal" placeholder="0,00">
+                    <input name="destination_amount" id="destinationAmount" type="text" inputmode="decimal" placeholder="0,00" data-mask="money">
                   </label>
                   <label>Cotação do câmbio
-                    <input name="transfer_exchange_rate" id="transferExchangeRate" type="text" inputmode="decimal" placeholder="Ex.: 0,180000">
+                    <input name="transfer_exchange_rate" id="transferExchangeRate" type="text" inputmode="decimal" placeholder="Ex.: 0,180000" data-mask="money" data-mask-scale="6" data-mask-signed="false">
                   </label>
                 </div>
                 <label id="exchangeRateLabel" hidden>
@@ -959,6 +972,7 @@
             <button class="portfolio-tab active" type="button" role="tab" aria-selected="true" aria-controls="portfolioPositionPanel" data-portfolio-tab="position">Posição</button>
             <button class="portfolio-tab" type="button" role="tab" aria-selected="false" aria-controls="portfolioAnalysisPanel" data-portfolio-tab="analysis" tabindex="-1">Análise</button>
             <button class="portfolio-tab" type="button" role="tab" aria-selected="false" aria-controls="portfolioGoalsPanel" data-portfolio-tab="goals" tabindex="-1">Metas</button>
+            <button class="portfolio-tab" type="button" role="tab" aria-selected="false" aria-controls="portfolioEventsPanel" data-portfolio-tab="events" tabindex="-1">Eventos</button>
             <button class="portfolio-tab" type="button" role="tab" aria-selected="false" aria-controls="portfolioHistoryPanel" data-portfolio-tab="history" tabindex="-1">Histórico</button>
           </div>
 
@@ -1005,6 +1019,53 @@
             <p class="message" id="portfolioMessage" role="alert"></p>
           </section>
 
+          <!-- Portfolio Return Drawer -->
+          <aside id="portfolioReturnDrawer" class="drawer portfolio-return-drawer" hidden aria-hidden="true" aria-labelledby="portfolioReturnDrawerTitle">
+            <div class="drawer-overlay" id="portfolioReturnDrawerOverlay"></div>
+            <div class="drawer-content">
+              <header class="drawer-header">
+                <div>
+                  <p class="eyebrow">Rentabilidade</p>
+                  <h2 id="portfolioReturnDrawerTitle">Rentabilidade</h2>
+                </div>
+                <button class="drawer-close-button" id="portfolioReturnDrawerCloseBtn" type="button" aria-label="Fechar gráfico" title="Fechar">
+                  <span aria-hidden="true">×</span>
+                </button>
+              </header>
+              <div class="drawer-body">
+                <div class="portfolio-return-chart-wrap">
+                  <div class="portfolio-return-chart-row">
+                    <div class="portfolio-return-y-axis" id="portfolioReturnYAxis" aria-hidden="true"></div>
+                    <div id="portfolioReturnChart" class="portfolio-return-chart" role="img" aria-label="Gráfico de rentabilidade mensal da carteira e benchmarks"></div>
+                  </div>
+                  <div id="portfolioReturnXLabels" class="portfolio-return-x-labels"></div>
+                </div>
+                <div class="portfolio-return-legend" id="portfolioReturnLegend"></div>
+                <p class="portfolio-return-notice" id="portfolioReturnNotice" hidden>
+                  <small>Variações refletem a valorização líquida dos aportes do mês; renda variável/cripto usam o valor atual como aproximação quando não há cotação histórica. Meses futuros ficam zerados até serem observados.</small>
+                </p>
+              </div>
+            </div>
+          </aside>
+
+          <aside id="portfolioGroupDrawer" class="drawer portfolio-group-drawer" hidden aria-hidden="true" aria-labelledby="portfolioGroupDrawerTitle">
+            <div class="drawer-overlay" id="portfolioGroupDrawerOverlay"></div>
+            <div class="drawer-content">
+              <header class="drawer-header">
+                <div>
+                  <p class="eyebrow">Composição</p>
+                  <h2 id="portfolioGroupDrawerTitle">Detalhes da linha</h2>
+                </div>
+                <button class="drawer-close-button" id="portfolioGroupDrawerCloseBtn" type="button" aria-label="Fechar composição" title="Fechar">
+                  <span aria-hidden="true">×</span>
+                </button>
+              </header>
+              <div class="drawer-body">
+                <div id="portfolioGroupDrawerList" class="portfolio-group-drawer-list"></div>
+              </div>
+            </div>
+          </aside>
+
           <section class="panel" id="portfolioAssetFormPanel" hidden>
             <div class="section-heading">
               <h2 id="portfolioAssetFormTitle">Ativo em carteira</h2>
@@ -1033,7 +1094,7 @@
                   </select>
                 </label>
                 <label>Custo total
-                  <input name="total_cost" type="text" inputmode="decimal" placeholder="0,00" required>
+                  <input name="total_cost" type="text" inputmode="decimal" placeholder="0,00" data-mask="money" required>
                 </label>
               </div>
               <div class="field-row">
@@ -1112,7 +1173,7 @@
                     </select>
                   </label>
                   <label><span id="portfolioFixedIncomeRateLabel">Taxa</span>
-                    <input name="fixed_income_rate" id="portfolioFixedIncomeRate" type="text" inputmode="decimal" placeholder="Ex.: 14,00">
+                    <input name="fixed_income_rate" id="portfolioFixedIncomeRate" type="text" inputmode="decimal" placeholder="Ex.: 14,00" data-mask="money" data-mask-scale="4" data-mask-signed="false">
                   </label>
                 </div>
                 <p class="fixed-income-preview" id="portfolioFixedIncomePreview" aria-live="polite" hidden></p>
@@ -1132,10 +1193,10 @@
               </div>
               <div class="field-row" id="portfolioPricingFields">
                 <label>Quantidade
-                  <input name="quantity" type="text" inputmode="decimal" placeholder="0,000000">
+                  <input name="quantity" type="text" inputmode="decimal" placeholder="0,000000" data-mask="money" data-mask-scale="6" data-mask-signed="false">
                 </label>
                 <label>Preço médio
-                  <input name="unit_price" type="text" inputmode="decimal" placeholder="0,00">
+                  <input name="unit_price" type="text" inputmode="decimal" placeholder="0,00" data-mask="money">
                 </label>
               </div>
               <input name="exchange_rate_to_brl" type="hidden" value="1,000000">
@@ -1215,6 +1276,19 @@
             </section>
           </section>
 
+          <section class="portfolio-tab-panel" id="portfolioEventsPanel" role="tabpanel" data-portfolio-panel="events" hidden>
+            <section class="panel report-content-panel">
+              <div class="section-heading">
+                <div>
+                  <h2>Eventos da carteira</h2>
+                  <p class="muted-copy">Proventos futuros anunciados para ações, ETFs e BDRs da carteira.</p>
+                </div>
+                <button class="ghost small-button" type="button" id="refreshPortfolioEventsButton">Atualizar eventos</button>
+              </div>
+              <div id="portfolioEvents" aria-live="polite"></div>
+            </section>
+          </section>
+
           <section class="portfolio-tab-panel" id="portfolioHistoryPanel" role="tabpanel" data-portfolio-panel="history" hidden>
           <section class="panel report-content-panel">
             <div class="section-heading">
@@ -1265,7 +1339,7 @@
                   <select name="subcategory_id" id="limitSubcategory"></select>
                 </label>
                 <label>Limite mensal
-                  <input name="limit_amount" type="text" inputmode="decimal" placeholder="0,00" required>
+                  <input name="limit_amount" type="text" inputmode="decimal" placeholder="0,00" data-mask="money" required>
                 </label>
                 <label>Observações
                   <textarea name="notes" rows="3"></textarea>
@@ -1309,7 +1383,7 @@
                       </select>
                     </label>
                     <label>Valor
-                      <input name="amount" id="simulationAmount" type="text" inputmode="decimal" placeholder="0,00" required>
+                      <input name="amount" id="simulationAmount" type="text" inputmode="decimal" placeholder="0,00" data-mask="money" required>
                     </label>
                   </div>
                   <div class="field-row">
@@ -1348,6 +1422,8 @@
               </section>
 
               <section class="panel simulation-results-panel">
+                <div id="simulationEmptyState"></div>
+                <div id="simulationResultsContent" hidden>
                 <div class="simulation-panel-intro">
                   <h3>Resultados</h3>
                   <span class="muted-copy">Os números abaixo refletem a projeção em memória e mantêm a estrutura visual do cockpit.</span>
@@ -1377,6 +1453,7 @@
                   <small>Riscos de saldo ou limite destacados sem interromper a simulação.</small>
                 </div>
                 <div class="simulation-warnings" id="simulationWarnings"></div>
+                </div>
               </section>
             </div>
           </section>
@@ -1394,12 +1471,12 @@
             </div>
 
             <div class="report-tabs" role="tablist" aria-label="Relatórios financeiros">
-              <button class="report-tab active" type="button" role="tab" aria-selected="true" aria-controls="reportContent" data-report-tab="categories">Categorias</button>
-              <button class="report-tab" type="button" role="tab" aria-selected="false" aria-controls="reportContent" data-report-tab="subcategories" tabindex="-1">Subcategorias</button>
-              <button class="report-tab" type="button" role="tab" aria-selected="false" aria-controls="reportContent" data-report-tab="cashflow" tabindex="-1">Entradas x Saídas</button>
-              <button class="report-tab" type="button" role="tab" aria-selected="false" aria-controls="reportContent" data-report-tab="accounts" tabindex="-1">Contas</button>
-              <button class="report-tab" type="button" role="tab" aria-selected="false" aria-controls="reportContent" data-report-tab="tags" tabindex="-1">Tags</button>
-              <button class="report-tab" type="button" role="tab" aria-selected="false" aria-controls="reportContent" data-report-tab="statement" tabindex="-1">Demonstrativos</button>
+              <button id="reportTabCategories" class="report-tab active" type="button" role="tab" aria-selected="true" aria-controls="reportContent" data-report-tab="categories">Categorias</button>
+              <button id="reportTabSubcategories" class="report-tab" type="button" role="tab" aria-selected="false" aria-controls="reportContent" data-report-tab="subcategories" tabindex="-1">Subcategorias</button>
+              <button id="reportTabCashflow" class="report-tab" type="button" role="tab" aria-selected="false" aria-controls="reportContent" data-report-tab="cashflow" tabindex="-1">Entradas x Saídas</button>
+              <button id="reportTabAccounts" class="report-tab" type="button" role="tab" aria-selected="false" aria-controls="reportContent" data-report-tab="accounts" tabindex="-1">Contas</button>
+              <button id="reportTabTags" class="report-tab" type="button" role="tab" aria-selected="false" aria-controls="reportContent" data-report-tab="tags" tabindex="-1">Tags</button>
+              <button id="reportTabStatement" class="report-tab" type="button" role="tab" aria-selected="false" aria-controls="reportContent" data-report-tab="statement" tabindex="-1">Demonstrativos</button>
             </div>
 
             <div class="report-summary">
@@ -1472,6 +1549,12 @@
                 <button class="primary" type="submit">Adicionar</button>
               </form>
               <p class="message" id="categoryMessage" role="alert"></p>
+              <div class="classification-list-toolbar">
+                <label class="classification-search">Buscar categorias e subcategorias
+                  <input id="categorySearch" type="search" placeholder="Nome da categoria ou subcategoria" aria-controls="categoryList">
+                </label>
+                <span id="categoryListSummary" class="classification-list-summary" role="status" aria-live="polite"></span>
+              </div>
               <div class="classification-list" id="categoryList"></div>
             </section>
 
@@ -1482,6 +1565,12 @@
                 <button class="primary" type="submit">Adicionar</button>
               </form>
               <p class="message" id="tagMessage" role="alert"></p>
+              <div class="classification-list-toolbar">
+                <label class="classification-search">Buscar tags
+                  <input id="tagSearch" type="search" placeholder="Nome da tag" aria-controls="tagList">
+                </label>
+                <span id="tagListSummary" class="classification-list-summary" role="status" aria-live="polite"></span>
+              </div>
               <div class="classification-list" id="tagList"></div>
             </section>
           </div>
@@ -1581,7 +1670,7 @@
                   <option value="card">Cartão</option>
                 </select>
               </label>
-              <label>Busca
+              <label class="operation-history-search">Busca
                 <input name="q" type="search" placeholder="Descrição, lote, entidade">
               </label>
               <button class="primary" type="submit">Filtrar</button>
@@ -1956,7 +2045,7 @@
                   <dt>Contato</dt>
                   <dd class="about-contact">
                     <a href="mailto:darksansquer@gmail.com">darksansquer@gmail.com</a>
-                    <span class="about-bmc-embed" id="bmc-btn-container"></span>
+                    <a class="about-bmc-embed" href="https://www.buymeacoffee.com/sansquerh" target="_blank" rel="noopener noreferrer">☕ Buy me a coffee</a>
                   </dd>
                 </div>
               </dl>
@@ -2046,7 +2135,7 @@
               <div class="evolution-chart-header">
                 <span class="trend-text">Projeção de saldo</span>
               </div>
-              <svg id="forecastSvg" class="evolution-svg" viewBox="0 0 100 50" preserveAspectRatio="none"></svg>
+              <div id="forecastSvg" class="evolution-svg" role="img" aria-label="Gráfico de previsão"></div>
               <div id="forecastXLabels" class="evolution-x-labels"></div>
             </div>
           </div>
@@ -2092,24 +2181,40 @@
                 <span id="evolutionChartTrend" class="trend-text"></span>
                 <strong id="evolutionChartTotal" class="total-text"></strong>
               </div>
-              <svg id="evolutionSvg" class="evolution-svg" viewBox="0 0 100 50" preserveAspectRatio="none"></svg>
+              <div id="evolutionSvg" class="evolution-svg" role="img" aria-label="Gráfico de evolução"></div>
               <div id="evolutionXLabels" class="evolution-x-labels"></div>
             </div>
           </div>
         </div>
       </aside>
     </main>
-    <dialog class="global-search-dialog" id="globalSearchDialog" aria-labelledby="globalSearchTitle">
+    <dialog class="global-search-dialog" id="globalSearchDialog" role="dialog" aria-modal="true" aria-labelledby="globalSearchTitle" aria-describedby="globalSearchDescription">
       <div class="global-search-heading">
         <div><p class="eyebrow">Busca global</p><h2 id="globalSearchTitle">Localizar no Sistema Financeiro</h2></div>
         <button class="ghost small-button" id="globalSearchClose" type="button" aria-label="Fechar busca">Fechar</button>
       </div>
+      <p class="sr-only" id="globalSearchDescription">Use as setas para percorrer os resultados e Escape para fechar a busca.</p>
       <label class="global-search-field">Buscar módulos, contas, cartões, lançamentos, ativos ou categorias
-        <input id="globalSearchInput" type="search" autocomplete="off" placeholder="Digite para buscar nos dados carregados…">
+        <input id="globalSearchInput" type="search" autocomplete="off" placeholder="Digite para buscar em todo o histórico…" aria-controls="globalSearchResults">
       </label>
-      <div class="global-search-results" id="globalSearchResults" role="listbox" aria-label="Resultados da busca"></div>
+      <div class="global-search-results" id="globalSearchResults" role="listbox" aria-label="Resultados da busca" aria-live="polite"></div>
     </dialog>
-    <script type="module" src="/app.js?v=158"></script>
-    <script async defer data-name="BMC-Widget" data-cfasync="false" src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js" data-id="sansquerh" data-description="Support me on Buy me a coffee!" data-message="Tks pelo café!" data-color="#5F7FFF" data-position="Right" data-x_margin="18" data-y_margin="18" data-container="bmc-btn-container"></script>
+    <dialog class="command-palette-dialog" id="commandPaletteDialog" aria-labelledby="commandPaletteTitle">
+      <div class="command-palette-heading">
+        <div>
+          <p class="eyebrow">Command Palette</p>
+          <h2 id="commandPaletteTitle">Comandos rápidos</h2>
+        </div>
+        <button class="ghost small-button" id="commandPaletteClose" type="button" aria-label="Fechar palette">Fechar</button>
+      </div>
+      <label class="command-palette-field">Buscar comando
+        <input id="commandPaletteInput" type="search" autocomplete="off" placeholder="Digite um módulo, ação ou preferência…" aria-controls="commandPaletteResults">
+      </label>
+      <div class="command-palette-meta" aria-live="polite"><span id="commandPaletteCount"></span><kbd>Esc</kbd> fecha</div>
+      <div class="command-palette-results" id="commandPaletteResults" role="listbox" aria-label="Comandos"></div>
+    </dialog>
+    <script src="/vendor/imask/7.6.1/imask.min.js?v=7.6.1"></script>
+    <script src="/vendor/apexcharts/4.7.0/apexcharts.min.js?v=4.7.0"></script>
+    <script type="module" src="/app.js?v=165"></script>
   </body>
 </html>

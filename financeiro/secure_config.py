@@ -9,6 +9,10 @@ import secrets
 from pathlib import Path
 
 from financeiro import database
+from financeiro.ai_endpoint_security import (
+    AIEndpointSecurityError,
+    validate_ai_base_url,
+)
 
 CONFIG_KEY_ENV = "SISTEMA_FINANCEIRO_CONFIG_KEY"
 CONFIG_KEY_PATH_ENV = "SISTEMA_FINANCEIRO_CONFIG_KEY_PATH"
@@ -338,6 +342,11 @@ def save_ai_settings(user_id: int, data: dict) -> dict:
         raise SecureConfigError("URL base do provedor de IA invalida.")
     if enabled and not model:
         raise SecureConfigError("Informe o modelo de IA.")
+    if base_url:
+        try:
+            base_url = validate_ai_base_url(base_url)
+        except AIEndpointSecurityError as exc:
+            raise SecureConfigError(str(exc)) from exc
 
     existing_key = ""
     if secure_config_exists(user_id, "ai"):
@@ -353,7 +362,7 @@ def save_ai_settings(user_id: int, data: dict) -> dict:
     elif auth_type == "none":
         delete_secure_config(user_id, "ai")
 
-    # spec: tendencias-saude-financeira v2.22 — critérios 17, 21, 23, 27 e 28
+    # spec: tendencias-saude-financeira v2.23 — critérios 17, 21, 23, 27 e 28
     with database.get_connection() as conn:
         conn.execute(
             """

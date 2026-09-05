@@ -45,7 +45,7 @@ class TrendsCalculationTest(unittest.TestCase):
         self.tempdir.cleanup()
 
     def test_empty_user_returns_series_and_zero_values(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critérios 1, 3, 5, 6, 27 e 28
+        # spec: tendencias-saude-financeira v2.23 — critérios 1, 3, 5, 6, 27 e 28
         user = create_user("T1", "t1@example.com", "strong-password")
         result = calculate_trends(user["id"], "2026-07")
 
@@ -61,7 +61,7 @@ class TrendsCalculationTest(unittest.TestCase):
         json.dumps(result, ensure_ascii=False)
 
     def test_series_includes_account_and_credit_card_by_invoice_month(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critérios 3, 25 e 26
+        # spec: tendencias-saude-financeira v2.23 — critérios 3, 25 e 26
         user = create_user("T2", "t2@example.com", "strong-password")
         with database.get_connection() as conn:
             account_id = conn.execute(
@@ -119,7 +119,7 @@ class TrendsCalculationTest(unittest.TestCase):
         self.assertEqual(result["confianca"], "baixa")
 
     def test_foreign_currency_credit_card_uses_ptax_normalized_value(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critérios 3, 26 e 27
+        # spec: tendencias-saude-financeira v2.23 — critérios 3, 26 e 27
         user = create_user("T2B", "t2b@example.com", "strong-password")
         card = create_credit_card(user["id"], {
             "name": "Cartão USD",
@@ -153,7 +153,7 @@ class TrendsCalculationTest(unittest.TestCase):
         self.assertEqual(july["expense_cents"], 5_500)
 
     def test_budget_vs_actual_uses_existing_limits(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critérios 4 e 5
+        # spec: tendencias-saude-financeira v2.23 — critérios 4 e 5
         user = create_user("T3", "t3@example.com", "strong-password")
         with database.get_connection() as conn:
             account_id = conn.execute(
@@ -198,8 +198,96 @@ class TrendsCalculationTest(unittest.TestCase):
         self.assertTrue(limit_finding)
         self.assertIn("acima do limite", limit_finding[0]["titulo"].lower())
 
+    def test_recurring_limit_overrun_detected_for_three_consecutive_months(self) -> None:
+        # spec: tendencias-saude-financeira v2.24 — critério de limite recorrente
+        user = create_user("T3C", "t3c@example.com", "strong-password")
+        with database.get_connection() as conn:
+            account_id = conn.execute(
+                """
+                INSERT INTO checking_accounts (
+                    user_id, name, bank_name, account_type, currency,
+                    initial_balance_cents, current_balance_cents
+                ) VALUES (?, 'Conta', 'Banco', 'liquidity', 'BRL', 0, 0)
+                """,
+                (user["id"],),
+            ).lastrowid
+            category_id = conn.execute(
+                "INSERT INTO categories (user_id, name, group_type) VALUES (?, 'Mercado', 'expense')",
+                (user["id"],),
+            ).lastrowid
+            conn.executemany(
+                """
+                INSERT INTO transactions (
+                    user_id, type, description, normalized_description, amount_cents,
+                    amount_brl_cents, date, account_id, category_id, series_kind
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    (user["id"], "income", "Salário", "salario", 1_000_000, 1_000_000, "2026-07-05", account_id, None, "recurring"),
+                    (user["id"], "expense", "Mercado maio", "mercado maio", 500_000, 500_000, "2026-05-10", account_id, category_id, "single"),
+                    (user["id"], "expense", "Mercado junho", "mercado junho", 550_000, 550_000, "2026-06-10", account_id, category_id, "single"),
+                    (user["id"], "expense", "Mercado julho", "mercado julho", 600_000, 600_000, "2026-07-10", account_id, category_id, "single"),
+                ],
+            )
+            for month in ("2026-05", "2026-06", "2026-07"):
+                conn.execute(
+                    "INSERT INTO spending_limits (user_id, month, category_id, limit_amount_cents) VALUES (?, ?, ?, 400000)",
+                    (user["id"], month, category_id),
+                )
+
+        result = calculate_trends(user["id"], "2026-07")
+        overruns = [f for f in result["achados"] if f["tipo"] == "limite_recorrente"]
+        self.assertEqual(len(overruns), 1)
+        finding = overruns[0]
+        self.assertEqual(finding["severidade"], "atencao")
+        self.assertIn("Mercado", finding["titulo"])
+        self.assertIn("3 meses seguidos", finding["titulo"])
+        self.assertEqual(finding["limite_cents"], 400_000)
+        self.assertEqual(finding["media_ultrapassagem_cents"], 150_000)
+        self.assertEqual(len(finding["meses"]), 3)
+
+    def test_recurring_limit_overrun_not_detected_with_only_two_months(self) -> None:
+        # spec: tendencias-saude-financeira v2.24 — critério de limite recorrente
+        user = create_user("T3D", "t3d@example.com", "strong-password")
+        with database.get_connection() as conn:
+            account_id = conn.execute(
+                """
+                INSERT INTO checking_accounts (
+                    user_id, name, bank_name, account_type, currency,
+                    initial_balance_cents, current_balance_cents
+                ) VALUES (?, 'Conta', 'Banco', 'liquidity', 'BRL', 0, 0)
+                """,
+                (user["id"],),
+            ).lastrowid
+            category_id = conn.execute(
+                "INSERT INTO categories (user_id, name, group_type) VALUES (?, 'Mercado', 'expense')",
+                (user["id"],),
+            ).lastrowid
+            conn.executemany(
+                """
+                INSERT INTO transactions (
+                    user_id, type, description, normalized_description, amount_cents,
+                    amount_brl_cents, date, account_id, category_id, series_kind
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    (user["id"], "income", "Salário", "salario", 1_000_000, 1_000_000, "2026-07-05", account_id, None, "recurring"),
+                    (user["id"], "expense", "Mercado junho", "mercado junho", 550_000, 550_000, "2026-06-10", account_id, category_id, "single"),
+                    (user["id"], "expense", "Mercado julho", "mercado julho", 600_000, 600_000, "2026-07-10", account_id, category_id, "single"),
+                ],
+            )
+            for month in ("2026-06", "2026-07"):
+                conn.execute(
+                    "INSERT INTO spending_limits (user_id, month, category_id, limit_amount_cents) VALUES (?, ?, ?, 400000)",
+                    (user["id"], month, category_id),
+                )
+
+        result = calculate_trends(user["id"], "2026-07")
+        overruns = [f for f in result["achados"] if f["tipo"] == "limite_recorrente"]
+        self.assertEqual(len(overruns), 0)
+
     def test_cash_opportunity_uses_projected_end_of_month_balance(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critério 54
+        # spec: tendencias-saude-financeira v2.23 — critério 54
         user = create_user("T3B", "t3b@example.com", "strong-password")
         with database.get_connection() as conn:
             account_id = conn.execute(
@@ -246,7 +334,7 @@ class TrendsCalculationTest(unittest.TestCase):
         self.assertIn("2x das despesas planejadas", result["resumo_local"])
 
     def test_point_income_bonus_and_plr(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critérios 8 e 9
+        # spec: tendencias-saude-financeira v2.23 — critérios 8 e 9
         user = create_user("T4", "t4@example.com", "strong-password")
         with database.get_connection() as conn:
             account_id = conn.execute(
@@ -296,7 +384,7 @@ class TrendsCalculationTest(unittest.TestCase):
         self.assertTrue(any("pontual" in f["descricao"].lower() for f in point_findings))
 
     def test_point_expense_travel_and_emergency(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critério 13
+        # spec: tendencias-saude-financeira v2.23 — critério 13
         user = create_user("T5", "t5@example.com", "strong-password")
         with database.get_connection() as conn:
             account_id = conn.execute(
@@ -345,7 +433,7 @@ class TrendsCalculationTest(unittest.TestCase):
         self.assertTrue(any(e["tipo"] == "manutencao_emergencia" for e in events))
 
     def test_point_event_findings_are_grouped_by_subcategory(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critérios 7, 10 e 13
+        # spec: tendencias-saude-financeira v2.23 — critérios 7, 10 e 13
         user = create_user("T5B", "t5b@example.com", "strong-password")
         with database.get_connection() as conn:
             account_id = conn.execute(
@@ -388,7 +476,7 @@ class TrendsCalculationTest(unittest.TestCase):
         self.assertIn("2 lançamento(s)", findings[0]["descricao"])
 
     def test_installment_acceleration_is_detected_from_operation_log(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critério 13
+        # spec: tendencias-saude-financeira v2.23 — critério 13
         user = create_user("T6", "t6@example.com", "strong-password")
         with database.get_connection() as conn:
             account_id = conn.execute(
@@ -455,7 +543,7 @@ class TrendsCalculationTest(unittest.TestCase):
         self.assertNotIn("Notebook Dell", result["resumo_local"])
 
     def test_installment_postponement_is_not_detected_as_acceleration(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critério 13
+        # spec: tendencias-saude-financeira v2.23 — critério 13
         user = create_user("T6B", "t6b@example.com", "strong-password")
         with database.get_connection() as conn:
             category_id = conn.execute(
@@ -491,7 +579,7 @@ class TrendsCalculationTest(unittest.TestCase):
         self.assertFalse([finding for finding in result["achados"] if finding["tipo"] == "antecipacao_parcela"])
 
     def test_future_installments_concentrated_in_invoice_are_detected_as_acceleration(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critério 13
+        # spec: tendencias-saude-financeira v2.23 — critério 13
         user = create_user("T6C", "t6c@example.com", "strong-password")
         with database.get_connection() as conn:
             card_id = conn.execute(
@@ -536,7 +624,7 @@ class TrendsCalculationTest(unittest.TestCase):
         self.assertTrue([finding for finding in result["achados"] if finding["tipo"] == "antecipacao_parcela"])
 
     def test_confidence_intermediate_with_three_months(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critérios 6 e 22
+        # spec: tendencias-saude-financeira v2.23 — critérios 6 e 22
         user = create_user("T7", "t7@example.com", "strong-password")
         with database.get_connection() as conn:
             account_id = conn.execute(
@@ -576,7 +664,7 @@ class TrendsCalculationTest(unittest.TestCase):
         self.assertEqual(expense_finding[0]["valor_cents"], 200_000)
 
     def test_confidence_high_with_six_months(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critérios 6, 22, 96
+        # spec: tendencias-saude-financeira v2.23 — critérios 6, 22, 96
         user = create_user("T8", "t8@example.com", "strong-password")
         with database.get_connection() as conn:
             account_id = conn.execute(
@@ -605,7 +693,7 @@ class TrendsCalculationTest(unittest.TestCase):
         self.assertEqual(result["receitas_base_comparacao_cents"], 1_000_000)
 
     def test_recurring_subscriptions_aggregated_by_subcategory(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critério 29
+        # spec: tendencias-saude-financeira v2.23 — critério 29
         user = create_user("T10", "t10@example.com", "strong-password")
         with database.get_connection() as conn:
             account_id = conn.execute(
@@ -670,7 +758,7 @@ class TrendsCalculationTest(unittest.TestCase):
         self.assertIn("R$ 1.800,00", result["resumo_local"])
 
     def test_multi_currency_warning(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critério 27
+        # spec: tendencias-saude-financeira v2.23 — critério 27
         user = create_user("T9", "t9@example.com", "strong-password")
         with database.get_connection() as conn:
             conn.executemany(
@@ -702,12 +790,16 @@ class TrendsRouteTest(unittest.TestCase):
         self.original_db_path = database.DB_PATH
         database.DATA_DIR = Path(self.tempdir.name)
         database.DB_PATH = database.DATA_DIR / "test-trends.db"
+        os.environ["AI_ALLOW_PRIVATE_ENDPOINTS"] = "true"
+        os.environ["AI_ALLOWED_LOCAL_ENDPOINTS"] = "localhost:1234"
         initialize_database()
 
     def tearDown(self) -> None:
         database.DATA_DIR = self.original_data_dir
         database.DB_PATH = self.original_db_path
         self.tempdir.cleanup()
+        os.environ.pop("AI_ALLOW_PRIVATE_ENDPOINTS", None)
+        os.environ.pop("AI_ALLOWED_LOCAL_ENDPOINTS", None)
 
     def _handler(self, path: str, user: dict | None = None, body: dict | None = None) -> app.AppHandler:
         handler = object.__new__(app.AppHandler)
@@ -731,7 +823,7 @@ class TrendsRouteTest(unittest.TestCase):
         return stack
 
     def test_financial_health_trends_requires_session_user(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critério 28
+        # spec: tendencias-saude-financeira v2.23 — critério 28
         handler = self._handler("/api/financial-health-trends?month=2026-07")
         with self._context():
             with self.assertRaises(app.ApiError) as error:
@@ -739,7 +831,7 @@ class TrendsRouteTest(unittest.TestCase):
         self.assertEqual(error.exception.status, HTTPStatus.UNAUTHORIZED)
 
     def test_financial_health_trends_returns_payload(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critérios 1 e 3
+        # spec: tendencias-saude-financeira v2.23 — critérios 1 e 3
         user = create_user("RouteUser", "route@example.com", "strong-password")
         handler = self._handler("/api/financial-health-trends?month=2026-07", user=user)
         with self._context(user):
@@ -752,13 +844,13 @@ class TrendsRouteTest(unittest.TestCase):
         self.assertFalse(payload["ia_ativa"])
 
     def test_financial_health_trends_marks_ai_active_when_configured(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critérios 12, 17 e 20
+        # spec: tendencias-saude-financeira v2.23 — critérios 12, 17 e 20
         user = create_user("RouteUserAI", "route-ai@example.com", "strong-password")
         from financeiro.secure_config import save_ai_settings
         save_ai_settings(user["id"], {
             "provider": "local",
             "enabled": True,
-            "base_url": "http://localhost:1234/v1",
+            "base_url": "http://localhost:1234",
             "model": "llama",
             "auth_type": "none",
         })
@@ -771,7 +863,7 @@ class TrendsRouteTest(unittest.TestCase):
         self.assertTrue(payload["ia_ativa"])
 
     def test_ai_settings_requires_session_user(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critério 28
+        # spec: tendencias-saude-financeira v2.23 — critério 28
         handler = self._handler("/api/ai-settings")
         with self._context():
             with self.assertRaises(app.ApiError) as error:
@@ -779,7 +871,7 @@ class TrendsRouteTest(unittest.TestCase):
         self.assertEqual(error.exception.status, HTTPStatus.UNAUTHORIZED)
 
     def test_ai_settings_save_and_return_status(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critérios 17, 18, 19, 27 e 28
+        # spec: tendencias-saude-financeira v2.23 — critérios 17, 18, 19, 27 e 28
         user = create_user("RouteUser2", "route2@example.com", "strong-password")
         handler = self._handler(
             "/api/ai-settings",
@@ -787,7 +879,7 @@ class TrendsRouteTest(unittest.TestCase):
             body={
                 "provider": "local",
                 "enabled": True,
-                "base_url": "http://localhost:1234/v1",
+                "base_url": "http://localhost:1234",
                 "model": "llama",
                 "auth_type": "none",
                 "timeout_seconds": 5,
@@ -813,7 +905,7 @@ class TrendsRouteTest(unittest.TestCase):
         self.assertFalse(status2["has_api_key"])
 
     def test_ai_settings_put_route_saves_with_valid_origin(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critérios 17, 27 e 28
+        # spec: tendencias-saude-financeira v2.23 — critérios 17, 27 e 28
         user = create_user("RouteUserPut", "route-put@example.com", "strong-password")
         handler = self._handler(
             "/api/ai-settings",
@@ -821,7 +913,7 @@ class TrendsRouteTest(unittest.TestCase):
             body={
                 "provider": "local",
                 "enabled": True,
-                "base_url": "http://localhost:1234/v1",
+                "base_url": "http://localhost:1234",
                 "model": "llama",
                 "auth_type": "none",
             },
@@ -836,7 +928,7 @@ class TrendsRouteTest(unittest.TestCase):
         self.assertEqual(status["provider"], "local")
 
     def test_ai_summary_requires_session_user(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critério 28
+        # spec: tendencias-saude-financeira v2.23 — critério 28
         handler = self._handler("/api/financial-health-trends/ai-summary", body={"month": "2026-07"})
         with self._context():
             with self.assertRaises(app.ApiError) as error:
@@ -844,7 +936,7 @@ class TrendsRouteTest(unittest.TestCase):
         self.assertEqual(error.exception.status, HTTPStatus.UNAUTHORIZED)
 
     def test_ai_summary_returns_fallback_when_ia_disabled(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critérios 12 e 17
+        # spec: tendencias-saude-financeira v2.23 — critérios 12 e 17
         user = create_user("RouteUser3", "route3@example.com", "strong-password")
         handler = self._handler("/api/financial-health-trends/ai-summary", user=user, body={"month": "2026-07"})
         with self._context(user):
@@ -855,13 +947,13 @@ class TrendsRouteTest(unittest.TestCase):
         self.assertTrue(payload["resumo_local"])
 
     def test_ai_summary_uses_external_service_when_enabled(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critérios 12, 14 e 16
+        # spec: tendencias-saude-financeira v2.23 — critérios 12, 14 e 16
         user = create_user("RouteUser4", "route4@example.com", "strong-password")
         from financeiro.secure_config import save_ai_settings
         save_ai_settings(user["id"], {
             "provider": "local",
             "enabled": True,
-            "base_url": "http://localhost:1234/v1",
+            "base_url": "http://localhost:1234",
             "model": "llama",
             "auth_type": "none",
         })
@@ -874,7 +966,7 @@ class TrendsRouteTest(unittest.TestCase):
         response_mock.read.return_value = json.dumps(fake_response).encode("utf-8")
 
         with self._context(user):
-            with mock.patch("financeiro.ai_summary.urlopen", return_value=response_mock) as urlopen_mock:
+            with mock.patch("financeiro.ai_summary.ai_urlopen", return_value=response_mock) as urlopen_mock:
                 handler.handle_ai_summary()
         payload = handler.send_json.call_args[0][0]
         self.assertEqual(payload["resumo_ia"], "Resumo reescrito pela IA.")
@@ -884,7 +976,7 @@ class TrendsRouteTest(unittest.TestCase):
         self.assertIn("/chat/completions", call.args[0].full_url)
 
     def test_ai_summary_minimizes_payload_and_does_not_send_secret(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critérios 14, 16, 21, 23 e 28
+        # spec: tendencias-saude-financeira v2.23 — critérios 14, 16, 21, 23 e 28
         user = create_user("RouteUser5", "route5@example.com", "strong-password")
         from financeiro.secure_config import save_ai_settings
         save_ai_settings(user["id"], {
@@ -921,7 +1013,7 @@ class TrendsRouteTest(unittest.TestCase):
         response_mock.__exit__ = mock.Mock(return_value=False)
         response_mock.read.return_value = json.dumps(fake_response).encode("utf-8")
 
-        with mock.patch("financeiro.ai_summary.urlopen", return_value=response_mock) as urlopen_mock:
+        with mock.patch("financeiro.ai_summary.ai_urlopen", return_value=response_mock) as urlopen_mock:
             summary = generate_ai_summary(user["id"], trends_payload)
 
         self.assertEqual(summary, "Resumo IA.")
@@ -946,25 +1038,27 @@ class TrendsRouteTest(unittest.TestCase):
         self.assertNotIn("orcamento_realizado", serialized_body)
 
     def test_ai_summary_uses_gemini_generate_content_contract(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critérios 12, 24 e 32
+        # spec: tendencias-saude-financeira v2.23 — critérios 12, 24 e 32
         user = create_user("GeminiUser", "gemini@example.com", "strong-password")
         from financeiro.secure_config import save_ai_settings
-        save_ai_settings(user["id"], {
-            "provider": "google",
-            "enabled": True,
-            "model": "gemini-1.5-flash",
-            "api_key": "gemini-secret",
-            "timeout_seconds": 3,
-            "temperature": 0.1,
-            "max_tokens": 321,
-        })
+        with mock.patch("financeiro.secure_config.validate_ai_base_url", side_effect=lambda url: url):
+            save_ai_settings(user["id"], {
+                "provider": "google",
+                "enabled": True,
+                "model": "gemini-1.5-flash",
+                "api_key": "gemini-secret",
+                "timeout_seconds": 3,
+                "temperature": 0.1,
+                "max_tokens": 321,
+            })
         fake_response = {"candidates": [{"content": {"parts": [{"text": "Resumo Gemini."}]}}]}
         response_mock = mock.Mock()
         response_mock.__enter__ = mock.Mock(return_value=response_mock)
         response_mock.__exit__ = mock.Mock(return_value=False)
         response_mock.read.return_value = json.dumps(fake_response).encode("utf-8")
 
-        with mock.patch("financeiro.ai_summary.urlopen", return_value=response_mock) as urlopen_mock:
+        with mock.patch("financeiro.ai_summary.ai_urlopen", return_value=response_mock) as urlopen_mock, \
+                mock.patch("financeiro.ai_summary.validate_ai_base_url", side_effect=lambda url, **_: url):
             summary = generate_ai_summary(user["id"], {"month": "2026-07", "resumo_local": "Local"})
 
         self.assertEqual(summary, "Resumo Gemini.")
@@ -981,22 +1075,24 @@ class TrendsRouteTest(unittest.TestCase):
         self.assertNotIn("gemini-secret", json.dumps(body, ensure_ascii=False))
 
     def test_ai_summary_accepts_gemini_model_with_models_prefix(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critérios 12, 24 e 32
+        # spec: tendencias-saude-financeira v2.23 — critérios 12, 24 e 32
         user = create_user("GeminiPrefixedUser", "gemini-prefixed@example.com", "strong-password")
         from financeiro.secure_config import save_ai_settings
-        save_ai_settings(user["id"], {
-            "provider": "google",
-            "enabled": True,
-            "model": "models/gemini-1.5-flash",
-            "api_key": "gemini-secret",
-        })
+        with mock.patch("financeiro.secure_config.validate_ai_base_url", side_effect=lambda url: url):
+            save_ai_settings(user["id"], {
+                "provider": "google",
+                "enabled": True,
+                "model": "models/gemini-1.5-flash",
+                "api_key": "gemini-secret",
+            })
         fake_response = {"candidates": [{"content": {"parts": [{"text": "Resumo Gemini."}]}}]}
         response_mock = mock.Mock()
         response_mock.__enter__ = mock.Mock(return_value=response_mock)
         response_mock.__exit__ = mock.Mock(return_value=False)
         response_mock.read.return_value = json.dumps(fake_response).encode("utf-8")
 
-        with mock.patch("financeiro.ai_summary.urlopen", return_value=response_mock) as urlopen_mock:
+        with mock.patch("financeiro.ai_summary.ai_urlopen", return_value=response_mock) as urlopen_mock, \
+                mock.patch("financeiro.ai_summary.validate_ai_base_url", side_effect=lambda url, **_: url):
             summary = generate_ai_summary(user["id"], {"month": "2026-07", "resumo_local": "Local"})
 
         self.assertEqual(summary, "Resumo Gemini.")
@@ -1007,25 +1103,27 @@ class TrendsRouteTest(unittest.TestCase):
         )
 
     def test_ai_summary_uses_anthropic_messages_contract(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critérios 12, 24 e 32
+        # spec: tendencias-saude-financeira v2.23 — critérios 12, 24 e 32
         user = create_user("ClaudeUser", "claude@example.com", "strong-password")
         from financeiro.secure_config import save_ai_settings
-        save_ai_settings(user["id"], {
-            "provider": "anthropic",
-            "enabled": True,
-            "model": "claude-3-5-haiku-latest",
-            "api_key": "anthropic-secret",
-            "timeout_seconds": 3,
-            "temperature": 0.1,
-            "max_tokens": 321,
-        })
+        with mock.patch("financeiro.secure_config.validate_ai_base_url", side_effect=lambda url: url):
+            save_ai_settings(user["id"], {
+                "provider": "anthropic",
+                "enabled": True,
+                "model": "claude-3-5-haiku-latest",
+                "api_key": "anthropic-secret",
+                "timeout_seconds": 3,
+                "temperature": 0.1,
+                "max_tokens": 321,
+            })
         fake_response = {"content": [{"type": "text", "text": "Resumo Claude."}]}
         response_mock = mock.Mock()
         response_mock.__enter__ = mock.Mock(return_value=response_mock)
         response_mock.__exit__ = mock.Mock(return_value=False)
         response_mock.read.return_value = json.dumps(fake_response).encode("utf-8")
 
-        with mock.patch("financeiro.ai_summary.urlopen", return_value=response_mock) as urlopen_mock:
+        with mock.patch("financeiro.ai_summary.ai_urlopen", return_value=response_mock) as urlopen_mock, \
+                mock.patch("financeiro.ai_summary.validate_ai_base_url", side_effect=lambda url, **_: url):
             summary = generate_ai_summary(user["id"], {"month": "2026-07", "resumo_local": "Local"})
 
         self.assertEqual(summary, "Resumo Claude.")
@@ -1041,22 +1139,22 @@ class TrendsRouteTest(unittest.TestCase):
         self.assertNotIn("anthropic-secret", json.dumps(body, ensure_ascii=False))
 
     def test_ai_summary_returns_none_on_provider_failure(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critérios 16 e 26
+        # spec: tendencias-saude-financeira v2.23 — critérios 16 e 26
         user = create_user("RouteUser6", "route6@example.com", "strong-password")
         from financeiro.secure_config import save_ai_settings
         save_ai_settings(user["id"], {
             "provider": "local",
             "enabled": True,
-            "base_url": "http://localhost:1234/v1",
+            "base_url": "http://localhost:1234",
             "model": "llama",
             "auth_type": "none",
         })
-        with mock.patch("financeiro.ai_summary.urlopen", side_effect=URLError("offline")):
+        with mock.patch("financeiro.ai_summary.ai_urlopen", side_effect=URLError("offline")):
             summary = generate_ai_summary(user["id"], {"month": "2026-07", "resumo_local": "Local"})
         self.assertIsNone(summary)
 
     def test_minimized_ai_payload_keeps_only_narrative_findings(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critérios 14, 21 e 23
+        # spec: tendencias-saude-financeira v2.23 — critérios 14, 21 e 23
         payload = {
             "month": "2026-07",
             "confianca": "intermediaria",

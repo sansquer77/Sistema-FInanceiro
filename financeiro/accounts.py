@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from datetime import date
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from http import HTTPStatus
 
 from financeiro.database import begin_immediate, get_connection, row_to_dict
+from financeiro.money import cents_to_money as shared_cents_to_money
+from financeiro.money import localized_money_to_cents
 
 SUPPORTED_CURRENCIES = {"BRL", "USD", "EUR", "GBP"}
 ACCOUNT_TYPES = {"liquidity", "wallet", "investment"}
@@ -260,17 +261,14 @@ def normalize_account_payload(data: dict) -> dict:
 
 
 def money_to_cents(value: object) -> int:
-    raw = str(value or "0").strip().replace(".", "").replace(",", ".")
     try:
-        decimal = Decimal(raw).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    except InvalidOperation as exc:
+        return localized_money_to_cents(value)
+    except ValueError as exc:
         raise AccountError("Saldo inicial invalido.") from exc
-    return int(decimal * 100)
 
 
 def cents_to_money(cents: int) -> str:
-    value = Decimal(cents) / Decimal(100)
-    return f"{value:.2f}"
+    return shared_cents_to_money(cents)
 
 
 def empty_to_none(value: object) -> str | None:

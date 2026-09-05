@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from financeiro import database
 from financeiro.accounts import create_checking_account
@@ -14,7 +15,8 @@ from financeiro.credit_cards import (
     set_credit_card_transaction_reconciled,
 )
 from financeiro.database import initialize_database
-from financeiro.reports import build_tag_report
+from financeiro.cockpit import build_cockpit_summary
+from financeiro.reports import _tag_report_query, build_report_overview, build_tag_report
 from financeiro.transactions import create_transaction, set_transaction_reconciled
 
 
@@ -70,6 +72,62 @@ class TagReportTest(unittest.TestCase):
         self.assertEqual(tag["balance_cents"], 150000)
         self.assertEqual(tag["investment_cents"], 0)
         self.assertEqual(tag["count"], 2)
+
+    def test_tag_report_does_not_materialize_detailed_list_helpers(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta", "bank_name": "Banco", "currency": "BRL", "initial_balance": "0,00",
+        })
+        create_transaction(user["id"], {
+            "type": "expense", "description": "Compra", "amount": "10,00", "date": "2026-01-10",
+            "account_id": str(account["id"]), "category": "Compras", "tags": "Casa",
+        })
+
+        with (
+            mock.patch("financeiro.reports.list_transactions", side_effect=AssertionError("lista detalhada")),
+            mock.patch("financeiro.reports.list_credit_card_transactions", side_effect=AssertionError("lista detalhada")),
+        ):
+            response = build_tag_report(user["id"], "2026-01")
+
+        self.assertEqual(response["tags"][0]["expense_cents"], 1000)
+
+    def test_tag_report_month_query_uses_temporal_indexes_without_optional_or(self) -> None:
+        sql, params = _tag_report_query(1, "2026-01", "2026-01-01", "2026-01-31")
+
+        self.assertNotIn("IS NULL OR", sql)
+        self.assertIn("transactions.date BETWEEN ? AND ?", sql)
+        self.assertIn("credit_card_transactions.invoice_month = ?", sql)
+        with database.get_connection() as conn:
+            plan = "\n".join(row["detail"] for row in conn.execute(f"EXPLAIN QUERY PLAN {sql}", params))
+        self.assertIn("idx_transactions_user_date", plan)
+        self.assertIn("idx_credit_card_transactions_user_invoice_date", plan)
+
+    def test_cockpit_summary_aggregates_month_without_detailed_lists(self) -> None:
+        user = create_user("Alice", "alice@example.com", "correct-password")
+        account = create_checking_account(user["id"], {
+            "name": "Conta", "bank_name": "Banco", "currency": "BRL", "initial_balance": "0,00",
+        })
+        create_transaction(user["id"], {
+            "type": "income", "description": "Salário", "amount": "1000,00", "date": "2026-01-05",
+            "account_id": str(account["id"]), "category": "Receitas",
+        })
+        create_transaction(user["id"], {
+            "type": "expense", "description": "Aluguel", "amount": "400,00", "date": "2026-01-10",
+            "account_id": str(account["id"]), "category": "Moradia", "series_kind": "recurring",
+            "recurrence_frequency": "monthly",
+        })
+
+        response = build_cockpit_summary(user["id"], "2026-01")
+
+        self.assertEqual(response["month_totals"]["income"], 1000.0)
+        self.assertEqual(response["month_totals"]["expense"], 400.0)
+        self.assertEqual(response["top_expenses"][0]["label"], "Moradia")
+        self.assertEqual(response["planning"]["expense"][0]["total"], 400.0)
+
+        overview = build_report_overview(user["id"], "2026-01")
+        self.assertEqual(overview["totals_by_type"]["income"]["BRL"], 100000)
+        self.assertEqual(overview["totals_by_type"]["expense"]["BRL"], 40000)
+        self.assertEqual(overview["count"], 2)
 
     def test_tag_report_separates_currencies(self) -> None:
         user = create_user("Alice", "alice@example.com", "correct-password")

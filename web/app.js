@@ -1,4 +1,5 @@
 import { api, configureApi, fetchAllListed, upload } from "./modules/api.js";
+import { destroyAllCharts } from "./modules/chart-adapter.js";
 import {
   currentMonthValue,
   formatDate,
@@ -54,8 +55,8 @@ import {
   togglePrivacyMode,
   updatePrivacyToggleButton,
 } from "./modules/privacy-utils.js";
-import { applyTheme, setTheme, storedTheme } from "./modules/theme-utils.js";
-import { applyDensity, setDensity, storedDensity } from "./modules/density-utils.js";
+import { applyTheme, setTheme, storedTheme, toggleTheme } from "./modules/theme-utils.js";
+import { applyDensity, setDensity, storedDensity, toggleDensity } from "./modules/density-utils.js";
 import { registerAuthView } from "./modules/auth-view.js";
 import { registerUserAdminView } from "./modules/user-admin-view.js";
 import { registerClassificationsView } from "./modules/classifications-view.js";
@@ -65,14 +66,18 @@ import { registerImportsView } from "./modules/imports-view.js";
 import { registerCockpitView } from "./modules/cockpit-view.js";
 import { registerAccountsView } from "./modules/accounts-view.js";
 import { registerCardsView } from "./modules/cards-view.js";
-import { registerPortfolioView } from "./modules/portfolio-view.js?v=157";
+import { registerPortfolioView } from "./modules/portfolio-view.js?v=162";
 import { registerTransactionsView } from "./modules/transactions-view.js";
 import { registerSimulationsView } from "./modules/simulations-view.js";
 import { registerOperationHistoryView } from "./modules/operation-history-view.js";
 import { registerInstructionsView } from "./modules/instructions-view.js";
 import { registerGlobalSearch } from "./modules/global-search.js";
+import { registerCommandPalette } from "./modules/command-palette.js";
 import { initializeOverlayUX } from "./modules/overlay-utils.js";
 import { initializeDataUX } from "./modules/data-ux.js";
+import { applyMasks, destroyMasks } from "./modules/input-mask.js";
+import { createAppState, resetSessionData } from "./modules/app-state.js";
+import { createAppDataLoader } from "./modules/app-data-loader.js";
 
 applyTheme();
 applyDensity();
@@ -80,68 +85,16 @@ applyPrivacyMode();
 initializeFormUX();
 initializeOverlayUX();
 initializeDataUX();
+applyMasks();
 
 const decisionModal = createDecisionModal();
 
 configureApi({
   onUnauthorized: handleSessionExpired,
+  onMutation: handleDataMutation,
 });
 
-const state = {
-  user: null,
-  accounts: [],
-  archivedAccounts: [],
-  creditCards: [],
-  archivedCreditCards: [],
-  cardInvoiceTransactions: [],
-  cardInvoicePayments: [],
-  cardTransactions: [],
-  cardPayments: [],
-  selectedCreditCardId: "",
-  selectedAccountId: "",
-  cardInvoiceSearch: "",
-  cardInvoiceStatusFilter: "all",
-  transactionSearch: "",
-  transactionStatusFilter: "all",
-  transactionHighlightId: "",
-  transactions: [],
-  accountTransactions: [],
-  cockpit: null,
-  cockpitLoadedMonth: "",
-  cockpitTab: "summary",
-  cockpitMonth: currentMonthValue(),
-  categories: [],
-  tags: [],
-  spendingLimits: [],
-  currentSpendingLimits: [],
-  appInfo: null,
-  latestVersion: null,
-  portfolio: null,
-  portfolioReturns: null,
-  portfolioDirty: true,
-  portfolioLoading: false,
-  portfolioError: "",
-  portfolioGroup: "account_name",
-  portfolioExpandedGroups: new Set(),
-  portfolioCollapsedGroups: new Set(),
-  portfolioAssetSaving: false,
-  portfolioHighlightId: "",
-  portfolioTab: "position",
-  view: "cockpit",
-  cockpitRefreshRequestId: 0,
-  transactionMonth: currentMonthValue(),
-  limitMonth: currentMonthValue(),
-  cardInvoiceMonth: currentMonthValue(),
-  reportMonth: currentMonthValue(),
-  reportTab: "categories",
-  reportAccountId: "",
-  statementScope: "consolidated",
-  statementCurrency: "all",
-  statementAccountIds: [],
-  statementCardIds: [],
-  transactionSliceRequestId: 0,
-  cardInvoiceRequestId: 0,
-};
+const state = createAppState({ currentMonth: currentMonthValue() });
 
 const authView = document.querySelector("#authView");
 const dashboardView = document.querySelector("#dashboardView");
@@ -219,6 +172,10 @@ const categoryMessage = document.querySelector("#categoryMessage");
 const tagMessage = document.querySelector("#tagMessage");
 const categoryList = document.querySelector("#categoryList");
 const tagList = document.querySelector("#tagList");
+const categorySearch = document.querySelector("#categorySearch");
+const tagSearch = document.querySelector("#tagSearch");
+const categoryListSummary = document.querySelector("#categoryListSummary");
+const tagListSummary = document.querySelector("#tagListSummary");
 const limitForm = document.querySelector("#limitForm");
 const limitFormTitle = document.querySelector("#limitFormTitle");
 const limitCategory = document.querySelector("#limitCategory");
@@ -284,6 +241,11 @@ const portfolioReturnDrawer = document.querySelector("#portfolioReturnDrawer");
 const portfolioReturnDrawerOverlay = document.querySelector("#portfolioReturnDrawerOverlay");
 const portfolioReturnDrawerCloseBtn = document.querySelector("#portfolioReturnDrawerCloseBtn");
 const portfolioReturnDrawerTitle = document.querySelector("#portfolioReturnDrawerTitle");
+const portfolioGroupDrawer = document.querySelector("#portfolioGroupDrawer");
+const portfolioGroupDrawerOverlay = document.querySelector("#portfolioGroupDrawerOverlay");
+const portfolioGroupDrawerCloseBtn = document.querySelector("#portfolioGroupDrawerCloseBtn");
+const portfolioGroupDrawerTitle = document.querySelector("#portfolioGroupDrawerTitle");
+const portfolioGroupDrawerList = document.querySelector("#portfolioGroupDrawerList");
 const portfolioReturnChart = document.querySelector("#portfolioReturnChart");
 const portfolioReturnXLabels = document.querySelector("#portfolioReturnXLabels");
 const portfolioReturnYAxis = document.querySelector("#portfolioReturnYAxis");
@@ -297,6 +259,8 @@ const portfolioCurrencyList = document.querySelector("#portfolioCurrencyList");
 const portfolioAccountList = document.querySelector("#portfolioAccountList");
 const portfolioPositions = document.querySelector("#portfolioPositions");
 const portfolioHistory = document.querySelector("#portfolioHistory");
+const portfolioEvents = document.querySelector("#portfolioEvents");
+const refreshPortfolioEventsButton = document.querySelector("#refreshPortfolioEventsButton");
 const portfolioGoalsForm = document.querySelector("#portfolioGoalsForm");
 const portfolioGoalsFields = document.querySelector("#portfolioGoalsFields");
 const portfolioGoalsTotal = document.querySelector("#portfolioGoalsTotal");
@@ -452,6 +416,12 @@ const cockpitPortfolioMaturityAlert = document.querySelector("#cockpitPortfolioM
 const cockpitVersionAlert = document.querySelector("#cockpitVersionAlert");
 const cockpitVersionAlertVersion = document.querySelector("#cockpitVersionAlertVersion");
 const cockpitVersionAlertDismiss = document.querySelector("#cockpitVersionAlertDismiss");
+const cockpitCriticalNotifications = document.querySelector("#cockpitCriticalNotifications");
+const cockpitInformationalNotifications = document.querySelector("#cockpitInformationalNotifications");
+const cockpitCombinedNotifications = document.querySelector("#cockpitCombinedNotifications");
+const cockpitCriticalNotificationCount = document.querySelector("#cockpitCriticalNotificationCount");
+const cockpitInformationalNotificationCount = document.querySelector("#cockpitInformationalNotificationCount");
+const cockpitCombinedNotificationCount = document.querySelector("#cockpitCombinedNotificationCount");
 const cockpitCalendarPanel = document.querySelector("#cockpitCalendarPanel");
 const cockpitCalendarMeta = document.querySelector("#cockpitCalendarMeta");
 const consultorTabs = document.querySelectorAll("[data-consultor-tab]");
@@ -501,7 +471,9 @@ const simulationProjectedBalance = document.querySelector("#simulationProjectedB
 const simulationDifference = document.querySelector("#simulationDifference");
 const simulationChart = document.querySelector("#simulationChart");
 const simulationWeeklyProjection = document.querySelector("#simulationWeeklyProjection");
-  const simulationWarnings = document.querySelector("#simulationWarnings");
+const simulationWarnings = document.querySelector("#simulationWarnings");
+const simulationEmptyState = document.querySelector("#simulationEmptyState");
+const simulationResultsContent = document.querySelector("#simulationResultsContent");
 const resetSimulationButton = document.querySelector("#resetSimulationButton");
 const aboutAppVersion = document.querySelector("#aboutAppVersion");
 const globalSearchTrigger = document.querySelector("#globalSearchTrigger");
@@ -509,6 +481,12 @@ const globalSearchDialog = document.querySelector("#globalSearchDialog");
 const globalSearchInput = document.querySelector("#globalSearchInput");
 const globalSearchResults = document.querySelector("#globalSearchResults");
 const globalSearchClose = document.querySelector("#globalSearchClose");
+const commandPaletteTrigger = document.querySelector("#commandPaletteTrigger");
+const commandPaletteDialog = document.querySelector("#commandPaletteDialog");
+const commandPaletteInput = document.querySelector("#commandPaletteInput");
+const commandPaletteResults = document.querySelector("#commandPaletteResults");
+const commandPaletteClose = document.querySelector("#commandPaletteClose");
+const commandPaletteCount = document.querySelector("#commandPaletteCount");
 const navButtons = document.querySelectorAll("[data-view]");
 const moduleViews = {
   cockpit: document.querySelector("#cockpitView"),
@@ -566,6 +544,47 @@ const SIDEBAR_COLLAPSED_KEY = "financeiro.sidebar.collapsed";
 const NAV_GROUPS_COLLAPSED_KEY = "financeiro.sidebar.navGroupsCollapsed";
 const viewScrollPositions = new Map();
 
+const appDataLoader = createAppDataLoader({
+  state,
+  services: { api, fetchAllListed },
+  getViews: () => ({
+    accounts: accountsView,
+    cards: cardsView,
+    transactions: transactionsView,
+    cockpit: cockpitView,
+    portfolio: portfolioView,
+    classifications: classificationsView,
+    limits: limitsView,
+  }),
+  actions: {
+    cockpitMonthValue,
+    ensureSelectedAccount,
+    invalidateFinancialHealth,
+    markPortfolioDirty,
+    renderBase: renderBaseViews,
+    renderFinance: () => { renderBaseViews(); renderFinanceViews(); },
+    renderAll: () => { renderBaseViews(); renderFinanceViews(); renderManagementViews(); },
+    renderCockpit,
+    touchCockpitUpdated: () => setLastUpdated(cockpitLastUpdated),
+    setLoadError: (message) => setMessage(accountMessage, message, "error"),
+  },
+});
+
+const {
+  loadAll,
+  loadAccounts,
+  loadCreditCards,
+  loadTransactionsAndAccounts,
+  loadTransactionSlice,
+  loadCockpit,
+  refreshCockpitData,
+  loadPortfolio,
+  loadClassifications,
+  loadSpendingLimits,
+  loadCurrentSpendingLimits,
+  loadCardInvoice,
+} = appDataLoader;
+
 registerGlobalSearch({
   state,
   elements: {
@@ -578,7 +597,34 @@ registerGlobalSearch({
   viewTitles,
   normalizeSearch,
   escapeHtml,
+  api,
   onNavigate: showModule,
+});
+
+registerCommandPalette({
+  state,
+  elements: {
+    trigger: commandPaletteTrigger,
+    dialog: commandPaletteDialog,
+    input: commandPaletteInput,
+    results: commandPaletteResults,
+    closeButton: commandPaletteClose,
+    count: commandPaletteCount,
+  },
+  viewTitles,
+  normalizeSearch,
+  escapeHtml,
+  onNavigate: showModule,
+  actions: {
+    openGlobalSearch: () => globalSearchTrigger?.click(),
+    getPrivacyMode: () => document.documentElement.dataset.privacy === "enabled",
+    togglePrivacy: () => privacyToggleButton?.click(),
+    getTheme: () => storedTheme(),
+    toggleTheme: () => toggleTheme(),
+    getDensity: () => storedDensity(),
+    toggleDensity: () => toggleDensity(),
+    openContextualHelp: () => contextualHelpButton?.click(),
+  },
 });
 
 const classificationsView = registerClassificationsView({
@@ -593,6 +639,10 @@ const classificationsView = registerClassificationsView({
     tagMessage,
     categoryList,
     tagList,
+    categorySearch,
+    tagSearch,
+    categoryListSummary,
+    tagListSummary,
   },
   api,
   formData,
@@ -753,6 +803,12 @@ const cockpitView = registerCockpitView({
     cockpitVersionAlert,
     cockpitVersionAlertVersion,
     cockpitVersionAlertDismiss,
+    cockpitCriticalNotifications,
+    cockpitInformationalNotifications,
+    cockpitCombinedNotifications,
+    cockpitCriticalNotificationCount,
+    cockpitInformationalNotificationCount,
+    cockpitCombinedNotificationCount,
     cockpitCalendarPanel,
     cockpitCalendarMeta,
     consultorTabs,
@@ -794,11 +850,10 @@ const cockpitView = registerCockpitView({
   renderLimitAlerts: () => limitsView.renderLimitAlerts(cockpitMonthValue()),
   onCockpitMonthChanged: refreshCockpitData,
   loadPortfolio,
-  portfolioTotalsByCurrency,
   portfolioMaturityAlerts: () => portfolioView.portfolioMaturityAlerts(),
   goToPortfolio: () => showModule("portfolio"),
   onNavigateToTransaction: (transactionId, accountId, date) => {
-    // spec: cockpit-calendario v0.8 — critério 17
+    // spec: cockpit-calendario v0.9 — critério 17
     state.transactionHighlightId = String(transactionId);
     if (accountId && state.accounts.some((account) => String(account.id) === String(accountId))) {
       state.selectedAccountId = String(accountId);
@@ -817,6 +872,35 @@ const cockpitView = registerCockpitView({
   onNavigateToPortfolio: (positionId) => {
     state.portfolioHighlightId = String(positionId);
     showModule("portfolio");
+  },
+  onNotificationAction: async (action) => {
+    const params = action?.params || {};
+    if (action?.route === "limits") {
+      if (isValidMonthValue(params.month)) state.limitMonth = params.month;
+      await loadSpendingLimits();
+      showModule("limits");
+      return;
+    }
+    if (action?.route === "transactions") {
+      if (isValidMonthValue(params.month)) state.transactionMonth = params.month;
+      if (params.account_id) state.selectedAccountId = String(params.account_id);
+      showModule("transactions");
+      return;
+    }
+    if (action?.route === "cards") {
+      if (isValidMonthValue(params.month)) state.cardInvoiceMonth = params.month;
+      if (params.card_id) state.selectedCreditCardId = String(params.card_id);
+      showModule("cardLaunches");
+      return;
+    }
+    if (action?.route === "calendar") {
+      state.cockpitTab = "calendar";
+      showModule("cockpit");
+      return;
+    }
+    if (action?.route === "portfolio") {
+      showModule("portfolio");
+    }
   },
 });
 
@@ -896,7 +980,6 @@ const cardsView = registerCardsView({
     cancelCardTransactionEditButton,
   },
   api,
-  fetchAllListed,
   formData,
   setFormBusy,
   setMessage,
@@ -917,7 +1000,7 @@ const cardsView = registerCardsView({
   cardTransactionTypeLabel,
   transactionSeriesLabel,
   cardCategoryPath,
-  launchActionButton,
+  launchActionButton: (...args) => transactionsView.launchActionButton(...args),
   decisionModal,
   deleteSeriesScope,
   openMonthPicker,
@@ -927,7 +1010,7 @@ const cardsView = registerCardsView({
     renderFinanceViews();
   },
   onCardTransactionsChanged: () => {
-    renderLimits();
+    limitsView.renderLimits();
     renderCockpit();
   },
   onInvoicePaid: loadTransactionsAndAccounts,
@@ -1025,13 +1108,11 @@ const transactionsView = registerTransactionsView({
   openMonthPicker,
   decisionModal,
   ensureSelectedAccount,
-  getBalanceUntil,
-  accountHasPreferredCardForecast,
   loadCockpit,
   markPortfolioDirty,
   renderBaseViews,
   renderFinanceViews,
-  renderPortfolio,
+  renderPortfolio: () => portfolioView.renderPortfolio(),
   renderImportTargets,
 });
 
@@ -1054,6 +1135,8 @@ const simulationsView = registerSimulationsView({
     simulationChart,
     simulationWeeklyProjection,
     simulationWarnings,
+    simulationEmptyState,
+    simulationResultsContent,
     resetSimulationButton,
   },
   formatMoney,
@@ -1097,6 +1180,11 @@ const portfolioView = registerPortfolioView({
     portfolioReturnDrawerOverlay,
     portfolioReturnDrawerCloseBtn,
     portfolioReturnDrawerTitle,
+    portfolioGroupDrawer,
+    portfolioGroupDrawerOverlay,
+    portfolioGroupDrawerCloseBtn,
+    portfolioGroupDrawerTitle,
+    portfolioGroupDrawerList,
     portfolioReturnChart,
     portfolioReturnXLabels,
     portfolioReturnYAxis,
@@ -1110,6 +1198,8 @@ const portfolioView = registerPortfolioView({
     portfolioAccountList,
     portfolioPositions,
     portfolioHistory,
+    portfolioEvents,
+    refreshPortfolioEventsButton,
     portfolioGoalsForm,
     portfolioGoalsFields,
     portfolioGoalsTotal,
@@ -1172,6 +1262,14 @@ document.addEventListener("keydown", (event) => {
   event.preventDefault();
   const mode = togglePrivacyMode();
   updatePrivacyToggleButton(privacyToggleButton, mode);
+});
+document.addEventListener("keydown", (event) => {
+  const isPaletteKey = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k";
+  if (!isPaletteKey || isTypingTarget(event.target)) {
+    return;
+  }
+  event.preventDefault();
+  commandPaletteTrigger?.click();
 });
 updatePrivacyToggleButton(privacyToggleButton, document.documentElement.dataset.privacy);
 observePrivacyMoneyValues(document.body);
@@ -1300,14 +1398,14 @@ async function loadAppInfo() {
   try {
     state.appInfo = await api("/api/app-info");
   } catch (error) {
-    state.appInfo = { version: "1.0.50" };
+    state.appInfo = { version: "2.0.0" };
   }
   renderAppInfo();
 }
 
 function renderAppInfo() {
   if (aboutAppVersion) {
-    aboutAppVersion.textContent = state.appInfo?.version || "1.0.50";
+    aboutAppVersion.textContent = state.appInfo?.version || "2.0.0";
   }
 }
 
@@ -1321,29 +1419,13 @@ async function loadLatestVersion() {
 }
 
 function resetSessionState() {
-  state.user = null;
-  state.accounts = [];
-  state.archivedAccounts = [];
-  state.creditCards = [];
-  state.archivedCreditCards = [];
-  state.cardInvoiceTransactions = [];
-  state.cardInvoicePayments = [];
-  state.cardTransactions = [];
-  state.cardPayments = [];
-  state.selectedCreditCardId = "";
-  state.transactionSearch = "";
-  state.transactionStatusFilter = "all";
-  state.transactionHighlightId = "";
-  state.transactions = [];
-  state.accountTransactions = [];
-  state.cockpit = null;
-  state.cockpitTab = "summary";
-  state.cockpitMonth = currentMonthValue();
-  state.categories = [];
-  state.tags = [];
-  state.spendingLimits = [];
-  state.currentSpendingLimits = [];
-  state.portfolio = null;
+  destroyAllCharts();
+  destroyMasks();
+  resetSessionData(state, { currentMonth: currentMonthValue() });
+  operationHistoryView.resetCache();
+  userAdminViewController.resetPreferencesCache();
+  transactionsView.resetTransactionSliceCache();
+  simulationsView.resetFormDataCache();
   resetAccountForm();
   resetCreditCardForm();
   resetCardTransactionForm();
@@ -1366,180 +1448,6 @@ async function loadDashboard() {
   resetCardTransactionForm();
   await loadAll();
   showModule(state.view);
-}
-
-async function loadAll() {
-  try {
-    const [accountsResponse, creditCardsResponse, transactionsResponse, cardTransactionsResponse, cardPaymentsResponse, cockpitResponse] = await Promise.all([
-      api("/api/checking-accounts"),
-      api("/api/credit-cards"),
-      fetchAllListed("/api/transactions", "transactions"),
-      fetchAllListed("/api/credit-card-transactions", "transactions"),
-      fetchAllListed("/api/credit-card-payments", "payments"),
-      api(`/api/cockpit?month=${encodeURIComponent(cockpitMonthValue())}`),
-    ]);
-    state.accounts = accountsResponse.accounts;
-    state.creditCards = creditCardsResponse.cards;
-    ensureSelectedCreditCard();
-    ensureSelectedAccount();
-    state.transactions = transactionsResponse;
-    state.accountTransactions = [];
-    state.cardTransactions = cardTransactionsResponse;
-    state.cardPayments = cardPaymentsResponse || [];
-    state.cockpit = cockpitResponse;
-    state.cockpitLoadedMonth = cockpitMonthValue();
-    invalidateFinancialHealth();
-    await loadArchivedAccounts();
-    await loadArchivedCreditCards();
-    await loadClassifications();
-    await loadSpendingLimits();
-    await loadCurrentSpendingLimits();
-    await loadTransactionSlice();
-    await loadCardInvoice();
-  } catch (error) {
-    state.accounts = [];
-    state.archivedAccounts = [];
-    state.creditCards = [];
-    state.archivedCreditCards = [];
-    state.cardInvoiceTransactions = [];
-    state.cardInvoicePayments = [];
-    state.cardTransactions = [];
-    state.cardPayments = [];
-    state.selectedCreditCardId = "";
-    state.transactions = [];
-    state.accountTransactions = [];
-    state.cockpit = null;
-    state.cockpitLoadedMonth = "";
-    state.categories = [];
-    state.tags = [];
-    state.spendingLimits = [];
-    state.currentSpendingLimits = [];
-    state.portfolio = null;
-    setMessage(accountMessage, error.message, "error");
-  }
-  renderBaseViews();
-  renderFinanceViews();
-  renderManagementViews();
-}
-
-async function loadAccounts() {
-  await accountsView.loadAccounts();
-  await loadTransactionSlice();
-  markPortfolioDirty();
-  renderBaseViews();
-  renderFinanceViews();
-}
-
-async function loadCreditCards() {
-  await cardsView.loadCreditCards();
-  await loadCockpit();
-  renderBaseViews();
-  renderFinanceViews();
-}
-
-async function loadArchivedAccounts() {
-  await accountsView.loadArchivedAccounts();
-}
-
-async function loadArchivedCreditCards() {
-  await cardsView.loadArchivedCreditCards();
-}
-
-async function loadTransactionsAndAccounts() {
-  const [accountsResponse, creditCardsResponse, transactionsResponse, cardTransactionsResponse, cardPaymentsResponse, cockpitResponse] = await Promise.all([
-    api("/api/checking-accounts"),
-    api("/api/credit-cards"),
-    fetchAllListed("/api/transactions", "transactions"),
-    fetchAllListed("/api/credit-card-transactions", "transactions"),
-    fetchAllListed("/api/credit-card-payments", "payments"),
-    api(`/api/cockpit?month=${encodeURIComponent(cockpitMonthValue())}`),
-  ]);
-  state.accounts = accountsResponse.accounts;
-  state.creditCards = creditCardsResponse.cards;
-  ensureSelectedCreditCard();
-  ensureSelectedAccount();
-  state.transactions = transactionsResponse;
-  await loadTransactionSlice();
-  state.cardTransactions = cardTransactionsResponse;
-  state.cardPayments = cardPaymentsResponse || [];
-  state.cockpit = cockpitResponse;
-  state.cockpitLoadedMonth = cockpitMonthValue();
-  invalidateFinancialHealth();
-  await loadArchivedAccounts();
-  await loadArchivedCreditCards();
-  await loadClassifications();
-  await loadSpendingLimits();
-  await loadCurrentSpendingLimits();
-  await loadCardInvoice();
-  markPortfolioDirty();
-  renderBaseViews();
-  renderFinanceViews();
-  renderManagementViews();
-}
-
-async function loadTransactionSlice() {
-  await transactionsView.loadTransactionSlice();
-}
-
-async function loadCockpit() {
-  const response = await api(`/api/cockpit?month=${encodeURIComponent(cockpitMonthValue())}`);
-  state.cockpit = response;
-  state.cockpitLoadedMonth = cockpitMonthValue();
-  invalidateFinancialHealth();
-}
-
-async function refreshCockpitData() {
-  const requestId = ++state.cockpitRefreshRequestId;
-  const month = cockpitMonthValue();
-  if (state.cockpit && state.cockpitLoadedMonth === month) {
-    cockpitView.setLoading(false);
-    renderCockpit();
-    setLastUpdated(cockpitLastUpdated);
-    return;
-  }
-  cockpitView.setLoading(true);
-  try {
-    const [
-      accountsResponse,
-      transactionsResponse,
-      cardTransactionsResponse,
-      cardPaymentsResponse,
-      cockpitResponse,
-      spendingLimitsResponse,
-    ] = await Promise.all([
-      api("/api/checking-accounts"),
-      fetchAllListed("/api/transactions", "transactions"),
-      fetchAllListed("/api/credit-card-transactions", "transactions"),
-      fetchAllListed("/api/credit-card-payments", "payments"),
-      api(`/api/cockpit?month=${encodeURIComponent(month)}`),
-      api(`/api/spending-limits?month=${encodeURIComponent(month)}`),
-    ]);
-    if (requestId !== state.cockpitRefreshRequestId) {
-      return;
-    }
-    state.accounts = accountsResponse.accounts || [];
-    ensureSelectedAccount();
-    state.transactions = transactionsResponse || [];
-    state.cardTransactions = cardTransactionsResponse || [];
-    state.cardPayments = cardPaymentsResponse || [];
-    state.cockpit = cockpitResponse;
-    state.cockpitLoadedMonth = month;
-    state.currentSpendingLimits = spendingLimitsResponse.limits || [];
-    invalidateFinancialHealth();
-    renderBaseViews();
-    if (state.view === "cockpit") {
-      renderCockpit();
-      setLastUpdated(cockpitLastUpdated);
-    }
-  } finally {
-    if (requestId === state.cockpitRefreshRequestId) {
-      cockpitView.setLoading(false);
-    }
-  }
-}
-
-async function loadPortfolio(options = {}) {
-  await portfolioView.loadPortfolio(options);
 }
 
 function markPortfolioDirty() {
@@ -1573,26 +1481,6 @@ function editPortfolioSourceTransaction(transactionId) {
   editTransaction(transaction);
 }
 
-async function loadClassifications() {
-  await classificationsView.loadClassifications();
-}
-
-async function loadSpendingLimits() {
-  await limitsView.loadSpendingLimits();
-}
-
-async function loadCurrentSpendingLimits() {
-  await limitsView.loadCurrentSpendingLimits(cockpitMonthValue());
-}
-
-async function loadCardInvoice() {
-  await cardsView.loadCardInvoice();
-}
-
-async function loadCardTransactions() {
-  await cardsView.loadCardTransactions();
-}
-
 function ensureSelectedCreditCard() {
   cardsView.ensureSelectedCreditCard();
 }
@@ -1619,6 +1507,9 @@ function showModule(view) {
     expandNavGroupOfView(view);
     moduleEyebrow.textContent = viewTitles[view][0];
     pageTitle.textContent = viewTitles[view][1];
+    if (previousView !== view && previousView === "portfolio") {
+      portfolioView.onLeave();
+    }
   };
   if (shouldAnimateModuleTransition(previousView, view)) {
     document.startViewTransition(updateVisibleModule);
@@ -1642,27 +1533,34 @@ function showModule(view) {
   if (view === "transactions") {
     ensureSelectedAccount();
     renderTransactionAccounts();
-    updateTransactionTypeState();
-    loadTransactionSlice().then(() => {
+    transactionsView.updateTransactionTypeState();
+    const transactionLoad = loadTransactionSlice();
+    renderTransactions();
+    transactionLoad.then(() => {
       renderTransactions();
       transactionsView.highlightSavedTransaction();
-    }).catch((error) => setMessage(transactionMessage, error.message, "error"));
+    }).catch((error) => {
+      renderTransactions();
+      setMessage(transactionMessage, error.message, "error");
+    });
   }
   if (view === "limits") {
-    renderLimits();
+    limitsView.renderLimits();
   }
   if (view === "simulations") {
     simulationsView.loadSimulationFormData().catch((error) => setMessage(simulationMessage, error.message, "error"));
   }
   if (view === "reports") {
-    renderReports();
+    reportsView.renderReports();
   }
   if (view === "portfolio") {
-    renderPortfolio();
-    loadPortfolio({ revalidate: true });
+    portfolioView.onEnter().catch((error) => setMessage(portfolioMessage, error.message, "error"));
   }
   if (view === "creditCards") {
     renderCreditCards();
+    if (!state.cardDataLoaded) {
+      cardsView.loadCreditCards().then(renderCreditCards).catch((error) => setMessage(creditCardMessage, error.message, "error"));
+    }
   }
   if (view === "cardLaunches") {
     renderCardInvoice();
@@ -1672,7 +1570,7 @@ function showModule(view) {
   }
   if (view === "operationHistory") {
     operationHistoryView.renderFilters();
-    operationHistoryView.loadOperationLogs({ reset: true });
+    operationHistoryView.loadOperationLogs({ reset: true, revalidate: true });
   }
   if (view === "instructions") {
     instructionsView.renderInstructions();
@@ -1681,12 +1579,17 @@ function showModule(view) {
     emailForm.elements.email.value = state.user.email;
     userAdminViewController.syncThemePreference();
     userAdminViewController.syncDensityPreference();
-    userAdminViewController.loadEmailConfigStatus();
-    userAdminViewController.loadAIConfigStatus();
-    userAdminViewController.loadConsultorConfigStatus();
-    userAdminViewController.loadConsultorProfile();
-    userAdminViewController.loadMaisRetornoConfigStatus();
+    userAdminViewController.loadPreferences();
   }
+}
+
+function handleDataMutation() {
+  operationHistoryView?.markDirty();
+  userAdminViewController?.markPreferencesDirty();
+  transactionsView?.markTransactionSliceDirty();
+  simulationsView?.markFormDataDirty();
+  state.reportDataMonth = "";
+  state.reportOverviewMonth = "";
 }
 
 function shouldAnimateModuleTransition(previousView, nextView) {
@@ -1809,13 +1712,13 @@ function renderBaseViews() {
 function renderFinanceViews() {
   renderCockpit();
   renderTransactions();
-  renderLimits();
-  renderReports();
+  limitsView.renderLimits();
+  reportsView.renderReports();
 }
 
 function renderManagementViews() {
-  renderClassifications();
-  renderPortfolio();
+  classificationsView.renderClassifications();
+  portfolioView.renderPortfolio();
 }
 
 function renderCockpit() {
@@ -1893,226 +1796,13 @@ function selectedAccountTransactions(transactions = state.accountTransactions) {
   return transactionsView.selectedAccountTransactions(transactions);
 }
 
-function renderClassifications() {
-  classificationsView.renderClassifications();
-}
-
-function renderLimits() {
-  limitsView.renderLimits();
-}
-
-function renderReports() {
-  reportsView.renderReports();
-}
-
-function renderPortfolio() {
-  portfolioView.renderPortfolio();
-}
-
-function portfolioTotalsByCurrency(rows) {
-  return portfolioView.portfolioTotalsByCurrency(rows);
-}
-
-function renderTransactionCollection(container, transactions, compact, balanceTransactions = transactions) {
-  transactionsView.renderTransactionCollection(container, transactions, compact, balanceTransactions);
-}
-
-function launchActionButton(icon, label, attributes, extraClass = "") {
-  return transactionsView.launchActionButton(icon, label, attributes, extraClass);
-}
-
-function updateTransactionTypeState() {
-  transactionsView.updateTransactionTypeState();
-}
-
-function shiftTransactionMonth(delta) {
-  transactionsView.shiftTransactionMonth(delta);
-}
-
-async function setTransactionMonth(month) {
-  await transactionsView.setTransactionMonth(month);
-}
-
-async function shiftCardInvoiceMonth(delta) {
-  await cardsView.shiftCardInvoiceMonth(delta);
-}
-
-async function setCardInvoiceMonth(month) {
-  await cardsView.setCardInvoiceMonth(month);
-}
-
 function getCurrencyTotals() {
-  const cockpitMonth = cockpitMonthValue();
-  const cockpitLimitDate = monthEndDate(cockpitMonth);
-  const totals = new Map();
-  for (const account of state.accounts) {
-    const row = currencyTotalRow(totals, account.currency);
-    const amount = accountProjectedBalance(account, cockpitLimitDate);
-    row.current += amount;
-    row.accounts.push({
-      id: account.id,
-      name: account.name,
-      type: accountTypeLabel(account.account_type),
-      amount,
-      reconciled: accountReconciledBalance(account, cockpitLimitDate),
-    });
-  }
-  for (const card of state.creditCards) {
-    const row = currencyTotalRow(totals, card.currency);
-    const openAmount = cardInvoiceCompetenceBalance(card.id, cockpitMonth);
-    const reservedAmount = preferredCardForecastAmount(card, cockpitLimitDate);
-    const signedAmount = -Math.max(openAmount - reservedAmount, 0);
-    const displayedAmount = -Math.max(openAmount, 0);
-    row.current += signedAmount;
-    row.cards.push({
-      id: card.id,
-      name: card.name,
-      issuer: card.issuer,
-      amount: displayedAmount,
-      reconciled: -cardReconciledBalance(card.id, cockpitMonth),
-    });
-  }
-  return new Map([...totals.entries()].sort(([currencyA], [currencyB]) => currencyA.localeCompare(currencyB)));
+  return new Map((state.cockpit?.currency_totals || []).map(({ currency, ...row }) => [currency, {
+    ...row,
+    accounts: (row.accounts || []).map((account) => ({ ...account, type: accountTypeLabel(account.type) })),
+  }]));
 }
 
-function currencyTotalRow(totals, currency) {
-  const normalizedCurrency = currency || "BRL";
-  if (!totals.has(normalizedCurrency)) {
-    totals.set(normalizedCurrency, {
-      current: 0,
-      accounts: [],
-      cards: [],
-    });
-  }
-  return totals.get(normalizedCurrency);
-}
-
-function accountReconciledBalance(account, limitDate) {
-  return accountBalanceUntil(account, limitDate, true);
-}
-
-function accountProjectedBalance(account, limitDate) {
-  return accountBalanceUntil(account, limitDate, false) - preferredCardForecastForAccount(account, limitDate);
-}
-
-function accountBalanceUntil(account, limitDate, reconciledOnly) {
-  return Number(account.initial_balance || 0) + state.transactions.reduce((total, transaction) => {
-    if (transaction.date > limitDate || !transaction.reconciled_at) {
-      if (reconciledOnly || transaction.date > limitDate) {
-        return total;
-      }
-    }
-    if (reconciledOnly && !transaction.reconciled_at) {
-      return total;
-    }
-    const amount = Number(transaction.amount);
-    if (String(transaction.account_id) === String(account.id)) {
-      total += transactionSourceDelta(transaction.type, amount);
-    }
-    if (transaction.type === "transfer" && String(transaction.destination_account_id || "") === String(account.id)) {
-      total += Number(transaction.destination_amount || transaction.amount);
-    }
-    return total;
-  }, 0);
-}
-
-function accountHasPreferredCardForecast(account, limitDate) {
-  return preferredCardForecastForAccount(account, limitDate) > 0;
-}
-
-function preferredCardForecastForAccount(account, limitDate) {
-  if (!account || !limitDate) {
-    return 0;
-  }
-  return state.creditCards.reduce((total, card) => {
-    if (String(card.preferred_payment_account_id || "") !== String(account.id)) {
-      return total;
-    }
-    if ((card.currency || "BRL") !== (account.currency || "BRL")) {
-      return total;
-    }
-    return total + preferredCardForecastAmount(card, limitDate);
-  }, 0);
-}
-
-function preferredCardForecastAmount(card, limitDate) {
-  if (!card || !card.preferred_payment_account_id) {
-    return 0;
-  }
-  const forecastByInvoice = new Map();
-  for (const transaction of state.cardTransactions) {
-    if (
-      String(transaction.credit_card_id) !== String(card.id)
-      || !transaction.reconciled_at
-      || !transaction.invoice_month
-      || cardInvoiceDueDateValue(transaction.invoice_month, card.due_day) > limitDate
-      || isCardInvoicePaid(card.id, transaction.invoice_month)
-    ) {
-      continue;
-    }
-    const current = forecastByInvoice.get(transaction.invoice_month) || 0;
-    forecastByInvoice.set(transaction.invoice_month, current + cardTransactionInvoiceDelta(transaction));
-  }
-  return [...forecastByInvoice.values()].reduce((total, amount) => total + Math.max(amount, 0), 0);
-}
-
-function cardTransactionInvoiceDelta(transaction) {
-  const amount = Number(transaction.amount || 0);
-  if (transaction.type === "income") {
-    return -amount;
-  }
-  if (transaction.type === "expense") {
-    return amount;
-  }
-  return 0;
-}
-
-function isCardInvoicePaid(cardId, invoiceMonth) {
-  return state.cardPayments.some((payment) => (
-    String(payment.credit_card_id) === String(cardId) && payment.invoice_month === invoiceMonth
-  ));
-}
-
-function cardInvoiceDueDateValue(invoiceMonth, dueDay) {
-  return cardInvoiceDateValue(invoiceMonth, dueDay);
-}
-
-function cardInvoiceDateValue(invoiceMonth, day) {
-  const [year, month] = String(invoiceMonth).split("-").map(Number);
-  const safeDay = Number(day || 1);
-  if (!year || !month) {
-    return `${invoiceMonth}-01`;
-  }
-  const lastDay = new Date(year, month, 0).getDate();
-  const invoiceDay = Math.min(Math.max(safeDay, 1), lastDay);
-  return `${year}-${String(month).padStart(2, "0")}-${String(invoiceDay).padStart(2, "0")}`;
-}
-
-function cardInvoiceCompetenceBalance(cardId, invoiceMonth) {
-  return state.cardTransactions.reduce((total, transaction) => {
-    if (String(transaction.credit_card_id) !== String(cardId) || transaction.invoice_month !== invoiceMonth) {
-      return total;
-    }
-    return total + cardTransactionInvoiceDelta(transaction);
-  }, 0);
-}
-
-function cardReconciledBalance(cardId, invoiceMonth) {
-  return state.cardTransactions.reduce((total, transaction) => {
-    if (
-      String(transaction.credit_card_id) !== String(cardId)
-      || transaction.invoice_month !== invoiceMonth
-      || !transaction.reconciled_at
-    ) {
-      return total;
-    }
-    return total + cardTransactionInvoiceDelta(transaction);
-  }, 0);
-}
-
-function cardOpenBalance(cardId, untilInvoiceMonth = null) {
-  return cardsView.cardOpenBalance(cardId, untilInvoiceMonth);
-}
 
 function creditCardCurrency(cardId) {
   return cardsView.creditCardCurrency(cardId);
@@ -2123,78 +1813,6 @@ function cockpitMonthValue() {
     state.cockpitMonth = currentMonthValue();
   }
   return state.cockpitMonth;
-}
-
-function getBalanceUntil(limitDate, transactions = state.transactions, reconciledOnly = false) {
-  const totals = new Map();
-  
-  // If a specific account is selected, calculate balance only for that account
-  if (state.selectedAccountId) {
-    const account = state.accounts.find((entry) => String(entry.id) === String(state.selectedAccountId));
-    if (account) {
-      totals.set(account.currency, Number(account.initial_balance));
-      
-      for (const transaction of transactions) {
-        if (transaction.date > limitDate) {
-          continue;
-        }
-        if (reconciledOnly && !transaction.reconciled_at) {
-          continue;
-        }
-        const amount = Number(transaction.amount);
-        const sourceCurrency = transaction.account_currency;
-        if (String(transaction.account_id) === String(state.selectedAccountId)) {
-          totals.set(sourceCurrency, (totals.get(sourceCurrency) || 0) + transactionSourceDelta(transaction.type, amount));
-        }
-        if (transaction.type === "transfer" && transaction.destination_account_id) {
-          const destinationCurrency = transaction.destination_account_currency || sourceCurrency;
-          const destinationAmount = Number(transaction.destination_amount || transaction.amount);
-          if (String(transaction.destination_account_id) === String(state.selectedAccountId)) {
-            totals.set(destinationCurrency, (totals.get(destinationCurrency) || 0) + destinationAmount);
-          }
-        }
-      }
-      if (!reconciledOnly) {
-        totals.set(account.currency, (totals.get(account.currency) || 0) - preferredCardForecastForAccount(account, limitDate));
-      }
-    }
-  } else {
-    // No account selected: calculate balance for all accounts
-    for (const account of state.accounts) {
-      const current = totals.get(account.currency) || 0;
-      totals.set(account.currency, current + Number(account.initial_balance));
-    }
-    for (const transaction of transactions) {
-      if (transaction.date > limitDate) {
-        continue;
-      }
-      if (reconciledOnly && !transaction.reconciled_at) {
-        continue;
-      }
-      const amount = Number(transaction.amount);
-      const sourceCurrency = transaction.account_currency;
-      totals.set(sourceCurrency, (totals.get(sourceCurrency) || 0) + transactionSourceDelta(transaction.type, amount));
-      if (transaction.type === "transfer" && transaction.destination_account_id) {
-        const destinationCurrency = transaction.destination_account_currency || sourceCurrency;
-        const destinationAmount = Number(transaction.destination_amount || transaction.amount);
-        totals.set(destinationCurrency, (totals.get(destinationCurrency) || 0) + destinationAmount);
-      }
-    }
-    if (!reconciledOnly) {
-      for (const account of state.accounts) {
-        totals.set(account.currency, (totals.get(account.currency) || 0) - preferredCardForecastForAccount(account, limitDate));
-      }
-    }
-  }
-  
-  return new Map([...totals.entries()].sort(([currencyA], [currencyB]) => currencyA.localeCompare(currencyB)));
-}
-
-function transactionSourceDelta(type, amount) {
-  if (type === "income") {
-    return amount;
-  }
-  return -amount;
 }
 
 function renderCockpitPortfolioByType() {

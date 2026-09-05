@@ -2,8 +2,8 @@
 tipo: spec
 area: distribuicao
 status: implementado
-versao: 2.3
-atualizado: 2026-08-09
+versao: 2.6
+atualizado: 2026-09-04
 relacionados:
   - "[[sdd]]"
   - "[[templates/spec-template|Template de spec]]"
@@ -16,7 +16,7 @@ aliases: ["Distribuicao", "Pacotes de Distribuicao", "Instalador macOS", "Instal
 # Distribuicao
 
 > [!info] Status
-> **implementado** · área: `distribuicao` · atualizado em 2026-08-09 · relacionados: [[sdd]], [[templates/spec-template|Template de spec]], [[arquitetura]], [[requisitos]]
+> **implementado** · área: `distribuicao` · atualizado em 2026-09-04 · relacionados: [[sdd]], [[templates/spec-template|Template de spec]], [[arquitetura]], [[requisitos]]
 
 ## Problema
 
@@ -29,9 +29,9 @@ Usuario final que vai instalar o Sistema Financeiro em outro computador e manten
 ## Jornada
 
 1. O mantenedor mantém em `Sistema Financeiro - Distribuicao/` apenas templates, launchers, instaladores, ícones e instruções necessários para montar os pacotes.
-2. O workflow da plataforma gera o runtime PyInstaller no sistema operacional alvo e monta o pacote em staging limpo.
+2. O workflow do GitHub Actions da plataforma gera o runtime PyInstaller no sistema operacional alvo e monta o pacote em staging limpo.
 3. O pacote exclui dados locais, testes, documentacao tecnica, caches, zips antigos, runtimes antigos e metadados desnecessarios.
-4. O mantenedor gera o zip final a partir da subpasta da plataforma, nomeado com o sistema operacional e a versão corrente do app.
+4. O workflow gera o zip final a partir da subpasta da plataforma, nomeado com o sistema operacional e a versão corrente do app.
 5. Os workflows oficiais publicam cada zip como artifact do GitHub Actions e como asset de GitHub Release para consumo pela Landing Page.
 6. No macOS, o novo usuario descompacta o zip, executa `Instalar Sistema Financeiro.command` e abre `Sistema Financeiro` pela pasta Aplicativos em modo local.
 7. No macOS, quando quiser acesso pela LAN, o usuario executa `~/Documents/Sistema Financeiro/Abrir Sistema Financeiro na Rede.command`.
@@ -70,6 +70,9 @@ Usuario final que vai instalar o Sistema Financeiro em outro computador e manten
 - O pacote nao deve conter nenhum arquivo ou subdiretorio de `data/`.
 - O pacote nao deve conter nenhum arquivo ou subdiretorio de `secure/`.
 - O pacote nao deve conter nenhum arquivo ou subdiretorio de `tests/`.
+- Dependências browser aprovadas da v2 devem ser incluídas como assets vendorizados locais, nunca buscadas por CDN durante a execução.
+- Cada asset de terceiro incluído deve ter versão exata, origem, hash SHA-256 e licença registrados em inventário distribuível; o texto de licença exigido acompanha o pacote.
+- `node_modules`, lockfiles e ferramentas de build não entram no pacote final; somente os artefatos browser aprovados e seus avisos de licença.
 - O pacote final nao deve conter a pasta `docs/`; a documentacao tecnica fica apenas no repositorio de desenvolvimento.
 - O pacote final nao deve conter arquivos, assets, dependencias ou configuracoes da Landing Page institucional; ela vive em repositório separado (`/Users/sansquer/Documents/GitHub/sistemafinanceiropage`) e nao faz parte do app instalavel.
 - O pacote final nao deve conter zips antigos de distribuicao embutidos dentro da propria pasta da plataforma.
@@ -107,6 +110,7 @@ Usuario final que vai instalar o Sistema Financeiro em outro computador e manten
 - Os artifacts do GitHub Actions devem usar o mesmo nome do zip final para facilitar rastreabilidade.
 - Os workflows oficiais devem publicar os zips como assets em GitHub Releases, usando a tag do push quando o evento for tag ou `vX.Y.Z` quando executados manualmente.
 - A publicação em GitHub Releases deve permitir sobrescrever o asset da mesma plataforma e versão para corrigir uma geração defeituosa sem alterar a URL final de consumo.
+- Cada workflow deve validar que o runtime PyInstaller inclui as dependências browser vendorizadas (`web/vendor/imask/`, `web/vendor/apexcharts/`) antes de publicar o pacote; a ausência de qualquer dependência aprovada falha o build.
 
 ## API e dados
 
@@ -167,6 +171,9 @@ Arquivos e diretorios afetados:
 
 ## Changelog
 
+- `2.6` — 2026-09-04 — Revisada a consistência documental após a validação sintática dos workflows das três plataformas; consolidado o histórico duplicado da versão 2.4.
+- `2.5` — 2026-09-04 — Workflows GitHub Actions de macOS, Windows e Linux passam a validar a presença das dependências browser vendorizadas (`web/vendor/imask/` e `web/vendor/apexcharts/`) no runtime PyInstaller antes da publicação.
+- `2.4` — 2026-08-30 — Pacotes oficiais passam a ser gerados exclusivamente pelos workflows do GitHub Actions; templates locais não armazenam runtimes ou zips finais e os pacotes da v2 exigem dependências browser locais com inventário de versão, origem, SHA-256 e licença. Ver [[adr/0013-dependencias-frontend-v2]].
 - `2.3` — 2026-08-09 — Pacotes e instaladores passam a tratar `secure/` como runtime local sensível, fora dos zips, preservado em atualizações junto com `data/`; documentada migração compatível de segredos para `secure_configs`.
 - `2.2` — 2026-08-04 — Pasta `Sistema Financeiro - Distribuicao/` passa a ser tratada como template enxuto versionado, removendo runtimes PyInstaller, zips, staging Linux, `.DS_Store` e árvore fonte antiga dos pacotes.
 - `2.1` — 2026-08-04 — Workflows de pacotes passam a nomear zips e artifacts como `SO - versão do app` e publicar os assets em GitHub Releases para consumo pela Landing Page.

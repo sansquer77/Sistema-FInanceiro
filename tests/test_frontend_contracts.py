@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import hashlib
 import unittest
 from pathlib import Path
 
@@ -11,6 +12,231 @@ MODULE_ROOT = WEB_ROOT / "modules"
 
 
 class FrontendModuleContractTest(unittest.TestCase):
+    def test_support_link_is_local_to_about_without_global_widget(self) -> None:
+        from html.parser import HTMLParser
+        class Links(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.sections = []
+                self.support_sections = []
+            def handle_starttag(self, tag, attrs):
+                attrs = dict(attrs)
+                if tag == "section":
+                    self.sections.append(attrs)
+                if tag == "a" and "buymeacoffee.com" in attrs.get("href", ""):
+                    self.support_sections.append(list(self.sections))
+            def handle_endtag(self, tag):
+                if tag == "section" and self.sections:
+                    self.sections.pop()
+        html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        parser = Links()
+        parser.feed(html)
+        self.assertEqual(len(parser.support_sections), 1)
+        self.assertTrue(any("about" in str(section).lower() for section in parser.support_sections[0]))
+        self.assertNotIn("widget.prod.min.js", html)
+        self.assertNotIn("BMC-Widget", html)
+
+    def test_transactions_view_composes_extracted_responsibilities(self) -> None:
+        transactions = (MODULE_ROOT / "transactions-view.js").read_text(encoding="utf-8")
+        cards = (MODULE_ROOT / "cards-view.js").read_text(encoding="utf-8")
+        base_form = (MODULE_ROOT / "transaction-form.js").read_text(encoding="utf-8")
+
+        for module_name in (
+            "classification-suggestion.js",
+            "transaction-balance-chart.js",
+            "transaction-list.js",
+            "transaction-form.js",
+            "transaction-investment-form.js",
+        ):
+            self.assertIn(f'from "./{module_name}"', transactions)
+        self.assertIn('from "./classification-suggestion.js"', cards)
+        self.assertNotIn("sourceToBrl / destinationToBrl", transactions)
+        self.assertNotIn("amount * rate", transactions)
+        self.assertIn("/api/exchange-rate?", base_form)
+
+    def test_apexcharts_is_pinned_local_and_used_through_shared_adapter(self) -> None:
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        adapter = (MODULE_ROOT / "chart-adapter.js").read_text(encoding="utf-8")
+        artifact = WEB_ROOT / "vendor/apexcharts/4.7.0/apexcharts.min.js"
+        license_file = WEB_ROOT / "vendor/apexcharts/4.7.0/LICENSE"
+        chart_views = (
+            "cockpit-view.js",
+            "trends-view.js",
+            "cards-view.js",
+            "transaction-balance-chart.js",
+            "simulations-view.js",
+            "portfolio-chart.js",
+            "reports-view.js",
+        )
+
+        self.assertIn('src="/vendor/apexcharts/4.7.0/apexcharts.min.js?v=4.7.0"', index)
+        self.assertNotRegex(index, r'<script[^>]+src=["\']https?://[^"\']*apexcharts')
+        self.assertTrue(artifact.is_file())
+        self.assertTrue(license_file.is_file())
+        self.assertEqual(
+            hashlib.sha256(artifact.read_bytes()).hexdigest(),
+            "c46de876c375aab3fbc23d82418f7d77251403335808983d2b832d4a38481948",
+        )
+        self.assertIn("new globalThis.ApexCharts", adapter)
+        self.assertIn("animateGradually: { enabled: false }", adapter)
+        self.assertIn("dynamicAnimation: { enabled: false }", adapter)
+        self.assertIn("animations: {\n        enabled: false", adapter)
+        self.assertLess(adapter.index("...(options.chart || {})"), adapter.index("animations: {"))
+        self.assertIn("instance.destroy()", adapter)
+        self.assertIn("const chartInstances = new Map()", adapter)
+        self.assertIn("new MutationObserver(scheduleDisconnectedChartCleanup)", adapter)
+        self.assertIn("if (!element.isConnected) {", adapter)
+        self.assertIn("chartDefinitions.delete(element)", adapter)
+        self.assertIn('attributeFilter: ["hidden"]', adapter)
+        self.assertIn('element.closest("[hidden]")', adapter)
+        self.assertIn("destroyAllCharts();", (WEB_ROOT / "app.js").read_text(encoding="utf-8"))
+        self.assertIn("destroyDisconnectedCharts();", adapter)
+        self.assertNotIn("const chartInstances = new WeakMap()", adapter)
+        for name in chart_views:
+            source = (MODULE_ROOT / name).read_text(encoding="utf-8")
+            self.assertIn('from "./chart-adapter.js"', source, name)
+            self.assertNotIn("new ApexCharts", source, name)
+
+    def test_portfolio_analysis_keeps_class_rows_distinct_by_currency(self) -> None:
+        portfolio = (MODULE_ROOT / "portfolio-grouping.js").read_text(encoding="utf-8")
+
+        self.assertNotIn('reduce(', portfolio)
+        self.assertIn('position.currency', portfolio)
+
+    def test_portfolio_goals_separate_usd_variable_income(self) -> None:
+        portfolio = (MODULE_ROOT / "portfolio-grouping.js").read_text(encoding="utf-8")
+        backend = (REPOSITORY_ROOT / "financeiro/portfolio.py").read_text(encoding="utf-8")
+
+        self.assertNotIn('aggregatePositions', portfolio)
+        self.assertIn('presentation.build_presentation', backend)
+        view = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
+        self.assertNotIn('.reduce(', view)
+        self.assertNotIn('quantity * unitPrice', view)
+        self.assertIn('position.result_percent', view)
+        self.assertIn('position.day_result_percent', view)
+        self.assertIn('"stock_usd": "Renda variável - USD"', backend)
+
+    def test_long_lists_use_shared_virtualizer_contract(self) -> None:
+        virtualizer = (MODULE_ROOT / "virtual-list.js").read_text(encoding="utf-8")
+        transactions = (MODULE_ROOT / "transactions-view.js").read_text(encoding="utf-8")
+        reports = (MODULE_ROOT / "reports-view.js").read_text(encoding="utf-8")
+        portfolio = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
+
+        self.assertIn("DEFAULT_OVERSCAN = 5", virtualizer)
+        self.assertIn("requestAnimationFrame", virtualizer)
+        self.assertIn('items.length <= threshold', virtualizer)
+        self.assertIn('from "./virtual-list.js"', transactions)
+        self.assertIn('from "./virtual-list.js"', reports)
+        self.assertIn('from "./virtual-list.js"', portfolio)
+        self.assertNotIn('const rows = items.map((transaction) => transactionTemplate', transactions)
+        self.assertIn("expanded: isExpanded, virtual: !compact", transactions)
+        self.assertIn("renderCollectionRows(rowsContainer, items", transactions)
+        self.assertIn("destroyVirtualLists(container)", transactions)
+        self.assertIn('DEFAULT_THRESHOLD = 200', virtualizer)
+        self.assertIn("pendingReportRankings.push", reports)
+        self.assertIn("renderItem: (row, index) => reportRankedRow", reports)
+        self.assertIn("else mountReportRanking(list, ranking, index)", reports)
+        self.assertNotIn(".outerHTML", reports)
+        self.assertIn('positionRows.length > 200', portfolio)
+        self.assertIn("virtualGroups.set(groupIndex, positionRows)", portfolio)
+        self.assertNotIn("const rows = portfolioPositionRows(group.positions)", portfolio)
+
+    def test_portfolio_analysis_flyout_avoids_persistent_webkit_layers(self) -> None:
+        portfolio = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
+        portfolio_chart = (MODULE_ROOT / "portfolio-chart.js").read_text(encoding="utf-8")
+        portfolio_lifecycle = (MODULE_ROOT / "portfolio-lifecycle.js").read_text(encoding="utf-8")
+        app = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn("portfolioGroupDrawerList?.replaceChildren()", portfolio)
+        self.assertIn("function onLeave()", portfolio)
+        self.assertIn("clearPortfolioPresentation", portfolio)
+        self.assertIn("portfolioView.onLeave()", app)
+        self.assertIn("portfolioView.onEnter()", app)
+        self.assertIn("destroyChart(portfolioReturnChart)", portfolio_chart)
+        self.assertIn("function closeReturns()", portfolio_chart)
+        self.assertIn("REVALIDATE_AFTER_MS = 30_000", portfolio_lifecycle)
+        self.assertIn("now - state.portfolioLoadedAt", portfolio_lifecycle)
+        hidden_rule = styles[styles.index(".portfolio-group-drawer[hidden] {"):]
+        hidden_rule = hidden_rule[:hidden_rule.index("}")]
+        self.assertIn("display: none !important", hidden_rule)
+        overlay_rule = styles[styles.index(".portfolio-group-drawer .drawer-overlay {"):]
+        overlay_rule = overlay_rule[:overlay_rule.index("}")]
+        self.assertIn("-webkit-backdrop-filter: none", overlay_rule)
+        self.assertIn("backdrop-filter: none", overlay_rule)
+
+    def test_portfolio_events_are_lazy_and_do_not_estimate_total(self) -> None:
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        facade = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
+        events = (MODULE_ROOT / "portfolio-events.js").read_text(encoding="utf-8")
+        self.assertIn('data-portfolio-tab="events"', index)
+        self.assertIn('activeTab === "events"', facade)
+        self.assertIn("portfolioEventsView.load()", facade)
+        self.assertIn("/api/portfolio/events", events)
+        self.assertIn("amount_per_share_micros", events)
+        self.assertIn('from "./virtual-list.js"', events)
+        self.assertIn("renderCollectionRows", events)
+        self.assertIn("threshold: 60", events)
+        self.assertIn("destroyVirtualLists(container)", events)
+        self.assertIn("Data ex", events)
+        self.assertIn("payment_date", events)
+        self.assertIn("Carteira", events)
+        self.assertIn("portfolio-events-month", events)
+        self.assertIn("formatMonth", events)
+        self.assertIn("portfolio-event-empty", events)
+        self.assertIn("Dados obtidos de fontes públicas; sempre validar com seu Banco/Corretora.", events)
+        self.assertIn("Proventos futuros anunciados para ações, ETFs e BDRs da carteira.", index)
+        self.assertIn("event.source", events)
+        self.assertIn('role="columnheader">Fonte', events)
+        self.assertIn('state.portfolioTab === "events" && nextTab !== "events"', facade)
+        self.assertNotIn("events.map(eventRow)", events)
+        self.assertNotIn("position.quantity", events)
+        self.assertNotIn("estimated_total", events)
+
+    def test_apexcharts_overlays_races_and_history_bounds_are_guarded(self) -> None:
+        portfolio = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
+        evolution = (MODULE_ROOT / "report-evolution.js").read_text(encoding="utf-8")
+        adapter = (MODULE_ROOT / "chart-adapter.js").read_text(encoding="utf-8")
+        cards = (MODULE_ROOT / "cards-view.js").read_text(encoding="utf-8")
+        transactions = (MODULE_ROOT / "transaction-balance-chart.js").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn("document.body.append(portfolioReturnDrawer)", portfolio)
+        self.assertIn("const requestId = ++evolutionRequestId", evolution)
+        self.assertIn("requestId !== evolutionRequestId || context !== currentEvolutionContext", evolution)
+        self.assertIn('height: 92, sparkline: { enabled: true }', cards)
+        self.assertIn('height: 92, sparkline: { enabled: true }', transactions)
+        self.assertIn("centeredMonthlyPoints(rows", cards)
+        self.assertIn("centeredMonthlyPoints(rows", transactions)
+        self.assertIn("centeredMonthlyAxis(rows)", cards)
+        self.assertIn("centeredMonthlyAxis(rows)", transactions)
+        self.assertIn("continuousAreaFill()", cards)
+        self.assertIn("continuousAreaFill()", transactions)
+        self.assertIn('type: "vertical"', adapter)
+        self.assertIn("opacityFrom = 0.36", adapter)
+        self.assertIn("opacityTo = 0.04", adapter)
+        self.assertIn("stops: [0, 100]", adapter)
+        self.assertIn('borderColor: chartToken("--chart-average-line"', cards)
+        self.assertIn("borderWidth: 2", cards)
+        self.assertIn("tooltip: { enabled: false }", cards)
+        self.assertIn("tooltip: { enabled: false }", transactions)
+        self.assertIn("min: -0.5", adapter)
+        self.assertIn("rows.length - 0.5", adapter)
+        self.assertNotIn("centeredValueTooltip", adapter)
+        for legacy_symbol in (
+            "balanceHistoryChartTop",
+            "balanceHistoryChartBaseline",
+            "balanceHistoryPath",
+            "balanceHistoryAreaPath",
+            "smoothBalancePath",
+        ):
+            self.assertNotIn(legacy_symbol, transactions)
+        plot_rule = styles[styles.index(".invoice-history-chart .invoice-history-plot {"):]
+        plot_rule = plot_rule[:plot_rule.index("}")]
+        self.assertIn("height: 92px", plot_rule)
+        self.assertIn("overflow: hidden", plot_rule)
+        self.assertNotIn(".invoice-history-apex .apexcharts-tooltip", styles)
+
     def test_app_module_imports_resolve_to_local_files(self) -> None:
         source = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
         imports = re.findall(r'from\s+["\'](\./[^"\']+)["\']', source)
@@ -18,6 +244,32 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertTrue(imports, "app.js deve importar módulos ES locais")
         missing = [relative for relative in imports if not (WEB_ROOT / relative.split("?", 1)[0]).resolve().is_file()]
         self.assertEqual(missing, [], f"Imports ES sem arquivo correspondente: {missing}")
+
+    def test_bank_logo_catalog_assets_exist(self) -> None:
+        bank_logos = (MODULE_ROOT / "bank-logos.js").read_text(encoding="utf-8")
+        bank_asset_dir = WEB_ROOT / "assets" / "banks"
+        network_asset_dir = WEB_ROOT / "assets" / "bandeiras"
+
+        self.assertIn("export const BANK_LOGOS", bank_logos)
+        self.assertIn("export const CARD_NETWORK_LOGOS", bank_logos)
+        self.assertIn("normalizeBankName", bank_logos)
+        self.assertIn("renderBankLogo", bank_logos)
+        self.assertIn("renderCardNetworkLogo", bank_logos)
+        self.assertIn("attachBankLogoFallbacks", bank_logos)
+
+        bank_entries = re.findall(r'export const BANK_LOGOS = \[.*?\];', bank_logos, re.DOTALL)[0]
+        network_entries = re.findall(r'export const CARD_NETWORK_LOGOS = \[.*?\];', bank_logos, re.DOTALL)[0]
+
+        bank_files = re.findall(r'file:\s*"([^"]+)"', bank_entries)
+        network_files = re.findall(r'file:\s*"([^"]+)"', network_entries)
+
+        missing_banks = [file for file in bank_files if not (bank_asset_dir / file).is_file()]
+        missing_networks = [file for file in network_files if not (network_asset_dir / file).is_file()]
+        self.assertEqual(missing_banks, [], f"Assets de banco ausentes: {missing_banks}")
+        self.assertEqual(missing_networks, [], f"Assets de bandeira ausentes: {missing_networks}")
+
+        for file in bank_files + network_files:
+            self.assertRegex(file, r"^[a-z0-9\-]+\.[a-z0-9]+$", f"Nome de asset fora do padrão ASCII minúsculo: {file}")
 
     def test_all_frontend_modules_are_documented_in_the_frontend_spec(self) -> None:
         spec = (REPOSITORY_ROOT / "docs/specs/frontend-modularizacao.md").read_text(encoding="utf-8")
@@ -35,6 +287,60 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertFalse((REPOSITORY_ROOT / "package.json").exists())
         self.assertFalse((REPOSITORY_ROOT / "node_modules").exists())
 
+    def test_simulation_plot_has_its_own_row_below_month_cards(self) -> None:
+        source = (MODULE_ROOT / "simulations-view.js").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+        html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        self.assertLess(source.index('class="invoice-history-card'), source.index('class="invoice-history-plot"'))
+        self.assertIn('<div class="invoice-history-plot" role="presentation">\n          <div class="invoice-history-apex"></div>', source)
+        rule = styles.split(".simulation-chart .invoice-history-plot {", 1)[1].split("}", 1)[0]
+        for declaration in ("position: relative", "grid-row: 2", "grid-column: 1 / -1", "height: 170px"):
+            self.assertIn(declaration, rule)
+        rail = styles.split(".simulation-chart .invoice-history-rail {", 1)[1].split("}", 1)[0]
+        self.assertIn("grid-template-rows: auto 170px", rail)
+        container = styles.split(".simulation-chart {", 1)[1].split("}", 1)[0]
+        self.assertIn("overflow-x: auto", container)
+        self.assertLess(html.index('id="simulationChart"'), html.index('id="simulationWeeklyProjection"'))
+
+    def test_initial_states_do_not_mount_empty_import_or_simulation_regions(self) -> None:
+        imports = (MODULE_ROOT / "imports-view.js").read_text(encoding="utf-8")
+        simulations = (MODULE_ROOT / "simulations-view.js").read_text(encoding="utf-8")
+        html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        self.assertIn('title: "Pronto para importar"', imports)
+        self.assertIn('kind: "loading"', imports)
+        self.assertIn('id="simulationEmptyState"', html)
+        self.assertIn('id="simulationResultsContent" hidden', html)
+        self.assertIn('showEmptyState();', simulations)
+        self.assertIn('simulationResultsContent.hidden = false', simulations)
+
+    def test_trends_tooltips_pair_text_and_surface_theme_tokens(self) -> None:
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+        start = styles.index(".trends-chart .apexcharts-canvas .apexcharts-tooltip,")
+        rule = styles[start:styles.index("}", start)]
+        for declaration in ("color: var(--ink)", "background: var(--panel)", "border-color: var(--line)",
+                            ".apexcharts-xaxistooltip", ".apexcharts-yaxistooltip"):
+            self.assertIn(declaration, rule)
+        title = styles.split(".trends-chart .apexcharts-canvas .apexcharts-tooltip .apexcharts-tooltip-title {", 1)[1].split("}", 1)[0]
+        self.assertIn("color: var(--ink)", title)
+        self.assertIn("background: var(--surface-low)", title)
+        for direction in ("top", "bottom"):
+            arrow = styles.split(f".trends-chart .apexcharts-canvas .apexcharts-xaxistooltip-{direction}::after {{", 1)[1].split("}", 1)[0]
+            self.assertIn(f"border-{direction}-color: var(--panel)", arrow)
+
+    def test_portfolio_return_tooltip_reuses_theme_contrast_rules(self) -> None:
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+        cases = {
+            ".apexcharts-tooltip,": ("color: var(--ink)", "background: var(--panel)"),
+            ".apexcharts-tooltip .apexcharts-tooltip-title,": ("color: var(--ink)", "background: var(--surface-low)"),
+            ".apexcharts-xaxistooltip-bottom::after,": ("border-bottom-color: var(--panel)",),
+            ".apexcharts-xaxistooltip-top::after,": ("border-top-color: var(--panel)",),
+        }
+        for selector, declarations in cases.items():
+            rule = styles.split(f".portfolio-return-chart .apexcharts-canvas {selector}", 1)[1].split("}", 1)[0]
+            self.assertIn(".trends-chart", rule)
+            for declaration in declarations:
+                self.assertIn(declaration, rule)
+
     def test_simulations_view_tolerates_mixed_static_asset_versions(self) -> None:
         source = (MODULE_ROOT / "simulations-view.js").read_text(encoding="utf-8")
         index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
@@ -45,21 +351,99 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("Projeção diária de caixa", index)
 
     def test_cockpit_uses_progressive_fluid_interactions(self) -> None:
-        app_source = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+        loader_source = (MODULE_ROOT / "app-data-loader.js").read_text(encoding="utf-8")
         cockpit_source = (MODULE_ROOT / "cockpit-view.js").read_text(encoding="utf-8")
         tab_utils = (MODULE_ROOT / "tab-utils.js").read_text(encoding="utf-8")
         styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
         index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
 
         self.assertIn('id="cockpitView" aria-busy="false"', index)
-        self.assertIn("cockpitView.setLoading(true)", app_source)
-        self.assertIn("cockpitView.setLoading(false)", app_source)
+        self.assertIn("cockpit.setLoading(true)", loader_source)
+        self.assertIn("cockpit.setLoading(false)", loader_source)
         self.assertIn("transitionView(updateActivePanel)", cockpit_source)
         self.assertIn('event.key === "ArrowRight"', tab_utils)
         self.assertIn('event.key === "ArrowLeft"', tab_utils)
         self.assertIn("prefers-reduced-motion: reduce", tab_utils)
         self.assertIn("view-transition-name: cockpit-active-panel", styles)
         self.assertIn("#cockpitView.is-refreshing", styles)
+
+    def test_app_keeps_composition_root_and_extracted_application_services(self) -> None:
+        app_source = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+        state_source = (MODULE_ROOT / "app-state.js").read_text(encoding="utf-8")
+        loader_source = (MODULE_ROOT / "app-data-loader.js").read_text(encoding="utf-8")
+
+        self.assertIn("const state = createAppState", app_source)
+        self.assertIn("const appDataLoader = createAppDataLoader", app_source)
+        self.assertIn("async function boot()", app_source)
+        self.assertIn("function resetSessionState()", app_source)
+        self.assertIn("function showModule(view)", app_source)
+        self.assertNotIn("async function loadAll()", app_source)
+        self.assertIn("export function createAppState", state_source)
+        self.assertIn("export function resetSessionData", state_source)
+        self.assertNotIn("document.", state_source)
+        self.assertNotIn("api(", state_source)
+        self.assertIn("export function createAppDataLoader", loader_source)
+        self.assertIn("getViews", loader_source)
+        self.assertNotIn("document.", loader_source)
+        self.assertNotIn('fetchAllListed("/api/transactions", "transactions")', loader_source)
+        self.assertNotIn('fetchAllListed("/api/credit-card-payments", "payments")', loader_source)
+        self.assertIn('/api/transactions?month=', loader_source)
+        self.assertIn('/api/credit-card-transactions?month=', loader_source)
+        self.assertNotIn('from "./', loader_source)
+
+    def test_cards_loads_only_selected_invoice_and_bounded_history(self) -> None:
+        cards_source = (MODULE_ROOT / "cards-view.js").read_text(encoding="utf-8")
+        state_source = (MODULE_ROOT / "app-state.js").read_text(encoding="utf-8")
+
+        self.assertIn("response.history || []", cards_source)
+        self.assertIn("cardInvoiceHistory", state_source)
+        self.assertNotIn('fetchAllListed("/api/credit-card-transactions"', cards_source)
+        self.assertNotIn('fetchAllListed("/api/credit-card-payments"', cards_source)
+
+    def test_safari_data_detection_is_disabled_without_overriding_system_fonts(self) -> None:
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn(
+            '<meta name="format-detection" content="telephone=no, date=no, address=no, email=no">',
+            index,
+        )
+        self.assertIn("system-ui", styles)
+        self.assertIn("-apple-system", styles)
+
+    def test_heavy_view_loads_share_freshness_invalidation_and_inflight_policy(self) -> None:
+        app = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+        api = (MODULE_ROOT / "api.js").read_text(encoding="utf-8")
+        policy = (MODULE_ROOT / "load-policy.js").read_text(encoding="utf-8")
+        history = (MODULE_ROOT / "operation-history-view.js").read_text(encoding="utf-8")
+        preferences = (MODULE_ROOT / "user-admin-view.js").read_text(encoding="utf-8")
+        transactions = (MODULE_ROOT / "transaction-slice-loader.js").read_text(encoding="utf-8")
+        simulations = (MODULE_ROOT / "simulations-view.js").read_text(encoding="utf-8")
+
+        self.assertIn("let dirty = true", policy)
+        self.assertIn("let loadedAt = 0", policy)
+        self.assertIn("let inFlight = null", policy)
+        self.assertIn("revision === loadRevision", policy)
+        self.assertIn("onMutation: handleDataMutation", app)
+        self.assertIn("notifyMutation(path, options.method)", api)
+        self.assertIn("markDirty: loadPolicy.markDirty", history)
+        self.assertIn("loadPreferences", preferences)
+        self.assertIn("markPreferencesDirty", preferences)
+        self.assertIn('const key = `${accountId}:${month}`', transactions)
+        self.assertIn("const snapshots = new Map()", transactions)
+        self.assertIn("const requests = new Map()", transactions)
+        self.assertIn("while (snapshots.size > maxEntries)", transactions)
+        self.assertIn("revision === loadRevision", transactions)
+        self.assertIn("markFormDataDirty", simulations)
+        self.assertIn("resetPreferencesCache", app)
+        self.assertIn("resetTransactionSliceCache", app)
+
+    def test_paid_card_invoice_is_not_subtracted_twice_from_cockpit_forecast(self) -> None:
+        projection_source = (REPOSITORY_ROOT / "financeiro/balance_projections.py").read_text(encoding="utf-8")
+
+        self.assertIn("0 if is_invoice_paid", projection_source)
+        self.assertIn("-max(open_cents - reserved, 0)", projection_source)
+        self.assertNotIn("preferredCardForecastAmount", (WEB_ROOT / "app.js").read_text(encoding="utf-8"))
 
     def test_all_analytical_tabsets_share_keyboard_and_transition_helpers(self) -> None:
         modules = {
@@ -81,7 +465,9 @@ class FrontendModuleContractTest(unittest.TestCase):
 
         self.assertIn('class="summary-strip executive-summary-strip"', index)
         self.assertIn('class="cockpit-priority-alerts"', index)
-        self.assertLess(index.index('id="cockpitLimitAlert"'), index.index('class="summary-strip executive-summary-strip"'))
+        self.assertLess(index.index('id="cockpitVersionAlert"'), index.index('class="summary-strip executive-summary-strip"'))
+        self.assertIn('id="cockpitCriticalNotifications"', index)
+        self.assertIn('id="cockpitInformationalNotifications"', index)
         for section in ("planning", "debts", "top-expenses", "top-income"):
             self.assertIn(f'data-cockpit-section="{section}"', index)
         self.assertIn(".dashboard-main:has(#cockpitView:not([hidden])) > .topbar", styles)
@@ -116,6 +502,81 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn('control.setAttribute("aria-describedby"', dom_utils)
         self.assertIn(".form-actions .danger", styles)
         self.assertIn("margin-inline-start: auto", styles)
+
+    def test_input_masks_are_applied_to_money_and_date_fields(self) -> None:
+        import re
+
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        app_source = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+        mask_source = (MODULE_ROOT / "input-mask.js").read_text(encoding="utf-8")
+
+        self.assertIn('src="/vendor/imask/7.6.1/imask.min.js', index)
+        money_inputs = (
+            ("amount", False),
+            ("investment_amount", False),
+            ("investment_unit_price", False),
+            ("investment_brokerage_fee", False),
+            ("investment_exchange_fee", False),
+            ("investment_tax", False),
+            ("investment_other_costs", False),
+            ("destination_amount", False),
+            ("transfer_exchange_rate", False),
+            ("limit_amount", False),
+            ("total_cost", False),
+            ("unit_price", False),
+        )
+        for name, _ in money_inputs:
+            match = re.search(rf'<input[^>]*name="{re.escape(name)}"[^>]*>', index)
+            self.assertIsNotNone(match, name)
+            self.assertIn('data-mask="money"', match.group(0), name)
+
+        self.assertIn('data-mask="money" data-mask-scale="6" data-mask-signed="false"', index)
+        self.assertIn('data-mask="money" data-mask-scale="4" data-mask-signed="false"', index)
+        self.assertIn('applyMasks();', app_source)
+        self.assertIn('destroyMasks();', app_source)
+        self.assertIn('applyMoneyMask', mask_source)
+        self.assertIn('applyDateMask', mask_source)
+        self.assertIn('thousandsSeparator: "."', mask_source)
+        self.assertIn('radix: ","', mask_source)
+
+    def test_command_palette_is_registered_and_accessible(self) -> None:
+        import re
+
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        app_source = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+        palette_source = (MODULE_ROOT / "command-palette.js").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn('id="commandPaletteDialog"', index)
+        self.assertIn('id="commandPaletteInput"', index)
+        self.assertIn('id="commandPaletteResults"', index)
+        self.assertIn('id="commandPaletteTrigger"', index)
+        dialog_tag = index[index.index('id="commandPaletteDialog"') - 40:index.index('id="commandPaletteDialog"')]
+        self.assertIn('<dialog', dialog_tag)
+        self.assertIn('aria-controls="commandPaletteDialog"', index[index.index('id="commandPaletteTrigger"'):index.index('id="commandPaletteTrigger"') + 160])
+        self.assertIn('registerCommandPalette', app_source)
+        self.assertIn('commandPaletteTrigger?.click()', app_source)
+        self.assertIn('event.key.toLowerCase() === "k"', app_source)
+        self.assertIn('.command-palette-dialog', styles)
+        self.assertIn('.command-palette-results', styles)
+        self.assertIn('role="listbox"', index[index.index('id="commandPaletteResults"'):index.index('id="commandPaletteResults"') + 120])
+        self.assertIn('aria-activedescendant', palette_source)
+        self.assertIn('data-command-palette-index', palette_source)
+
+    def test_virtualization_is_used_for_card_invoices_and_operation_history(self) -> None:
+        cards_source = (MODULE_ROOT / "cards-view.js").read_text(encoding="utf-8")
+        history_source = (MODULE_ROOT / "operation-history-view.js").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+        virtual_list_source = (MODULE_ROOT / "virtual-list.js").read_text(encoding="utf-8")
+        self.assertIn('import { renderCollectionRows } from "./virtual-list.js"', cards_source)
+        self.assertIn('import { destroyVirtualLists, renderCollectionRows } from "./virtual-list.js"', history_source)
+        self.assertIn("renderCollectionRows(transactionsContainer", cards_source)
+        self.assertIn("renderCollectionRows(operationHistoryList", history_source)
+        self.assertIn(".card-invoice-transactions.virtual-list", styles)
+        self.assertIn(".operation-history-list.virtual-list", styles)
+        self.assertIn("aria-rowcount", virtual_list_source)
+        self.assertIn("aria-rowindex", virtual_list_source)
 
     def test_header_tables_and_filters_share_global_layout_contracts(self) -> None:
         index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
@@ -152,21 +613,29 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn(".instructions-toolbar {\n  position: sticky;\n  top: 82px", styles)
         self.assertIn(".transaction-day-heading {\n  position: sticky;\n  top: 82px", styles)
 
-    def test_global_search_is_local_keyboard_accessible_and_preserves_view_context(self) -> None:
+    def test_global_search_is_bounded_keyboard_accessible_and_preserves_view_context(self) -> None:
         index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
         app_source = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
         search_source = (MODULE_ROOT / "global-search.js").read_text(encoding="utf-8")
 
         self.assertIn('id="globalSearchDialog"', index)
+        self.assertIn('role="dialog" aria-modal="true"', index)
+        self.assertIn('aria-describedby="globalSearchDescription"', index)
         self.assertIn('id="globalSearchInput" type="search"', index)
+        self.assertIn('aria-controls="globalSearchResults"', index)
         self.assertIn('role="listbox"', index)
         self.assertIn('event.key === "/"', search_source)
         self.assertIn('!trigger.closest("[hidden]")', search_source)
-        self.assertIn("state.transactions || []", search_source)
-        self.assertIn("state.cardTransactions || []", search_source)
+        self.assertNotIn("state.transactions || []", search_source)
+        self.assertNotIn("state.cardTransactions || []", search_source)
         self.assertIn("state.portfolio?.positions || []", search_source)
         self.assertNotIn("fetch(", search_source)
-        self.assertNotIn("api(", search_source)
+        self.assertIn("/api/global-search?", search_source)
+        self.assertIn("requestRevision", search_source)
+        self.assertIn("handleDialogKeydown", search_source)
+        self.assertIn("previouslyFocused", search_source)
+        self.assertIn('event.key !== "Tab"', search_source)
+        self.assertIn("setTimeout(async () =>", search_source)
         self.assertIn("const viewScrollPositions = new Map()", app_source)
         self.assertIn("viewScrollPositions.set(previousView, window.scrollY)", app_source)
         self.assertIn("window.scrollTo({ top: viewScrollPositions.get(view) || 0", app_source)
@@ -241,14 +710,17 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn(".report-table td:first-child", styles)
         self.assertIn(".toast-region", styles)
         portfolio = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
+        portfolio_form = (MODULE_ROOT / "portfolio-form.js").read_text(encoding="utf-8")
+        portfolio_lifecycle = (MODULE_ROOT / "portfolio-lifecycle.js").read_text(encoding="utf-8")
         transactions = (MODULE_ROOT / "transactions-view.js").read_text(encoding="utf-8")
         asset_autocomplete = (MODULE_ROOT / "asset-autocomplete.js").read_text(encoding="utf-8")
         self.assertIn("data-restore-automatic-quote-payload", portfolio)
         self.assertIn('method: "DELETE"', portfolio)
         self.assertIn('triggerButton.textContent = "Atualizando..."', portfolio)
         self.assertIn('quoteCell?.setAttribute("aria-busy", "true")', portfolio)
-        self.assertIn("!options.revalidate", portfolio)
-        self.assertIn("loadPortfolio({ revalidate: true })", app_source)
+        self.assertIn("!options.revalidate", portfolio_lifecycle)
+        self.assertIn("portfolioView.onEnter()", app_source)
+        self.assertIn("loadPortfolio({ revalidate: true, renderCached: false })", portfolio)
         self.assertLess(
             portfolio.index("const data = formData(portfolioAssetForm);"),
             portfolio.index("setFormBusy(portfolioAssetForm, true);"),
@@ -259,20 +731,15 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn('document.createElement("datalist")', asset_autocomplete)
         self.assertIn("updateQuantityRedemptionPreview", portfolio)
         self.assertIn('name: "remaining_quantity"', portfolio)
-        self.assertIn("quantity: position.quantity || 0", portfolio)
+        self.assertIn("quantity: position.quantity || 0", portfolio_form)
         self.assertIn("portfolio.redemption_history || []", portfolio)
         self.assertIn("Ganho/perda", portfolio)
         self.assertIn("Custo FIFO", portfolio)
-        self.assertIn("portfolioAllocationRows", portfolio)
+        self.assertIn("state.portfolio.presentation.allocation", portfolio)
         self.assertIn("/api/portfolio/allocation-goals", portfolio)
         self.assertIn('data-portfolio-tab="goals"', index)
         self.assertIn('id="portfolioGoalsForm"', index)
-        self.assertGreater(
-            index.index('id="portfolioReturnDrawer"'),
-            index.index('id="aboutView"'),
-        )
-        self.assertLess(index.index('id="portfolioReturnDrawer"'), index.index('id="forecastDrawer"'))
-        self.assertIn('portfolio-view.js?v=157', app_source)
+        self.assertIn('portfolio-view.js?v=162', app_source)
         transition_start = portfolio.index("transitionView(() => {")
         transition_end = portfolio.index("  };", transition_start)
         self.assertIn("renderActivePortfolioTab();", portfolio[transition_start:transition_end])

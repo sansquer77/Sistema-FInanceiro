@@ -4,14 +4,13 @@ from datetime import date, timedelta
 from http import HTTPStatus
 
 from financeiro.accounts import money_to_cents
+from financeiro.calendar_rules import add_months, month_end_date, normalize_iso_date
 from financeiro.database import get_connection, row_to_dict
-from financeiro.transactions import add_months, normalize_date, normalize_id
+from financeiro.identifiers import optional_positive_int_id, positive_int_id
+from financeiro.recurrence import MONTHLY_RECURRENCE_FREQUENCIES as RECURRENCE_FREQUENCIES
+from financeiro.recurrence import SERIES_KINDS
 
 SIMULATION_TYPES = {"income", "expense"}
-SERIES_KINDS = {"single", "installment", "recurring"}
-RECURRENCE_FREQUENCIES = {"monthly"}
-
-
 class SimulationError(Exception):
     def __init__(self, message: str, status: HTTPStatus = HTTPStatus.BAD_REQUEST) -> None:
         self.message = message
@@ -65,8 +64,14 @@ def normalize_simulation_payload(data: dict) -> dict:
     amount_cents = money_to_cents(data.get("amount", "0"))
     if amount_cents <= 0:
         raise SimulationError("Informe um valor maior que zero.")
-    simulation_date = normalize_date(data.get("date"))
-    account_id = normalize_id(data.get("account_id"), "Informe a conta.")
+    try:
+        simulation_date = normalize_iso_date(data.get("date"))
+    except ValueError as exc:
+        raise SimulationError("Informe uma data valida.") from exc
+    try:
+        account_id = positive_int_id(data.get("account_id"))
+    except ValueError as exc:
+        raise SimulationError("Informe a conta.") from exc
     series_kind = str(data.get("series_kind") or "single").strip().lower()
     if series_kind not in SERIES_KINDS:
         raise SimulationError("Tipo de repeticao invalido.")
@@ -79,7 +84,7 @@ def normalize_simulation_payload(data: dict) -> dict:
         recurrence_frequency = str(data.get("recurrence_frequency") or "monthly").strip().lower()
         if recurrence_frequency not in RECURRENCE_FREQUENCIES:
             raise SimulationError("Informe a frequencia da recorrencia.")
-        # spec: efeito-borboleta v1.5 — critério 16
+        # spec: efeito-borboleta v1.8 — critério 16
         # (recorrentes usam 120 ocorrencias automaticamente quando o campo nao e enviado)
         raw_count = str(data.get("recurrence_count") or "").strip()
         recurrence_count = normalize_count(raw_count, "Informe a quantidade de ocorrencias.") if raw_count else 120
@@ -111,10 +116,10 @@ def normalize_count(value: object, message: str) -> int:
 
 
 def normalize_optional_id(value: object) -> int | None:
-    text = str(value or "").strip()
-    if not text:
-        return None
-    return normalize_id(text, "Identificador invalido.")
+    try:
+        return optional_positive_int_id(value)
+    except ValueError as exc:
+        raise SimulationError("Identificador invalido.") from exc
 
 
 def normalize_description(value: object, simulation_type: str) -> str:
@@ -222,7 +227,7 @@ def signed_impact_cents(simulation_type: str, amount_cents: int) -> int:
 def build_account_impact(conn, user_id: int, account: dict, payload: dict, virtual_items: list[dict]) -> dict:
     base_balance_cents = fetch_account_balance_until(conn, user_id, account["id"], payload["date"], reconciled_only=True)
     projected_base_cents = account_projected_balance_until(conn, user_id, account, month_end_date(payload["date"][:7]))
-    # spec: efeito-borboleta v1.5 — critério 18
+    # spec: efeito-borboleta v1.8 — critério 18
     # (o card "Saldo projetado no mês" soma apenas o impacto virtual do mês da simulação,
     # não as ocorrências de meses futuros da série)
     month = payload["date"][:7]
@@ -408,7 +413,7 @@ def build_chart_series(conn, user_id: int, account: dict, payload: dict, virtual
 
 
 def build_daily_projection(conn, user_id: int, account: dict, payload: dict, virtual_items: list[dict]) -> list[dict]:
-    # spec: efeito-borboleta v1.5 — critérios 19 a 24
+    # spec: efeito-borboleta v1.8 — critérios 19 a 24
     start_date = daily_projection_start_date(date.fromisoformat(payload["date"]))
     projection = []
     for day_index in range(15):
@@ -531,11 +536,6 @@ def build_forecast_months(payload: dict, virtual_items: list[dict]) -> list[str]
         month_date = add_months(current, offset)
         generated.append(month_date.strftime("%Y-%m"))
     return generated
-
-
-def month_end_date(month: str) -> str:
-    start_date = date.fromisoformat(f"{month}-01")
-    return ((start_date + timedelta(days=32)).replace(day=1) - timedelta(days=1)).isoformat()
 
 
 def build_warnings(account_impact: dict, limit_impact: dict) -> list[str]:

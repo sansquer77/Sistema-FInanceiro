@@ -1,39 +1,42 @@
 from __future__ import annotations
 
-from collections import defaultdict, OrderedDict
+from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from http import HTTPStatus
 import json
 import re
-import ssl
 import sqlite3
-from threading import Lock
-from urllib.error import HTTPError, URLError
 from urllib.parse import quote
-from urllib.request import Request, urlopen
 
 from financeiro.accounts import cents_to_money, empty_to_none, money_to_cents, recompute_account_balance
+from financeiro.calendar_rules import add_months, normalize_iso_date
 from financeiro.database import begin_immediate, get_connection, row_to_dict
+from financeiro.identifiers import positive_int_id
+from financeiro.money import MONEY_SCALE, cents_to_decimal, decimal_to_cents
+from financeiro import portfolio_calculations as calculations
+from financeiro import portfolio_positions as positions_store
+from financeiro import portfolio_quotes as quotes
+from financeiro import portfolio_presentation as presentation
+from financeiro import portfolio_events as events
+from financeiro.market_calendar import load_holiday_dates
+from financeiro.portfolio_valuation import PositionValuation
+from financeiro.portfolio_returns import PortfolioReturns
+from financeiro.portfolio_snapshots import list_snapshots, upsert_snapshots
 from financeiro.secure_config import load_mais_retorno_api_key
 from financeiro.transactions import convert_to_brl_cents, get_exchange_rate_to_brl, parse_exchange_rate, rate_to_micros
 
-MONEY_SCALE = Decimal("100")
 MICRO_SCALE = Decimal("1000000")
 YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=5d&interval=1d"
 COINGECKO_SIMPLE_PRICE_URL = "https://api.coingecko.com/api/v3/simple/price?ids={ids}&vs_currencies={currency}&include_24hr_change=true"
 MAIS_RETORNO_QUOTES_URL = "https://data.maisretorno.com/mr-data/v4/api/quotes/{symbol}?start_date={start}&end_date={end}"
 BCB_SERIES_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{series}/dados/ultimos/1?formato=json"
 BCB_SERIES_RANGE_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{series}/dados?formato=json&dataInicial={start}&dataFinal={end}"
-MARKET_QUOTE_TTL_SECONDS = 6 * 60 * 60
-INDEXER_QUOTE_TTL_SECONDS = 24 * 60 * 60
-QUOTE_MEMORY_CACHE: OrderedDict[str, tuple[datetime, dict | list]] = OrderedDict()
-FX_MEMORY_CACHE: OrderedDict[tuple[str, str], int] = OrderedDict()
-QUOTE_MEMORY_CACHE_LOCK = Lock()
-FX_MEMORY_CACHE_LOCK = Lock()
-QUOTE_MEMORY_CACHE_MAX_ENTRIES = 512
-FX_MEMORY_CACHE_MAX_ENTRIES = 128
+MARKET_QUOTE_TTL_SECONDS = quotes.MARKET_QUOTE_TTL_SECONDS
+INDEXER_QUOTE_TTL_SECONDS = quotes.INDEXER_QUOTE_TTL_SECONDS
+QUOTE_MEMORY_CACHE_MAX_ENTRIES = quotes.QUOTE_MEMORY_CACHE_MAX_ENTRIES
+FX_MEMORY_CACHE_MAX_ENTRIES = quotes.FX_MEMORY_CACHE_MAX_ENTRIES
 
 ASSET_TYPE_LABELS = {
     "stock": "Renda variável",
@@ -44,6 +47,10 @@ ASSET_TYPE_LABELS = {
     "private_pension": "Previdência privada",
     "savings": "Poupança",
     "other": "Outros",
+}
+ALLOCATION_GOAL_LABELS = {
+    **ASSET_TYPE_LABELS,
+    "stock_usd": "Renda variável - USD",
 }
 PORTFOLIO_ACCOUNT_TYPES = {"liquidity", "investment"}
 
@@ -109,150 +116,71 @@ class PortfolioError(Exception):
         super().__init__(message)
 
 
-def get_portfolio(user_id: int, force_refresh: bool = False) -> dict:
-    with get_connection() as conn:
-        operation_rows_raw = conn.execute(
-            """
-            SELECT
-                investment_operations.*,
-                'operation' AS source_type,
-                investment_operations.id AS source_id,
-                1 AS apply_tax_estimate,
-                transactions.date,
-                transactions.description,
-                transactions.amount_cents,
-                transactions.exchange_rate_micros,
-                transactions.amount_brl_cents,
-                checking_accounts.name AS account_name,
-                checking_accounts.currency AS account_currency
-            FROM investment_operations
-            JOIN transactions
-                ON transactions.id = investment_operations.transaction_id
-                AND transactions.user_id = investment_operations.user_id
-                AND transactions.archived_at IS NULL
-                AND (
-                    transactions.reconciled_at IS NOT NULL
-                    OR (
-                        transactions.series_kind = 'single'
-                        AND transactions.date <= DATE('now', 'localtime')
-                    )
-                )
-            JOIN checking_accounts
-                ON checking_accounts.id = investment_operations.account_id
-                AND checking_accounts.user_id = investment_operations.user_id
-            WHERE investment_operations.user_id = ?
-            """,
-            (user_id,),
-        ).fetchall()
-        opening_rows_raw = conn.execute(
-            """
-            SELECT
-                investment_opening_positions.id,
-                'opening' AS source_type,
-                investment_opening_positions.id AS source_id,
-                investment_opening_positions.user_id,
-                NULL AS transaction_id,
-                investment_opening_positions.account_id,
-                investment_opening_positions.asset_type,
-                investment_opening_positions.asset_identifier,
-                investment_opening_positions.asset_name,
-                investment_opening_positions.cnpj,
-                investment_opening_positions.quantity_micros,
-                investment_opening_positions.unit_price_cents,
-                investment_opening_positions.total_cost_cents AS invested_amount_cents,
-                0 AS brokerage_fee_cents,
-                0 AS exchange_fee_cents,
-                0 AS tax_cents,
-                0 AS other_costs_cents,
-                investment_opening_positions.fixed_income_mode,
-                investment_opening_positions.fixed_income_indexer,
-                investment_opening_positions.fixed_income_rate_micros,
-                investment_opening_positions.fixed_income_maturity_date,
-                investment_opening_positions.apply_tax_estimate,
-                investment_opening_positions.emergency_reserve_eligible,
-                investment_opening_positions.savings_anniversaries_json,
-                investment_opening_positions.acquisition_date AS date,
-                'Posicao inicial' AS description,
-                investment_opening_positions.total_cost_cents AS amount_cents,
-                investment_opening_positions.exchange_rate_micros,
-                convert_placeholder.amount_brl_cents AS amount_brl_cents,
-                checking_accounts.name AS account_name,
-                checking_accounts.currency AS account_currency
-            FROM investment_opening_positions
-            JOIN checking_accounts
-                ON checking_accounts.id = investment_opening_positions.account_id
-                AND checking_accounts.user_id = investment_opening_positions.user_id
-            LEFT JOIN (
-                SELECT 0 AS amount_brl_cents
-            ) AS convert_placeholder
-            WHERE investment_opening_positions.user_id = ?
-            """,
-            (user_id,),
-        ).fetchall()
-        redemption_rows = conn.execute(
-            """
-            SELECT
-                source_type,
-                source_id,
-                SUM(redeemed_cost_cents) AS redeemed_cost_cents,
-                SUM(redeemed_quantity_micros) AS redeemed_quantity_micros
-            FROM investment_redemptions
-            WHERE user_id = ?
-            GROUP BY source_type, source_id
-            """,
-            (user_id,),
-        ).fetchall()
-        closed_rows = conn.execute(
-            """
-            SELECT investment_closed_positions.*, checking_accounts.name AS account_name
-            FROM investment_closed_positions
-            JOIN checking_accounts
-                ON checking_accounts.id = investment_closed_positions.account_id
-                AND checking_accounts.user_id = investment_closed_positions.user_id
-            WHERE investment_closed_positions.user_id = ?
-            ORDER BY investment_closed_positions.closed_at DESC, investment_closed_positions.id DESC
-            """,
-            (user_id,),
-        ).fetchall()
-        redemption_summary_rows = conn.execute(
-            """
-            SELECT investment_redemption_summaries.*, checking_accounts.name AS account_name
-            FROM investment_redemption_summaries
-            JOIN checking_accounts
-                ON checking_accounts.id = investment_redemption_summaries.account_id
-                AND checking_accounts.user_id = investment_redemption_summaries.user_id
-            WHERE investment_redemption_summaries.user_id = ?
-            ORDER BY investment_redemption_summaries.date DESC, investment_redemption_summaries.id DESC
-            """,
-            (user_id,),
-        ).fetchall()
+urlopen = quotes.urlopen  # Compatibility seam for existing consumers/tests.
+_quote_cache = quotes.QuoteCache(
+    connection_factory=lambda: get_connection(),
+    read_json=lambda *args, **kwargs: read_json_url(*args, **kwargs),
+    error_type=PortfolioError,
+    clock=lambda: datetime.now(),
+    max_entries=QUOTE_MEMORY_CACHE_MAX_ENTRIES,
+    fx_max_entries=FX_MEMORY_CACHE_MAX_ENTRIES,
+)
+QUOTE_MEMORY_CACHE = _quote_cache.memory
+QUOTE_MEMORY_CACHE_LOCK = _quote_cache.memory_lock
+FX_MEMORY_CACHE = _quote_cache.fx_memory
+FX_MEMORY_CACHE_LOCK = _quote_cache.fx_lock
 
-    redemption_totals = {
-        (row["source_type"], row["source_id"]): {
-            "redeemed_cost_cents": int(row["redeemed_cost_cents"] or 0),
-            "redeemed_quantity_micros": int(row["redeemed_quantity_micros"] or 0),
-        }
-        for row in redemption_rows
-    }
-    operation_rows = [portfolio_row_with_redemptions(row_to_dict(row), redemption_totals) for row in operation_rows_raw]
-    opening_rows = [portfolio_row_with_redemptions(row_to_dict(row), redemption_totals) for row in opening_rows_raw]
-    closed_positions = [format_closed_position(row_to_dict(row)) for row in closed_rows]
-    redemption_history = [format_redemption_summary(row_to_dict(row)) for row in redemption_summary_rows]
-    rows = filter_closed_portfolio_rows([*operation_rows, *opening_rows], closed_positions)
-    rows = sorted(rows, key=lambda row: (row["date"], row["id"]))
-    positions = build_positions(rows)
-    quote_positions(positions, user_id=user_id, force_refresh=force_refresh)
-    apply_value_overrides(user_id, positions)
-    summary = summarize_positions(positions)
-    positions = [format_quoted_position(position) for position in positions]
-    return {
-        "positions": positions,
-        "history": closed_positions,
-        "redemption_history": redemption_history,
-        "summary": summary,
+
+def get_portfolio(user_id: int, force_refresh: bool = False) -> dict:
+    # spec: arquitetura-v2/desconcentracao-arquitetura-v2 v2.3 — critérios 12–14
+    with get_connection() as conn:
+        conn.execute("BEGIN")
+        inputs = positions_store.load_position_inputs(conn, user_id)
+        redemption_rows = positions_store.load_redemption_history(conn, user_id)
+
+    positions = assemble_portfolio_positions(inputs, user_id, force_refresh=force_refresh)
+    closed_rows = sorted(inputs["closed"], key=lambda row: (row["closed_at"], row["id"]), reverse=True)
+    result = {
+        "positions": [format_quoted_position(position) for position in positions],
+        "history": [format_closed_position(row) for row in closed_rows],
+        "redemption_history": [format_redemption_summary(row) for row in redemption_rows],
+        "summary": summarize_positions(positions),
         "indexers": indexer_catalog(),
         "allocation_goals": get_allocation_goals(user_id),
     }
+    result["presentation"] = presentation.build_presentation(result["positions"], result["summary"], result["allocation_goals"])
+    return result
+
+
+def get_portfolio_events(user_id: int, force_refresh: bool = False, start_date: date | None = None) -> dict:
+    # Fecha o snapshot SQLite antes de qualquer consulta ao provedor externo.
+    with get_connection() as conn:
+        conn.execute("BEGIN")
+        inputs = positions_store.load_position_inputs(conn, user_id)
+    event_assets = events.build_event_assets(build_unquoted_portfolio_positions(inputs), yahoo_symbol)
+    return events.get_events(
+        event_assets,
+        cached_json=cached_json_url,
+        cached_calendar=cached_yahoo_calendar,
+        error_type=PortfolioError,
+        force_refresh=force_refresh,
+        start_date=start_date,
+        holidays=load_holiday_dates(get_connection),
+    )
+
+
+def cached_yahoo_calendar(symbol: str, message: str, cache_key: str, ttl_seconds: int, force_refresh: bool = False) -> dict:
+    return _quote_cache.cached_loader(
+        cache_key,
+        message,
+        ttl_seconds,
+        lambda: quotes.read_yahoo_calendar_json(symbol, message, opener=urlopen, error_type=PortfolioError),
+        force_refresh=force_refresh,
+    )
+
+
+def preview_portfolio(data: dict) -> dict:
+    return presentation.preview(data, PortfolioError)
 
 
 def get_allocation_goals(user_id: int) -> list[dict]:
@@ -268,12 +196,12 @@ def get_allocation_goals(user_id: int) -> list[dict]:
             "label": label,
             "target_percent": decimal_to_string(Decimal(goals.get(asset_type, 0)) / MICRO_SCALE),
         }
-        for asset_type, label in ASSET_TYPE_LABELS.items()
+        for asset_type, label in ALLOCATION_GOAL_LABELS.items()
     ]
 
 
 def save_allocation_goals(user_id: int, data: dict) -> dict:
-    # spec: investimentos-portfolio v2.43 — critérios 62-66
+    # spec: investimentos-portfolio v2.53 — critérios 62-66
     raw_goals = data.get("goals")
     if not isinstance(raw_goals, list):
         raise PortfolioError("Informe as metas de alocacao.")
@@ -282,7 +210,7 @@ def save_allocation_goals(user_id: int, data: dict) -> dict:
         if not isinstance(item, dict):
             raise PortfolioError("Meta de alocacao invalida.")
         asset_type = str(item.get("asset_type") or "").strip().lower()
-        if asset_type not in ASSET_TYPE_LABELS or asset_type in normalized:
+        if asset_type not in ALLOCATION_GOAL_LABELS or asset_type in normalized:
             raise PortfolioError("Classe de ativo invalida ou duplicada.")
         target_micros = decimal_to_micros(item.get("target_percent"))
         if target_micros < 0 or target_micros > int(Decimal("100") * MICRO_SCALE):
@@ -301,6 +229,10 @@ def save_allocation_goals(user_id: int, data: dict) -> dict:
             [(user_id, asset_type, target) for asset_type, target in normalized.items() if target > 0],
         )
     return get_portfolio(user_id)
+
+
+def allocation_goal_key(position: dict) -> str:
+    return positions_store.allocation_goal_key(position)
 
 
 def portfolio_row_with_redemptions(row: dict, redemption_totals: dict[tuple, dict]) -> dict:
@@ -501,7 +433,7 @@ def delete_opening_position(user_id: int, position_id: object) -> dict:
 
 
 def redeem_position(user_id: int, data: dict) -> dict:
-    # spec: investimentos-portfolio v2.43 — criterios 9, 55-58
+    # spec: investimentos-portfolio v2.53 — criterios 9, 55-58
     # (em posicao com multiplas origens, o consumo do resgate segue FIFO pela
     #  data da primeira operacao — candidates.sort abaixo garante essa ordem)
     selector = normalize_redemption_selector(data)
@@ -531,15 +463,10 @@ def redeem_position(user_id: int, data: dict) -> dict:
         ).fetchone()
         if not account:
             raise PortfolioError("Conta da carteira nao encontrada.", HTTPStatus.NOT_FOUND)
-    # B5: warm the quote cache outside the write lock, so the recompute below only
-    # reads cache/database and never issues an external call with the transaction open.
-    current_portfolio_positions(user_id)
+    inputs, positions = prepare_portfolio_positions(user_id)
     with get_connection() as conn:
         begin_immediate(conn)
-        # B5: recompute positions and candidates inside the write transaction so
-        # validation and consumption use a snapshot consistent with the committed
-        # state (no TOCTOU between an out-of-lock read and the inserts below).
-        positions = current_portfolio_positions(user_id)
+        assert_portfolio_inputs_unchanged(conn, user_id, inputs)
         candidates = [
             candidate
             for position in positions
@@ -721,9 +648,7 @@ def close_position(user_id: int, data: dict) -> dict:
         ).fetchone()
         if not account:
             raise PortfolioError("Conta da carteira nao encontrada.", HTTPStatus.NOT_FOUND)
-    # B5: warm the quote cache outside the write lock, so the recompute below only
-    # reads cache/database and never issues an external call with the transaction open.
-    positions = current_portfolio_positions(user_id)
+    inputs, positions = prepare_portfolio_positions(user_id)
     matches = [
         position for position in positions
         if matches_redemption_selector(position, selector)
@@ -735,10 +660,7 @@ def close_position(user_id: int, data: dict) -> dict:
     closing_value_brl_cents = convert_to_brl_cents(closing_value_cents, exchange_rate_micros)
     with get_connection() as conn:
         begin_immediate(conn)
-        # B5: recompute positions and matches inside the write transaction so the
-        # aggregation/snapshot and the upsert below use a state consistent with
-        # the committed DB (no TOCTOU between the read and the insert).
-        positions = current_portfolio_positions(user_id)
+        assert_portfolio_inputs_unchanged(conn, user_id, inputs)
         matches = [
             position for position in positions
             if matches_redemption_selector(position, selector)
@@ -857,7 +779,7 @@ def close_position(user_id: int, data: dict) -> dict:
 
 
 def should_register_closing_credit(data: dict) -> bool:
-    # spec: investimentos-portfolio v2.43 — criterios 10-11
+    # spec: investimentos-portfolio v2.53 — criterios 10-11
     # (a opcao de credito e opt-in explicito e vem desmarcada por padrao no
     #  formulario, justamente para evitar duplicidade com resgates ja lancados)
     return str(data.get("register_credit") or "").strip().lower() in {"1", "true", "on", "yes", "sim"}
@@ -897,77 +819,50 @@ def record_portfolio_closing_credit(
 
 
 def current_portfolio_positions(user_id: int, force_refresh: bool = False) -> list[dict]:
+    return prepare_portfolio_positions(user_id, force_refresh=force_refresh)[1]
+
+
+def prepare_portfolio_positions(user_id: int, force_refresh: bool = False) -> tuple[dict, list[dict]]:
+    # spec: investimentos/investimentos-portfolio v2.53 — critérios 77-79
+    # Fecha o snapshot de leitura antes de consultar cotações, indexadores ou câmbio.
     with get_connection() as conn:
-        operation_rows_raw = conn.execute(
-            """
-            SELECT investment_operations.*, 'operation' AS source_type, investment_operations.id AS source_id,
-                1 AS apply_tax_estimate, transactions.date, transactions.description, transactions.amount_cents,
-                transactions.exchange_rate_micros, transactions.amount_brl_cents,
-                checking_accounts.name AS account_name, checking_accounts.currency AS account_currency
-            FROM investment_operations
-            JOIN transactions ON transactions.id = investment_operations.transaction_id
-                AND transactions.user_id = investment_operations.user_id
-                AND transactions.archived_at IS NULL
-                AND (
-                    transactions.reconciled_at IS NOT NULL
-                    OR (
-                        transactions.series_kind = 'single'
-                        AND transactions.date <= DATE('now', 'localtime')
-                    )
-                )
-            JOIN checking_accounts ON checking_accounts.id = investment_operations.account_id
-                AND checking_accounts.user_id = investment_operations.user_id
-            WHERE investment_operations.user_id = ?
-            """,
-            (user_id,),
-        ).fetchall()
-        opening_rows_raw = conn.execute(
-            """
-            SELECT investment_opening_positions.id, 'opening' AS source_type,
-                investment_opening_positions.id AS source_id, investment_opening_positions.user_id,
-                NULL AS transaction_id, investment_opening_positions.account_id,
-                investment_opening_positions.asset_type, investment_opening_positions.asset_identifier,
-                investment_opening_positions.asset_name, investment_opening_positions.cnpj,
-                investment_opening_positions.quantity_micros, investment_opening_positions.unit_price_cents,
-                investment_opening_positions.total_cost_cents AS invested_amount_cents,
-                0 AS brokerage_fee_cents, 0 AS exchange_fee_cents, 0 AS tax_cents, 0 AS other_costs_cents,
-                investment_opening_positions.fixed_income_mode, investment_opening_positions.fixed_income_indexer,
-                investment_opening_positions.fixed_income_rate_micros, investment_opening_positions.fixed_income_maturity_date,
-                investment_opening_positions.apply_tax_estimate, investment_opening_positions.emergency_reserve_eligible,
-                investment_opening_positions.savings_anniversaries_json,
-                investment_opening_positions.acquisition_date AS date,
-                'Posicao inicial' AS description, investment_opening_positions.total_cost_cents AS amount_cents,
-                investment_opening_positions.exchange_rate_micros, 0 AS amount_brl_cents,
-                checking_accounts.name AS account_name, checking_accounts.currency AS account_currency
-            FROM investment_opening_positions
-            JOIN checking_accounts ON checking_accounts.id = investment_opening_positions.account_id
-                AND checking_accounts.user_id = investment_opening_positions.user_id
-            WHERE investment_opening_positions.user_id = ?
-            """,
-            (user_id,),
-        ).fetchall()
-        redemption_rows = conn.execute(
-            """
-            SELECT source_type, source_id, SUM(redeemed_cost_cents) AS redeemed_cost_cents,
-                SUM(redeemed_quantity_micros) AS redeemed_quantity_micros
-            FROM investment_redemptions
-            WHERE user_id = ?
-            GROUP BY source_type, source_id
-            """,
-            (user_id,),
-        ).fetchall()
-        closed_rows = conn.execute(
-            "SELECT * FROM investment_closed_positions WHERE user_id = ?",
-            (user_id,),
-        ).fetchall()
-    redemption_totals = {(row["source_type"], row["source_id"]): {"redeemed_cost_cents": int(row["redeemed_cost_cents"] or 0), "redeemed_quantity_micros": int(row["redeemed_quantity_micros"] or 0)} for row in redemption_rows}
-    closed_positions = [format_closed_position(row_to_dict(row)) for row in closed_rows]
-    rows = [portfolio_row_with_redemptions(row_to_dict(row), redemption_totals) for row in [*operation_rows_raw, *opening_rows_raw]]
-    rows = filter_closed_portfolio_rows(rows, closed_positions)
-    positions = build_positions(sorted(rows, key=lambda row: (row["date"], row["id"])))
+        conn.execute("BEGIN")
+        inputs = positions_store.load_position_inputs(conn, user_id)
+    return inputs, assemble_portfolio_positions(inputs, user_id, force_refresh=force_refresh)
+
+
+def assemble_portfolio_positions(inputs: dict, user_id: int, force_refresh: bool = False) -> list[dict]:
+    """Monta e valoriza um snapshot já desconectado, sem modificar suas entradas."""
+    # spec: arquitetura-v2/desconcentracao-arquitetura-v2 v2.3 — critérios 12 e 13
+    positions = build_unquoted_portfolio_positions(inputs)
     quote_positions(positions, user_id=user_id, force_refresh=force_refresh)
-    apply_value_overrides(user_id, positions)
+    apply_value_overrides(user_id, positions, rows=inputs["overrides"])
     return positions
+
+
+def build_unquoted_portfolio_positions(inputs: dict) -> list[dict]:
+    """Monta posições abertas a partir do snapshot local, sem SQL ou rede."""
+    redemption_totals = {
+        (row["source_type"], row["source_id"]): {
+            "redeemed_cost_cents": int(row["redeemed_cost_cents"] or 0),
+            "redeemed_quantity_micros": int(row["redeemed_quantity_micros"] or 0),
+        }
+        for row in inputs["redemptions"]
+    }
+    closed_positions = [format_closed_position(row_to_dict(row)) for row in inputs["closed"]]
+    rows = [portfolio_row_with_redemptions(row_to_dict(row), redemption_totals) for row in [*inputs["operations"], *inputs["openings"]]]
+    rows = filter_closed_portfolio_rows(rows, closed_positions)
+    return build_positions(sorted(rows, key=lambda row: (row["date"], row["id"])))
+
+
+def assert_portfolio_inputs_unchanged(conn, user_id: int, inputs: dict) -> None:
+    # spec: investimentos/investimentos-portfolio v2.53 — critério 78
+    # BEGIN IMMEDIATE protege esta revalidação e todas as gravações seguintes.
+    if positions_store.load_position_inputs(conn, user_id) != inputs:
+        raise PortfolioError(
+            "A carteira foi alterada durante a operacao. Atualize e tente novamente.",
+            HTTPStatus.CONFLICT,
+        )
 
 
 def filter_closed_portfolio_rows(rows: list[dict], closed_positions: list[dict]) -> list[dict]:
@@ -1051,7 +946,7 @@ def aggregate_backend_positions(positions: list[dict]) -> dict:
 
 
 def decimal_to_micros_value(value: Decimal) -> int:
-    return int((Decimal(value or 0) * MICRO_SCALE).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    return positions_store.decimal_to_micros_value(Decimal(value or 0))
 
 
 def common_value(positions: list[dict], key: str) -> str:
@@ -1191,7 +1086,7 @@ def normalize_opening_position_payload(data: dict) -> dict:
 
 
 def normalize_emergency_reserve_eligible(data: dict, asset_type: str) -> int:
-    # spec: investimentos/investimentos-portfolio v2.43 — critérios 20 e 21
+    # spec: investimentos/investimentos-portfolio v2.53 — critérios 20 e 21
     if asset_type not in {"fixed_income", "savings"}:
         return 0
     return 1 if str(data.get("emergency_reserve_eligible") or "").strip().lower() in {"1", "true", "on", "yes"} else 0
@@ -1279,23 +1174,10 @@ def parse_savings_anniversaries(value: object, fallback_date: object, fallback_a
 
 
 def consume_savings_anniversaries_fifo(entries: list[dict], redeemed_cost_cents: int) -> list[dict]:
-    # spec: investimentos-portfolio v2.43 — criterio poupanca-resgate-fifo
+    # spec: investimentos-portfolio v2.53 — criterio poupanca-resgate-fifo
     # (resgates de poupanca consomem primeiro os aniversarios mais antigos para
     # manter a base de rentabilidade alinhada ao saldo remanescente por lote)
-    remaining_redeemed = max(int(redeemed_cost_cents or 0), 0)
-    adjusted = []
-    for entry in sorted(entries, key=lambda item: str(item.get("date") or "")):
-        amount_cents = int(entry.get("amount_cents") or 0)
-        if amount_cents <= 0:
-            continue
-        if remaining_redeemed >= amount_cents:
-            remaining_redeemed -= amount_cents
-            continue
-        if remaining_redeemed > 0:
-            amount_cents -= remaining_redeemed
-            remaining_redeemed = 0
-        adjusted.append({"date": str(entry.get("date") or ""), "amount_cents": amount_cents})
-    return adjusted
+    return positions_store.consume_savings_anniversaries_fifo(entries, redeemed_cost_cents)
 
 
 def normalize_position_value_override_payload(data: dict) -> dict:
@@ -1319,18 +1201,19 @@ def normalize_position_value_override_payload(data: dict) -> dict:
     }
 
 
-def apply_value_overrides(user_id: int, positions: list[dict]) -> None:
+def apply_value_overrides(user_id: int, positions: list[dict], *, rows=None) -> None:
     if not positions:
         return
-    with get_connection() as conn:
-        rows = conn.execute(
-            """
-            SELECT *
-            FROM investment_value_overrides
-            WHERE user_id = ?
-            """,
-            (user_id,),
-        ).fetchall()
+    if rows is None:
+        with get_connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT *
+                FROM investment_value_overrides
+                WHERE user_id = ?
+                """,
+                (user_id,),
+            ).fetchall()
     overrides = {portfolio_override_key(row_to_dict(row)): row_to_dict(row) for row in rows}
     for position in positions:
         override = overrides.get(portfolio_override_key(position))
@@ -1372,7 +1255,7 @@ def resolve_position_exchange_rate(currency: str, acquisition_date: str, raw_rat
         return rate_to_micros(Decimal("1"))
     if str(raw_rate or "").strip():
         return rate_to_micros(parse_exchange_rate(raw_rate))
-    # spec: investimentos-portfolio v2.43 — criterio 48
+    # spec: investimentos-portfolio v2.53 — criterio 48
     # (sem cotacao manual, consulta a ultima PTAX de venda disponivel
     #  ate a data de aquisicao, como em Lancamentos)
     return rate_to_micros(get_exchange_rate_to_brl(currency, acquisition_date))
@@ -1380,18 +1263,14 @@ def resolve_position_exchange_rate(currency: str, acquisition_date: str, raw_rat
 
 def normalize_id(value: object, message: str) -> int:
     try:
-        normalized = int(str(value or "").strip())
+        return positive_int_id(value)
     except ValueError as exc:
         raise PortfolioError(message) from exc
-    if normalized <= 0:
-        raise PortfolioError(message)
-    return normalized
 
 
 def normalize_date(value: object) -> str:
-    raw = str(value or "").strip()
     try:
-        return date.fromisoformat(raw).isoformat()
+        return normalize_iso_date(value)
     except ValueError as exc:
         raise PortfolioError("Informe uma data valida.") from exc
 
@@ -1401,7 +1280,7 @@ def normalize_optional_date(value: object) -> str | None:
     if not raw:
         return None
     try:
-        return date.fromisoformat(raw).isoformat()
+        return normalize_iso_date(raw)
     except ValueError as exc:
         raise PortfolioError("Informe uma data valida.") from exc
 
@@ -1609,7 +1488,7 @@ def apply_market_quote(position: dict, force_refresh: bool = False) -> None:
 
 
 def apply_fund_quote(position: dict, user_id: int | None = None, force_refresh: bool = False) -> None:
-    # spec: investimentos/investimentos-portfolio v2.43 — criterios 27 e 28
+    # spec: investimentos/investimentos-portfolio v2.53 — criterios 27 e 28
     # (cotas de fundos via API Mais Retorno: opt-in configurado nas Preferencias,
     #  posicao com CNPJ e carteira em BRL; sem isso a posicao mantem valor de
     #  custo com status "Cotacao manual pendente")
@@ -1633,7 +1512,7 @@ def apply_fund_quote(position: dict, user_id: int | None = None, force_refresh: 
 
 
 def fetch_fund_quote_for_user(user_id: int, cnpj: str, force_refresh: bool = False) -> dict:
-    # spec: lancamentos v3.25 — criterio cota-fundo-lancamento
+    # spec: lancamentos v3.35 — criterio cota-fundo-lancamento
     # (busca assistida de cota de fundo no formulario de aporte; o preco segue editavel)
     identifier = mais_retorno_identifier_from_cnpj(cnpj)
     if not identifier:
@@ -1652,7 +1531,7 @@ def fetch_fund_quote_for_user(user_id: int, cnpj: str, force_refresh: bool = Fal
 
 
 def mais_retorno_fund_identifier(position: dict) -> str:
-    # spec: investimentos/investimentos-portfolio v2.43 — criterio fundos-mais-retorno
+    # spec: investimentos/investimentos-portfolio v2.53 — criterio fundos-mais-retorno
     # (API exige CNPJ somente com digitos, sem pontos/barra, mais sufixo ":fi")
     return mais_retorno_identifier_from_cnpj(position.get("cnpj"))
 
@@ -1670,7 +1549,7 @@ def mais_retorno_quotes_for_range(
     force_refresh: bool = False,
     cache_suffix: str = "",
 ) -> list:
-    # spec: investimentos/investimentos-portfolio v2.43 — criterios 27 e 28:
+    # spec: investimentos/investimentos-portfolio v2.53 — criterios 27 e 28:
     # range de datas questionado junto com a data atual; cache diario (ate o
     # fim do dia) para evitar re-consumo da API ao entrar na tela no mesmo dia
     url = MAIS_RETORNO_QUOTES_URL.format(symbol=quote(identifier), start=start, end=end)
@@ -1691,7 +1570,7 @@ def mais_retorno_quotes_for_range(
 
 def fetch_mais_retorno_quote(identifier: str, api_key: str, force_refresh: bool = False) -> dict:
     today = date.today().isoformat()
-    # spec: investimentos/investimentos-portfolio v2.43 — criterios 27 e 28:
+    # spec: investimentos/investimentos-portfolio v2.53 — criterios 27 e 28:
     # 1a tentativa sempre com a data atual; em dias sem cota publicada (fim de
     # semana/feriado) a API retorna lista vazia, entao re-consulta com janela
     # retroativa de 7 dias e usa a ultima cota publicada
@@ -1707,7 +1586,7 @@ def fetch_mais_retorno_quote(identifier: str, api_key: str, force_refresh: bool 
         latest = max(quotes, key=lambda item: str(item["d"]))
         earlier = [item for item in quotes if str(item["d"]) < str(latest["d"])]
         previous = max(earlier, key=lambda item: str(item["d"])) if earlier else latest
-        # spec: investimentos/investimentos-portfolio v2.43 — criterios 27 e 28:
+        # spec: investimentos/investimentos-portfolio v2.53 — criterios 27 e 28:
         # a API usa "." como separador decimal (JSON); normaliza virgula por
         # seguranca antes de converter para Decimal
         price = Decimal(str(latest["c"]).replace(",", "."))
@@ -1726,34 +1605,7 @@ def fetch_mais_retorno_quote(identifier: str, api_key: str, force_refresh: bool 
 
 
 def apply_fixed_income_value(position: dict, force_refresh: bool = False) -> None:
-    today = date.today()
-    factor_cache: dict[str, Decimal] = {}
-    net_cents, gross_cents, iof_tax_cents, income_tax_cents, custody_fee_cents, rate_factor, source = fixed_income_value_as_of(
-        position, today, force_refresh=force_refresh, factor_cache=factor_cache
-    )
-    mode = position["fixed_income_mode"] or "post"
-    indexer = position["fixed_income_indexer"] or "CDI"
-    annual_rate = parse_rate_decimal(position.get("fixed_income_rate"))
-    position["quote"] = fixed_income_quote_label(mode, indexer, annual_rate, rate_factor)
-    position["quote_source"] = source
-    position["quote_status"] = "ok"
-    position["quote_date"] = date.today().isoformat()
-    position["current_value_cents"] = net_cents
-    position["current_value_brl_cents"] = value_to_brl(position["current_value_cents"], position["currency"])
-    position["fixed_income_gross_value_cents"] = gross_cents
-    position["fixed_income_iof_tax_cents"] = iof_tax_cents
-    position["fixed_income_income_tax_cents"] = income_tax_cents
-    position["fixed_income_custody_fee_cents"] = custody_fee_cents
-    position["fixed_income_net_value_cents"] = net_cents
-    position["day_result_cents"] = day_variation_cents(
-        position,
-        net_cents,
-        today,
-        lambda pos, as_of, refresh, cache: fixed_income_value_as_of(pos, as_of, force_refresh=refresh, factor_cache=cache)[0],
-        force_refresh=force_refresh,
-        factor_cache=factor_cache,
-    )
-    position["day_result_brl_cents"] = value_to_brl(position["day_result_cents"], position["currency"])
+    return _valuation.apply_fixed_income_value(position=position, force_refresh=force_refresh)
 
 
 def day_variation_cents(
@@ -1764,19 +1616,7 @@ def day_variation_cents(
     force_refresh: bool = False,
     factor_cache: dict[str, Decimal] | None = None,
 ) -> int:
-    # spec: investimentos/investimentos-portfolio v2.43 — criterios 43 a 45
-    # (variacao do dia = valor hoje menos valor no dia anterior, com a base de
-    #  comparacao limitada a data de aquisicao: no dia da aquisicao a variacao
-    #  exibida e zero. Para pos-fixados, dias sem taxa publicada (fim de
-    #  semana/feriado) naturalmente produzem variacao zero no indexador)
-    baseline_date = date.fromisoformat(position["first_operation_date"])
-    if as_of_date <= baseline_date:
-        return 0
-    previous_date = as_of_date - timedelta(days=1)
-    if previous_date < baseline_date:
-        previous_date = baseline_date
-    previous_value = int(value_provider(position, previous_date, force_refresh, factor_cache))
-    return current_value_cents - previous_value
+    return _valuation.day_variation_cents(position=position, current_value_cents=current_value_cents, as_of_date=as_of_date, value_provider=value_provider, force_refresh=force_refresh, factor_cache=factor_cache)
 
 
 def fixed_income_value_as_of(
@@ -1785,71 +1625,7 @@ def fixed_income_value_as_of(
     force_refresh: bool = False,
     factor_cache: dict[str, Decimal] | None = None,
 ) -> tuple[int, int, int, int, int, Decimal, str]:
-    start_date = date.fromisoformat(position["first_operation_date"])
-    if as_of_date < start_date:
-        return 0, 0, 0, 0, 0, Decimal("0"), "Taxa cadastrada"
-    maturity_date = parse_optional_iso_date(position.get("fixed_income_maturity_date"))
-    end_date = min(as_of_date, maturity_date) if maturity_date else as_of_date
-    days = max((end_date - start_date).days, 0)
-    annual_rate = parse_rate_decimal(position.get("fixed_income_rate"))
-    mode = position["fixed_income_mode"] or "post"
-    indexer = position["fixed_income_indexer"] or "CDI"
-    rate_factor = Decimal("0")
-    gross_factor = Decimal("1")
-    source = "Taxa cadastrada"
-    try:
-        if mode == "pre":
-            rate_factor = annual_rate / Decimal("100")
-            gross_factor = compound_annual_factor(rate_factor, days)
-        else:
-            multiplier = annual_rate / Decimal("100") if annual_rate else Decimal("1")
-            if factor_cache is not None:
-                indexer_factor = _accumulated_factor_by_month(
-                    indexer, start_date, end_date, multiplier, factor_cache, force_refresh=force_refresh
-                )
-            else:
-                indexer_factor = fetch_accumulated_indexer_factor(indexer, start_date, end_date, multiplier, force_refresh=force_refresh)
-            source = f"Banco Central SGS ({indexer} acumulado)"
-            if mode == "hybrid":
-                if factor_cache is not None:
-                    indexer_factor_plain = _accumulated_factor_by_month(
-                        indexer, start_date, end_date, Decimal("1"), factor_cache, force_refresh=force_refresh
-                    )
-                else:
-                    indexer_factor_plain = fetch_accumulated_indexer_factor(indexer, start_date, end_date, force_refresh=force_refresh)
-                rate_factor = indexer_factor_plain - Decimal("1") + annual_rate / Decimal("100")
-                gross_factor = indexer_factor_plain * compound_annual_factor(annual_rate / Decimal("100"), days)
-            else:
-                rate_factor = indexer_factor - Decimal("1")
-                gross_factor = indexer_factor
-    except PortfolioError:
-        if mode == "pre":
-            rate_factor = annual_rate / Decimal("100")
-            gross_factor = compound_annual_factor(rate_factor, days)
-        else:
-            fallback_indexer_rate = fallback_indexer_annual_rate(indexer)
-            multiplier = annual_rate / Decimal("100") if annual_rate else Decimal("1")
-            fallback_indexer_factor = compound_annual_factor(fallback_indexer_rate * multiplier, days)
-            source = f"Estimativa local ({indexer}); Banco Central indisponivel"
-            if mode == "hybrid":
-                fallback_indexer_factor = compound_annual_factor(fallback_indexer_rate, days)
-                rate_factor = fallback_indexer_factor - Decimal("1") + annual_rate / Decimal("100")
-                gross_factor = fallback_indexer_factor * compound_annual_factor(annual_rate / Decimal("100"), days)
-            else:
-                rate_factor = fallback_indexer_factor - Decimal("1")
-                gross_factor = fallback_indexer_factor
-    gross = Decimal(position["total_cost_cents"]) * gross_factor
-    gross_cents = int(gross.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
-    iof_tax_cents = 0
-    income_tax_cents = 0
-    custody_fee_cents = fixed_income_custody_fee_cents(position, gross_cents, days)
-    net_cents = gross_cents
-    if should_apply_fixed_income_taxes(position):
-        gross_profit_cents = max(gross_cents - position["total_cost_cents"], 0)
-        iof_tax_cents = fixed_income_iof_tax_cents(gross_profit_cents, days)
-        income_tax_cents = fixed_income_income_tax_cents(max(gross_profit_cents - iof_tax_cents, 0), days)
-        net_cents = max(gross_cents - iof_tax_cents - income_tax_cents - custody_fee_cents, 0)
-    return net_cents, gross_cents, iof_tax_cents, income_tax_cents, custody_fee_cents, rate_factor, source
+    return _valuation.fixed_income_value_as_of(position=position, as_of_date=as_of_date, force_refresh=force_refresh, factor_cache=factor_cache)
 
 
 def _position_value_native_as_of(
@@ -1858,14 +1634,18 @@ def _position_value_native_as_of(
     force_refresh: bool = False,
     factor_cache: dict[str, Decimal] | None = None,
 ) -> int:
-    # spec: rentabilidade-portfolio v1.7 — critério 4
-    if as_of_date < date.fromisoformat(position["first_operation_date"]):
-        return 0
-    if position["asset_type"] == "fixed_income":
-        return fixed_income_value_as_of(position, as_of_date, force_refresh=force_refresh, factor_cache=factor_cache)[0]
-    if position["asset_type"] == "savings":
-        return savings_value_as_of(position, as_of_date, force_refresh=force_refresh, factor_cache=factor_cache)
-    return int(position.get("current_value_cents") or 0)
+    return _valuation._position_value_native_as_of(position=position, as_of_date=as_of_date, force_refresh=force_refresh, factor_cache=factor_cache)
+
+
+def position_value_snapshot_metadata(
+    position: dict,
+    as_of_date: date,
+    force_refresh: bool = False,
+    factor_cache: dict[str, Decimal] | None = None,
+) -> dict:
+    return _valuation.position_value_snapshot_metadata(
+        position=position, as_of_date=as_of_date, force_refresh=force_refresh, factor_cache=factor_cache
+    )
 
 
 def _accumulated_factor_by_month(
@@ -1876,223 +1656,122 @@ def _accumulated_factor_by_month(
     month_cache: dict[str, Decimal],
     force_refresh: bool = False,
 ) -> Decimal:
-    # Decomposicao exata do fator acumulado em fatores mensais com cache
-    # compartilhado: evita N x 12 requisicoes BCB distintas no cache frio.
-    # Para indexadores diarios o produto por dia e associativo; para indexadores
-    # mensais (IPCA/IGP-M) o peso de overlap por mes se preserva na divisao
-    # em limites de mes. Fallback de payload vazio tambem e decomponivel
-    # (juros compostos somam expoentes), mantendo resultado identico.
-    if end_date < start_date:
-        return Decimal("1")
-    factor = Decimal("1")
-    month = date(start_date.year, start_date.month, 1)
-    last_month = date(end_date.year, end_date.month, 1)
-    while month <= last_month:
-        segment_start = max(month, start_date)
-        segment_end = min(add_months(month, 1) - timedelta(days=1), end_date)
-        cache_key = f"{indexer}:{multiplier}:{segment_start.isoformat()}:{segment_end.isoformat()}"
-        if cache_key not in month_cache:
-            month_cache[cache_key] = fetch_accumulated_indexer_factor(
-                indexer, segment_start, segment_end, multiplier, force_refresh=force_refresh
-            )
-        factor *= month_cache[cache_key]
-        month = add_months(month, 1)
-    return factor
+    return _valuation._accumulated_factor_by_month(indexer=indexer, start_date=start_date, end_date=end_date, multiplier=multiplier, month_cache=month_cache, force_refresh=force_refresh)
 
 
 def _monthly_return_pct(prev_value: int, end_value: int, net_contribution: int) -> Decimal:
-    denominator = max(prev_value + max(net_contribution, 0), 1)
-    return (Decimal(end_value - prev_value - net_contribution) * Decimal("100")) / Decimal(denominator)
+    return _returns._monthly_return_pct(prev_value=prev_value, end_value=end_value, net_contribution=net_contribution)
 
 
 def get_portfolio_returns(user_id: int, force_refresh: bool = False, positions: list[dict] | None = None) -> dict:
-    # spec: rentabilidade-portfolio v1.7 — critérios 1 a 10
-    # Rentabilidade mensal (em percentual) por moeda consolidada (BRL e USD),
-    # comparada ao CDI e ao IPCA do mês. Últimos 12 meses, ou todos os meses
-    # disponíveis quando a base é menor. Cada moeda é calculada na própria
-    # moeda (valores nativos), sem efeito de câmbio na série.
-    try:
-        if positions is None:
-            portfolio = get_portfolio(user_id, force_refresh=force_refresh)
-            positions = portfolio.get("positions") or []
-        if not positions:
-            return {"series": [], "start_month": None, "end_month": None, "has_historical_approximation": False, "error": None}
+    resolved_positions = positions
+    if resolved_positions is None:
+        resolved_positions = (get_portfolio(user_id, force_refresh=force_refresh).get("positions") or [])
+    if resolved_positions:
+        _capture_current_portfolio_snapshot(user_id, resolved_positions, force_refresh=force_refresh)
+    return _returns.get_portfolio_returns(user_id=user_id, force_refresh=force_refresh, positions=resolved_positions)
 
-        today = date.today()
-        end_month = date(today.year, today.month, 1)
-        first_operation_date = min(date.fromisoformat(position["first_operation_date"]) for position in positions)
-        start_month = date(first_operation_date.year, first_operation_date.month, 1)
-        max_start_month = add_months(end_month, -11)
-        if start_month < max_start_month:
-            start_month = max_start_month
 
-        months = []
-        current = start_month
-        while current <= end_month:
-            months.append(current)
-            current = add_months(current, 1)
+def _capture_current_portfolio_snapshot(user_id: int, positions: list[dict], *, force_refresh: bool = False) -> None:
+    """Captura a competência atual após toda valorização e rede estarem concluídas."""
+    reference_date = date.today()
+    snapshot_month = reference_date.strftime("%Y-%m")
+    previous_rows = _list_portfolio_snapshots(user_id)
+    previous_by_asset = {}
+    for row in previous_rows:
+        if row["snapshot_month"] >= snapshot_month:
+            continue
+        key = (row["account_id"], row["currency"], row["asset_type"], row["asset_identifier"], row["asset_name"])
+        if key not in previous_by_asset or row["snapshot_month"] > previous_by_asset[key]["snapshot_month"]:
+            previous_by_asset[key] = row
+    factor_cache: dict[str, Decimal] = {}
+    snapshots_by_asset: dict[tuple, dict] = {}
+    for position in positions:
+        metadata = position_value_snapshot_metadata(
+            position, reference_date, force_refresh=force_refresh, factor_cache=factor_cache
+        )
+        asset_key = (
+            int(position["account_id"]), str(position.get("currency") or "BRL").upper(),
+            position.get("asset_type") or "other", position.get("asset_identifier") or "",
+            position.get("asset_name") or "",
+        )
+        current_cost = int(position.get("total_cost_cents") or 0)
+        quantity_micros = decimal_to_micros_value(Decimal(str(position.get("quantity") or 0)))
+        first_operation = date.fromisoformat(position["first_operation_date"])
+        snapshot = snapshots_by_asset.setdefault(asset_key, {
+            "user_id": user_id,
+            "snapshot_month": snapshot_month,
+            "as_of_date": metadata["as_of_date"],
+            "account_id": int(position["account_id"]),
+            "currency": str(position.get("currency") or "BRL").upper(),
+            "asset_type": position.get("asset_type") or "other",
+            "asset_identifier": position.get("asset_identifier") or "",
+            "asset_name": position.get("asset_name") or "",
+            "quantity_micros": 0,
+            "unit_price_cents": 0,
+            "market_value_cents": 0,
+            "cost_basis_cents": 0,
+            "contribution_cents": 0,
+            "redemption_cents": 0,
+            "dividend_cents": 0,
+            "quote_source": metadata["quote_source"],
+            "valuation_status": metadata["valuation_status"],
+        })
+        # spec: rentabilidade-portfolio v2.9 — critérios 9, 10 e 14
+        # A posição apresentada pode conter vários lotes com a mesma identidade.
+        # O snapshot é único por ativo, portanto consolida os lotes antes do
+        # UPSERT para que nenhum valor seja substituído pelo último lote.
+        snapshot["quantity_micros"] += quantity_micros
+        snapshot["market_value_cents"] += int(metadata["value_cents"])
+        snapshot["cost_basis_cents"] += current_cost
+        if first_operation.strftime("%Y-%m") == snapshot_month:
+            snapshot["contribution_cents"] += current_cost
+        if metadata["valuation_status"] != "observed":
+            snapshot["valuation_status"] = "approximate"
+        if metadata["as_of_date"] < snapshot["as_of_date"]:
+            snapshot["as_of_date"] = metadata["as_of_date"]
+        if metadata["quote_source"] != snapshot["quote_source"]:
+            snapshot["quote_source"] = "mixed"
 
-        currency_order = []
-        seen = set()
-        for position in positions:
-            currency = str(position.get("currency") or "BRL").upper()
-            if currency not in seen:
-                seen.add(currency)
-                currency_order.append(currency)
+    snapshots = list(snapshots_by_asset.values())
+    for snapshot in snapshots:
+        asset_key = (
+            snapshot["account_id"], snapshot["currency"], snapshot["asset_type"],
+            snapshot["asset_identifier"], snapshot["asset_name"],
+        )
+        previous_snapshot = previous_by_asset.get(asset_key)
+        if previous_snapshot is not None:
+            cost_delta = snapshot["cost_basis_cents"] - int(previous_snapshot.get("cost_basis_cents") or 0)
+            snapshot["contribution_cents"] = max(cost_delta, 0)
+            snapshot["redemption_cents"] = max(-cost_delta, 0)
+        quantity_micros = snapshot["quantity_micros"]
+        snapshot["unit_price_cents"] = (
+            int((Decimal(snapshot["market_value_cents"]) * Decimal("1000000") / Decimal(quantity_micros)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+            if quantity_micros > 0 else 0
+        )
+    with get_connection() as conn:
+        upsert_snapshots(conn, snapshots)
 
-        series: list[dict] = []
-        prev_by_currency: dict[str, int] = {}
-        prev_invested_by_currency: dict[str, int] = {}
-        month_factor_cache: dict[str, Decimal] = {}
-        ipca_month_cache: dict[str, float] = {}
-        position_factor_cache: dict[str, Decimal] = {}
 
-        for month_date in months:
-            month_start = month_date
-            month_end = add_months(month_date, 1) - timedelta(days=1)
-            as_of = min(month_end, today)
-
-            month_values: dict[str, int] = {}
-            month_invested: dict[str, int] = {}
-            for position in positions:
-                currency = str(position.get("currency") or "BRL").upper()
-                first_operation = date.fromisoformat(position["first_operation_date"])
-                if as_of < first_operation:
-                    continue
-                # Posicao que entrou neste mês: conta pelo custo (baseline),
-                # sem retorno sintético de entrada; meses seguintes valorizam.
-                if month_start <= first_operation <= month_end:
-                    value = int(position.get("total_cost_cents") or 0)
-                else:
-                    value = _position_value_native_as_of(
-                        position, as_of, force_refresh=force_refresh, factor_cache=position_factor_cache
-                    )
-                month_values[currency] = month_values.get(currency, 0) + value
-                month_invested[currency] = month_invested.get(currency, 0) + int(position.get("total_cost_cents") or 0)
-
-            month_key = month_date.strftime("%Y-%m")
-            cdi_return = (Decimal(str(_cdi_factor_for_month(month_date, as_of, month_factor_cache, force_refresh=force_refresh))) - Decimal("1")) * Decimal("100")
-            ipca_factor = _ipca_factor_for_month(month_date, as_of, ipca_month_cache, force_refresh=force_refresh)
-            ipca_return = (Decimal(str(ipca_factor)) - Decimal("1")) * Decimal("100")
-
-            entry: dict[str, object] = {
-                "month": month_key,
-                "cdi_return_pct": float(cdi_return.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)),
-                "ipca_return_pct": float(ipca_return.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)),
-            }
-
-            for currency in currency_order:
-                value = month_values.get(currency, 0)
-                invested = month_invested.get(currency, 0)
-                prev_value = prev_by_currency.get(currency)
-                if prev_value is not None:
-                    if prev_value <= 0:
-                        portfolio_return = Decimal("0")
-                    else:
-                        net_contribution = invested - prev_invested_by_currency.get(currency, 0)
-                        portfolio_return = _monthly_return_pct(prev_value, value, net_contribution)
-                else:
-                    portfolio_return = Decimal("0")
-                entry[f"{currency}_return_pct"] = float(portfolio_return.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP))
-                prev_by_currency[currency] = value
-                prev_invested_by_currency[currency] = invested
-
-            series.append(entry)
-
-        has_approximation = any(position["asset_type"] not in {"fixed_income", "savings"} for position in positions)
-
-        return {
-            "series": series,
-            "start_month": start_month.strftime("%Y-%m"),
-            "end_month": end_month.strftime("%Y-%m"),
-            "has_historical_approximation": has_approximation,
-            "error": None,
-        }
-    except Exception as exc:
-        print(f"[portfolio-returns-error] user={user_id}: {exc}")
-        return {"series": [], "start_month": None, "end_month": None, "has_historical_approximation": False, "error": str(exc)}
+def _list_portfolio_snapshots(user_id: int) -> list[dict]:
+    with get_connection() as conn:
+        return list_snapshots(conn, user_id)
 
 
 def _cdi_factor_for_period(start_date: date, end_date: date, force_refresh: bool = False) -> Decimal:
-    if end_date < start_date:
-        return Decimal("1")
-    try:
-        return fetch_accumulated_indexer_factor("CDI", start_date, end_date, force_refresh=force_refresh)
-    except PortfolioError:
-        try:
-            latest_rate = fetch_indexer_rate("CDI", force_refresh=force_refresh)
-            return compound_annual_factor(latest_rate, max((end_date - start_date).days, 0))
-        except PortfolioError:
-            return Decimal("1")
+    return _returns._cdi_factor_for_period(start_date=start_date, end_date=end_date, force_refresh=force_refresh)
 
 
 def _cdi_factor_for_month(month_date: date, as_of: date, cache: dict[str, Decimal] | None = None, force_refresh: bool = False) -> Decimal:
-    month_end = min(add_months(month_date, 1) - timedelta(days=1), as_of)
-    if month_end < month_date:
-        return Decimal("1")
-    cache_key = f"{month_date.isoformat()}:{month_end.isoformat()}"
-    if cache is not None and cache_key in cache:
-        return cache[cache_key]
-    try:
-        factor = fetch_accumulated_indexer_factor("CDI", month_date, month_end, force_refresh=force_refresh)
-    except PortfolioError:
-        try:
-            latest_rate = fetch_indexer_rate("CDI", force_refresh=force_refresh)
-            factor = compound_annual_factor(latest_rate, max((month_end - month_date).days, 0))
-        except PortfolioError:
-            factor = Decimal("1")
-    if cache is not None:
-        cache[cache_key] = factor
-    return factor
+    return _returns._cdi_factor_for_month(month_date=month_date, as_of=as_of, cache=cache, force_refresh=force_refresh)
 
 
 def _ipca_factor_for_month(month_date: date, as_of: date, cache: dict[str, float] | None = None, force_refresh: bool = False) -> float:
-    month_end = min(add_months(month_date, 1) - timedelta(days=1), as_of)
-    if month_end < month_date:
-        return 1.0
-    cache_key = f"{month_date.isoformat()}:{month_end.isoformat()}"
-    if cache is not None and cache_key in cache:
-        return cache[cache_key]
-    try:
-        factor = fetch_accumulated_indexer_factor("IPCA", month_date, month_end, force_refresh=force_refresh)
-    except PortfolioError:
-        try:
-            latest_rate = fetch_indexer_rate("IPCA", force_refresh=force_refresh)
-            factor = compound_annual_factor(latest_rate, max((month_end - month_date).days, 0))
-        except PortfolioError:
-            factor = Decimal("1")
-    value = float(factor)
-    if cache is not None:
-        cache[cache_key] = value
-    return value
+    return _returns._ipca_factor_for_month(month_date=month_date, as_of=as_of, cache=cache, force_refresh=force_refresh)
 
 
 def apply_savings_value(position: dict, force_refresh: bool = False) -> None:
-    today = date.today()
-    factor_cache: dict[str, Decimal] = {}
-    current_cents, additional_monthly_rate, source, status = savings_value_as_of_with_meta(
-        position, today, force_refresh=force_refresh, factor_cache=factor_cache
-    )
-    position["quote"] = savings_quote_label(additional_monthly_rate)
-    position["quote_source"] = source
-    position["quote_status"] = status
-    position["quote_date"] = today.isoformat()
-    position["current_value_cents"] = current_cents
-    position["current_value_brl_cents"] = value_to_brl(current_cents, position["currency"])
-    position["fixed_income_gross_value_cents"] = current_cents
-    position["fixed_income_iof_tax_cents"] = 0
-    position["fixed_income_income_tax_cents"] = 0
-    position["fixed_income_custody_fee_cents"] = 0
-    position["fixed_income_net_value_cents"] = current_cents
-    position["day_result_cents"] = day_variation_cents(
-        position,
-        current_cents,
-        today,
-        lambda pos, as_of, refresh, cache: savings_value_as_of(pos, as_of, force_refresh=refresh, factor_cache=cache),
-        force_refresh=force_refresh,
-        factor_cache=factor_cache,
-    )
-    position["day_result_brl_cents"] = value_to_brl(position["day_result_cents"], position["currency"])
+    return _valuation.apply_savings_value(position=position, force_refresh=force_refresh)
 
 
 def savings_value_as_of_with_meta(
@@ -2101,40 +1780,7 @@ def savings_value_as_of_with_meta(
     force_refresh: bool = False,
     factor_cache: dict[str, Decimal] | None = None,
 ) -> tuple[int, Decimal, str, str]:
-    anniversaries = aggregate_savings_anniversaries(position.get("savings_anniversaries") or [])
-    if not anniversaries:
-        anniversaries = [{"date": position["first_operation_date"], "amount_cents": position["total_cost_cents"]}]
-    current_value = Decimal("0")
-    source = "Banco Central SGS (TR/SELIC); aniversarios mensais"
-    status = "ok"
-    additional_monthly_rate = Decimal("0")
-    try:
-        additional_monthly_rate = savings_additional_monthly_rate(force_refresh=force_refresh)
-        for anniversary in anniversaries:
-            start_date = parse_optional_iso_date(anniversary.get("date"))
-            amount_cents = int(anniversary.get("amount_cents") or 0)
-            if not start_date or amount_cents <= 0 or as_of_date < start_date:
-                continue
-            current_value += Decimal(amount_cents) * savings_factor_for_anniversary(
-                start_date,
-                as_of_date,
-                additional_monthly_rate,
-                force_refresh=force_refresh,
-                factor_cache=factor_cache,
-            )
-    except PortfolioError as exc:
-        status = exc.message
-        source = "Estimativa local; Banco Central indisponivel"
-        fallback_rate = fallback_indexer_annual_rate("SELIC")
-        additional_monthly_rate = savings_additional_monthly_rate_from_selic(fallback_rate)
-        for anniversary in anniversaries:
-            start_date = parse_optional_iso_date(anniversary.get("date"))
-            amount_cents = int(anniversary.get("amount_cents") or 0)
-            if not start_date or amount_cents <= 0 or as_of_date < start_date:
-                continue
-            completed_months = completed_savings_anniversaries(start_date, as_of_date)
-            current_value += Decimal(amount_cents) * ((Decimal("1") + additional_monthly_rate) ** completed_months)
-    return int(current_value.quantize(Decimal("1"), rounding=ROUND_HALF_UP)), additional_monthly_rate, source, status
+    return _valuation.savings_value_as_of_with_meta(position=position, as_of_date=as_of_date, force_refresh=force_refresh, factor_cache=factor_cache)
 
 
 def savings_value_as_of(
@@ -2143,7 +1789,7 @@ def savings_value_as_of(
     force_refresh: bool = False,
     factor_cache: dict[str, Decimal] | None = None,
 ) -> int:
-    return savings_value_as_of_with_meta(position, as_of_date, force_refresh=force_refresh, factor_cache=factor_cache)[0]
+    return _valuation.savings_value_as_of(position=position, as_of_date=as_of_date, force_refresh=force_refresh, factor_cache=factor_cache)
 
 
 def savings_factor_for_anniversary(
@@ -2153,92 +1799,43 @@ def savings_factor_for_anniversary(
     force_refresh: bool = False,
     factor_cache: dict[str, Decimal] | None = None,
 ) -> Decimal:
-    factor = Decimal("1")
-    completed_months = completed_savings_anniversaries(start_date, end_date)
-    for month_index in range(1, completed_months + 1):
-        period_start = add_months(start_date, month_index - 1)
-        period_end = add_months(start_date, month_index)
-        if factor_cache is not None:
-            tr_factor = _accumulated_factor_by_month(
-                "TR", period_start, period_end, Decimal("1"), factor_cache, force_refresh=force_refresh
-            )
-        else:
-            tr_factor = fetch_accumulated_indexer_factor("TR", period_start, period_end, force_refresh=force_refresh)
-        factor *= tr_factor * (Decimal("1") + additional_monthly_rate)
-    return factor
+    return _valuation.savings_factor_for_anniversary(start_date=start_date, end_date=end_date, additional_monthly_rate=additional_monthly_rate, force_refresh=force_refresh, factor_cache=factor_cache)
 
 
 def aggregate_savings_anniversaries(entries: list[dict]) -> list[dict]:
-    totals: dict[str, int] = {}
-    for entry in entries:
-        anniversary_date = str(entry.get("date") or "").strip()
-        if not parse_optional_iso_date(anniversary_date):
-            continue
-        totals[anniversary_date] = totals.get(anniversary_date, 0) + int(entry.get("amount_cents") or 0)
-    return [
-        {"date": anniversary_date, "amount_cents": amount_cents}
-        for anniversary_date, amount_cents in sorted(totals.items())
-        if amount_cents > 0
-    ]
+    return positions_store.aggregate_savings_anniversaries(entries)
 
 
 def completed_savings_anniversaries(start_date: date, end_date: date) -> int:
-    if end_date < add_months(start_date, 1):
-        return 0
-    completed = 0
-    while add_months(start_date, completed + 1) <= end_date:
-        completed += 1
-    return completed
+    return _valuation.completed_savings_anniversaries(start_date=start_date, end_date=end_date)
 
 
 def savings_additional_monthly_rate(force_refresh: bool = False) -> Decimal:
-    selic_annual = fetch_indexer_rate("SELIC", force_refresh=force_refresh)
-    return savings_additional_monthly_rate_from_selic(selic_annual)
+    return _valuation.savings_additional_monthly_rate(force_refresh=force_refresh)
 
 
 def savings_additional_monthly_rate_from_selic(selic_annual: Decimal) -> Decimal:
-    # spec: investimentos-portfolio v2.43 — secao "Regras > Poupanca"
-    # (TR + 0,5% a.m. quando Selic > 8,5% a.a.; TR + 70% da Selic equivalente
-    #  mensal quando Selic <= 8,5% a.a. — limiar e formula nao sao obvios)
-    if selic_annual > Decimal("0.085"):
-        return Decimal("0.005")
-    return (Decimal("1") + selic_annual * Decimal("0.70")) ** (Decimal("1") / Decimal("12")) - Decimal("1")
+    return _valuation.savings_additional_monthly_rate_from_selic(selic_annual=selic_annual)
 
 
 def savings_quote_label(additional_monthly_rate: Decimal) -> str:
-    return f"TR + {format_decimal_percent(additional_monthly_rate * Decimal('100'))}% a.m."
+    return _valuation.savings_quote_label(additional_monthly_rate=additional_monthly_rate)
 
 
 def parse_optional_iso_date(value: object) -> date | None:
-    raw = str(value or "").strip()
-    if not raw:
-        return None
-    try:
-        return date.fromisoformat(raw)
-    except ValueError:
-        return None
+    return _valuation.parse_optional_iso_date(value=value)
 
 
 def compound_annual_factor(rate: Decimal, days: int) -> Decimal:
-    if not rate or days <= 0:
-        return Decimal("1")
-    return (Decimal("1") + rate) ** (Decimal(days) / Decimal("365"))
+    return _valuation.compound_annual_factor(rate=rate, days=days)
 
 
 def fixed_income_quote_label(mode: str, indexer: str, annual_rate: Decimal, rate_factor: Decimal) -> str:
-    if mode == "pre":
-        return f"{format_decimal_percent(annual_rate)}% a.a."
-    if mode == "hybrid":
-        return f"{indexer} + {format_decimal_percent(annual_rate)}% a.a."
-    if annual_rate:
-        return f"{format_decimal_percent(annual_rate)}% do {indexer}"
-    return f"{format_decimal_percent(rate_factor * Decimal('100'))}% acumulado"
+    return _valuation.fixed_income_quote_label(mode=mode, indexer=indexer, annual_rate=annual_rate, rate_factor=rate_factor)
 
 
 def should_apply_fixed_income_taxes(position: dict) -> bool:
-    return position["source_type"] == "operation" or (
-        position["source_type"] == "opening" and bool(position.get("apply_tax_estimate"))
-    )
+    return _valuation.should_apply_fixed_income_taxes(position=position)
 
 
 def fallback_indexer_annual_rate(indexer: str) -> Decimal:
@@ -2246,97 +1843,27 @@ def fallback_indexer_annual_rate(indexer: str) -> Decimal:
 
 
 def fixed_income_income_tax_cents(gross_profit_cents: int, days: int) -> int:
-    # spec: investimentos-portfolio v2.43 — criterio 3 (secao "Regras > Renda Fixa":
-    # tabela regressiva de IR, 22,5% a 15% conforme dias corridos desde a aquisicao)
-    if gross_profit_cents <= 0:
-        return 0
-    if days <= 180:
-        tax_rate = Decimal("0.225")
-    elif days <= 360:
-        tax_rate = Decimal("0.20")
-    elif days <= 720:
-        tax_rate = Decimal("0.175")
-    else:
-        tax_rate = Decimal("0.15")
-    return int((Decimal(gross_profit_cents) * tax_rate).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    return _valuation.fixed_income_income_tax_cents(gross_profit_cents=gross_profit_cents, days=days)
 
 
 def fixed_income_custody_fee_cents(position: dict, gross_cents: int, days: int) -> int:
-    # spec: investimentos/investimentos-portfolio v2.43 — critério 25
-    # Tesouro Direto tem taxa B3 de custodia provisionada diariamente. O app
-    # estima a taxa na curva, sem tentar reproduzir marcacao a mercado oficial.
-    if gross_cents <= 0 or days <= 0 or not is_treasury_direct_position(position):
-        return 0
-    treasury_name = treasury_position_name(position)
-    if "RENDA+" in treasury_name or "RENDA +" in treasury_name or "EDUCA+" in treasury_name or "EDUCA +" in treasury_name:
-        return 0
-    fee_base_cents = gross_cents
-    if "SELIC" in treasury_name:
-        fee_base_cents = max(gross_cents - 1_000_000, 0)
-    if fee_base_cents <= 0:
-        return 0
-    return int((Decimal(fee_base_cents) * Decimal("0.002") * Decimal(days) / Decimal("365")).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    return _valuation.fixed_income_custody_fee_cents(position=position, gross_cents=gross_cents, days=days)
 
 
 def is_treasury_direct_position(position: dict) -> bool:
-    name = treasury_position_name(position)
-    return "TESOURO" in name
+    return _valuation.is_treasury_direct_position(position=position)
 
 
 def treasury_position_name(position: dict) -> str:
-    return " ".join([
-        str(position.get("asset_identifier") or ""),
-        str(position.get("asset_name") or ""),
-    ]).upper()
+    return _valuation.treasury_position_name(position=position)
 
 
 def fixed_income_iof_tax_cents(gross_profit_cents: int, days: int) -> int:
-    # spec: investimentos-portfolio v2.43 — criterio 3 (secao "Regras > Renda Fixa":
-    # IOF regressivo so incide ate 30 dias corridos desde a aquisicao)
-    if gross_profit_cents <= 0 or days >= 30:
-        return 0
-    daily_rates = {
-        0: Decimal("1"),
-        1: Decimal("0.96"),
-        2: Decimal("0.93"),
-        3: Decimal("0.90"),
-        4: Decimal("0.86"),
-        5: Decimal("0.83"),
-        6: Decimal("0.80"),
-        7: Decimal("0.76"),
-        8: Decimal("0.73"),
-        9: Decimal("0.70"),
-        10: Decimal("0.66"),
-        11: Decimal("0.63"),
-        12: Decimal("0.60"),
-        13: Decimal("0.56"),
-        14: Decimal("0.53"),
-        15: Decimal("0.50"),
-        16: Decimal("0.46"),
-        17: Decimal("0.43"),
-        18: Decimal("0.40"),
-        19: Decimal("0.36"),
-        20: Decimal("0.33"),
-        21: Decimal("0.30"),
-        22: Decimal("0.26"),
-        23: Decimal("0.23"),
-        24: Decimal("0.20"),
-        25: Decimal("0.16"),
-        26: Decimal("0.13"),
-        27: Decimal("0.10"),
-        28: Decimal("0.06"),
-        29: Decimal("0.03"),
-    }
-    tax_rate = daily_rates.get(max(days, 0), Decimal("0"))
-    return int((Decimal(gross_profit_cents) * tax_rate).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    return _valuation.fixed_income_iof_tax_cents(gross_profit_cents=gross_profit_cents, days=days)
 
 
 def apply_cost_value(position: dict, status: str) -> None:
-    position["current_value_cents"] = position["total_cost_cents"]
-    position["current_value_brl_cents"] = position["total_cost_brl_cents"]
-    position["day_result_cents"] = 0
-    position["day_result_brl_cents"] = 0
-    position["quote_status"] = status
+    return _valuation.apply_cost_value(position=position, status=status)
 
 
 def fetch_yahoo_quote(symbol: str, force_refresh: bool = False) -> dict:
@@ -2484,36 +2011,18 @@ def monthly_overlap_weight(reference_date: date, start_date: date, end_date: dat
     return Decimal(overlap_days) / Decimal(month_days)
 
 
-def add_months(start_date: date, months: int) -> date:
-    target_month = start_date.month - 1 + months
-    year = start_date.year + target_month // 12
-    month = target_month % 12 + 1
-    day = min(start_date.day, days_in_month(year, month))
-    return date(year, month, day)
-
-
-def days_in_month(year: int, month: int) -> int:
-    if month == 12:
-        return 31
-    return (date(year, month + 1, 1) - timedelta(days=1)).day
-
-
 def format_bcb_date(value: date) -> str:
     return value.strftime("%d/%m/%Y")
 
 
 def bcb_range_ttl_seconds(end_date: date) -> int:
-    if end_date < date.today():
-        return 30 * 24 * 60 * 60
-    return INDEXER_QUOTE_TTL_SECONDS
+    return quotes.bcb_range_ttl_seconds(end_date, date.today())
 
 
 def seconds_until_end_of_day() -> int:
-    # spec: investimentos/investimentos-portfolio v2.43 — criterios 27 e 28
+    # spec: investimentos/investimentos-portfolio v2.53 — criterios 27 e 28
     # (cache de cotacao de fundos vale ate o fim do dia corrente)
-    now = datetime.now()
-    end = datetime(now.year, now.month, now.day) + timedelta(days=1)
-    return max(1, int((end - now).total_seconds()))
+    return quotes.seconds_until_end_of_day(datetime.now())
 
 
 def cached_json_url(
@@ -2524,125 +2033,39 @@ def cached_json_url(
     force_refresh: bool = False,
     headers: dict | None = None,
 ) -> dict | list:
-    now = datetime.now()
-    if not force_refresh:
-        memory_payload = get_memory_cached_payload(cache_key, now)
-        if memory_payload is not None:
-            return memory_payload
-        persistent_payload = get_persistent_cached_payload(cache_key, now)
-        if persistent_payload is not None:
-            return persistent_payload
-    try:
-        payload = read_json_url(url, message, headers=headers)
-        store_cached_payload(cache_key, payload, now + timedelta(seconds=ttl_seconds))
-        return payload
-    except PortfolioError:
-        stale_payload = get_persistent_cached_payload(cache_key, now, allow_stale=True)
-        if stale_payload is not None:
-            return stale_payload
-        raise
+    return _quote_cache.cached_json_url(url, message, cache_key, ttl_seconds, force_refresh=force_refresh, headers=headers)
 
 
 def get_memory_cached_payload(cache_key: str, now: datetime) -> dict | list | None:
-    with QUOTE_MEMORY_CACHE_LOCK:
-        prune_quote_memory_cache_locked(now)
-        cached = QUOTE_MEMORY_CACHE.get(cache_key)
-        if not cached:
-            return None
-        expires_at, payload = cached
-        if expires_at > now:
-            # Move para o fim para manter política LRU sob pressão de memória.
-            QUOTE_MEMORY_CACHE.move_to_end(cache_key)
-            return payload
-        QUOTE_MEMORY_CACHE.pop(cache_key, None)
-        return None
+    return _quote_cache.get_memory_cached_payload(cache_key, now)
 
 
 def get_persistent_cached_payload(cache_key: str, now: datetime, allow_stale: bool = False) -> dict | list | None:
-    try:
-        with get_connection() as conn:
-            row = conn.execute(
-                "SELECT payload_json, expires_at FROM quote_cache WHERE cache_key = ?",
-                (cache_key,),
-            ).fetchone()
-    except Exception:
-        return None
-    if not row:
-        return None
-    try:
-        expires_at = datetime.fromisoformat(row["expires_at"])
-        payload = json.loads(row["payload_json"])
-    except (TypeError, ValueError, json.JSONDecodeError):
-        return None
-    if not allow_stale and expires_at <= now:
-        return None
-    set_quote_memory_cache(cache_key, expires_at, payload, now)
-    return payload
+    return _quote_cache.get_persistent_cached_payload(cache_key, now, allow_stale=allow_stale)
 
 
 def store_cached_payload(cache_key: str, payload: dict | list, expires_at: datetime) -> None:
-    set_quote_memory_cache(cache_key, expires_at, payload, datetime.now())
-    try:
-        with get_connection() as conn:
-            conn.execute(
-                """
-                INSERT INTO quote_cache (cache_key, payload_json, expires_at, updated_at)
-                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-                ON CONFLICT(cache_key) DO UPDATE SET
-                    payload_json = excluded.payload_json,
-                    expires_at = excluded.expires_at,
-                    updated_at = CURRENT_TIMESTAMP
-                """,
-                (cache_key, json.dumps(payload, ensure_ascii=True), expires_at.isoformat()),
-            )
-    except Exception:
-        return
+    return _quote_cache.store_cached_payload(cache_key, payload, expires_at)
 
 
 def set_quote_memory_cache(cache_key: str, expires_at: datetime, payload: dict | list, now: datetime) -> None:
-    with QUOTE_MEMORY_CACHE_LOCK:
-        prune_quote_memory_cache_locked(now)
-        QUOTE_MEMORY_CACHE[cache_key] = (expires_at, payload)
-        _trim_cache_to_limit(QUOTE_MEMORY_CACHE, QUOTE_MEMORY_CACHE_MAX_ENTRIES)
+    return _quote_cache.set_quote_memory_cache(cache_key, expires_at, payload, now)
 
 
 def prune_quote_memory_cache(now: datetime) -> None:
-    with QUOTE_MEMORY_CACHE_LOCK:
-        prune_quote_memory_cache_locked(now)
+    return _quote_cache.prune_quote_memory_cache(now)
 
 
 def prune_quote_memory_cache_locked(now: datetime) -> None:
-    expired_keys = [key for key, (expires_at, _payload) in QUOTE_MEMORY_CACHE.items() if expires_at <= now]
-    for key in expired_keys:
-        QUOTE_MEMORY_CACHE.pop(key, None)
+    return _quote_cache.prune_quote_memory_cache_locked(now)
 
 
 def _trim_cache_to_limit(cache: OrderedDict, max_entries: int) -> None:
-    while len(cache) > max_entries:
-        cache.popitem(last=False)
+    quotes.trim_cache_to_limit(cache, max_entries)
 
 
 def read_json_url(url: str, message: str, headers: dict | None = None) -> dict | list:
-    request_headers = {"User-Agent": "SistemaFinanceiro/0.1", **(headers or {})}
-    request = Request(url, headers=request_headers)
-    try:
-        with urlopen(request, timeout=6) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except URLError as exc:
-        if is_ssl_certificate_error(exc):
-            try:
-                with urlopen(request, timeout=6, context=ssl._create_unverified_context()) as response:
-                    return json.loads(response.read().decode("utf-8"))
-            except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as retry_exc:
-                raise PortfolioError(message) from retry_exc
-        raise PortfolioError(message) from exc
-    except (HTTPError, TimeoutError, json.JSONDecodeError) as exc:
-        raise PortfolioError(message) from exc
-
-
-def is_ssl_certificate_error(exc: URLError) -> bool:
-    reason = getattr(exc, "reason", None)
-    return isinstance(reason, ssl.SSLError) and "CERTIFICATE_VERIFY_FAILED" in str(reason)
+    return quotes.read_json_url(url, message, headers=headers, opener=urlopen, error_type=PortfolioError)
 
 
 def yahoo_symbol(position: dict) -> str:
@@ -2651,14 +2074,7 @@ def yahoo_symbol(position: dict) -> str:
         return ""
     if position["asset_type"] in {"crypto", "stablecoin"}:
         return crypto_yahoo_symbol(identifier, position["currency"])
-    normalized_identifier = str(identifier).strip().upper()
-    normalized_currency = str(position["currency"] or "BRL").strip().upper()
-    aliased_symbol = YAHOO_SYMBOL_ALIASES.get((normalized_identifier, normalized_currency))
-    if aliased_symbol:
-        return aliased_symbol
-    if "." in identifier or position["currency"] != "BRL":
-        return identifier
-    return f"{identifier}.SA"
+    return quotes.yahoo_symbol(position, YAHOO_SYMBOL_ALIASES)
 
 
 def crypto_yahoo_symbol(identifier: str, currency: str) -> str:
@@ -2673,26 +2089,7 @@ def crypto_yahoo_symbol(identifier: str, currency: str) -> str:
 
 
 def summarize_positions(positions: list[dict]) -> dict:
-    total_cost = sum(position["total_cost_brl_cents"] for position in positions)
-    current_value = sum(position["current_value_brl_cents"] for position in positions)
-    day_result = sum(position["day_result_brl_cents"] for position in positions)
-    by_type = group_positions(positions, "asset_type_label")
-    by_indexer = group_positions(positions, "fixed_income_indexer")
-    by_currency = group_positions(positions, "currency")
-    by_account = group_positions(positions, "account_name")
-    return {
-        "total_cost_brl": cents_to_money(total_cost),
-        "current_value_brl": cents_to_money(current_value),
-        "result_brl": cents_to_money(current_value - total_cost),
-        "result_percent": percent(current_value - total_cost, total_cost),
-        "day_result_brl": cents_to_money(day_result),
-        "day_result_percent": percent(day_result, current_value - day_result),
-        "position_count": len(positions),
-        "by_type": by_type,
-        "by_indexer": by_indexer,
-        "by_currency": by_currency,
-        "by_account": by_account,
-    }
+    return calculations.summarize_positions(positions)
 
 
 def format_quoted_position(position: dict) -> dict:
@@ -2709,58 +2106,15 @@ def format_quoted_position(position: dict) -> dict:
     position["emergency_reserve_eligible"] = bool(position.get("emergency_reserve_eligible"))
     position["day_result"] = cents_to_money(position["day_result_cents"])
     position["day_result_brl"] = cents_to_money(position["day_result_brl_cents"])
-    return position
+    return presentation.decorate_position(position)
 
 
 def group_positions(positions: list[dict], key: str) -> list[dict]:
-    totals = defaultdict(lambda: {
-        "label": "",
-        "currency": "BRL",
-        "cost_cents": 0,
-        "current_cents": 0,
-        "day_result_cents": 0,
-        "cost_brl_cents": 0,
-        "current_brl_cents": 0,
-        "day_result_brl_cents": 0,
-        "count": 0,
-    })
-    for position in positions:
-        label = portfolio_group_label(position, key)
-        currency = position.get("currency") or "BRL"
-        row = totals[(label, currency)]
-        row["label"] = label
-        row["currency"] = currency
-        row["cost_cents"] += position["total_cost_cents"]
-        row["current_cents"] += position["current_value_cents"]
-        row["day_result_cents"] += position["day_result_cents"]
-        row["cost_brl_cents"] += position["total_cost_brl_cents"]
-        row["current_brl_cents"] += position["current_value_brl_cents"]
-        row["day_result_brl_cents"] += position["day_result_brl_cents"]
-        row["count"] += 1
-    return [
-        {
-            "label": row["label"],
-            "cost_brl": cents_to_money(row["cost_cents"]),
-            "current_brl": cents_to_money(row["current_cents"]),
-            "result_brl": cents_to_money(row["current_cents"] - row["cost_cents"]),
-            "result_percent": percent(row["current_cents"] - row["cost_cents"], row["cost_cents"]),
-            "day_result_brl": cents_to_money(row["day_result_cents"]),
-            "day_result_percent": percent(row["day_result_cents"], row["current_cents"] - row["day_result_cents"]),
-            "chart_current_brl": cents_to_money(row["current_brl_cents"]),
-            "count": row["count"],
-            "currency": row["currency"],
-        }
-        for row in sorted(totals.values(), key=lambda item: item["current_brl_cents"], reverse=True)
-    ]
+    return calculations.group_positions(positions, key)
 
 
 def portfolio_group_label(position: dict, key: str) -> str:
-    label = position.get(key)
-    if key == "fixed_income_indexer" and position.get("asset_type") == "savings":
-        return "Poupança"
-    if key == "fixed_income_indexer" and not label and position.get("currency") != "BRL":
-        return position.get("currency") or "Nao informado"
-    return label or "Nao informado"
+    return calculations.portfolio_group_label(position, key)
 
 
 def format_position(position: dict) -> dict:
@@ -2832,54 +2186,26 @@ def indexer_catalog() -> list[dict]:
 
 
 def normalize_asset_identifier(value: object, asset_type: str) -> str:
-    identifier = str(value or "").strip().upper()
-    if asset_type in {"crypto", "stablecoin"}:
-        identifier = CRYPTO_ALIASES.get(identifier, identifier)
-        compact = identifier.replace("/", "-")
-        if "-" in compact:
-            base, quote_currency = compact.split("-", 1)
-            if base and quote_currency in CRYPTO_QUOTE_SUFFIXES:
-                return base
-            return compact
-        if identifier in CRYPTO_ASSETS:
-            return identifier
-        for suffix in CRYPTO_QUOTE_SUFFIXES:
-            if identifier.endswith(suffix) and len(identifier) > len(suffix):
-                return identifier[:-len(suffix)]
-    return identifier
+    return calculations.normalize_asset_identifier(value, asset_type)
 
 
 def effective_asset_type(asset_type: object, identifier: object) -> str:
-    normalized_type = str(asset_type or "other").strip().lower()
-    normalized_identifier = normalize_asset_identifier(identifier, "crypto")
-    if normalized_type in {"crypto", "stablecoin"} and normalized_identifier in STABLECOIN_ASSETS:
-        return "stablecoin"
-    return normalized_type
+    return calculations.effective_asset_type(asset_type, identifier)
 
 
 def normalize_indexer(value: object) -> str:
-    return str(value or "").strip().upper().replace("Í", "I")
+    return calculations.normalize_indexer(value)
 
 
 def micros_to_decimal(micros: int) -> Decimal:
-    return Decimal(int(micros or 0)) / MICRO_SCALE
+    return calculations.micros_to_decimal(micros)
 
 
 def parse_rate_decimal(value: object) -> Decimal:
-    # spec: rentabilidade-portfolio v1.7 — critério 4
+    # spec: rentabilidade-portfolio v2.9 — critério 4
     # get_portfolio retorna a taxa ja formatada (ex.: "4,27"); aceita Decimal ou
     # string com ponto/virgula para nao quebrar o calculo de valor por data.
-    if isinstance(value, Decimal):
-        return value
-    raw = str(value or "").strip()
-    if not raw:
-        return Decimal("0")
-    if "," in raw:
-        raw = raw.replace(".", "").replace(",", ".")
-    try:
-        return Decimal(raw)
-    except InvalidOperation:
-        return Decimal("0")
+    return calculations.parse_rate_decimal(value)
 
 
 def decimal_to_micros(value: object) -> int:
@@ -2897,27 +2223,14 @@ def decimal_to_micros(value: object) -> int:
     return int((decimal_value * MICRO_SCALE).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
-def decimal_to_cents(value: Decimal) -> int:
-    return int((value * MONEY_SCALE).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
-
-
-def cents_to_decimal(cents: int) -> Decimal:
-    return Decimal(cents) / MONEY_SCALE
-
-
 def decimal_to_string(value: Decimal) -> str:
-    # spec: investimentos/investimentos-portfolio v2.43 — critério normalização de quantidade
+    # spec: investimentos/investimentos-portfolio v2.53 — critério normalização de quantidade
     # com até 2 casas decimais (half-up) para não estourar o layout das tabelas.
-    if not value:
-        return "0"
-    rounded = value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    return f"{rounded.normalize():f}"
+    return calculations.decimal_to_string(value)
 
 
 def format_decimal_percent(value: Decimal) -> str:
-    rounded = value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    text = f"{rounded.normalize():f}"
-    return text.replace(".", ",")
+    return calculations.format_decimal_percent(value)
 
 
 def value_to_brl(amount_cents: int, currency: str) -> int:
@@ -2930,28 +2243,38 @@ def value_to_brl(amount_cents: int, currency: str) -> int:
 
 def portfolio_exchange_rate_micros(currency: str) -> int:
     quote_date = previous_business_day(date.today()).isoformat()
-    cache_key = (currency, quote_date)
-    with FX_MEMORY_CACHE_LOCK:
-        if cache_key not in FX_MEMORY_CACHE:
-            try:
-                FX_MEMORY_CACHE[cache_key] = rate_to_micros(get_exchange_rate_to_brl(currency, quote_date))
-            except Exception:
-                FX_MEMORY_CACHE[cache_key] = rate_to_micros(Decimal("1"))
-            _trim_cache_to_limit(FX_MEMORY_CACHE, FX_MEMORY_CACHE_MAX_ENTRIES)
-        else:
-            FX_MEMORY_CACHE.move_to_end(cache_key)
-        return FX_MEMORY_CACHE[cache_key]
+    return _quote_cache.exchange_rate_micros(
+        currency, quote_date, get_rate=get_exchange_rate_to_brl, to_micros=rate_to_micros,
+    )
 
 
 def previous_business_day(reference_date: date) -> date:
-    day = reference_date - timedelta(days=1)
-    while day.weekday() >= 5:
-        day -= timedelta(days=1)
-    return day
+    return quotes.previous_business_day(reference_date)
 
 
 def percent(delta: int, base: int) -> str:
-    if not base:
-        return "0.00"
-    value = Decimal(delta) / Decimal(base) * Decimal("100")
-    return f"{value.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP):.2f}"
+    return calculations.percent(delta, base)
+
+
+_valuation = PositionValuation(
+    today=lambda: date.today(),
+    error_type=PortfolioError,
+    fetch_accumulated_indexer_factor=lambda *args, **kwargs: fetch_accumulated_indexer_factor(*args, **kwargs),
+    fetch_indexer_rate=lambda *args, **kwargs: fetch_indexer_rate(*args, **kwargs),
+    value_to_brl=lambda *args, **kwargs: value_to_brl(*args, **kwargs),
+    fallback_indexer_annual_rate=lambda *args, **kwargs: fallback_indexer_annual_rate(*args, **kwargs),
+    parse_rate_decimal=lambda *args, **kwargs: parse_rate_decimal(*args, **kwargs),
+    format_decimal_percent=lambda *args, **kwargs: format_decimal_percent(*args, **kwargs),
+)
+
+
+_returns = PortfolioReturns(
+    today=lambda: date.today(),
+    error_type=PortfolioError,
+    get_portfolio=lambda *args, **kwargs: get_portfolio(*args, **kwargs),
+    _position_value_native_as_of=lambda *args, **kwargs: _position_value_native_as_of(*args, **kwargs),
+    fetch_accumulated_indexer_factor=lambda *args, **kwargs: fetch_accumulated_indexer_factor(*args, **kwargs),
+    fetch_indexer_rate=lambda *args, **kwargs: fetch_indexer_rate(*args, **kwargs),
+    compound_annual_factor=lambda *args, **kwargs: compound_annual_factor(*args, **kwargs),
+    list_snapshots=lambda user_id: _list_portfolio_snapshots(user_id),
+)

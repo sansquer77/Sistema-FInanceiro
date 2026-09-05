@@ -2,8 +2,8 @@
 tipo: metodologia
 area: meta
 status: implementado
-versao: 2.6
-atualizado: 2026-07-24
+versao: 2.7
+atualizado: 2026-08-30
 relacionados:
   - "[[templates/spec-template|Template de spec]]"
   - "[[arquitetura]]"
@@ -33,6 +33,7 @@ docs/
   visao-produto.md          Direção de produto e módulos
   roadmap.md                Sequência de evolução
   glossario.md              Vocabulário de domínio com links
+  qualidade-codigo.md       Fronteiras de responsabilidade e sinais de alerta
   templates/
     spec-template.md        Modelo obrigatório para novos documentos
   specs/                     Uma spec por módulo funcional
@@ -147,6 +148,7 @@ rascunho ──▶ em-implementacao ──▶ implementado ──▶ em-revisao 
 
 ## Changelog
 
+- `2.7` — 2026-08-30 — Incorporada [[qualidade-codigo]] como referência implementada para revisar fronteiras de responsabilidade e evitar regressões arquiteturais.
 - `2.6` — 2026-07-24 — Adicionados marcadores `<!-- sync:NOME -->` ao redor dos quatro blocos duplicados com AGENTS.md (fluxo de 8 passos, modelo spec-anchored, spec-vs-adr-vs-design, rastreabilidade código↔spec), para tornar o par grep-ável e reduzir risco de drift entre os dois arquivos.
 - `2.5` — 2026-07-24 — "Rastreabilidade: código ↔ spec" ganhou regra explícita: quando a spec citada muda de `versao`, o `vX.Y` do comentário no código deve ser atualizado no mesmo PR (checklist do AGENTS.md espelha essa regra).
 - `2.4` — 2026-07-24 — Adicionada a seção "Rastreabilidade: código ↔ spec", com convenção de comentário (`spec: area/slug vX.Y — critério N`) para regras de negócio não óbvias; passo 6 do fluxo passa a referenciá-la.
