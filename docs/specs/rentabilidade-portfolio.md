@@ -96,6 +96,7 @@ Tabelas: `investment_opening_positions`, `investment_operations`, `investment_re
 - Dado um erro ao consultar o CDI/IPCA ou ao montar o resumo, quando o drawer é aberto, então o app exibe mensagem de erro sem travar o Portfólio.
 - Dado uma posição que entrou no mês atual, quando o gráfico calcula aquele mês, então o aporte não é tratado como retorno (marca baseline).
 - Dado o usuário abrindo o gráfico em desktop, quando o flyover é exibido, então ocupa aproximadamente metade da viewport e o gráfico tem área de desenho de 420px de altura, sem prejudicar a adaptação para telas estreitas.
+- Dado o cabeçalho global fixo, quando o drawer de rentabilidade é aberto, então overlay, cabeçalho e gráfico permanecem integralmente acima do conteúdo e do cabeçalho da aplicação.
 
 - Dado o gráfico de rentabilidade, quando o tooltip aparece em tema claro ou escuro, então texto, fundo, cabeçalho e indicador de mês usam cores do tema ativo sem alterar as séries. Contrato CSS automatizado; aparência no Safari requer validação manual.
 
@@ -129,6 +130,7 @@ Tabelas: `investment_opening_positions`, `investment_operations`, `investment_re
 - [x] Passo 5 — Ajustar estilos do gráfico em `web/styles.css` (reuso das classes existentes). Fecha: critérios 3, 4.
 - [x] Passo 6 — Escrever testes automatizados para o cálculo mensal por moeda e CDI/IPCA por mês. Fecha: critérios 2, 3, 4, 5, 6, 7, 8, 12.
 - [x] Passo 7 — Ampliar o flyover e refinar o SVG nativo com preenchimento sutil das séries da carteira e traços pontilhados para benchmarks, sem dependência externa. Fecha: critérios 2, 12.
+- [x] Passo 8 — Hospedar o drawer no nível global de overlays para que seu contexto de empilhamento permaneça acima do cabeçalho sticky. Fecha: critério 13.
 
 ## Changelog
 
