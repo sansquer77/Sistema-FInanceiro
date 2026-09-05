@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 12.40
-atualizado: 2026-09-04
+versao: 12.42
+atualizado: 2026-09-05
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -149,6 +149,8 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `12.42` — 2026-09-05 — [[specs/open-finance]] v0.8 corrigida para refletir o suporte já existente a múltiplas tags por lançamento e seus separadores de entrada.
+- `12.41` — 2026-09-05 — [[specs/open-finance]] v0.7 permanece em rascunho e documenta staging com descrição bruta/normalizada, memória local de classificação e tags de projeto; Pluggy segue como candidato enquanto não houver provedor gratuito e simples para o usuário padrão.
 - `12.40` — 2026-09-04 — Snapshots de rentabilidade passam a consolidar corretamente múltiplos lotes do mesmo ativo antes da persistência.
 - `12.39` — 2026-09-04 — Corrigido o baseline da primeira captura de rentabilidade para não interpretar todo o estoque histórico como aporte do mês corrente.
 - `12.38` — 2026-09-04 — Corrigida a reconciliação de tabelas aditivas em bancos v2 existentes, incluindo snapshots de rentabilidade e leitura de notificações.
