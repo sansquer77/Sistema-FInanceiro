@@ -4,6 +4,7 @@ import re
 import hashlib
 import unittest
 from pathlib import Path
+from urllib.parse import urlparse
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -40,8 +41,10 @@ class FrontendModuleContractTest(unittest.TestCase):
                 attrs = dict(attrs)
                 if tag == "section":
                     self.sections.append(attrs)
-                if tag == "a" and "buymeacoffee.com" in attrs.get("href", ""):
-                    self.support_sections.append(list(self.sections))
+                if tag == "a":
+                    host = urlparse(attrs.get("href", "")).hostname or ""
+                    if host == "buymeacoffee.com" or host.endswith(".buymeacoffee.com"):
+                        self.support_sections.append(list(self.sections))
             def handle_endtag(self, tag):
                 if tag == "section" and self.sections:
                     self.sections.pop()

@@ -1,5 +1,6 @@
 from datetime import date, datetime, timezone
 import unittest
+from urllib.parse import urlparse
 
 from financeiro import portfolio_events
 
@@ -63,7 +64,11 @@ class PortfolioEventsTest(unittest.TestCase):
                                               start_date=date(2026, 9, 1))
         self.assertEqual(len(result["events"]), 1)
         self.assertEqual(result["unavailable"][0]["asset_identifier"], "FAIL3")
-        yahoo_calls = [call for call in calls if "query1.finance.yahoo.com" in call[0]]
+        yahoo_calls = [
+            call for call in calls
+            if (urlparse(call[0]).hostname or "").endswith(".query1.finance.yahoo.com")
+            or (urlparse(call[0]).hostname or "") == "query1.finance.yahoo.com"
+        ]
         self.assertEqual(len(yahoo_calls), 2)
         self.assertTrue(all(call[3] for call in calls))
         self.assertTrue(all("period1=" in call[0] and "period2=" in call[0] for call in yahoo_calls))

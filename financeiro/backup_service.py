@@ -11,6 +11,7 @@ import base64
 import secrets
 import shutil
 from datetime import datetime, timedelta, timezone
+from contextlib import closing
 from pathlib import Path
 
 from cryptography.hazmat.primitives import hashes
@@ -140,13 +141,13 @@ def create_backup(
 def _online_database_copy(destination: Path) -> None:
     # spec: backup-restauracao v1.0 — critérios 1 e 2
     with database.get_connection(database.DB_PATH) as source:
-        with sqlite3.connect(destination) as target:
+        with closing(sqlite3.connect(destination)) as target:
             source.backup(target, pages=256, sleep=0.01)
 
 
 def _database_integrity(path: Path) -> str:
     uri = path.resolve().as_uri() + "?mode=ro"
-    with sqlite3.connect(uri, uri=True) as conn:
+    with closing(sqlite3.connect(uri, uri=True)) as conn:
         rows = [str(row[0]) for row in conn.execute("PRAGMA integrity_check")]
         foreign_keys = conn.execute("PRAGMA foreign_key_check").fetchall()
         version = int(conn.execute("PRAGMA user_version").fetchone()[0])
@@ -478,7 +479,7 @@ def _validate_restored_secure_configs(root: Path) -> None:
         raise BackupError("A chave mestra restaurada e invalida.")
     temp_key = root / "secure/config.key"
     temp_key.write_text(base64.b64encode(raw_key).decode("ascii"), encoding="ascii")
-    with sqlite3.connect(root / "data/finance.db") as conn:
+    with closing(sqlite3.connect(root / "data/finance.db")) as conn:
         payloads = [str(row[0]) for row in conn.execute("SELECT payload_enc FROM secure_configs")]
     for payload in payloads:
         decrypt_json_from_storage(payload, temp_key)
@@ -491,7 +492,7 @@ def _promote_restored_environment(root: Path) -> None:
     if env_key and env_key.encode("utf-8") != restored_key_raw:
         raise BackupError("A chave configurada pelo ambiente diverge da chave do backup.")
 
-    with sqlite3.connect(database.DB_PATH, timeout=5) as conn:
+    with closing(sqlite3.connect(database.DB_PATH, timeout=5)) as conn:
         checkpoint = conn.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
         if checkpoint and int(checkpoint[0]) != 0:
             raise BackupError("O banco esta ocupado; tente restaurar quando nao houver outras operacoes.")
