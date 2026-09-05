@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 12.42
+versao: 12.43
 atualizado: 2026-09-05
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -83,6 +83,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | Spec | Status | Área |
 |---|---|---|
 | [[specs/open-finance]] | 📝 rascunho | Open Finance |
+| [[specs/backup-restauracao]] | 📝 rascunho | Backup e restauração |
 | [[specs/consolidacao-familiar]] | 📝 rascunho | Consolidação Familiar |
 | [[specs/imposto-renda]] | ❌ depreciado — custo de manter regras fiscais atualizadas não compensa para uso familiar | Investimentos |
 | [[specs/exportacao-dados]] | ❌ depreciado — arquivo SQLite já acessível por leitor genérico ou agente de IA | Exportação |
@@ -109,6 +110,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[adr/0014-desconcentracao-fachadas-e-roteamento]] | Fachadas compatíveis, roteamento declarativo e responsabilidades internas menores na fundação v2. |
 | [[adr/0015-ssrf-ai-endpoints]] | Validação de endpoints configuráveis de IA contra SSRF, com opt-in por env para provedores locais. |
 | [[adr/0016-calendario-mercado-anbima]] | Calendário nacional ANBIMA persistido localmente como fonte única para dias úteis derivados de eventos B3. |
+| [[adr/0018-backup-completo-criptografado]] | Rascunho do pacote completo de backup com container ZIP e payload criptografado autenticado. |
 
 ---
 
@@ -149,6 +151,7 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `12.43` — 2026-09-05 — Criados [[specs/backup-restauracao]] e [[adr/0018-backup-completo-criptografado]], ambos em rascunho, para backup completo, restauração validada, retenção e senha criptografada em Preferências.
 - `12.42` — 2026-09-05 — [[specs/open-finance]] v0.8 corrigida para refletir o suporte já existente a múltiplas tags por lançamento e seus separadores de entrada.
 - `12.41` — 2026-09-05 — [[specs/open-finance]] v0.7 permanece em rascunho e documenta staging com descrição bruta/normalizada, memória local de classificação e tags de projeto; Pluggy segue como candidato enquanto não houver provedor gratuito e simples para o usuário padrão.
 - `12.40` — 2026-09-04 — Snapshots de rentabilidade passam a consolidar corretamente múltiplos lotes do mesmo ativo antes da persistência.
