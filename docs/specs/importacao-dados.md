@@ -2,8 +2,8 @@
 tipo: spec
 area: importacao
 status: implementado
-versao: 1.6
-atualizado: 2026-09-01
+versao: 1.7
+atualizado: 2026-09-04
 relacionados:
   - "[[contas-correntes]]"
   - "[[cartoes]]"
@@ -18,7 +18,7 @@ aliases: ["Importação", "Importação de dados"]
 # Importação de dados
 
 > [!info] Status
-> **implementado** · área: `importacao` · atualizado em 2026-09-01 · relacionados: [[contas-correntes]], [[cartoes]], [[categorias-tags-gestao]], [[adr/0004-importador-xls-sem-dependencia]]
+> **implementado** · área: `importacao` · atualizado em 2026-09-04 · relacionados: [[contas-correntes]], [[cartoes]], [[categorias-tags-gestao]], [[adr/0004-importador-xls-sem-dependencia]]
 
 ## Problema
 
@@ -117,8 +117,11 @@ Tabelas: `transactions`, `credit_card_transactions`, `transaction_tags`, `credit
 - Dado um XLSX com membro duplicado, criptografado, método de compressão não suportado ou caminho interno inseguro, quando importado, é rejeitado como modelo inválido.
 - Dado uma worksheet acima dos limites de linhas, células ou coluna, quando analisada, é rejeitada sem preencher listas proporcionais ao índice malicioso.
 - Dado o modelo XLSX oficial ou um modelo antigo dentro dos limites, quando importado, continua sendo aceito com as mesmas colunas e valores.
+- Dado o painel de resultado antes do primeiro envio, quando a tela é aberta, então ele apresenta orientação semântica para baixar, preencher e selecionar o modelo.
 
 ## Changelog
+
+- `1.7` — 2026-09-04 — Painel de resultado passa a exibir orientação inicial, carregamento e erro semântico.
 
 - `1.6` — 2026-09-01 — Parser XLSX passa a limitar arquivo, membros ZIP, expansão, razão de compressão, caminhos, linhas, células, colunas e shared strings antes da persistência, mitigando ZIP/XML bombs sem alterar CSV/XLS.
 - `1.5` — 2026-08-28 — Timestamp UTC dos modelos XLSX passa a usar `timezone.utc`, preservando o formato W3CDTF e a compatibilidade com o Python 3.9 usado pelo launcher da homologação.

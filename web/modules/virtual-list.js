@@ -11,7 +11,17 @@ export function renderCollectionRows(container, items, { expanded = true, virtua
   if (!expanded) return;
   // spec: frontend-v2/frontend-fundacao-v2 v1.0 — critérios 28 e 29
   if (virtual && renderVirtualList(container, items, options)) return;
-  container.innerHTML = items.map(options.renderItem).join("");
+  const renderedItems = items.map(options.renderItem);
+  if (renderedItems.some((item) => item instanceof Node)) {
+    const fragment = document.createDocumentFragment();
+    renderedItems.forEach((item) => {
+      if (item instanceof Node) fragment.append(item);
+      else if (item != null) fragment.append(document.createRange().createContextualFragment(String(item)));
+    });
+    container.append(fragment);
+    return;
+  }
+  container.innerHTML = renderedItems.join("");
 }
 
 export function renderVirtualList(container, items, { rowHeight, renderItem, overscan = DEFAULT_OVERSCAN, threshold = DEFAULT_THRESHOLD, viewportHeight = 560, initialIndex = 0 } = {}) {

@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 12.21
+versao: 12.40
 atualizado: 2026-09-04
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -108,6 +108,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[adr/0013-dependencias-frontend-v2]] | ApexCharts 4.7.0 e IMask vendorizados, Command Palette nativa no padrão cmdk e virtualização compartilhada sem framework. |
 | [[adr/0014-desconcentracao-fachadas-e-roteamento]] | Fachadas compatíveis, roteamento declarativo e responsabilidades internas menores na fundação v2. |
 | [[adr/0015-ssrf-ai-endpoints]] | Validação de endpoints configuráveis de IA contra SSRF, com opt-in por env para provedores locais. |
+| [[adr/0016-calendario-mercado-anbima]] | Calendário nacional ANBIMA persistido localmente como fonte única para dias úteis derivados de eventos B3. |
 
 ---
 
@@ -148,6 +149,25 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `12.40` — 2026-09-04 — Snapshots de rentabilidade passam a consolidar corretamente múltiplos lotes do mesmo ativo antes da persistência.
+- `12.39` — 2026-09-04 — Corrigido o baseline da primeira captura de rentabilidade para não interpretar todo o estoque histórico como aporte do mês corrente.
+- `12.38` — 2026-09-04 — Corrigida a reconciliação de tabelas aditivas em bancos v2 existentes, incluindo snapshots de rentabilidade e leitura de notificações.
+- `12.37` — 2026-09-04 — Rentabilidade conclui captura antes da resposta, classificação rigorosa da cobertura e aplicação dos fluxos mensais persistidos.
+- `12.36` — 2026-09-04 — [[specs/rentabilidade-portfolio]] v2.5 e [[adr/0017-snapshots-rentabilidade-portfolio]] v1.0 concluem snapshots mensais, cobertura explícita e flyover agregado por moeda.
+- `12.35` — 2026-09-04 — Contrato de rentabilidade ampliado com cobertura de snapshots, sem alteração das séries agregadas consumidas pelo frontend.
+- `12.34` — 2026-09-04 — Rentabilidade passa a priorizar snapshots mensais persistidos, mantendo fallback aproximado para competências ainda sem cobertura.
+- `12.33` — 2026-09-04 — Camada de valorização passou a fornecer metadados de origem/status para a futura captura de snapshots, mantendo fallback aproximado.
+- `12.32` — 2026-09-04 — [[specs/rentabilidade-portfolio]] v2.0 entra em implementação e [[adr/0017-snapshots-rentabilidade-portfolio]] define snapshots mensais por ativo com apresentação agregada por moeda.
+- `12.31` — 2026-09-04 — Rentabilidade do Portfólio passa a usar o ano civil corrente completo, com explicação explícita para aportes, aproximações e meses futuros.
+- `12.30` — 2026-09-04 — Preenchimento dos gráficos de Contas e Cartões centralizado em uma camada contínua, eliminando a quebra de cor entre saldo atual e previsto.
+- `12.29` — 2026-09-04 — Corrigida a renderização DOM das listas de cartões e invertido o degradê dos gráficos de contas/cartões para uma única paleta azul.
+- `12.28` — 2026-09-04 — Gráficos de saldo de Contas e faturas de Cartões ganharam área degradê horizontal sob as linhas, sem alterar séries ou dados.
+- `12.27` — 2026-09-04 — Fechamento dos achados UX P2/P3: Histórico responsivo, ARIA de Relatórios, microcopy do Cockpit, densidade de Sobre e atenção preventiva em Limites.
+- `12.26` — 2026-09-04 — [[specs/importacao-dados]] v1.7 e [[specs/efeito-borboleta]] v1.9 adotam estados iniciais semânticos e ocultam resultados dependentes até haver dados válidos.
+- `12.25` — 2026-09-04 — [[specs/frontend-modularizacao]] v4.31 reforça a acessibilidade da Busca global no WebKit com semântica modal, foco confinado e restauração segura.
+- `12.24` — 2026-09-04 — [[specs/categorias-tags-gestao]] v1.2 reduz a densidade de listas extensas com busca local, subcategorias recolhíveis e menus contextuais acessíveis.
+- `12.23` — 2026-09-04 — [[specs/investimentos-portfolio]] v2.61 e [[adr/0016-calendario-mercado-anbima]] adotam calendário ANBIMA local para datas derivadas de eventos B3, sem fallback BrasilAPI.
+- `12.22` — 2026-09-04 — [[specs/investimentos-portfolio]] v2.60 inclui eventos societários B3, corrige a documentação da coluna Fonte e compartilha TLS verificado entre os provedores da agenda.
 - `12.21` — 2026-09-04 — [[specs/investimentos-portfolio]] v2.55 elimina o aviso ambíguo de indisponibilidade na aba Eventos e usa estado vazio neutro para ausência de anúncios futuros ou calendários não publicados.
 - `12.20` — 2026-09-04 — [[specs/investimentos-portfolio]] v2.54 transforma Eventos em agenda futura mensal com carteiras associadas, fonte em nota de rodapé e sessão Yahoo `calendarEvents`; [[specs/alertas-cockpit]] v1.2 reutiliza a janela limitada.
 - `12.19` — 2026-09-04 — [[specs/investimentos-portfolio]] v2.53 e [[specs/alertas-cockpit]] v1.1 limitam a consulta semanal de proventos no Cockpit, endurecem o parser e virtualizam/desmontam a aba Eventos, distinguindo Data ex de pagamento opcional.

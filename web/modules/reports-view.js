@@ -39,6 +39,11 @@ export function registerReportsView({
     reportContent,
   } = elements;
 
+  function syncReportPanelLabel() {
+    const activeTab = Array.from(reportTabs || []).find((tab) => tab.dataset.reportTab === state.reportTab);
+    if (activeTab?.id) reportContent.setAttribute("aria-labelledby", activeTab.id);
+  }
+
   const statement = createReportStatement({
     state, elements, api, renderReports, formatDate, formatMonthLabel,
     formatMoney, formatPercent, escapeHtml, chartColor, reportItemClassification,
@@ -67,6 +72,7 @@ export function registerReportsView({
     if (state.reportTab !== "tags") tagsRequestId += 1;
     reportMonthLabel.textContent = formatMonthShortLabel(state.reportMonth);
     syncRovingTabState(reportTabs, state.reportTab, (button) => button.dataset.reportTab);
+    syncReportPanelLabel();
     renderReportAccountOptions();
     reportAccountFilter.hidden = state.reportTab !== "accounts";
     statementControls.hidden = state.reportTab !== "statement";

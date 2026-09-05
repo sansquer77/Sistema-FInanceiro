@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 3.8
+versao: 3.10
 atualizado: 2026-09-04
 relacionados:
   - "[[arquitetura]]"
@@ -32,7 +32,7 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 - **Recorrência e Parcelamento**: suporte a séries de lançamentos periódicos ou parcelados com acompanhamento de índice de parcelas e conciliação bancária (`reconciled_at`). Ver [[lancamentos]].
 - **Cartões de Crédito**: cadastro de cartões com limite, emissor, bandeira, fechamento, vencimento e conta preferencial de pagamento. Lançamentos de despesas e receitas no cartão por fatura mensal (formato `AAAA-MM`), conciliação de lançamentos, compras parceladas/recorrentes, movimentação entre faturas e fluxo de pagamento de fatura (integral ou parcial, com saldo residual lançado na fatura seguinte) integrado às contas-correntes. Ver [[cartoes]].
 - **Limites de Gastos (Metas/Budgets)**: estabelecimento de limites de despesas mensais por categoria e subcategoria. Ver [[limites-gastos]].
-- **Portfólio de Investimentos**: posições iniciais (`opening positions`) e operações de investimento, autocomplete de ativos já utilizados, resgates por quantidade com baixa FIFO, histórico imutável de resultado realizado, metas percentuais por classe e agenda futura de eventos de ações/ETFs/BDRs consultada em B3/Nasdaq com fallback Yahoo e cache diário, com Data ex, pagamento opcional fornecido pelo provedor, carteiras associadas e sem estimativa de provento total. Ausência de anúncio futuro ou calendário não é apresentada como erro. Suporte a ações/ETFs/BDRs (`stock`), cripto volátil (`crypto`), stablecoins (`stablecoin`), fundos (`fund`), renda fixa (`fixed_income`), previdência privada (`private_pension`), poupança (`savings`) e outros (`other`). Ver [[investimentos-portfolio]].
+- **Portfólio de Investimentos**: posições iniciais (`opening positions`) e operações de investimento, autocomplete de ativos já utilizados, resgates por quantidade com baixa FIFO, histórico imutável de resultado realizado, metas percentuais por classe e agenda futura de eventos de ações/ETFs/BDRs consultada em B3/Nasdaq com fallback Yahoo e cache diário. A agenda inclui proventos, bonificações, desdobramentos e grupamentos informados pela B3, com Data ex ajustada pelo calendário nacional ANBIMA local, pagamento opcional fornecido pelo provedor, carteiras associadas, fonte explícita e sem estimativa de provento total ou conversão monetária de fatores societários. Ausência de anúncio futuro ou calendário não é apresentada como erro. Suporte a ações/ETFs/BDRs (`stock`), cripto volátil (`crypto`), stablecoins (`stablecoin`), fundos (`fund`), renda fixa (`fixed_income`), previdência privada (`private_pension`), poupança (`savings`) e outros (`other`). Ver [[investimentos-portfolio]].
 - **Precificação e Validação de Ativos**:
   - Integração com Yahoo Finance (ações e fundos) e CoinGecko/Yahoo (criptoativos) para cotações automáticas.
   - Integração com o Sistema Gerenciador de Séries Temporais (SGS) do Banco Central para obter CDI, SELIC, IPCA, IGP-M e TR para o cálculo do rendimento acumulado de renda fixa (com fallback local seguro).
@@ -133,6 +133,8 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 
 ## Changelog
 
+- `3.10` — 2026-09-04 — Data ex derivada de eventos B3 passa a usar calendário nacional ANBIMA persistido localmente e atualizado anualmente sem fonte alternativa.
+- `3.9` — 2026-09-04 — Agenda B3 passa a incluir bonificações, desdobramentos e grupamentos, mantendo fonte explícita e sem converter fatores societários em valores monetários.
 - `3.8` — 2026-09-04 — Agenda de eventos passa a usar B3 para ativos brasileiros, Nasdaq para internacionais e Yahoo como fallback, com cache diário e sem novas credenciais.
 - `3.7` — 2026-09-04 — Eventos do Portfólio usa estado vazio neutro quando não há anúncio futuro ou calendário disponível, sem induzir o usuário a interpretar ETFs acumuladores como falha.
 - `3.6` — 2026-09-04 — Eventos do Portfólio passa a exibir agenda futura agrupada, carteiras associadas e fonte em nota de rodapé; o Cockpit reutiliza a leitura de calendário limitada à semana.

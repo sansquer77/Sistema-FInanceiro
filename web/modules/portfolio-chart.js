@@ -46,7 +46,11 @@ export function createPortfolioChart({ state, elements, api, formatPercentValue,
       const end = monthLabel(returns.end_month);
       portfolioReturnDrawerTitle.textContent = start === end ? start : `${start} a ${end}`;
     }
-    if (portfolioReturnNotice) portfolioReturnNotice.hidden = !returns.has_historical_approximation;
+    if (portfolioReturnNotice) {
+      const copy = portfolioReturnNotice.querySelector("small") || portfolioReturnNotice;
+      copy.textContent = portfolioCoverageNotice(returns.snapshot_coverage);
+      portfolioReturnNotice.hidden = false;
+    }
 
     const seriesConfig = [
       { key: "BRL_return_pct", label: "R$", color: chartColor(0) },
@@ -102,4 +106,20 @@ function monthLabel(month) {
 function shortMonthLabel(month) {
   const [year, monthNumber] = month.split("-").map(Number);
   return new Date(year, monthNumber - 1, 1).toLocaleDateString("pt-BR", { month: "short" }).replace(".", "").slice(0, 1).toUpperCase();
+}
+
+export function portfolioCoverageNotice(coverage = {}) {
+  const observed = Array.isArray(coverage.observed_months) ? coverage.observed_months.length : 0;
+  const approximate = Array.isArray(coverage.approximate_months) ? coverage.approximate_months.length : 0;
+  const future = Array.isArray(coverage.future_months) ? coverage.future_months.length : 0;
+  const elapsed = observed + approximate;
+  const percent = Number.isFinite(Number(coverage.coverage_percent)) ? Number(coverage.coverage_percent) : 0;
+  const coverageText = elapsed
+    ? `${observed} de ${elapsed} ${elapsed === 1 ? "mês decorrido usa" : "meses decorridos usam"} snapshot observado (${percent.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%).`
+    : "Ainda não há mês decorrido com snapshot observado.";
+  const approximationText = approximate
+    ? ` ${approximate} ${approximate === 1 ? "mês permanece aproximado" : "meses permanecem aproximados"} por ausência de fechamento histórico.`
+    : "";
+  const futureText = future ? ` ${future} ${future === 1 ? "mês futuro permanece zerado" : "meses futuros permanecem zerados"}.` : "";
+  return `${coverageText}${approximationText}${futureText}`;
 }

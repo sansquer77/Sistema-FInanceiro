@@ -20,8 +20,10 @@ from financeiro import portfolio_positions as positions_store
 from financeiro import portfolio_quotes as quotes
 from financeiro import portfolio_presentation as presentation
 from financeiro import portfolio_events as events
+from financeiro.market_calendar import load_holiday_dates
 from financeiro.portfolio_valuation import PositionValuation
 from financeiro.portfolio_returns import PortfolioReturns
+from financeiro.portfolio_snapshots import list_snapshots, upsert_snapshots
 from financeiro.secure_config import load_mais_retorno_api_key
 from financeiro.transactions import convert_to_brl_cents, get_exchange_rate_to_brl, parse_exchange_rate, rate_to_micros
 
@@ -163,6 +165,7 @@ def get_portfolio_events(user_id: int, force_refresh: bool = False, start_date: 
         error_type=PortfolioError,
         force_refresh=force_refresh,
         start_date=start_date,
+        holidays=load_holiday_dates(get_connection),
     )
 
 
@@ -1634,6 +1637,17 @@ def _position_value_native_as_of(
     return _valuation._position_value_native_as_of(position=position, as_of_date=as_of_date, force_refresh=force_refresh, factor_cache=factor_cache)
 
 
+def position_value_snapshot_metadata(
+    position: dict,
+    as_of_date: date,
+    force_refresh: bool = False,
+    factor_cache: dict[str, Decimal] | None = None,
+) -> dict:
+    return _valuation.position_value_snapshot_metadata(
+        position=position, as_of_date=as_of_date, force_refresh=force_refresh, factor_cache=factor_cache
+    )
+
+
 def _accumulated_factor_by_month(
     indexer: str,
     start_date: date,
@@ -1650,7 +1664,98 @@ def _monthly_return_pct(prev_value: int, end_value: int, net_contribution: int) 
 
 
 def get_portfolio_returns(user_id: int, force_refresh: bool = False, positions: list[dict] | None = None) -> dict:
-    return _returns.get_portfolio_returns(user_id=user_id, force_refresh=force_refresh, positions=positions)
+    resolved_positions = positions
+    if resolved_positions is None:
+        resolved_positions = (get_portfolio(user_id, force_refresh=force_refresh).get("positions") or [])
+    if resolved_positions:
+        _capture_current_portfolio_snapshot(user_id, resolved_positions, force_refresh=force_refresh)
+    return _returns.get_portfolio_returns(user_id=user_id, force_refresh=force_refresh, positions=resolved_positions)
+
+
+def _capture_current_portfolio_snapshot(user_id: int, positions: list[dict], *, force_refresh: bool = False) -> None:
+    """Captura a competência atual após toda valorização e rede estarem concluídas."""
+    reference_date = date.today()
+    snapshot_month = reference_date.strftime("%Y-%m")
+    previous_rows = _list_portfolio_snapshots(user_id)
+    previous_by_asset = {}
+    for row in previous_rows:
+        if row["snapshot_month"] >= snapshot_month:
+            continue
+        key = (row["account_id"], row["currency"], row["asset_type"], row["asset_identifier"], row["asset_name"])
+        if key not in previous_by_asset or row["snapshot_month"] > previous_by_asset[key]["snapshot_month"]:
+            previous_by_asset[key] = row
+    factor_cache: dict[str, Decimal] = {}
+    snapshots_by_asset: dict[tuple, dict] = {}
+    for position in positions:
+        metadata = position_value_snapshot_metadata(
+            position, reference_date, force_refresh=force_refresh, factor_cache=factor_cache
+        )
+        asset_key = (
+            int(position["account_id"]), str(position.get("currency") or "BRL").upper(),
+            position.get("asset_type") or "other", position.get("asset_identifier") or "",
+            position.get("asset_name") or "",
+        )
+        current_cost = int(position.get("total_cost_cents") or 0)
+        quantity_micros = decimal_to_micros_value(Decimal(str(position.get("quantity") or 0)))
+        first_operation = date.fromisoformat(position["first_operation_date"])
+        snapshot = snapshots_by_asset.setdefault(asset_key, {
+            "user_id": user_id,
+            "snapshot_month": snapshot_month,
+            "as_of_date": metadata["as_of_date"],
+            "account_id": int(position["account_id"]),
+            "currency": str(position.get("currency") or "BRL").upper(),
+            "asset_type": position.get("asset_type") or "other",
+            "asset_identifier": position.get("asset_identifier") or "",
+            "asset_name": position.get("asset_name") or "",
+            "quantity_micros": 0,
+            "unit_price_cents": 0,
+            "market_value_cents": 0,
+            "cost_basis_cents": 0,
+            "contribution_cents": 0,
+            "redemption_cents": 0,
+            "dividend_cents": 0,
+            "quote_source": metadata["quote_source"],
+            "valuation_status": metadata["valuation_status"],
+        })
+        # spec: rentabilidade-portfolio v2.9 — critérios 9, 10 e 14
+        # A posição apresentada pode conter vários lotes com a mesma identidade.
+        # O snapshot é único por ativo, portanto consolida os lotes antes do
+        # UPSERT para que nenhum valor seja substituído pelo último lote.
+        snapshot["quantity_micros"] += quantity_micros
+        snapshot["market_value_cents"] += int(metadata["value_cents"])
+        snapshot["cost_basis_cents"] += current_cost
+        if first_operation.strftime("%Y-%m") == snapshot_month:
+            snapshot["contribution_cents"] += current_cost
+        if metadata["valuation_status"] != "observed":
+            snapshot["valuation_status"] = "approximate"
+        if metadata["as_of_date"] < snapshot["as_of_date"]:
+            snapshot["as_of_date"] = metadata["as_of_date"]
+        if metadata["quote_source"] != snapshot["quote_source"]:
+            snapshot["quote_source"] = "mixed"
+
+    snapshots = list(snapshots_by_asset.values())
+    for snapshot in snapshots:
+        asset_key = (
+            snapshot["account_id"], snapshot["currency"], snapshot["asset_type"],
+            snapshot["asset_identifier"], snapshot["asset_name"],
+        )
+        previous_snapshot = previous_by_asset.get(asset_key)
+        if previous_snapshot is not None:
+            cost_delta = snapshot["cost_basis_cents"] - int(previous_snapshot.get("cost_basis_cents") or 0)
+            snapshot["contribution_cents"] = max(cost_delta, 0)
+            snapshot["redemption_cents"] = max(-cost_delta, 0)
+        quantity_micros = snapshot["quantity_micros"]
+        snapshot["unit_price_cents"] = (
+            int((Decimal(snapshot["market_value_cents"]) * Decimal("1000000") / Decimal(quantity_micros)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+            if quantity_micros > 0 else 0
+        )
+    with get_connection() as conn:
+        upsert_snapshots(conn, snapshots)
+
+
+def _list_portfolio_snapshots(user_id: int) -> list[dict]:
+    with get_connection() as conn:
+        return list_snapshots(conn, user_id)
 
 
 def _cdi_factor_for_period(start_date: date, end_date: date, force_refresh: bool = False) -> Decimal:
@@ -2097,7 +2202,7 @@ def micros_to_decimal(micros: int) -> Decimal:
 
 
 def parse_rate_decimal(value: object) -> Decimal:
-    # spec: rentabilidade-portfolio v1.8 — critério 4
+    # spec: rentabilidade-portfolio v2.9 — critério 4
     # get_portfolio retorna a taxa ja formatada (ex.: "4,27"); aceita Decimal ou
     # string com ponto/virgula para nao quebrar o calculo de valor por data.
     return calculations.parse_rate_decimal(value)
@@ -2171,4 +2276,5 @@ _returns = PortfolioReturns(
     fetch_accumulated_indexer_factor=lambda *args, **kwargs: fetch_accumulated_indexer_factor(*args, **kwargs),
     fetch_indexer_rate=lambda *args, **kwargs: fetch_indexer_rate(*args, **kwargs),
     compound_annual_factor=lambda *args, **kwargs: compound_annual_factor(*args, **kwargs),
+    list_snapshots=lambda user_id: _list_portfolio_snapshots(user_id),
 )

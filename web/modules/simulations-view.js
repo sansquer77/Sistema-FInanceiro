@@ -32,10 +32,22 @@ export function registerSimulationsView({
     simulationChart,
     simulationWeeklyProjection,
     simulationWarnings,
+    simulationEmptyState,
+    simulationResultsContent,
     resetSimulationButton,
   } = elements;
   const weeklyProjectionElement = simulationWeeklyProjection
     || document.querySelector("#simulationWeeklyProjection");
+
+  function showEmptyState(message = "Preencha o cenário e clique em Simular para visualizar saldos, projeção e alertas.", kind = "info") {
+    if (simulationEmptyState) {
+      simulationEmptyState.innerHTML = stateMarkup(message, { kind, title: kind === "error" ? "Simulação indisponível" : "Aguardando simulação" });
+      simulationEmptyState.hidden = false;
+    }
+    if (simulationResultsContent) simulationResultsContent.hidden = true;
+  }
+
+  showEmptyState();
 
   simulationForm.addEventListener("submit", handleSubmit);
   resetSimulationButton.addEventListener("click", resetForm);
@@ -96,11 +108,12 @@ export function registerSimulationsView({
     if (simulationDifference) {
       simulationDifference.textContent = "-";
     }
-    simulationChart.innerHTML = '<p class="muted-copy">Preencha o formulário e clique em Simular.</p>';
+    simulationChart.innerHTML = "";
     if (weeklyProjectionElement) {
       weeklyProjectionElement.innerHTML = "";
     }
     simulationWarnings.innerHTML = "";
+    showEmptyState();
   }
 
   async function handleSubmit(event) {
@@ -114,12 +127,15 @@ export function registerSimulationsView({
       setMessage(simulationMessage, "Simulação pronta.", "success");
     } catch (error) {
       setMessage(simulationMessage, error.message, "error");
+      showEmptyState(error.message, "error");
     } finally {
       setFormBusy(simulationForm, false);
     }
   }
 
   function renderSimulation(response) {
+    if (simulationEmptyState) simulationEmptyState.hidden = true;
+    if (simulationResultsContent) simulationResultsContent.hidden = false;
     const accountImpact = response.account_impact || {};
     const account = state.accounts.find((entry) => String(entry.id) === String(response.scenario?.account_id));
     const currency = account?.currency || "BRL";

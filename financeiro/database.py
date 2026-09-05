@@ -15,6 +15,7 @@ from financeiro.database_migrations import (
     set_schema_version,
 )
 from financeiro.database_schema import SCHEMA_VERSION, create_baseline_schema
+from financeiro.market_calendar import ensure_market_calendar_schema
 
 ROOT = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parents[1]
 DATA_DIR = Path(os.environ.get("SISTEMA_FINANCEIRO_DATA_DIR", ROOT / "data"))
@@ -56,6 +57,13 @@ def initialize_database() -> None:
         pass
     else:
         migrate_if_supported(DB_PATH)
+
+    with get_connection(DB_PATH) as conn:
+        # The v2 baseline is additive and idempotent. Reapply it for databases
+        # already marked with the current schema version so tables introduced
+        # by compatible releases are available before any request is served.
+        create_baseline_schema(conn)
+        ensure_market_calendar_schema(conn)
 
     maintain_quote_cache(
         DB_PATH,

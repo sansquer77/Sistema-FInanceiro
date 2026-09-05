@@ -163,7 +163,7 @@ export function registerLimitsView({
     }
     rows.forEach((row) => {
       const item = document.createElement("article");
-      item.className = `spending-limit-item ${row.percent > 1 ? "over-limit" : ""}`;
+      item.className = `spending-limit-item ${row.percent > 1 ? "over-limit" : row.percent >= 0.8 ? "near-limit" : ""}`;
       item.innerHTML = `
         <div class="limit-item-main">
           <div>
@@ -172,6 +172,7 @@ export function registerLimitsView({
             <span>${formatMoney(row.spent, "BRL")} de ${formatMoney(row.limit, "BRL")}</span>
           </div>
           <strong>${formatPercent(row.percent)}</strong>
+          ${row.percent >= 0.8 && row.percent <= 1 ? '<small class="limit-attention-label">Atenção: próximo do limite</small>' : ""}
         </div>
         <div class="limit-progress" aria-label="${escapeHtml(row.label)} consumido">
           <span style="width:${Math.min(row.percent * 100, 100)}%"></span>

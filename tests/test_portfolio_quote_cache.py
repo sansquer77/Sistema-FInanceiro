@@ -6,7 +6,7 @@ from pathlib import Path
 import sqlite3
 import tempfile
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 import ssl
 from urllib.error import URLError
 
@@ -124,6 +124,23 @@ class QuoteCacheTest(unittest.TestCase):
             )
         opener.assert_called_once()
         self.assertNotIn("context", opener.call_args.kwargs)
+
+    def test_production_transport_shares_verified_tls_context(self):
+        opener = Mock(return_value=io.BytesIO(b'{"ok": true}'))
+        context = ssl.create_default_context()
+        with patch.object(quotes, "urlopen", opener), patch.object(
+            quotes, "verified_ssl_context", return_value=context
+        ):
+            result = quotes.read_json_url(
+                "https://example.invalid",
+                "indisponivel",
+                opener=opener,
+                error_type=portfolio.PortfolioError,
+            )
+        self.assertEqual(result, {"ok": True})
+        self.assertIs(opener.call_args.kwargs["context"], context)
+        self.assertEqual(context.verify_mode, ssl.CERT_REQUIRED)
+        self.assertTrue(context.check_hostname)
 
     def test_public_cache_objects_alias_owned_state(self):
         self.assertIs(portfolio.QUOTE_MEMORY_CACHE, portfolio._quote_cache.memory)

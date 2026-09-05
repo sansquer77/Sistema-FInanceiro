@@ -87,6 +87,42 @@ class PortfolioEventsTest(unittest.TestCase):
         self.assertEqual(events[0]["source"], "B3")
         self.assertEqual(events[0]["confirmation_label"], "Anunciado · B3")
 
+    def test_b3_ex_date_skips_anbima_holiday(self):
+        events = portfolio_events.parse_b3_events(
+            [{"cashDividends": [{
+                "assetIssued": "BRPETRACNPR6", "lastDatePrior": "02/04/2026",
+                "paymentDate": "10/04/2026", "rate": "0,50", "label": "DIVIDENDO",
+            }]}],
+            {"asset_identifier": "PETR4", "asset_name": "Petrobras", "currency": "BRL"},
+            minimum_date=date(2026, 4, 1), maximum_date=date(2026, 4, 30),
+            holidays={date(2026, 4, 3)},
+        )
+        self.assertEqual(events[0]["date"], "2026-04-06")
+
+    def test_b3_corporate_events_include_bonus_split_and_reverse_split(self):
+        payload = [{"stockDividends": [
+            {"assetIssued": "BRITUBACNPR1", "lastDatePrior": "30/09/2026", "label": "BONIFICACAO", "factor": "3,00000000000"},
+            {"assetIssued": "BRITUBACNPR1", "lastDatePrior": "30/09/2026", "label": "DESDOBRAMENTO", "factor": "50,00000000000"},
+            {"assetIssued": "BRITUBACNPR1", "lastDatePrior": "30/09/2026", "label": "GRUPAMENTO", "factor": "0,01000000000"},
+            {"assetIssued": "BRITUBACNOR4", "lastDatePrior": "30/09/2026", "label": "BONIFICACAO", "factor": "3,00000000000"},
+        ]}]
+        events = portfolio_events.parse_b3_events(
+            payload,
+            {"asset_identifier": "ITUB4", "asset_name": "Itaú", "currency": "BRL", "portfolio_names": ["Carteira"]},
+            minimum_date=date(2026, 9, 1), maximum_date=date(2026, 11, 30),
+        )
+        self.assertEqual(
+            [(event["event_type"], event["event_label"]) for event in events],
+            [
+                ("stock_bonus", "Bonificação"),
+                ("stock_split", "Desdobramento"),
+                ("reverse_stock_split", "Grupamento"),
+            ],
+        )
+        self.assertTrue(all(event["date"] == "2026-10-01" for event in events))
+        self.assertTrue(all(event["amount_per_share_micros"] is None for event in events))
+        self.assertTrue(all(event["source"] == "B3" for event in events))
+
     def test_nasdaq_future_dividend_uses_decimal_without_float(self):
         payload = {"data": {"dividends": {"rows": [{
             "exOrEffDate": "10/15/2026", "paymentDate": "10/20/2026",

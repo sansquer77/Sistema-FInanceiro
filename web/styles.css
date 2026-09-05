@@ -3530,8 +3530,8 @@ padding: 8px 16px;
 }
 
 .about-feature-list {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   gap: 8px;
   margin-top: 12px;
 }
@@ -3824,6 +3824,25 @@ padding: 8px 16px;
   margin-top: 14px;
 }
 
+.classification-list-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin-top: 14px;
+}
+
+.classification-search {
+  margin: 0;
+}
+
+.classification-list-summary {
+  padding-bottom: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 .classification-item {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -3833,6 +3852,88 @@ padding: 8px 16px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
+}
+
+.classification-item-copy {
+  min-width: 0;
+}
+
+.classification-actions-menu {
+  position: relative;
+  justify-self: end;
+}
+
+.classification-actions-menu > summary {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 800;
+  list-style: none;
+}
+
+.classification-actions-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.classification-actions-menu > summary:hover,
+.classification-actions-menu > summary:focus-visible,
+.classification-actions-menu[open] > summary {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.classification-actions-popover {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  right: 0;
+  display: grid;
+  min-width: 132px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.classification-actions-popover button {
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+.classification-actions-popover button:hover,
+.classification-actions-popover button:focus-visible {
+  background: var(--bg-alt);
+}
+
+.classification-actions-popover .danger-text {
+  color: var(--danger);
+}
+
+.subcategory-disclosure {
+  grid-column: 1 / -1;
+  min-width: 0;
+  border-top: 1px solid var(--line);
+}
+
+.subcategory-disclosure > summary {
+  width: fit-content;
+  padding-top: 10px;
+  color: var(--primary);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .classification-item strong,
@@ -3847,11 +3948,9 @@ padding: 8px 16px;
 }
 
 .subcategory-list {
-  grid-column: 1 / -1;
   display: grid;
   gap: 8px;
   padding: 10px 0 0 12px;
-  border-top: 1px solid var(--line);
 }
 
 .subcategory-item {
@@ -6608,6 +6707,19 @@ form[aria-busy="true"] .form-actions {
   border-left-color: var(--danger);
 }
 
+.spending-limit-item.near-limit {
+  border-left-color: var(--warning, #a66b00);
+  background: var(--surface-low);
+}
+
+.limit-attention-label {
+  display: block;
+  margin-top: 3px;
+  color: var(--warning, #a66b00);
+  font-size: 11px;
+  font-weight: 900;
+}
+
 .limit-item-main,
 .limit-item-footer {
   display: grid;
@@ -7801,8 +7913,17 @@ form[aria-busy="true"] .form-actions {
 }
 
 .operation-history-filters {
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   align-items: end;
+}
+
+.operation-history-filters .operation-history-search {
+  grid-column: span 2;
+  min-width: 220px;
+}
+
+.operation-history-filters .operation-history-search input {
+  width: 100%;
 }
 
 .filter-toolbar {

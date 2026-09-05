@@ -5,6 +5,7 @@ export function registerGlobalSearch({ state, elements, viewTitles, normalizeSea
   let visibleItems = [];
   let requestRevision = 0;
   let searchTimer = null;
+  let previouslyFocused = null;
 
   trigger.addEventListener("click", open);
   closeButton.addEventListener("click", close);
@@ -15,6 +16,7 @@ export function registerGlobalSearch({ state, elements, viewTitles, normalizeSea
   dialog.addEventListener("click", (event) => {
     if (event.target === dialog) close();
   });
+  dialog.addEventListener("keydown", handleDialogKeydown);
   document.addEventListener("keydown", (event) => {
     if (event.key === "/" && !trigger.closest("[hidden]") && !isTypingTarget(event.target)) {
       event.preventDefault();
@@ -23,6 +25,7 @@ export function registerGlobalSearch({ state, elements, viewTitles, normalizeSea
   });
 
   function open() {
+    previouslyFocused = document.activeElement;
     if (!dialog.open) dialog.showModal();
     input.value = "";
     scheduleRender();
@@ -33,7 +36,31 @@ export function registerGlobalSearch({ state, elements, viewTitles, normalizeSea
     requestRevision += 1;
     clearTimeout(searchTimer);
     if (dialog.open) dialog.close();
-    trigger.focus();
+    const focusTarget = previouslyFocused?.isConnected ? previouslyFocused : trigger;
+    previouslyFocused = null;
+    focusTarget?.focus();
+  }
+
+  function handleDialogKeydown(event) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      close();
+      return;
+    }
+    if (event.key !== "Tab") return;
+    const focusable = [...dialog.querySelectorAll(
+      "button:not([disabled]), input:not([disabled]), [href], select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])",
+    )].filter((element) => !element.closest("[hidden]"));
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
   }
 
   function scheduleRender() {

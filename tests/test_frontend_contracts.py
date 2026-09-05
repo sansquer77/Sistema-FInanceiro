@@ -294,6 +294,17 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("overflow-x: auto", container)
         self.assertLess(html.index('id="simulationChart"'), html.index('id="simulationWeeklyProjection"'))
 
+    def test_initial_states_do_not_mount_empty_import_or_simulation_regions(self) -> None:
+        imports = (MODULE_ROOT / "imports-view.js").read_text(encoding="utf-8")
+        simulations = (MODULE_ROOT / "simulations-view.js").read_text(encoding="utf-8")
+        html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        self.assertIn('title: "Pronto para importar"', imports)
+        self.assertIn('kind: "loading"', imports)
+        self.assertIn('id="simulationEmptyState"', html)
+        self.assertIn('id="simulationResultsContent" hidden', html)
+        self.assertIn('showEmptyState();', simulations)
+        self.assertIn('simulationResultsContent.hidden = false', simulations)
+
     def test_trends_tooltips_pair_text_and_surface_theme_tokens(self) -> None:
         styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
         start = styles.index(".trends-chart .apexcharts-canvas .apexcharts-tooltip,")
@@ -600,7 +611,10 @@ class FrontendModuleContractTest(unittest.TestCase):
         search_source = (MODULE_ROOT / "global-search.js").read_text(encoding="utf-8")
 
         self.assertIn('id="globalSearchDialog"', index)
+        self.assertIn('role="dialog" aria-modal="true"', index)
+        self.assertIn('aria-describedby="globalSearchDescription"', index)
         self.assertIn('id="globalSearchInput" type="search"', index)
+        self.assertIn('aria-controls="globalSearchResults"', index)
         self.assertIn('role="listbox"', index)
         self.assertIn('event.key === "/"', search_source)
         self.assertIn('!trigger.closest("[hidden]")', search_source)
@@ -610,6 +624,9 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertNotIn("fetch(", search_source)
         self.assertIn("/api/global-search?", search_source)
         self.assertIn("requestRevision", search_source)
+        self.assertIn("handleDialogKeydown", search_source)
+        self.assertIn("previouslyFocused", search_source)
+        self.assertIn('event.key !== "Tab"', search_source)
         self.assertIn("setTimeout(async () =>", search_source)
         self.assertIn("const viewScrollPositions = new Map()", app_source)
         self.assertIn("viewScrollPositions.set(previousView, window.scrollY)", app_source)

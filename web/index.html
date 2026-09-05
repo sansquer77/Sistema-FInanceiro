@@ -1042,7 +1042,7 @@
                 </div>
                 <div class="portfolio-return-legend" id="portfolioReturnLegend"></div>
                 <p class="portfolio-return-notice" id="portfolioReturnNotice" hidden>
-                  <small>Renda variável/cripto usam o valor atual como aproximação do período, pois cotações históricas ainda não são armazenadas.</small>
+                  <small>Variações refletem a valorização líquida dos aportes do mês; renda variável/cripto usam o valor atual como aproximação quando não há cotação histórica. Meses futuros ficam zerados até serem observados.</small>
                 </p>
               </div>
             </div>
@@ -1422,6 +1422,8 @@
               </section>
 
               <section class="panel simulation-results-panel">
+                <div id="simulationEmptyState"></div>
+                <div id="simulationResultsContent" hidden>
                 <div class="simulation-panel-intro">
                   <h3>Resultados</h3>
                   <span class="muted-copy">Os números abaixo refletem a projeção em memória e mantêm a estrutura visual do cockpit.</span>
@@ -1451,6 +1453,7 @@
                   <small>Riscos de saldo ou limite destacados sem interromper a simulação.</small>
                 </div>
                 <div class="simulation-warnings" id="simulationWarnings"></div>
+                </div>
               </section>
             </div>
           </section>
@@ -1468,12 +1471,12 @@
             </div>
 
             <div class="report-tabs" role="tablist" aria-label="Relatórios financeiros">
-              <button class="report-tab active" type="button" role="tab" aria-selected="true" aria-controls="reportContent" data-report-tab="categories">Categorias</button>
-              <button class="report-tab" type="button" role="tab" aria-selected="false" aria-controls="reportContent" data-report-tab="subcategories" tabindex="-1">Subcategorias</button>
-              <button class="report-tab" type="button" role="tab" aria-selected="false" aria-controls="reportContent" data-report-tab="cashflow" tabindex="-1">Entradas x Saídas</button>
-              <button class="report-tab" type="button" role="tab" aria-selected="false" aria-controls="reportContent" data-report-tab="accounts" tabindex="-1">Contas</button>
-              <button class="report-tab" type="button" role="tab" aria-selected="false" aria-controls="reportContent" data-report-tab="tags" tabindex="-1">Tags</button>
-              <button class="report-tab" type="button" role="tab" aria-selected="false" aria-controls="reportContent" data-report-tab="statement" tabindex="-1">Demonstrativos</button>
+              <button id="reportTabCategories" class="report-tab active" type="button" role="tab" aria-selected="true" aria-controls="reportContent" data-report-tab="categories">Categorias</button>
+              <button id="reportTabSubcategories" class="report-tab" type="button" role="tab" aria-selected="false" aria-controls="reportContent" data-report-tab="subcategories" tabindex="-1">Subcategorias</button>
+              <button id="reportTabCashflow" class="report-tab" type="button" role="tab" aria-selected="false" aria-controls="reportContent" data-report-tab="cashflow" tabindex="-1">Entradas x Saídas</button>
+              <button id="reportTabAccounts" class="report-tab" type="button" role="tab" aria-selected="false" aria-controls="reportContent" data-report-tab="accounts" tabindex="-1">Contas</button>
+              <button id="reportTabTags" class="report-tab" type="button" role="tab" aria-selected="false" aria-controls="reportContent" data-report-tab="tags" tabindex="-1">Tags</button>
+              <button id="reportTabStatement" class="report-tab" type="button" role="tab" aria-selected="false" aria-controls="reportContent" data-report-tab="statement" tabindex="-1">Demonstrativos</button>
             </div>
 
             <div class="report-summary">
@@ -1546,6 +1549,12 @@
                 <button class="primary" type="submit">Adicionar</button>
               </form>
               <p class="message" id="categoryMessage" role="alert"></p>
+              <div class="classification-list-toolbar">
+                <label class="classification-search">Buscar categorias e subcategorias
+                  <input id="categorySearch" type="search" placeholder="Nome da categoria ou subcategoria" aria-controls="categoryList">
+                </label>
+                <span id="categoryListSummary" class="classification-list-summary" role="status" aria-live="polite"></span>
+              </div>
               <div class="classification-list" id="categoryList"></div>
             </section>
 
@@ -1556,6 +1565,12 @@
                 <button class="primary" type="submit">Adicionar</button>
               </form>
               <p class="message" id="tagMessage" role="alert"></p>
+              <div class="classification-list-toolbar">
+                <label class="classification-search">Buscar tags
+                  <input id="tagSearch" type="search" placeholder="Nome da tag" aria-controls="tagList">
+                </label>
+                <span id="tagListSummary" class="classification-list-summary" role="status" aria-live="polite"></span>
+              </div>
               <div class="classification-list" id="tagList"></div>
             </section>
           </div>
@@ -1655,7 +1670,7 @@
                   <option value="card">Cartão</option>
                 </select>
               </label>
-              <label>Busca
+              <label class="operation-history-search">Busca
                 <input name="q" type="search" placeholder="Descrição, lote, entidade">
               </label>
               <button class="primary" type="submit">Filtrar</button>
@@ -2144,15 +2159,16 @@
         </div>
       </aside>
     </main>
-    <dialog class="global-search-dialog" id="globalSearchDialog" aria-labelledby="globalSearchTitle">
+    <dialog class="global-search-dialog" id="globalSearchDialog" role="dialog" aria-modal="true" aria-labelledby="globalSearchTitle" aria-describedby="globalSearchDescription">
       <div class="global-search-heading">
         <div><p class="eyebrow">Busca global</p><h2 id="globalSearchTitle">Localizar no Sistema Financeiro</h2></div>
         <button class="ghost small-button" id="globalSearchClose" type="button" aria-label="Fechar busca">Fechar</button>
       </div>
+      <p class="sr-only" id="globalSearchDescription">Use as setas para percorrer os resultados e Escape para fechar a busca.</p>
       <label class="global-search-field">Buscar módulos, contas, cartões, lançamentos, ativos ou categorias
-        <input id="globalSearchInput" type="search" autocomplete="off" placeholder="Digite para buscar em todo o histórico…">
+        <input id="globalSearchInput" type="search" autocomplete="off" placeholder="Digite para buscar em todo o histórico…" aria-controls="globalSearchResults">
       </label>
-      <div class="global-search-results" id="globalSearchResults" role="listbox" aria-label="Resultados da busca"></div>
+      <div class="global-search-results" id="globalSearchResults" role="listbox" aria-label="Resultados da busca" aria-live="polite"></div>
     </dialog>
     <dialog class="command-palette-dialog" id="commandPaletteDialog" aria-labelledby="commandPaletteTitle">
       <div class="command-palette-heading">

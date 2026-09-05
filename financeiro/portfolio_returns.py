@@ -13,6 +13,7 @@ class PortfolioReturns:
     def __init__(
         self, *, today, error_type, get_portfolio, _position_value_native_as_of,
         fetch_accumulated_indexer_factor, fetch_indexer_rate, compound_annual_factor,
+        list_snapshots=None,
     ):
         self.today = today
         self.error_type = error_type
@@ -21,13 +22,14 @@ class PortfolioReturns:
         self.fetch_accumulated_indexer_factor = fetch_accumulated_indexer_factor
         self.fetch_indexer_rate = fetch_indexer_rate
         self.compound_annual_factor = compound_annual_factor
+        self.list_snapshots = list_snapshots
 
     def _monthly_return_pct(self, prev_value: int, end_value: int, net_contribution: int) -> Decimal:
         denominator = max(prev_value + max(net_contribution, 0), 1)
         return (Decimal(end_value - prev_value - net_contribution) * Decimal("100")) / Decimal(denominator)
 
     def get_portfolio_returns(self, user_id: int, force_refresh: bool = False, positions: list[dict] | None = None) -> dict:
-        # spec: rentabilidade-portfolio v1.8 — critérios 1 a 10
+        # spec: rentabilidade-portfolio v2.9 — critérios 1 a 10
         # Rentabilidade mensal (em percentual) por moeda consolidada (BRL e USD),
         # comparada ao CDI e ao IPCA do mês. Últimos 12 meses, ou todos os meses
         # disponíveis quando a base é menor. Cada moeda é calculada na própria
@@ -37,15 +39,19 @@ class PortfolioReturns:
                 portfolio = self.get_portfolio(user_id, force_refresh=force_refresh)
                 positions = portfolio.get("positions") or []
             if not positions:
-                return {"series": [], "start_month": None, "end_month": None, "has_historical_approximation": False, "error": None}
+                return {
+                    "series": [], "start_month": None, "end_month": None,
+                    "has_historical_approximation": False,
+                    "snapshot_coverage": {"observed_months": [], "approximate_months": [], "future_months": [], "coverage_percent": 0.0},
+                    "error": None,
+                }
 
             today = self.today()
-            end_month = date(today.year, today.month, 1)
-            first_operation_date = min(date.fromisoformat(position["first_operation_date"]) for position in positions)
-            start_month = date(first_operation_date.year, first_operation_date.month, 1)
-            max_start_month = add_months(end_month, -11)
-            if start_month < max_start_month:
-                start_month = max_start_month
+            # A janela é sempre o ano civil corrente. Meses futuros permanecem
+            # no eixo para evitar que a escala mude durante o ano; eles recebem
+            # zero até haver dados observáveis.
+            start_month = date(today.year, 1, 1)
+            end_month = date(today.year, 12, 1)
 
             months = []
             current = start_month
@@ -67,15 +73,49 @@ class PortfolioReturns:
             month_factor_cache: dict[str, Decimal] = {}
             ipca_month_cache: dict[str, float] = {}
             position_factor_cache: dict[str, Decimal] = {}
+            snapshot_by_month: dict[str, list[dict]] = {}
+            if self.list_snapshots:
+                for snapshot in self.list_snapshots(user_id):
+                    snapshot_by_month.setdefault(snapshot["snapshot_month"], []).append(snapshot)
+            observed_months: list[str] = []
+            approximate_months: list[str] = []
+            future_months: list[str] = []
 
             for month_date in months:
                 month_start = month_date
                 month_end = add_months(month_date, 1) - timedelta(days=1)
+                if month_start > date(today.year, today.month, 1):
+                    future_months.append(month_date.strftime("%Y-%m"))
+                    series.append({
+                        "month": month_date.strftime("%Y-%m"),
+                        "cdi_return_pct": 0.0,
+                        "ipca_return_pct": 0.0,
+                        **{f"{currency}_return_pct": 0.0 for currency in currency_order},
+                    })
+                    continue
                 as_of = min(month_end, today)
 
                 month_values: dict[str, int] = {}
                 month_invested: dict[str, int] = {}
+                month_snapshot_flow: dict[str, int] = {}
+                snapshot_rows = snapshot_by_month.get(month_date.strftime("%Y-%m"), [])
+                if snapshot_rows:
+                    if all(snapshot.get("valuation_status") == "observed" for snapshot in snapshot_rows):
+                        observed_months.append(month_date.strftime("%Y-%m"))
+                    else:
+                        approximate_months.append(month_date.strftime("%Y-%m"))
+                    for snapshot in snapshot_rows:
+                        currency = str(snapshot.get("currency") or "BRL").upper()
+                        month_values[currency] = month_values.get(currency, 0) + int(snapshot.get("market_value_cents") or 0)
+                        month_invested[currency] = month_invested.get(currency, 0) + int(snapshot.get("cost_basis_cents") or 0)
+                        month_snapshot_flow[currency] = month_snapshot_flow.get(currency, 0) + (
+                            int(snapshot.get("contribution_cents") or 0)
+                            - int(snapshot.get("redemption_cents") or 0)
+                            - int(snapshot.get("dividend_cents") or 0)
+                        )
                 for position in positions:
+                    if snapshot_rows:
+                        continue
                     currency = str(position.get("currency") or "BRL").upper()
                     first_operation = date.fromisoformat(position["first_operation_date"])
                     if as_of < first_operation:
@@ -110,7 +150,11 @@ class PortfolioReturns:
                         if prev_value <= 0:
                             portfolio_return = Decimal("0")
                         else:
-                            net_contribution = invested - prev_invested_by_currency.get(currency, 0)
+                            net_contribution = (
+                                month_snapshot_flow.get(currency, 0)
+                                if snapshot_rows
+                                else invested - prev_invested_by_currency.get(currency, 0)
+                            )
                             portfolio_return = self._monthly_return_pct(prev_value, value, net_contribution)
                     else:
                         portfolio_return = Decimal("0")
@@ -118,20 +162,35 @@ class PortfolioReturns:
                     prev_by_currency[currency] = value
                     prev_invested_by_currency[currency] = invested
 
+                if not snapshot_rows:
+                    approximate_months.append(month_date.strftime("%Y-%m"))
+
                 series.append(entry)
 
-            has_approximation = any(position["asset_type"] not in {"fixed_income", "savings"} for position in positions)
+            has_approximation = bool(approximate_months)
+            elapsed_month_count = len(observed_months) + len(approximate_months)
 
             return {
                 "series": series,
                 "start_month": start_month.strftime("%Y-%m"),
                 "end_month": end_month.strftime("%Y-%m"),
                 "has_historical_approximation": has_approximation,
+                "snapshot_coverage": {
+                    "observed_months": observed_months,
+                    "approximate_months": approximate_months,
+                    "future_months": future_months,
+                    "coverage_percent": round((len(observed_months) / elapsed_month_count) * 100, 2) if elapsed_month_count else 0.0,
+                },
                 "error": None,
             }
         except Exception as exc:
             print(f"[portfolio-returns-error] user={user_id}: {exc}")
-            return {"series": [], "start_month": None, "end_month": None, "has_historical_approximation": False, "error": str(exc)}
+            return {
+                "series": [], "start_month": None, "end_month": None,
+                "has_historical_approximation": False,
+                "snapshot_coverage": {"observed_months": [], "approximate_months": [], "future_months": [], "coverage_percent": 0.0},
+                "error": str(exc),
+            }
 
     def _cdi_factor_for_period(self, start_date: date, end_date: date, force_refresh: bool = False) -> Decimal:
         if end_date < start_date:

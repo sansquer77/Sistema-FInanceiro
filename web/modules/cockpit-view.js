@@ -250,7 +250,7 @@ export function registerCockpitView({
     if (!button || !badge) return;
     badge.textContent = String(count);
     button.classList.toggle("has-items", count > 0);
-    button.setAttribute("aria-label", count ? `${count} ${count === 1 ? singular : plural}` : `Nenhum ${plural}`);
+    button.setAttribute("aria-label", count ? `${count} ${count === 1 ? singular : plural}` : `Nenhum ${singular}`);
   }
 
   async function markNotificationsSeen(notificationIds) {

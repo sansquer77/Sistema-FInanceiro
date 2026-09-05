@@ -172,6 +172,10 @@ const categoryMessage = document.querySelector("#categoryMessage");
 const tagMessage = document.querySelector("#tagMessage");
 const categoryList = document.querySelector("#categoryList");
 const tagList = document.querySelector("#tagList");
+const categorySearch = document.querySelector("#categorySearch");
+const tagSearch = document.querySelector("#tagSearch");
+const categoryListSummary = document.querySelector("#categoryListSummary");
+const tagListSummary = document.querySelector("#tagListSummary");
 const limitForm = document.querySelector("#limitForm");
 const limitFormTitle = document.querySelector("#limitFormTitle");
 const limitCategory = document.querySelector("#limitCategory");
@@ -467,7 +471,9 @@ const simulationProjectedBalance = document.querySelector("#simulationProjectedB
 const simulationDifference = document.querySelector("#simulationDifference");
 const simulationChart = document.querySelector("#simulationChart");
 const simulationWeeklyProjection = document.querySelector("#simulationWeeklyProjection");
-  const simulationWarnings = document.querySelector("#simulationWarnings");
+const simulationWarnings = document.querySelector("#simulationWarnings");
+const simulationEmptyState = document.querySelector("#simulationEmptyState");
+const simulationResultsContent = document.querySelector("#simulationResultsContent");
 const resetSimulationButton = document.querySelector("#resetSimulationButton");
 const aboutAppVersion = document.querySelector("#aboutAppVersion");
 const globalSearchTrigger = document.querySelector("#globalSearchTrigger");
@@ -633,6 +639,10 @@ const classificationsView = registerClassificationsView({
     tagMessage,
     categoryList,
     tagList,
+    categorySearch,
+    tagSearch,
+    categoryListSummary,
+    tagListSummary,
   },
   api,
   formData,
@@ -1125,6 +1135,8 @@ const simulationsView = registerSimulationsView({
     simulationChart,
     simulationWeeklyProjection,
     simulationWarnings,
+    simulationEmptyState,
+    simulationResultsContent,
     resetSimulationButton,
   },
   formatMoney,

@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 4.0
+versao: 4.4
 atualizado: 2026-09-04
 relacionados:
   - "[[requisitos]]"
@@ -24,6 +24,8 @@ tags: [arquitetura, meta]
 ## Visão geral
 
 O Sistema Financeiro é um app local composto por servidor HTTP em Python, banco SQLite e interface web estática. Roda em macOS sem dependências externas para operação financeira básica.
+
+Na inicialização, bancos já marcados com a versão corrente recebem novamente o baseline aditivo idempotente antes de o servidor aceitar requisições. Isso incorpora tabelas e índices compatíveis adicionados durante a evolução da v2 sem exigir uma nova migração destrutiva ou alterar dados existentes.
 
 ```text
 app.py              Adaptador HTTP, autenticação e arquivos estáticos
@@ -358,10 +360,12 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | `balance_projections.py` | Saldos conciliados/projetados e reservas de faturas; a projeção detalhada atende o Extrato, enquanto o Cockpit usa uma consolidação por moeda agregada diretamente no SQLite, sem materializar históricos. |
 | `portfolio.py` | API pública e composição do Portfólio; mantém CRUD, adaptação dos provedores e aplicação de cotações de mercado/fundos. Delega transporte/cache, valorização por data e série histórica. Resgates e encerramentos preparam posições fora da escrita e revalidam entradas locais na transação, sem recotação. Ver [[investimentos-portfolio]]. |
 | `portfolio_positions.py` | Identidade, auxiliares de lotes/FIFO e leituras locais compartilhadas: entradas da carteira e vencimentos abertos de renda fixa filtrados no SQLite; histórico de resgates por conexão recebida. Não contém CRUD completo nem consultas externas. |
-| `portfolio_quotes.py` | Transporte HTTP/JSON, cache SQLite, caches em memória de cotações/câmbio, locks, TTL, expurgo/LRU e fallback vencido. Dependências injetadas sem importar a fachada; normalização de provedores permanece em `portfolio.py`. |
-| `portfolio_events.py` | Deduplicação dos ativos elegíveis, consulta e parsing de eventos futuros; usa B3 para ativos brasileiros, Nasdaq para internacionais e Yahoo Finance como fallback, com transporte/cache injetados e sem cálculo de valor total estimado. |
+| `portfolio_quotes.py` | Transporte HTTPS/JSON com contexto TLS verificado compartilhado, cache SQLite, caches em memória de cotações/câmbio, locks, TTL, expurgo/LRU e fallback vencido. Erros de certificado falham de forma segura, sem retry que desative validação. Dependências injetadas sem importar a fachada; normalização de provedores permanece em `portfolio.py`. |
+| `portfolio_events.py` | Deduplicação dos ativos elegíveis, consulta e parsing de eventos futuros; usa B3 para proventos e eventos societários de ativos brasileiros, Nasdaq para internacionais e Yahoo Finance como fallback, com transporte/cache injetados e sem cálculo de valor total estimado. |
+| `market_calendar.py` | Download limitado e TLS-verificado da planilha nacional ANBIMA, parsing pelo leitor XLS interno, atualização anual transacional e consulta do calendário local de dias sem liquidação; não usa BrasilAPI. |
 | `portfolio_valuation.py` | `PositionValuation`: valor por data de renda fixa/poupança, impostos, custódia, aniversários, variação diária e fatores mensais compartilhados. Sem SQL/HTTP; recebe provedores e relógio na composição. |
 | `portfolio_returns.py` | `PortfolioReturns`: série mensal por moeda, baseline e benchmarks CDI/IPCA; recebe valorização por data e carregador opcional da carteira, sem duplicar juros/impostos. Caches de fatores locais à chamada. |
+| `portfolio_snapshots.py` | Repositório idempotente de snapshots mensais por ativo; somente SQLite, sem cálculo financeiro ou chamadas externas. |
 | `portfolio_calculations.py` | Agregações, normalizações e cálculos puros do Portfólio. |
 | `portfolio_presentation.py` | Modelos financeiros de leitura para posições/fontes, agregados, cabeçalhos, composição e metas; prévias de resgate e soma de metas. Centavos/Decimal, sem SQL ou rede. |
 | `financial_health.py` | Núcleo analítico do Score de Saúde Financeira: cálculo atômico dos pilares, lista `pilares`, Paz Financeira e função de histórico com validação de `months` (1-36). Ver [[score-saude-financeira]]. |
@@ -424,7 +428,10 @@ O baseline inicial da v2 usa `PRAGMA user_version = 20000`. Banco ausente é cri
 | `investment_redemptions` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
 | `investment_closed_positions` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
 | `investment_value_overrides` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
+| `investment_monthly_snapshots` | `portfolio_returns.py` — snapshots mensais por ativo para rentabilidade; leitura agregada por moeda. Ver [[specs/rentabilidade-portfolio]], [[adr/0017-snapshots-rentabilidade-portfolio]]. |
 | `quote_cache` | `portfolio_quotes.py` — Ver [[investimentos-portfolio]]. |
+| `market_holidays` | `market_calendar.py` — calendário nacional ANBIMA atual, sem histórico de versões. Ver [[investimentos-portfolio]], [[adr/0016-calendario-mercado-anbima]]. |
+| `market_calendar_state` | `market_calendar.py` — controle da fonte, última tentativa/importação, ano verificado, hash e quantidade de feriados. |
 | `user_ai_settings` | `secure_config.py` — metadados não secretos de configuração opcional de IA por usuário; segredo fica em `secure_configs`. Ver [[tendencias-saude-financeira]]. |
 | `secure_configs` | `secure_config.py` — envelopes criptografados por usuário para SMTP, IA e Mais Retorno; `source_path` indica arquivo legado migrado quando aplicável. Ver [[specs/preferencias-abas]], [[adr/0010-segredos-criptografados-sqlite]]. |
 | `consultor_settings` | `database.py` — configuração do Consultor por usuário (`consultor_enabled`, `investor_profile`, `data_access_consent`). Ver [[specs/consultor]]. |
@@ -456,6 +463,8 @@ A chave mestra padrão de `secure_config.py` fica fora de `data/`, em `secure/co
 - `idx_investment_opening_positions_user`
 - `idx_investment_redemptions_source`
 - `idx_investment_value_overrides_user`
+- `idx_investment_monthly_snapshots_user_month`
+- `idx_investment_monthly_snapshots_user_asset`
 - `idx_investment_closed_positions_user`
 - `idx_investment_closed_positions_user_closed`
 - `idx_credit_card_transactions_card_month`
@@ -542,7 +551,7 @@ Ver [[cartoes]].
 6. Resgates usam FIFO; encerramentos movem posições para histórico.
 7. Ativos em moeda estrangeira exibidos na moeda da carteira; conversão via lançamentos de câmbio.
 8. Consolidações do Portfólio mantêm valores exibidos na moeda original, mas expõem valor atual normalizado em BRL para a escala das barras visuais, usando cotação do fechamento anterior quando a moeda não é BRL.
-9. A UI do Portfólio carrega a aba **Posição** primeiro; Análise, Eventos, Histórico e rentabilidade detalhada são renderizados/carregados sob demanda. Eventos usa rota própria, somente para posições abertas de renda variável, sem repetir a valorização da carteira; a agenda futura cobre o mês atual e os dois seguintes, é agrupada por competência, virtualizada quando extensa e desmontada ao trocar de aba. A data principal é Data ex e a data de pagamento é opcional, exibida somente quando fornecida pelo provedor; ausência de anúncio ou calendário resulta em estado vazio neutro, sem aviso de erro.
+9. A UI do Portfólio carrega a aba **Posição** primeiro; Análise, Eventos, Histórico e rentabilidade detalhada são renderizados/carregados sob demanda. Eventos usa rota própria, somente para posições abertas de renda variável, sem repetir a valorização da carteira; a agenda futura cobre o mês atual e os dois seguintes, é agrupada por competência, virtualizada quando extensa e desmontada ao trocar de aba. Para a B3, inclui proventos, bonificações, desdobramentos e grupamentos compatíveis com a espécie do ativo. A Data ex derivada de `lastDatePrior` avança pelo calendário nacional ANBIMA persistido localmente; a data de pagamento é opcional. Ausência de anúncio ou calendário resulta em estado vazio neutro, sem aviso de erro.
 10. A central de Informativos reutiliza o calendário futuro de Eventos e filtra somente a semana corrente; nenhuma chamada carrega histórico desde a primeira aquisição.
 11. Renda fixa e Poupança exibem variação do dia calculada como a diferença do valor na curva entre hoje e o dia anterior (base limitada à data de aquisição), reutilizando `fixed_income_value_as_of`/`savings_value_as_of` com cache de fatores compartilhado; dias sem taxa publicada produzem variação zero em pós-fixados.
 
@@ -608,6 +617,10 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `4.4` — 2026-09-04 — Inicialização reconcilia o baseline aditivo idempotente também em bancos já marcados como v2, antes de atender requisições.
+- `4.3` — 2026-09-04 — Registrada `investment_monthly_snapshots` e seus índices para a futura rentabilidade baseada em snapshots por ativo, conforme ADR-0017.
+- `4.2` — 2026-09-04 — Adicionado `market_calendar.py` e tabelas locais para importar o calendário ANBIMA com atualização anual transacional e aplicá-lo às datas derivadas dos eventos B3.
+- `4.1` — 2026-09-04 — Transporte de B3, Nasdaq e Yahoo compartilha contexto TLS verificado com falha segura; parser B3 passa a abranger bonificações, desdobramentos e grupamentos.
 - `4.0` — 2026-09-04 — Cadeia de eventos implementada com B3/Nasdaq como fontes primárias, Yahoo como fallback, cache diário e normalização segura no núcleo Python.
 - `3.99` — 2026-09-04 — Documentada a estratégia de fontes da aba Eventos: B3 para ativos brasileiros, Nasdaq para internacionais e Yahoo Finance como fallback, com cache diário.
 - `3.98` — 2026-09-04 — Aba Eventos usa estado vazio neutro quando não há anúncio futuro ou calendário do provedor, evitando sinalizar ETFs acumuladores e divulgações ainda não publicadas como erro.

@@ -7,7 +7,6 @@ import json
 import ssl
 import time
 from threading import Lock
-from threading import Lock
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
@@ -216,9 +215,9 @@ def read_json_url(url: str, message: str, headers: dict | None = None, *, opener
     request_headers = {"User-Agent": "SistemaFinanceiro/0.1", **(headers or {})}
     request = Request(url, headers=request_headers)
     try:
-        with opener(request, timeout=6) as response:
+        with open_verified_url(opener, request) as response:
             return read_limited_json(response, max_bytes=MAX_QUOTE_JSON_BYTES)
-    except (HTTPError, URLError, TimeoutError, OutboundJsonError) as exc:
+    except (HTTPError, URLError, TimeoutError, OSError, OutboundJsonError) as exc:
         raise error_type(message) from exc
 
 
@@ -282,11 +281,22 @@ def _yahoo_session(opener) -> tuple[str, str]:
         return _YAHOO_SESSION
 
 
-def _open_yahoo(opener, request):
+def verified_ssl_context() -> ssl.SSLContext:
+    """Cria um contexto TLS verificado; nunca reduz ou desativa a validação."""
     try:
         import certifi  # type: ignore
 
-        context = ssl.create_default_context(cafile=certifi.where())
+        return ssl.create_default_context(cafile=certifi.where())
     except Exception:
-        context = ssl.create_default_context()
-    return opener(request, timeout=6, context=context)
+        return ssl.create_default_context()
+
+
+def open_verified_url(opener, request):
+    """Compartilha TLS verificado em produção sem alterar openers injetados nos testes."""
+    if opener is urlopen:
+        return opener(request, timeout=6, context=verified_ssl_context())
+    return opener(request, timeout=6)
+
+
+def _open_yahoo(opener, request):
+    return open_verified_url(opener, request)

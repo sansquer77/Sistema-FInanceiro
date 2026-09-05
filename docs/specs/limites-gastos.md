@@ -2,7 +2,7 @@
 tipo: spec
 area: limites
 status: implementado
-versao: 1.3
+versao: 1.4
 atualizado: 2026-09-01
 relacionados:
   - "[[categorias-tags-gestao]]"
@@ -86,6 +86,10 @@ Tabelas: `spending_limits`, `categories`, `subcategories`.
 - `1.2` — 2026-08-02 — Seletor mensal de Limites padronizado com botões compactos por ícone e rótulo `MM/AAAA`.
 - `1.1` — 2026-07-08 — Limites passam a ser documentados como recorrentes, com `month` representando início de vigência.
 - `1.0` — 2026-06-29 — Frontmatter e critérios formalizados.
+
+## Changelog
+
+- `1.4` — 2026-09-04 — Limites entre 80% e 100% exibem estado textual e visual de atenção antes do estouro.
 
 ## Relacionados
 

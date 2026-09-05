@@ -93,8 +93,8 @@ from financeiro.credit_cards import (
     update_credit_card_transaction,
     update_credit_card,
 )
-from financeiro.database import initialize_database
-from financeiro.database import get_connection
+from financeiro.database import DB_PATH, get_connection, initialize_database
+from financeiro.market_calendar import refresh_anbima_calendar_if_due
 from financeiro.ai_summary import ai_summary_enabled, generate_ai_summary
 from financeiro.financial_health import (
     FinancialHealthError,
@@ -1628,6 +1628,7 @@ def audit_value(value: object) -> str:
 
 def main() -> None:
     initialize_database()
+    refresh_anbima_calendar_if_due(DB_PATH, connection_factory=get_connection)
     server = ThreadingHTTPServer((HOST, PORT), AppHandler)
     print(f"Sistema Financeiro rodando em {PUBLIC_URL}")
     warning = insecure_lan_warning(HOST, PUBLIC_URL)

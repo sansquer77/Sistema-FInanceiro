@@ -2,8 +2,8 @@
 tipo: spec
 area: simulacoes
 status: implementado
-versao: 1.8
-atualizado: 2026-08-31
+versao: 1.9
+atualizado: 2026-09-04
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -18,7 +18,7 @@ aliases: ["Efeito Borboleta", "Simulador Financeiro"]
 # Efeito Borboleta
 
 > [!info] Status
-> **implementado** · área: `simulacoes` · atualizado em 2026-08-31 · relacionados: [[contas-correntes]], [[lancamentos]], [[cartoes]], [[limites-gastos]], [[relatorios]]
+> **implementado** · área: `simulacoes` · atualizado em 2026-09-04 · relacionados: [[contas-correntes]], [[lancamentos]], [[cartoes]], [[limites-gastos]], [[relatorios]]
 
 ## Problema
 
@@ -141,6 +141,7 @@ Resposta esperada:
 - Dado uma receita que evita um saldo negativo previsto, quando a projeção é exibida, então o efeito é `avoids_negative` e as duas primeiras datas negativas são informadas quando aplicável.
 - Dado uma simulação válida, quando a projeção diária é renderizada, então ela possui 15 colunas e três linhas: Previsto, Simulado e Diferença.
 - Dado `simulations-view.js` atualizado com um `app.js` ou HTML anterior ainda em cache, quando o contêiner semanal não é injetado ou não existe, então a simulação continua renderizando os demais resultados sem erro de JavaScript.
+- Dado o módulo aberto sem simulação válida, quando a tela é exibida, então as seções de resultados, gráfico, projeção e alertas permanecem ocultas e um único estado informativo orienta o usuário.
 
 - Dado um cenário exibido, quando o comparativo é renderizado, então os cards mensais ficam acima da área exclusiva do gráfico e a tabela diária permanece abaixo da legenda, sem sobreposição (estrutura automatizada; aparência em Safari requer validação manual).
 
@@ -163,6 +164,8 @@ Resposta esperada:
 - [x] Passo 5 — Cobrir janelas próxima/distante, impacto na data e classificação do risco por testes automatizados. Fecha: critérios 19–25.
 
 ## Changelog
+
+- `1.9` — 2026-09-04 — Resultado inicial usa um único estado informativo; conteúdo dependente fica oculto até simulação válida.
 
 - `1.8` — 2026-08-31 — Comparativo mensal com cards acima do gráfico e tabela diária abaixo; rolagem horizontal interna em áreas estreitas. Corrigida descrição antiga que omitia a tabela abaixo do gráfico.
 - `1.7` — 2026-08-30 — Dados auxiliares de contas passam a usar cache curto, in-flight compartilhado, invalidação após mutações e reset entre sessões.

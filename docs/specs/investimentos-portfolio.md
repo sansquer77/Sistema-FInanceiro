@@ -2,7 +2,7 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.59
+versao: 2.61
 atualizado: 2026-09-04
 relacionados:
   - "[[contas-correntes]]"
@@ -100,8 +100,9 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 - USDC, USDT, DAI, FDUSD, PYUSD, TUSD, USDP e USDE cadastrados anteriormente como `crypto` são classificados como Stablecoin na leitura, sem migração destrutiva; novas posições e aportes conhecidos persistem como `stablecoin`.
 - Ativos internacionais cujo ticker operacional precisa de sufixo de bolsa podem usar alias explícito do provedor; `VWRA` em carteira USD resolve para `VWRA.L` (London Stock Exchange, listagem USD) no Yahoo Finance.
 - A quantidade exibida em posições, origens e posições encerradas é normalizada com **até 2 casas decimais** (arredondamento `half-up`), independentemente da precisão cadastrada ou retornada pela cotação, para preservar o layout das tabelas.
-- A aba **Eventos** consulta sob demanda os próximos proventos anunciados somente para ações, ETFs e BDRs ainda presentes na carteira, em uma janela do mês atual mais dois meses. Para ativos brasileiros, usa a API pública da B3 como fonte primária; para ativos internacionais, usa a API pública da Nasdaq (sem chave) e Yahoo Finance como fallback. O cache é diário por ativo para capturar alterações sem repetir consultas no mesmo dia. Os resultados são agrupados por mês e informam Data ex, data de pagamento quando fornecida, ativo, carteira(s), valor por cota/ação e nível de confirmação; a fonte fica restrita à nota de rodapé: “Dados obtidos de fontes públicas; sempre validar com seu Banco/Corretora”.
-- Como o provedor não distingue de forma confiável dividendos de juros sobre capital próprio, o evento é apresentado como `Dividendo/JCP`; o app não atribui natureza fiscal definitiva nem o apresenta como comunicado oficial do emissor.
+- A aba **Eventos** consulta sob demanda os próximos eventos anunciados somente para ações, ETFs e BDRs ainda presentes na carteira, em uma janela do mês atual mais dois meses. Para ativos brasileiros, usa a API pública da B3 como fonte primária; para ativos internacionais, usa a API pública da Nasdaq (sem chave) e Yahoo Finance como fallback. O cache é diário por ativo para capturar alterações sem repetir consultas no mesmo dia. Os resultados são agrupados por mês e informam Data ex, data de pagamento quando fornecida, ativo, carteira(s), evento, valor por cota/ação e a fonte (`B3`, `Nasdaq` ou `Yahoo Finance`) na coluna própria. A nota de rodapé mantém apenas a orientação abrangente: “Dados obtidos de fontes públicas; sempre validar com seu Banco/Corretora”.
+- A B3 preserva a natureza divulgada para dividendos, JCP, rendimentos, bonificações, desdobramentos e grupamentos. Yahoo Finance continua exibindo `Dividendo/JCP` quando o payload de fallback não permite distinguir a natureza fiscal. Para eventos societários sem valor monetário unitário, o app não converte o fator em dinheiro nem estima benefício financeiro.
+- A Data ex derivada de `lastDatePrior` usa o calendário nacional ANBIMA persistido no SQLite. A planilha oficial é obtida na primeira execução e revalidada no máximo uma vez por ano; indisponibilidade externa preserva a última cópia válida, não bloqueia a abertura do app e não aciona outra fonte de feriados.
 - A aba não multiplica o provento pela quantidade atual ou histórica e não estima valor total a receber. Falhas de um ativo não impedem os demais resultados e nenhuma consulta é feita antes de a aba ser aberta.
 
 **Fundos (`fund`):**
@@ -181,8 +182,10 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - [x] Criar consulta isolada de eventos históricos de renda variável, com cache limitado, falha parcial por ativo e sem estimativa de valor total.
 - [x] Carregar e renderizar a aba Eventos somente no primeiro acesso ou após mudança da carteira, mantendo fonte e confirmação visíveis.
 - [x] Limitar a consulta de eventos usada pelo Cockpit à semana corrente, validar os campos externos e virtualizar/desmontar a apresentação extensa da aba Eventos.
-- [x] Consultar `calendarEvents` com sessão Yahoo, exibir somente a janela futura de três meses, agrupar por competência, associar carteiras e mover a fonte para nota de rodapé.
+- [x] Consultar `calendarEvents` com sessão Yahoo, exibir somente a janela futura de três meses, agrupar por competência e associar carteiras.
 - [x] Consultar B3 para ativos brasileiros e Nasdaq para internacionais, com Yahoo como fallback, cache diário e parsers monetários sem ponto flutuante.
+- [x] Incluir bonificações, desdobramentos e grupamentos anunciados pela B3 sem interpretar o fator societário como valor monetário.
+- [x] Persistir o calendário nacional ANBIMA na primeira execução e usá-lo na derivação da Data ex, com atualização anual transacional e sem fallback BrasilAPI.
 
 ## Critérios de aceite
 
@@ -265,7 +268,7 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado um resgate ou encerramento, quando a transação de escrita está aberta, então nenhuma consulta externa de cotação, indexador ou câmbio é executada.
 - Dado que os dados locais da carteira mudaram durante a obtenção das cotações, quando a escrita é iniciada, então a operação retorna conflito HTTP 409 sem gravar resgate, encerramento ou crédito e orienta tentar novamente.
 - Dado que os dados locais não mudaram, quando a operação é confirmada, então FIFO, custos, valores e crédito opt-in mantêm o comportamento atual, mesmo que o cache expire durante a confirmação.
-- Dado ações, ETFs ou BDRs abertos na carteira, quando o usuário abre a aba **Eventos**, então o app consulta sob demanda e lista os eventos anunciados na janela futura, preservando os campos Data ex, Pagamento, Ativo, Carteira, Evento, Valor por cota/ação e Confirmação.
+- Dado ações, ETFs ou BDRs abertos na carteira, quando o usuário abre a aba **Eventos**, então o app consulta sob demanda e lista os eventos anunciados na janela futura, preservando os campos Data ex, Pagamento, Ativo, Carteira, Evento, Valor por cota/ação e Fonte; o nível de confirmação permanece no texto acessível do selo da fonte.
 - Dado um ativo brasileiro elegível, quando a aba consulta eventos, então usa B3 primeiro e Yahoo Finance como fallback; para ativo internacional usa Nasdaq primeiro e Yahoo Finance como fallback.
 - Dado qualquer quantidade atual ou histórica da posição, quando os eventos são apresentados, então o app não calcula nem exibe valor total estimado a receber.
 - Dado falha de consulta para um ativo, quando outros ativos possuem eventos válidos, então os resultados disponíveis continuam visíveis e a indisponibilidade parcial é informada sem bloquear a aba.
@@ -282,6 +285,11 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado a aba Eventos com qualquer combinação de fontes, quando a lista é exibida, então a nota apresenta somente “Dados obtidos de fontes públicas; sempre validar com seu Banco/Corretora.”.
 - Dado um evento obtido pela cadeia de provedores, quando exibido na coluna Fonte, então o selo identifica diretamente `B3`, `Nasdaq` ou `Yahoo Finance`; o nível de detecção permanece disponível no texto acessível do selo.
 - Dado um evento cuja Data ex já ocorreu dentro do mês atual e cujo pagamento ainda é futuro, quando a aba Eventos é carregada, então o evento permanece na janela mensal e não cai no fallback apenas por ser anterior ao dia corrente.
+- Dado que a B3 retorna uma bonificação, um desdobramento ou um grupamento compatível com a espécie do ativo, quando o evento está na janela mensal, então ele é listado com sua natureza, fonte B3 e valor unitário `Não informado`, sem converter o fator societário em dinheiro.
+- Dado `lastDatePrior` anterior a fim de semana ou feriado nacional ANBIMA, quando a Data ex é derivada, então o app avança até o próximo dia útil do calendário local.
+- Dado que o calendário ANBIMA ainda não foi importado, quando o app inicia com rede disponível, então baixa a planilha oficial com TLS verificado e limite de tamanho e persiste somente datas válidas no SQLite.
+- Dado que já existe um calendário ANBIMA válido, quando a atualização anual falha, então os registros existentes são preservados e a abertura do app continua normalmente.
+- Dado uma tentativa de atualização já realizada no dia, quando o app reinicia, então não repete a requisição externa no mesmo dia.
 
 ## Plano de implementação — transações sem rede
 
@@ -299,6 +307,8 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 
 ## Changelog
 
+- `2.61` — 2026-09-04 — Datas ex derivadas da B3 passam a usar calendário nacional ANBIMA local, importado de XLS oficial com TLS verificado, limite de tamanho, atualização anual transacional e sem fallback BrasilAPI.
+- `2.60` — 2026-09-04 — A spec reconhece a coluna Fonte existente, preserva a natureza informada pela B3 e inclui bonificações, desdobramentos e grupamentos sem estimativa monetária; B3/Nasdaq/Yahoo compartilham transporte TLS verificado com falha segura.
 - `2.59` — 2026-09-04 — A janela da aba Eventos passa a começar no primeiro dia do mês atual, preservando eventos B3 com Data ex já ocorrida no mês e pagamento futuro.
 - `2.58` — 2026-09-04 — A coluna Fonte identifica explicitamente B3, Nasdaq ou Yahoo Finance; grade, alinhamentos, badge, rodapé e texto introdutório da aba Eventos foram refinados para melhor leitura.
 - `2.57` — 2026-09-04 — Implementada a cadeia B3/Nasdaq com fallback Yahoo, cache diário, normalização monetária segura e nota de rodapé unificada, sem alterar as colunas da aba Eventos.

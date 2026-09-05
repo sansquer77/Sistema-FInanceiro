@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-globalThis.document = { addEventListener() {} };
+globalThis.document = { addEventListener() {}, activeElement: null };
 
 const { registerGlobalSearch } = await import("../web/modules/global-search.js");
 
@@ -16,6 +16,8 @@ function element() {
     focus() {},
     closest() { return null; },
     querySelector() { return null; },
+    querySelectorAll() { return []; },
+    isConnected: true,
   };
 }
 

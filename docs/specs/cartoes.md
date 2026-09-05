@@ -2,8 +2,8 @@
 tipo: spec
 area: cartoes
 status: implementado
-versao: 2.17
-atualizado: 2026-09-03
+versao: 2.20
+atualizado: 2026-09-04
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -203,6 +203,10 @@ Tabelas: `credit_cards`, `credit_card_transactions`, `credit_card_payments`, `cr
 - Dado qualquer volume de histórico de cartões, quando o usuário entra em Lançamentos de Cartões ou troca de fatura, então são transferidos somente os lançamentos e pagamentos da competência ativa e cinco totais mensais agregados para o gráfico, sem percorrer as listagens históricas completas.
 
 ## Changelog
+
+- `2.20` — 2026-09-04 — Área do gráfico passou a ser uma camada contínua sob as duas séries, sem quebra visual na transição para a previsão.
+- `2.19` — 2026-09-04 — Corrigido o erro `[object HTMLElement]` na lista da fatura e ajustado o gráfico para uma única paleta azul com degradê invertido.
+- `2.18` — 2026-09-04 — Histórico de faturas usa preenchimento degradê horizontal sob as linhas do ApexCharts para melhorar a percepção de evolução.
 
 - `2.17` — 2026-09-03 — A tela de Lançamentos de Cartões deixa de baixar compras e pagamentos históricos completos; a fatura ativa passa a fornecer detalhes da competência e um resumo agregado limitado a cinco meses para o gráfico.
 

@@ -8,6 +8,8 @@ import json
 import re
 from urllib.parse import quote
 
+from financeiro.market_calendar import next_business_day
+
 
 EVENT_MEMORY_TTL_SECONDS = 24 * 60 * 60
 EVENT_CALENDAR_TTL_SECONDS = 24 * 60 * 60
@@ -85,8 +87,9 @@ def get_events(
     today: date | None = None,
     force_refresh: bool = False,
     start_date: date | None = None,
+    holidays: frozenset[date] | set[date] = frozenset(),
 ) -> dict:
-    # spec: investimentos/investimentos-portfolio v2.59 — critérios 80 a 97
+    # spec: investimentos/investimentos-portfolio v2.61 — critérios 80 a 102
     reference_date = today or date.today()
     month_start = reference_date.replace(day=1)
     window_end = _add_months(month_start, 3) - timedelta(days=1)
@@ -108,6 +111,7 @@ def get_events(
                 requested_start=requested_start,
                 window_end=window_end,
                 cached_calendar=cached_calendar,
+                holidays=holidays,
             ),
             assets,
         )
@@ -120,7 +124,7 @@ def get_events(
     return {"events": events, "unavailable": unavailable, "as_of": reference_date.isoformat()}
 
 
-def _fetch_asset_events(asset, *, cached_json, cached_calendar, error_type, reference_date, force_refresh, requested_start, window_end):
+def _fetch_asset_events(asset, *, cached_json, cached_calendar, error_type, reference_date, force_refresh, requested_start, window_end, holidays):
     provider_events = _fetch_primary_provider_events(
         asset,
         cached_json=cached_json,
@@ -129,6 +133,7 @@ def _fetch_asset_events(asset, *, cached_json, cached_calendar, error_type, refe
         force_refresh=force_refresh,
         requested_start=requested_start,
         window_end=window_end,
+        holidays=holidays,
     )
     if provider_events:
         return provider_events, None
@@ -172,7 +177,7 @@ def _fetch_asset_events(asset, *, cached_json, cached_calendar, error_type, refe
         }
 
 
-def _fetch_primary_provider_events(asset, *, cached_json, error_type, reference_date, force_refresh, requested_start, window_end):
+def _fetch_primary_provider_events(asset, *, cached_json, error_type, reference_date, force_refresh, requested_start, window_end, holidays):
     if _is_brazilian_asset(asset):
         company = _b3_issuing_company(asset["asset_identifier"])
         if not company:
@@ -187,7 +192,7 @@ def _fetch_primary_provider_events(asset, *, cached_json, error_type, reference_
                 f"b3-events:{company}", EVENT_CALENDAR_TTL_SECONDS,
                 force_refresh=force_refresh, headers=B3_HEADERS,
             )
-            return parse_b3_events(payload, asset, minimum_date=requested_start, maximum_date=window_end)
+            return parse_b3_events(payload, asset, minimum_date=requested_start, maximum_date=window_end, holidays=holidays)
         except error_type:
             return []
 
@@ -208,18 +213,20 @@ def _fetch_primary_provider_events(asset, *, cached_json, error_type, reference_
     return []
 
 
-def parse_b3_events(payload: object, asset: dict, *, minimum_date: date, maximum_date: date) -> list[dict]:
+def parse_b3_events(payload: object, asset: dict, *, minimum_date: date, maximum_date: date, holidays=frozenset()) -> list[dict]:
     companies = payload if isinstance(payload, list) else []
-    dividends = companies[0].get("cashDividends") if companies and isinstance(companies[0], dict) else []
-    if not isinstance(dividends, list):
-        return []
+    company = companies[0] if companies and isinstance(companies[0], dict) else {}
+    cash_dividends = company.get("cashDividends") or []
+    stock_dividends = company.get("stockDividends") or []
+    cash_dividends = cash_dividends if isinstance(cash_dividends, list) else []
+    stock_dividends = stock_dividends if isinstance(stock_dividends, list) else []
     parsed = []
     seen = set()
-    for raw in dividends:
+    for raw in cash_dividends:
         if not isinstance(raw, dict) or not _b3_share_type_matches(asset["asset_identifier"], raw.get("assetIssued")):
             continue
         last_date_prior = _parse_provider_date(raw.get("lastDatePrior"), "%d/%m/%Y")
-        event_date = _next_weekday(last_date_prior) if last_date_prior else None
+        event_date = next_business_day(last_date_prior, holidays) if last_date_prior else None
         payment_date = _parse_provider_date(raw.get("paymentDate"), "%d/%m/%Y")
         amount_micros = _decimal_to_micros(raw.get("rate"), decimal_comma=True)
         if not event_date or not (minimum_date <= event_date <= maximum_date):
@@ -232,6 +239,25 @@ def parse_b3_events(payload: object, asset: dict, *, minimum_date: date, maximum
         parsed.append(_event_record(
             asset, event_date, payment_date, amount_micros,
             event_type="dividend_or_jcp", event_label=label,
+            source="B3", confirmation_label="Anunciado · B3",
+        ))
+    for raw in stock_dividends:
+        if not isinstance(raw, dict) or not _b3_share_type_matches(asset["asset_identifier"], raw.get("assetIssued")):
+            continue
+        last_date_prior = _parse_provider_date(raw.get("lastDatePrior"), "%d/%m/%Y")
+        event_date = next_business_day(last_date_prior, holidays) if last_date_prior else None
+        if not event_date or not (minimum_date <= event_date <= maximum_date):
+            continue
+        label = _b3_event_label(raw.get("label"))
+        if label not in {"Bonificação", "Desdobramento", "Grupamento"}:
+            continue
+        identity = (event_date, None, None, label, str(raw.get("assetIssued") or ""))
+        if identity in seen:
+            continue
+        seen.add(identity)
+        parsed.append(_event_record(
+            asset, event_date, None, None,
+            event_type=_b3_corporate_event_type(label), event_label=label,
             source="B3", confirmation_label="Anunciado · B3",
         ))
     return parsed
@@ -314,13 +340,6 @@ def _parse_provider_date(value: object, date_format: str) -> date | None:
     return parsed if MIN_PROVIDER_DATE <= parsed <= MAX_PROVIDER_DATE else None
 
 
-def _next_weekday(value: date) -> date:
-    result = value + timedelta(days=1)
-    while result.weekday() >= 5:
-        result += timedelta(days=1)
-    return result
-
-
 def _decimal_to_micros(value: object, *, decimal_comma: bool = False) -> int | None:
     text = str(value or "").strip().replace("$", "").replace(" ", "")
     if decimal_comma:
@@ -347,7 +366,19 @@ def _b3_event_label(value: object) -> str:
         return "Rendimento"
     if "BONIF" in normalized:
         return "Bonificação"
+    if "DESDOBRAMENTO" in normalized:
+        return "Desdobramento"
+    if "GRUPAMENTO" in normalized:
+        return "Grupamento"
     return "Provento"
+
+
+def _b3_corporate_event_type(label: str) -> str:
+    return {
+        "Bonificação": "stock_bonus",
+        "Desdobramento": "stock_split",
+        "Grupamento": "reverse_stock_split",
+    }[label]
 
 
 def parse_yahoo_events(

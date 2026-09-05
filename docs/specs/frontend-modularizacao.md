@@ -2,7 +2,7 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 4.30
+versao: 4.32
 atualizado: 2026-09-04
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
@@ -164,6 +164,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Estados localizados usam o helper compartilhado de `dom-utils.js` com quatro tipos explícitos: `loading`, `error`, `empty` e `info`; carregamento anuncia `aria-busy`, erro usa `role="alert"` e vazio oferece orientação contextual sempre que houver próxima ação conhecida.
 - Nenhum módulo deve representar falha ou carregamento apenas por texto neutro em `.empty-state`; ícone, título, mensagem e semântica acessível vêm do mesmo componente.
 - Overlays compartilham foco inicial, confinamento de Tab, fechamento por Escape, restauração de foco e atributos `role="dialog"`/`aria-modal`.
+- A Busca global expõe descrição para tecnologia assistiva, relaciona campo e resultados por `aria-controls`, anuncia alterações do listbox e mantém o conteúdo do diálogo disponível na árvore AX do WebKit.
 - Sucessos operacionais usam toast não bloqueante; erros permanecem junto à operação que falhou.
 - Cabeçalhos de cards usam ações agrupadas e podem anunciar a última atualização com horário local.
 - Tabelas de dados oferecem ordenação local por coluna, primeira coluna sticky, contagem de linhas e filtros ativos removíveis quando os controles pertencem a `.filter-toolbar`.
@@ -189,6 +190,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - [x] Preservar `boot()`, sessão visual, navegação e composição em `app.js`.
 - [x] Atualizar contratos automatizados e validar todos os fluxos existentes.
 - [x] Unificar semântica e teclado de modais, dialogs e drawers.
+- [x] Reforçar semântica, confinamento e restauração de foco da Busca global, com cobertura automatizada; validação manual no VoiceOver permanece recomendada.
 - [x] Centralizar toasts de sucesso e manter erros inline.
 - [x] Padronizar cabeçalhos de cards e última atualização.
 - [x] Enriquecer tabelas, filtros e paginação incremental.
@@ -272,6 +274,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Changelog
 
+- `4.31` — 2026-09-04 — Busca global reforçada com `role="dialog"`, `aria-modal`, descrição, relação campo/resultados, foco confinado e restauração segura.
 - `4.30` — 2026-09-04 — Adicionado `portfolio-events.js` para carregar e apresentar sob demanda os eventos históricos da carteira, com cache de sessão e sem cálculos financeiros no frontend.
 - `4.29` — 2026-09-04 — Relatórios remove DOM/`outerHTML` intermediário dos rankings virtualizados e preserva detalhes sob demanda; Portfólio elimina a segunda construção das fábricas de linha antes da janela visível.
 - `4.28` — 2026-09-04 — Atualizado `virtual-list.js` para refletir uso também em Faturas (`cards-view.js`) e Histórico de Operações (`operation-history-view.js`).
@@ -338,6 +341,10 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - `1.7` — 2026-07-09 — `operation-history-view.js` registrado como view funcional do Histórico de Operações.
 - `1.8` — 2026-07-20 — `decision-modal.js` registrado como helper reutilizável para decisões e formulários curtos.
 - `1.9` — 2026-07-24 — Tela estática Sobre documentada como view simples roteada por `app.js`.
+
+## Changelog
+
+- `4.32` — 2026-09-04 — Barra do Histórico de Operações ganhou distribuição responsiva; abas de Relatórios atualizam `aria-labelledby` conforme a seleção; Sobre ganhou grade de leitura mais equilibrada.
 
 ## Relacionados
 

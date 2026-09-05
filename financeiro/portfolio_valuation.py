@@ -158,7 +158,7 @@ class PositionValuation:
         force_refresh: bool = False,
         factor_cache: dict[str, Decimal] | None = None,
     ) -> int:
-        # spec: rentabilidade-portfolio v1.8 — critério 4
+        # spec: rentabilidade-portfolio v2.9 — critério 4
         if as_of_date < date.fromisoformat(position["first_operation_date"]):
             return 0
         if position["asset_type"] == "fixed_income":
@@ -166,6 +166,40 @@ class PositionValuation:
         if position["asset_type"] == "savings":
             return self.savings_value_as_of(position, as_of_date, force_refresh=force_refresh, factor_cache=factor_cache)
         return int(position.get("current_value_cents") or 0)
+
+    def position_value_snapshot_metadata(
+        self,
+        position: dict,
+        as_of_date: date,
+        force_refresh: bool = False,
+        factor_cache: dict[str, Decimal] | None = None,
+    ) -> dict:
+        """Retorna valor e proveniência para uma futura captura mensal.
+
+        A função reutiliza exatamente as mesmas fontes da valorização atual.
+        Ativos sem série histórica persistida são marcados como aproximados,
+        sem inventar uma cotação de fechamento.
+        """
+        if as_of_date < date.fromisoformat(position["first_operation_date"]):
+            return {"value_cents": 0, "quote_source": "not_available", "valuation_status": "approximate", "as_of_date": as_of_date.isoformat()}
+        if position["asset_type"] == "fixed_income":
+            value, _gross, _iof, _income, _custody, _factor, source = self.fixed_income_value_as_of(
+                position, as_of_date, force_refresh=force_refresh, factor_cache=factor_cache
+            )
+            return {"value_cents": value, "quote_source": source or "indexer", "valuation_status": "observed", "as_of_date": as_of_date.isoformat()}
+        if position["asset_type"] == "savings":
+            value, _rate, source, status = self.savings_value_as_of_with_meta(
+                position, as_of_date, force_refresh=force_refresh, factor_cache=factor_cache
+            )
+            return {"value_cents": value, "quote_source": source or "indexer", "valuation_status": "observed" if status == "ok" else "approximate", "as_of_date": as_of_date.isoformat()}
+        quote_date = str(position.get("quote_date") or "")
+        has_observed_quote = position.get("quote_status") == "ok" and bool(quote_date)
+        return {
+            "value_cents": int(position.get("current_value_cents") or 0),
+            "quote_source": position.get("quote_source") or "current_value",
+            "valuation_status": "observed" if has_observed_quote else "approximate",
+            "as_of_date": quote_date if has_observed_quote else as_of_date.isoformat(),
+        }
 
     def _accumulated_factor_by_month(
         self,

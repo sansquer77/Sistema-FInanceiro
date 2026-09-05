@@ -310,6 +310,30 @@ CREATE TABLE IF NOT EXISTS investment_value_overrides (
     )
 );
 
+CREATE TABLE IF NOT EXISTS investment_monthly_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    snapshot_month TEXT NOT NULL,
+    as_of_date TEXT NOT NULL,
+    account_id INTEGER NOT NULL REFERENCES checking_accounts(id) ON DELETE CASCADE,
+    currency TEXT NOT NULL,
+    asset_type TEXT NOT NULL DEFAULT 'other',
+    asset_identifier TEXT NOT NULL DEFAULT '',
+    asset_name TEXT NOT NULL DEFAULT '',
+    quantity_micros INTEGER NOT NULL DEFAULT 0 CHECK (quantity_micros >= 0),
+    unit_price_cents INTEGER NOT NULL DEFAULT 0 CHECK (unit_price_cents >= 0),
+    market_value_cents INTEGER NOT NULL DEFAULT 0 CHECK (market_value_cents >= 0),
+    cost_basis_cents INTEGER NOT NULL DEFAULT 0 CHECK (cost_basis_cents >= 0),
+    contribution_cents INTEGER NOT NULL DEFAULT 0,
+    redemption_cents INTEGER NOT NULL DEFAULT 0,
+    dividend_cents INTEGER NOT NULL DEFAULT 0,
+    quote_source TEXT NOT NULL DEFAULT 'not_available',
+    valuation_status TEXT NOT NULL DEFAULT 'approximate' CHECK (valuation_status IN ('observed', 'approximate')),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (user_id, snapshot_month, account_id, currency, asset_type, asset_identifier, asset_name)
+);
+
 CREATE TABLE IF NOT EXISTS portfolio_allocation_goals (
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     asset_type TEXT NOT NULL,
@@ -376,6 +400,24 @@ CREATE TABLE IF NOT EXISTS quote_cache (
     expires_at TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+"""
+
+
+MARKET_CALENDAR_SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS market_holidays (
+    holiday_date TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'ANBIMA'
+);
+
+CREATE TABLE IF NOT EXISTS market_calendar_state (
+    source TEXT PRIMARY KEY,
+    imported_at TEXT,
+    last_attempt_at TEXT,
+    checked_year INTEGER,
+    content_sha256 TEXT,
+    row_count INTEGER NOT NULL DEFAULT 0 CHECK (row_count >= 0)
 );
 """
 
@@ -595,6 +637,14 @@ PERFORMANCE_INDEXES = (
         "ON investment_value_overrides (user_id, account_id, asset_type)"
     ),
     (
+        "CREATE INDEX IF NOT EXISTS idx_investment_monthly_snapshots_user_month "
+        "ON investment_monthly_snapshots (user_id, snapshot_month, currency)"
+    ),
+    (
+        "CREATE INDEX IF NOT EXISTS idx_investment_monthly_snapshots_user_asset "
+        "ON investment_monthly_snapshots (user_id, account_id, asset_type, asset_identifier)"
+    ),
+    (
         "CREATE INDEX IF NOT EXISTS idx_investment_closed_positions_user "
         "ON investment_closed_positions (user_id, account_id, asset_type, closed_at)"
     ),
@@ -651,6 +701,7 @@ TABLES_BLOCKS = (
     PORTFOLIO_SCHEMA_SQL,
     LIMITS_SCHEMA_SQL,
     CACHE_SCHEMA_SQL,
+    MARKET_CALENDAR_SCHEMA_SQL,
     AUDIT_SCHEMA_SQL,
     CONFIG_SCHEMA_SQL,
     CONSULTOR_TABLES_SQL,
