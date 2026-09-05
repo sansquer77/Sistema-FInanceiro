@@ -2151,6 +2151,35 @@
         </div>
       </section>
 
+      <!-- Portfolio Return Drawer -->
+      <aside id="portfolioReturnDrawer" class="drawer portfolio-return-drawer" hidden aria-hidden="true" aria-labelledby="portfolioReturnDrawerTitle">
+        <div class="drawer-overlay" id="portfolioReturnDrawerOverlay"></div>
+        <div class="drawer-content">
+          <header class="drawer-header">
+            <div>
+              <p class="eyebrow">Rentabilidade</p>
+              <h2 id="portfolioReturnDrawerTitle">Rentabilidade</h2>
+            </div>
+            <button class="drawer-close-button" id="portfolioReturnDrawerCloseBtn" type="button" aria-label="Fechar gráfico" title="Fechar">
+              <span aria-hidden="true">×</span>
+            </button>
+          </header>
+          <div class="drawer-body">
+            <div class="portfolio-return-chart-wrap">
+              <div class="portfolio-return-chart-row">
+                <div class="portfolio-return-y-axis" id="portfolioReturnYAxis" aria-hidden="true"></div>
+                <svg id="portfolioReturnChart" class="portfolio-return-chart" viewBox="0 0 100 64" preserveAspectRatio="none" role="img" aria-label="Gráfico de rentabilidade mensal da carteira e benchmarks"></svg>
+              </div>
+              <div id="portfolioReturnXLabels" class="portfolio-return-x-labels"></div>
+            </div>
+            <div class="portfolio-return-legend" id="portfolioReturnLegend"></div>
+            <p class="portfolio-return-notice" id="portfolioReturnNotice" hidden>
+              <small>Renda variável/cripto usam o valor atual como aproximação do período, pois cotações históricas ainda não são armazenadas.</small>
+            </p>
+          </div>
+        </div>
+      </aside>
+
       <!-- Cockpit Forecast Drawer -->
       <aside id="forecastDrawer" class="drawer" hidden aria-hidden="true" aria-labelledby="forecastDrawerTitle">
         <div class="drawer-overlay" id="forecastDrawerCloseOverlay"></div>
