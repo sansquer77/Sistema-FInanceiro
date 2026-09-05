@@ -96,6 +96,19 @@ export function centeredMonthlyAxis(rows) {
   };
 }
 
+export function continuousAreaFill(opacityFrom = 0.36, opacityTo = 0.04) {
+  return {
+    type: "gradient",
+    gradient: {
+      type: "vertical",
+      shadeIntensity: 0,
+      opacityFrom,
+      opacityTo,
+      stops: [0, 100],
+    },
+  };
+}
+
 export function destroyChart(element) {
   chartDefinitions.delete(element);
   destroyChartInstance(element);

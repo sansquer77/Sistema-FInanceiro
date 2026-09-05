@@ -30,6 +30,63 @@ class DatabaseV2MigrationTest(unittest.TestCase):
         self.assertTrue(database.DB_PATH.exists())
         self.assertEqual(self.schema_version(database.DB_PATH), database.SCHEMA_VERSION)
         self.assertFalse(self.backup_path.exists())
+        with database.get_connection() as conn:
+            migrations = conn.execute(
+                "SELECT version, name FROM schema_migrations ORDER BY version"
+            ).fetchall()
+        self.assertEqual(
+            [(database.BASELINE_SCHEMA_VERSION, "v2_baseline"), (database.SCHEMA_VERSION, "sqlite_operational_hardening")],
+            [(row["version"], row["name"]) for row in migrations],
+        )
+
+    def test_baseline_database_advances_through_incremental_migration(self) -> None:
+        database.initialize_database()
+        with database.get_connection() as conn:
+            conn.execute("DROP TABLE schema_migrations")
+            conn.execute(f"PRAGMA user_version = {database.BASELINE_SCHEMA_VERSION}")
+            conn.execute(
+                "INSERT INTO users (name, email, password_hash) VALUES ('Ana', 'ana@example.com', 'hash')"
+            )
+
+        database.initialize_database()
+
+        self.assertEqual(self.schema_version(database.DB_PATH), database.SCHEMA_VERSION)
+        with database.get_connection() as conn:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM users").fetchone()[0], 1)
+            versions = [
+                row["version"]
+                for row in conn.execute("SELECT version FROM schema_migrations ORDER BY version")
+            ]
+        self.assertEqual(
+            versions,
+            [database.BASELINE_SCHEMA_VERSION, database.SCHEMA_VERSION],
+        )
+
+    def test_incremental_migration_rolls_back_version_and_history_on_failure(self) -> None:
+        database.initialize_database()
+        with database.get_connection() as conn:
+            conn.execute("DROP TABLE schema_migrations")
+            conn.execute(f"PRAGMA user_version = {database.BASELINE_SCHEMA_VERSION}")
+
+        def fail_migration(conn):
+            conn.execute("CREATE TABLE should_rollback (id INTEGER PRIMARY KEY)")
+            raise sqlite3.DatabaseError("falha simulada")
+
+        with mock.patch.dict(
+            database_migrations.INCREMENTAL_MIGRATIONS,
+            {database.SCHEMA_VERSION: ("failing", fail_migration)},
+            clear=True,
+        ):
+            with self.assertRaises(sqlite3.DatabaseError):
+                database.initialize_database()
+
+        self.assertEqual(self.schema_version(database.DB_PATH), database.BASELINE_SCHEMA_VERSION)
+        with closing(sqlite3.connect(database.DB_PATH)) as conn:
+            self.assertIsNone(
+                conn.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'should_rollback'"
+                ).fetchone()
+            )
 
     def test_reopening_v2_database_skips_schema_compatibility(self) -> None:
         database.initialize_database()
@@ -50,6 +107,40 @@ class DatabaseV2MigrationTest(unittest.TestCase):
             conn.commit()
 
         self.assertEqual(database_migrations.read_schema_version(spaced_db), 0)
+
+    def test_connection_policy_uses_wal_full_durability_and_foreign_keys(self) -> None:
+        database.initialize_database()
+
+        with database.get_connection() as conn:
+            self.assertEqual(conn.execute("PRAGMA journal_mode").fetchone()[0].lower(), "wal")
+            self.assertEqual(conn.execute("PRAGMA synchronous").fetchone()[0], 2)
+            self.assertEqual(conn.execute("PRAGMA foreign_keys").fetchone()[0], 1)
+            self.assertEqual(
+                conn.execute("PRAGMA busy_timeout").fetchone()[0],
+                database.SQLITE_BUSY_TIMEOUT_MS,
+            )
+
+    def test_startup_optimizer_creates_query_planner_statistics(self) -> None:
+        database.initialize_database()
+
+        with database.get_connection() as conn:
+            self.assertIsNotNone(
+                conn.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'sqlite_stat1'"
+                ).fetchone()
+            )
+
+    def test_wal_keeps_reads_available_during_a_short_write(self) -> None:
+        database.initialize_database()
+
+        with database.get_connection() as writer, database.get_connection() as reader:
+            database.begin_immediate(writer)
+            writer.execute(
+                "INSERT INTO users (name, email, password_hash) VALUES ('Ana', 'ana@example.com', 'hash')"
+            )
+            self.assertEqual(reader.execute("SELECT COUNT(*) FROM users").fetchone()[0], 0)
+            writer.commit()
+            self.assertEqual(reader.execute("SELECT COUNT(*) FROM users").fetchone()[0], 1)
 
     def test_legacy_database_is_preserved_and_promoted_under_stable_name(self) -> None:
         self.create_legacy_database()

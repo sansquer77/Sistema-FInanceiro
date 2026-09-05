@@ -1,4 +1,4 @@
-import { renderChart, destroyChart } from "./chart-adapter.js";
+import { continuousAreaFill, destroyChart, renderChart } from "./chart-adapter.js";
 
 export function createReportEvolution({
   reportContent, api, formatMoney, formatMonthShortLabel,
@@ -170,7 +170,7 @@ export function createReportEvolution({
       ],
       colors: [color, color],
       stroke: { curve: "smooth", width: [3, 2], dashArray: [0, 6] },
-      fill: { type: "gradient", gradient: { opacityFrom: 0.28, opacityTo: 0.01 } },
+      fill: continuousAreaFill(),
       markers: { size: [4, 3] },
       xaxis: { categories, labels: { formatter: (month) => formatMonthShortLabel(month) } },
       yaxis: { labels: { formatter: formatChartValue } },

@@ -1,5 +1,11 @@
 import { stateMarkup } from "./dom-utils.js";
-import { centeredMonthlyAxis, centeredMonthlyPoints, chartToken, renderChart } from "./chart-adapter.js";
+import {
+  centeredMonthlyAxis,
+  centeredMonthlyPoints,
+  chartToken,
+  continuousAreaFill,
+  renderChart,
+} from "./chart-adapter.js";
 
 export function createTransactionBalanceChart({
   state,
@@ -56,7 +62,7 @@ export function createTransactionBalanceChart({
       ],
       colors: [chartToken("--accent", "#5f7fff"), chartToken("--accent", "#5f7fff")],
       stroke: { curve: "smooth", width: [3, 2], dashArray: [0, 5] },
-      fill: { type: "solid", opacity: 0 },
+      fill: continuousAreaFill(),
       markers: { size: 4 },
       xaxis: centeredMonthlyAxis(rows),
       tooltip: { enabled: false },

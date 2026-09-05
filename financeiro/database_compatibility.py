@@ -14,7 +14,7 @@ def normalize_legacy_schema(conn: sqlite3.Connection) -> None:
     the candidate is promoted. It never opens connections, creates backups,
     renames files or sets the schema version.
     """
-    # spec: migracao-dados/migracao-banco-v2 v1.5 — critérios 3, 4, 7, 8 e 11
+    # spec: migracao-dados/migracao-banco-v2 v1.6 — critérios 3, 4, 7, 8 e 11
     # Order matters: later steps may depend on tables/columns ensured earlier.
     ensure_column(conn, "transactions", "category_id", "INTEGER REFERENCES categories(id)")
     ensure_column(conn, "transactions", "subcategory_id", "INTEGER REFERENCES subcategories(id)")

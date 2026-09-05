@@ -2,8 +2,8 @@
 tipo: spec
 area: relatorios
 status: implementado
-versao: 2.23
-atualizado: 2026-09-03
+versao: 2.24
+atualizado: 2026-09-05
 relacionados:
   - "[[lancamentos]]"
   - "[[cartoes]]"
@@ -17,7 +17,7 @@ aliases: ["Relatórios", "Cockpit"]
 # Relatórios
 
 > [!info] Status
-> **implementado** · versão: `2.23` · área: `relatorios` · atualizado em 2026-09-03 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[limites-gastos]]
+> **implementado** · versão: `2.24` · área: `relatorios` · atualizado em 2026-09-05 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[limites-gastos]]
 
 ## Problema
 
@@ -239,6 +239,7 @@ Cobertura: `tests/test_statement_report.py` e `tests/frontend_open_debts.test.mj
 
 <!-- Validação automatizada desta etapa: tests/test_evolution_presentation.py e tests/frontend_evolution.test.mjs. Validação visual no Safari não executada. -->
 
+- `2.24` — 2026-09-05 — Reforçada a opacidade do degradê compartilhado da Evolução para preservar sua leitura no tema claro e manter consistência com Contas e Cartões.
 - `2.23` — 2026-09-03 — Relatório de tags passa a usar consultas distintas com e sem competência; o caminho mensal aplica predicados temporais diretos e utiliza os índices de data e `invoice_month`.
 
 - `2.22` — 2026-09-01 — Saldo operacional por moeda do Cockpit passa a ser agregado diretamente no SQLite, sem carregar históricos detalhados nem executar a projeção completa do Extrato; contrato anterior preservado por teste de caracterização.

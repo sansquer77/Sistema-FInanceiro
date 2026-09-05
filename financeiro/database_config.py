@@ -1,3 +1,5 @@
 from __future__ import annotations
 
 SQLITE_BUSY_TIMEOUT_MS = 5000
+SQLITE_SYNCHRONOUS = "FULL"
+SQLITE_OPTIMIZE_MASK = "0x10002"

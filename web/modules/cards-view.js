@@ -3,6 +3,7 @@ import {
   centeredMonthlyAxis,
   centeredMonthlyPoints,
   chartToken,
+  continuousAreaFill,
   renderChart,
 } from "./chart-adapter.js";
 import { renderBankLogo, renderCardNetworkLogo, attachBankLogoFallbacks } from "./bank-logos.js";
@@ -853,9 +854,26 @@ export function registerCardsView({
       ],
       colors: [chartToken("--accent", "#5f7fff"), chartToken("--accent", "#5f7fff")],
       stroke: { curve: "smooth", width: [3, 2], dashArray: [0, 5] },
-      fill: { type: "solid", opacity: 0 },
+      fill: continuousAreaFill(),
       markers: { size: 4 },
-      annotations: { yaxis: [{ y: average.amount, label: { text: `Média ${averageLabel}` } }] },
+      annotations: {
+        yaxis: [{
+          y: average.amount,
+          borderColor: chartToken("--chart-average-line", "#9aa3b8"),
+          borderWidth: 2,
+          strokeDashArray: 0,
+          label: {
+            borderColor: chartToken("--chart-average-line", "#9aa3b8"),
+            text: `Média ${averageLabel}`,
+            style: {
+              background: chartToken("--panel", "#ffffff"),
+              color: chartToken("--ink", "#111827"),
+              fontSize: "10px",
+              fontWeight: 600,
+            },
+          },
+        }],
+      },
       xaxis: centeredMonthlyAxis(rows),
       tooltip: { enabled: false },
     });

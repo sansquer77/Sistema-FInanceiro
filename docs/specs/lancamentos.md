@@ -2,8 +2,8 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 3.35
-atualizado: 2026-09-03
+versao: 3.37
+atualizado: 2026-09-05
 relacionados:
   - "[[contas-correntes]]"
   - "[[categorias-tags-gestao]]"
@@ -17,7 +17,7 @@ aliases: ["Lançamentos", "Transações"]
 # Lançamentos
 
 > [!info] Status
-> **implementado** · versão: `3.35` · área: `lancamentos` · atualizado em 2026-09-03 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]]
+> **implementado** · versão: `3.37` · área: `lancamentos` · atualizado em 2026-09-05 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]]
 
 ## Problema
 
@@ -167,7 +167,7 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dado um cabeçalho diário, quando acionado, então alterna o conteúdo do dia e informa o estado por `aria-expanded`.
 - Dado um grupo diário longo, quando a página é rolada dentro dele, então o cabeçalho da data permanece brevemente visível.
 - Dado o gráfico de histórico/projeção de saldos, quando exibido, então cada cartão mensal mostra o mês no topo e não exibe marcadores `Previsto` ou `Conciliado` dentro da área do gráfico.
-- Dado o gráfico de histórico/projeção de saldos em Lançamentos de Contas, quando há meses passados, atual e futuros, então ele usa o mesmo padrão visual do gráfico de faturas com cards mensais compactos, curva SVG suave e projeção futura atenuada/pontilhada.
+- Dado o gráfico de histórico/projeção de saldos em Lançamentos de Contas, quando há meses passados, atual e futuros, então ele usa ApexCharts no mesmo padrão visual da Evolução de Relatórios: cards mensais compactos, curva realizada suave, projeção futura pontilhada na mesma cor e preenchimento vertical contínuo sob toda a série.
 - Dado o gráfico de histórico/projeção de saldos com valores extensos, quando exibido em qualquer tamanho de tela, então os valores cabem nos cartões mensais por ajuste responsivo de tipografia e de largura mínima dos cartões, mantendo o tamanho atual da área e sem truncar centavos.
 - Dado o usuário visualizando o seletor mensal de Lançamentos de Contas, quando os botões de navegação aparecem, então usam ícones compactos com rótulo acessível em vez de palavras longas.
 - Dado o usuário visualizando o seletor mensal de Lançamentos de Contas, quando o mês é exibido, então o rótulo usa o formato `MM/AAAA`.
@@ -225,6 +225,9 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - [x] Testar sucesso, falha, concorrência e contratos de apresentação aplicáveis.
 
 ## Changelog
+
+- `3.37` — 2026-09-05 — Reforçada a presença do degradê contínuo sob o gráfico de saldos no tema claro, mantendo a linha e o término da área legíveis sem criar bloco opaco.
+- `3.36` — 2026-09-05 — Gráfico de saldo passa a compartilhar com a Evolução de Relatórios o preenchimento vertical contínuo do ApexCharts; realizado e previsão usam a mesma família cromática, preservando a linha futura pontilhada.
 
 - `3.35` — 2026-09-03 — A fatia `month + account_id` passa a usar intervalo mensal estrito; o Extrato preserva saldos acumulados exclusivamente pelo contrato `/api/balance-projection`, sem transportar o histórico anterior.
 

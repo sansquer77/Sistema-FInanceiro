@@ -10,6 +10,8 @@ from pathlib import Path
 from financeiro.database_compatibility import normalize_legacy_schema
 from financeiro.database_config import SQLITE_BUSY_TIMEOUT_MS
 from financeiro.database_schema import (
+    BASELINE_SCHEMA_VERSION,
+    MIGRATIONS_SCHEMA_SQL,
     create_baseline_indexes,
     create_baseline_tables,
 )
@@ -27,9 +29,14 @@ class MigrationPaths:
     candidate: Path
 
 
+INCREMENTAL_MIGRATIONS = {
+    20001: ("sqlite_operational_hardening", lambda conn: conn.execute(MIGRATIONS_SCHEMA_SQL)),
+}
+
+
 def read_schema_version(db_path: Path) -> int:
     try:
-        # spec: migracao-dados/migracao-banco-v2 v1.4 — critério 12
+        # spec: migracao-dados/migracao-banco-v2 v1.6 — critério 12
         # A URI mode=ro falha em algumas combinações do SQLite do macOS quando
         # o caminho contém espaços. A conexão normal é aberta sem executar
         # escrita e também consegue consultar bancos configurados em WAL.
@@ -49,6 +56,51 @@ def set_schema_version(
         conn.execute(f"PRAGMA user_version = {int(version)}")
 
 
+def migrate_incremental_database(
+    db_path: Path,
+    *,
+    current_version: int,
+    target_version: int,
+    connection_factory: Callable[[Path], sqlite3.Connection],
+) -> None:
+    """Apply known post-baseline migrations atomically and in order."""
+    # spec: migracao-dados/migracao-banco-v2 v1.6 — critério 13
+    if current_version < BASELINE_SCHEMA_VERSION or current_version >= target_version:
+        raise DatabaseMigrationError(f"Versao de banco nao suportada: {current_version}.")
+    expected_versions = list(range(current_version + 1, target_version + 1))
+    if any(version not in INCREMENTAL_MIGRATIONS for version in expected_versions):
+        raise DatabaseMigrationError(
+            f"Nao existe caminho de migracao do schema {current_version} para {target_version}."
+        )
+    with connection_factory(db_path) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        conn.execute(MIGRATIONS_SCHEMA_SQL)
+        _record_schema_migration(conn, BASELINE_SCHEMA_VERSION, "v2_baseline")
+        for version in expected_versions:
+            name, migration = INCREMENTAL_MIGRATIONS[version]
+            migration(conn)
+            _record_schema_migration(conn, version, name)
+            conn.execute(f"PRAGMA user_version = {int(version)}")
+
+
+def record_schema_history(conn: sqlite3.Connection, target_version: int) -> None:
+    """Record the baseline and every known step already present in a new candidate."""
+    conn.execute(MIGRATIONS_SCHEMA_SQL)
+    _record_schema_migration(conn, BASELINE_SCHEMA_VERSION, "v2_baseline")
+    for version in range(BASELINE_SCHEMA_VERSION + 1, target_version + 1):
+        migration = INCREMENTAL_MIGRATIONS.get(version)
+        if migration is None:
+            raise DatabaseMigrationError(f"Migracao de schema desconhecida: {version}.")
+        _record_schema_migration(conn, version, migration[0])
+
+
+def _record_schema_migration(conn: sqlite3.Connection, version: int, name: str) -> None:
+    conn.execute(
+        "INSERT OR IGNORE INTO schema_migrations (version, name) VALUES (?, ?)",
+        (int(version), str(name)),
+    )
+
+
 def migrate_legacy_database(
     paths: MigrationPaths,
     *,
@@ -60,7 +112,7 @@ def migrate_legacy_database(
     The operation is recoverable: the original active file is preserved as the
     backup, and failures before promotion keep the legacy database in place.
     """
-    # spec: migracao-dados/migracao-banco-v2 v1.5 — critérios 3, 4, 7, 8 e 11
+    # spec: migracao-dados/migracao-banco-v2 v1.6 — critérios 3, 4, 7, 8 e 11
     if paths.backup.exists():
         raise DatabaseMigrationError(
             f"A migracao foi bloqueada porque {paths.backup.name} ja existe. "
@@ -78,6 +130,7 @@ def migrate_legacy_database(
             normalize_legacy_schema(conn)
         with connection_factory(paths.work) as conn:
             create_baseline_indexes(conn)
+            record_schema_history(conn, target_version)
         set_schema_version(paths.work, target_version, connection_factory=connection_factory)
         _validate_database(paths.work, target_version)
         _vacuum_into(paths.work, paths.candidate)

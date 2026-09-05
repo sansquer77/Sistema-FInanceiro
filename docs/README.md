@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 12.43
+versao: 12.46
 atualizado: 2026-09-05
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -151,6 +151,9 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `12.46` — 2026-09-05 — Reforçado no tema claro o degradê vertical compartilhado pelos gráficos de Contas, Cartões e Evolução de Relatórios, preservando término suave e leitura das linhas.
+- `12.45` — 2026-09-05 — Gráficos de saldo de Contas e evolução de Faturas passam a compartilhar com a Evolução de Relatórios a área vertical contínua do ApexCharts e a mesma família cromática entre realizado e previsão.
+- `12.44` — 2026-09-05 — [[specs/migracao-banco-v2]] v1.6 e [[adr/0003-sqlite-fonte-de-verdade]] v1.2 definem migrações incrementais rastreáveis, WAL apenas na inicialização, durabilidade `FULL` e estatísticas do planner via `PRAGMA optimize`.
 - `12.43` — 2026-09-05 — Criados [[specs/backup-restauracao]] e [[adr/0018-backup-completo-criptografado]], ambos em rascunho, para backup completo, restauração validada, retenção e senha criptografada em Preferências.
 - `12.42` — 2026-09-05 — [[specs/open-finance]] v0.8 corrigida para refletir o suporte já existente a múltiplas tags por lançamento e seus separadores de entrada.
 - `12.41` — 2026-09-05 — [[specs/open-finance]] v0.7 permanece em rascunho e documenta staging com descrição bruta/normalizada, memória local de classificação e tags de projeto; Pluggy segue como candidato enquanto não houver provedor gratuito e simples para o usuário padrão.

@@ -2,8 +2,8 @@
 tipo: adr
 area: meta
 status: implementado
-versao: 1.1
-atualizado: 2026-07-03
+versao: 1.2
+atualizado: 2026-09-05
 relacionados:
   - "[[arquitetura]]"
   - "[[adr/0001-stack-local-sem-framework]]"
@@ -14,7 +14,7 @@ aliases: ["ADR-0003", "SQLite local"]
 # ADR-0003 — SQLite como fonte de verdade local
 
 > [!info] Status
-> **implementado** · tipo: `adr` · atualizado em 2026-07-03
+> **implementado** · tipo: `adr` · atualizado em 2026-09-05
 
 ## Contexto
 
@@ -27,6 +27,10 @@ Usar **SQLite** como única fonte de verdade, armazenado em `data/finance.db` e 
 Valores monetários são persistidos em **centavos** (inteiro) para evitar erros de ponto flutuante.
 
 Para tolerar uso familiar leve com poucos usuários acessando o mesmo servidor local, as conexões usam WAL e `busy_timeout`. Escritas críticas devem ser curtas, serializadas quando dependem de leitura prévia, e evitar chamadas externas enquanto a conexão estiver aberta.
+
+O WAL é configurado somente durante criação/inicialização/migração, pois é uma propriedade persistente do arquivo. Conexões de domínio mantêm `foreign_keys=ON`, espera limitada por locks e `synchronous=FULL`, priorizando durabilidade sem retirar a concorrência entre leitores e uma escrita curta. A inicialização usa `PRAGMA optimize=0x10002` para manter as estatísticas do planner sob controle do próprio SQLite.
+
+Após o baseline `20000`, cada mudança recebe versão incremental em `PRAGMA user_version` e registro em `schema_migrations`, permitindo aplicar passos conhecidos em ordem e recusar bancos futuros ou desconhecidos.
 
 ## Consequências positivas
 
@@ -44,6 +48,7 @@ Para tolerar uso familiar leve com poucos usuários acessando o mesmo servidor l
 
 ## Changelog
 
+- `1.2` — 2026-09-05 — Definidos WAL somente na inicialização, `synchronous=FULL`, otimização controlada do planner e migrações incrementais registradas após o baseline v2.
 - `1.1` — 2026-07-03 — Decisão complementada com WAL, `busy_timeout` e disciplina de transações curtas para uso familiar leve.
 
 ## Alternativas descartadas

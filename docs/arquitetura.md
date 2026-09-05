@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 4.4
-atualizado: 2026-09-04
+versao: 4.5
+atualizado: 2026-09-05
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -337,8 +337,8 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | `database_config.py` | Constantes transversais de configuração SQLite, como `SQLITE_BUSY_TIMEOUT_MS`. |
 | `database_maintenance.py` | Rotinas operacionais do `quote_cache`: poda de entradas expiradas e compactação condicional. Ver [[specs/manutencao-cache-cotacoes]]. |
 | `database_compatibility.py` | Normalizações históricas do schema legado 1.x aplicadas apenas à cópia de trabalho da migração. |
-| `database_schema.py` | Descrição canônica do baseline v2: tabelas, constraints e índices. Oferece `create_baseline_schema`, `create_baseline_tables` e `create_baseline_indexes`. |
-| `database_migrations.py` | Orquestração física e recuperável da migração legada: cópia, compatibilização, `VACUUM INTO`, validação e promoção. |
+| `database_schema.py` | Descrição canônica do baseline v2 e da versão atual: tabelas, constraints e índices. Oferece `create_baseline_schema`, `create_baseline_tables` e `create_baseline_indexes`. |
+| `database_migrations.py` | Orquestração física e recuperável da migração legada e registro/aplicação transacional das migrações incrementais pós-baseline. |
 | `money.py` | Conversões monetárias puras, escala de centavos, arredondamento e divisão exata de parcelas. Ver [[specs/utilitarios-dominio]]. |
 | `calendar_rules.py` | Normalização ISO e aritmética pura de datas, meses e fins de mês. Ver [[specs/utilitarios-dominio]]. |
 | `identifiers.py` | Parsing puro de identificadores inteiros positivos obrigatórios e opcionais. Ver [[specs/utilitarios-dominio]]. |
@@ -398,16 +398,17 @@ Banco local em `data/finance.db`, criado automaticamente na inicialização. Arq
 
 O cache regenerável `quote_cache` recebe manutenção na inicialização por `financeiro/database_maintenance.py`: respostas expiradas há mais de 30 dias são removidas, com limites de 1.000 entradas por provedor e 1.500 no total. Se a limpeza liberar ao menos 1 MiB e 20% das páginas, o banco executa `VACUUM`; abaixo disso, o SQLite apenas reutiliza as páginas livres. Falhas nessa manutenção não bloqueiam a abertura e nenhuma tabela financeira é afetada. `financeiro/database.py` orquestra a chamada, mas não conhece os detalhes de retenção, poda e compactação. Ver [[specs/manutencao-cache-cotacoes]].
 
-Conexões SQLite são abertas com `journal_mode=WAL`, `busy_timeout` curto e `foreign_keys=ON`. Escritas que dependem de leituras prévias de saldo/fatura usam transações imediatas para serializar a janela crítica; operações potencialmente demoradas, como envio SMTP, cotação externa, consolidação de portfólio e importações em lote, não devem manter uma conexão aberta além do trecho estritamente necessário de leitura ou gravação.
+O arquivo SQLite recebe `journal_mode=WAL` uma vez no ciclo de inicialização; conexões de domínio não renegociam esse modo persistente. Cada conexão usa `busy_timeout` curto, `foreign_keys=ON` e `synchronous=FULL`. Escritas que dependem de leituras prévias de saldo/fatura usam transações imediatas para serializar a janela crítica; operações potencialmente demoradas, como envio SMTP, cotação externa, consolidação de portfólio e importações em lote, não devem manter uma conexão aberta além do trecho estritamente necessário de leitura ou gravação. Depois de criação ou migração, `PRAGMA optimize=0x10002` permite ao SQLite criar ou atualizar estatísticas do planner de forma controlada.
 
 ### Baseline e migração para a linha v2
 
-O baseline inicial da v2 usa `PRAGMA user_version = 20000`. Banco ausente é criado e marcado diretamente; banco já marcado abre sem percorrer as compatibilizações da linha 1.x. Um `finance.db` com `user_version = 0` é tratado como legado: na abertura, `financeiro/database_migrations.py` orquestra a cópia de trabalho, as compatibilizações históricas via `financeiro/database_compatibility.py::normalize_legacy_schema`, o candidato compacto por `VACUUM INTO`, as validações de integridade/chaves estrangeiras/versão/contagens e a promoção recuperável. O original passa a `data/finance-v1.bkp`, que nunca é sobrescrito, enquanto o candidato mantém o nome ativo `data/finance.db`. Falhas anteriores à promoção preservam o nome original; falha na segunda renomeação tenta restaurá-lo. Ver [[specs/migracao-banco-v2]] e [[adr/0012-fundacao-v2-contrato-e-migracao-de-dados]].
+O baseline inicial da v2 usa `PRAGMA user_version = 20000`; a evolução operacional do SQLite inaugura a versão incremental `20001`. A tabela `schema_migrations` registra baseline e passos posteriores, enquanto `user_version` seleciona e ordena as migrações. Banco ausente é criado diretamente na versão atual; banco `20000` avança transacionalmente para `20001`; versões futuras ou intermediárias desconhecidas são recusadas. Um `finance.db` com `user_version = 0` continua tratado como legado: na abertura, `financeiro/database_migrations.py` orquestra a cópia de trabalho, as compatibilizações históricas via `financeiro/database_compatibility.py::normalize_legacy_schema`, o candidato compacto por `VACUUM INTO`, as validações de integridade/chaves estrangeiras/versão/contagens e a promoção recuperável. O original passa a `data/finance-v1.bkp`, que nunca é sobrescrito, enquanto o candidato mantém o nome ativo `data/finance.db`. Falhas anteriores à promoção preservam o nome original; falha na segunda renomeação tenta restaurá-lo. Ver [[specs/migracao-banco-v2]] e [[adr/0012-fundacao-v2-contrato-e-migracao-de-dados]].
 
 ### Tabelas
 
 | Tabela | Módulo responsável |
 |---|---|
+| `schema_migrations` | `database_migrations.py` — histórico idempotente do baseline e das migrações incrementais aplicadas. |
 | `users` | `auth.py` |
 | `sessions` | `auth.py` |
 | `password_resets` | `auth.py` |
@@ -617,6 +618,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `4.5` — 2026-09-05 — Persistência passa a usar `synchronous=FULL`, WAL configurado somente na inicialização, estatísticas via `PRAGMA optimize` e migração incremental rastreável `20000` → `20001` em `schema_migrations`.
 - `4.4` — 2026-09-04 — Inicialização reconcilia o baseline aditivo idempotente também em bancos já marcados como v2, antes de atender requisições.
 - `4.3` — 2026-09-04 — Registrada `investment_monthly_snapshots` e seus índices para a futura rentabilidade baseada em snapshots por ativo, conforme ADR-0017.
 - `4.2` — 2026-09-04 — Adicionado `market_calendar.py` e tabelas locais para importar o calendário ANBIMA com atualização anual transacional e aplicá-lo às datas derivadas dos eventos B3.

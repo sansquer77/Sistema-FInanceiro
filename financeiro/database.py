@@ -3,18 +3,25 @@ from __future__ import annotations
 import os
 import sqlite3
 import sys
+from contextlib import closing
 from pathlib import Path
 
-from financeiro.database_config import SQLITE_BUSY_TIMEOUT_MS
+from financeiro.database_config import (
+    SQLITE_BUSY_TIMEOUT_MS,
+    SQLITE_OPTIMIZE_MASK,
+    SQLITE_SYNCHRONOUS,
+)
 from financeiro.database_maintenance import maintain_quote_cache
 from financeiro.database_migrations import (
     DatabaseMigrationError,
     MigrationPaths,
     migrate_legacy_database,
+    migrate_incremental_database,
     read_schema_version,
+    record_schema_history,
     set_schema_version,
 )
-from financeiro.database_schema import SCHEMA_VERSION, create_baseline_schema
+from financeiro.database_schema import BASELINE_SCHEMA_VERSION, SCHEMA_VERSION, create_baseline_schema
 from financeiro.market_calendar import ensure_market_calendar_schema
 
 ROOT = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parents[1]
@@ -38,9 +45,9 @@ def get_connection(db_path: Path | None = None) -> sqlite3.Connection:
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path, timeout=SQLITE_BUSY_TIMEOUT_MS / 1000, factory=ManagedConnection)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode = WAL")
     conn.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS}")
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute(f"PRAGMA synchronous = {SQLITE_SYNCHRONOUS}")
     return conn
 
 
@@ -53,9 +60,8 @@ def initialize_database() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     if not DB_PATH.exists():
         create_database(DB_PATH)
-    elif read_schema_version(DB_PATH) == SCHEMA_VERSION:
-        pass
     else:
+        configure_database_file(DB_PATH)
         migrate_if_supported(DB_PATH)
 
     with get_connection(DB_PATH) as conn:
@@ -65,6 +71,8 @@ def initialize_database() -> None:
         create_baseline_schema(conn)
         ensure_market_calendar_schema(conn)
 
+    optimize_database(DB_PATH)
+
     maintain_quote_cache(
         DB_PATH,
         connection_factory=get_connection,
@@ -72,14 +80,24 @@ def initialize_database() -> None:
 
 
 def create_database(db_path: Path) -> None:
+    configure_database_file(db_path)
     with get_connection(db_path) as conn:
         create_baseline_schema(conn)
+        record_schema_history(conn, SCHEMA_VERSION)
     set_schema_version(db_path, SCHEMA_VERSION, connection_factory=get_connection)
 
 
 def migrate_if_supported(db_path: Path) -> None:
     schema_version = read_schema_version(db_path)
     if schema_version == SCHEMA_VERSION:
+        return
+    if BASELINE_SCHEMA_VERSION <= schema_version < SCHEMA_VERSION:
+        migrate_incremental_database(
+            db_path,
+            current_version=schema_version,
+            target_version=SCHEMA_VERSION,
+            connection_factory=get_connection,
+        )
         return
     if schema_version != 0:
         raise DatabaseMigrationError(
@@ -97,6 +115,25 @@ def migrate_if_supported(db_path: Path) -> None:
         target_version=SCHEMA_VERSION,
         connection_factory=get_connection,
     )
+
+
+def configure_database_file(db_path: Path) -> None:
+    """Configure persistent SQLite file properties during startup only."""
+    # spec: migracao-dados/migracao-banco-v2 v1.6 — critérios 14 e 15
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    with closing(sqlite3.connect(db_path, timeout=SQLITE_BUSY_TIMEOUT_MS / 1000)) as conn:
+        conn.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS}")
+        journal_mode = str(conn.execute("PRAGMA journal_mode = WAL").fetchone()[0]).lower()
+        if journal_mode != "wal":
+            raise DatabaseMigrationError("Nao foi possivel configurar o banco em modo WAL.")
+        conn.execute(f"PRAGMA synchronous = {SQLITE_SYNCHRONOUS}")
+
+
+def optimize_database(db_path: Path) -> None:
+    """Let SQLite refresh planner statistics under its built-in work limit."""
+    # spec: migracao-dados/migracao-banco-v2 v1.6 — critério 15
+    with get_connection(db_path) as conn:
+        conn.execute(f"PRAGMA optimize={SQLITE_OPTIMIZE_MASK}")
 
 
 def row_to_dict(row: sqlite3.Row | None) -> dict | None:
