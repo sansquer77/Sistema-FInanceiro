@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 12.46
+versao: 12.47
 atualizado: 2026-09-05
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -83,7 +83,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | Spec | Status | Área |
 |---|---|---|
 | [[specs/open-finance]] | 📝 rascunho | Open Finance |
-| [[specs/backup-restauracao]] | 📝 rascunho | Backup e restauração |
+| [[specs/backup-restauracao]] | 🔎 em revisão | Backup e restauração |
 | [[specs/consolidacao-familiar]] | 📝 rascunho | Consolidação Familiar |
 | [[specs/imposto-renda]] | ❌ depreciado — custo de manter regras fiscais atualizadas não compensa para uso familiar | Investimentos |
 | [[specs/exportacao-dados]] | ❌ depreciado — arquivo SQLite já acessível por leitor genérico ou agente de IA | Exportação |
@@ -110,7 +110,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[adr/0014-desconcentracao-fachadas-e-roteamento]] | Fachadas compatíveis, roteamento declarativo e responsabilidades internas menores na fundação v2. |
 | [[adr/0015-ssrf-ai-endpoints]] | Validação de endpoints configuráveis de IA contra SSRF, com opt-in por env para provedores locais. |
 | [[adr/0016-calendario-mercado-anbima]] | Calendário nacional ANBIMA persistido localmente como fonte única para dias úteis derivados de eventos B3. |
-| [[adr/0018-backup-completo-criptografado]] | Rascunho do pacote completo de backup com container ZIP e payload criptografado autenticado. |
+| [[adr/0018-backup-completo-criptografado]] | Decisão em revisão do pacote completo de backup com container ZIP e payload criptografado autenticado. |
 
 ---
 
@@ -151,6 +151,7 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `12.47` — 2026-09-05 — Backup completo da instalação implementado e colocado em revisão: pacote `.sfbackup` AES-256-GCM, política multiusuário, cópia SQLite online, retenção, automação na abertura e restauração com salvaguarda.
 - `12.46` — 2026-09-05 — Reforçado no tema claro o degradê vertical compartilhado pelos gráficos de Contas, Cartões e Evolução de Relatórios, preservando término suave e leitura das linhas.
 - `12.45` — 2026-09-05 — Gráficos de saldo de Contas e evolução de Faturas passam a compartilhar com a Evolução de Relatórios a área vertical contínua do ApexCharts e a mesma família cromática entre realizado e previsão.
 - `12.44` — 2026-09-05 — [[specs/migracao-banco-v2]] v1.6 e [[adr/0003-sqlite-fonte-de-verdade]] v1.2 definem migrações incrementais rastreáveis, WAL apenas na inicialização, durabilidade `FULL` e estatísticas do planner via `PRAGMA optimize`.

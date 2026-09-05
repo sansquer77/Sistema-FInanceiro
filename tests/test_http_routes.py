@@ -19,6 +19,11 @@ class HttpRoutesTest(unittest.TestCase):
         self.assertEqual(resolve_route("GET", "/api/reports/overview"), "handle_report_overview")
         self.assertEqual(resolve_route("GET", "/api/global-search"), "handle_global_search")
         self.assertEqual(resolve_route("GET", "/api/cockpit/notifications"), "handle_cockpit_notifications")
+        self.assertEqual(resolve_route("GET", "/api/backup/settings"), "handle_backup_settings")
+        self.assertEqual(resolve_route("PUT", "/api/backup/settings"), "handle_save_backup_settings")
+        self.assertEqual(resolve_route("POST", "/api/backup/run"), "handle_run_backup")
+        self.assertEqual(resolve_route("POST", "/api/backup/validate"), "handle_validate_backup_restore")
+        self.assertEqual(resolve_route("POST", "/api/backup/restore"), "handle_restore_backup")
         self.assertEqual(
             resolve_route("POST", "/api/cockpit/notifications/mark-seen"),
             "handle_mark_cockpit_notifications_seen",

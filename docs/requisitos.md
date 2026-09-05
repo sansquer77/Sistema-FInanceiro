@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 3.10
-atualizado: 2026-09-04
+versao: 3.11
+atualizado: 2026-09-05
 relacionados:
   - "[[arquitetura]]"
   - "[[visao-produto]]"
@@ -14,7 +14,7 @@ tags: [produto, meta]
 # Requisitos
 
 > [!info] Status
-> **implementado** (escopo vivo) · área: `meta` · atualizado em 2026-09-04 · relacionados: [[arquitetura]], [[visao-produto]]
+> **implementado** (escopo vivo) · versão: `3.11` · área: `meta` · atualizado em 2026-09-05 · relacionados: [[arquitetura]], [[visao-produto]], [[specs/backup-restauracao]]
 
 ## Objetivo
 
@@ -50,12 +50,13 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 - **Sobre o app**: tela informativa no grupo Usuário com objetivo, funcionalidades, tecnologias, contato e infraestrutura mínima. Ver [[sobre-app]].
 - **Interface web estática**: painéis locais em `web/`, sem framework ou build step; dependências browser aprovadas são fixadas, auditadas e distribuídas localmente para manter operação offline. Ver [[arquitetura]], [[adr/0002-modularizacao-frontend]] e [[adr/0013-dependencias-frontend-v2]].
 - **Distribuição desktop**: pacotes macOS e Windows com instaladores, modo local e launchers opcionais para rede local confiável. Ver [[distribuição]].
+- **Backup completo da instalação**: política própria em Preferências, cópia online do SQLite inteiro, chave mestra e configurações em pacote `.sfbackup` autenticado, execução recorrente na abertura, retenção e restauração validada com salvaguarda. Em instalações domésticas compartilhadas, somente o usuário ativo mais antigo administra o ambiente completo. Ver [[specs/backup-restauracao]] e [[adr/0018-backup-completo-criptografado]].
 - **Licenciamento open source**: código-fonte e distribuição pública sob Apache License 2.0. Ver [[adr/0008-licenca-apache-2-0]].
 
 ## Fora do escopo atual
 
 - Open Finance, sincronização em nuvem ou integrações bancárias automáticas diretas.
-- Multiusuário concorrente em rede; o modo LAN é apenas exposição local controlada para redes confiáveis, sem transformar o app em serviço multiusuário.
+- Operação como serviço multiusuário de alta concorrência ou exposto diretamente à internet. O uso doméstico em LAN confiável com poucos usuários e baixa concorrência é suportado pelo SQLite/WAL, sem prometer escala de servidor dedicado.
 - Suporte formal, SLA, consultoria, garantia de funcionamento ou compromisso de atendimento a usuários.
 
 ## Escopo planejado da fundação v2
@@ -100,6 +101,7 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 - O Perfil Complementar do Consultor fica criptografado por usuário em `consultor_perfil_complementar.payload_enc`; o histórico do Consultor é apagado ao desligar a IA geral, desabilitar o Consultor ou revogar o consentimento de acesso aos dados.
 - A chave local padrão fica em `secure/config.key`, com compatibilidade para `data/email_config.key`; instalações administradas podem usar `SISTEMA_FINANCEIRO_CONFIG_KEY_PATH` ou `SISTEMA_FINANCEIRO_CONFIG_KEY`.
 - Pacotes distribuíveis não incluem credenciais SMTP; cada usuário configura seu próprio remetente localmente.
+- Backups completos usam AES-256-GCM e scrypt por meio de `cryptography`; senha lembrada fica apenas em `secure_configs`, e restauração exige autenticação do pacote antes de qualquer substituição.
 - Arquivos de runtime em `data/` não devem ser versionados.
 - Upload de importação é limitado a 5 MB.
 - Identificadores recebidos pela API devem ser validados contra o usuário autenticado.
@@ -110,7 +112,7 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 
 ## Requisitos não funcionais
 
-- O app deve rodar localmente em macOS com Python 3 e bibliotecas padrão (ou extensões mínimas offline).
+- O app deve rodar localmente em macOS com Python 3, biblioteca padrão e extensões mínimas empacotadas; `cryptography` é a dependência nativa aprovada para backup autenticado.
 - Pacotes distribuídos devem oferecer modo local por padrão e modo rede/LAN apenas por launcher explícito.
 - O frontend deve continuar simples, responsivo e sem build step.
 - Dependências browser devem ser vendorizadas em versão exata, acompanhadas de licença, origem e hash, sem download por CDN em runtime.
@@ -133,6 +135,7 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 
 ## Changelog
 
+- `3.11` — 2026-09-05 — Backup completo autenticado incorporado ao escopo e cenário doméstico com poucos usuários concorrentes explicitado como suportado, mantendo alta concorrência/Internet fora do contrato.
 - `3.10` — 2026-09-04 — Data ex derivada de eventos B3 passa a usar calendário nacional ANBIMA persistido localmente e atualizado anualmente sem fonte alternativa.
 - `3.9` — 2026-09-04 — Agenda B3 passa a incluir bonificações, desdobramentos e grupamentos, mantendo fonte explícita e sem converter fatores societários em valores monetários.
 - `3.8` — 2026-09-04 — Agenda de eventos passa a usar B3 para ativos brasileiros, Nasdaq para internacionais e Yahoo como fallback, com cache diário e sem novas credenciais.

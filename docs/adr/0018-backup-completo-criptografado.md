@@ -1,22 +1,22 @@
 ---
 tipo: adr
 area: seguranca
-status: rascunho
-versao: 0.1
+status: em-revisao
+versao: 1.1
 atualizado: 2026-09-05
 relacionados:
   - "[[../specs/backup-restauracao]]"
   - "[[0010-segredos-criptografados-sqlite]]"
   - "[[0003-sqlite-fonte-de-verdade]]"
   - "[[../distribuição]]"
-tags: [adr, "area/seguranca", "status/rascunho"]
+tags: [adr, "area/seguranca", "status/em-revisao"]
 aliases: ["ADR-0018", "Backup completo criptografado"]
 ---
 
 # ADR-0018 — Pacote completo de backup criptografado
 
 > [!info] Status
-> **rascunho** · área: `seguranca` · atualizado em 2026-09-05 · relacionados: [[../specs/backup-restauracao]], [[0010-segredos-criptografados-sqlite]]
+> **em revisão** · versão: `1.1` · área: `seguranca` · atualizado em 2026-09-05 · relacionados: [[../specs/backup-restauracao]], [[0010-segredos-criptografados-sqlite]]
 
 ## Contexto
 
@@ -24,7 +24,7 @@ O `finance.db` não é o único artefato necessário para recuperar uma instala�
 
 O usuário solicitou um backup completo em pacote ZIP, salvo em diretório escolhido nas Preferências e executado de forma recorrente. O pacote pode circular em mídia removível, pasta compartilhada ou sincronização externa; portanto, seu conteúdo financeiro e suas chaves não podem ficar expostos.
 
-## Decisão proposta
+## Decisão
 
 Adotar um pacote ZIP como container de transporte, mas proteger o conteúdo em um payload criptografado com autenticação forte. O ZIP não usará ZipCrypto nem dependerá da criptografia legada da biblioteca padrão. O payload protegido conterá:
 
@@ -36,7 +36,19 @@ Adotar um pacote ZIP como container de transporte, mas proteger o conteúdo em u
 
 A senha será fornecida na configuração da aba Backup em Preferências. Para permitir execução automática, o usuário poderá optar por armazená-la criptografada em `secure_configs`, protegida pela chave mestra atual. A senha nunca será gravada em texto puro, logs, banco sem proteção ou no pacote fora do payload cifrado.
 
-O algoritmo, KDF, parâmetros e dependência multiplataforma ainda precisam ser fechados antes da implementação. O formato deve usar criptografia autenticada, salt e nonce aleatórios por pacote, envelope versionado e rejeição de parâmetros que possam causar consumo arbitrário de CPU ou memória.
+O payload interno será um ZIP comum, criado somente em diretório temporário privado. O pacote externo `.sfbackup` também será um ZIP e conterá apenas `envelope.json`, `payload.enc` e `LEIA-ME.txt`. O manifesto financeiro permanecerá exclusivamente no ZIP interno cifrado.
+
+A criptografia usa `AES-256-GCM` da biblioteca `cryptography`. A chave é derivada da senha por `scrypt` com salt aleatório de 16 bytes, `n=32768`, `r=8`, `p=1` e chave de 32 bytes. Cada pacote usa nonce aleatório de 12 bytes. O `envelope.json` registra somente versão do formato, algoritmo, KDF, parâmetros limitados, salt, nonce, tag e tamanho do payload. Todo o envelope canônico, exceto a tag, é autenticado como AAD.
+
+Criação e abertura usam a API incremental de `Cipher`, evitando manter banco, ZIP interno e ciphertext simultaneamente em memória. A leitura rejeita antes da derivação qualquer versão, algoritmo ou parâmetro fora do contrato, além de impor limites ao número, nome, tamanho individual e tamanho total descomprimido das entradas.
+
+A senha deve ter no mínimo 12 caracteres. Para backups automáticos, ela pode ser lembrada somente por escolha explícita e fica em `secure_configs` com `config_type = backup_password`, sob a chave mestra da instalação. A política é única por instalação, embora registre o usuário que a configurou, pois o pacote protege todo o ambiente e não apenas um usuário.
+
+Em instalações compartilhadas, o usuário ativo mais antigo assume o papel de responsável operacional. Apenas ele altera a política, executa backup manual ou confirma restauração; isso evita que uma conta substitua o SQLite completo das demais. A execução automática independe de sessão e usa a política única já autorizada.
+
+Na versão 1 do formato, a restauração aceita somente o mesmo `SCHEMA_VERSION` do aplicativo em execução. Isso evita promover um banco futuro ou depender de migração durante a operação destrutiva. Evoluções de compatibilidade exigem nova versão do envelope ou decisão documental explícita.
+
+O diretório de destino será informado como caminho absoluto validado na interface web. Seletores nativos multiplataforma ficam fora desta primeira implementação por não existir ponte nativa comum na arquitetura atual.
 
 ## Alternativas consideradas
 
@@ -59,7 +71,7 @@ O algoritmo, KDF, parâmetros e dependência multiplataforma ainda precisam ser 
 - O formato precisará de versionamento e testes de round-trip entre plataformas.
 - A restauração será mais lenta que uma cópia simples, mas poderá validar integridade antes de alterar o ambiente ativo.
 
-## Gates para sair de rascunho
+## Gates de validação para concluir a revisão
 
 1. Algoritmo e parâmetros aprovados com benchmark nos runtimes distribuídos.
 2. Pacote criado e restaurado em macOS, Windows e Linux.
@@ -70,6 +82,8 @@ O algoritmo, KDF, parâmetros e dependência multiplataforma ainda precisam ser 
 
 ## Changelog
 
+- `1.1` — 2026-09-05 — Implementação em revisão após round-trip e testes adversariais; formalizada política única da instalação e autorização exclusiva do usuário ativo mais antigo em cenários domésticos multiusuário.
+- `1.0` — 2026-09-05 — Fechado o formato `.sfbackup`: ZIP externo mínimo, ZIP interno protegido por AES-256-GCM incremental, scrypt limitado, senha mínima de 12 caracteres, política única por instalação e restauração restrita ao schema corrente.
 - `0.1` — 2026-09-05 — Rascunho inicial da decisão de usar ZIP como container e payload criptografado autenticado para backup completo.
 
 ## Relacionados

@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 
 BASELINE_SCHEMA_VERSION = 20000
-SCHEMA_VERSION = 20001
+SCHEMA_VERSION = 20002
 
 
 MIGRATIONS_SCHEMA_SQL = """
@@ -471,12 +471,29 @@ CREATE TABLE IF NOT EXISTS user_ai_settings (
 CREATE TABLE IF NOT EXISTS secure_configs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    config_type TEXT NOT NULL CHECK (config_type IN ('email', 'ai', 'mais_retorno')),
+    config_type TEXT NOT NULL CHECK (config_type IN ('email', 'ai', 'mais_retorno', 'backup_password')),
     payload_enc TEXT NOT NULL,
     source_path TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (user_id, config_type)
+);
+
+CREATE TABLE IF NOT EXISTS backup_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    backup_directory TEXT NOT NULL DEFAULT '',
+    schedule_frequency TEXT NOT NULL DEFAULT 'weekly'
+        CHECK (schedule_frequency IN ('on_start', 'daily', 'weekly', 'monthly')),
+    retention_count INTEGER NOT NULL DEFAULT 5 CHECK (retention_count BETWEEN 1 AND 100),
+    remember_password INTEGER NOT NULL DEFAULT 0 CHECK (remember_password IN (0, 1)),
+    configured_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    last_backup_at TEXT,
+    last_backup_status TEXT NOT NULL DEFAULT 'never_run'
+        CHECK (last_backup_status IN ('success', 'failed', 'never_run')),
+    last_package_filename TEXT NOT NULL DEFAULT '',
+    last_error TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 """
 

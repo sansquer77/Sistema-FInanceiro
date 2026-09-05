@@ -4,6 +4,7 @@ import re
 import hashlib
 import unittest
 from pathlib import Path
+from urllib.parse import urlparse
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -12,6 +13,23 @@ MODULE_ROOT = WEB_ROOT / "modules"
 
 
 class FrontendModuleContractTest(unittest.TestCase):
+    def test_backup_preferences_expose_full_validated_flow(self) -> None:
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        app_source = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+        preferences = (MODULE_ROOT / "user-admin-view.js").read_text(encoding="utf-8")
+        for expected in (
+            'data-user-tab="backup"', 'id="userBackupPanel"', 'id="backupSettingsForm"',
+            'id="backupRunForm"', 'id="backupRestoreForm"', 'id="backupRestoreConfirmButton"',
+        ):
+            self.assertIn(expected, index)
+        self.assertIn("backupSettingsForm", app_source)
+        self.assertIn('api("/api/backup/settings"', preferences)
+        self.assertIn('api("/api/backup/run"', preferences)
+        self.assertIn('api("/api/backup/validate"', preferences)
+        self.assertIn('api("/api/backup/restore"', preferences)
+        self.assertIn("backupRestorePasswordInMemory", preferences)
+        self.assertIn("Somente o responsável pela instalação", preferences)
+
     def test_support_link_is_local_to_about_without_global_widget(self) -> None:
         from html.parser import HTMLParser
         class Links(HTMLParser):
@@ -23,8 +41,10 @@ class FrontendModuleContractTest(unittest.TestCase):
                 attrs = dict(attrs)
                 if tag == "section":
                     self.sections.append(attrs)
-                if tag == "a" and "buymeacoffee.com" in attrs.get("href", ""):
-                    self.support_sections.append(list(self.sections))
+                if tag == "a":
+                    host = urlparse(attrs.get("href", "")).hostname or ""
+                    if host == "buymeacoffee.com" or host.endswith(".buymeacoffee.com"):
+                        self.support_sections.append(list(self.sections))
             def handle_endtag(self, tag):
                 if tag == "section" and self.sections:
                     self.sections.pop()

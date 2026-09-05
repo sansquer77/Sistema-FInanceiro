@@ -36,6 +36,7 @@ EXACT_ROUTES: dict[str, dict[str, str]] = {
         "/api/financial-health-trends": "handle_financial_health_trends",
         "/api/ai-settings": "handle_ai_settings_status",
         "/api/mais-retorno-config": "handle_mais_retorno_config_status",
+        "/api/backup/settings": "handle_backup_settings",
         "/api/consultor/config": "handle_consultor_config",
         "/api/consultor/perfil-complementar": "handle_consultor_complementary_profile",
         "/api/consultor/history": "handle_consultor_history",
@@ -71,11 +72,15 @@ EXACT_ROUTES: dict[str, dict[str, str]] = {
         "/api/consultor/perfil-complementar": "handle_save_consultor_complementary_profile",
         "/api/consultor/analyze": "handle_consultor_analyze",
         "/api/cockpit/notifications/mark-seen": "handle_mark_cockpit_notifications_seen",
+        "/api/backup/run": "handle_run_backup",
+        "/api/backup/validate": "handle_validate_backup_restore",
+        "/api/backup/restore": "handle_restore_backup",
     },
     "PUT": {
         "/api/portfolio/value": "handle_update_portfolio_value",
         "/api/portfolio/allocation-goals": "handle_save_portfolio_allocation_goals",
         "/api/ai-settings": "handle_save_ai_settings", "/api/mais-retorno-config": "handle_save_mais_retorno_config",
+        "/api/backup/settings": "handle_save_backup_settings",
     },
     "DELETE": {
         "/api/me": "handle_delete_user", "/api/portfolio/value": "handle_delete_portfolio_value_override",

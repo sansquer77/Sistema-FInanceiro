@@ -15,6 +15,7 @@ MODULES = {
     "classifications",
     "limits",
     "user_admin",
+    "backup",
 }
 OPERATION_TYPES = {
     "create",
@@ -46,6 +47,8 @@ ENTITY_TYPES = {
     "tag",
     "spending_limit",
     "user",
+    "backup_policy",
+    "backup_package",
 }
 MAX_LIMIT = 100
 

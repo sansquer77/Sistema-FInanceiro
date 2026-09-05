@@ -14,7 +14,7 @@ def normalize_legacy_schema(conn: sqlite3.Connection) -> None:
     the candidate is promoted. It never opens connections, creates backups,
     renames files or sets the schema version.
     """
-    # spec: migracao-dados/migracao-banco-v2 v1.6 — critérios 3, 4, 7, 8 e 11
+    # spec: migracao-dados/migracao-banco-v2 v1.7 — critérios 3, 4, 7, 8 e 11
     # Order matters: later steps may depend on tables/columns ensured earlier.
     ensure_column(conn, "transactions", "category_id", "INTEGER REFERENCES categories(id)")
     ensure_column(conn, "transactions", "subcategory_id", "INTEGER REFERENCES subcategories(id)")
@@ -347,7 +347,7 @@ def ensure_secure_configs(conn: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS secure_configs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-            config_type TEXT NOT NULL CHECK (config_type IN ('email', 'ai', 'mais_retorno')),
+            config_type TEXT NOT NULL CHECK (config_type IN ('email', 'ai', 'mais_retorno', 'backup_password')),
             payload_enc TEXT NOT NULL,
             source_path TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -357,6 +357,36 @@ def ensure_secure_configs(conn: sqlite3.Connection) -> None:
         """
     )
     ensure_column(conn, "secure_configs", "source_path", "TEXT NOT NULL DEFAULT ''")
+    table_sql = str(conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'secure_configs'"
+    ).fetchone()[0] or "")
+    if "backup_password" not in table_sql:
+        conn.execute("ALTER TABLE secure_configs RENAME TO secure_configs_before_backup")
+        conn.execute(
+            """
+            CREATE TABLE secure_configs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                config_type TEXT NOT NULL
+                    CHECK (config_type IN ('email', 'ai', 'mais_retorno', 'backup_password')),
+                payload_enc TEXT NOT NULL,
+                source_path TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (user_id, config_type)
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO secure_configs (
+                id, user_id, config_type, payload_enc, source_path, created_at, updated_at
+            )
+            SELECT id, user_id, config_type, payload_enc, source_path, created_at, updated_at
+            FROM secure_configs_before_backup
+            """
+        )
+        conn.execute("DROP TABLE secure_configs_before_backup")
     conn.execute(
         """
         CREATE UNIQUE INDEX IF NOT EXISTS idx_secure_configs_user_type

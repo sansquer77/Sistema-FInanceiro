@@ -2,8 +2,8 @@
 tipo: spec
 area: usuario
 status: implementado
-versao: 0.10
-atualizado: 2026-08-30
+versao: 0.11
+atualizado: 2026-09-05
 relacionados:
   - "[[investimentos-portfolio]]"
   - "[[tendencias-saude-financeira]]"
@@ -15,10 +15,10 @@ tags: [spec, "area/usuario", "status/implementado"]
 aliases: ["Preferências", "Abas de Preferências", "Mais Retorno"]
 ---
 
-# Preferências — abas Geral, APIs e Perigo
+# Preferências — abas Geral, APIs, Backup e Perigo
 
 > [!info] Status
-> **implementado** · área: `usuario` · atualizado em 2026-08-09 · relacionados: [[investimentos-portfolio]], [[tendencias-saude-financeira]], [[recuperacao-senha]]
+> **implementado** · versão: `0.11` · área: `usuario` · atualizado em 2026-09-05 · relacionados: [[investimentos-portfolio]], [[tendencias-saude-financeira]], [[recuperacao-senha]], [[backup-restauracao]]
 
 ## Problema
 
@@ -30,18 +30,20 @@ Qualquer usuário autenticado que precise configurar perfil, integrações opcio
 
 ## Jornada
 
-1. O usuário abre **Usuário > Preferências** e encontra três abas: **Geral**, **APIs** e **Perigo**.
+1. O usuário abre **Usuário > Preferências** e encontra quatro abas: **Geral**, **APIs**, **Backup** e **Perigo**.
 2. Na aba **Geral**, ajusta aparência, email, senha e recuperação por email (configurações rotineiras).
 3. Na aba **APIs**, liga/desliga e configura integrações opcionais: a **Configuração de IA** (reescrita de resumo de Tendências e Consultor) e a **Mais Retorno** (cotas de fundos do Portfólio).
-4. Na aba **Perigo**, encontra as ações destrutivas **Apagar lançamentos** e **Apagar conta**, que continuam exigindo confirmação explícita e senha atual.
-5. No Portfólio, com a integração Mais Retorno ativada, posições de fundos com CNPJ passam a exibir o valor atual pela última cota disponível.
+4. Na aba **Backup**, o responsável pela instalação configura, executa e restaura o pacote completo; as demais contas visualizam o estado sem permissão de alteração.
+5. Na aba **Perigo**, encontra as ações destrutivas **Apagar lançamentos** e **Apagar conta**, que continuam exigindo confirmação explícita e senha atual.
+6. No Portfólio, com a integração Mais Retorno ativada, posições de fundos com CNPJ passam a exibir o valor atual pela última cota disponível.
 
 ## Regras
 
 **Abas:**
-- Preferências tem exatamente três abas: `Geral`, `APIs` e `Perigo`. A troca de aba mostra/oculta os painéis sem recarregar a página e sem estado persistente entre sessões (a primeira aba aberta é sempre `Geral`).
+- Preferências tem exatamente quatro abas: `Geral`, `APIs`, `Backup` e `Perigo`. A troca de aba mostra/oculta os painéis sem recarregar a página e sem estado persistente entre sessões (a primeira aba aberta é sempre `Geral`).
 - A aba **Geral** contém: Aparência (tema), Alterar email, Alterar senha e Recuperação por email.
 - A aba **APIs** contém: Configuração de IA (provedor, modelo, chave, ativação — reutilizada por Tendências e Consultor) e Configuração Mais Retorno.
+- A aba **Backup** contém a política global, execução imediata, estado da última tentativa e restauração em duas fases definidos em [[backup-restauracao]].
 - A aba **Perigo** contém apenas as ações destrutivas: Apagar lançamentos e Apagar conta, com os mesmos formulários, confirmações e rotas atuais — nada é removido nem enfraquecido.
 
 **Mais Retorno (configuração):**
@@ -65,13 +67,13 @@ Qualquer usuário autenticado que precise configurar perfil, integrações opcio
 
 - `GET /api/mais-retorno-config` — status da configuração (`configured`, `enabled`, `has_api_key`), sem segredos.
 - `PUT /api/mais-retorno-config` — salva `enabled` e `api_key`; valida origem (Host/Origin) como toda mutação.
-- Tabela `secure_configs`: guarda envelopes criptografados por usuário (`config_type = email | ai | mais_retorno`) em `payload_enc`; `source_path` registra a origem quando o payload veio de arquivo legado.
+- Tabela `secure_configs`: guarda envelopes criptografados por usuário (`config_type = email | ai | mais_retorno | backup_password`) em `payload_enc`; `source_path` registra a origem quando o payload veio de arquivo legado. A senha de backup só existe quando o gestor operacional opta explicitamente por lembrá-la.
 - Arquivos legados compatíveis: `data/email_config_user_{id}.enc`, `data/ai_config_user_{id}.enc`, `data/mais_retorno_config_user_{id}.enc` e `data/email_config.key`.
 - Arquivo novo de chave mestra padrão: `secure/config.key`, fora de `data/`; servidores podem sobrepor com `SISTEMA_FINANCEIRO_CONFIG_KEY_PATH`.
 
 ## Critérios de aceite
 
-1. Dado um usuário autenticado, quando abre **Usuário > Preferências**, então visualiza as abas **Geral**, **APIs** e **Perigo**, com a aba **Geral** ativa por padrão e seus painéis visíveis.
+1. Dado um usuário autenticado, quando abre **Usuário > Preferências**, então visualiza as abas **Geral**, **APIs**, **Backup** e **Perigo**, com a aba **Geral** ativa por padrão e seus painéis visíveis.
 2. Dado o usuário na aba **Geral**, quando clica em **APIs** ou **Perigo**, então apenas o painel correspondente fica visível e a aba ativa muda de destaque, sem recarregar a página.
 3. Dado o usuário na aba **Geral**, quando abre Preferências, então encontra Aparência, Alterar email, Alterar senha e Recuperação por email.
 4. Dado o usuário na aba **APIs**, quando abre Preferências, então encontra a Configuração de IA e a Configuração Mais Retorno.
@@ -106,6 +108,7 @@ Qualquer usuário autenticado que precise configurar perfil, integrações opcio
 
 ## Changelog
 
+- `0.11` — 2026-09-05 — Adicionada a aba Backup com política global da instalação, execução imediata, estado e restauração validada em duas fases; controles ficam somente leitura para contas que não sejam a responsável operacional.
 - `0.10` — 2026-08-30 — Cinco consultas de configuração passam a compartilhar ciclo de carga, snapshot de 30 segundos, invalidação após gravações e reset de sessão.
 - `0.9` — 2026-08-30 — Iniciada coordenação dos cinco carregamentos de configuração com cache curto, invalidação e deduplicação em andamento.
 - `0.8` — 2026-08-09 — Segredos de SMTP, IA e Mais Retorno passam a ser persistidos como envelopes criptografados em `secure_configs`; arquivos `.enc` e `data/email_config.key` continuam compatíveis e são copiados/migrados no primeiro uso.

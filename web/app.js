@@ -346,6 +346,23 @@ const maisRetornoConfigForm = document.querySelector("#maisRetornoConfigForm");
 const maisRetornoEnabled = document.querySelector("#maisRetornoEnabled");
 const maisRetornoApiKey = document.querySelector("#maisRetornoApiKey");
 const maisRetornoConfigMessage = document.querySelector("#maisRetornoConfigMessage");
+const backupSettingsForm = document.querySelector("#backupSettingsForm");
+const backupDirectory = document.querySelector("#backupDirectory");
+const backupFrequency = document.querySelector("#backupFrequency");
+const backupRetention = document.querySelector("#backupRetention");
+const backupRememberPassword = document.querySelector("#backupRememberPassword");
+const backupPassword = document.querySelector("#backupPassword");
+const backupPasswordConfirmation = document.querySelector("#backupPasswordConfirmation");
+const backupSettingsMessage = document.querySelector("#backupSettingsMessage");
+const backupLastStatus = document.querySelector("#backupLastStatus");
+const backupRunForm = document.querySelector("#backupRunForm");
+const backupRunPassword = document.querySelector("#backupRunPassword");
+const backupRunMessage = document.querySelector("#backupRunMessage");
+const backupRestoreForm = document.querySelector("#backupRestoreForm");
+const backupRestorePath = document.querySelector("#backupRestorePath");
+const backupRestorePassword = document.querySelector("#backupRestorePassword");
+const backupRestoreConfirmButton = document.querySelector("#backupRestoreConfirmButton");
+const backupRestoreMessage = document.querySelector("#backupRestoreMessage");
 const clearLaunchesMessage = document.querySelector("#clearLaunchesMessage");
 const deleteUserMessage = document.querySelector("#deleteUserMessage");
 const monthlyPlanningList = document.querySelector("#monthlyPlanningList");
@@ -1352,6 +1369,23 @@ const userAdminViewController = registerUserAdminView({
     maisRetornoEnabled,
     maisRetornoApiKey,
     maisRetornoConfigMessage,
+    backupSettingsForm,
+    backupDirectory,
+    backupFrequency,
+    backupRetention,
+    backupRememberPassword,
+    backupPassword,
+    backupPasswordConfirmation,
+    backupSettingsMessage,
+    backupLastStatus,
+    backupRunForm,
+    backupRunPassword,
+    backupRunMessage,
+    backupRestoreForm,
+    backupRestorePath,
+    backupRestorePassword,
+    backupRestoreConfirmButton,
+    backupRestoreMessage,
     emailMessage,
     passwordMessage,
     emailConfigMessage,

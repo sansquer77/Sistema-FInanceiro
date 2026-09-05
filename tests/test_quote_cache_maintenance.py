@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 import tempfile
 import unittest
-from contextlib import closing
+from contextlib import closing, contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
 from unittest import mock
@@ -27,10 +27,18 @@ class QuoteCacheMaintenanceTest(unittest.TestCase):
         database.DB_PATH = self.original_db_path
         self.tempdir.cleanup()
 
-    def _connection_factory(self, path: Path) -> sqlite3.Connection:
+    @contextmanager
+    def _connection_factory(self, path: Path):
         conn = sqlite3.connect(path)
         conn.row_factory = sqlite3.Row
-        return conn
+        try:
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
     def test_prunes_only_entries_older_than_stale_retention(self) -> None:
         self.insert_cache("bcb:old", self.now - timedelta(days=31), self.now - timedelta(days=40))

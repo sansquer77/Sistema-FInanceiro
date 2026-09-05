@@ -119,7 +119,7 @@ def migrate_if_supported(db_path: Path) -> None:
 
 def configure_database_file(db_path: Path) -> None:
     """Configure persistent SQLite file properties during startup only."""
-    # spec: migracao-dados/migracao-banco-v2 v1.6 — critérios 14 e 15
+    # spec: migracao-dados/migracao-banco-v2 v1.7 — critérios 14 e 15
     db_path.parent.mkdir(parents=True, exist_ok=True)
     with closing(sqlite3.connect(db_path, timeout=SQLITE_BUSY_TIMEOUT_MS / 1000)) as conn:
         conn.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS}")
@@ -131,7 +131,7 @@ def configure_database_file(db_path: Path) -> None:
 
 def optimize_database(db_path: Path) -> None:
     """Let SQLite refresh planner statistics under its built-in work limit."""
-    # spec: migracao-dados/migracao-banco-v2 v1.6 — critério 15
+    # spec: migracao-dados/migracao-banco-v2 v1.7 — critério 15
     with get_connection(db_path) as conn:
         conn.execute(f"PRAGMA optimize={SQLITE_OPTIMIZE_MASK}")
 

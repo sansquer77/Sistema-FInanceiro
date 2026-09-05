@@ -1689,6 +1689,7 @@
           <div class="user-pref-tabs" role="tablist" aria-label="Preferências">
             <button class="user-pref-tab active" type="button" role="tab" aria-selected="true" aria-controls="userGeneralPanel" data-user-tab="geral">Geral</button>
             <button class="user-pref-tab" type="button" role="tab" aria-selected="false" aria-controls="userApisPanel" data-user-tab="apis" tabindex="-1">APIs</button>
+            <button class="user-pref-tab" type="button" role="tab" aria-selected="false" aria-controls="userBackupPanel" data-user-tab="backup" tabindex="-1">Backup</button>
             <button class="user-pref-tab" type="button" role="tab" aria-selected="false" aria-controls="userDangerPanel" data-user-tab="perigo" tabindex="-1">Perigo</button>
           </div>
 
@@ -1941,6 +1942,77 @@
                   <button class="primary" type="submit">Salvar configuração</button>
                 </form>
                 <p class="message" id="maisRetornoConfigMessage" role="alert"></p>
+              </section>
+            </div>
+          </section>
+
+          <section class="user-pref-panel" id="userBackupPanel" role="tabpanel" hidden>
+            <div class="user-settings-grid backup-settings-grid">
+              <section class="panel backup-policy-panel">
+                <h2>Backup completo</h2>
+                <p class="form-help">Protege o banco de todos os usuários, configurações e chave mestra em um pacote <code>.sfbackup</code> autenticado. Somente o responsável pela instalação pode alterar esta política.</p>
+                <form id="backupSettingsForm" class="form">
+                  <label>Diretório de destino
+                    <input name="backup_directory" id="backupDirectory" type="text" placeholder="/caminho/absoluto/para/backups" autocomplete="off" required>
+                  </label>
+                  <div class="field-row">
+                    <label>Frequência
+                      <select name="schedule_frequency" id="backupFrequency">
+                        <option value="on_start">Em toda abertura</option>
+                        <option value="daily">Diária</option>
+                        <option value="weekly">Semanal</option>
+                        <option value="monthly">Mensal</option>
+                      </select>
+                    </label>
+                    <label>Pacotes mantidos
+                      <input name="retention_count" id="backupRetention" type="number" min="1" max="100" value="5" required>
+                    </label>
+                  </div>
+                  <label class="checkbox-field">
+                    <input name="remember_password" id="backupRememberPassword" type="checkbox" value="1">
+                    <span>Lembrar a senha criptografada para executar backups automáticos</span>
+                  </label>
+                  <div class="field-row">
+                    <label>Senha do pacote
+                      <input name="password" id="backupPassword" type="password" minlength="12" autocomplete="new-password" placeholder="Mínimo de 12 caracteres">
+                    </label>
+                    <label>Confirmar senha
+                      <input name="password_confirmation" id="backupPasswordConfirmation" type="password" minlength="12" autocomplete="new-password">
+                    </label>
+                  </div>
+                  <button class="primary" type="submit">Salvar política</button>
+                </form>
+                <p class="message" id="backupSettingsMessage" role="alert"></p>
+              </section>
+
+              <section class="panel">
+                <h2>Executar agora</h2>
+                <p class="form-help" id="backupLastStatus">Nenhum backup executado.</p>
+                <form id="backupRunForm" class="form">
+                  <label>Senha, se não estiver lembrada
+                    <input name="password" id="backupRunPassword" type="password" minlength="12" autocomplete="current-password">
+                  </label>
+                  <button class="primary" type="submit">Gerar backup agora</button>
+                </form>
+                <p class="message" id="backupRunMessage" role="alert"></p>
+              </section>
+
+              <section class="panel">
+                <h2>Restaurar pacote</h2>
+                <p class="form-help">A validação não altera o ambiente. A confirmação posterior cria antes um pacote de segurança do estado atual.</p>
+                <form id="backupRestoreForm" class="form">
+                  <label>Caminho do pacote
+                    <input name="package_path" id="backupRestorePath" type="text" placeholder="/caminho/backup.sfbackup" autocomplete="off" required>
+                  </label>
+                  <label>Senha do pacote
+                    <input name="password" id="backupRestorePassword" type="password" minlength="12" autocomplete="current-password" required>
+                  </label>
+                  <div class="form-actions">
+                    <button class="ghost" type="submit">Validar pacote</button>
+                    <button class="danger" id="backupRestoreConfirmButton" type="button" hidden>Confirmar restauração</button>
+                  </div>
+                </form>
+                <p class="message" id="backupRestoreMessage" role="alert"></p>
               </section>
             </div>
           </section>
