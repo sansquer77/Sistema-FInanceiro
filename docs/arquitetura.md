@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 4.5
+versao: 4.6
 atualizado: 2026-09-05
 relacionados:
   - "[[requisitos]]"
@@ -19,7 +19,7 @@ tags: [arquitetura, meta]
 # Arquitetura
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-09-04 · relacionados: [[requisitos]], [[qualidade-codigo]], [[specs/bank-logos]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]]
+> **implementado** · versão: `4.6` · área: `meta` · atualizado em 2026-09-05 · relacionados: [[requisitos]], [[qualidade-codigo]], [[specs/backup-restauracao]], [[adr/0018-backup-completo-criptografado]]
 
 ## Visão geral
 
@@ -303,6 +303,16 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `GET` | `/api/mais-retorno-config` |
 | `PUT` | `/api/mais-retorno-config` |
 
+#### Rotas — Backup e restauração → [[specs/backup-restauracao]]
+
+| Método | Rota | Responsabilidade |
+|---|---|---|
+| `GET` | `/api/backup/settings` | Política e último estado, sem senha. |
+| `PUT` | `/api/backup/settings` | Valida e salva política global e senha lembrada opcional. |
+| `POST` | `/api/backup/run` | Executa cópia online e gera pacote autenticado. |
+| `POST` | `/api/backup/validate` | Valida e prepara o pacote em área temporária, sem alterar o ambiente. |
+| `POST` | `/api/backup/restore` | Confirma o token efêmero, cria salvaguarda e promove o ambiente restaurado. |
+
 #### Rotas — Score de Saúde Financeira → [[score-saude-financeira]]
 
 | Método | Rota |
@@ -384,6 +394,9 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | `operation_logs.py` | Auditoria funcional das operações do usuário. Ver [[historico-operacoes]]. |
 | `emailer.py` | Envio SMTP do código de recuperação de senha. Ver [[recuperacao-senha]]. |
 | `secure_config.py` | Armazenamento criptografado da configuração SMTP local, segredos de IA e chaves de integrações por usuário em `secure_configs`, com compatibilidade para arquivos `.enc` legados. Ver [[recuperacao-senha]], [[tendencias-saude-financeira]], [[specs/preferencias-abas]]. |
+| `backup_settings.py` | Política única da instalação, autorização do usuário ativo mais antigo, validação de diretório/retenção, vencimento e senha lembrada em `secure_configs`. Ver [[specs/backup-restauracao]]. |
+| `backup_service.py` | Cópia SQLite online, manifesto/hashes, envelope AES-256-GCM incremental, retenção autenticada, validação temporária e promoção restaurável. |
+| `backup_coordination.py` | Gate leitor/escritor do processo HTTP: preserva requisições concorrentes no uso normal e concede acesso exclusivo à promoção de uma restauração. |
 | `version_check.py` | Consulta a landing page oficial por nova versão, compara com a versão local e mantém cache de 1h. Ver [[alerta-nova-versao]]. |
 | `outbound_json.py` | Fronteira compartilhada para leitura limitada de JSON externo; valida tamanho declarado e efetivo antes de decodificar, com limites por integração. Ver [[specs/seguranca-transporte-externo]]. |
 | `calendar.py` | Cálculo offline da aba **Calendário** do Cockpit: contas a receber/pagar atrasadas e vencimentos de renda fixa em 30 e 60 dias, sem montar ou valorar a carteira. Ver [[specs/cockpit-calendario]]. |
@@ -402,7 +415,7 @@ O arquivo SQLite recebe `journal_mode=WAL` uma vez no ciclo de inicialização; 
 
 ### Baseline e migração para a linha v2
 
-O baseline inicial da v2 usa `PRAGMA user_version = 20000`; a evolução operacional do SQLite inaugura a versão incremental `20001`. A tabela `schema_migrations` registra baseline e passos posteriores, enquanto `user_version` seleciona e ordena as migrações. Banco ausente é criado diretamente na versão atual; banco `20000` avança transacionalmente para `20001`; versões futuras ou intermediárias desconhecidas são recusadas. Um `finance.db` com `user_version = 0` continua tratado como legado: na abertura, `financeiro/database_migrations.py` orquestra a cópia de trabalho, as compatibilizações históricas via `financeiro/database_compatibility.py::normalize_legacy_schema`, o candidato compacto por `VACUUM INTO`, as validações de integridade/chaves estrangeiras/versão/contagens e a promoção recuperável. O original passa a `data/finance-v1.bkp`, que nunca é sobrescrito, enquanto o candidato mantém o nome ativo `data/finance.db`. Falhas anteriores à promoção preservam o nome original; falha na segunda renomeação tenta restaurá-lo. Ver [[specs/migracao-banco-v2]] e [[adr/0012-fundacao-v2-contrato-e-migracao-de-dados]].
+O baseline inicial da v2 usa `PRAGMA user_version = 20000`; o endurecimento operacional do SQLite inaugura a versão incremental `20001`, e a política global de backup leva o schema atual a `20002`. A tabela `schema_migrations` registra baseline e passos posteriores, enquanto `user_version` seleciona e ordena as migrações. Banco ausente é criado diretamente na versão atual; bancos entre `20000` e `20001` avançam transacionalmente em ordem até `20002`; versões futuras ou intermediárias desconhecidas são recusadas. Um `finance.db` com `user_version = 0` continua tratado como legado: na abertura, `financeiro/database_migrations.py` orquestra a cópia de trabalho, as compatibilizações históricas via `financeiro/database_compatibility.py::normalize_legacy_schema`, o candidato compacto por `VACUUM INTO`, as validações de integridade/chaves estrangeiras/versão/contagens e a promoção recuperável. O original passa a `data/finance-v1.bkp`, que nunca é sobrescrito, enquanto o candidato mantém o nome ativo `data/finance.db`. Falhas anteriores à promoção preservam o nome original; falha na segunda renomeação tenta restaurá-lo. Ver [[specs/migracao-banco-v2]] e [[adr/0012-fundacao-v2-contrato-e-migracao-de-dados]].
 
 ### Tabelas
 
@@ -434,7 +447,8 @@ O baseline inicial da v2 usa `PRAGMA user_version = 20000`; a evolução operaci
 | `market_holidays` | `market_calendar.py` — calendário nacional ANBIMA atual, sem histórico de versões. Ver [[investimentos-portfolio]], [[adr/0016-calendario-mercado-anbima]]. |
 | `market_calendar_state` | `market_calendar.py` — controle da fonte, última tentativa/importação, ano verificado, hash e quantidade de feriados. |
 | `user_ai_settings` | `secure_config.py` — metadados não secretos de configuração opcional de IA por usuário; segredo fica em `secure_configs`. Ver [[tendencias-saude-financeira]]. |
-| `secure_configs` | `secure_config.py` — envelopes criptografados por usuário para SMTP, IA e Mais Retorno; `source_path` indica arquivo legado migrado quando aplicável. Ver [[specs/preferencias-abas]], [[adr/0010-segredos-criptografados-sqlite]]. |
+| `secure_configs` | `secure_config.py` — envelopes criptografados por usuário para SMTP, IA, Mais Retorno e senha lembrada do backup; `source_path` indica arquivo legado migrado quando aplicável. Ver [[specs/preferencias-abas]], [[adr/0010-segredos-criptografados-sqlite]]. |
+| `backup_settings` | `backup_settings.py` — política única da instalação, usuário responsável, frequência, retenção e estado da última execução; nunca contém senha em claro. |
 | `consultor_settings` | `database.py` — configuração do Consultor por usuário (`consultor_enabled`, `investor_profile`, `data_access_consent`). Ver [[specs/consultor]]. |
 | `consultor_analyses` | `database.py` — histórico de execuções bem-sucedidas do Consultor, indexado por usuário, data e `analysis_id` para leitura e quota diária. Ver [[specs/consultor]]. |
 | `consultor_perfil_complementar` | `database.py` — payload criptografado do Perfil Complementar por usuário (`payload_enc`, `schema_version`). Ver [[specs/consultor]]. |
@@ -445,6 +459,8 @@ O baseline inicial da v2 usa `PRAGMA user_version = 20000`; a evolução operaci
 `user_ai_settings` armazena somente provedor, endpoint/base URL, modelo, estado ligado/desligado, autenticação e parâmetros operacionais. Chaves de API de IA, senha SMTP e chaves de integrações opcionais são salvas em `secure_configs.payload_enc` como envelopes criptografados por usuário; APIs nunca devem retornar o segredo. Instalações antigas com `data/*_config_user_{id}.enc` continuam legíveis: o payload criptografado é copiado para `secure_configs` no primeiro uso, sem exigir que o usuário recadastre a chave.
 
 A chave mestra padrão de `secure_config.py` fica fora de `data/`, em `secure/config.key` ao lado da pasta de dados; `data/email_config.key` continua aceito e é copiado para o novo caminho no primeiro uso. Operações de servidor podem fixar o caminho com `SISTEMA_FINANCEIRO_CONFIG_KEY_PATH` ou fornecer o material diretamente por `SISTEMA_FINANCEIRO_CONFIG_KEY`.
+
+Após inicializar e migrar o banco, o processo verifica a política global de backup antes de abrir o servidor HTTP. Se ela estiver vencida e possuir senha lembrada, executa uma única cópia online consistente que inclui todos os usuários do SQLite. Travas em memória impedem criações/restaurações simultâneas no processo; o WAL mantém leituras disponíveis durante a cópia. A restauração exige validação autenticada, token efêmero vinculado ao responsável e nova confirmação com senha; a promoção só ocorre após criar um `.sfbackup` de segurança do estado ativo.
 
 ### Índices principais
 
@@ -618,6 +634,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `4.6` — 2026-09-05 — Documentada a arquitetura do backup completo da instalação: schema `20002`, política global multiusuário, cinco rotas, AES-256-GCM incremental, execução na abertura, retenção autenticada e restauração com salvaguarda e acesso exclusivo durante a promoção.
 - `4.5` — 2026-09-05 — Persistência passa a usar `synchronous=FULL`, WAL configurado somente na inicialização, estatísticas via `PRAGMA optimize` e migração incremental rastreável `20000` → `20001` em `schema_migrations`.
 - `4.4` — 2026-09-04 — Inicialização reconcilia o baseline aditivo idempotente também em bancos já marcados como v2, antes de atender requisições.
 - `4.3` — 2026-09-04 — Registrada `investment_monthly_snapshots` e seus índices para a futura rentabilidade baseada em snapshots por ativo, conforme ADR-0017.

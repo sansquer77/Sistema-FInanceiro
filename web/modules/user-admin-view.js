@@ -18,6 +18,8 @@ export function registerUserAdminView(context) {
   let emailConfigPresets = [];
   let aiConfigPresets = [];
   let consultorSettings = null;
+  let backupRestoreToken = "";
+  let backupRestorePasswordInMemory = "";
   const preferencesLoadPolicy = createLoadPolicy();
 
   function loadPreferences({ force = false } = {}) {
@@ -27,6 +29,7 @@ export function registerUserAdminView(context) {
       loadConsultorConfigStatus(),
       loadConsultorProfile(),
       loadMaisRetornoConfigStatus(),
+      loadBackupSettings(),
     ]), { force });
   }
 
@@ -552,6 +555,148 @@ export function registerUserAdminView(context) {
     }
   }
 
+  async function loadBackupSettings() {
+    if (!elements.backupSettingsForm) return;
+    try {
+      const status = await api("/api/backup/settings");
+      elements.backupDirectory.value = status.backup_directory || "";
+      elements.backupFrequency.value = status.schedule_frequency || "weekly";
+      elements.backupRetention.value = String(status.retention_count || 5);
+      elements.backupRememberPassword.checked = status.remember_password === true;
+      elements.backupPassword.value = "";
+      elements.backupPasswordConfirmation.value = "";
+      setBackupControlsEnabled(status.can_manage === true);
+      renderBackupStatus(status);
+      setMessage(
+        elements.backupSettingsMessage,
+        status.can_manage
+          ? (status.configured ? "Política de backup configurada para esta instalação." : "Configure o primeiro backup completo.")
+          : "Somente o responsável pela instalação pode alterar ou restaurar backups.",
+        status.configured ? "success" : "",
+      );
+    } catch (error) {
+      setMessage(elements.backupSettingsMessage, error.message, "error");
+    }
+  }
+
+  function setBackupControlsEnabled(enabled) {
+    [elements.backupSettingsForm, elements.backupRunForm, elements.backupRestoreForm].forEach((form) => {
+      form?.querySelectorAll("input, select, button").forEach((control) => {
+        control.disabled = !enabled;
+      });
+    });
+  }
+
+  function renderBackupStatus(status) {
+    if (!elements.backupLastStatus) return;
+    if (status.last_backup_status === "success" && status.last_backup_at) {
+      const when = new Date(`${String(status.last_backup_at).replace(" ", "T")}Z`);
+      const label = Number.isNaN(when.getTime()) ? status.last_backup_at : when.toLocaleString("pt-BR");
+      elements.backupLastStatus.textContent = `Último backup concluído em ${label}: ${status.last_package_filename}.`;
+    } else if (status.last_backup_status === "failed") {
+      elements.backupLastStatus.textContent = `A última tentativa falhou. ${status.last_error || "Tente novamente."}`;
+    } else {
+      elements.backupLastStatus.textContent = "Nenhum backup executado.";
+    }
+  }
+
+  async function handleBackupSettingsSubmit(event) {
+    event.preventDefault();
+    setMessage(elements.backupSettingsMessage, "");
+    try {
+      const status = await api("/api/backup/settings", {
+        method: "PUT",
+        body: {
+          backup_directory: elements.backupDirectory.value,
+          schedule_frequency: elements.backupFrequency.value,
+          retention_count: Number(elements.backupRetention.value),
+          remember_password: elements.backupRememberPassword.checked,
+          password: elements.backupPassword.value,
+          password_confirmation: elements.backupPasswordConfirmation.value,
+        },
+      });
+      renderBackupStatus(status);
+      elements.backupPassword.value = "";
+      elements.backupPasswordConfirmation.value = "";
+      setMessage(elements.backupSettingsMessage, "Política de backup salva.", "success");
+    } catch (error) {
+      setMessage(elements.backupSettingsMessage, error.message, "error");
+    }
+  }
+
+  async function handleBackupRunSubmit(event) {
+    event.preventDefault();
+    setMessage(elements.backupRunMessage, "Gerando e validando o pacote…");
+    try {
+      const result = await api("/api/backup/run", {
+        method: "POST", body: { password: elements.backupRunPassword.value },
+      });
+      elements.backupRunPassword.value = "";
+      setMessage(elements.backupRunMessage, `Backup concluído: ${result.package_filename}.`, "success");
+      await loadBackupSettings();
+    } catch (error) {
+      setMessage(elements.backupRunMessage, error.message, "error");
+    }
+  }
+
+  async function handleBackupRestoreValidate(event) {
+    event.preventDefault();
+    backupRestoreToken = "";
+    backupRestorePasswordInMemory = "";
+    elements.backupRestoreConfirmButton.hidden = true;
+    setMessage(elements.backupRestoreMessage, "Validando pacote sem alterar o ambiente…");
+    try {
+      const password = elements.backupRestorePassword.value;
+      const result = await api("/api/backup/validate", {
+        method: "POST",
+        body: { package_path: elements.backupRestorePath.value, password },
+      });
+      backupRestoreToken = result.confirmation_token;
+      backupRestorePasswordInMemory = password;
+      elements.backupRestoreConfirmButton.hidden = false;
+      setMessage(
+        elements.backupRestoreMessage,
+        `Pacote válido (${result.app_version}, schema ${result.schema_version}). Confirme para substituir o ambiente completo.`,
+        "success",
+      );
+    } catch (error) {
+      setMessage(elements.backupRestoreMessage, error.message, "error");
+    }
+  }
+
+  async function handleBackupRestoreConfirm() {
+    if (!backupRestoreToken || !backupRestorePasswordInMemory) return;
+    const choice = await decisionModal?.choose({
+      title: "Restaurar ambiente completo",
+      message: "Todos os usuários e dados atuais serão substituídos pelo pacote validado. Antes da troca, o app criará um backup de segurança recuperável. Deseja continuar?",
+      actions: [
+        { value: false, label: "Cancelar", variant: "ghost" },
+        { value: true, label: "Restaurar ambiente", variant: "danger" },
+      ],
+    });
+    if (choice !== true) return;
+    setMessage(elements.backupRestoreMessage, "Criando salvaguarda e restaurando…");
+    try {
+      const result = await api("/api/backup/restore", {
+        method: "POST",
+        body: { confirmation_token: backupRestoreToken, password: backupRestorePasswordInMemory },
+      });
+      backupRestoreToken = "";
+      backupRestorePasswordInMemory = "";
+      elements.backupRestorePassword.value = "";
+      elements.backupRestoreConfirmButton.hidden = true;
+      setMessage(
+        elements.backupRestoreMessage,
+        result.restart_required
+          ? "Restauração concluída. Reinicie o Sistema Financeiro antes de continuar usando o app."
+          : "Restauração concluída.",
+        "success",
+      );
+    } catch (error) {
+      setMessage(elements.backupRestoreMessage, error.message, "error");
+    }
+  }
+
   async function handleClearLaunchesSubmit(event) {
     event.preventDefault();
     setMessage(elements.clearLaunchesMessage, "");
@@ -636,6 +781,10 @@ export function registerUserAdminView(context) {
   if (elements.maisRetornoConfigForm) {
     elements.maisRetornoConfigForm.addEventListener("submit", handleMaisRetornoConfigSubmit);
   }
+  elements.backupSettingsForm?.addEventListener("submit", handleBackupSettingsSubmit);
+  elements.backupRunForm?.addEventListener("submit", handleBackupRunSubmit);
+  elements.backupRestoreForm?.addEventListener("submit", handleBackupRestoreValidate);
+  elements.backupRestoreConfirmButton?.addEventListener("click", handleBackupRestoreConfirm);
   elements.clearLaunchesForm.addEventListener("submit", handleClearLaunchesSubmit);
   elements.deleteUserForm.addEventListener("submit", handleDeleteUserSubmit);
 
@@ -648,6 +797,7 @@ export function registerUserAdminView(context) {
     loadConsultorConfigStatus,
     loadConsultorProfile,
     loadMaisRetornoConfigStatus,
+    loadBackupSettings,
     syncThemePreference,
     syncDensityPreference,
   };

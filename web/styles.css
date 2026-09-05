@@ -9071,3 +9071,10 @@ form[aria-busy="true"] .form-actions {
 .command-palette-trigger:hover,.command-palette-trigger:focus-visible { background:var(--surface-container-high); }
 .command-palette-trigger kbd { padding:2px 5px; border:1px solid var(--outline-variant); border-radius:5px; background:var(--surface-container-high); font-family:inherit; font-size:.75rem; }
 @media (max-width:640px) { .command-palette-dialog { width:calc(100vw - 16px); } .command-palette-trigger span { display:none; } }
+.backup-settings-grid {
+  align-items: start;
+}
+
+.backup-policy-panel {
+  grid-column: 1 / -1;
+}

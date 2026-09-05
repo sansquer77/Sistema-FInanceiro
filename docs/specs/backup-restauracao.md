@@ -1,8 +1,8 @@
 ---
 tipo: spec
 area: backup-restauracao
-status: rascunho
-versao: 0.1
+status: em-revisao
+versao: 1.0
 atualizado: 2026-09-05
 relacionados:
   - "[[migracao-banco-v2]]"
@@ -11,14 +11,14 @@ relacionados:
   - "[[../adr/0010-segredos-criptografados-sqlite]]"
   - "[[../adr/0018-backup-completo-criptografado]]"
   - "[[../arquitetura]]"
-tags: [spec, "area/backup-restauracao", "status/rascunho"]
+tags: [spec, "area/backup-restauracao", "status/em-revisao"]
 aliases: ["Backup e Restauração"]
 ---
 
 # Backup e Restauração
 
 > [!info] Status
-> **rascunho** · área: `backup-restauracao` · atualizado em 2026-09-05 · relacionados: [[migracao-banco-v2]], [[privacidade-valores]], [[../adr/0018-backup-completo-criptografado]]
+> **em revisão** · versão: `1.0` · área: `backup-restauracao` · atualizado em 2026-09-05 · relacionados: [[migracao-banco-v2]], [[privacidade-valores]], [[../adr/0018-backup-completo-criptografado]]
 
 ## Problema
 
@@ -66,6 +66,10 @@ Usuário local que quer proteger seus dados contra falha do disco, perda do comp
 - O backup automático ocorre na abertura quando estiver vencido. Agendamento com o app fechado depende de integração posterior com o agendador do sistema operacional.
 - A retenção remove apenas pacotes válidos excedentes, nunca o último pacote válido nem arquivos que não tenham sido confirmados como backups do app.
 - O destino não pode apontar para `data/`, `secure/`, o diretório temporário de restauração ou uma subpasta do próprio pacote em criação.
+- A política protege a instalação SQLite inteira, inclusive em servidor caseiro com poucos usuários concorrentes; ela nunca filtra o pacote pelo usuário autenticado.
+- Somente o usuário ativo mais antigo pode configurar, executar manualmente ou restaurar backups. As demais contas consultam o estado sem obter o segredo e sem poder alterar o ambiente compartilhado.
+- Duas criações ou restaurações não podem executar simultaneamente no mesmo processo.
+- A promoção de uma restauração obtém acesso exclusivo à instalação: aguarda requisições já iniciadas e impede novas leituras ou escritas até concluir ou reverter, sem serializar o uso normal fora dessa janela.
 
 ## Segurança
 
@@ -77,7 +81,13 @@ Usuário local que quer proteger seus dados contra falha do disco, perda do comp
 
 ## API e dados
 
-Rotas e tabelas ainda não estão definidas enquanto a spec permanecer em rascunho. A implementação deverá reutilizar `secure_configs` e o mecanismo de conexão do SQLite, sem transformar o pacote em fonte de verdade concorrente.
+- `backup_settings`: registro único por instalação com diretório, frequência, retenção, opção de lembrar senha, usuário configurador e estado da última execução.
+- `secure_configs`: aceita `config_type = backup_password`; contém a senha somente quando a opção de lembrá-la estiver ativa.
+- `GET /api/backup/settings`: retorna política e estado, nunca a senha.
+- `PUT /api/backup/settings`: valida e salva política, senha e confirmação.
+- `POST /api/backup/run`: gera um pacote imediato; aceita senha em memória quando ela não estiver lembrada.
+- `POST /api/backup/validate`: valida pacote e senha em área temporária, sem alterar arquivos ativos, e devolve um token efêmero de confirmação.
+- `POST /api/backup/restore`: consome o token efêmero e confirma a promoção; a resposta orienta reiniciar o app.
 
 ## Critérios de aceite
 
@@ -93,17 +103,19 @@ Rotas e tabelas ainda não estão definidas enquanto a spec permanecer em rascun
 - Dado que a senha foi alterada, quando um novo backup é gerado, então os pacotes futuros usam a nova senha e os anteriores permanecem inalterados.
 - Dado um pacote inválido entre versões retidas, quando a retenção é executada, então o app não remove o último pacote válido por engano.
 - Dado um destino igual ao diretório ativo ou temporário, quando o usuário tenta salvá-lo, então a configuração é rejeitada.
+- Dada uma instalação com múltiplos usuários, quando o backup é gerado, então todos integram a mesma cópia SQLite consistente e apenas o responsável da instalação pode administrar ou restaurar o pacote.
+- Dada uma instalação compartilhada em uso, quando uma restauração é confirmada, então requisições em andamento terminam antes da promoção e novas requisições aguardam o término da restauração.
 
 ## Pendências
 
 > [!question] Pendências
 
-- [ ] Confirmar se a senha será lembrada criptografada para backups automáticos ou exigida a cada execução.
-- [ ] Definir a biblioteca e o formato exato do payload criptografado nos runtimes macOS, Windows e Linux.
-- [ ] Definir política de senha mínima e mensagens para senha esquecida.
-- [ ] Definir se o diretório será escolhido nativamente em cada plataforma ou informado como caminho validado.
+- [x] Confirmar se a senha será lembrada criptografada para backups automáticos ou exigida a cada execução: ambas as opções são suportadas; automação exige lembrança explícita.
+- [x] Definir a biblioteca e o formato exato do payload criptografado nos runtimes macOS, Windows e Linux: `cryptography`, AES-256-GCM incremental e scrypt, conforme ADR-0018.
+- [x] Definir política de senha mínima e mensagens para senha esquecida: mínimo de 12 caracteres e nenhuma recuperação.
+- [x] Definir se o diretório será escolhido nativamente em cada plataforma ou informado como caminho validado: caminho absoluto validado nesta versão.
 - [ ] Definir agendamento posterior com o sistema operacional quando o app estiver fechado.
-- [ ] Definir o contrato de restauração entre versões incompatíveis do schema.
+- [x] Definir o contrato de restauração entre versões incompatíveis do schema: a versão inicial aceita somente o schema corrente.
 
 ## Fora de escopo
 
@@ -114,15 +126,17 @@ Rotas e tabelas ainda não estão definidas enquanto a spec permanecer em rascun
 
 ## Plano de implementação
 
-- [ ] Passo 1 — Fechar formato, criptografia, senha e compatibilidade no ADR-0018. Fecha: critérios 1, 3, 4, 5, 6 e 10.
-- [ ] Passo 2 — Criar configuração idempotente em Preferências e validação de diretório/retenção. Fecha: critérios 9 e 12.
-- [ ] Passo 3 — Implementar cópia online, manifesto, hashes, pacote temporário e promoção atômica. Fecha: critérios 1, 2 e 3.
-- [ ] Passo 4 — Implementar restauração temporária, validação e salvaguarda do ambiente ativo. Fecha: critérios 5, 6, 7 e 8.
-- [ ] Passo 5 — Implementar execução recorrente na abertura e retenção segura. Fecha: critérios 9 e 11.
-- [ ] Passo 6 — Testar round-trip, adulteração, senha incorreta, falhas de disco e compatibilidade nos pacotes distribuídos.
+- [x] Passo 1 — Fechar formato, criptografia, senha e compatibilidade no ADR-0018. Fecha: critérios 1, 3, 4, 5, 6 e 10.
+- [x] Passo 2 — Criar configuração idempotente em Preferências e validação de diretório/retenção. Fecha: critérios 9 e 12.
+- [x] Passo 3 — Implementar cópia online, manifesto, hashes, pacote temporário e promoção atômica. Fecha: critérios 1, 2 e 3.
+- [x] Passo 4 — Implementar restauração temporária, validação e salvaguarda do ambiente ativo. Fecha: critérios 5, 6, 7 e 8.
+- [x] Passo 5 — Implementar execução recorrente na abertura e retenção segura. Fecha: critérios 9 e 11.
+- [x] Passo 6 — Testar round-trip, adulteração, senha incorreta, falhas de disco e compatibilidade nos pacotes distribuídos. Round-trip e falhas estão automatizados; os workflows instalam `cryptography` nos três sistemas e o smoke test final ocorre na geração dos artefatos da release.
 
 ## Changelog
 
+- `1.0` — 2026-09-05 — Implementação concluída e em revisão de distribuição: política global segura para ambiente multiusuário, backup online autenticado, restauração em duas fases com acesso exclusivo na promoção, salvaguarda, agendamento na abertura, retenção validada, interface e testes de falha/round-trip.
+- `0.2` — 2026-09-05 — Iniciada a implementação; fechados formato, criptografia, senha, persistência, rotas, seleção por caminho absoluto e compatibilidade de schema.
 - `0.1` — 2026-09-05 — Rascunho inicial do módulo completo de Backup e Restauração, com pacote ZIP criptografado, senha configurável em Preferências, validação, retenção e execução recorrente na abertura.
 
 ## Relacionados

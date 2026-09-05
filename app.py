@@ -46,6 +46,22 @@ from financeiro.auth import (
     update_user_password,
 )
 from financeiro.balance_projections import build_balance_projection, build_currency_totals_for_user
+from financeiro.backup_service import run_scheduled_backup_if_due
+from financeiro.backup_coordination import INSTALLATION_ACCESS_GATE
+from financeiro.backup_service import (
+    BackupError,
+    create_backup,
+    restore_validated_package,
+    validate_restore_package,
+)
+from financeiro.backup_settings import (
+    BackupSettingsError,
+    get_backup_settings,
+    load_remembered_password,
+    require_backup_manager,
+    save_backup_settings,
+    user_can_manage_backups,
+)
 from financeiro.calendar import get_cockpit_calendar
 from financeiro.categories import (
     create_category,
@@ -259,37 +275,46 @@ class AppHandler(BaseHTTPRequestHandler):
     server_version = f"{APP_NAME.replace(' ', '')}/{APP_VERSION}"
 
     def do_GET(self) -> None:
-        path = self.route_path()
-        if path == "/api/simulations/butterfly-effect":
-            self.send_json({"error": "Metodo nao permitido."}, HTTPStatus.METHOD_NOT_ALLOWED)
-            return
-        if dispatch_route(self, "GET", path):
-            return
-        self.serve_static()
+        with INSTALLATION_ACCESS_GATE.shared():
+            path = self.route_path()
+            if path == "/api/simulations/butterfly-effect":
+                self.send_json({"error": "Metodo nao permitido."}, HTTPStatus.METHOD_NOT_ALLOWED)
+                return
+            if dispatch_route(self, "GET", path):
+                return
+            self.serve_static()
 
     def do_POST(self) -> None:
-        if not self.validate_mutation_source():
-            return
         path = self.route_path()
-        if dispatch_route(self, "POST", path):
-            return
-        self.send_json({"error": "Rota nao encontrada."}, HTTPStatus.NOT_FOUND)
+        access = (
+            INSTALLATION_ACCESS_GATE.exclusive()
+            if path == "/api/backup/restore"
+            else INSTALLATION_ACCESS_GATE.shared()
+        )
+        with access:
+            if not self.validate_mutation_source():
+                return
+            if dispatch_route(self, "POST", path):
+                return
+            self.send_json({"error": "Rota nao encontrada."}, HTTPStatus.NOT_FOUND)
 
     def do_PUT(self) -> None:
-        if not self.validate_mutation_source():
-            return
-        path = self.route_path()
-        if dispatch_route(self, "PUT", path):
-            return
-        self.send_json({"error": "Rota nao encontrada."}, HTTPStatus.NOT_FOUND)
+        with INSTALLATION_ACCESS_GATE.shared():
+            if not self.validate_mutation_source():
+                return
+            path = self.route_path()
+            if dispatch_route(self, "PUT", path):
+                return
+            self.send_json({"error": "Rota nao encontrada."}, HTTPStatus.NOT_FOUND)
 
     def do_DELETE(self) -> None:
-        if not self.validate_mutation_source():
-            return
-        path = self.route_path()
-        if dispatch_route(self, "DELETE", path):
-            return
-        self.send_json({"error": "Rota nao encontrada."}, HTTPStatus.NOT_FOUND)
+        with INSTALLATION_ACCESS_GATE.shared():
+            if not self.validate_mutation_source():
+                return
+            path = self.route_path()
+            if dispatch_route(self, "DELETE", path):
+                return
+            self.send_json({"error": "Rota nao encontrada."}, HTTPStatus.NOT_FOUND)
 
     def route_path(self) -> str:
         path = urlsplit(self.path).path
@@ -620,6 +645,64 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_json(save_mais_retorno_settings(user["id"], data))
         except SecureConfigError as exc:
             self.send_json({"error": str(exc) or "Configuracao da Mais Retorno invalida."}, HTTPStatus.BAD_REQUEST)
+
+    def handle_backup_settings(self) -> None:
+        if not self.validate_read_source():
+            return
+        user = self.require_user()
+        self.send_json({**get_backup_settings(), "can_manage": user_can_manage_backups(user["id"])})
+
+    def handle_save_backup_settings(self) -> None:
+        user = self.require_user()
+        try:
+            result = save_backup_settings(user["id"], self.read_json())
+            self.record_operation(
+                user["id"], "backup", "update", "backup_policy",
+                "Politica de backup da instalacao atualizada.",
+            )
+            self.send_json({**result, "can_manage": True})
+        except BackupSettingsError as exc:
+            status = HTTPStatus.FORBIDDEN if not user_can_manage_backups(user["id"]) else HTTPStatus.BAD_REQUEST
+            self.send_json({"error": str(exc)}, status)
+
+    def handle_run_backup(self) -> None:
+        user = self.require_user()
+        try:
+            require_backup_manager(user["id"])
+            data = self.read_json()
+            password = str(data.get("password") or "") or load_remembered_password()
+            result = create_backup(password)
+            self.record_operation(
+                user["id"], "backup", "create", "backup_package",
+                f"Backup completo gerado: {result['package_filename']}.",
+            )
+            self.send_json(result)
+        except BackupSettingsError as exc:
+            self.send_json({"error": str(exc)}, HTTPStatus.FORBIDDEN)
+        except BackupError as exc:
+            self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+
+    def handle_validate_backup_restore(self) -> None:
+        user = self.require_user()
+        data = self.read_json()
+        try:
+            self.send_json(validate_restore_package(user["id"], data.get("package_path"), str(data.get("password") or "")))
+        except BackupSettingsError as exc:
+            self.send_json({"error": str(exc)}, HTTPStatus.FORBIDDEN)
+        except BackupError as exc:
+            self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+
+    def handle_restore_backup(self) -> None:
+        user = self.require_user()
+        data = self.read_json()
+        try:
+            self.send_json(restore_validated_package(
+                user["id"], data.get("confirmation_token"), str(data.get("password") or "")
+            ))
+        except BackupSettingsError as exc:
+            self.send_json({"error": str(exc)}, HTTPStatus.FORBIDDEN)
+        except BackupError as exc:
+            self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
 
     def handle_ai_summary(self) -> None:
         # spec: tendencias-saude-financeira v2.22 — critérios 12, 13, 14, 16 e 17
@@ -1628,6 +1711,7 @@ def audit_value(value: object) -> str:
 
 def main() -> None:
     initialize_database()
+    run_scheduled_backup_if_due()
     refresh_anbima_calendar_if_due(DB_PATH, connection_factory=get_connection)
     server = ThreadingHTTPServer((HOST, PORT), AppHandler)
     print(f"Sistema Financeiro rodando em {PUBLIC_URL}")

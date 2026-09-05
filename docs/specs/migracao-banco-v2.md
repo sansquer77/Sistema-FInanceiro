@@ -2,7 +2,7 @@
 tipo: spec
 area: migracao-dados
 status: implementado
-versao: 1.6
+versao: 1.7
 atualizado: 2026-09-05
 relacionados:
   - "[[../arquitetura]]"
@@ -39,7 +39,7 @@ Usuário existente que atualiza o aplicativo para a linha v2 e usuário novo que
 
 - `data/finance.db`: banco ativo; mantém o nome esperado pelo app e por rotinas externas de backup.
 - `data/finance-v1.bkp`: cópia integral e não sobrescrita do banco legado anterior à migração.
-- `PRAGMA user_version`: versão inteira e monotônica do schema; o baseline inicial da linha v2 usa `20000` e a primeira evolução incremental usa `20001`.
+- `PRAGMA user_version`: versão inteira e monotônica do schema; o baseline inicial da linha v2 usa `20000`, o endurecimento operacional usa `20001` e a política global de backup usa `20002`.
 - `schema_migrations`: registro auditável dos passos incrementais aplicados após o baseline.
 - arquivos temporários de migração: permanecem no mesmo diretório do banco para permitir promoção por renomeação no mesmo volume e são removidos após sucesso ou falha tratada.
 
@@ -71,7 +71,7 @@ Usuário existente que atualiza o aplicativo para a linha v2 e usuário novo que
 - `financeiro/database_schema.py` descreve canonicamente o baseline v2: tabelas, constraints, chaves estrangeiras, índices obrigatórios e `PERFORMANCE_INDEXES`. Oferece:
   ```python
   BASELINE_SCHEMA_VERSION = 20000
-  SCHEMA_VERSION = 20001
+  SCHEMA_VERSION = 20002
 
   def create_baseline_tables(conn: sqlite3.Connection) -> None:
       ...
@@ -110,7 +110,7 @@ Usuário existente que atualiza o aplicativo para a linha v2 e usuário novo que
 
 ## Critérios de aceite
 
-1. Dado diretório de dados sem banco, quando o app inicializa, então cria `finance.db` diretamente na versão atual `20001` e registra seu histórico de schema.
+1. Dado diretório de dados sem banco, quando o app inicializa, então cria `finance.db` diretamente na versão atual `20002` e registra seu histórico de schema.
 2. Dado banco v2 válido, quando o app inicializa novamente, então não executa o caminho de compatibilidade legado.
 3. Dado `finance.db` legado válido, quando o app inicializa, então preserva o arquivo original como `finance-v1.bkp`.
 4. Dado migração legada concluída, quando os arquivos são inspecionados, então o banco ativo v2 mantém o nome `finance.db`.
@@ -125,6 +125,7 @@ Usuário existente que atualiza o aplicativo para a linha v2 e usuário novo que
 13. Dado banco no baseline `20000`, quando o app inicia, então aplica a migração incremental `20001`, registra baseline e passo atual em `schema_migrations` e preserva os dados.
 14. Dado banco atual, quando uma conexão de domínio é aberta, então usa `foreign_keys=ON`, `busy_timeout` e `synchronous=FULL` sem redefinir `journal_mode`.
 15. Dado banco criado ou atualizado, quando a inicialização termina, então o arquivo permanece em WAL e o planner recebe `PRAGMA optimize=0x10002`.
+16. Dado banco na versão `20000` ou `20001`, quando o app inicia com a funcionalidade de backup, então aplica em ordem os passos pendentes até `20002`, cria a política global idempotente e amplia `secure_configs` sem perder os segredos existentes.
 
 ## Fora de escopo
 
@@ -145,9 +146,11 @@ Usuário existente que atualiza o aplicativo para a linha v2 e usuário novo que
 - [x] Passo 7 — extrair a orquestração física e recuperável da migração legada para `financeiro/database_migrations.py`, recebendo caminhos e uma fábrica de conexões. Fecha: critérios 1 a 12.
 - [x] Passo 8 — separar a criação do baseline em tabelas (`create_baseline_tables`) e índices (`create_baseline_indexes`), aplicando a ordem tabelas → compatibilização → índices na migração legada, e adicionar teste com fixture legado genuíno. Fecha: critérios 1 a 12.
 - [x] Passo 9 — inaugurar migrações incrementais rastreáveis (`20000` → `20001`), fixar `synchronous=FULL`, configurar WAL apenas na inicialização e otimizar estatísticas do planner. Fecha: critérios 13 a 15.
+- [x] Passo 10 — adicionar a migração incremental `20002` para a política global de backup e a senha opcional protegida, preservando bancos compartilhados e segredos existentes. Fecha: critério 16.
 
 ## Changelog
 
+- `1.7` — 2026-09-05 — Schema atual avançado a `20002` pela política global de backup; migração incremental preserva instalações compartilhadas e amplia `secure_configs` sem expor ou perder segredos.
 - `1.6` — 2026-09-05 — Evolução pós-baseline passa a usar `user_version` incremental e `schema_migrations`; WAL sai do caminho de cada conexão, durabilidade fica explícita em `FULL` e a inicialização executa `PRAGMA optimize` controlado.
 - `1.5` — 2026-09-03 — Migração legada separada em três fases: criação das tabelas baseline, normalização de compatibilidade e criação dos índices baseline; adicionado teste com fixture legado genuíno.
 - `1.4` — 2026-09-03 — Orquestração física e recuperável da migração legada extraída para `financeiro/database_migrations.py`; `database.py` passa a ser apenas o ponto de entrada público e a fábrica de conexões.

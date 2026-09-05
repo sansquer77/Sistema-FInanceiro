@@ -35,7 +35,11 @@ class DatabaseV2MigrationTest(unittest.TestCase):
                 "SELECT version, name FROM schema_migrations ORDER BY version"
             ).fetchall()
         self.assertEqual(
-            [(database.BASELINE_SCHEMA_VERSION, "v2_baseline"), (database.SCHEMA_VERSION, "sqlite_operational_hardening")],
+            [
+                (database.BASELINE_SCHEMA_VERSION, "v2_baseline"),
+                (20001, "sqlite_operational_hardening"),
+                (database.SCHEMA_VERSION, "backup_settings"),
+            ],
             [(row["version"], row["name"]) for row in migrations],
         )
 
@@ -59,14 +63,20 @@ class DatabaseV2MigrationTest(unittest.TestCase):
             ]
         self.assertEqual(
             versions,
-            [database.BASELINE_SCHEMA_VERSION, database.SCHEMA_VERSION],
+            [database.BASELINE_SCHEMA_VERSION, 20001, database.SCHEMA_VERSION],
         )
+        with database.get_connection() as conn:
+            self.assertIsNotNone(
+                conn.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'backup_settings'"
+                ).fetchone()
+            )
 
     def test_incremental_migration_rolls_back_version_and_history_on_failure(self) -> None:
         database.initialize_database()
         with database.get_connection() as conn:
-            conn.execute("DROP TABLE schema_migrations")
-            conn.execute(f"PRAGMA user_version = {database.BASELINE_SCHEMA_VERSION}")
+            conn.execute("DELETE FROM schema_migrations WHERE version = ?", (database.SCHEMA_VERSION,))
+            conn.execute(f"PRAGMA user_version = {database.SCHEMA_VERSION - 1}")
 
         def fail_migration(conn):
             conn.execute("CREATE TABLE should_rollback (id INTEGER PRIMARY KEY)")
@@ -80,7 +90,7 @@ class DatabaseV2MigrationTest(unittest.TestCase):
             with self.assertRaises(sqlite3.DatabaseError):
                 database.initialize_database()
 
-        self.assertEqual(self.schema_version(database.DB_PATH), database.BASELINE_SCHEMA_VERSION)
+        self.assertEqual(self.schema_version(database.DB_PATH), database.SCHEMA_VERSION - 1)
         with closing(sqlite3.connect(database.DB_PATH)) as conn:
             self.assertIsNone(
                 conn.execute(
@@ -156,6 +166,9 @@ class DatabaseV2MigrationTest(unittest.TestCase):
             self.assertEqual(
                 conn.execute("SELECT payload_enc FROM secure_configs").fetchone()[0],
                 '{"ciphertext":"segredo-criptografado"}',
+            )
+            conn.execute(
+                "INSERT INTO secure_configs (user_id, config_type, payload_enc) VALUES (1, 'backup_password', '{}')"
             )
 
     def test_reopening_migrated_database_does_not_replace_backup(self) -> None:

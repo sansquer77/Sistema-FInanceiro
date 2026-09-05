@@ -31,12 +31,61 @@ class MigrationPaths:
 
 INCREMENTAL_MIGRATIONS = {
     20001: ("sqlite_operational_hardening", lambda conn: conn.execute(MIGRATIONS_SCHEMA_SQL)),
+    20002: ("backup_settings", lambda conn: _migrate_backup_settings(conn)),
 }
+
+
+def _migrate_backup_settings(conn: sqlite3.Connection) -> None:
+    """Extend secure config types and add the installation-wide backup policy."""
+    conn.execute("ALTER TABLE secure_configs RENAME TO secure_configs_before_backup")
+    conn.execute(
+        """CREATE TABLE secure_configs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            config_type TEXT NOT NULL
+                CHECK (config_type IN ('email', 'ai', 'mais_retorno', 'backup_password')),
+            payload_enc TEXT NOT NULL,
+            source_path TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (user_id, config_type)
+        )"""
+    )
+    conn.execute(
+        """INSERT INTO secure_configs (
+            id, user_id, config_type, payload_enc, source_path, created_at, updated_at
+        )
+        SELECT id, user_id, config_type, payload_enc, source_path, created_at, updated_at
+        FROM secure_configs_before_backup"""
+    )
+    conn.execute("DROP TABLE secure_configs_before_backup")
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_secure_configs_user_type "
+        "ON secure_configs (user_id, config_type)"
+    )
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS backup_settings (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            backup_directory TEXT NOT NULL DEFAULT '',
+            schedule_frequency TEXT NOT NULL DEFAULT 'weekly'
+                CHECK (schedule_frequency IN ('on_start', 'daily', 'weekly', 'monthly')),
+            retention_count INTEGER NOT NULL DEFAULT 5 CHECK (retention_count BETWEEN 1 AND 100),
+            remember_password INTEGER NOT NULL DEFAULT 0 CHECK (remember_password IN (0, 1)),
+            configured_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            last_backup_at TEXT,
+            last_backup_status TEXT NOT NULL DEFAULT 'never_run'
+                CHECK (last_backup_status IN ('success', 'failed', 'never_run')),
+            last_package_filename TEXT NOT NULL DEFAULT '',
+            last_error TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )"""
+    )
 
 
 def read_schema_version(db_path: Path) -> int:
     try:
-        # spec: migracao-dados/migracao-banco-v2 v1.6 — critério 12
+        # spec: migracao-dados/migracao-banco-v2 v1.7 — critério 12
         # A URI mode=ro falha em algumas combinações do SQLite do macOS quando
         # o caminho contém espaços. A conexão normal é aberta sem executar
         # escrita e também consegue consultar bancos configurados em WAL.
@@ -64,7 +113,7 @@ def migrate_incremental_database(
     connection_factory: Callable[[Path], sqlite3.Connection],
 ) -> None:
     """Apply known post-baseline migrations atomically and in order."""
-    # spec: migracao-dados/migracao-banco-v2 v1.6 — critério 13
+    # spec: migracao-dados/migracao-banco-v2 v1.7 — critério 13
     if current_version < BASELINE_SCHEMA_VERSION or current_version >= target_version:
         raise DatabaseMigrationError(f"Versao de banco nao suportada: {current_version}.")
     expected_versions = list(range(current_version + 1, target_version + 1))
@@ -112,7 +161,7 @@ def migrate_legacy_database(
     The operation is recoverable: the original active file is preserved as the
     backup, and failures before promotion keep the legacy database in place.
     """
-    # spec: migracao-dados/migracao-banco-v2 v1.6 — critérios 3, 4, 7, 8 e 11
+    # spec: migracao-dados/migracao-banco-v2 v1.7 — critérios 3, 4, 7, 8 e 11
     if paths.backup.exists():
         raise DatabaseMigrationError(
             f"A migracao foi bloqueada porque {paths.backup.name} ja existe. "

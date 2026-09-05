@@ -2,8 +2,8 @@
 tipo: spec
 area: distribuicao
 status: implementado
-versao: 2.6
-atualizado: 2026-09-04
+versao: 2.7
+atualizado: 2026-09-05
 relacionados:
   - "[[sdd]]"
   - "[[templates/spec-template|Template de spec]]"
@@ -16,7 +16,7 @@ aliases: ["Distribuicao", "Pacotes de Distribuicao", "Instalador macOS", "Instal
 # Distribuicao
 
 > [!info] Status
-> **implementado** · área: `distribuicao` · atualizado em 2026-09-04 · relacionados: [[sdd]], [[templates/spec-template|Template de spec]], [[arquitetura]], [[requisitos]]
+> **implementado** · versão: `2.7` · área: `distribuicao` · atualizado em 2026-09-05 · relacionados: [[sdd]], [[arquitetura]], [[requisitos]], [[specs/backup-restauracao]]
 
 ## Problema
 
@@ -111,6 +111,7 @@ Usuario final que vai instalar o Sistema Financeiro em outro computador e manten
 - Os workflows oficiais devem publicar os zips como assets em GitHub Releases, usando a tag do push quando o evento for tag ou `vX.Y.Z` quando executados manualmente.
 - A publicação em GitHub Releases deve permitir sobrescrever o asset da mesma plataforma e versão para corrigir uma geração defeituosa sem alterar a URL final de consumo.
 - Cada workflow deve validar que o runtime PyInstaller inclui as dependências browser vendorizadas (`web/vendor/imask/`, `web/vendor/apexcharts/`) antes de publicar o pacote; a ausência de qualquer dependência aprovada falha o build.
+- Os workflows macOS, Windows e Linux devem instalar a versão fixada de `cryptography` antes do PyInstaller para incluir AES-256-GCM/scrypt usados pelos pacotes `.sfbackup`; o smoke test da release deve criar, validar e restaurar um pacote no sistema alvo.
 
 ## API e dados
 
@@ -171,6 +172,7 @@ Arquivos e diretorios afetados:
 
 ## Changelog
 
+- `2.7` — 2026-09-05 — Builds das três plataformas passam a incluir `cryptography 50.0.1`; smoke test de backup/restauração autenticados entra no gate operacional da release.
 - `2.6` — 2026-09-04 — Revisada a consistência documental após a validação sintática dos workflows das três plataformas; consolidado o histórico duplicado da versão 2.4.
 - `2.5` — 2026-09-04 — Workflows GitHub Actions de macOS, Windows e Linux passam a validar a presença das dependências browser vendorizadas (`web/vendor/imask/` e `web/vendor/apexcharts/`) no runtime PyInstaller antes da publicação.
 - `2.4` — 2026-08-30 — Pacotes oficiais passam a ser gerados exclusivamente pelos workflows do GitHub Actions; templates locais não armazenam runtimes ou zips finais e os pacotes da v2 exigem dependências browser locais com inventário de versão, origem, SHA-256 e licença. Ver [[adr/0013-dependencias-frontend-v2]].

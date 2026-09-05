@@ -462,6 +462,8 @@ def secure_config_legacy_path(user_id: int, config_type: str) -> Path:
         return ai_secret_config_path(user_id)
     if config_type == "mais_retorno":
         return mais_retorno_config_path(user_id)
+    if config_type == "backup_password":
+        return database.DATA_DIR / f"backup_password_user_{int(user_id)}.enc"
     raise SecureConfigError("Tipo de configuracao segura invalido.")
 
 
