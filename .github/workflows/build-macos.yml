@@ -65,6 +65,8 @@ jobs:
 
           rm -rf "$RUNTIME_ROOT"
           cp -R "dist/SistemaFinanceiro" "$RUNTIME_ROOT"
+          cp "Sistema Financeiro - Distribuicao/INSTRUCOES-SERVIDOR.md" \
+            "$PACKAGE_ROOT/INSTRUCOES-SERVIDOR.md"
 
           find "$PACKAGE_ROOT" \( \
             -name data -o \
@@ -99,6 +101,7 @@ jobs:
           fi
 
           unzip -Z1 "$ZIP_PATH" | grep -E 'MacOS/Aplicativo/SistemaFinanceiro/SistemaFinanceiro$'
+          unzip -Z1 "$ZIP_PATH" | grep -E 'MacOS/INSTRUCOES-SERVIDOR.md$'
 
       - name: Validar dependencias browser vendorizadas
         run: |
