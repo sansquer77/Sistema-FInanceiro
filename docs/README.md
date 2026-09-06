@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 12.47
-atualizado: 2026-09-05
+versao: 12.54
+atualizado: 2026-09-06
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -29,6 +29,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[glossario]] | Vocabulário de domínio com links para as specs onde cada conceito é definido. |
 | [[qualidade-codigo]] | Fronteiras de responsabilidade, sinais de alerta e regras de organização do código. |
 | [[distribuição]] | Regras de geração, limpeza, instalação e validação dos pacotes macOS e Windows. |
+| [[server]] | Provisionamento, operação, deploy e recuperação da instalação Linux com systemd e Nginx. |
 | [[templates/spec-template]] | Template obrigatório para criar novos documentos. |
 
 ---
@@ -151,6 +152,13 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `12.54` — 2026-09-06 — [[distribuição]] v2.8 adiciona aos três pacotes um guia genérico de servidor Linux, separado da configuração operacional pessoal em [[server]].
+- `12.53` — 2026-09-06 — [[specs/Update Server]] v1.4 e [[server]] v1.6 removem a validação privilegiada duplicada no cliente, mantendo a confirmação no script remoto.
+- `12.52` — 2026-09-06 — [[specs/Update Server]] v1.3 e [[server]] v1.5 endurecem o pipeline `deploysf` com exclusões simétricas, sincronização limpa, recuperação de falha e validação do serviço.
+- `12.51` — 2026-09-06 — [[server]] v1.4 documenta a atualização manual do script remoto sem modificar a rotina habitual do `deploysf`.
+- `12.50` — 2026-09-06 — [[specs/Update Server]] v1.2 e [[server]] v1.3 versionam o script remoto e protegem `data/`, `secure/` e `.venv/` no deploy Linux.
+- `12.49` — 2026-09-06 — [[server]] v1.2 e [[specs/Update Server]] v1.1 passam a refletir o pipeline real de promoção controlada e o script remoto efetivamente instalado.
+- `12.48` — 2026-09-06 — [[server]] v1.1 fecha montagem persistente do Endor, primeira carga, dependência `cryptography`, firewall, script remoto de deploy, criação automática de `data/` e autenticação SSH dedicada.
 - `12.47` — 2026-09-05 — Backup completo da instalação implementado e colocado em revisão: pacote `.sfbackup` AES-256-GCM, política multiusuário, cópia SQLite online, retenção, automação na abertura e restauração com salvaguarda.
 - `12.46` — 2026-09-05 — Reforçado no tema claro o degradê vertical compartilhado pelos gráficos de Contas, Cartões e Evolução de Relatórios, preservando término suave e leitura das linhas.
 - `12.45` — 2026-09-05 — Gráficos de saldo de Contas e evolução de Faturas passam a compartilhar com a Evolução de Relatórios a área vertical contínua do ApexCharts e a mesma família cromática entre realizado e previsão.

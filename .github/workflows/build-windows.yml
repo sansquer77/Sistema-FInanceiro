@@ -81,6 +81,7 @@ jobs:
           Copy-Item "$sourceRoot\Instalar Sistema Financeiro.bat" "$packageRoot\Instalar Sistema Financeiro.bat" -Force
           Copy-Item "$sourceRoot\README-INSTALACAO-WINDOWS.md" "$packageRoot\README-INSTALACAO-WINDOWS.md" -Force
           Copy-Item "$sourceRoot\configurar_windows.ps1" "$packageRoot\configurar_windows.ps1" -Force
+          Copy-Item "Sistema Financeiro - Distribuicao\INSTRUCOES-SERVIDOR.md" "$packageRoot\INSTRUCOES-SERVIDOR.md" -Force
           Copy-Item "$sourceRoot\Aplicativo\Abrir Sistema Financeiro.bat" "$appRoot\Abrir Sistema Financeiro.bat" -Force
           Copy-Item "$sourceRoot\Aplicativo\Abrir Sistema Financeiro na Rede.bat" "$appRoot\Abrir Sistema Financeiro na Rede.bat" -Force
           Copy-Item "dist\SistemaFinanceiro" $runtimeRoot -Recurse
@@ -122,6 +123,12 @@ jobs:
           $hasExe = $items | Select-String 'Windows/Aplicativo/SistemaFinanceiro/SistemaFinanceiro.exe$'
           if (-not $hasExe) {
             Write-Error "Executavel Windows nao encontrado no pacote."
+            exit 1
+          }
+
+          $hasServerGuide = $items | Select-String 'Windows/INSTRUCOES-SERVIDOR.md$'
+          if (-not $hasServerGuide) {
+            Write-Error "Guia generico de servidor nao encontrado no pacote."
             exit 1
           }
 

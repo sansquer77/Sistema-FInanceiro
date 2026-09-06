@@ -2,8 +2,8 @@
 tipo: spec
 area: distribuicao
 status: implementado
-versao: 1.0
-atualizado: 2026-07-07
+versao: 1.4
+atualizado: 2026-09-06
 relacionados:
   - "[[sdd]]"
   - "[[templates/spec-template|Template de spec]]"
@@ -17,7 +17,7 @@ aliases: ["Update Server", "Atualizacao do Servidor", "Deploy do Servidor"]
 # Update Server
 
 > [!info] Status
-> **implementado** · área: `distribuicao` · atualizado em 2026-07-07 · relacionados: [[sdd]], [[templates/spec-template|Template de spec]], [[distribuição]], [[arquitetura]], [[seguranca-autenticacao]]
+> **implementado** · área: `distribuicao` · atualizado em 2026-09-06 · relacionados: [[sdd]], [[templates/spec-template|Template de spec]], [[distribuição]], [[arquitetura]], [[seguranca-autenticacao]]
 
 ## Problema
 
@@ -29,13 +29,14 @@ Mantenedor responsável por atualizar a instância Linux do Sistema Financeiro e
 
 ## Jornada
 
-1. O mantenedor conecta no servidor via SSH.
-2. O serviço é interrompido para liberar arquivos de código e evitar escrita concorrente.
-3. A versão atual de `/opt/sistema-financeiro` é copiada para `/mnt/endor/Sistema Financeiro_backup`.
-4. A nova versão disponível em `/mnt/endor/Sistema Financeiro` é aplicada em `/opt/sistema-financeiro`.
-5. A propriedade dos arquivos volta para `sistema:sistema`.
-6. O serviço é reiniciado e os logs são monitorados.
-7. Em falha crítica, o backup é restaurado imediatamente.
+1. O mantenedor promove para a pasta de homologação somente o código V2 já testado e validado localmente.
+2. O `deploysf` sincroniza essa homologação com o staging Endor e aciona o script remoto via SSH.
+3. O serviço é interrompido para liberar arquivos de código e evitar escrita concorrente.
+4. A versão atual de `/opt/sistema-financeiro` é copiada para `/mnt/endor/Sistema Financeiro_backup`.
+5. A nova versão disponível em `/mnt/endor/Sistema Financeiro` é aplicada em `/opt/sistema-financeiro`.
+6. A propriedade dos arquivos volta para `sistema:sistema`.
+7. O serviço é reiniciado e os logs são monitorados.
+8. Em falha crítica, o backup é restaurado imediatamente.
 
 ## Dados
 
@@ -51,14 +52,17 @@ Mantenedor responsável por atualizar a instância Linux do Sistema Financeiro e
 
 ## Regras
 
-- Este procedimento é operacional e deve ser executado manualmente no servidor via SSH.
+- O deploy normal parte da homologação local validada e é acionado pelo alias `deploysf`; SSH manual permanece disponível para diagnóstico e rollback.
 - O banco SQLite e demais arquivos de `data/` não devem ser alterados por este documento.
 - Antes de copiar código novo, o serviço deve estar parado.
 - O backup anterior em `/mnt/endor/Sistema Financeiro_backup` pode ser removido somente depois de confirmar que `/opt/sistema-financeiro` existe.
 - O backup deve ser criado antes de qualquer alteração em `/opt/sistema-financeiro`.
 - A atualização recomendada deve preservar `/opt/sistema-financeiro/data/`.
+- A atualização remota deve preservar também `/opt/sistema-financeiro/secure/` e `/opt/sistema-financeiro/.venv/`, ainda que existam diretórios homônimos no staging.
 - A cópia com `cp -r "/mnt/endor/Sistema Financeiro/"* /opt/sistema-financeiro/` é aceita como procedimento simples somente quando a origem não contém `data/` e quando não há necessidade de remover arquivos obsoletos.
 - Para reduzir regressões, o procedimento recomendado usa `rsync` com `--delete` e exclusões explícitas de dados/runtime.
+- O script macOS deve propagar falhas de `rsync`, SSH e atualização remota, anunciando sucesso somente depois de confirmar o serviço ativo.
+- Se uma falha ocorrer depois da interrupção do serviço, o script remoto deve tentar iniciá-lo novamente antes de encerrar com erro.
 - Após a cópia, `/opt/sistema-financeiro` deve pertencer a `sistema:sistema`.
 - Após iniciar o serviço, os logs devem ser acompanhados até confirmar inicialização sem erro crítico.
 - Rollback deve restaurar o backup inteiro e aplicar novamente `chown -R sistema:sistema`.
@@ -244,6 +248,9 @@ sudo systemctl reload nginx
 - Dado o serviço em execução, quando `sudo systemctl stop sistema-financeiro.service` é executado, então a aplicação deixa de atender antes da cópia.
 - Dado o backup criado, quando inspecionado, então contém `app.py`, `financeiro/` e `web/`.
 - Dado o procedimento recomendado com `rsync`, quando a atualização termina, então `/opt/sistema-financeiro/data/` permanece preservado.
+- Dado que `data/`, `secure/` ou `.venv/` existam no staging, quando o deploy remoto é executado, então os diretórios homônimos da instalação permanecem inalterados.
+- Dado erro depois de parar o serviço, quando o script remoto encerra, então ele tenta restabelecer o serviço e devolve falha ao chamador.
+- Dado que a atualização remota terminou, quando `deploysf` anuncia sucesso, então o `systemd` confirmou `sistema-financeiro.service` ativo.
 - Dado a nova versão copiada, quando `sudo chown -R sistema:sistema /opt/sistema-financeiro` é executado, então o usuário do serviço consegue escrever arquivos de runtime.
 - Dado o serviço reiniciado, quando `journalctl -u sistema-financeiro -f` é monitorado, então não aparecem falhas críticas de inicialização.
 - Dado falha crítica após deploy, quando o rollback é executado, então o backup volta para `/opt/sistema-financeiro` e o serviço inicia novamente.
@@ -259,6 +266,10 @@ sudo systemctl reload nginx
 
 ## Changelog
 
+- `1.4` — 2026-09-06 — Removida a validação `sudo systemctl` duplicada no cliente; a confirmação permanece no script remoto autorizado e seu status é propagado pelo SSH.
+- `1.3` — 2026-09-06 — Deploy macOS e remoto passam a compartilhar exclusões, usar sincronização limpa, propagar falhas e validar a recuperação/atividade do serviço.
+- `1.2` — 2026-09-06 — Script remoto versionado em `adm/` passa a preservar explicitamente `data/`, `secure/` e `.venv/`, sem antecipar a remoção de arquivos obsoletos.
+- `1.1` — 2026-09-06 — Registrado o fluxo real de promoção controlada entre repositório V2, homologação local, staging Endor e produção.
 - `1.0` — 2026-07-07 — Spec criada para atualização manual do servidor, backup, deploy, rollback e renovação de certificado.
 
 ## Relacionados

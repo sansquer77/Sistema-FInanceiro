@@ -33,21 +33,7 @@ Existem dois cenarios de rede.
 
 ### Acessar o servidor Linux central
 
-Use esta opcao quando o Sistema Financeiro estiver rodando no servidor `192.168.1.212`.
-
-1. No Mac, abra o Terminal na pasta descompactada do pacote.
-2. Execute:
-
-   ```bash
-   chmod +x configurar_mac.sh
-   sudo ./configurar_mac.sh
-   ```
-
-3. Acesse no navegador:
-
-   `https://sistema-financeiro.net:8030`
-
-Se o certificado SSL for autoassinado, o navegador pode pedir confirmacao de seguranca no primeiro acesso.
+Use esta opcao quando um administrador mantiver o Sistema Financeiro em um servidor Linux sempre ligado. Consulte `INSTRUCOES-SERVIDOR.md`, incluído na raiz deste pacote, para configurar o runtime, o serviço `systemd`, o Nginx, o HTTPS e as atualizações. O domínio, o IP e a porta devem ser definidos pelo operador da instalação.
 
 ### Expor este Mac para outros dispositivos da LAN
 

@@ -67,6 +67,8 @@ jobs:
           mkdir -p "$APP_ROOT"
 
           cp -R "dist/SistemaFinanceiro" "$RUNTIME_ROOT"
+          cp "Sistema Financeiro - Distribuicao/INSTRUCOES-SERVIDOR.md" \
+            "$PACKAGE_ROOT/INSTRUCOES-SERVIDOR.md"
 
           cat > "$APP_ROOT/Abrir Sistema Financeiro.sh" <<'SCRIPT'
           #!/usr/bin/env bash
@@ -141,17 +143,7 @@ jobs:
 
           ### Acessar o servidor Linux central
 
-          Use esta opcao quando o Sistema Financeiro estiver rodando no servidor `192.168.1.212`.
-
-          Acesse diretamente:
-
-          `https://sistema-financeiro.net:8030`
-
-          Se necessario, adicione no `/etc/hosts`:
-
-          ```text
-          192.168.1.212 sistema-financeiro.net
-          ```
+          Use esta opcao quando um administrador mantiver o Sistema Financeiro em um servidor Linux sempre ligado. Consulte `INSTRUCOES-SERVIDOR.md`, incluído na raiz do pacote, para configurar o runtime, o servico `systemd`, o Nginx, o HTTPS e as atualizacoes. O dominio, o IP e a porta devem ser definidos pelo operador da instalacao.
 
           ### Expor este Linux para outros dispositivos da LAN
 
@@ -204,6 +196,7 @@ jobs:
           fi
 
           unzip -Z1 "$ZIP_PATH" | grep -E 'Linux/Aplicativo/SistemaFinanceiro/SistemaFinanceiro$'
+          unzip -Z1 "$ZIP_PATH" | grep -E 'Linux/INSTRUCOES-SERVIDOR.md$'
 
       - name: Validar dependencias browser vendorizadas
         run: |

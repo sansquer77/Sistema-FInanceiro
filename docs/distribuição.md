@@ -2,8 +2,8 @@
 tipo: spec
 area: distribuicao
 status: implementado
-versao: 2.7
-atualizado: 2026-09-05
+versao: 2.8
+atualizado: 2026-09-06
 relacionados:
   - "[[sdd]]"
   - "[[templates/spec-template|Template de spec]]"
@@ -64,6 +64,7 @@ Usuario final que vai instalar o Sistema Financeiro em outro computador e manten
 | `Sistema Financeiro - Distribuicao/Windows/Windows - X.Y.Z.zip` | arquivo zip | Zip final do Windows, gerado a partir de `Sistema Financeiro - Distribuicao/Windows/`, onde `X.Y.Z` vem de `financeiro/app_metadata.py`. |
 | `Sistema Financeiro - Distribuicao/Linux/` | diretorio gerado | Staging Linux criado pelo workflow. Não precisa ser versionado porque README e launchers Linux são gerados no próprio workflow. |
 | `Sistema Financeiro - Distribuicao/Linux/Linux Ubuntu - X.Y.Z.zip` | arquivo zip gerado | Zip final do Linux Ubuntu, gerado pelo workflow, onde `X.Y.Z` vem de `financeiro/app_metadata.py`. |
+| `Sistema Financeiro - Distribuicao/INSTRUCOES-SERVIDOR.md` | arquivo | Fonte canônica do guia genérico de servidor Linux copiado para a raiz dos três pacotes. |
 
 ## Regras
 
@@ -86,6 +87,7 @@ Usuario final que vai instalar o Sistema Financeiro em outro computador e manten
 - Os atalhos Windows devem executar `SistemaFinanceiro/SistemaFinanceiro.exe`, nunca `python app.py`, para evitar uso acidental de arquivos fonte antigos.
 - Cada pacote deve conter um unico README de usuario final na raiz da plataforma, com instrucoes separadas em modulos de execucao local e execucao em rede.
 - Os pacotes nao devem incluir `Aplicativo/README.md` de desenvolvimento, pois ele menciona `python app.py`, `docs/` e estrutura fonte que nao pertencem ao runtime distribuido.
+- Os pacotes das três plataformas devem incluir `INSTRUCOES-SERVIDOR.md` na raiz, sem IP, domínio, volume ou alias pessoal do mantenedor.
 - O pacote macOS tambem deve conter `Sistema Financeiro.app` dentro de `MacOS/Aplicativo/`.
 - O bundle `Sistema Financeiro.app` dentro da distribuicao macOS deve usar launcher portatil baseado em `$HOME/Documents/Sistema Financeiro`, chamando `SistemaFinanceiro/SistemaFinanceiro` e nao caminhos absolutos da maquina de desenvolvimento.
 - O launcher do app e `MacOS/Instalar Sistema Financeiro.command` devem ter permissao de execucao.
@@ -134,6 +136,8 @@ Arquivos e diretorios afetados:
 ## Critérios de aceite
 
 - Dado qualquer pacote gerado, quando o zip for inspecionado, entao nao existe nenhum caminho contendo `/data/` ou `/tests/`.
+- Dado qualquer pacote gerado, quando o zip for inspecionado, entao `INSTRUCOES-SERVIDOR.md` existe na raiz da plataforma.
+- Dado o guia genérico de servidor, quando seu conteúdo for inspecionado, entao não contém IP, domínio, volume ou alias específicos da instalação pessoal.
 - Dado qualquer pacote gerado, quando o zip for inspecionado, entao nao existe nenhum caminho contendo `/secure/`.
 - Dado qualquer pacote gerado, quando o zip for inspecionado, entao nao existe nenhum caminho contendo `/docs/`.
 - Dado qualquer pacote gerado, quando o zip for inspecionado, entao nao existem arquivos, assets, dependencias ou configuracoes da Landing Page institucional.
@@ -172,6 +176,7 @@ Arquivos e diretorios afetados:
 
 ## Changelog
 
+- `2.8` — 2026-09-06 — Criado guia genérico de servidor Linux, compartilhado pelos pacotes macOS, Windows e Linux, com instalação e atualização administráveis a partir dos três sistemas sem expor a infraestrutura pessoal.
 - `2.7` — 2026-09-05 — Builds das três plataformas passam a incluir `cryptography 50.0.1`; smoke test de backup/restauração autenticados entra no gate operacional da release.
 - `2.6` — 2026-09-04 — Revisada a consistência documental após a validação sintática dos workflows das três plataformas; consolidado o histórico duplicado da versão 2.4.
 - `2.5` — 2026-09-04 — Workflows GitHub Actions de macOS, Windows e Linux passam a validar a presença das dependências browser vendorizadas (`web/vendor/imask/` e `web/vendor/apexcharts/`) no runtime PyInstaller antes da publicação.
