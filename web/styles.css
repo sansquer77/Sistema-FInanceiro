@@ -5836,7 +5836,12 @@ form[aria-busy="true"] .form-actions {
 }
 
 .portfolio-col-quantity {
-  width: 86px;
+  width: 118px;
+}
+
+.portfolio-positions .portfolio-table th:nth-child(4),
+.portfolio-positions .portfolio-table td:nth-child(4) {
+  padding-right: 18px;
 }
 
 .portfolio-col-price {

@@ -1165,7 +1165,7 @@ export function registerPortfolioView({
       <tr>
         <td><strong>${escapeHtml(redemption.asset_name || redemption.asset_identifier || "Investimento")}</strong><span>${escapeHtml(redemption.asset_identifier || redemption.asset_type_label || "")}</span></td>
         <td>${formatDate(redemption.date)}<span>${escapeHtml(redemption.account_name || "")}</span></td>
-        <td>${quantity > 0 ? portfolioGrouping.formatQuantity(quantity, redemption.asset_type) : "—"}<span>${escapeHtml(redemption.currency || "")}</span></td>
+        <td>${quantity > 0 ? portfolioGrouping.formatQuantity(quantity, redemption.asset_type) : "—"}<span>${escapeHtml(redemption.asset_identifier || redemption.asset_type_label || "Unidade")}</span></td>
         <td class="money-cell">${formatMoney(redemption.net_value, redemption.currency)}<span>Bruto ${formatMoney(redemption.gross_value, redemption.currency)} · taxas ${formatMoney(redemption.fees, redemption.currency)}</span></td>
         <td class="money-cell">${formatMoney(redemption.redeemed_cost, redemption.currency)}<span>Baixa FIFO</span></td>
         <td class="money-cell ${result < 0 ? "danger-text" : "positive-text"}">${formatMoney(result, redemption.currency)}<span>Realizado</span></td>

@@ -202,7 +202,7 @@ def get_allocation_goals(user_id: int) -> list[dict]:
 
 
 def save_allocation_goals(user_id: int, data: dict) -> dict:
-    # spec: investimentos-portfolio v2.63 — critérios 62-66
+    # spec: investimentos-portfolio v2.64 — critérios 62-66
     raw_goals = data.get("goals")
     if not isinstance(raw_goals, list):
         raise PortfolioError("Informe as metas de alocacao.")
@@ -434,7 +434,7 @@ def delete_opening_position(user_id: int, position_id: object) -> dict:
 
 
 def redeem_position(user_id: int, data: dict) -> dict:
-    # spec: investimentos-portfolio v2.63 — criterios 9, 55-58
+    # spec: investimentos-portfolio v2.64 — criterios 9, 55-58
     # (em posicao com multiplas origens, o consumo do resgate segue FIFO pela
     #  data da primeira operacao — candidates.sort abaixo garante essa ordem)
     selector = normalize_redemption_selector(data)
@@ -555,7 +555,7 @@ def redeem_position(user_id: int, data: dict) -> dict:
             override_id = override_ids.get(portfolio_override_key(position))
             if override_id is not None:
                 manual_debits[override_id] = manual_debits.get(override_id, 0) + take_cents
-        # spec: investimentos/investimentos-portfolio v2.63 — resgate com valor manual
+        # spec: investimentos/investimentos-portfolio v2.64 — resgate com valor manual
         # Usa o bruto alocado a cada posição, sem descontar taxas duas vezes.
         for override_id, debit in manual_debits.items():
             conn.execute(
@@ -793,7 +793,7 @@ def close_position(user_id: int, data: dict) -> dict:
 
 
 def should_register_closing_credit(data: dict) -> bool:
-    # spec: investimentos-portfolio v2.63 — criterios 10-11
+    # spec: investimentos-portfolio v2.64 — criterios 10-11
     # (a opcao de credito e opt-in explicito e vem desmarcada por padrao no
     #  formulario, justamente para evitar duplicidade com resgates ja lancados)
     return str(data.get("register_credit") or "").strip().lower() in {"1", "true", "on", "yes", "sim"}
@@ -837,7 +837,7 @@ def current_portfolio_positions(user_id: int, force_refresh: bool = False) -> li
 
 
 def prepare_portfolio_positions(user_id: int, force_refresh: bool = False) -> tuple[dict, list[dict]]:
-    # spec: investimentos/investimentos-portfolio v2.63 — critérios 77-79
+    # spec: investimentos/investimentos-portfolio v2.64 — critérios 77-79
     # Fecha o snapshot de leitura antes de consultar cotações, indexadores ou câmbio.
     with get_connection() as conn:
         conn.execute("BEGIN")
@@ -870,7 +870,7 @@ def build_unquoted_portfolio_positions(inputs: dict) -> list[dict]:
 
 
 def assert_portfolio_inputs_unchanged(conn, user_id: int, inputs: dict) -> None:
-    # spec: investimentos/investimentos-portfolio v2.63 — critério 78
+    # spec: investimentos/investimentos-portfolio v2.64 — critério 78
     # BEGIN IMMEDIATE protege esta revalidação e todas as gravações seguintes.
     if positions_store.load_position_inputs(conn, user_id) != inputs:
         raise PortfolioError(
@@ -1100,7 +1100,7 @@ def normalize_opening_position_payload(data: dict) -> dict:
 
 
 def normalize_emergency_reserve_eligible(data: dict, asset_type: str) -> int:
-    # spec: investimentos/investimentos-portfolio v2.63 — critérios 20 e 21
+    # spec: investimentos/investimentos-portfolio v2.64 — critérios 20 e 21
     if asset_type not in {"fixed_income", "savings"}:
         return 0
     return 1 if str(data.get("emergency_reserve_eligible") or "").strip().lower() in {"1", "true", "on", "yes"} else 0
@@ -1188,7 +1188,7 @@ def parse_savings_anniversaries(value: object, fallback_date: object, fallback_a
 
 
 def consume_savings_anniversaries_fifo(entries: list[dict], redeemed_cost_cents: int) -> list[dict]:
-    # spec: investimentos-portfolio v2.63 — criterio poupanca-resgate-fifo
+    # spec: investimentos-portfolio v2.64 — criterio poupanca-resgate-fifo
     # (resgates de poupanca consomem primeiro os aniversarios mais antigos para
     # manter a base de rentabilidade alinhada ao saldo remanescente por lote)
     return positions_store.consume_savings_anniversaries_fifo(entries, redeemed_cost_cents)
@@ -1269,7 +1269,7 @@ def resolve_position_exchange_rate(currency: str, acquisition_date: str, raw_rat
         return rate_to_micros(Decimal("1"))
     if str(raw_rate or "").strip():
         return rate_to_micros(parse_exchange_rate(raw_rate))
-    # spec: investimentos-portfolio v2.63 — criterio 48
+    # spec: investimentos-portfolio v2.64 — criterio 48
     # (sem cotacao manual, consulta a ultima PTAX de venda disponivel
     #  ate a data de aquisicao, como em Lancamentos)
     return rate_to_micros(get_exchange_rate_to_brl(currency, acquisition_date))
@@ -1502,7 +1502,7 @@ def apply_market_quote(position: dict, force_refresh: bool = False) -> None:
 
 
 def apply_fund_quote(position: dict, user_id: int | None = None, force_refresh: bool = False) -> None:
-    # spec: investimentos/investimentos-portfolio v2.63 — criterios 27 e 28
+    # spec: investimentos/investimentos-portfolio v2.64 — criterios 27 e 28
     # (cotas de fundos via API Mais Retorno: opt-in configurado nas Preferencias,
     #  posicao com CNPJ e carteira em BRL; sem isso a posicao mantem valor de
     #  custo com status "Cotacao manual pendente")
@@ -1545,7 +1545,7 @@ def fetch_fund_quote_for_user(user_id: int, cnpj: str, force_refresh: bool = Fal
 
 
 def mais_retorno_fund_identifier(position: dict) -> str:
-    # spec: investimentos/investimentos-portfolio v2.63 — criterio fundos-mais-retorno
+    # spec: investimentos/investimentos-portfolio v2.64 — criterio fundos-mais-retorno
     # (API exige CNPJ somente com digitos, sem pontos/barra, mais sufixo ":fi")
     return mais_retorno_identifier_from_cnpj(position.get("cnpj"))
 
@@ -1563,7 +1563,7 @@ def mais_retorno_quotes_for_range(
     force_refresh: bool = False,
     cache_suffix: str = "",
 ) -> list:
-    # spec: investimentos/investimentos-portfolio v2.63 — criterios 27 e 28:
+    # spec: investimentos/investimentos-portfolio v2.64 — criterios 27 e 28:
     # range de datas questionado junto com a data atual; cache diario (ate o
     # fim do dia) para evitar re-consumo da API ao entrar na tela no mesmo dia
     url = MAIS_RETORNO_QUOTES_URL.format(symbol=quote(identifier), start=start, end=end)
@@ -1584,7 +1584,7 @@ def mais_retorno_quotes_for_range(
 
 def fetch_mais_retorno_quote(identifier: str, api_key: str, force_refresh: bool = False) -> dict:
     today = date.today().isoformat()
-    # spec: investimentos/investimentos-portfolio v2.63 — criterios 27 e 28:
+    # spec: investimentos/investimentos-portfolio v2.64 — criterios 27 e 28:
     # 1a tentativa sempre com a data atual; em dias sem cota publicada (fim de
     # semana/feriado) a API retorna lista vazia, entao re-consulta com janela
     # retroativa de 7 dias e usa a ultima cota publicada
@@ -1600,7 +1600,7 @@ def fetch_mais_retorno_quote(identifier: str, api_key: str, force_refresh: bool 
         latest = max(quotes, key=lambda item: str(item["d"]))
         earlier = [item for item in quotes if str(item["d"]) < str(latest["d"])]
         previous = max(earlier, key=lambda item: str(item["d"])) if earlier else latest
-        # spec: investimentos/investimentos-portfolio v2.63 — criterios 27 e 28:
+        # spec: investimentos/investimentos-portfolio v2.64 — criterios 27 e 28:
         # a API usa "." como separador decimal (JSON); normaliza virgula por
         # seguranca antes de converter para Decimal
         price = Decimal(str(latest["c"]).replace(",", "."))
@@ -2034,7 +2034,7 @@ def bcb_range_ttl_seconds(end_date: date) -> int:
 
 
 def seconds_until_end_of_day() -> int:
-    # spec: investimentos/investimentos-portfolio v2.63 — criterios 27 e 28
+    # spec: investimentos/investimentos-portfolio v2.64 — criterios 27 e 28
     # (cache de cotacao de fundos vale ate o fim do dia corrente)
     return quotes.seconds_until_end_of_day(datetime.now())
 
@@ -2135,7 +2135,7 @@ def format_position(position: dict) -> dict:
     average_cents = decimal_to_cents(Decimal(position["total_cost_cents"]) / position["quantity"] / MONEY_SCALE) if position["quantity"] else position["last_unit_price_cents"]
     position["sources"] = format_position_sources(position)
     position["savings_anniversaries"] = format_savings_anniversaries(aggregate_savings_anniversaries(position.get("savings_anniversaries") or []))
-    # spec: investimentos/investimentos-portfolio v2.63 — critério 56
+    # spec: investimentos/investimentos-portfolio v2.64 — critério 56
     # A tabela continua compacta, mas mutações recebem a quantidade exata armazenada.
     position["redemption_quantity"] = calculations.quantity_to_string(position["quantity"])
     position["quantity"] = calculations.display_quantity(position["quantity"], position["asset_type"])
@@ -2261,7 +2261,7 @@ def decimal_to_quantity_units(value: object) -> int:
 
 
 def decimal_to_string(value: Decimal) -> str:
-    # spec: investimentos/investimentos-portfolio v2.63 — critério normalização de quantidade
+    # spec: investimentos/investimentos-portfolio v2.64 — critério normalização de quantidade
     # com até 2 casas decimais (half-up) para não estourar o layout das tabelas.
     return calculations.decimal_to_string(value)
 
