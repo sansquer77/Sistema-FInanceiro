@@ -1432,14 +1432,14 @@ async function loadAppInfo() {
   try {
     state.appInfo = await api("/api/app-info");
   } catch (error) {
-    state.appInfo = { version: "2.0.0" };
+    state.appInfo = { version: "2.0.1" };
   }
   renderAppInfo();
 }
 
 function renderAppInfo() {
   if (aboutAppVersion) {
-    aboutAppVersion.textContent = state.appInfo?.version || "2.0.0";
+    aboutAppVersion.textContent = state.appInfo?.version || "2.0.1";
   }
 }
 

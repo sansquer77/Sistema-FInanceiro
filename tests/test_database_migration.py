@@ -38,7 +38,8 @@ class DatabaseV2MigrationTest(unittest.TestCase):
             [
                 (database.BASELINE_SCHEMA_VERSION, "v2_baseline"),
                 (20001, "sqlite_operational_hardening"),
-                (database.SCHEMA_VERSION, "backup_settings"),
+                (20002, "backup_settings"),
+                (database.SCHEMA_VERSION, "portfolio_quantity_precision"),
             ],
             [(row["version"], row["name"]) for row in migrations],
         )
@@ -63,7 +64,7 @@ class DatabaseV2MigrationTest(unittest.TestCase):
             ]
         self.assertEqual(
             versions,
-            [database.BASELINE_SCHEMA_VERSION, 20001, database.SCHEMA_VERSION],
+            [database.BASELINE_SCHEMA_VERSION, 20001, 20002, database.SCHEMA_VERSION],
         )
         with database.get_connection() as conn:
             self.assertIsNotNone(
@@ -71,6 +72,36 @@ class DatabaseV2MigrationTest(unittest.TestCase):
                     "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'backup_settings'"
                 ).fetchone()
             )
+
+    def test_quantity_precision_migration_preserves_existing_portfolio_values(self) -> None:
+        database.initialize_database()
+        with database.get_connection() as conn:
+            conn.execute("INSERT INTO users (name, email, password_hash) VALUES ('Ana', 'ana@example.com', 'hash')")
+            user_id = conn.execute("SELECT id FROM users").fetchone()[0]
+            conn.execute(
+                """INSERT INTO checking_accounts (
+                    user_id, name, bank_name, account_type, currency
+                ) VALUES (?, 'Carteira', 'Banco', 'investment', 'BRL')""",
+                (user_id,),
+            )
+            account_id = conn.execute("SELECT id FROM checking_accounts").fetchone()[0]
+            conn.execute(
+                """INSERT INTO investment_opening_positions (
+                    user_id, account_id, asset_type, asset_identifier,
+                    acquisition_date, quantity_micros, total_cost_cents
+                ) VALUES (?, ?, 'crypto', 'ETH', '2026-01-01', 28649, 10000)""",
+                (user_id, account_id),
+            )
+            conn.execute("DELETE FROM schema_migrations WHERE version = 20003")
+            conn.execute("PRAGMA user_version = 20002")
+
+        database.initialize_database()
+
+        with database.get_connection() as conn:
+            stored = conn.execute(
+                "SELECT quantity_micros FROM investment_opening_positions"
+            ).fetchone()[0]
+        self.assertEqual(stored, 2_864_900)
 
     def test_incremental_migration_rolls_back_version_and_history_on_failure(self) -> None:
         database.initialize_database()

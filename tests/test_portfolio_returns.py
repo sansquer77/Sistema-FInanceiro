@@ -183,7 +183,7 @@ class PortfolioReturnsTest(unittest.TestCase):
         repeated = [row for row in rows if row["asset_identifier"] == "CDB-REPETIDO"]
         self.assertEqual(len(repeated), 1)
         self.assertEqual(repeated[0]["cost_basis_cents"], 150_000)
-        self.assertEqual(repeated[0]["quantity_micros"], 2_000_000)
+        self.assertEqual(repeated[0]["quantity_micros"], 200_000_000)
 
     def test_persisted_snapshots_override_approximation_and_report_coverage(self) -> None:
         user = create_user("Alice", "alice@example.com", "correct-password")

@@ -751,7 +751,7 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn('document.createElement("datalist")', asset_autocomplete)
         self.assertIn("updateQuantityRedemptionPreview", portfolio)
         self.assertIn('name: "remaining_quantity"', portfolio)
-        self.assertIn("quantity: position.quantity || 0", portfolio_form)
+        self.assertIn("quantity: position.redemption_quantity || position.quantity || 0", portfolio_form)
         self.assertIn("portfolio.redemption_history || []", portfolio)
         self.assertIn("Ganho/perda", portfolio)
         self.assertIn("Custo FIFO", portfolio)

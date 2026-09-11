@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 4.6
-atualizado: 2026-09-05
+versao: 4.8
+atualizado: 2026-09-11
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -19,7 +19,7 @@ tags: [arquitetura, meta]
 # Arquitetura
 
 > [!info] Status
-> **implementado** · versão: `4.6` · área: `meta` · atualizado em 2026-09-05 · relacionados: [[requisitos]], [[qualidade-codigo]], [[specs/backup-restauracao]], [[adr/0018-backup-completo-criptografado]]
+> **implementado** · versão: `4.8` · área: `meta` · atualizado em 2026-09-11 · relacionados: [[requisitos]], [[qualidade-codigo]], [[specs/backup-restauracao]], [[adr/0018-backup-completo-criptografado]]
 
 ## Visão geral
 
@@ -415,7 +415,7 @@ O arquivo SQLite recebe `journal_mode=WAL` uma vez no ciclo de inicialização; 
 
 ### Baseline e migração para a linha v2
 
-O baseline inicial da v2 usa `PRAGMA user_version = 20000`; o endurecimento operacional do SQLite inaugura a versão incremental `20001`, e a política global de backup leva o schema atual a `20002`. A tabela `schema_migrations` registra baseline e passos posteriores, enquanto `user_version` seleciona e ordena as migrações. Banco ausente é criado diretamente na versão atual; bancos entre `20000` e `20001` avançam transacionalmente em ordem até `20002`; versões futuras ou intermediárias desconhecidas são recusadas. Um `finance.db` com `user_version = 0` continua tratado como legado: na abertura, `financeiro/database_migrations.py` orquestra a cópia de trabalho, as compatibilizações históricas via `financeiro/database_compatibility.py::normalize_legacy_schema`, o candidato compacto por `VACUUM INTO`, as validações de integridade/chaves estrangeiras/versão/contagens e a promoção recuperável. O original passa a `data/finance-v1.bkp`, que nunca é sobrescrito, enquanto o candidato mantém o nome ativo `data/finance.db`. Falhas anteriores à promoção preservam o nome original; falha na segunda renomeação tenta restaurá-lo. Ver [[specs/migracao-banco-v2]] e [[adr/0012-fundacao-v2-contrato-e-migracao-de-dados]].
+O baseline inicial da v2 usa `PRAGMA user_version = 20000`; o endurecimento operacional do SQLite inaugura `20001`, a política global de backup usa `20002` e a precisão de oito casas das quantidades do Portfólio leva o schema atual a `20003`. A tabela `schema_migrations` registra baseline e passos posteriores, enquanto `user_version` seleciona e ordena as migrações. Banco ausente é criado diretamente na versão atual; bancos entre `20000` e `20002` avançam transacionalmente em ordem até `20003`; versões futuras ou intermediárias desconhecidas são recusadas. Um `finance.db` com `user_version = 0` continua tratado como legado: na abertura, `financeiro/database_migrations.py` orquestra a cópia de trabalho, as compatibilizações históricas via `financeiro/database_compatibility.py::normalize_legacy_schema`, o candidato compacto por `VACUUM INTO`, as validações de integridade/chaves estrangeiras/versão/contagens e a promoção recuperável. O original passa a `data/finance-v1.bkp`, que nunca é sobrescrito, enquanto o candidato mantém o nome ativo `data/finance.db`. Falhas anteriores à promoção preservam o nome original; falha na segunda renomeação tenta restaurá-lo. Ver [[specs/migracao-banco-v2]] e [[adr/0012-fundacao-v2-contrato-e-migracao-de-dados]].
 
 ### Tabelas
 
@@ -437,8 +437,8 @@ O baseline inicial da v2 usa `PRAGMA user_version = 20000`; o endurecimento oper
 | `transaction_tags` | `transactions.py` — Ver [[lancamentos]]. |
 | `credit_card_transaction_tags` | `credit_cards.py` — Ver [[cartoes]]. |
 | `spending_limits` | `spending_limits.py` — Ver [[limites-gastos]]. |
-| `investment_opening_positions` | `portfolio.py` — inclui `emergency_reserve_eligible` para reserva de emergência explícita. Ver [[investimentos-portfolio]]. |
-| `investment_operations` | `transactions.py` grava aportes e `portfolio.py` consolida; inclui `emergency_reserve_eligible` para reserva de emergência explícita em aportes. Ver [[investimentos-portfolio]]. |
+| `investment_opening_positions` | `portfolio.py` — inclui `emergency_reserve_eligible`; desde o schema `20003`, `quantity_micros` preserva o nome legado, mas representa unidades de `1e-8`. Ver [[investimentos-portfolio]]. |
+| `investment_operations` | `transactions.py` grava aportes e `portfolio.py` consolida; inclui `emergency_reserve_eligible`; desde o schema `20003`, `quantity_micros` preserva o nome legado, mas representa unidades de `1e-8`. Ver [[investimentos-portfolio]]. |
 | `investment_redemptions` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
 | `investment_closed_positions` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
 | `investment_value_overrides` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
@@ -634,6 +634,8 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `4.8` — 2026-09-11 — Resgates passam a reduzir o valor manual correspondente pelo bruto dentro da mesma transação SQLite da baixa FIFO e do crédito líquido, preservando rollback e isolamento por posição.
+- `4.7` — 2026-09-11 — Portfólio passa a preservar quantidades com oito casas no schema `20003`; o contrato separa a quantidade operacional exata da exibição arredondada e mantém o nome legado das colunas para compatibilidade.
 - `4.6` — 2026-09-05 — Documentada a arquitetura do backup completo da instalação: schema `20002`, política global multiusuário, cinco rotas, AES-256-GCM incremental, execução na abertura, retenção autenticada e restauração com salvaguarda e acesso exclusivo durante a promoção.
 - `4.5` — 2026-09-05 — Persistência passa a usar `synchronous=FULL`, WAL configurado somente na inicialização, estatísticas via `PRAGMA optimize` e migração incremental rastreável `20000` → `20001` em `schema_migrations`.
 - `4.4` — 2026-09-04 — Inicialização reconcilia o baseline aditivo idempotente também em bancos já marcados como v2, antes de atender requisições.

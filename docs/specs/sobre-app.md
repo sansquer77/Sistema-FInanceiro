@@ -2,8 +2,8 @@
 tipo: spec
 area: usuario
 status: implementado
-versao: 1.11
-atualizado: 2026-08-31
+versao: 1.12
+atualizado: 2026-09-11
 relacionados:
   - "[[frontend-modularizacao]]"
   - "[[../arquitetura|Arquitetura]]"
@@ -16,7 +16,7 @@ aliases: ["Sobre o App", "Sobre"]
 # Sobre o App
 
 > [!info] Status
-> **implementado** · área: `usuario` · atualizado em 2026-08-31 · relacionados: [[frontend-modularizacao]], [[../arquitetura|Arquitetura]], [[../distribuição|Distribuicao]], [[../requisitos|Requisitos]]
+> **implementado** · área: `usuario` · atualizado em 2026-09-11 · relacionados: [[frontend-modularizacao]], [[../arquitetura|Arquitetura]], [[../distribuição|Distribuicao]], [[../requisitos|Requisitos]]
 
 ## Problema
 
@@ -101,6 +101,7 @@ Usuários finais e mantenedores que usam o Sistema Financeiro localmente, instal
 
 ## Changelog
 
+- `1.12` — 2026-09-11 — Versão do produto elevada para `2.0.1` como PATCH da correção de resgates fracionários e da precisão de oito casas do Portfólio.
 - `1.11` — 2026-08-31 — Widget global removido; apoio disponível somente pelo link local na seção Contato da tela Sobre. Contrato HTML verifica localização e ausência do script externo.
 
 - `1.10` — 2026-08-31 — Especificadas correções de resposta visual, carregamento e escopo do apoio, conforme regras acima.
