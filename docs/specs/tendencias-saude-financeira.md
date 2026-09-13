@@ -2,8 +2,8 @@
 tipo: spec
 area: tendencias-saude-financeira
 status: implementado
-versao: 2.24
-atualizado: 2026-09-04
+versao: 2.25
+atualizado: 2026-09-13
 relacionados:
   - "[[score-saude-financeira]]"
   - "[[relatorios]]"
@@ -20,7 +20,7 @@ aliases: ["Tendências de Saúde Financeira", "Achados Financeiros", "Insights F
 # Tendências e Achados de Saúde Financeira
 
 > [!info] Status
-> **implementado** · área: `tendencias-saude-financeira` · atualizado em 2026-08-31 · relacionados: [[score-saude-financeira]], [[relatorios]], [[lancamentos]], [[cartoes]]
+> **implementado** · área: `tendencias-saude-financeira` · atualizado em 2026-09-13 · relacionados: [[score-saude-financeira]], [[relatorios]], [[lancamentos]], [[cartoes]]
 
 ## Problema
 
@@ -257,6 +257,7 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 - Dado uma requisição sem sessão válida, quando tenta consultar tendências ou preferências de IA, então o sistema retorna erro de autenticação sem expor dados.
 - Dado uma tentativa de salvar chave de API, quando a configuração é persistida, então o segredo é armazenado criptografado e nunca retornado pela API.
 - Dado o modo local/offline do app, quando nenhuma IA está configurada, então o sistema continua totalmente utilizável.
+- Dado um usuário com parcela movida em cascata por várias faturas até o destino final, quando consulta os meses intermediários, então esses meses não exibem a parcela como antecipação.
 - Dado um usuário com IA ativa e resumo reescrito com sucesso, quando visualiza o bloco **Tendências e achados**, então o título do bloco exibe um marcador discreto com ícone indicando IA.
 - Dado um usuário com histórico curto, quando visualiza **Tendências e achados**, então o aviso **Histórico curto** aparece fora dos cards de achados, como texto de seção.
 - Dado um usuário em tela estreita ou intermediária, quando visualiza a aba **Tendências**, então **Tendências e achados**, **Budget x Realizado** e os cards de confiança aparecem em fluxo vertical usando a largura disponível.
@@ -298,6 +299,7 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 
 ## Changelog
 
+- `2.25` — 2026-09-13 — Corrigida detecção de antecipação de parcelas para considerar apenas o destino final quando uma parcela é movida em cascata por várias faturas, evitando cards falsos nos meses intermediários.
 - `2.24` — 2026-09-04 — Adicionada detecção de limites de gastos ultrapassados em 3 meses consecutivos, gerando achado estruturado `limite_recorrente` que sugere revisar o valor do limite.
 - `2.23` — 2026-08-31 — Corrigido o contraste do tooltip de Tendências com tokens dos temas claro e escuro, incluindo cabeçalho e indicadores dos eixos; contrato CSS coberto por teste automatizado.
 - `2.22` — 2026-08-11 — Versionamento da app registrado: PATCH `1.4.0` → `1.4.1` aplicado em `financeiro/app_metadata.py` junto com a melhoria desta spec (v2.21), documentado no changelog do MoC.

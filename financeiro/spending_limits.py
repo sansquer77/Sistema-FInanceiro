@@ -79,7 +79,7 @@ def list_spending_limits_with_consumption(user_id: int, month: object | None) ->
         return limits
     month_start = f"{normalized_month}-01"
     month_end = f"{normalized_month}-31"
-    # spec: limites/limites-gastos v1.3 — consumo independe das listas mensais
+    # spec: limites/limites-gastos v1.5 — consumo independe das listas mensais
     # residentes no frontend e exclui o débito agregado de pagamentos de fatura.
     with get_connection() as conn:
         rows = conn.execute(
@@ -324,5 +324,7 @@ def normalize_optional_id(value: object) -> int | None:
 
 
 def format_spending_limit(spending_limit: dict) -> dict:
-    spending_limit["limit_amount"] = cents_to_money(spending_limit.pop("limit_amount_cents"))
+    # spec: limites/limites-gastos v1.5 — mantém limit_amount_cents para consumidores
+    # internos (ex.: alertas do cockpit) além do limit_amount legível na interface.
+    spending_limit["limit_amount"] = cents_to_money(spending_limit["limit_amount_cents"])
     return spending_limit

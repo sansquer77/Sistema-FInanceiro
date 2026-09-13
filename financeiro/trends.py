@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import sqlite3
 from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 from http import HTTPStatus
@@ -11,7 +12,7 @@ from financeiro.calendar_rules import days_in_month
 
 MONTH_PATTERN = re.compile(r"^\d{4}-\d{2}$")
 
-# spec: tendencias-saude-financeira v2.23 — critérios 8, 9 e 13
+# spec: tendencias-saude-financeira v2.25 — critérios 8, 9 e 13
 POINT_INCOME_CATEGORIES = {
     "Freelance e Autônomo",
     "Outras Receitas",
@@ -39,10 +40,10 @@ POINT_EXPENSE_SUBCATEGORIES = {
     "Manutenção, Reparos e Reformas",
 }
 
-# spec: tendencias-saude-financeira v2.23 — critério 29
+# spec: tendencias-saude-financeira v2.25 — critério 29
 SUBSCRIPTIONS_CATEGORY = "Assinaturas e Serviços"
 
-# spec: tendencias-saude-financeira v2.23 — critério 8 (reforço por palavras-chave)
+# spec: tendencias-saude-financeira v2.25 — critério 8 (reforço por palavras-chave)
 POINT_EVENT_KEYWORDS = [
     "plr",
     "bonus",
@@ -64,7 +65,7 @@ class TrendsError(Exception):
 
 def calculate_trends(user_id: int, month: object | None = None, currency: str = "BRL") -> dict:
     """
-    spec: tendencias-saude-financeira v2.23 — critérios 1, 3, 4, 5, 6, 7, 8, 9, 13,
+    spec: tendencias-saude-financeira v2.25 — critérios 1, 3, 4, 5, 6, 7, 8, 9, 13,
           22, 25, 26, 27, 28 e 29
     Núcleo local de cálculo de tendências: série mensal, Budget x Realizado,
     achados estruturados, eventos pontuais, assinaturas/serviços recorrentes e confiança.
@@ -157,7 +158,7 @@ def normalize_month(month: object | None) -> str:
 
 def build_monthly_series(conn, user_id: int, month: str) -> dict[str, dict[str, int]]:
     """
-    spec: tendencias-saude-financeira v2.23 — critério 3
+    spec: tendencias-saude-financeira v2.25 — critério 3
     Constrói série mensal de receitas e despesas analíticas.
     Conta-corrente usa o mês da data; cartão usa invoice_month.
     Pagamentos de fatura são excluídos das despesas analíticas.
@@ -190,7 +191,7 @@ def build_monthly_series(conn, user_id: int, month: str) -> dict[str, dict[str, 
         (user_id, start_date, end_date),
     ).fetchall()
 
-    # spec: tendencias-saude-financeira v2.23 — critério 26
+    # spec: tendencias-saude-financeira v2.25 — critério 26
     # (lançamentos de cartão entram pela competência da fatura)
     card_rows = conn.execute(
         """
@@ -227,7 +228,7 @@ def build_comparison_base(
     confidence: str,
 ) -> dict[str, int]:
     """
-    spec: tendencias-saude-financeira v2.23 — critérios 6, 22 e 95/96
+    spec: tendencias-saude-financeira v2.25 — critérios 6, 22 e 95/96
     Comparação base: média móvel de 3 meses quando histórico suficiente;
     média disponível quando intermediário; mês anterior (ou zero) quando curto.
     """
@@ -259,7 +260,7 @@ def build_comparison_base(
 
 def build_budget_vs_actual(conn, user_id: int, month: str) -> list[dict]:
     """
-    spec: tendencias-saude-financeira v2.23 — critérios 4 e 5
+    spec: tendencias-saude-financeira v2.25 — critérios 4 e 5
     Reaproveita limites vigentes do mês e calcula consumo real por
     categoria/subcategoria.
     """
@@ -448,7 +449,7 @@ def detect_cash_opportunity(conn, user_id: int, month: str) -> dict | None:
 
 def detect_recurring_limit_overruns(conn, user_id: int, month: str) -> list[dict]:
     """
-    spec: tendencias-saude-financeira v2.24 — critério de limite recorrente
+    spec: tendencias-saude-financeira v2.25 — critério de limite recorrente
     Identifica limites de gastos ultrapassados nos 3 meses consecutivos
     anteriores ao mês consultado (incluindo-o). Para cada limite vigente,
     compara o realizado mensal da categoria/subcategoria com o limite.
@@ -505,7 +506,7 @@ def detect_recurring_limit_overruns(conn, user_id: int, month: str) -> list[dict
 
 def detect_point_events(conn, user_id: int, month: str) -> list[dict]:
     """
-    spec: tendencias-saude-financeira v2.23 — critérios 8, 9 e 13
+    spec: tendencias-saude-financeira v2.25 — critérios 8, 9 e 13
     Identifica receitas e despesas candidatas a eventos pontuais usando
     categorias/subcategorias existentes como sinal principal e palavras-chave
     de descrição/tags como reforço.
@@ -717,11 +718,16 @@ def keyword_match(description: str, tags: str) -> bool:
 
 def detect_installment_acceleration(conn, user_id: int, month: str) -> list[dict]:
     """
-    spec: tendencias-saude-financeira v2.23 — critério 13
+    spec: tendencias-saude-financeira v2.25 — critério 13
     Detecta antecipações de parcelas registradas no histórico operacional
     como "Lancamento movido para fatura yyyy-mm" e parcelas futuras
     concentradas diretamente na fatura do mês.
     """
+    # spec: tendencias-saude-financeira v2.25 — critérios 13 e 51
+    # Busca todos os logs de movimento da transação (sem filtrar pelo mês de
+    # destino) para poder considerar apenas o log mais recente de cada parcela.
+    # Isso evita contar movimentos intermediários quando o usuário move uma
+    # parcela em cascata por várias faturas até o destino final.
     rows = conn.execute(
         """
         SELECT
@@ -743,15 +749,29 @@ def detect_installment_acceleration(conn, user_id: int, month: str) -> list[dict
             AND operation_logs.description LIKE ?
         ORDER BY operation_logs.created_at DESC
         """,
-        (user_id, f"%movido para fatura {month}%"),
+        (user_id, "%movido para fatura %"),
     ).fetchall()
+
+    latest_by_transaction: dict[str, sqlite3.Row] = {}
+    for row in rows:
+        transaction_id = str(row["transaction_id"] or "").strip() if row["transaction_id"] else ""
+        if not transaction_id:
+            transaction_id = str(row["entity_id"] or "").strip()
+        if not transaction_id:
+            continue
+        existing = latest_by_transaction.get(transaction_id)
+        if existing is None or str(row["created_at"] or "") > str(existing["created_at"] or ""):
+            latest_by_transaction[transaction_id] = row
 
     accelerations = []
     accepted_log_transaction_ids = set()
-    for row in rows:
+    for row in latest_by_transaction.values():
         metadata = safe_parse_metadata(row["metadata_json"])
         previous_month = str(metadata.get("previous_invoice_month") or "").strip()
-        target_month = str(metadata.get("target_invoice_month") or metadata.get("invoice_month") or month).strip()
+        target_month = str(metadata.get("target_invoice_month") or metadata.get("invoice_month") or "").strip()
+        # Só interessa se o destino final da parcela for exatamente o mês consultado.
+        if target_month != month:
+            continue
         direction = str(metadata.get("direction") or "").strip()
         is_previous_direction = direction == "previous"
         is_target_before_previous = bool(previous_month and target_month and previous_month > target_month)
@@ -759,7 +779,7 @@ def detect_installment_acceleration(conn, user_id: int, month: str) -> list[dict
             continue
         amount = int(metadata.get("amount_cents") or row["transaction_amount_cents"] or 0)
         purchase = str(metadata.get("transaction_description") or row["transaction_description"] or "").strip()
-        transaction_id = str(metadata.get("transaction_id") or row["transaction_id"] or "").strip()
+        transaction_id = str(metadata.get("transaction_id") or row["transaction_id"] or row["entity_id"] or "").strip()
         if transaction_id:
             accepted_log_transaction_ids.add(transaction_id)
         accelerations.append({
@@ -828,7 +848,7 @@ def safe_parse_metadata(value: object) -> dict:
 
 def detect_recurring_subscriptions(conn, user_id: int, month: str) -> list[dict]:
     """
-    spec: tendencias-saude-financeira v2.23 — critério 29
+    spec: tendencias-saude-financeira v2.25 — critério 29
     Agrega despesas recorrentes mensais da categoria 'Assinaturas e Serviços'
     por subcategoria (conta-corrente e cartão), sinalizando o peso relativo
     no orçamento sem recomendar cancelamento.
@@ -925,8 +945,8 @@ def build_findings(
     confidence: str,
 ) -> list[dict]:
     """
-    spec: tendencias-saude-financeira v2.23 — critérios 6, 7, 13, 22 e 29
-    spec: tendencias-saude-financeira v2.24 — critério de limite recorrente
+    spec: tendencias-saude-financeira v2.25 — critérios 6, 7, 13, 22 e 29
+    spec: tendencias-saude-financeira v2.25 — critério de limite recorrente
     Lista achados estruturados: variação de receita/despesa, limites excedidos,
     limites recorrentemente ultrapassados, eventos pontuais e assinaturas/serviços recorrentes.
     """
@@ -1015,7 +1035,7 @@ def build_findings(
                 "referencia": "limite_mensal",
             })
 
-    # spec: tendencias-saude-financeira v2.24 — critério de limite recorrente
+    # spec: tendencias-saude-financeira v2.25 — critério de limite recorrente
     for overrun in limit_overruns:
         label = overrun["subcategory_name"] or overrun["category_name"]
         months_text = ", ".join(
@@ -1090,7 +1110,7 @@ def build_findings(
             "quantidade": item["count"],
         })
 
-    # spec: tendencias-saude-financeira v2.23 — critério 29
+    # spec: tendencias-saude-financeira v2.25 — critério 29
     for item in subscriptions:
         label = item["subcategory_name"] or "Assinaturas e Serviços"
         findings.append({
@@ -1106,7 +1126,7 @@ def build_findings(
         })
 
     if cash_opportunity:
-        # spec: tendencias-saude-financeira v2.23 — critério 54
+        # spec: tendencias-saude-financeira v2.25 — critério 54
         findings.append({
             "tipo": "oportunidade_caixa",
             "severidade": "info",
@@ -1242,7 +1262,7 @@ def build_local_summary(
 
 def determine_confidence(previous_months: list[str]) -> str:
     """
-    spec: tendencias-saude-financeira v2.23 — critérios 94, 95 e 96
+    spec: tendencias-saude-financeira v2.25 — critérios 94, 95 e 96
     """
     count = len(previous_months)
     if count < 3:
@@ -1254,7 +1274,7 @@ def determine_confidence(previous_months: list[str]) -> str:
 
 def detect_multiple_currencies(conn, user_id: int, month: str) -> str | None:
     """
-    spec: tendencias-saude-financeira v2.23 — critério 27
+    spec: tendencias-saude-financeira v2.25 — critério 27
     Detecta se há dados em mais de uma moeda e indica a base usada.
     """
     account_currencies = {
