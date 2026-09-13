@@ -32,7 +32,25 @@ class MigrationPaths:
 INCREMENTAL_MIGRATIONS = {
     20001: ("sqlite_operational_hardening", lambda conn: conn.execute(MIGRATIONS_SCHEMA_SQL)),
     20002: ("backup_settings", lambda conn: _migrate_backup_settings(conn)),
+    20003: ("portfolio_quantity_precision", lambda conn: _migrate_portfolio_quantity_precision(conn)),
 }
+
+
+def _migrate_portfolio_quantity_precision(conn: sqlite3.Connection) -> None:
+    """Move portfolio quantities from 1e-6 to 1e-8 without changing values."""
+    columns = {
+        "investment_operations": ("quantity_micros",),
+        "investment_opening_positions": ("quantity_micros",),
+        "investment_redemptions": ("redeemed_quantity_micros",),
+        "investment_redemption_summaries": (
+            "redeemed_quantity_micros", "remaining_quantity_micros",
+        ),
+        "investment_monthly_snapshots": ("quantity_micros",),
+        "investment_closed_positions": ("quantity_micros",),
+    }
+    for table, names in columns.items():
+        for name in names:
+            conn.execute(f"UPDATE {table} SET {name} = {name} * 100")
 
 
 def _migrate_backup_settings(conn: sqlite3.Connection) -> None:
@@ -85,7 +103,7 @@ def _migrate_backup_settings(conn: sqlite3.Connection) -> None:
 
 def read_schema_version(db_path: Path) -> int:
     try:
-        # spec: migracao-dados/migracao-banco-v2 v1.7 — critério 12
+        # spec: migracao-dados/migracao-banco-v2 v1.8 — critério 12
         # A URI mode=ro falha em algumas combinações do SQLite do macOS quando
         # o caminho contém espaços. A conexão normal é aberta sem executar
         # escrita e também consegue consultar bancos configurados em WAL.
@@ -113,7 +131,7 @@ def migrate_incremental_database(
     connection_factory: Callable[[Path], sqlite3.Connection],
 ) -> None:
     """Apply known post-baseline migrations atomically and in order."""
-    # spec: migracao-dados/migracao-banco-v2 v1.7 — critério 13
+    # spec: migracao-dados/migracao-banco-v2 v1.8 — critério 13
     if current_version < BASELINE_SCHEMA_VERSION or current_version >= target_version:
         raise DatabaseMigrationError(f"Versao de banco nao suportada: {current_version}.")
     expected_versions = list(range(current_version + 1, target_version + 1))
@@ -161,7 +179,7 @@ def migrate_legacy_database(
     The operation is recoverable: the original active file is preserved as the
     backup, and failures before promotion keep the legacy database in place.
     """
-    # spec: migracao-dados/migracao-banco-v2 v1.7 — critérios 3, 4, 7, 8 e 11
+    # spec: migracao-dados/migracao-banco-v2 v1.8 — critérios 3, 4, 7, 8 e 11
     if paths.backup.exists():
         raise DatabaseMigrationError(
             f"A migracao foi bloqueada porque {paths.backup.name} ja existe. "

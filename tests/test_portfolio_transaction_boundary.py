@@ -2,6 +2,7 @@ from contextlib import contextmanager
 from decimal import Decimal
 from http import HTTPStatus
 from pathlib import Path
+import sqlite3
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -255,6 +256,35 @@ class PortfolioTransactionBoundaryTest(unittest.TestCase):
                     with self.assertRaisesRegex(RuntimeError, "rollback"):
                         operation(self.user["id"], self.payload)
                 self.assertEqual(self.financial_counts(), (0, 0, 0, 0))
+
+    def test_redemption_rolls_back_manual_value_with_financial_writes(self):
+        portfolio.update_position_value_override(
+            self.user["id"], {**self.payload, "current_value": "100,00"}
+        )
+        with database.get_connection() as conn:
+            conn.execute("""
+                CREATE TRIGGER fail_redemption_summary
+                BEFORE INSERT ON investment_redemption_summaries
+                BEGIN
+                    SELECT RAISE(ABORT, 'rollback');
+                END
+            """)
+
+        with self.assertRaises(sqlite3.IntegrityError):
+            portfolio.redeem_position(self.user["id"], self.payload)
+
+        self.assertEqual(self.financial_counts(), (0, 0, 0, 0))
+        with database.get_connection() as conn:
+            manual_value = conn.execute(
+                "SELECT current_value_cents FROM investment_value_overrides WHERE user_id = ?",
+                (self.user["id"],),
+            ).fetchone()[0]
+            balance = conn.execute(
+                "SELECT current_balance_cents FROM checking_accounts WHERE id = ?",
+                (self.account["id"],),
+            ).fetchone()[0]
+        self.assertEqual(manual_value, 10_000)
+        self.assertEqual(balance, 0)
 
 
 if __name__ == "__main__":

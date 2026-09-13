@@ -2,13 +2,14 @@
 tipo: spec
 area: limites
 status: implementado
-versao: 1.4
-atualizado: 2026-09-01
+versao: 1.5
+atualizado: 2026-09-13
 relacionados:
   - "[[categorias-tags-gestao]]"
   - "[[cartoes]]"
   - "[[relatorios]]"
   - "[[arquitetura]]"
+  - "[[alertas-cockpit]]"
 tags: [spec, "area/limites"]
 aliases: ["Limites de Gastos", "Budgets", "Metas"]
 ---
@@ -16,7 +17,7 @@ aliases: ["Limites de Gastos", "Budgets", "Metas"]
 # Limites de Gastos
 
 > [!info] Status
-> **implementado** · versão: `1.3` · área: `limites` · atualizado em 2026-09-01 · relacionados: [[categorias-tags-gestao]], [[cartoes]], [[relatorios]]
+> **implementado** · versão: `1.5` · área: `limites` · atualizado em 2026-09-13 · relacionados: [[categorias-tags-gestao]], [[cartoes]], [[relatorios]], [[alertas-cockpit]]
 
 ## Problema
 
@@ -89,6 +90,7 @@ Tabelas: `spending_limits`, `categories`, `subcategories`.
 
 ## Changelog
 
+- `1.5` — 2026-09-13 — Corrigida a ausência de `limit_amount_cents` no retorno de `list_spending_limits_with_consumption`, que impedia o alerta de limite estourado na central de mensagens do Cockpit.
 - `1.4` — 2026-09-04 — Limites entre 80% e 100% exibem estado textual e visual de atenção antes do estouro.
 
 ## Relacionados

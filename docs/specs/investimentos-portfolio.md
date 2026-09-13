@@ -2,8 +2,8 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.61
-atualizado: 2026-09-04
+versao: 2.64
+atualizado: 2026-09-11
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -16,7 +16,7 @@ aliases: ["Investimentos", "Portfólio"]
 # Investimentos e Portfólio
 
 > [!info] Status
-> **implementado** · área: `investimentos` · atualizado em 2026-09-04 · relacionados: [[contas-correntes]], [[lancamentos]], [[relatorios]]
+> **implementado** · área: `investimentos` · atualizado em 2026-09-11 · relacionados: [[contas-correntes]], [[lancamentos]], [[relatorios]]
 
 ## Problema
 
@@ -99,7 +99,8 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 - Stablecoins usam classe própria (`stablecoin`), separada de criptoativos voláteis, mas reutilizam as mesmas fontes de cotação. A moeda contábil e o par de cotação continuam definidos pela conta/carteira: uma posição em carteira BRL usa USDC/BRL; em carteira USD usa USDC/USD.
 - USDC, USDT, DAI, FDUSD, PYUSD, TUSD, USDP e USDE cadastrados anteriormente como `crypto` são classificados como Stablecoin na leitura, sem migração destrutiva; novas posições e aportes conhecidos persistem como `stablecoin`.
 - Ativos internacionais cujo ticker operacional precisa de sufixo de bolsa podem usar alias explícito do provedor; `VWRA` em carteira USD resolve para `VWRA.L` (London Stock Exchange, listagem USD) no Yahoo Finance.
-- A quantidade exibida em posições, origens e posições encerradas é normalizada com **até 2 casas decimais** (arredondamento `half-up`), independentemente da precisão cadastrada ou retornada pela cotação, para preservar o layout das tabelas.
+- Quantidades de cripto e stablecoins são exibidas com oito casas decimais em posições, origens e histórico; os demais ativos mantêm até duas casas. A precisão operacional permanece independente da formatação.
+- Resgates descontam o valor bruto do valor manual da posição correspondente na mesma transação da baixa FIFO e do crédito líquido. Taxas não reduzem novamente o valor manual. O valor remanescente tem piso zero; falhas revertem todas as escritas.
 - A aba **Eventos** consulta sob demanda os próximos eventos anunciados somente para ações, ETFs e BDRs ainda presentes na carteira, em uma janela do mês atual mais dois meses. Para ativos brasileiros, usa a API pública da B3 como fonte primária; para ativos internacionais, usa a API pública da Nasdaq (sem chave) e Yahoo Finance como fallback. O cache é diário por ativo para capturar alterações sem repetir consultas no mesmo dia. Os resultados são agrupados por mês e informam Data ex, data de pagamento quando fornecida, ativo, carteira(s), evento, valor por cota/ação e a fonte (`B3`, `Nasdaq` ou `Yahoo Finance`) na coluna própria. A nota de rodapé mantém apenas a orientação abrangente: “Dados obtidos de fontes públicas; sempre validar com seu Banco/Corretora”.
 - A B3 preserva a natureza divulgada para dividendos, JCP, rendimentos, bonificações, desdobramentos e grupamentos. Yahoo Finance continua exibindo `Dividendo/JCP` quando o payload de fallback não permite distinguir a natureza fiscal. Para eventos societários sem valor monetário unitário, o app não converte o fator em dinheiro nem estima benefício financeiro.
 - A Data ex derivada de `lastDatePrior` usa o calendário nacional ANBIMA persistido no SQLite. A planilha oficial é obtida na primeira execução e revalidada no máximo uma vez por ano; indisponibilidade externa preserva a última cópia válida, não bloqueia a abertura do app e não aciona outra fonte de feriados.
@@ -229,7 +230,8 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado uma posição de Previdência Privada com CNPJ em carteira BRL e a integração Mais Retorno ativada, quando o Portfólio é carregado, então a posição usa a última cota da API como valor atual, com fonte e data da cota.
 - Dado uma posição de fundo sem integração ativada, sem CNPJ ou em carteira não-BRL, quando o Portfólio é carregado, então a posição mantém o valor de custo com status `Cotacao manual pendente` e nenhuma chamada à API Mais Retorno é feita.
 - Dado uma posição de fundo com a API Mais Retorno indisponível, quando o Portfólio é carregado, então a posição mantém o valor de custo com status amigável e o restante do portfólio segue funcionando.
-- Dado posições com quantidade de alta precisão (ex.: `94,65389`), quando o Portfólio é exibido, então a quantidade aparece com no máximo 2 casas decimais para preservar o layout das tabelas.
+- Dado posições com quantidade de alta precisão, quando o Portfólio é exibido, então cripto e stablecoins mostram oito casas e os demais ativos no máximo duas.
+- Dado uma quantidade longa, como `453,19877900` USDC, quando a aba **Posição** é exibida, então a coluna de quantidade reserva espaço suficiente e mantém separação visual do preço médio.
 - Dado o módulo Portfólio aberto, quando o usuário navega entre **Posição**, **Análise**, **Metas**, **Eventos** e **Histórico**, então apenas o painel da aba ativa é exibido e os dados das demais abas permanecem preservados.
 - Dado um ativo de renda fixa com taxa cadastrada, quando listado no Portfólio, então a variação do dia é a diferença entre o valor líquido na curva de hoje e o do dia anterior, zerada no dia da aquisição.
 - Dado um ativo de renda fixa pós-fixado em dia sem taxa publicada (fim de semana/feriado), quando listado no Portfólio, então a variação do dia exibe zero, sem crescimento artificial do indexador.
@@ -247,10 +249,14 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado uma carteira válida selecionada no formulário de posição inicial, quando o usuário salva um ativo de qualquer categoria, inclusive Stablecoin, então o identificador da carteira é enviado antes de os controles entrarem em estado ocupado e a posição é cadastrada sem falso erro de carteira ausente.
 - Dado ativos existentes no Portfólio, quando o usuário digita o código no cadastro de posição inicial ou em um lançamento de investimento, então recebe sugestões, pode selecionar um ativo para preencher seu nome e continua podendo informar um código novo livremente.
 - Dado um ativo com quantidade positiva, quando o usuário abre **Resgatar**, então o formulário mostra quantidade disponível/a resgatar, cotação unitária, valor bruto, taxas, crédito líquido e quantidade remanescente.
+- Dado um ativo fracionário cuja quantidade possua mais de duas casas, quando o usuário abre **Resgatar**, então cripto e stablecoins exibem oito casas na tabela e o formulário e a gravação usam a quantidade operacional exata de até oito casas; os demais ativos exibem até duas casas.
 - Dado o usuário alterando quantidade, cotação ou taxas no resgate quantitativo, quando o formulário é atualizado, então valor bruto, saldo líquido e quantidade remanescente são recalculados antes da confirmação.
 - Dado uma posição formada por múltiplos aportes, quando ocorre um resgate quantitativo parcial, então os lotes mais antigos são consumidos primeiro (FIFO), preservando quantidade e custo dos lotes restantes.
 - Dado um resgate quantitativo com taxas, quando confirmado, então a baixa registra o valor bruto realizado e a conta recebe somente o saldo líquido; quantidades acima do disponível e taxas acima do bruto são rejeitadas.
+- Dado uma posição com valor atual manual, quando um resgate parcial é confirmado, então o valor bruto do resgate é descontado desse valor manual na mesma transação, sem descontar as taxas novamente e sem alterar posições distintas.
+- Dado uma falha depois da baixa do valor manual e antes da conclusão do resgate, quando a transação é revertida, então valor manual, saldo da conta, lotes FIFO e históricos permanecem inalterados.
 - Dado um resgate confirmado, quando consultado posteriormente na aba Histórico, então exibe quantidade baixada, valor bruto, taxas, valor líquido, custo FIFO, ganho/perda realizado e quantidade/custo remanescentes conforme o snapshot do momento da operação.
+- Dado um resgate de ativo identificado, quando a quantidade é exibida no Histórico, então sua unidade é o código do ativo, como `ETH` ou `USDC`, e não a moeda contábil da carteira.
 - Dado operações posteriores sobre o mesmo ativo, quando um resgate antigo é consultado, então seus valores realizados e remanescentes históricos não são recalculados nem alterados retroativamente.
 - Dado a aba Histórico aberta, quando há resgates parciais e/ou posições encerradas, então eles aparecem em seções distintas e o estado vazio orienta que ambos os eventos serão registrados ali.
 - Dado o usuário configurando metas por classe na aba Metas, quando salva, então os percentuais entre 0% e 100% são persistidos somente se a soma for exatamente 100%.
@@ -307,6 +313,9 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 
 ## Changelog
 
+- `2.64` — 2026-09-11 — A coluna de quantidade ganha espaço para oito casas e o Histórico passa a identificar quantidades pelo código do ativo, não pela moeda da carteira.
+- `2.63` — 2026-09-11 — Resgate reduz atomicamente o valor manual pelo bruto, preservando resíduos e isolamento entre posições; cripto e stablecoins exibem oito casas nas posições e no histórico.
+- `2.62` — 2026-09-11 — Corrigido o resgate de quantidades fracionárias como ETH: o contrato separa quantidade visual arredondada da quantidade operacional exata de até oito casas usada no modal, na prévia e na revalidação FIFO; a migração preserva as quantidades anteriormente armazenadas.
 - `2.61` — 2026-09-04 — Datas ex derivadas da B3 passam a usar calendário nacional ANBIMA local, importado de XLS oficial com TLS verificado, limite de tamanho, atualização anual transacional e sem fallback BrasilAPI.
 - `2.60` — 2026-09-04 — A spec reconhece a coluna Fonte existente, preserva a natureza informada pela B3 e inclui bonificações, desdobramentos e grupamentos sem estimativa monetária; B3/Nasdaq/Yahoo compartilham transporte TLS verificado com falha segura.
 - `2.59` — 2026-09-04 — A janela da aba Eventos passa a começar no primeiro dia do mês atual, preservando eventos B3 com Data ex já ocorrida no mês e pagamento futuro.

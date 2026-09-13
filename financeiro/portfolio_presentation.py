@@ -5,7 +5,7 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import json
 
 from financeiro.accounts import cents_to_money, money_to_cents
-from financeiro.portfolio_calculations import percent, portfolio_group_label
+from financeiro.portfolio_calculations import percent, portfolio_group_label, display_quantity
 
 
 def decimal(value):
@@ -26,11 +26,11 @@ def asset_key(position):
 
 
 def decorate_position(position):
-    # spec: investimentos-portfolio v2.53 — resultados por moeda, sem cálculo no cliente
+    # spec: investimentos-portfolio v2.64 — resultados por moeda, sem cálculo no cliente
     current = int(position['current_value_cents'])
     cost = cents(position.get('total_cost'))
     day = cents(position.get('day_result'))
-    quantity = decimal(position.get('quantity'))
+    quantity = decimal(position.get('redemption_quantity', position.get('quantity')))
     position.update(result=cents_to_money(current - cost),
                     result_percent=percent(current - cost, cost) if cost > 0 else '0.00',
                     day_result_percent=percent(day, current - day) if current - day > 0 else '0.00',
@@ -48,8 +48,10 @@ def aggregate(positions):
               'fixed_income_iof_tax', 'fixed_income_income_tax', 'fixed_income_custody_fee', 'fixed_income_net_value')
     for field in fields:
         base[field] = cents_to_money(sum(cents(p.get(field)) for p in positions))
-    quantity = sum((decimal(p.get('quantity')) for p in positions), Decimal(0))
-    base.update(quantity=str(quantity), current_value_cents=cents(base['current_value']),
+    quantity = sum((decimal(p.get('redemption_quantity', p.get('quantity'))) for p in positions), Decimal(0))
+    base.update(quantity=display_quantity(quantity, base['asset_type']),
+                redemption_quantity=f"{quantity.quantize(Decimal('0.00000001'), rounding=ROUND_HALF_UP).normalize():f}" if quantity else '0',
+                current_value_cents=cents(base['current_value']),
                 current_value_brl_cents=cents(base['current_value_brl']),
                 average_price=cents_to_money(int((Decimal(cents(base['total_cost'])) / quantity).quantize(Decimal('1'), rounding=ROUND_HALF_UP))) if quantity > 0 else base['average_price'],
                 apply_tax_estimate=all(p.get('apply_tax_estimate') for p in positions),
@@ -145,12 +147,13 @@ def preview(data, error_type):
         return dict(total_percent=str(total), valid=total == 100)
     if data.get('kind') != 'redemption':
         raise error_type('Prévia inválida.')
-    quantity = number(data.get('quantity')).quantize(Decimal('0.000001'), rounding=ROUND_HALF_UP)
+    quantity = number(data.get('quantity')).quantize(Decimal('0.00000001'), rounding=ROUND_HALF_UP)
     available = number(data.get('available_quantity'))
     unit = money_to_cents(str(number(data.get('unit_price'))).replace('.', ','))
     fees = money_to_cents(str(number(data.get('fees'))).replace('.', ','))
     gross = int((quantity*unit).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
     errors = dict(quantity='A quantidade excede o saldo disponível.' if quantity > available else '',
                   fees='As taxas não podem superar o valor bruto.' if fees > gross else '')
+    remaining = max(available-quantity, Decimal(0))
     return dict(gross_amount=cents_to_money(gross), amount=cents_to_money(max(gross-fees, 0)),
-                remaining_quantity=str(max(available-quantity, Decimal(0))), errors=errors)
+                remaining_quantity=f"{remaining.normalize():f}" if remaining else '0', errors=errors)

@@ -36,7 +36,9 @@ def aggregate_savings_anniversaries(entries: list[dict]) -> list[dict]:
 
 
 def decimal_to_micros_value(value: Decimal) -> int:
-    return int((value * Decimal("1000000")).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    # O nome das colunas foi preservado por compatibilidade; desde o schema
+    # 20003 elas armazenam unidades de 1e-8 para suportar criptoativos.
+    return int((value * Decimal("100000000")).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
 def load_position_inputs(conn, user_id: int) -> dict:

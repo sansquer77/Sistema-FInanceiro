@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 
 BASELINE_SCHEMA_VERSION = 20000
-SCHEMA_VERSION = 20002
+SCHEMA_VERSION = 20003
 
 
 MIGRATIONS_SCHEMA_SQL = """

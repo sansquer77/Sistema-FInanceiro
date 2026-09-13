@@ -6,6 +6,7 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from financeiro.accounts import cents_to_money
 
 MICRO_SCALE = Decimal("1000000")
+QUANTITY_SCALE = Decimal("100000000")
 CRYPTO_ASSETS = {"BTC", "ETH", "SOL", "USDC", "USDT"}
 STABLECOIN_ASSETS = {"USDC", "USDT", "DAI", "FDUSD", "PYUSD", "TUSD", "USDP", "USDE"}
 CRYPTO_ALIASES = {"BITCOIN": "BTC", "ETHEREUM": "ETH", "SOLANA": "SOL", "USD COIN": "USDC", "TETHER": "USDT"}
@@ -92,6 +93,10 @@ def micros_to_decimal(micros: int) -> Decimal:
     return Decimal(int(micros or 0)) / MICRO_SCALE
 
 
+def quantity_units_to_decimal(units: int) -> Decimal:
+    return Decimal(int(units or 0)) / QUANTITY_SCALE
+
+
 def parse_rate_decimal(value: object) -> Decimal:
     if isinstance(value, Decimal):
         return value
@@ -110,6 +115,17 @@ def decimal_to_string(value: Decimal) -> str:
     if not value:
         return "0"
     return f"{value.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP).normalize():f}"
+
+
+def quantity_to_string(value: Decimal) -> str:
+    """Serialize operational quantities with crypto-compatible precision."""
+    if not value:
+        return "0"
+    return f"{value.quantize(Decimal('0.00000001'), rounding=ROUND_HALF_UP).normalize():f}"
+
+
+def display_quantity(value: Decimal, asset_type: str) -> str:
+    return f"{value:.8f}" if asset_type in {'crypto', 'stablecoin'} else decimal_to_string(value)
 
 
 def format_decimal_percent(value: Decimal) -> str:

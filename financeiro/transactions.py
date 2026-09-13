@@ -25,6 +25,7 @@ INVESTMENT_ASSET_TYPES = {"stock", "crypto", "stablecoin", "fund", "fixed_income
 STABLECOIN_ASSETS = {"USDC", "USDT", "DAI", "FDUSD", "PYUSD", "TUSD", "USDP", "USDE"}
 FIXED_INCOME_MODES = {"pre", "post", "hybrid"}
 EXCHANGE_RATE_SCALE = Decimal("1000000")
+QUANTITY_SCALE = Decimal("100000000")
 PTAX_RATE_URL = (
     "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/"
     "CotacaoMoedaPeriodo(moeda=@moeda,dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)"
@@ -755,7 +756,7 @@ def normalize_investment_operation(data: dict, amount_cents: int, transaction_ty
         "asset_identifier": asset_identifier,
         "asset_name": empty_to_none(data.get("investment_asset_name")),
         "cnpj": empty_to_none(data.get("investment_cnpj")),
-        "quantity_micros": decimal_to_micros(data.get("investment_quantity")),
+        "quantity_micros": decimal_to_micros(data.get("investment_quantity"), scale=QUANTITY_SCALE),
         "unit_price_cents": money_to_cents(data.get("investment_unit_price", "0")) if str(data.get("investment_unit_price") or "").strip() else 0,
         "invested_amount_cents": invested_amount_cents,
         "brokerage_fee_cents": money_to_cents(data.get("investment_brokerage_fee", "0")) if str(data.get("investment_brokerage_fee") or "").strip() else 0,
@@ -782,7 +783,7 @@ def normalize_investment_asset_hint(category: str, subcategory: str, asset_ident
 
 
 def normalize_investment_emergency_reserve_eligible(data: dict, asset_type: str) -> int:
-    # spec: investimentos/investimentos-portfolio v2.53 — critérios 21 e 23
+    # spec: investimentos/investimentos-portfolio v2.64 — critérios 21 e 23
     if asset_type not in {"fixed_income", "savings"}:
         return 0
     return 1 if str(data.get("investment_emergency_reserve_eligible") or "").strip().lower() in {"1", "true", "on", "yes"} else 0
@@ -805,7 +806,7 @@ def normalize_flag(value: object) -> bool:
     return raw in {"1", "true", "yes", "sim", "on"}
 
 
-def decimal_to_micros(value: object) -> int:
+def decimal_to_micros(value: object, *, scale: Decimal = EXCHANGE_RATE_SCALE) -> int:
     raw = str(value or "").strip()
     if not raw:
         return 0
@@ -817,7 +818,7 @@ def decimal_to_micros(value: object) -> int:
         raise TransactionError("Informe um numero valido nos detalhes do investimento.") from exc
     if decimal_value < 0:
         raise TransactionError("Informe valores positivos nos detalhes do investimento.")
-    return int((decimal_value * EXCHANGE_RATE_SCALE).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    return int((decimal_value * scale).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
 def average_amount_for_recurring_description(
@@ -1238,7 +1239,7 @@ def extract_investment_operation(transaction: dict) -> dict | None:
         "asset_identifier": transaction.pop("investment_asset_identifier", None),
         "asset_name": transaction.pop("investment_asset_name", None),
         "cnpj": transaction.pop("investment_cnpj", None),
-        "quantity": micros_to_decimal(transaction.pop("investment_quantity_micros", 0) or 0),
+        "quantity": micros_to_decimal(transaction.pop("investment_quantity_micros", 0) or 0, scale=QUANTITY_SCALE),
         "unit_price": cents_to_money(transaction.pop("investment_unit_price_cents", 0) or 0),
         "invested_amount": cents_to_money(transaction.pop("investment_invested_amount_cents", 0) or 0),
         "brokerage_fee": cents_to_money(transaction.pop("investment_brokerage_fee_cents", 0) or 0),
@@ -1278,10 +1279,10 @@ def parse_savings_anniversaries(value: object) -> list[dict]:
     ]
 
 
-def micros_to_decimal(micros: int) -> str:
+def micros_to_decimal(micros: int, *, scale: Decimal = EXCHANGE_RATE_SCALE) -> str:
     if not micros:
         return ""
-    value = Decimal(micros) / EXCHANGE_RATE_SCALE
+    value = Decimal(micros) / scale
     return f"{value.normalize():f}"
 
 

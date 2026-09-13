@@ -10,6 +10,7 @@ def position(currency='BRL', current=12000, brl=12000):
     return dict(account_id=1, account_name='Carteira', currency=currency, asset_type='stock',
                 asset_type_label='Renda variável', asset_identifier='ABC', asset_name='Ativo',
                 quantity='2', average_price='50.00', total_cost='100.00', total_cost_cents=10000,
+                redemption_quantity='2',
                 total_cost_brl='100.00', total_cost_brl_cents=10000, day_result='1.00',
                 day_result_cents=100, day_result_brl_cents=100,
                 current_value=presentation.cents_to_money(current), current_value_cents=current,
@@ -27,6 +28,14 @@ class PortfolioPresentationTest(unittest.TestCase):
         presentation.decorate_position(p)
         self.assertEqual(p['result_percent'], '0.00')
         self.assertEqual(p['redemption_unit_price'], '0.00')
+
+    def test_redemption_price_uses_operational_quantity_instead_of_rounded_display(self):
+        p = position(current=36334)
+        p.update(quantity='0.03', redemption_quantity='0.02852400')
+
+        presentation.decorate_position(p)
+
+        self.assertEqual(p['redemption_unit_price'], '12738.05')
 
     def test_groups_never_add_different_native_currencies(self):
         positions = [position(), position('USD', current=20000, brl=100000)]

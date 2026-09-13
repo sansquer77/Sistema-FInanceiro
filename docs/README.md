@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 12.54
-atualizado: 2026-09-06
+versao: 12.58
+atualizado: 2026-09-11
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -152,6 +152,10 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `12.58` — 2026-09-11 — [[specs/investimentos-portfolio]] v2.64 melhora o espaçamento de quantidades longas e corrige a unidade exibida nos resgates do Histórico.
+- `12.57` — 2026-09-11 — [[specs/investimentos-portfolio]] v2.63 faz o resgate descontar atomicamente o valor bruto do valor manual e padroniza a exibição de cripto e stablecoins com oito casas.
+- `12.56` — 2026-09-11 — [[specs/sobre-app]] v1.12 registra o incremento PATCH do produto para `2.0.1` após a correção de resgates fracionários do Portfólio.
+- `12.55` — 2026-09-11 — [[specs/investimentos-portfolio]] v2.62 e [[specs/migracao-banco-v2]] v1.8 corrigem resgates fracionários e elevam quantidades do Portfólio a oito casas no schema `20003`.
 - `12.54` — 2026-09-06 — [[distribuição]] v2.8 adiciona aos três pacotes um guia genérico de servidor Linux, separado da configuração operacional pessoal em [[server]].
 - `12.53` — 2026-09-06 — [[specs/Update Server]] v1.4 e [[server]] v1.6 removem a validação privilegiada duplicada no cliente, mantendo a confirmação no script remoto.
 - `12.52` — 2026-09-06 — [[specs/Update Server]] v1.3 e [[server]] v1.5 endurecem o pipeline `deploysf` com exclusões simétricas, sincronização limpa, recuperação de falha e validação do serviço.

@@ -578,6 +578,78 @@ class TrendsCalculationTest(unittest.TestCase):
         self.assertEqual(result["antecipacao_parcelas"], [])
         self.assertFalse([finding for finding in result["achados"] if finding["tipo"] == "antecipacao_parcela"])
 
+    def test_cascade_invoice_move_uses_only_final_destination(self) -> None:
+        # spec: tendencias-saude-financeira v2.24 — critério 13
+        # Regressão: quando uma parcela é movida em cascata por várias faturas
+        # até o destino final, apenas o destino final deve gerar o card de
+        # antecipação; os meses intermediários não devem aparecer.
+        user = create_user("T6D", "t6d@example.com", "strong-password")
+        card_id = create_credit_card(user["id"], {
+            "name": "Cartão", "issuer": "Banco", "currency": "BRL",
+            "limit": "500000", "closing_day": "20", "due_day": "10",
+        })["id"]
+        with database.get_connection() as conn:
+            category_id = conn.execute(
+                "INSERT INTO categories (user_id, name, group_type) VALUES (?, 'Eletronicos', 'expense')",
+                (user["id"],),
+            ).lastrowid
+            transaction_id = conn.execute(
+                """INSERT INTO credit_card_transactions
+                   (user_id, credit_card_id, type, description, amount_cents, amount_brl_cents,
+                    date, invoice_month, category_id, series_kind, installment_index, installment_count)
+                   VALUES (?, ?, 'expense', 'Celular', 15000, 15000, '2026-07-05', '2026-10',
+                           ?, 'installment', 4, 4)""",
+                (user["id"], card_id, category_id),
+            ).lastrowid
+            # Simula movimento em cascata: parcela 4 (outubro) -> setembro -> agosto
+            for metadata in [
+                {
+                    "direction": "previous",
+                    "previous_invoice_month": "2026-10",
+                    "target_invoice_month": "2026-09",
+                    "transaction_id": transaction_id,
+                    "transaction_description": "Celular",
+                    "amount_cents": 15000,
+                },
+                {
+                    "direction": "previous",
+                    "previous_invoice_month": "2026-09",
+                    "target_invoice_month": "2026-08",
+                    "transaction_id": transaction_id,
+                    "transaction_description": "Celular",
+                    "amount_cents": 15000,
+                },
+            ]:
+                conn.execute(
+                    """INSERT INTO operation_logs
+                       (user_id, module, operation_type, entity_type, entity_id,
+                        credit_card_id, description, metadata_json, created_at)
+                       VALUES (?, 'cards', 'move', 'credit_card_transaction', ?, ?, ?, ?, ?)""",
+                    (
+                        user["id"],
+                        transaction_id,
+                        card_id,
+                        f"Lancamento movido para fatura {metadata['target_invoice_month']}",
+                        json.dumps(metadata),
+                        # O destino final (agosto) precisa ser o log mais recente.
+                        f"2026-07-31 15:00:{60 - int(metadata['target_invoice_month'][-2:])}",
+                    ),
+                )
+
+        august = calculate_trends(user["id"], "2026-08")
+        september = calculate_trends(user["id"], "2026-09")
+        october = calculate_trends(user["id"], "2026-10")
+
+        august_acceleration = [item for item in august["antecipacao_parcelas"] if item["compra"] == "Celular"]
+        september_acceleration = [item for item in september["antecipacao_parcelas"] if item["compra"] == "Celular"]
+        october_acceleration = [item for item in october["antecipacao_parcelas"] if item["compra"] == "Celular"]
+
+        # Agosto é o destino final da parcela.
+        self.assertEqual(len(august_acceleration), 1, august_acceleration)
+        # Setembro e outubro não devem mostrar antecipação dessa série.
+        self.assertEqual(len(september_acceleration), 0, september_acceleration)
+        self.assertEqual(len(october_acceleration), 0, october_acceleration)
+
     def test_future_installments_concentrated_in_invoice_are_detected_as_acceleration(self) -> None:
         # spec: tendencias-saude-financeira v2.23 — critério 13
         user = create_user("T6C", "t6c@example.com", "strong-password")

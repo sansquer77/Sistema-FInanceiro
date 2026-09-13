@@ -7,8 +7,11 @@ from datetime import date
 from pathlib import Path
 
 from financeiro import database
+from financeiro.accounts import create_checking_account
 from financeiro.auth import create_user
+from financeiro.categories import create_category
 from financeiro.cockpit_notifications import build_cockpit_notifications, mark_informational_seen
+from financeiro.spending_limits import create_spending_limit, list_spending_limits_with_consumption
 import app
 
 
@@ -52,6 +55,32 @@ class CockpitNotificationsTest(unittest.TestCase):
         self.assertEqual({item["type"] for item in payload["critical"]}, {
             "limit_exceeded", "projected_negative_balance", "overdue_payable",
         })
+
+    def test_limit_exceeded_alert_uses_real_spending_limits_loader(self):
+        # spec: cockpit/alertas-cockpit v1.2 — critério 1
+        # Regressão: list_spending_limits_with_consumption preserva limit_amount_cents
+        # para que o alerta de estouro seja detectado pelo backend.
+        account = create_checking_account(self.user["id"], {
+            "name": "Conta", "bank_name": "Banco", "currency": "BRL", "initial_balance": "0,00",
+        })
+        category = create_category(self.user["id"], "Alimentação Alertas", "expense")
+        create_spending_limit(self.user["id"], {
+            "month": self.today.strftime("%Y-%m"),
+            "category_id": category["id"],
+            "limit_amount": "1200,00",
+        })
+        with database.get_connection() as conn:
+            conn.execute(
+                """INSERT INTO transactions
+                   (user_id, type, description, amount_cents, amount_brl_cents, date, account_id, category_id)
+                   VALUES (?, 'expense', 'Mercado', 135000, 135000, ?, ?, ?)""",
+                (self.user["id"], self.today.isoformat(), account["id"], category["id"]),
+            )
+        payload = self.build(limits_loader=list_spending_limits_with_consumption)
+        limits = [item for item in payload["critical"] if item["type"] == "limit_exceeded"]
+        self.assertEqual(len(limits), 1)
+        self.assertIn("Alimentação", limits[0]["title"])
+        self.assertIn("1350.00", limits[0]["description"])
 
     def test_informational_seen_state_is_persistent_but_item_remains_visible(self):
         event = {"id": "ITUB4:2026-09-05", "asset_identifier": "ITUB4", "payment_date": "2026-09-05", "source": "Yahoo", "confirmation_level": "detectado"}
