@@ -62,8 +62,8 @@
   --logo-shadow: 0 2px 5px rgba(31, 41, 51, 0.08);
   --control-shadow: 0 1px 4px rgba(31, 41, 51, 0.12);
   --control-shadow-sm: 0 1px 3px rgba(31, 41, 51, 0.12);
-  --tooltip-surface: #1f2933;
-  --tooltip-text: #ffffff;
+  --tooltip-surface: #f4f6fb;
+  --tooltip-text: #101114;
   --drawer-overlay: rgba(15, 23, 42, 0.42);
   --drawer-shadow: -4px 0 24px rgba(15, 23, 42, 0.12);
   --modal-overlay: rgba(15, 23, 42, 0.42);
@@ -148,8 +148,8 @@
   --logo-shadow: 0 2px 8px rgba(0, 0, 0, 0.32);
   --control-shadow: 0 1px 6px rgba(0, 0, 0, 0.28);
   --control-shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.24);
-  --tooltip-surface: #f4f6fb;
-  --tooltip-text: #101114;
+  --tooltip-surface: #1f2933;
+  --tooltip-text: #ffffff;
   --drawer-overlay: rgba(0, 0, 0, 0.58);
   --drawer-shadow: -6px 0 28px rgba(0, 0, 0, 0.34);
   --modal-overlay: rgba(0, 0, 0, 0.62);
@@ -8463,6 +8463,30 @@ form[aria-busy="true"] .form-actions {
   color: var(--ink);
   background: var(--panel);
   border-color: var(--line);
+}
+
+/* ApexCharts renders tooltips outside the view-specific theme wrappers. Keep
+   every chart legible when the application is using the dark theme. */
+.apexcharts-tooltip,
+.apexcharts-xaxistooltip,
+.apexcharts-yaxistooltip {
+  color: var(--tooltip-text) !important;
+  background: var(--tooltip-surface) !important;
+  border-color: var(--line) !important;
+  box-shadow: var(--control-shadow) !important;
+}
+
+.apexcharts-tooltip-title {
+  color: var(--tooltip-text) !important;
+  background: var(--surface-low) !important;
+  border-bottom-color: var(--line) !important;
+}
+
+.apexcharts-tooltip-text,
+.apexcharts-tooltip-text-y-label,
+.apexcharts-tooltip-text-y-value,
+.apexcharts-tooltip-marker {
+  color: var(--tooltip-text) !important;
 }
 
 .portfolio-return-chart .apexcharts-canvas .apexcharts-tooltip .apexcharts-tooltip-title,
