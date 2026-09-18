@@ -760,7 +760,15 @@ def detect_installment_acceleration(conn, user_id: int, month: str) -> list[dict
         if not transaction_id:
             continue
         existing = latest_by_transaction.get(transaction_id)
-        if existing is None or str(row["created_at"] or "") > str(existing["created_at"] or ""):
+        if existing is None:
+            latest_by_transaction[transaction_id] = row
+            continue
+        # spec: tendencias-saude-financeira v2.25 — critério 13
+        # Desempate por id do log de operação para escolher o destino final
+        # quando vários movimentos compartilharem o mesmo timestamp.
+        current_key = (str(row["created_at"] or ""), int(row["id"] or 0))
+        existing_key = (str(existing["created_at"] or ""), int(existing["id"] or 0))
+        if current_key > existing_key:
             latest_by_transaction[transaction_id] = row
 
     accelerations = []
