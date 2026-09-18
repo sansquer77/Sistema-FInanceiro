@@ -197,6 +197,12 @@ def migrate_legacy_database(
             normalize_legacy_schema(conn)
         with connection_factory(paths.work) as conn:
             create_baseline_indexes(conn)
+            # spec: migracao-dados/migracao-banco-v2 v1.8 — critério 17
+            # Bancos legados também precisam da conversão de precisão de
+            # quantidades antes de serem promovidos; apenas registrar o passo
+            # em schema_migrations não converte os valores existentes.
+            if target_version >= 20003:
+                _migrate_portfolio_quantity_precision(conn)
             record_schema_history(conn, target_version)
         set_schema_version(paths.work, target_version, connection_factory=connection_factory)
         _validate_database(paths.work, target_version)

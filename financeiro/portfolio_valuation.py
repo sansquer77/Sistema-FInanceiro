@@ -14,7 +14,7 @@ class PositionValuation:
     def __init__(
         self, *, today, error_type, fetch_accumulated_indexer_factor,
         fetch_indexer_rate, value_to_brl, fallback_indexer_annual_rate,
-        parse_rate_decimal, format_decimal_percent,
+        parse_rate_decimal, format_decimal_percent, fetch_monthly_indexer_rate=None,
     ):
         self.today = today
         self.error_type = error_type
@@ -24,6 +24,7 @@ class PositionValuation:
         self.fallback_indexer_annual_rate = fallback_indexer_annual_rate
         self.parse_rate_decimal = parse_rate_decimal
         self.format_decimal_percent = format_decimal_percent
+        self.fetch_monthly_indexer_rate = fetch_monthly_indexer_rate
 
     def apply_fixed_income_value(self, position: dict, force_refresh: bool = False) -> None:
         today = self.today()
@@ -64,7 +65,7 @@ class PositionValuation:
         force_refresh: bool = False,
         factor_cache: dict[str, Decimal] | None = None,
     ) -> int:
-        # spec: investimentos/investimentos-portfolio v2.64 — criterios 43 a 45
+        # spec: investimentos/investimentos-portfolio v2.65 — criterios 43 a 45
         # (variacao do dia = valor hoje menos valor no dia anterior, com a base de
         #  comparacao limitada a data de aquisicao: no dia da aquisicao a variacao
         #  exibida e zero. Para pos-fixados, dias sem taxa publicada (fim de
@@ -109,7 +110,17 @@ class PositionValuation:
                     )
                 else:
                     indexer_factor = self.fetch_accumulated_indexer_factor(indexer, start_date, end_date, multiplier, force_refresh=force_refresh)
-                source = f"Banco Central SGS ({indexer} acumulado)"
+                source = (
+                    f"Banco Central SGS ({indexer}; última competência publicada)"
+                    if indexer in {"IPCA", "IGP-M"}
+                    else f"Banco Central SGS ({indexer} acumulado)"
+                )
+                if indexer in {"IPCA", "IGP-M"} and self.fetch_monthly_indexer_rate:
+                    try:
+                        latest_monthly_rate = self.fetch_monthly_indexer_rate(indexer, force_refresh=force_refresh)
+                        source += f" — última taxa {self.format_decimal_percent(latest_monthly_rate * Decimal('100'))}%"
+                    except self.error_type:
+                        pass
                 if mode == "hybrid":
                     if factor_cache is not None:
                         indexer_factor_plain = self._accumulated_factor_by_month(
@@ -346,7 +357,7 @@ class PositionValuation:
         return self.savings_additional_monthly_rate_from_selic(selic_annual)
 
     def savings_additional_monthly_rate_from_selic(self, selic_annual: Decimal) -> Decimal:
-        # spec: investimentos-portfolio v2.64 — secao "Regras > Poupanca"
+        # spec: investimentos-portfolio v2.65 — secao "Regras > Poupanca"
         # (TR + 0,5% a.m. quando Selic > 8,5% a.a.; TR + 70% da Selic equivalente
         #  mensal quando Selic <= 8,5% a.a. — limiar e formula nao sao obvios)
         if selic_annual > Decimal("0.085"):
@@ -385,7 +396,7 @@ class PositionValuation:
         )
 
     def fixed_income_income_tax_cents(self, gross_profit_cents: int, days: int) -> int:
-        # spec: investimentos-portfolio v2.64 — criterio 3 (secao "Regras > Renda Fixa":
+        # spec: investimentos-portfolio v2.65 — criterio 3 (secao "Regras > Renda Fixa":
         # tabela regressiva de IR, 22,5% a 15% conforme dias corridos desde a aquisicao)
         if gross_profit_cents <= 0:
             return 0
@@ -400,7 +411,7 @@ class PositionValuation:
         return int((Decimal(gross_profit_cents) * tax_rate).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
     def fixed_income_custody_fee_cents(self, position: dict, gross_cents: int, days: int) -> int:
-        # spec: investimentos/investimentos-portfolio v2.64 — critério 25
+        # spec: investimentos/investimentos-portfolio v2.65 — critério 25
         # Tesouro Direto tem taxa B3 de custodia provisionada diariamente. O app
         # estima a taxa na curva, sem tentar reproduzir marcacao a mercado oficial.
         if gross_cents <= 0 or days <= 0 or not self.is_treasury_direct_position(position):
@@ -426,7 +437,7 @@ class PositionValuation:
         ]).upper()
 
     def fixed_income_iof_tax_cents(self, gross_profit_cents: int, days: int) -> int:
-        # spec: investimentos-portfolio v2.64 — criterio 3 (secao "Regras > Renda Fixa":
+        # spec: investimentos-portfolio v2.65 — criterio 3 (secao "Regras > Renda Fixa":
         # IOF regressivo so incide ate 30 dias corridos desde a aquisicao)
         if gross_profit_cents <= 0 or days >= 30:
             return 0

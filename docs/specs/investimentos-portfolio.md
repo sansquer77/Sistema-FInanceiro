@@ -2,8 +2,8 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.64
-atualizado: 2026-09-11
+versao: 2.65
+atualizado: 2026-09-18
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -62,6 +62,7 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 
 **Renda Fixa:**
 - Pós-fixados/híbridos usam indexadores (CDI, SELIC, IPCA, IGP-M, TR) via API do Banco Central (SGS).
+- Para IPCA e IGP-M, a valorização consulta de uma vez as últimas competências mensais publicadas, mantém cache diário, informa a última taxa mensal considerada na origem exibida e trata a ausência da competência corrente como dado ainda não publicado; não anualiza a última variação mensal como fallback.
 - Pré-fixados usam a taxa acordada anual nominal/efetiva informada no campo de taxa; exibem `Pré-fixado` e a taxa antes do vencimento.
 - No cadastro de renda fixa, a interface deve diferenciar claramente: `Pré-fixada` usa taxa em `% a.a.`; `Pós-fixada` usa percentual do indexador (ex.: `123` com CDI significa `123% do CDI`, enquanto vazio/zero representa `100% do CDI`); `Híbrida` usa indexador mais taxa adicional em `% a.a.`.
 - Para aplicações como CDB `123% do CDI`, a interface deve orientar o usuário a selecionar modalidade `Pós-fixada`, indexador `CDI` e percentual `123`, evitando cadastrar como `Pré-fixada` ou `Híbrida`; essa orientação deve ficar em helper contextual acionado por ícone discreto para preservar espaço e alinhamento do formulário, com exemplos objetivos de pré-fixada, pós-fixada e híbrida.
@@ -313,6 +314,7 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 
 ## Changelog
 
+- `2.65` — 2026-09-18 — IPCA e IGP-M passam a usar consulta mensal consolidada e cacheada do SGS; a ausência da competência corrente deixa de ser apresentada como indisponibilidade do Banco Central.
 - `2.64` — 2026-09-11 — A coluna de quantidade ganha espaço para oito casas e o Histórico passa a identificar quantidades pelo código do ativo, não pela moeda da carteira.
 - `2.63` — 2026-09-11 — Resgate reduz atomicamente o valor manual pelo bruto, preservando resíduos e isolamento entre posições; cripto e stablecoins exibem oito casas nas posições e no histórico.
 - `2.62` — 2026-09-11 — Corrigido o resgate de quantidades fracionárias como ETH: o contrato separa quantidade visual arredondada da quantidade operacional exata de até oito casas usada no modal, na prévia e na revalidação FIFO; a migração preserva as quantidades anteriormente armazenadas.

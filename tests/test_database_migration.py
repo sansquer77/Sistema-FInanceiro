@@ -103,6 +103,40 @@ class DatabaseV2MigrationTest(unittest.TestCase):
             ).fetchone()[0]
         self.assertEqual(stored, 2_864_900)
 
+    def test_legacy_database_with_portfolio_applies_quantity_precision(self) -> None:
+        database.create_database(database.DB_PATH)
+        with database.get_connection() as conn:
+            conn.execute(
+                "INSERT INTO users (name, email, password_hash) VALUES ('Ana', 'ana@example.com', 'hash')"
+            )
+            user_id = conn.execute("SELECT id FROM users").fetchone()[0]
+            conn.execute(
+                """INSERT INTO checking_accounts (
+                    user_id, name, bank_name, account_type, currency
+                ) VALUES (?, 'Carteira', 'Banco', 'investment', 'BRL')""",
+                (user_id,),
+            )
+            account_id = conn.execute("SELECT id FROM checking_accounts").fetchone()[0]
+            conn.execute(
+                """INSERT INTO investment_opening_positions (
+                    user_id, account_id, asset_type, asset_identifier,
+                    acquisition_date, quantity_micros, total_cost_cents
+                ) VALUES (?, ?, 'crypto', 'ETH', '2026-01-01', 28649, 10000)""",
+                (user_id, account_id),
+            )
+            conn.execute("DELETE FROM schema_migrations")
+            conn.execute("PRAGMA user_version = 0")
+
+        database.initialize_database()
+
+        self.assertTrue(self.backup_path.exists())
+        self.assertEqual(self.schema_version(database.DB_PATH), database.SCHEMA_VERSION)
+        with database.get_connection() as conn:
+            stored = conn.execute(
+                "SELECT quantity_micros FROM investment_opening_positions"
+            ).fetchone()[0]
+        self.assertEqual(stored, 2_864_900)
+
     def test_incremental_migration_rolls_back_version_and_history_on_failure(self) -> None:
         database.initialize_database()
         with database.get_connection() as conn:

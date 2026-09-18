@@ -11,11 +11,30 @@ from financeiro import portfolio, portfolio_returns, portfolio_valuation
 
 
 class ValuationBoundariesTest(unittest.TestCase):
+    def test_monthly_indexers_use_consolidated_window_and_fail_safe_when_unavailable(self):
+        with patch.object(portfolio, 'cached_json_url', return_value=[]) as cached:
+            with self.assertRaises(portfolio.PortfolioError):
+                portfolio.fetch_accumulated_indexer_factor(
+                    'IPCA', date(2026, 8, 1), date(2026, 9, 18)
+                )
+        url = cached.call_args.args[0]
+        self.assertIn('/ultimos/', url)
+        self.assertNotIn('dataInicial=', url)
+
+    def test_monthly_valuation_identifies_last_published_competence(self):
+        engine = self.engine()
+        position = self.position(
+            fixed_income_mode='post', fixed_income_indexer='IPCA', fixed_income_rate='100'
+        )
+        result = engine.fixed_income_value_as_of(position, date(2026, 8, 31))
+        self.assertIn('última competência publicada', result[6])
+
     def engine(self):
         return portfolio_valuation.PositionValuation(
             today=lambda: date(2026, 8, 31), error_type=portfolio.PortfolioError,
             fetch_accumulated_indexer_factor=lambda *a, **k: Decimal('1.01'),
             fetch_indexer_rate=lambda *a, **k: Decimal('0.15'),
+            fetch_monthly_indexer_rate=lambda *a, **k: Decimal('-0.0032'),
             value_to_brl=lambda value, currency: value,
             fallback_indexer_annual_rate=lambda indexer: Decimal('0.15'),
             parse_rate_decimal=lambda value: Decimal(str(value or 0)),

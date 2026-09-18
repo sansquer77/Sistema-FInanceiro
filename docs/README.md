@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 12.58
-atualizado: 2026-09-11
+versao: 12.59
+atualizado: 2026-09-18
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -152,6 +152,7 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `12.59` — 2026-09-18 — [[specs/investimentos-portfolio]] v2.65 consolida a consulta mensal de IPCA/IGP-M e diferencia competência ainda não publicada de indisponibilidade real do SGS.
 - `12.58` — 2026-09-11 — [[specs/investimentos-portfolio]] v2.64 melhora o espaçamento de quantidades longas e corrige a unidade exibida nos resgates do Histórico.
 - `12.57` — 2026-09-11 — [[specs/investimentos-portfolio]] v2.63 faz o resgate descontar atomicamente o valor bruto do valor manual e padroniza a exibição de cripto e stablecoins com oito casas.
 - `12.56` — 2026-09-11 — [[specs/sobre-app]] v1.12 registra o incremento PATCH do produto para `2.0.1` após a correção de resgates fracionários do Portfólio.

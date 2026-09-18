@@ -333,7 +333,7 @@ export function registerPortfolioView({
   function resetPortfolioAssetForm() {
     portfolioAssetForm.reset();
     portfolioAssetForm.elements.id.value = "";
-    // spec: investimentos-portfolio v2.62 — criterio 48
+    // spec: investimentos-portfolio v2.64 — criterio 48
     portfolioAssetForm.elements.exchange_rate_to_brl.value = "";
     portfolioAssetFormTitle.textContent = "Ativo em carteira";
     deletePortfolioAssetButton.hidden = true;
@@ -1012,7 +1012,7 @@ export function registerPortfolioView({
   function portfolioTreasuryNote() {
     return `
       <p class="portfolio-footnote">
-        Tesouro Direto: valores de renda fixa são estimados na curva pela taxa contratada cadastrada. Diferenças frente ao site do Tesouro podem ocorrer por marcação a mercado em resgate antecipado, provisão oficial de taxas e regras específicas do título. A Taxa B3 exibida é estimada em 0,20% a.a. pro rata, com isenção simplificada para Tesouro Selic até R$ 10.000,00 e sem estimativa automática para Renda+/Educa+.
+        Valores de renda fixa são estimados na curva pela taxa contratada cadastrada; para IPCA e IGP-M, quando a competência atual ainda não foi publicada, é usada a última competência disponível no Banco Central. Diferenças frente ao site do Tesouro podem ocorrer por marcação a mercado em resgate antecipado, provisão oficial de taxas e regras específicas do título. A Taxa B3 exibida é estimada em 0,20% a.a. pro rata, com isenção simplificada para Tesouro Selic até R$ 10.000,00 e sem estimativa automática para Renda+/Educa+.
       </p>
     `;
   }
@@ -1398,7 +1398,7 @@ export function registerPortfolioView({
     `;
   }
 
-  // spec: investimentos-portfolio v2.62 — criterio 47
+  // spec: investimentos-portfolio v2.64 — criterio 47
   function portfolioEmergencyShieldIcon() {
     return '<svg class="portfolio-emergency-shield" viewBox="0 0 24 24" width="12" height="12" role="img" aria-label="Reserva de emergência" title="Reserva de emergência" fill="currentColor"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5l8-3z"/></svg>';
   }
