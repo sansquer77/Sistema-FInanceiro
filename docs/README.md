@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 12.68
+versao: 12.96
 atualizado: 2026-09-24
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -64,7 +64,6 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[specs/privacidade-valores]] | ✅ implementado | Privacidade |
 | [[specs/alerta-nova-versao]] | ✅ implementado | Atualização |
 | [[specs/rentabilidade-portfolio]] | ✅ implementado | Investimentos |
-| [[specs/efeito-borboleta]] | ✅ implementado | Simulações |
 | [[specs/cockpit-calendario]] | ✅ implementado | Cockpit |
 | [[specs/Update Server]] | ✅ implementado | Distribuição |
 | [[distribuição]] | ✅ implementado | Distribuição |
@@ -75,6 +74,9 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[specs/desconcentracao-arquitetura-v2]] | ✅ implementado | Arquitetura v2 |
 | [[specs/alertas-cockpit]] | ✅ implementado | Cockpit |
 | [[specs/frontend-fundacao-v2]] | ✅ implementado | Frontend v2 |
+| [[specs/backup-restauracao]] | ✅ implementado | Backup e restauração |
+| [[specs/emprestimos-quitacao]] | 🚧 em implementação | Empréstimos e quitação |
+| [[specs/efeito-borboleta]] | 🚧 em implementação | Simulações |
 
 ---
 
@@ -85,7 +87,6 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | Spec | Status | Área |
 |---|---|---|
 | [[specs/open-finance]] | ❌ depreciado — provedor adequado ao usuário padrão não definido; integração continua fora do escopo atual | Open Finance |
-| [[specs/backup-restauracao]] | 🔎 em revisão | Backup e restauração |
 | [[specs/consolidacao-familiar]] | 📝 rascunho | Consolidação Familiar |
 | [[specs/imposto-renda]] | ❌ depreciado — custo de manter regras fiscais atualizadas não compensa para uso familiar | Investimentos |
 | [[specs/exportacao-dados]] | ❌ depreciado — arquivo SQLite já acessível por leitor genérico ou agente de IA | Exportação |
@@ -112,7 +113,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[adr/0014-desconcentracao-fachadas-e-roteamento]] | Fachadas compatíveis, roteamento declarativo e responsabilidades internas menores na fundação v2. |
 | [[adr/0015-ssrf-ai-endpoints]] | Validação de endpoints configuráveis de IA contra SSRF, com opt-in por env para provedores locais. |
 | [[adr/0016-calendario-mercado-anbima]] | Calendário nacional ANBIMA persistido localmente como fonte única para dias úteis derivados de eventos B3. |
-| [[adr/0018-backup-completo-criptografado]] | Decisão em revisão do pacote completo de backup com container ZIP e payload criptografado autenticado. |
+| [[adr/0018-backup-completo-criptografado]] | Pacote completo de backup com container ZIP e payload criptografado autenticado, validado nos runtimes distribuídos. |
 
 ---
 
@@ -152,6 +153,37 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 O Sistema Financeiro é disponibilizado gratuitamente como projeto open source sob a **Apache License 2.0** (`Apache-2.0`). Consulte o arquivo [`LICENSE`](../LICENSE) na raiz do repositório.
 
 ## Changelog
+
+- `12.96` — 2026-09-24 — [[specs/emprestimos-quitacao]] diferencia o ícone de Empréstimos do Portfólio com moeda, seta de pagamento e mão simplificada.
+- `12.95` — 2026-09-24 — [[specs/categorias-tags-gestao]] e [[specs/emprestimos-quitacao]] definem **Empréstimos e Financiamentos** com identidade estável, preservada ao renomear.
+- `12.94` — 2026-09-24 — [[specs/emprestimos-quitacao]] mostra a jornada de quitação em barra 100% preenchida pelos pagamentos, com total pago e parcelas no hover.
+- `12.93` — 2026-09-24 — [[specs/emprestimos-quitacao]] alinha o formulário de cadastro e suas ações ao padrão da aba Objetivos, abrindo-o no topo do painel.
+- `12.92` — 2026-09-24 — [[specs/emprestimos-quitacao]] simplifica associação pelo lançamento, recolhe o cadastro e adiciona evolução mensal de pagamentos e explicação ao arquivar.
+- `12.91` — 2026-09-24 — [[specs/efeito-borboleta]] reúne estudos de Receitas/Despesas e Empréstimos em abas; cadastro e acompanhamento das dívidas permanecem em Empréstimos.
+- `12.90` — 2026-09-24 — Portfólio identifica visualmente ativos vinculados a objetivos com uma bandeira compacta distinta do escudo da Reserva de Emergência.
+- `12.89` — 2026-09-24 — [[specs/alertas-cockpit]] v1.3 integra lembrete de vencimento de empréstimo à Central, com navegação para o novo módulo.
+
+- `12.88` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.19 aprovada para implementação; inicia persistência, rotas, tela Gestão → Empréstimos e simulação Price.
+
+- `12.87` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.18 adiciona lembrete de vencimento na Central e aviso de pagamento não registrado com revisão manual.
+- `12.86` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.17 invalida vínculos de pagamentos alterados e sinaliza revisão manual no empréstimo.
+- `12.85` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.16 oferece redução de prazo ou de parcela para amortização extraordinária.
+- `12.84` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.15 calcula automaticamente o compromisso nominal pelas parcelas restantes, com ajuste de última parcela.
+- `12.83` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.14 esclarece que prazo e pagamentos sem taxa ou principal não identificam juros e registra possível campo para saldo principal.
+- `12.82` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.13 torna obrigatória a quantidade de parcelas restantes e elimina a inferência do prazo.
+- `12.81` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.12 aceita taxa efetiva mensal ou CET efetivo anual com conversão equivalente para a simulação.
+- `12.80` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.11 mantém seguros e tarifas embutidos na parcela e identifica a projeção Price como estimativa simplificada.
+- `12.79` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.10 define compromisso nominal restante como saldo exibido e data da próxima parcela como início do cronograma.
+- `12.78` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.9 explicita as pendências sobre saldo-base, data-base e encargos das parcelas.
+- `12.77` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.8 mantém quitação dentro de Empréstimos e explicita o Efeito Borboleta como estudo visual sem ações.
+- `12.76` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.7 define taxa mensal como fonte de verdade e prazo informado como referência de consistência.
+- `12.75` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.6 exige tratamento independente por moeda, inclusive nas estratégias e nos vínculos a pagamentos.
+- `12.74` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.5 delimita o módulo a empréstimos e dívidas contratuais relevantes, excluindo compras parceladas de consumo.
+- `12.73` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.4 delimita a V1 ao sistema Price prefixado e explicita SAC e contratos indexados como fora de escopo.
+- `12.72` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.3 define cadastro do saldo atual, prestação, taxa mensal e prazo restante, exigindo taxa ou prazo no mínimo.
+- `12.71` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.2 define decomposição estimada de parcelas Price usando taxa mensal ou prazo restante junto do saldo e da prestação.
+- `12.70` — 2026-09-24 — Criado rascunho da spec [[specs/emprestimos-quitacao]] para cadastro manual, vinculação de pagamentos existentes e estratégias de quitação.
+- `12.69` — 2026-09-24 — Backup e ADR-0018 marcados como implementados após confirmação de que os testes foram concluídos.
 
 - `12.68` — 2026-09-24 — [[specs/open-finance]] v0.9 depreciada por ausência de provedor com onboarding adequado e por permanecer fora do escopo do produto.
 - `12.67` — 2026-09-24 — [[specs/classificacao-assistida]] v1.1 adiciona contexto de conta/cartão; [[arquitetura]] v4.12 documenta os parâmetros da rota.

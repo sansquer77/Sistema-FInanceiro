@@ -2,7 +2,7 @@
 tipo: spec
 area: objetivos-financeiros
 status: em-revisao
-versao: 0.10
+versao: 0.11
 atualizado: 2026-09-24
 relacionados:
   - "[[limites-gastos]]"
@@ -205,6 +205,7 @@ As tabelas devem ser criadas pela migração incremental idempotente do schema v
 33. Dada uma carteira com mais de três investimentos marcados como Reserva de Emergência, quando o resumo é exibido, então o total da reserva permanece destacado, cada carteira mostra seu subtotal e até três títulos, e um controle acessível revela/recolhe os demais. Verificação visual manual.
 34. Dada a aba Objetivos, quando não há criação ou edição em andamento, então o formulário fica recolhido e há uma ação **+ Novo objetivo** em destaque; ao criar ou editar, o formulário abre sob demanda e pode ser cancelado sem salvar.
 35. Dada a aba Objetivos sem nenhum objetivo cadastrado, quando aberta, então a Reserva de Emergência é carregada e exibida normalmente, sem depender da criação de um objetivo.
+36. Dado um investimento vinculado a um objetivo, quando aparece no Portfólio, então recebe uma marca visual distinta da Reserva de Emergência, com o mesmo estilo compacto e identificação acessível, aplicada ao ativo consolidado e seus movimentos.
 
 ## Pendências
 
@@ -242,6 +243,7 @@ As tabelas devem ser criadas pela migração incremental idempotente do schema v
 ## Changelog
 
 - `0.10` — 2026-09-24 — A Reserva de Emergência carrega e aparece ao abrir Objetivos mesmo sem objetivos cadastrados; suas falhas de carregamento são isoladas da lista.
+- `0.11` — 2026-09-24 — Define uma marca visual compacta e distinta no Portfólio para identificar ativos vinculados a objetivos, independente de qual objetivo.
 - `0.9` — 2026-09-24 — Formulário de criação deixa de ocupar espaço permanente; ação primária abre o formulário para criação e edição sob demanda.
 - `0.8` — 2026-09-24 — Reserva de Emergência passa a exibir subtotais por carteira e revelar títulos excedentes sob demanda, mantendo o total geral em destaque.
 - `0.7` — 2026-09-24 — A série de aportes futuros e sua legenda usam o token azul `--chart-6`, mantendo a semântica de projeção sem roxo e com suporte aos temas claro/escuro.

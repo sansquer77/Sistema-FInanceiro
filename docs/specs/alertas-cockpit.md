@@ -2,8 +2,8 @@
 tipo: spec
 area: cockpit
 status: implementado
-versao: 1.2
-atualizado: 2026-09-04
+versao: 1.3
+atualizado: 2026-09-24
 relacionados:
   - "[[cockpit-calendario]]"
   - "[[limites-gastos]]"
@@ -19,7 +19,7 @@ aliases: ["Alertas e Notificações do Cockpit", "Alertas Cockpit", "Central de 
 # Alertas e Notificações do Cockpit
 
 > [!info] Status
-> **implementado** · versão: `1.2` · área: `cockpit` · atualizado em 2026-09-04 · relacionados: [[cockpit-calendario]], [[limites-gastos]], [[cartoes]], [[lancamentos]], [[investimentos-portfolio]], [[arquitetura]], [[requisitos]]
+> **implementado** · versão: `1.3` · área: `cockpit` · atualizado em 2026-09-24 · relacionados: [[cockpit-calendario]], [[limites-gastos]], [[cartoes]], [[lancamentos]], [[investimentos-portfolio]], [[specs/emprestimos-quitacao]], [[arquitetura]], [[requisitos]]
 
 ### Problema
 
@@ -211,6 +211,7 @@ Restrição de unicidade: `PRIMARY KEY (user_id, notification_id)`.
 - Dado um usuário não autenticado, quando uma requisição for enviada para `GET /api/cockpit/notifications`, então o servidor retorna status HTTP 401 Unauthorized e nenhum dado é exposto.
 - Dado que o usuário marcou informativos como vistos, quando uma nova requisição a `GET /api/cockpit/notifications` é realizada (inclusive após novo login ou recarga da página), então os itens correspondentes retornam com `seen: true` e não contabilizam no `informational_count` não lido.
 - Dado que há uma nova versão do sistema disponível, quando o usuário acessa o Cockpit, então o banner de nova versão (`cockpitVersionAlert`) continua sendo renderizado no topo do painel executivo com seu botão de dispensar, sem ser incorporado ao flyout de notificações financeiras.
+- Dado um empréstimo ativo cuja próxima parcela vence hoje, quando o usuário consulta a Central de Notificações, então há um alerta com ação para abrir Gestão → Empréstimos.
 
 ### Pendências
 
@@ -234,6 +235,8 @@ Restrição de unicidade: `PRIMARY KEY (user_id, notification_id)`.
 - [x] Passo 7 — Testes automatizados: criar testes unitários e de integração em `tests/test_cockpit_notifications.py` cobrindo cálculo de alertas, persistência na `notification_reads`, tolerância a falhas de cotação e controle de autenticação. Fecha: critérios 1, 3, 4, 10, 11, 12.
 
 ### Changelog
+
+- `1.3` — 2026-09-24 — Adiciona lembrete crítico na data do vencimento de um empréstimo, com ação para abrir Gestão → Empréstimos.
 
 - `1.2` — 2026-09-04 — Informativos de proventos passam a usar o calendário futuro compartilhado da aba Eventos, mantendo a filtragem da semana corrente.
 - `1.1` — 2026-09-04 — A consulta externa de proventos do Cockpit fica limitada à semana corrente, sem carregar o histórico completo usado pela aba Eventos.

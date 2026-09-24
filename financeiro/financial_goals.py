@@ -187,7 +187,7 @@ def link_goal_funding_source(user_id: int, goal_id: object, data: dict) -> dict:
         members = matching_investment_sources(conn, user_id, identity)
         if not members:
             raise FinancialGoalError("Investimento nao encontrado na carteira.", HTTPStatus.NOT_FOUND)
-        # spec: objetivos-financeiros v0.10 — critérios 29 a 32
+        # spec: objetivos-financeiros v0.11 — critérios 29 a 32
         if any(member.get("emergency_reserve_eligible") for member in members):
             raise FinancialGoalError(
                 "Este investimento compoe a Reserva de Emergencia e nao pode financiar outro objetivo."
@@ -236,7 +236,7 @@ def unlink_goal_funding_source(user_id: int, goal_id: object, link_id: object) -
 
 def ensure_not_linked_to_financial_goal(conn, user_id: int, source_type: str, source_id: int) -> None:
     """Impede que uma fonte alocada seja reaproveitada na Reserva de Emergência."""
-    # spec: objetivos-financeiros v0.10 — critérios 31 e 32
+    # spec: objetivos-financeiros v0.11 — critérios 31 e 32
     source = fetch_funding_source(conn, user_id, source_type, source_id)
     identity = investment_asset_identity(source)
     rows = conn.execute(
@@ -410,7 +410,7 @@ def format_funding_source(link: dict, source: dict) -> dict:
 
 
 def hydrate_goal(goal: dict, sources: list[dict], user_id: int, positions: list[dict] | None = None) -> dict:
-    # spec: objetivos-financeiros v0.10 — critério 30
+    # spec: objetivos-financeiros v0.11 — critério 30
     manual_balance_cents = int(goal.get("reserved_balance_cents") or 0)
     sources = enrich_funding_source_values(sources, user_id, positions)
     linked_balance_cents = sum(int(source.get("current_value_brl_cents") or 0) for source in sources)
@@ -585,7 +585,7 @@ def format_goal(goal: dict) -> dict:
 
 def build_goal_projection(goal: dict, reserved: int, effective_target: int, months: int) -> dict:
     """Build conservative and yield scenarios without changing the reserved balance."""
-    # spec: objetivos-financeiros v0.10 — critérios 7, 8, 9, 11, 27, 28 e 30
+    # spec: objetivos-financeiros v0.11 — critérios 7, 8, 9, 11, 27, 28 e 30
     remaining = max(effective_target - reserved, 0)
     conservative_monthly = (remaining + months - 1) // months if months > 0 else remaining
     conservative_contributions = remaining

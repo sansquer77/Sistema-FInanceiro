@@ -1302,7 +1302,9 @@ export function registerPortfolioView({
 
   function aggregatePortfolioPositions(positions, groupKey) {
     const indices = positions.map((position) => state.portfolio.positions.indexOf(position));
-    return state.portfolio.presentation.asset_groups[JSON.stringify(indices)];
+    const aggregate = state.portfolio.presentation.asset_groups[JSON.stringify(indices)];
+    if (aggregate) aggregate.goal_linked = positions.some((position) => position.goal_linked);
+    return aggregate;
   }
 
   function portfolioPositionRow(position, options = {}) {
@@ -1331,6 +1333,7 @@ export function registerPortfolioView({
       !options.parent && !options.child && position.asset_name && position.asset_name !== identifier ? position.asset_name : "",
       position.cnpj ? `CNPJ ${position.cnpj}` : "",
       position.emergency_reserve_eligible ? "Reserva de emergência" : "",
+      position.goal_linked ? "Vinculado a objetivo" : "",
       portfolioFixedIncomeDetail(position),
       position.fixed_income_maturity_date ? `Venc. ${formatDate(position.fixed_income_maturity_date)}` : "",
     ].filter(Boolean).join(" · ");
@@ -1366,7 +1369,7 @@ export function registerPortfolioView({
           <div class="portfolio-asset-name">${toggle}<strong>${escapeHtml(rowLabel)}</strong>${maturityDetail}</div>
           <span class="portfolio-detail" title="${escapeHtml(assetDetail || "Sem detalhe adicional")}">${escapeHtml(assetDetail || "Sem detalhe adicional")}</span>
         </td>
-        <td><span class="portfolio-primary">${escapeHtml(position.asset_type_label)}${position.emergency_reserve_eligible ? portfolioEmergencyShieldIcon() : ""}</span><span>${escapeHtml(position.market_label || "Brasil")}</span></td>
+        <td><span class="portfolio-primary">${escapeHtml(position.asset_type_label)}${position.emergency_reserve_eligible ? portfolioEmergencyShieldIcon() : ""}${position.goal_linked ? portfolioGoalFlagIcon() : ""}</span><span>${escapeHtml(position.market_label || "Brasil")}</span></td>
         <td><span class="portfolio-primary">${escapeHtml(position.account_name)}</span><span>${escapeHtml(position.currency)}</span></td>
         <td class="money-cell">${portfolioGrouping.formatQuantity(position.quantity, position.asset_type)}</td>
         <td class="money-cell">${formatMoney(position.average_price, position.currency)}</td>
@@ -1401,6 +1404,11 @@ export function registerPortfolioView({
   // spec: investimentos-portfolio v2.64 — criterio 47
   function portfolioEmergencyShieldIcon() {
     return '<svg class="portfolio-emergency-shield" viewBox="0 0 24 24" width="12" height="12" role="img" aria-label="Reserva de emergência" title="Reserva de emergência" fill="currentColor"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5l8-3z"/></svg>';
+  }
+
+  // spec: objetivos-financeiros v0.11 — critério 36
+  function portfolioGoalFlagIcon() {
+    return '<svg class="portfolio-goal-flag" viewBox="0 0 24 24" width="12" height="12" role="img" aria-label="Vinculado a objetivo" title="Vinculado a objetivo" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4m0 1c5-4 9 4 14 0v10c-5 4-9-4-14 0"/></svg>';
   }
 
   function portfolioSecondaryMoney(primaryValue, secondaryValue, currency) {

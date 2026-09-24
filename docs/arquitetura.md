@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 4.12
+versao: 4.16
 atualizado: 2026-09-24
 relacionados:
   - "[[requisitos]]"
@@ -19,7 +19,7 @@ tags: [arquitetura, meta]
 # Arquitetura
 
 > [!info] Status
-> **implementado** · versão: `4.8` · área: `meta` · atualizado em 2026-09-11 · relacionados: [[requisitos]], [[qualidade-codigo]], [[specs/backup-restauracao]], [[adr/0018-backup-completo-criptografado]]
+> **implementado** · versão: `4.16` · área: `meta` · atualizado em 2026-09-24 · relacionados: [[requisitos]], [[qualidade-codigo]], [[specs/emprestimos-quitacao]]
 
 ## Visão geral
 
@@ -76,6 +76,7 @@ O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Co
 | `privacy-utils.js` | Persistência local e aplicação do modo de ocultação de valores. |
 | `instructions-content.js` | Conteúdo estático, offline e versionado da central de ajuda. Ver [[instrucoes-app]]. |
 | `app-state.js` | Fábrica do estado inicial e reset puro dos dados de sessão, sem singleton, DOM ou API. |
+| `loans-view.js` | Cadastro recolhido sob demanda, acompanhamento de pagamentos e gráficos mensais; estudos no Efeito Borboleta; sem regra financeira no navegador. Ver [[specs/emprestimos-quitacao]]. |
 | `app-data-loader.js` | Coordenação dos carregamentos compartilhados por dependências explícitas e acesso tardio às views; o boot e o Cockpit mantêm somente recortes mensais, sem históricos integrais ou pagamentos globais. |
 | `bank-logos.js` | Catálogo e resolvedor compartilhado de logos de instituições e bandeiras, com normalização, aliases e fallback visual. Ver [[specs/bank-logos]]. |
 
@@ -110,7 +111,7 @@ Os assets normalizados do catálogo ficam em `web/assets/banks/` e `web/assets/b
 | `transaction-investment-form.js` | Campos, estado condicional e assistência próprios dos aportes. |
 | `classification-suggestion.js` | Sugestão local compartilhada pelos formulários de Contas e Cartões. |
 | `operation-history-view.js` | Histórico de Operações: filtros, busca, agrupamentos e paginação. |
-| `simulations-view.js` | Efeito Borboleta: formulário e renderização das projeções calculadas pelo backend. |
+| `simulations-view.js` | Efeito Borboleta: abas Receitas/Despesas e Empréstimos; formulários e renderização dos estudos calculados pelo backend. |
 | `load-policy.js` | Política compartilhada de cache curto, invalidação, chave contextual e deduplicação de requisições em andamento. |
 | `transaction-slice-loader.js` | Coordena lançamentos/projeção por conta+mês com até quatro snapshots recentes e requisições independentes por chave; revisão invalida respostas anteriores a mutações/logout. |
 | `transaction-reconciliation.js` | Aplica a resposta confirmada à lista imediatamente, protege clique duplicado e recarrega saldos sem aguardar Cockpit ou histórico global. |
@@ -240,6 +241,18 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `GET/POST` | `/api/financial-goals/{id}/funding-sources` |
 | `DELETE` | `/api/financial-goals/{id}/funding-sources/{link_id}` |
 | `GET` | `/api/financial-goals/emergency-reserve` |
+
+### Empréstimos e quitação
+
+| Método | Rota | Responsabilidade |
+|---|---|---|
+| `GET/POST` | `/api/loans` | Listar e cadastrar empréstimos manuais. |
+| `PUT/DELETE` | `/api/loans/{id}` | Atualizar ou arquivar contrato. |
+| `POST` | `/api/loans/{id}/payments` | Rota compatível para associar lançamento de conta existente, sem duplicá-lo; o fluxo principal também aceita `loan_id` ao criar/editar uma despesa avulsa em Lançamentos. |
+| `POST` | `/api/loans/simulate` | Calcular projeção hipotética Price sem persistir cenário. |
+| `POST` | `/api/loans/simulate-strategy` | Comparar avalanche/bola de neve dentro de uma moeda. |
+
+O domínio fica em `loans.py`; `loans` guarda contratos e `loan_payment_links` referencia lançamentos da conta. A validação e criação do vínculo ocorre na mesma transação SQLite da gravação do lançamento. Alterações/reconciliações/exclusões de transação invalidam o vínculo e marcam revisão manual. `cockpit_notifications.py` emite lembrete crítico no dia do vencimento, com navegação para Gestão → Empréstimos.
 
 As projeções são calculadas em centavos por `financial_goals.py`. O saldo reservado combina movimentações manuais e valores atuais em BRL dos ativos de investimento consolidados vinculados; o frontend recebe cenários já discriminados e limita-se a renderizar o gráfico ApexCharts. Movimentações de objetivo não alteram automaticamente contas ou investimentos.
 
@@ -376,6 +389,7 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | `credit_card_invoice.py` | Consulta agregada e serialização do recorte de fatura/histórico visual limitado. Ver [[cartoes]]. |
 | `spending_limits.py` | Metas recorrentes e consumo mensal agregado por categoria/subcategoria, incluindo competência de faturas e exclusão do pagamento agregado. Ver [[limites-gastos]]. |
 | `financial_goals.py` | Objetivos, provisões, livro de movimentações manuais, projeções, cobertura, Reserva de Emergência e exclusividade de origens. Ver [[specs/objetivos-financeiros]]. |
+| `loans.py` | Contratos, vínculo de pagamentos existentes, alertas de revisão e simulações Price/avalanche/bola de neve. Ver [[specs/emprestimos-quitacao]]. |
 | `global_search.py` | Busca histórica autenticada e paginada em lançamentos de contas/cartões, isolada por usuário e executada sob demanda pela Command Palette. |
 | `http_routes.py` | Tabela declarativa e resolução de rotas, independente do transporte HTTP. Ver [[specs/desconcentracao-arquitetura-v2]]. |
 | `cockpit.py` | Agregações de domínio do resumo mensal do Cockpit com `SUM`, `COUNT` e `GROUP BY` no SQLite, fora do adaptador HTTP e sem materializar lançamentos detalhados. |
@@ -429,7 +443,7 @@ O arquivo SQLite recebe `journal_mode=WAL` uma vez no ciclo de inicialização; 
 
 ### Baseline e migração para a linha v2
 
-O baseline inicial da v2 usa `PRAGMA user_version = 20000`; o endurecimento operacional do SQLite inaugura `20001`, a política global de backup usa `20002`, a precisão de oito casas das quantidades do Portfólio usa `20003` e Objetivos Financeiros leva o schema atual a `20004`. A tabela `schema_migrations` registra baseline e passos posteriores, enquanto `user_version` seleciona e ordena as migrações. Banco ausente é criado diretamente na versão atual; bancos entre `20000` e `20003` avançam transacionalmente em ordem até `20004`; versões futuras ou intermediárias desconhecidas são recusadas. Um `finance.db` com `user_version = 0` continua tratado como legado: na abertura, `financeiro/database_migrations.py` orquestra a cópia de trabalho, as compatibilizações históricas via `financeiro/database_compatibility.py::normalize_legacy_schema`, o candidato compacto por `VACUUM INTO`, as validações de integridade/chaves estrangeiras/versão/contagens e a promoção recuperável. O original passa a `data/finance-v1.bkp`, que nunca é sobrescrito, enquanto o candidato mantém o nome ativo `data/finance.db`. Falhas anteriores à promoção preservam o nome original; falha na segunda renomeação tenta restaurá-lo. Ver [[specs/migracao-banco-v2]] e [[adr/0012-fundacao-v2-contrato-e-migracao-de-dados]].
+O baseline inicial da v2 usa `PRAGMA user_version = 20000`; o endurecimento operacional do SQLite inaugura `20001`, a política global de backup usa `20002`, a precisão de oito casas das quantidades do Portfólio usa `20003`, Objetivos Financeiros usa `20004`, Empréstimos usa `20005` e a identidade estável de categorias usa `20006`. A tabela `schema_migrations` registra baseline e passos posteriores, enquanto `user_version` seleciona e ordena as migrações. Banco ausente é criado diretamente na versão atual; bancos entre `20000` e `20005` avançam transacionalmente em ordem até `20006`; versões futuras ou intermediárias desconhecidas são recusadas. Um `finance.db` com `user_version = 0` continua tratado como legado: na abertura, `financeiro/database_migrations.py` orquestra a cópia de trabalho, as compatibilizações históricas via `financeiro/database_compatibility.py::normalize_legacy_schema`, o candidato compacto por `VACUUM INTO`, as validações de integridade/chaves estrangeiras/versão/contagens e a promoção recuperável. O original passa a `data/finance-v1.bkp`, que nunca é sobrescrito, enquanto o candidato mantém o nome ativo `data/finance.db`. Falhas anteriores à promoção preservam o nome original; falha na segunda renomeação tenta restaurá-lo. Ver [[specs/migracao-banco-v2]] e [[adr/0012-fundacao-v2-contrato-e-migracao-de-dados]].
 
 ### Tabelas
 
@@ -444,7 +458,7 @@ O baseline inicial da v2 usa `PRAGMA user_version = 20000`; o endurecimento oper
 | `credit_cards` | `credit_cards.py` — Ver [[cartoes]]. |
 | `credit_card_transactions` | `credit_cards.py` — Ver [[cartoes]]. |
 | `credit_card_payments` | `credit_cards.py` — Ver [[cartoes]]. |
-| `categories` | `categories.py` — Ver [[categorias-tags-gestao]]. |
+| `categories` | `categories.py` — taxonomia de cada usuário; `system_key` identifica categorias sem depender do nome exibido. Ver [[categorias-tags-gestao]]. |
 | `subcategories` | `categories.py` — Ver [[categorias-tags-gestao]]. |
 | `tags` | `categories.py` — Ver [[categorias-tags-gestao]]. |
 | `transactions` | `transactions.py` — Ver [[lancamentos]]. |
@@ -454,6 +468,8 @@ O baseline inicial da v2 usa `PRAGMA user_version = 20000`; o endurecimento oper
 | `financial_goals` | `financial_goals.py` — definição, estado e premissas de projeção. Ver [[specs/objetivos-financeiros]]. |
 | `financial_goal_movements` | `financial_goals.py` — livro auditável de aportes, retiradas e ajustes manuais. Ver [[specs/objetivos-financeiros]]. |
 | `financial_goal_funding_sources` | `financial_goals.py` — vínculos exclusivos a ativos de investimento consolidados, ancorados em uma entrada canônica; o saldo do ativo acompanha todos os lotes e movimentos. Ver [[specs/objetivos-financeiros]]. |
+| `loans` | `loans.py` — contratos, compromisso nominal e taxa mensal; cálculos separados por moeda. Ver [[specs/emprestimos-quitacao]]. |
+| `loan_payment_links` | `loans.py` — referências aos lançamentos existentes; não cria movimentos financeiros duplicados. Ver [[specs/emprestimos-quitacao]]. |
 | `investment_opening_positions` | `portfolio.py` — inclui `emergency_reserve_eligible`; desde o schema `20003`, `quantity_micros` preserva o nome legado, mas representa unidades de `1e-8`. Ver [[investimentos-portfolio]]. |
 | `investment_operations` | `transactions.py` grava aportes e `portfolio.py` consolida; inclui `emergency_reserve_eligible`; desde o schema `20003`, `quantity_micros` preserva o nome legado, mas representa unidades de `1e-8`. Ver [[investimentos-portfolio]]. |
 | `investment_redemptions` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
@@ -650,6 +666,12 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 - [[adr/0014-desconcentracao-fachadas-e-roteamento]] — Fachadas compatíveis, roteamento declarativo e módulos internos menores para a fundação v2.
 
 ## Changelog
+
+- `4.16` — 2026-09-24 — Schema `20006` dá identidade estável à categoria de pagamentos de empréstimos; renomear a categoria não interrompe a associação.
+- `4.15` — 2026-09-24 — Formulário de Lançamentos passa a associar pagamentos aos empréstimos no backend; painel apresenta gráfico mensal e confirmação de arquivamento.
+
+- `4.14` — 2026-09-24 — Efeito Borboleta passa a hospedar os estudos determinísticos de Empréstimos em aba própria; `loans-view.js` concentra cadastro, acompanhamento, pagamentos e alimentação dos formulários de simulação.
+- `4.13` — 2026-09-24 — Registra rotas, tabelas e módulo Python da funcionalidade Empréstimos.
 
 - `4.12` — 2026-09-24 — Rota da classificação assistida documenta origem opcional e seleção contextual por conta/cartão.
 - `4.11` — 2026-09-24 — Documentada a prioridade contextual por conta/cartão na classificação assistida, mantendo fallback ao histórico geral.

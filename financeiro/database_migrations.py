@@ -7,12 +7,14 @@ from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
 
-from financeiro.database_compatibility import normalize_legacy_schema
+from financeiro.database_compatibility import ensure_column, normalize_legacy_schema
 from financeiro.database_config import SQLITE_BUSY_TIMEOUT_MS
 from financeiro.database_schema import (
     BASELINE_SCHEMA_VERSION,
     FINANCIAL_GOALS_SCHEMA_SQL,
     INDEX_SCHEMA_SQL,
+    LOANS_SCHEMA_SQL,
+    LOANS_INDEXES_SQL,
     MIGRATIONS_SCHEMA_SQL,
     create_baseline_indexes,
     create_baseline_tables,
@@ -36,6 +38,8 @@ INCREMENTAL_MIGRATIONS = {
     20002: ("backup_settings", lambda conn: _migrate_backup_settings(conn)),
     20003: ("portfolio_quantity_precision", lambda conn: _migrate_portfolio_quantity_precision(conn)),
     20004: ("financial_goals", lambda conn: _migrate_financial_goals(conn)),
+    20005: ("loans", lambda conn: _migrate_loans(conn)),
+    20006: ("category_system_keys", lambda conn: _migrate_category_system_keys(conn)),
 }
 
 
@@ -45,6 +49,42 @@ def _migrate_financial_goals(conn: sqlite3.Connection) -> None:
         for statement in sql_block.split(";"):
             if statement.strip():
                 conn.execute(statement)
+
+
+def _migrate_loans(conn: sqlite3.Connection) -> None:
+    """Add loan tracking and references to existing account transactions."""
+    for sql_block in (LOANS_SCHEMA_SQL, LOANS_INDEXES_SQL):
+        for statement in sql_block.split(";"):
+            if statement.strip():
+                conn.execute(statement)
+
+
+def _migrate_category_system_keys(conn: sqlite3.Connection) -> None:
+    """Give the loan payment category a stable semantic identity across renames."""
+    # spec: migracao-dados/migracao-banco-v2 v1.10 — critério 20
+    ensure_column(conn, "categories", "system_key", "TEXT")
+    conn.execute(
+        """UPDATE categories SET system_key='loan_payment'
+           WHERE group_type='expense' AND name IN ('Empréstimos', 'Empréstimos e Financiamentos')"""
+    )
+    conn.execute(
+        """UPDATE categories SET system_key='loan_payment'
+           WHERE id IN (
+             SELECT t.category_id FROM transactions t
+             JOIN loan_payment_links p ON p.transaction_id=t.id AND p.user_id=t.user_id
+             JOIN categories c ON c.id=t.category_id AND c.user_id=t.user_id
+             WHERE p.valid=1 AND t.category_id IS NOT NULL AND c.group_type='expense'
+           )"""
+    )
+    conn.execute(
+        """UPDATE categories SET name='Empréstimos e Financiamentos'
+           WHERE group_type='expense' AND name='Empréstimos'
+             AND NOT EXISTS (
+               SELECT 1 FROM categories current
+               WHERE current.user_id=categories.user_id AND current.group_type=categories.group_type
+                 AND current.name='Empréstimos e Financiamentos'
+             )"""
+    )
 
 
 def _migrate_portfolio_quantity_precision(conn: sqlite3.Connection) -> None:
@@ -214,6 +254,8 @@ def migrate_legacy_database(
             # em schema_migrations não converte os valores existentes.
             if target_version >= 20003:
                 _migrate_portfolio_quantity_precision(conn)
+            if target_version >= 20006:
+                _migrate_category_system_keys(conn)
             record_schema_history(conn, target_version)
         set_schema_version(paths.work, target_version, connection_factory=connection_factory)
         _validate_database(paths.work, target_version)

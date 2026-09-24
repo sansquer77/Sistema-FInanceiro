@@ -1,9 +1,9 @@
 ---
 tipo: spec
 area: backup-restauracao
-status: em-revisao
-versao: 1.0
-atualizado: 2026-09-05
+status: implementado
+versao: 1.1
+atualizado: 2026-09-24
 relacionados:
   - "[[migracao-banco-v2]]"
   - "[[privacidade-valores]]"
@@ -11,14 +11,14 @@ relacionados:
   - "[[../adr/0010-segredos-criptografados-sqlite]]"
   - "[[../adr/0018-backup-completo-criptografado]]"
   - "[[../arquitetura]]"
-tags: [spec, "area/backup-restauracao", "status/em-revisao"]
+tags: [spec, "area/backup-restauracao", "status/implementado"]
 aliases: ["Backup e Restauração"]
 ---
 
 # Backup e Restauração
 
 > [!info] Status
-> **em revisão** · versão: `1.0` · área: `backup-restauracao` · atualizado em 2026-09-05 · relacionados: [[migracao-banco-v2]], [[privacidade-valores]], [[../adr/0018-backup-completo-criptografado]]
+> **implementado** · versão: `1.1` · área: `backup-restauracao` · atualizado em 2026-09-24 · relacionados: [[migracao-banco-v2]], [[privacidade-valores]], [[../adr/0018-backup-completo-criptografado]]
 
 ## Problema
 
@@ -117,6 +117,8 @@ Usuário local que quer proteger seus dados contra falha do disco, perda do comp
 - [ ] Definir agendamento posterior com o sistema operacional quando o app estiver fechado.
 - [x] Definir o contrato de restauração entre versões incompatíveis do schema: a versão inicial aceita somente o schema corrente.
 
+> A validação da funcionalidade de Backup foi concluída e confirmada pelo responsável do produto em 2026-09-24. O agendamento com o app fechado permanece como evolução futura fora do escopo desta versão.
+
 ## Fora de escopo
 
 - Sincronização em nuvem ou envio automático para terceiros.
@@ -135,6 +137,7 @@ Usuário local que quer proteger seus dados contra falha do disco, perda do comp
 
 ## Changelog
 
+- `1.1` — 2026-09-24 — Validação do Backup confirmada pelo responsável do produto; spec marcada como implementada. Agendamento com o app fechado permanece como evolução futura.
 - `1.0` — 2026-09-05 — Implementação concluída e em revisão de distribuição: política global segura para ambiente multiusuário, backup online autenticado, restauração em duas fases com acesso exclusivo na promoção, salvaguarda, agendamento na abertura, retenção validada, interface e testes de falha/round-trip.
 - `0.2` — 2026-09-05 — Iniciada a implementação; fechados formato, criptografia, senha, persistência, rotas, seleção por caminho absoluto e compatibilidade de schema.
 - `0.1` — 2026-09-05 — Rascunho inicial do módulo completo de Backup e Restauração, com pacote ZIP criptografado, senha configurável em Preferências, validação, retenção e execução recorrente na abertura.

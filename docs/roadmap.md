@@ -2,8 +2,8 @@
 tipo: roadmap
 area: meta
 status: implementado
-versao: 1.9
-atualizado: 2026-09-23
+versao: 1.11
+atualizado: 2026-09-24
 relacionados:
   - "[[visao-produto]]"
   - "[[requisitos]]"
@@ -15,7 +15,7 @@ aliases: ["Roadmap", "Replicação Local"]
 # Roadmap
 
 > [!info] Status
-> **implementado** (módulos 1–12 concluídos; módulos 13, 14 e 15 descartados; módulos 16–18 implementados) · área: `meta` · atualizado em 2026-09-23
+> **em-implementacao** (módulos 1–12 e 16–18 concluídos; módulos 13–15 descartados; módulo 19 em implementação) · área: `meta` · atualizado em 2026-09-24
 
 Este documento organiza a evolução do Sistema Financeiro e serve de histórico de decisões de sequenciamento. Módulos planejados que ainda não iniciaram ficam com status `planejado`.
 
@@ -52,6 +52,7 @@ Este documento organiza a evolução do Sistema Financeiro e serve de histórico
 | 16 | Score de Saúde Financeira: indicador síntese (0 a 1000) e diagnóstico de 5 pilares de estabilidade financeira. | ✅ Implementado | [[specs/score-saude-financeira]] |
 | 17 | Fundação do frontend v2: ApexCharts vendorizado, IMask, Command Palette nativa e virtualização de listas extensas. | ✅ Implementado | [[specs/frontend-fundacao-v2]] |
 | 18 | Objetivos financeiros e fundos de provisão com Reserva de Emergência, exclusividade de recursos e projeções comparativas. | ✅ Implementado | [[specs/objetivos-financeiros]] |
+| 19 | Empréstimos e quitação: contratos e pagamentos vinculados em Gestão; estudos determinísticos Price e estratégias independentes por moeda no Efeito Borboleta. | 🚧 Em implementação | [[specs/emprestimos-quitacao]] |
 
 ---
 
@@ -123,6 +124,9 @@ A implementação local não copia a interface de nenhum produto externo. Reprod
 - Oferecer launchers de rede local apenas para redes confiáveis, mantendo reverse-proxy HTTPS como caminho para acesso remoto.
 
 ## Changelog
+
+- `1.11` — 2026-09-24 — Reorganiza Empréstimos: cadastro/acompanhamento no módulo próprio e estudos na aba de Empréstimos do Efeito Borboleta.
+- `1.10` — 2026-09-24 — Inicia o módulo 19 Empréstimos e quitação após fechamento das decisões da V1.
 
 - `1.9` — 2026-09-23 — Adicionado e implementado o módulo 18, Objetivos Financeiros e Fundos de Provisão, sobre a fundação gráfica da V2; módulo 17 sincronizado como implementado.
 - `1.8` — 2026-08-30 — Adicionado módulo 17, Fundação do frontend v2, em estado planejado; módulo 16 sincronizado como implementado.

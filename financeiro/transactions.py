@@ -164,6 +164,8 @@ def create_transaction(user_id: int, data: dict) -> dict:
 def create_transaction_with_conn(conn: sqlite3.Connection, user_id: int, data: dict) -> dict:
     transaction = normalize_transaction_payload(data)
     begin_immediate(conn)
+    if transaction.get("loan_id") and transaction["series_kind"] != "single":
+        raise TransactionError("Associe empréstimos somente a lançamentos avulsos.")
     source = get_active_account(conn, user_id, transaction["account_id"])
     if source["account_type"] == "wallet":
         force_single_transaction(transaction)
@@ -233,6 +235,11 @@ def create_transaction_with_conn(conn: sqlite3.Connection, user_id: int, data: d
     recompute_account_balance(conn, user_id, source["id"])
     if destination:
         recompute_account_balance(conn, user_id, destination["id"])
+    if transaction.get("loan_id"):
+        # spec: emprestimos-quitacao/emprestimos-quitacao v0.25 — critérios 24–25
+        # O vínculo nasce na mesma transação do lançamento, sem criar um segundo débito.
+        from financeiro.loans import link_payment_with_conn
+        link_payment_with_conn(conn, user_id, transaction["loan_id"], int(first_transaction_id))
     return format_transaction(fetch_transaction(conn, user_id, first_transaction_id))
 
 
@@ -252,6 +259,10 @@ def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
         ).fetchone()
         if not existing:
             raise TransactionError("Lancamento nao encontrado.", HTTPStatus.NOT_FOUND)
+        if transaction.get("loan_id") and transaction["series_kind"] != "single":
+            raise TransactionError("Associe empréstimos somente a lançamentos avulsos.")
+        from financeiro.loans import invalidate_loan_payment_links
+        invalidate_loan_payment_links(conn, user_id, normalized_id)
         if "series_kind" not in data and "payment_mode" not in data:
             preserve_existing_series_metadata(transaction, existing, data)
         source = get_active_account(conn, user_id, transaction["account_id"])
@@ -337,6 +348,10 @@ def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
         )
         replace_transaction_tags(conn, normalized_id, tag_ids)
         upsert_investment_operation(conn, user_id, normalized_id, source["id"], transaction)
+        if transaction.get("loan_id"):
+            # spec: lancamentos/lancamentos v3.39 — critério 61
+            from financeiro.loans import link_payment_with_conn
+            link_payment_with_conn(conn, user_id, transaction["loan_id"], normalized_id)
         if additional_occurrences:
             insert_additional_series_occurrences(
                 conn, user_id, transaction, additional_occurrences, source, destination,
@@ -571,6 +586,9 @@ def delete_transaction(user_id: int, transaction_id: str, apply_to_future: bool 
             raise TransactionError("Lancamento nao encontrado.", HTTPStatus.NOT_FOUND)
         transactions = [transaction, *future_transactions_to_delete(conn, user_id, transaction, apply_to_future)]
         transaction_ids = [item["id"] for item in transactions]
+        from financeiro.loans import invalidate_loan_payment_links
+        for linked_transaction_id in transaction_ids:
+            invalidate_loan_payment_links(conn, user_id, linked_transaction_id)
         conn.execute(
             f"""
             DELETE FROM transactions
@@ -612,6 +630,8 @@ def future_transactions_to_delete(conn, user_id: int, transaction, apply_to_futu
 
 def set_transaction_reconciled(user_id: int, transaction_id: str, reconciled: bool) -> dict:
     with get_connection() as conn:
+        from financeiro.loans import invalidate_loan_payment_links
+        invalidate_loan_payment_links(conn, user_id, int(transaction_id))
         cursor = conn.execute(
             """
             UPDATE transactions
@@ -654,6 +674,7 @@ def normalize_transaction_payload(data: dict) -> dict:
         "destination_account_id": destination_account_id,
         "exchange_rate": data.get("exchange_rate_to_brl") or data.get("exchange_rate"),
         "category": normalize_transaction_category(transaction_type, data.get("category")),
+        "loan_id": normalize_id(data.get("loan_id"), "Empréstimo inválido.") if str(data.get("loan_id") or "").strip() else None,
         "subcategory": normalize_optional_name(data.get("subcategory")) if transaction_type != "transfer" else None,
         "tags": normalize_optional_tags(data.get("tags") or data.get("tag")),
         "notes": empty_to_none(data.get("notes")),

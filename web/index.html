@@ -161,6 +161,10 @@
                   <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"></rect><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path><path d="M3 12h18"></path></svg>
                   <span class="nav-label">Portfólio</span>
                 </button>
+                <button class="nav-button" type="button" data-view="loans" data-short="EM" title="Empréstimos">
+                  <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="3.5"></circle><path d="M12 3.2v3.6m1.2-2.8c-.3-.4-.7-.6-1.2-.6-.8 0-1.4.4-1.4 1s.6.9 1.4 1.2 1.4.6 1.4 1.2-.6 1-1.4 1c-.5 0-.9-.2-1.2-.6"></path><path d="M12 10.5v4m-2-2 2 2 2-2"></path><path d="M3 20h5l3-2a2 2 0 0 1 2 0l3 2h5"></path></svg>
+                  <span class="nav-label">Empréstimos</span>
+                </button>
                 <button class="nav-button" type="button" data-view="limits" data-short="LM" title="Limites">
                   <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3"></path><path d="M12 19v3"></path><path d="M2 12h3"></path><path d="M19 12h3"></path></svg>
                   <span class="nav-label">Limites</span>
@@ -776,6 +780,12 @@
                     <select name="subcategory" id="transactionSubcategory"></select>
                   </label>
                 </div>
+                <div class="field-row" id="loanPaymentRow" hidden>
+                  <label>Empréstimo associado (opcional)
+                    <select name="loan_id" id="transactionLoan"><option value="">Sem associação</option></select>
+                  </label>
+                  <p class="field-hint">Associe este lançamento ao contrato correspondente. O pagamento continua sendo registrado uma única vez na conta.</p>
+                </div>
                 <p class="field-hint" id="transactionClassificationSuggestion" aria-live="polite"></p>
                 <div class="investment-fields" id="investmentOperationFields" hidden>
                   <div class="field-row">
@@ -963,6 +973,46 @@
               </div>
               <p class="transaction-context-count" id="transactionContextCount" aria-live="polite"></p>
               <div class="transaction-list" id="transactionList"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="module-view" id="loansView" hidden>
+          <div class="workspace loans-workspace">
+            <section class="panel loan-form-panel" id="loanFormPanel" hidden>
+              <div class="section-heading"><div><span class="eyebrow">Contrato</span><h2 id="loanFormTitle">Novo empréstimo</h2></div></div>
+              <form id="loanForm" class="form">
+                <input name="loan_id" type="hidden">
+                <label>Nome<input name="name" required placeholder="Ex.: Financiamento do carro"></label>
+                <div class="field-row">
+                  <label>Modalidade<select name="loan_type"><option value="auto">Veículo</option><option value="home">Imóvel</option><option value="personal">Pessoal</option><option value="payroll">Consignado</option><option value="renegotiated">Renegociada</option><option value="other">Outra</option></select></label>
+                  <label>Moeda<input name="currency" value="BRL" maxlength="3" required></label>
+                </div>
+                <div class="field-row">
+                  <label>Parcela mensal<input name="installment_amount" inputmode="decimal" placeholder="2.800,00" required></label>
+                  <label>Parcelas restantes<input name="remaining_installments" type="number" min="1" required></label>
+                </div>
+                <div class="field-row">
+                  <label>Taxa efetiva mensal (%)<input name="monthly_rate_percent" inputmode="decimal" placeholder="opcional"></label>
+                  <label>CET efetivo anual (%)<input name="annual_cet_percent" inputmode="decimal" placeholder="opcional"></label>
+                </div>
+                <div class="field-row">
+                  <label>Próximo vencimento<input name="next_due_date" type="date" required></label>
+                  <label>Compromisso nominal restante (opcional)<input name="remaining_commitment" inputmode="decimal" placeholder="Calculado pelas parcelas"></label>
+                </div>
+                <div class="form-actions">
+                  <button class="primary" type="submit">Salvar empréstimo</button>
+                  <button class="ghost" id="cancelLoanEdit" type="button" hidden>Cancelar</button>
+                </div>
+              </form>
+            </section>
+            <p class="message loan-message" id="loanMessage" role="status"></p>
+            <section class="panel loans-list-panel">
+              <div class="section-heading">
+                <div><span class="eyebrow">Acompanhamento</span><h2>Seus contratos</h2></div>
+                <button class="primary" id="newLoanButton" type="button" aria-controls="loanFormPanel" aria-expanded="false">+ Novo Empréstimo</button>
+              </div>
+              <div id="loanCurrencyTotals"></div><div id="loanList"></div>
             </section>
           </div>
         </section>
@@ -1517,6 +1567,11 @@
         </section>
 
         <section class="module-view" id="simulationsView" hidden>
+          <div class="portfolio-tabs" role="tablist" aria-label="Estudos do Efeito Borboleta">
+            <button id="simulationCashflowTab" class="portfolio-tab active" type="button" role="tab" aria-selected="true" aria-controls="simulationCashflowPanel" data-simulation-mode-tab="cashflow">Receitas/Despesas</button>
+            <button id="simulationLoansTab" class="portfolio-tab" type="button" role="tab" aria-selected="false" aria-controls="simulationLoansPanel" data-simulation-mode-tab="loans" tabindex="-1">Empréstimos</button>
+          </div>
+          <section id="simulationCashflowPanel" class="simulation-mode-panel" role="tabpanel" aria-labelledby="simulationCashflowTab" data-simulation-mode-panel="cashflow">
           <section class="panel simulation-shell">
             <div class="section-heading">
               <h2>Novo cenário</h2>
@@ -1609,6 +1664,29 @@
                 </div>
                 <div class="simulation-warnings" id="simulationWarnings"></div>
                 </div>
+              </section>
+            </div>
+          </section>
+          </section>
+          <section id="simulationLoansPanel" class="simulation-mode-panel" role="tabpanel" aria-labelledby="simulationLoansTab" data-simulation-mode-panel="loans" hidden>
+            <div class="page-heading"><div><p class="eyebrow">Estudo teórico</p><h2>Empréstimos</h2><p>Compare pagamentos adicionais e estratégias de quitação. Os cenários não alteram contratos, lançamentos ou saldos.</p></div></div>
+            <div class="workspace">
+              <section class="panel"><h3>Estudo de pagamento adicional</h3>
+                <form id="loanSimulationForm" class="form">
+                  <label>Empréstimo<select id="loanSimulationTarget" required></select></label>
+                  <label>Orçamento adicional mensal<input name="extra_monthly_payment" inputmode="decimal" value="0"></label>
+                  <label>Amortização extraordinária<input name="extraordinary_payment" inputmode="decimal" value="0"></label>
+                  <label>Efeito da amortização<select name="amortization_mode"><option value="reduce_term">Reduzir prazo e manter parcela</option><option value="reduce_payment">Reduzir parcela e manter prazo</option></select></label>
+                  <button class="primary" type="submit">Simular redução</button>
+                </form><div id="loanSimulationResult" aria-live="polite"></div>
+              </section>
+              <section class="panel"><h3>Plano por estratégia</h3>
+                <form id="loanStrategyForm" class="form">
+                  <label>Moeda<select name="currency" id="loanStrategyCurrency" required></select></label>
+                  <label>Estratégia<select name="strategy"><option value="avalanche">Avalanche · maior taxa primeiro</option><option value="snowball">Bola de neve · menor saldo primeiro</option></select></label>
+                  <label>Orçamento adicional mensal compartilhado<input name="monthly_budget" inputmode="decimal" value="0"></label>
+                  <button class="primary" type="submit">Simular estratégia</button>
+                </form><div id="loanStrategyResult" aria-live="polite"></div>
               </section>
             </div>
           </section>
@@ -2442,6 +2520,6 @@
     </dialog>
     <script src="/vendor/imask/7.6.1/imask.min.js?v=7.6.1"></script>
     <script src="/vendor/apexcharts/4.7.0/apexcharts.min.js?v=4.7.0"></script>
-    <script type="module" src="/app.js?v=165"></script>
+    <script type="module" src="/app.js?v=166"></script>
   </body>
 </html>

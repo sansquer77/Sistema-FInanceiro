@@ -15,6 +15,7 @@ MODULES = {
     "classifications",
     "limits",
     "financial_goals",
+    "loans",
     "user_admin",
     "backup",
 }
@@ -50,6 +51,8 @@ ENTITY_TYPES = {
     "financial_goal",
     "financial_goal_movement",
     "financial_goal_funding_source",
+    "loan",
+    "loan_payment",
     "user",
     "backup_policy",
     "backup_package",

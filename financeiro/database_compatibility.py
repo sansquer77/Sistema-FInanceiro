@@ -64,6 +64,7 @@ def normalize_legacy_schema(conn: sqlite3.Connection) -> None:
     ensure_column(conn, "investment_opening_positions", "savings_anniversaries_json", "TEXT")
     ensure_column(conn, "checking_accounts", "account_type", "TEXT NOT NULL DEFAULT 'liquidity'")
     ensure_column(conn, "categories", "group_type", "TEXT NOT NULL DEFAULT 'expense'")
+    ensure_column(conn, "categories", "system_key", "TEXT")
 
     ensure_operation_logs(conn)
     ensure_ai_settings(conn)
@@ -160,12 +161,13 @@ def migrate_category_unique_constraint(conn: sqlite3.Connection) -> None:
                 user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 name TEXT NOT NULL,
                 group_type TEXT NOT NULL DEFAULT 'expense' CHECK (group_type IN ('income', 'expense', 'investment')),
+                system_key TEXT,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE (user_id, group_type, name)
             );
 
-            INSERT INTO categories_new (id, user_id, name, group_type, created_at)
-            SELECT id, user_id, name, group_type, created_at
+            INSERT INTO categories_new (id, user_id, name, group_type, system_key, created_at)
+            SELECT id, user_id, name, group_type, system_key, created_at
             FROM categories;
 
             DROP TABLE categories;

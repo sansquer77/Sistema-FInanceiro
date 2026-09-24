@@ -2,8 +2,8 @@
 tipo: spec
 area: migracao-dados
 status: implementado
-versao: 1.9
-atualizado: 2026-09-23
+versao: 1.10
+atualizado: 2026-09-24
 relacionados:
   - "[[../arquitetura]]"
   - "[[importacao-dados]]"
@@ -71,7 +71,7 @@ Usuário existente que atualiza o aplicativo para a linha v2 e usuário novo que
 - `financeiro/database_schema.py` descreve canonicamente o baseline v2: tabelas, constraints, chaves estrangeiras, índices obrigatórios e `PERFORMANCE_INDEXES`. Oferece:
   ```python
   BASELINE_SCHEMA_VERSION = 20000
-  SCHEMA_VERSION = 20004
+  SCHEMA_VERSION = 20006
 
   def create_baseline_tables(conn: sqlite3.Connection) -> None:
       ...
@@ -128,6 +128,8 @@ Usuário existente que atualiza o aplicativo para a linha v2 e usuário novo que
 16. Dado banco na versão `20000` ou `20001`, quando o app inicia com a funcionalidade de backup, então aplica em ordem os passos pendentes até `20002`, cria a política global idempotente e amplia `secure_configs` sem perder os segredos existentes.
 17. Dado banco na versão `20002`, quando o app inicia, então migra as quantidades de investimentos de seis para oito casas sem alterar seus valores econômicos nem repetir a multiplicação em aberturas posteriores.
 18. Dado banco na versão `20003`, quando o app inicia, então aplica a migração `20004`, cria idempotentemente as tabelas e índices de objetivos financeiros e preserva todos os dados existentes.
+19. Dado banco na versão `20004`, quando o app inicia, então aplica a migração `20005` de empréstimos e preserva os lançamentos existentes.
+20. Dado banco na versão `20005`, quando o app inicia, então aplica a migração `20006`, adiciona identidade semântica às categorias, associa o nome padrão **Empréstimos e Financiamentos** e preserva IDs, lançamentos e vínculos.
 
 ## Fora de escopo
 
@@ -151,9 +153,12 @@ Usuário existente que atualiza o aplicativo para a linha v2 e usuário novo que
 - [x] Passo 10 — adicionar a migração incremental `20002` para a política global de backup e a senha opcional protegida, preservando bancos compartilhados e segredos existentes. Fecha: critério 16.
 - [x] Passo 11 — adicionar a migração incremental `20003` para quantidades de oito casas no Portfólio, preservando atomicamente posições, resgates, históricos e snapshots existentes. Fecha: critério 17.
 - [x] Passo 12 — adicionar a migração incremental `20004` para objetivos financeiros, movimentações manuais e vínculos exclusivos de cobertura. Fecha: critério 18.
+- [x] Passo 13 — adicionar migração incremental `20005` para empréstimos e vínculos a lançamentos existentes. Fecha: critério 19.
+- [x] Passo 14 — adicionar identidade semântica estável para categorias e mapear nomes legado/atual sem alterar IDs. Fecha: critério 20.
 
 ## Changelog
 
+- `1.10` — 2026-09-24 — Schema atual avançado a `20006`; categoria de pagamento de empréstimos recebe identidade estável durante a migração e o nome padrão oficial é atualizado.
 - `1.9` — 2026-09-23 — Schema atual avançado a `20004` com migração incremental idempotente das tabelas e índices de Objetivos Financeiros.
 - `1.8` — 2026-09-11 — Schema atual avançado a `20003`; quantidades do Portfólio passam de seis para oito casas por migração incremental atômica, sem alterar valores existentes.
 - `1.7` — 2026-09-05 — Schema atual avançado a `20002` pela política global de backup; migração incremental preserva instalações compartilhadas e amplia `secure_configs` sem expor ou perder segredos.

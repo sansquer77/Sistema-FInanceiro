@@ -6030,6 +6030,16 @@ form[aria-busy="true"] .form-actions {
   color: var(--color-success, #10B981);
 }
 
+.portfolio-goal-flag {
+  display: inline-block;
+  flex: none;
+  width: 12px;
+  height: 12px;
+  margin-left: 5px;
+  vertical-align: -2px;
+  color: var(--accent);
+}
+
 .portfolio-col-account {
   width: 116px;
 }
@@ -9306,3 +9316,14 @@ form[aria-busy="true"] .form-actions {
 .backup-policy-panel {
   grid-column: 1 / -1;
 }
+
+.loan-progress-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; max-width: 640px; margin-top: 10px; }
+.loan-progress-heading h4 { margin: 0; font-size: 0.9rem; }
+.loan-progress-heading strong { color: var(--on-surface-variant); font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+.loan-payment-evolution { min-height: 66px; max-width: 640px; margin: 0 0 8px; }
+.loan-progress-tooltip { display: grid; gap: 4px; padding: 9px 12px; color: var(--on-surface); background: var(--surface-container-lowest); border: 1px solid var(--outline-variant); border-radius: var(--rounded, 8px); font-size: 0.78rem; }
+.loan-progress-tooltip span { color: var(--on-surface-variant); }
+.loans-workspace { grid-template-columns: minmax(0, 1fr); align-items: start; }
+.loan-form-panel { margin-bottom: 18px; }
+.loan-form-panel[hidden] { display: none; }
+.loan-message:empty { display: none; }

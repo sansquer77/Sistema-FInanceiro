@@ -66,10 +66,11 @@ import { registerImportsView } from "./modules/imports-view.js";
 import { registerCockpitView } from "./modules/cockpit-view.js";
 import { registerAccountsView } from "./modules/accounts-view.js";
 import { registerCardsView } from "./modules/cards-view.js";
-import { registerPortfolioView } from "./modules/portfolio-view.js?v=163";
+import { registerPortfolioView } from "./modules/portfolio-view.js?v=164";
 import { registerTransactionsView } from "./modules/transactions-view.js";
-import { registerSimulationsView } from "./modules/simulations-view.js";
+import { registerSimulationsView } from "./modules/simulations-view.js?v=2";
 import { registerOperationHistoryView } from "./modules/operation-history-view.js";
+import { registerLoansView } from "./modules/loans-view.js?v=2";
 import { registerInstructionsView } from "./modules/instructions-view.js";
 import { registerGlobalSearch } from "./modules/global-search.js";
 import { registerCommandPalette } from "./modules/command-palette.js";
@@ -538,6 +539,7 @@ const moduleViews = {
   cardLaunches: document.querySelector("#cardLaunchesView"),
   transactions: document.querySelector("#transactionsView"),
   portfolio: document.querySelector("#portfolioView"),
+  loans: document.querySelector("#loansView"),
   limits: document.querySelector("#limitsView"),
   simulations: document.querySelector("#simulationsView"),
   reports: document.querySelector("#reportsView"),
@@ -556,6 +558,7 @@ const viewTitles = {
   cardLaunches: ["Lançamentos", "Fatura de Cartões"],
   transactions: ["Lançamentos", "Extrato de Contas"],
   portfolio: ["Gestão", "Portfólio"],
+  loans: ["Gestão", "Empréstimos"],
   limits: ["Gestão", "Limites"],
   simulations: ["Gestão", "Efeito Borboleta"],
   reports: ["Gestão", "Relatórios"],
@@ -574,6 +577,7 @@ const CONTEXTUAL_HELP_TOPICS = {
   cardLaunches: "lancar-compras-cartao",
   transactions: "primeiro-lancamento",
   portfolio: "entender-portfolio",
+  loans: "emprestimos-quitacao",
   limits: "limites-gastos",
   simulations: "simulacao-borboleta",
   reports: "relatorios",
@@ -936,6 +940,10 @@ const cockpitView = registerCockpitView({
       showModule("transactions");
       return;
     }
+    if (action?.route === "loans") {
+      showModule("loans");
+      return;
+    }
     if (action?.route === "cards") {
       if (isValidMonthValue(params.month)) state.cardInvoiceMonth = params.month;
       if (params.card_id) state.selectedCreditCardId = String(params.card_id);
@@ -1100,6 +1108,8 @@ const transactionsView = registerTransactionsView({
     investmentFixedIncomePreview,
     transactionCategory,
     transactionCategoryRow,
+    transactionLoan: document.querySelector("#transactionLoan"),
+    loanPaymentRow: document.querySelector("#loanPaymentRow"),
     transactionSubcategory,
     transactionClassificationSuggestion,
     seriesKind,
@@ -1187,7 +1197,10 @@ const simulationsView = registerSimulationsView({
     simulationEmptyState,
     simulationResultsContent,
     resetSimulationButton,
+    simulationModeTabs: document.querySelectorAll("[data-simulation-mode-tab]"),
+    simulationModePanels: document.querySelectorAll("[data-simulation-mode-panel]"),
   },
+  loadLoanStudies: () => loansView.loadLoanStudies().catch((error) => { document.querySelector("#loanSimulationResult").textContent = error.message; }),
   formatMoney,
   setFormBusy,
 });
@@ -1282,6 +1295,22 @@ const portfolioView = registerPortfolioView({
 });
 
 navButtons.forEach((button) => button.addEventListener("click", () => showModule(button.dataset.view)));
+const loansView = registerLoansView({
+  api,
+  fetchAllListed,
+  escapeHtml,
+  elements: {
+    loanForm: document.querySelector("#loanForm"), loanMessage: document.querySelector("#loanMessage"),
+    loanFormPanel: document.querySelector("#loanFormPanel"), newLoanButton: document.querySelector("#newLoanButton"),
+    loanList: document.querySelector("#loanList"), simulationForm: document.querySelector("#loanSimulationForm"),
+    simulationTarget: document.querySelector("#loanSimulationTarget"), simulationResult: document.querySelector("#loanSimulationResult"),
+    strategyForm: document.querySelector("#loanStrategyForm"), strategyCurrency: document.querySelector("#loanStrategyCurrency"),
+    strategyResult: document.querySelector("#loanStrategyResult"),
+    loanCurrencyTotals: document.querySelector("#loanCurrencyTotals"),
+    loanFormTitle: document.querySelector("#loanFormTitle"), cancelLoanEdit: document.querySelector("#cancelLoanEdit"),
+    decisionModal,
+  },
+});
 document.querySelectorAll(".nav-group-toggle").forEach((toggle) => {
   toggle.addEventListener("click", () => {
     const group = toggle.closest(".nav-group");
@@ -1616,6 +1645,7 @@ function showModule(view) {
   }
   if (view === "simulations") {
     simulationsView.loadSimulationFormData().catch((error) => setMessage(simulationMessage, error.message, "error"));
+    simulationsView.refreshActiveStudyData()?.catch((error) => { document.querySelector("#loanSimulationResult").textContent = error.message; });
   }
   if (view === "reports") {
     reportsView.renderReports();
@@ -1623,6 +1653,7 @@ function showModule(view) {
   if (view === "portfolio") {
     portfolioView.onEnter().catch((error) => setMessage(portfolioMessage, error.message, "error"));
   }
+  if (view === "loans") loansView.loadLoans().catch((error) => { document.querySelector("#loanMessage").textContent = error.message; });
   if (view === "creditCards") {
     renderCreditCards();
     if (!state.cardDataLoaded) {

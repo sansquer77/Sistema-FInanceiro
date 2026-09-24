@@ -28,6 +28,7 @@ EXACT_ROUTES: dict[str, dict[str, str]] = {
         "/api/tags": "handle_list_tags",
         "/api/spending-limits": "handle_list_spending_limits",
         "/api/financial-goals": "handle_list_financial_goals",
+        "/api/loans": "handle_list_loans",
         "/api/financial-goals/emergency-reserve": "handle_emergency_reserve_summary",
         "/api/global-search": "handle_global_search",
         "/api/cockpit": "handle_cockpit",
@@ -69,6 +70,9 @@ EXACT_ROUTES: dict[str, dict[str, str]] = {
         "/api/subcategories": "handle_create_subcategory", "/api/tags": "handle_create_tag",
         "/api/spending-limits": "handle_create_spending_limit",
         "/api/financial-goals": "handle_create_financial_goal",
+        "/api/loans": "handle_create_loan",
+        "/api/loans/simulate": "handle_simulate_loan",
+        "/api/loans/simulate-strategy": "handle_simulate_loan_strategy",
         "/api/simulations/butterfly-effect": "handle_simulate_butterfly_effect",
         "/api/financial-health-trends/ai-summary": "handle_ai_summary",
         "/api/consultor/config": "handle_save_consultor_config",
@@ -102,6 +106,7 @@ PATTERN_ROUTES: dict[str, tuple[tuple[RoutePredicate, str], ...]] = {
     "POST": (
         (lambda path: path.startswith("/api/financial-goals/") and path.endswith("/movements"), "handle_create_goal_movement"),
         (lambda path: path.startswith("/api/financial-goals/") and path.endswith("/funding-sources"), "handle_link_goal_funding_source"),
+        (lambda path: path.startswith("/api/loans/") and path.endswith("/payments"), "handle_link_loan_payment"),
         (lambda path: path.startswith("/api/checking-accounts/") and path.endswith("/restore"), "handle_restore_account"),
         (lambda path: path.startswith("/api/credit-cards/") and path.endswith("/restore"), "handle_restore_credit_card"),
     ),
@@ -119,6 +124,7 @@ PATTERN_ROUTES: dict[str, tuple[tuple[RoutePredicate, str], ...]] = {
         (lambda path: path.startswith("/api/tags/"), "handle_update_tag"),
         (lambda path: path.startswith("/api/spending-limits/"), "handle_update_spending_limit"),
         (lambda path: path.startswith("/api/financial-goals/") and len(path.strip("/").split("/")) == 3, "handle_update_financial_goal"),
+        (lambda path: path.startswith("/api/loans/") and len(path.strip("/").split("/")) == 3, "handle_update_loan"),
     ),
     "DELETE": (),
 }
@@ -127,6 +133,7 @@ PATTERN_ROUTES["DELETE"] = tuple(
     ((lambda prefix: (lambda path: path.startswith(prefix)))(prefix), handler)
     for prefix, handler in (
         ("/api/financial-goals/", "handle_financial_goal_delete_route"),
+        ("/api/loans/", "handle_loan_delete_route"),
         ("/api/categories/", "handle_delete_category"), ("/api/subcategories/", "handle_delete_subcategory"),
         ("/api/tags/", "handle_delete_tag"), ("/api/spending-limits/", "handle_delete_spending_limit"),
         ("/api/portfolio/positions/", "handle_delete_portfolio_position"),

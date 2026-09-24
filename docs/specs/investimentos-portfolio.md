@@ -2,8 +2,8 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.65
-atualizado: 2026-09-18
+versao: 2.66
+atualizado: 2026-09-24
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -257,6 +257,7 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado uma posição com valor atual manual, quando um resgate parcial é confirmado, então o valor bruto do resgate é descontado desse valor manual na mesma transação, sem descontar as taxas novamente e sem alterar posições distintas.
 - Dado uma falha depois da baixa do valor manual e antes da conclusão do resgate, quando a transação é revertida, então valor manual, saldo da conta, lotes FIFO e históricos permanecem inalterados.
 - Dado um resgate confirmado, quando consultado posteriormente na aba Histórico, então exibe quantidade baixada, valor bruto, taxas, valor líquido, custo FIFO, ganho/perda realizado e quantidade/custo remanescentes conforme o snapshot do momento da operação.
+- Dado um ativo vinculado a um objetivo financeiro, quando exibido no Portfólio, então recebe uma bandeira compacta e acessível distinta do escudo da Reserva de Emergência; a marca acompanha o consolidado e seus lançamentos componentes.
 - Dado um resgate de ativo identificado, quando a quantidade é exibida no Histórico, então sua unidade é o código do ativo, como `ETH` ou `USDC`, e não a moeda contábil da carteira.
 - Dado operações posteriores sobre o mesmo ativo, quando um resgate antigo é consultado, então seus valores realizados e remanescentes históricos não são recalculados nem alterados retroativamente.
 - Dado a aba Histórico aberta, quando há resgates parciais e/ou posições encerradas, então eles aparecem em seções distintas e o estado vazio orienta que ambos os eventos serão registrados ali.
@@ -314,6 +315,7 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 
 ## Changelog
 
+- `2.66` — 2026-09-24 — Ativos vinculados a objetivos recebem uma marca compacta em forma de bandeira no Portfólio, distinta do escudo da Reserva de Emergência e propagada pelo ativo consolidado.
 - `2.65` — 2026-09-18 — IPCA e IGP-M passam a usar consulta mensal consolidada e cacheada do SGS; a ausência da competência corrente deixa de ser apresentada como indisponibilidade do Banco Central.
 - `2.64` — 2026-09-11 — A coluna de quantidade ganha espaço para oito casas e o Histórico passa a identificar quantidades pelo código do ativo, não pela moeda da carteira.
 - `2.63` — 2026-09-11 — Resgate reduz atomicamente o valor manual pelo bruto, preservando resíduos e isolamento entre posições; cripto e stablecoins exibem oito casas nas posições e no histórico.

@@ -1,32 +1,33 @@
 ---
 tipo: spec
 area: simulacoes
-status: implementado
-versao: 1.9
-atualizado: 2026-09-04
+status: em-implementacao
+versao: 2.0
+atualizado: 2026-09-24
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
   - "[[cartoes]]"
   - "[[limites-gastos]]"
   - "[[relatorios]]"
+  - "[[emprestimos-quitacao]]"
   - "[[arquitetura]]"
-tags: [spec, "area/simulacoes", "status/implementado"]
+tags: [spec, "area/simulacoes", "status/em-implementacao"]
 aliases: ["Efeito Borboleta", "Simulador Financeiro"]
 ---
 
 # Efeito Borboleta
 
 > [!info] Status
-> **implementado** · área: `simulacoes` · atualizado em 2026-09-04 · relacionados: [[contas-correntes]], [[lancamentos]], [[cartoes]], [[limites-gastos]], [[relatorios]]
+> **em-implementacao** · área: `simulacoes` · atualizado em 2026-09-24 · relacionados: [[contas-correntes]], [[lancamentos]], [[cartoes]], [[limites-gastos]], [[relatorios]], [[emprestimos-quitacao]]
 
 ## Problema
 
-O usuário precisa avaliar o impacto de uma possível receita ou despesa antes de assumir o compromisso financeiro, sem criar lançamentos reais, alterar saldos, afetar faturas ou poluir relatórios históricos.
+O usuário precisa avaliar o impacto de uma possível receita, despesa ou estratégia de quitação antes de assumir o compromisso financeiro, sem criar lançamentos reais, alterar saldos ou poluir relatórios históricos.
 
 ## Usuário
 
-Qualquer usuário autenticado localmente que queira testar cenários financeiros hipotéticos, como uma compra planejada, uma renda extra, uma despesa emergencial ou a antecipação de uma decisão de consumo.
+Qualquer usuário autenticado localmente que queira testar cenários financeiros hipotéticos de receitas, despesas e quitação de empréstimos.
 
 ## Jornada
 
@@ -36,6 +37,8 @@ Qualquer usuário autenticado localmente que queira testar cenários financeiros
 4. O sistema calcula o impacto projetado sem gravar nenhum lançamento.
 5. O usuário visualiza comparativos entre a situação atual e o cenário simulado.
 6. O usuário descarta a simulação ao sair, limpar o formulário ou iniciar outro cenário.
+7. No Efeito Borboleta, o usuário alterna entre as abas **Receitas/Despesas** e **Empréstimos** para acessar estudos teóricos independentes.
+8. Na aba **Empréstimos**, simula pagamento adicional por contrato e compara planos avalanche/bola de neve sem alterar o cadastro, os lançamentos ou saldos reais.
 
 ## Dados
 
@@ -142,6 +145,8 @@ Resposta esperada:
 - Dado uma simulação válida, quando a projeção diária é renderizada, então ela possui 15 colunas e três linhas: Previsto, Simulado e Diferença.
 - Dado `simulations-view.js` atualizado com um `app.js` ou HTML anterior ainda em cache, quando o contêiner semanal não é injetado ou não existe, então a simulação continua renderizando os demais resultados sem erro de JavaScript.
 - Dado o módulo aberto sem simulação válida, quando a tela é exibida, então as seções de resultados, gráfico, projeção e alertas permanecem ocultas e um único estado informativo orienta o usuário.
+- Dado o módulo Efeito Borboleta, quando aberto, então oferece abas acessíveis **Receitas/Despesas** e **Empréstimos**, mantendo os estudos de dívidas organizados em uma única área de simulações.
+- Dado a aba **Empréstimos** aberta, quando o usuário executa estudo de pagamento adicional ou plano por estratégia, então usa os cálculos determinísticos de empréstimos sem alterar contratos, lançamentos, contas ou saldos.
 
 - Dado um cenário exibido, quando o comparativo é renderizado, então os cards mensais ficam acima da área exclusiva do gráfico e a tabela diária permanece abaixo da legenda, sem sobreposição (estrutura automatizada; aparência em Safari requer validação manual).
 
@@ -156,6 +161,7 @@ Resposta esperada:
 
 ## Plano de implementação
 
+- [x] Passo 7 — Reunir os estudos de quitação na aba Empréstimos, preservando os formulários teóricos e os cálculos do backend. Fecha: critérios 27 e 28.
 - [x] Passo 6 — Separar cards e plot em linhas de layout, manter tabela no fluxo e verificar o contrato de apresentação. Fecha: critério 26. Teste estrutural automatizado aprovado; validação visual no Safari pendente.
 - [x] Passo 1 — Preservar o núcleo determinístico, isolamento, moedas, validações e projeção mensal existentes. Fecha: critérios 1–18.
 - [x] Passo 2 — Substituir os cortes semanais por janela diária dinâmica e resumo de risco no backend. Fecha: critérios 19–24.
@@ -165,6 +171,7 @@ Resposta esperada:
 
 ## Changelog
 
+- `2.0` — 2026-09-24 — Efeito Borboleta passa a reunir estudos de Receitas/Despesas e Empréstimos em abas distintas; simulações de quitação permanecem teóricas e sem efeitos financeiros.
 - `1.9` — 2026-09-04 — Resultado inicial usa um único estado informativo; conteúdo dependente fica oculto até simulação válida.
 
 - `1.8` — 2026-08-31 — Comparativo mensal com cards acima do gráfico e tabela diária abaixo; rolagem horizontal interna em áreas estreitas. Corrigida descrição antiga que omitia a tabela abaixo do gráfico.

@@ -4,11 +4,13 @@ import { escapeHtml, formData, setFormBusy, setMessage, stateMarkup } from "./do
 import { formatDate, formatShortMonthName, todayLocalDateValue } from "./date-utils.js";
 import { chartToken, renderChart } from "./chart-adapter.js";
 import { createLoadPolicy } from "./load-policy.js";
+import { bindRovingTablist, syncRovingTabState } from "./tab-utils.js";
 
 export function registerSimulationsView({
   state,
   elements,
   formatMoney,
+  loadLoanStudies,
 }) {
   const formDataLoadPolicy = createLoadPolicy();
   const balanceHistoryChartTop = 24;
@@ -35,7 +37,22 @@ export function registerSimulationsView({
     simulationEmptyState,
     simulationResultsContent,
     resetSimulationButton,
+    simulationModeTabs,
+    simulationModePanels,
   } = elements;
+  let activeSimulationMode = "cashflow";
+  const simulationModeButtons = Array.from(simulationModeTabs || []);
+  const simulationModePanelElements = Array.from(simulationModePanels || []);
+  // spec: simulacoes/efeito-borboleta v2.0 — critérios 27–28
+  bindRovingTablist(simulationModeButtons, {
+    valueFor: (button) => button.dataset.simulationModeTab,
+    onSelect: (mode) => {
+      activeSimulationMode = mode;
+      syncRovingTabState(simulationModeButtons, mode, (button) => button.dataset.simulationModeTab);
+      simulationModePanelElements.forEach((panel) => { panel.hidden = panel.dataset.simulationModePanel !== mode; });
+      if (mode === "loans") loadLoanStudies?.();
+    },
+  });
   const weeklyProjectionElement = simulationWeeklyProjection
     || document.querySelector("#simulationWeeklyProjection");
 
@@ -70,6 +87,11 @@ export function registerSimulationsView({
       if (account) clearSimulationResult();
       simulationDate.value = todayLocalDateValue();
     }, { force });
+  }
+
+  function refreshActiveStudyData() {
+    if (activeSimulationMode === "loans") return loadLoanStudies?.();
+    return Promise.resolve();
   }
 
   function renderAccounts() {
@@ -351,6 +373,7 @@ export function registerSimulationsView({
 
   return {
     loadSimulationFormData,
+    refreshActiveStudyData,
     markFormDataDirty: formDataLoadPolicy.markDirty,
     resetFormDataCache: formDataLoadPolicy.reset,
     resetForm,

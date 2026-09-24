@@ -41,6 +41,7 @@ def build_cockpit_notifications(
     calendar = calendar_loader(user_id, reference_date=reference_date, portfolio_positions=positions)
     critical.extend(_overdue_account_notifications(calendar.get("overdue_payables") or []))
     critical.extend(_overdue_invoice_notifications(user_id, reference_date))
+    critical.extend(_loan_due_notifications(user_id, reference_date))
 
     informational = _maturity_notifications(calendar.get("maturity_30_days") or [], reference_date)
     informational.extend(_portfolio_event_notifications(portfolio_events or [], reference_date))
@@ -55,6 +56,26 @@ def build_cockpit_notifications(
         "informational_count": sum(not item["seen"] for item in informational),
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     }
+
+
+def _loan_due_notifications(user_id: int, reference_date: date) -> list[dict]:
+    due_date = reference_date.isoformat()
+    with get_connection() as conn:
+        rows = conn.execute(
+            """SELECT id, name, currency FROM loans
+               WHERE user_id=? AND archived_at IS NULL AND next_due_date=?
+                 AND remaining_installments > 0""",
+            (user_id, due_date),
+        ).fetchall()
+    return [
+        _item(
+            f"loan_due:{row['id']}:{due_date}", "loan_due", "loans",
+            f"Parcela de {row['name']} vence hoje",
+            f"Confira o pagamento do empréstimo em {row['currency']} e associe o lançamento da conta.",
+            due_date, "Ver empréstimo", "loans", {"loan_id": row["id"]},
+        )
+        for row in rows
+    ]
 
 
 def mark_informational_seen(user_id: int, notification_ids: Iterable[str]) -> int:

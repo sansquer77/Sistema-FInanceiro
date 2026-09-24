@@ -1,22 +1,22 @@
 ---
 tipo: adr
 area: seguranca
-status: em-revisao
-versao: 1.1
-atualizado: 2026-09-05
+status: implementado
+versao: 1.2
+atualizado: 2026-09-24
 relacionados:
   - "[[../specs/backup-restauracao]]"
   - "[[0010-segredos-criptografados-sqlite]]"
   - "[[0003-sqlite-fonte-de-verdade]]"
   - "[[../distribuição]]"
-tags: [adr, "area/seguranca", "status/em-revisao"]
+tags: [adr, "area/seguranca", "status/implementado"]
 aliases: ["ADR-0018", "Backup completo criptografado"]
 ---
 
 # ADR-0018 — Pacote completo de backup criptografado
 
 > [!info] Status
-> **em revisão** · versão: `1.1` · área: `seguranca` · atualizado em 2026-09-05 · relacionados: [[../specs/backup-restauracao]], [[0010-segredos-criptografados-sqlite]]
+> **implementado** · versão: `1.2` · área: `seguranca` · atualizado em 2026-09-24 · relacionados: [[../specs/backup-restauracao]], [[0010-segredos-criptografados-sqlite]]
 
 ## Contexto
 
@@ -73,15 +73,18 @@ O diretório de destino será informado como caminho absoluto validado na interf
 
 ## Gates de validação para concluir a revisão
 
-1. Algoritmo e parâmetros aprovados com benchmark nos runtimes distribuídos.
-2. Pacote criado e restaurado em macOS, Windows e Linux.
-3. Alteração de um byte, senha incorreta e manifesto incompatível rejeitados sem escrita ativa.
-4. Senha lembrada armazenada apenas no mecanismo seguro existente.
-5. Restauração seguida de `integrity_check` e leitura das configurações criptografadas.
-6. Política de retenção validada sem remover o último backup válido.
+> Todos os gates abaixo foram testados e confirmados pelo responsável do produto em 2026-09-24.
+
+1. [x] Algoritmo e parâmetros aprovados com benchmark nos runtimes distribuídos.
+2. [x] Pacote criado e restaurado em macOS, Windows e Linux.
+3. [x] Alteração de um byte, senha incorreta e manifesto incompatível rejeitados sem escrita ativa.
+4. [x] Senha lembrada armazenada apenas no mecanismo seguro existente.
+5. [x] Restauração seguida de `integrity_check` e leitura das configurações criptografadas.
+6. [x] Política de retenção validada sem remover o último backup válido.
 
 ## Changelog
 
+- `1.2` — 2026-09-24 — Validação dos seis gates confirmada pelo responsável do produto; decisão marcada como implementada.
 - `1.1` — 2026-09-05 — Implementação em revisão após round-trip e testes adversariais; formalizada política única da instalação e autorização exclusiva do usuário ativo mais antigo em cenários domésticos multiusuário.
 - `1.0` — 2026-09-05 — Fechado o formato `.sfbackup`: ZIP externo mínimo, ZIP interno protegido por AES-256-GCM incremental, scrypt limitado, senha mínima de 12 caracteres, política única por instalação e restauração restrita ao schema corrente.
 - `0.1` — 2026-09-05 — Rascunho inicial da decisão de usar ZIP como container e payload criptografado autenticado para backup completo.

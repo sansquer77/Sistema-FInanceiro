@@ -2,13 +2,14 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 3.37
-atualizado: 2026-09-05
+versao: 3.39
+atualizado: 2026-09-24
 relacionados:
   - "[[contas-correntes]]"
   - "[[categorias-tags-gestao]]"
   - "[[cartoes]]"
   - "[[investimentos-portfolio]]"
+  - "[[emprestimos-quitacao]]"
   - "[[arquitetura]]"
 tags: [spec, "area/lancamentos"]
 aliases: ["Lançamentos", "Transações"]
@@ -17,7 +18,7 @@ aliases: ["Lançamentos", "Transações"]
 # Lançamentos
 
 > [!info] Status
-> **implementado** · versão: `3.37` · área: `lancamentos` · atualizado em 2026-09-05 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]]
+> **implementado** · versão: `3.39` · área: `lancamentos` · atualizado em 2026-09-24 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]], [[emprestimos-quitacao]]
 
 ## Problema
 
@@ -143,6 +144,7 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 
 ## Critérios de aceite
 
+
 - Dado uma receita criada, quando listado, o saldo da conta aumenta pelo valor informado.
 - Dado uma despesa criada, quando listada, o saldo da conta diminui pelo valor informado.
 - Dado uma transferência criada, quando listada, origem e destino são atualizados corretamente.
@@ -215,6 +217,7 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dado o mesmo histórico financeiro, quando a projeção otimizada é calculada, então todos os saldos e indicadores de reserva correspondem ao cálculo de referência, inclusive em transferências e faturas pagas.
 - Dado um mês recente em cache, quando o usuário retorna a ele, então o app reaproveita a fatia válida; uma resposta de outro mês não substitui o selecionado.
 - Dado uma conta com lançamentos em competências anteriores, quando o Extrato consulta `month` e `account_id`, então recebe apenas as linhas do mês solicitado e preserva os saldos acumulados fornecidos pela projeção backend.
+- Dado um lançamento avulso de despesa categorizado pela identidade estável `loan_payment`, quando a conta possui moeda compatível com empréstimos ativos, então o formulário permite associação opcional a um contrato mesmo que o usuário tenha renomeado a categoria, e a gravação cria apenas o lançamento original da conta.
 
 ## Plano de implementação desta correção
 
@@ -225,6 +228,9 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - [x] Testar sucesso, falha, concorrência e contratos de apresentação aplicáveis.
 
 ## Changelog
+
+- `3.39` — 2026-09-24 — Associação ao empréstimo identifica a categoria por ID/identidade semântica persistente, independente do texto exibido.
+- `3.38` — 2026-09-24 — Formulário de lançamento permite associar uma despesa avulsa da categoria Empréstimos ao contrato correspondente, sem criar movimento duplicado.
 
 - `3.37` — 2026-09-05 — Reforçada a presença do degradê contínuo sob o gráfico de saldos no tema claro, mantendo a linha e o término da área legíveis sem criar bloco opaco.
 - `3.36` — 2026-09-05 — Gráfico de saldo passa a compartilhar com a Evolução de Relatórios o preenchimento vertical contínuo do ApexCharts; realizado e previsão usam a mesma família cromática, preservando a linha futura pontilhada.

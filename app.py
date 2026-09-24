@@ -30,6 +30,7 @@ from financeiro.cockpit import cockpit_payload
 from financeiro.cockpit import build_cockpit_summary
 from financeiro.cockpit_notifications import build_cockpit_notifications, mark_informational_seen
 from financeiro.open_debts import get_open_debts
+from financeiro.loans import LoanError, archive_loan, create_loan, link_payment, list_loans, project_payment_plan, project_payoff_strategy, update_loan
 from financeiro.global_search import GlobalSearchError, search_global
 from financeiro.reports import build_statement_report, build_evolution_presentation, build_report_overview
 from financeiro.auth import (
@@ -895,6 +896,89 @@ class AppHandler(BaseHTTPRequestHandler):
         query = parse_qs(urlsplit(self.path).query)
         include_archived = (query.get("include_archived") or [""])[0].lower() in {"1", "true", "yes", "sim"}
         self.send_json({"goals": list_financial_goals(user["id"], include_archived=include_archived)})
+
+    def handle_list_loans(self) -> None:
+        user = self.require_user()
+        self.send_json({"loans": list_loans(user["id"])})
+
+    def handle_create_loan(self) -> None:
+        user = self.require_user()
+        try:
+            loan = create_loan(user["id"], self.read_json())
+        except LoanError as exc:
+            self.send_json({"error": str(exc)}, exc.status)
+            return
+        self.record_operation(user["id"], "loans", "create", "loan", "Empréstimo criado", loan["id"])
+        self.send_json({"loan": loan}, status=HTTPStatus.CREATED)
+
+    def handle_simulate_loan(self) -> None:
+        user = self.require_user()
+        data = self.read_json()
+        try:
+            from financeiro.accounts import money_to_cents
+            installment_cents = int(data.get("installment_cents")) if data.get("installment_cents") is not None else money_to_cents(data.get("installment_amount"))
+            count = int(data.get("remaining_installments"))
+            extra_cents = money_to_cents(data.get("extra_monthly_payment") or 0)
+            extraordinary_cents = money_to_cents(data.get("extraordinary_payment") or 0)
+            rate_micros = data.get("monthly_rate_micros")
+            if installment_cents <= 0 or count < 1 or extra_cents < 0 or extraordinary_cents < 0:
+                raise ValueError("Valores da simulação inválidos.")
+            result = project_payment_plan(installment_cents, count, int(rate_micros) if rate_micros not in (None, "") else None, extra_cents, extraordinary_cents, str(data.get("amortization_mode") or "reduce_term"))
+        except (TypeError, ValueError, OverflowError):
+            self.send_json({"error": "Confira os dados da simulação."}, HTTPStatus.BAD_REQUEST)
+            return
+        self.send_json({"result": result})
+
+    def handle_simulate_loan_strategy(self) -> None:
+        user = self.require_user()
+        try:
+            from financeiro.accounts import money_to_cents
+            data = self.read_json()
+            currency = str(data.get("currency") or "").upper()
+            group = [loan for loan in list_loans(user["id"]) if loan["currency"] == currency and loan["remaining_installments"] > 0]
+            result = project_payoff_strategy(group, str(data.get("strategy") or ""), money_to_cents(data.get("monthly_budget") or 0))
+        except LoanError as exc:
+            self.send_json({"error": str(exc)}, exc.status)
+            return
+        except (TypeError, ValueError, OverflowError):
+            self.send_json({"error": "Confira a moeda e o orçamento mensal."}, HTTPStatus.BAD_REQUEST)
+            return
+        self.send_json({"result": result})
+
+    def handle_update_loan(self) -> None:
+        user = self.require_user()
+        try:
+            loan_id = int(self.route_path().split("/")[-1])
+            loan = update_loan(user["id"], loan_id, self.read_json())
+        except (LoanError, TypeError, ValueError) as exc:
+            self.send_json({"error": str(exc)}, getattr(exc, "status", HTTPStatus.BAD_REQUEST))
+            return
+        self.record_operation(user["id"], "loans", "update", "loan", "Empréstimo atualizado", loan_id)
+        self.send_json({"loan": loan})
+
+    def handle_link_loan_payment(self) -> None:
+        user = self.require_user()
+        try:
+            loan_id = int(self.route_path().split("/")[-2])
+            data = self.read_json()
+            transaction_id = int(data.get("transaction_id"))
+            link_payment(user["id"], loan_id, transaction_id)
+        except (LoanError, TypeError, ValueError) as exc:
+            self.send_json({"error": str(exc)}, getattr(exc, "status", HTTPStatus.BAD_REQUEST))
+            return
+        self.record_operation(user["id"], "loans", "create", "loan_payment", "Pagamento associado ao empréstimo", transaction_id, metadata={"loan_id": loan_id})
+        self.send_json({"ok": True}, status=HTTPStatus.CREATED)
+
+    def handle_loan_delete_route(self) -> None:
+        user = self.require_user()
+        try:
+            loan_id = int(self.route_path().split("/")[-1])
+            archive_loan(user["id"], loan_id)
+        except (LoanError, TypeError, ValueError) as exc:
+            self.send_json({"error": str(exc)}, getattr(exc, "status", HTTPStatus.BAD_REQUEST))
+            return
+        self.record_operation(user["id"], "loans", "archive", "loan", "Empréstimo arquivado", loan_id)
+        self.send_json({"ok": True})
 
     def handle_emergency_reserve_summary(self) -> None:
         user = self.require_user()

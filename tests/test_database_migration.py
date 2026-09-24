@@ -40,7 +40,8 @@ class DatabaseV2MigrationTest(unittest.TestCase):
                 (20001, "sqlite_operational_hardening"),
                 (20002, "backup_settings"),
                 (20003, "portfolio_quantity_precision"),
-                (database.SCHEMA_VERSION, "financial_goals"),
+                (20004, "financial_goals"),
+                (database.SCHEMA_VERSION, "loans"),
             ],
             [(row["version"], row["name"]) for row in migrations],
         )

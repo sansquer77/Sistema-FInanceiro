@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 3.13
-atualizado: 2026-09-23
+versao: 3.15
+atualizado: 2026-09-24
 relacionados:
   - "[[arquitetura]]"
   - "[[visao-produto]]"
@@ -14,7 +14,7 @@ tags: [produto, meta]
 # Requisitos
 
 > [!info] Status
-> **implementado** (escopo vivo) · versão: `3.11` · área: `meta` · atualizado em 2026-09-05 · relacionados: [[arquitetura]], [[visao-produto]], [[specs/backup-restauracao]]
+> **implementado** (escopo vivo) · versão: `3.14` · área: `meta` · atualizado em 2026-09-24 · relacionados: [[arquitetura]], [[visao-produto]], [[specs/emprestimos-quitacao]]
 
 ## Objetivo
 
@@ -67,6 +67,10 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 - **Command Palette**: lançador nativo por `Cmd+K`/`Ctrl+K`, com experiência equivalente ao padrão cmdk e sem introduzir React.
 - **Virtualização**: listas extensas renderizam apenas a janela visível e overscan, mantendo altura total por espaçadores e preservando filtros, ordenação, foco e acessibilidade.
 - Ver [[specs/frontend-fundacao-v2]] e [[adr/0013-dependencias-frontend-v2]].
+
+## Funcionalidades em implantação
+
+- **Empréstimos e quitação**: Gestão concentra cadastro, acompanhamento e pagamentos vinculados a lançamentos existentes; os estudos determinísticos de quitação por moeda ficam na aba Empréstimos do Efeito Borboleta. Ver [[specs/emprestimos-quitacao]] e [[specs/efeito-borboleta]].
 
 ## Regras funcionais
 
@@ -136,6 +140,9 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 - A documentação de arquitetura ([[arquitetura]]) deve ser atualizada quando endpoints, tabelas ou fluxos centrais mudarem.
 
 ## Changelog
+
+- `3.15` — 2026-09-24 — Esclarece a separação entre acompanhamento de dívidas em Empréstimos e estudos teóricos no Efeito Borboleta.
+- `3.14` — 2026-09-24 — Registra Empréstimos e quitação como funcionalidade em implantação.
 
 - `3.13` — 2026-09-23 — Especificada a cobertura de objetivos apenas por investimentos consolidados, com o valor atual do ativo compondo o saldo reservado e as projeções.
 - `3.12` — 2026-09-23 — Incluídos objetivos financeiros, fundos de provisão, resumo da Reserva de Emergência e comparação gráfica de cenários no escopo funcional da V2.

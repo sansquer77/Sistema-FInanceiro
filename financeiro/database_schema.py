@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 
 BASELINE_SCHEMA_VERSION = 20000
-SCHEMA_VERSION = 20004
+SCHEMA_VERSION = 20006
 
 
 MIGRATIONS_SCHEMA_SQL = """
@@ -147,6 +147,7 @@ CREATE TABLE IF NOT EXISTS categories (
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     group_type TEXT NOT NULL DEFAULT 'expense' CHECK (group_type IN ('income', 'expense', 'investment')),
+    system_key TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (user_id, group_type, name)
 );
@@ -587,6 +588,41 @@ ON consultor_perfil_complementar (user_id);
 """
 
 
+LOANS_SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS loans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    loan_type TEXT NOT NULL DEFAULT 'other',
+    currency TEXT NOT NULL DEFAULT 'BRL',
+    installment_cents INTEGER NOT NULL CHECK (installment_cents > 0),
+    remaining_installments INTEGER NOT NULL CHECK (remaining_installments >= 0),
+    remaining_commitment_cents INTEGER NOT NULL CHECK (remaining_commitment_cents >= 0),
+    monthly_rate_micros INTEGER,
+    annual_cet_micros INTEGER,
+    next_due_date TEXT NOT NULL,
+    review_required INTEGER NOT NULL DEFAULT 0 CHECK (review_required IN (0, 1)),
+    archived_at TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS loan_payment_links (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    loan_id INTEGER NOT NULL REFERENCES loans(id) ON DELETE CASCADE,
+    transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+    valid INTEGER NOT NULL DEFAULT 1 CHECK (valid IN (0, 1)),
+    linked_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, transaction_id)
+);
+"""
+
+LOANS_INDEXES_SQL = """
+CREATE INDEX IF NOT EXISTS idx_loans_user_active ON loans(user_id, archived_at, currency);
+CREATE INDEX IF NOT EXISTS idx_loan_payment_links_loan ON loan_payment_links(user_id, loan_id, valid);
+"""
+
+
 NOTIFICATIONS_SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS notification_reads (
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -788,12 +824,14 @@ TABLES_BLOCKS = (
     CONFIG_SCHEMA_SQL,
     CONSULTOR_TABLES_SQL,
     NOTIFICATIONS_SCHEMA_SQL,
+    LOANS_SCHEMA_SQL,
 )
 
 
 INDEXES_BLOCKS = (
     CONSULTOR_INDEXES_SQL,
     INDEX_SCHEMA_SQL,
+    LOANS_INDEXES_SQL,
 )
 
 
