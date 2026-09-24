@@ -117,6 +117,18 @@ from financeiro.financial_health import (
     calculate_financial_health_score,
     calculate_financial_health_score_history,
 )
+from financeiro.financial_goals import (
+    archive_financial_goal,
+    create_financial_goal,
+    create_goal_movement,
+    emergency_reserve_summary,
+    link_goal_funding_source,
+    list_financial_goals,
+    list_goal_funding_sources,
+    list_goal_movements,
+    unlink_goal_funding_source,
+    update_financial_goal,
+)
 from financeiro.imports import import_legacy_transactions, import_system_template, system_import_template
 from financeiro.http_routes import dispatch_route
 from financeiro.operation_logs import create_operation_log, get_operation_log, list_operation_logs
@@ -820,7 +832,9 @@ class AppHandler(BaseHTTPRequestHandler):
         query = parse_qs(urlsplit(self.path).query)
         description = (query.get("description") or [""])[0]
         group_type = (query.get("group_type") or [""])[0]
-        self.send_json(get_classification_suggestion(user["id"], description, group_type))
+        source = (query.get("source") or [None])[0]
+        source_id = (query.get("source_id") or [None])[0]
+        self.send_json(get_classification_suggestion(user["id"], description, group_type, source, source_id))
 
     def handle_list_categories(self) -> None:
         user = self.require_user()
@@ -875,6 +889,68 @@ class AppHandler(BaseHTTPRequestHandler):
         query = parse_qs(urlsplit(self.path).query)
         month = (query.get("month") or [None])[0]
         self.send_json({"limits": list_spending_limits_with_consumption(user["id"], month)})
+
+    def handle_list_financial_goals(self) -> None:
+        user = self.require_user()
+        query = parse_qs(urlsplit(self.path).query)
+        include_archived = (query.get("include_archived") or [""])[0].lower() in {"1", "true", "yes", "sim"}
+        self.send_json({"goals": list_financial_goals(user["id"], include_archived=include_archived)})
+
+    def handle_emergency_reserve_summary(self) -> None:
+        user = self.require_user()
+        self.send_json({"emergency_reserve": emergency_reserve_summary(user["id"])})
+
+    def handle_list_goal_movements(self) -> None:
+        user = self.require_user()
+        goal_id = self.route_path().split("/")[-2]
+        self.send_json({"movements": list_goal_movements(user["id"], goal_id)})
+
+    def handle_list_goal_funding_sources(self) -> None:
+        user = self.require_user()
+        goal_id = self.route_path().split("/")[-2]
+        self.send_json({"funding_sources": list_goal_funding_sources(user["id"], goal_id)})
+
+    def handle_create_financial_goal(self) -> None:
+        user = self.require_user()
+        goal = create_financial_goal(user["id"], self.read_json())
+        self.record_operation(user["id"], "financial_goals", "create", "financial_goal", "Objetivo financeiro criado", goal["id"])
+        self.send_json({"goal": goal}, status=HTTPStatus.CREATED)
+
+    def handle_update_financial_goal(self) -> None:
+        user = self.require_user()
+        goal_id = self.route_path().rsplit("/", 1)[-1]
+        goal = update_financial_goal(user["id"], goal_id, self.read_json())
+        self.record_operation(user["id"], "financial_goals", "update", "financial_goal", "Objetivo financeiro atualizado", goal_id)
+        self.send_json({"goal": goal})
+
+    def handle_create_goal_movement(self) -> None:
+        user = self.require_user()
+        goal_id = self.route_path().split("/")[-2]
+        movement = create_goal_movement(user["id"], goal_id, self.read_json())
+        self.record_operation(user["id"], "financial_goals", "create", "financial_goal_movement", "Movimentacao de objetivo registrada", movement["id"], metadata={"goal_id": goal_id, "movement_type": movement.get("movement_type")})
+        self.send_json({"movement": movement}, status=HTTPStatus.CREATED)
+
+    def handle_link_goal_funding_source(self) -> None:
+        user = self.require_user()
+        goal_id = self.route_path().split("/")[-2]
+        source = link_goal_funding_source(user["id"], goal_id, self.read_json())
+        self.record_operation(user["id"], "financial_goals", "create", "financial_goal_funding_source", "Origem de recurso vinculada ao objetivo", source["id"], metadata={"goal_id": goal_id})
+        self.send_json({"funding_source": source}, status=HTTPStatus.CREATED)
+
+    def handle_financial_goal_delete_route(self) -> None:
+        user = self.require_user()
+        parts = self.route_path().strip("/").split("/")
+        if len(parts) == 5 and parts[3] == "funding-sources":
+            unlink_goal_funding_source(user["id"], parts[2], parts[4])
+            self.record_operation(user["id"], "financial_goals", "delete", "financial_goal_funding_source", "Origem de recurso desvinculada do objetivo", parts[4], metadata={"goal_id": parts[2]})
+            self.send_json({"ok": True})
+            return
+        if len(parts) == 3:
+            archive_financial_goal(user["id"], parts[2])
+            self.record_operation(user["id"], "financial_goals", "archive", "financial_goal", "Objetivo financeiro arquivado", parts[2])
+            self.send_json({"ok": True})
+            return
+        raise ApiError("Rota nao encontrada.", HTTPStatus.NOT_FOUND)
 
     def handle_global_search(self) -> None:
         user = self.require_user()

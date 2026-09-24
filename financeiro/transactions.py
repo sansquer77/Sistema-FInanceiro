@@ -1095,6 +1095,18 @@ def upsert_investment_operation(conn, user_id: int, transaction_id: int, account
     if transaction["type"] != "investment" or not operation:
         conn.execute("DELETE FROM investment_operations WHERE transaction_id = ?", (transaction_id,))
         return
+    if operation["emergency_reserve_eligible"]:
+        existing = conn.execute(
+            "SELECT id FROM investment_operations WHERE transaction_id = ? AND user_id = ?",
+            (transaction_id, user_id),
+        ).fetchone()
+        if existing:
+            from financeiro.financial_goals import FinancialGoalError, ensure_not_linked_to_financial_goal
+
+            try:
+                ensure_not_linked_to_financial_goal(conn, user_id, "investment_operation", existing["id"])
+            except FinancialGoalError as exc:
+                raise TransactionError(exc.message, exc.status) from exc
     conn.execute(
         """
         INSERT INTO investment_operations (

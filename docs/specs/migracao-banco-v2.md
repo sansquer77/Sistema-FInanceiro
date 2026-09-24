@@ -2,8 +2,8 @@
 tipo: spec
 area: migracao-dados
 status: implementado
-versao: 1.8
-atualizado: 2026-09-11
+versao: 1.9
+atualizado: 2026-09-23
 relacionados:
   - "[[../arquitetura]]"
   - "[[importacao-dados]]"
@@ -16,7 +16,7 @@ aliases: ["Migração do banco para a v2", "Banco v2"]
 # Migração do banco para a v2
 
 > [!info] Status
-> **implementado** · área: `migracao-dados` · atualizado em 2026-09-11 · relacionados: [[../arquitetura]], [[importacao-dados]], [[../adr/0003-sqlite-fonte-de-verdade]], [[../adr/0012-fundacao-v2-contrato-e-migracao-de-dados]]
+> **implementado** · área: `migracao-dados` · atualizado em 2026-09-23 · relacionados: [[../arquitetura]], [[importacao-dados]], [[../adr/0003-sqlite-fonte-de-verdade]], [[../adr/0012-fundacao-v2-contrato-e-migracao-de-dados]]
 
 ## Problema
 
@@ -71,7 +71,7 @@ Usuário existente que atualiza o aplicativo para a linha v2 e usuário novo que
 - `financeiro/database_schema.py` descreve canonicamente o baseline v2: tabelas, constraints, chaves estrangeiras, índices obrigatórios e `PERFORMANCE_INDEXES`. Oferece:
   ```python
   BASELINE_SCHEMA_VERSION = 20000
-  SCHEMA_VERSION = 20003
+  SCHEMA_VERSION = 20004
 
   def create_baseline_tables(conn: sqlite3.Connection) -> None:
       ...
@@ -127,6 +127,7 @@ Usuário existente que atualiza o aplicativo para a linha v2 e usuário novo que
 15. Dado banco criado ou atualizado, quando a inicialização termina, então o arquivo permanece em WAL e o planner recebe `PRAGMA optimize=0x10002`.
 16. Dado banco na versão `20000` ou `20001`, quando o app inicia com a funcionalidade de backup, então aplica em ordem os passos pendentes até `20002`, cria a política global idempotente e amplia `secure_configs` sem perder os segredos existentes.
 17. Dado banco na versão `20002`, quando o app inicia, então migra as quantidades de investimentos de seis para oito casas sem alterar seus valores econômicos nem repetir a multiplicação em aberturas posteriores.
+18. Dado banco na versão `20003`, quando o app inicia, então aplica a migração `20004`, cria idempotentemente as tabelas e índices de objetivos financeiros e preserva todos os dados existentes.
 
 ## Fora de escopo
 
@@ -149,9 +150,11 @@ Usuário existente que atualiza o aplicativo para a linha v2 e usuário novo que
 - [x] Passo 9 — inaugurar migrações incrementais rastreáveis (`20000` → `20001`), fixar `synchronous=FULL`, configurar WAL apenas na inicialização e otimizar estatísticas do planner. Fecha: critérios 13 a 15.
 - [x] Passo 10 — adicionar a migração incremental `20002` para a política global de backup e a senha opcional protegida, preservando bancos compartilhados e segredos existentes. Fecha: critério 16.
 - [x] Passo 11 — adicionar a migração incremental `20003` para quantidades de oito casas no Portfólio, preservando atomicamente posições, resgates, históricos e snapshots existentes. Fecha: critério 17.
+- [x] Passo 12 — adicionar a migração incremental `20004` para objetivos financeiros, movimentações manuais e vínculos exclusivos de cobertura. Fecha: critério 18.
 
 ## Changelog
 
+- `1.9` — 2026-09-23 — Schema atual avançado a `20004` com migração incremental idempotente das tabelas e índices de Objetivos Financeiros.
 - `1.8` — 2026-09-11 — Schema atual avançado a `20003`; quantidades do Portfólio passam de seis para oito casas por migração incremental atômica, sem alterar valores existentes.
 - `1.7` — 2026-09-05 — Schema atual avançado a `20002` pela política global de backup; migração incremental preserva instalações compartilhadas e amplia `secure_configs` sem expor ou perder segredos.
 - `1.6` — 2026-09-05 — Evolução pós-baseline passa a usar `user_version` incremental e `schema_migrations`; WAL sai do caminho de cada conexão, durabilidade fica explícita em `FULL` e a inicialização executa `PRAGMA optimize` controlado.

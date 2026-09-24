@@ -6,6 +6,8 @@ export function createClassificationSuggestion({
   subcategoryInput,
   messageElement,
   renderSubcategories,
+  sourceType = "",
+  getSourceId = () => "",
   afterApply = () => {},
   allowedTypes = null,
   debounceMs = 300,
@@ -48,8 +50,14 @@ export function createClassificationSuggestion({
     const description = form.elements.description.value.trim();
     const groupType = typeInput.value;
     try {
+      const query = new URLSearchParams({ description, group_type: groupType });
+      const sourceId = getSourceId();
+      if (sourceType && sourceId) {
+        query.set("source", sourceType);
+        query.set("source_id", sourceId);
+      }
       const response = await api(
-        `/api/classification-suggestion?description=${encodeURIComponent(description)}&group_type=${encodeURIComponent(groupType)}`,
+        `/api/classification-suggestion?${query}`,
       );
       if (
         currentRequestId !== requestId
@@ -57,6 +65,7 @@ export function createClassificationSuggestion({
         || form.elements.id.value
         || description !== form.elements.description.value.trim()
         || groupType !== typeInput.value
+        || sourceId !== getSourceId()
         || !response.suggestion
       ) return;
       const suggestion = response.suggestion;

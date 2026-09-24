@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 12.59
-atualizado: 2026-09-18
+versao: 12.68
+atualizado: 2026-09-24
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -43,7 +43,8 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[specs/categorias-tags-gestao]] | ✅ implementado | Classificação |
 | [[specs/cartoes]] | ✅ implementado | Cartões |
 | [[specs/limites-gastos]] | ✅ implementado | Limites |
-| [[specs/classificacao-assistida]] | ✅ implementado | Classificação |
+| [[specs/objetivos-financeiros]] | 🔎 em revisão | Objetivos financeiros |
+| [[specs/classificacao-assistida]] | 🔎 em revisão | Classificação |
 | [[specs/investimentos-portfolio]] | ✅ implementado | Investimentos |
 | [[specs/relatorios]] | ✅ implementado | Relatórios |
 | [[specs/importacao-dados]] | ✅ implementado | Importação |
@@ -83,7 +84,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 
 | Spec | Status | Área |
 |---|---|---|
-| [[specs/open-finance]] | 📝 rascunho | Open Finance |
+| [[specs/open-finance]] | ❌ depreciado — provedor adequado ao usuário padrão não definido; integração continua fora do escopo atual | Open Finance |
 | [[specs/backup-restauracao]] | 🔎 em revisão | Backup e restauração |
 | [[specs/consolidacao-familiar]] | 📝 rascunho | Consolidação Familiar |
 | [[specs/imposto-renda]] | ❌ depreciado — custo de manter regras fiscais atualizadas não compensa para uso familiar | Investimentos |
@@ -152,6 +153,15 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `12.68` — 2026-09-24 — [[specs/open-finance]] v0.9 depreciada por ausência de provedor com onboarding adequado e por permanecer fora do escopo do produto.
+- `12.67` — 2026-09-24 — [[specs/classificacao-assistida]] v1.1 adiciona contexto de conta/cartão; [[arquitetura]] v4.12 documenta os parâmetros da rota.
+- `12.66` — 2026-09-24 — [[specs/classificacao-assistida]] v1.1 prioriza exemplos confirmados na mesma conta/cartão; [[arquitetura]] v4.11 sincronizada.
+- `12.65` — 2026-09-24 — [[specs/objetivos-financeiros]] v0.10 garante que a Reserva de Emergência carregue sem depender de objetivos cadastrados.
+- `12.64` — 2026-09-24 — [[specs/objetivos-financeiros]] v0.9 recolhe o formulário e o abre sob demanda pelo botão **+ Novo objetivo**, mantendo o fluxo de edição.
+- `12.63` — 2026-09-24 — [[specs/objetivos-financeiros]] v0.8 agrupa componentes da Reserva de Emergência por carteira, com subtotal e expansão sob demanda.
+- `12.62` — 2026-09-24 — [[specs/objetivos-financeiros]] v0.7 troca o roxo dos aportes futuros por azul claro via token `--chart-6`.
+- `12.61` — 2026-09-23 — [[specs/objetivos-financeiros]] v0.6 consolida vínculos por investimento, incorpora saldo atual do ativo ao objetivo e remove contas correntes das origens elegíveis.
+- `12.60` — 2026-09-23 — [[specs/objetivos-financeiros]] v0.5 porta objetivos, provisões, Reserva de Emergência e comparação gráfica de projeções para a arquitetura e os gráficos ApexCharts da V2.
 - `12.59` — 2026-09-18 — [[specs/investimentos-portfolio]] v2.65 consolida a consulta mensal de IPCA/IGP-M e diferencia competência ainda não publicada de indisponibilidade real do SGS.
 - `12.58` — 2026-09-11 — [[specs/investimentos-portfolio]] v2.64 melhora o espaçamento de quantidades longas e corrige a unidade exibida nos resgates do Histórico.
 - `12.57` — 2026-09-11 — [[specs/investimentos-portfolio]] v2.63 faz o resgate descontar atomicamente o valor bruto do valor manual e padroniza a exibição de cripto e stablecoins com oito casas.

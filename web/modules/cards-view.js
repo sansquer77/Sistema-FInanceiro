@@ -94,6 +94,8 @@ export function registerCardsView({
     subcategoryInput: cardTransactionSubcategory,
     messageElement: cardClassificationSuggestion,
     renderSubcategories: renderCardTransactionSubcategories,
+    sourceType: "credit_card",
+    getSourceId: () => cardTransactionForm.elements.credit_card_id.value,
   });
 
   creditCardForm.addEventListener("submit", handleCreditCardSubmit);
@@ -211,6 +213,8 @@ export function registerCardsView({
 
   async function handleCardInvoiceCardChange() {
     state.selectedCreditCardId = cardInvoiceCard.value;
+    cardTransactionForm.elements.credit_card_id.value = state.selectedCreditCardId;
+    classificationSuggestion.schedule();
     setMessage(cardInvoiceMessage, "");
     await loadCardInvoice();
     renderCreditCards();

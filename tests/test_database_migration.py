@@ -39,7 +39,8 @@ class DatabaseV2MigrationTest(unittest.TestCase):
                 (database.BASELINE_SCHEMA_VERSION, "v2_baseline"),
                 (20001, "sqlite_operational_hardening"),
                 (20002, "backup_settings"),
-                (database.SCHEMA_VERSION, "portfolio_quantity_precision"),
+                (20003, "portfolio_quantity_precision"),
+                (database.SCHEMA_VERSION, "financial_goals"),
             ],
             [(row["version"], row["name"]) for row in migrations],
         )
@@ -64,12 +65,17 @@ class DatabaseV2MigrationTest(unittest.TestCase):
             ]
         self.assertEqual(
             versions,
-            [database.BASELINE_SCHEMA_VERSION, 20001, 20002, database.SCHEMA_VERSION],
+            [database.BASELINE_SCHEMA_VERSION, 20001, 20002, 20003, database.SCHEMA_VERSION],
         )
         with database.get_connection() as conn:
             self.assertIsNotNone(
                 conn.execute(
                     "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'backup_settings'"
+                ).fetchone()
+            )
+            self.assertIsNotNone(
+                conn.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'financial_goals'"
                 ).fetchone()
             )
 

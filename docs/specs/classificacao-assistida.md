@@ -1,9 +1,9 @@
 ---
 tipo: spec
 area: classificacao
-status: implementado
-versao: 1.0
-atualizado: 2026-07-23
+status: em-revisao
+versao: 1.1
+atualizado: 2026-09-24
 relacionados:
   - "[[lancamentos]]"
   - "[[cartoes]]"
@@ -16,7 +16,7 @@ aliases: ["Classificação Assistida", "Sugestão de Categorias"]
 # Classificação Assistida
 
 > [!info] Status
-> **implementado** · área: `classificacao` · atualizado em 2026-07-23 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[../adr/0006-classificacao-assistida-local|ADR-0006]]
+> **em-revisao** · área: `classificacao` · atualizado em 2026-09-24 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[../adr/0006-classificacao-assistida-local|ADR-0006]]
 
 ## Problema
 
@@ -49,7 +49,7 @@ Qualquer usuário autenticado que registre manualmente despesas, receitas ou inv
 - `subcategory_id`: subcategoria escolhida anteriormente; opcional e pertencente à categoria.
 - `usage_count`: quantidade de confirmações dessa combinação; inteiro positivo.
 - `last_used_at`: data/hora da confirmação mais recente; usada como desempate e para futura expiração.
-- `source_context`: origem opcional (`account` ou `credit_card`) e seu identificador, usada somente como sinal de desempate.
+- `source_context`: origem opcional (`account` ou `credit_card`) e seu identificador; classificações confirmadas na mesma origem têm prioridade quando alcançam o suporte e a dominância mínimos.
 
 A normalização deve:
 
@@ -64,6 +64,7 @@ A normalização deve:
 - O histórico de um usuário nunca pode gerar sugestão para outro usuário.
 - Apenas lançamentos salvos com categoria válida alimentam o aprendizado.
 - Tipo/grupo é parte obrigatória da correspondência; uma descrição de receita não sugere categoria de despesa.
+- Quando informada, a mesma conta ou cartão é consultada primeiro; se houver pelo menos 2 confirmações locais, a decisão usa somente essas confirmações. Com menos evidência, o app usa o histórico geral do usuário.
 - A primeira versão usa correspondência exata da descrição normalizada.
 - O sistema só preenche automaticamente quando a combinação vencedora tiver suporte mínimo e dominância configurados; valor inicial proposto: pelo menos 2 confirmações e 80% das ocorrências.
 - Uma única ocorrência pode ser exibida como sugestão de baixa confiança, mas não deve alterar os campos automaticamente.
@@ -103,6 +104,15 @@ Resposta proposta:
 }
 ```
 
+`source` aceita `account` ou `credit_card`; `source_id` é opcional. Quando o contexto fornece pelo menos 2 ocorrências, `support` e `confidence` são calculados somente dentro da origem e uma ambiguidade local não é encoberta pelo histórico geral.
+
+## Plano de implementação
+
+- [x] Passo 1 — Preservar a correspondência normalizada e os limites atuais; adicionar origem opcional na API e priorização contextual sem tabela derivada ou dependência externa.
+- [x] Passo 2 — Enviar conta/cartão dos formulários e recalcular a sugestão quando a origem muda; manter debounce, cancelamento e proteção de seleção manual.
+- [ ] Passo 3 — Validar isolamento, contexto dominante, contexto conflitante e fallback para histórico geral com testes automatizados.
+- [ ] Passo 4 — Conferir query plan e fechar a documentação após validação.
+
 Uma integração opcional futura com API de IA deve usar rota separada, timeout curto, cache local, saída estruturada limitada aos IDs de classificações existentes e fallback imediato para o fluxo local.
 
 ## Critérios de aceite
@@ -117,6 +127,8 @@ Uma integração opcional futura com API de IA deve usar rota separada, timeout 
 - Dado que o usuário corrige uma sugestão e salva o lançamento, quando a descrição é usada novamente após confirmações suficientes, então a nova escolha passa a prevalecer.
 - Dado que dois usuários usam a mesma descrição, quando cada um registra seus lançamentos, então as sugestões permanecem independentes.
 - Dado um banco com grande volume de lançamentos, quando a sugestão exata é consultada, então o plano de consulta usa o índice da tabela de hábitos e não percorre `transactions` ou `credit_card_transactions`.
+- Dada uma descrição com classificações diferentes entre contas ou cartões, quando a mesma descrição é digitada numa origem com pelo menos duas confirmações dominantes, então a sugestão considera apenas o histórico daquela origem.
+- Dado que a origem atual tem menos de duas confirmações, quando uma sugestão é consultada, então o classificador recorre ao histórico geral do usuário, preservando os limites atuais de suporte e dominância.
 
 ## Fora de escopo
 
@@ -130,6 +142,7 @@ Uma integração opcional futura com API de IA deve usar rota separada, timeout 
 
 ## Changelog
 
+- `1.1` — 2026-09-24 — Sugestões exatas passam a priorizar histórico confirmado na mesma conta ou cartão, com fallback seguro ao histórico geral quando não há suporte contextual suficiente.
 - `1.0` — 2026-07-23 — MVP implementado nos formulários de conta e cartão, com migração idempotente, índices dedicados, debounce e proteção da escolha manual.
 - `0.2` — 2026-07-23 — MVP aprovado e iniciado; persistência simplificada para descrições normalizadas indexadas nas tabelas de lançamentos, preservando consistência automática em edições e exclusões.
 - `0.1` — 2026-07-23 — Estudo inicial e proposta de classificação local baseada em hábitos, com API de IA apenas como evolução opcional.

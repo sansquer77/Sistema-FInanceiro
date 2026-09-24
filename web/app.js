@@ -190,6 +190,32 @@ const spendingLimitList = document.querySelector("#spendingLimitList");
 const previousLimitMonthButton = document.querySelector("#previousLimitMonthButton");
 const nextLimitMonthButton = document.querySelector("#nextLimitMonthButton");
 const cancelLimitEditButton = document.querySelector("#cancelLimitEditButton");
+const limitsTabButtons = document.querySelectorAll("[data-limits-tab]");
+const limitsTabPanels = document.querySelectorAll("[data-limits-panel]");
+const goalForm = document.querySelector("#goalForm");
+const goalFormPanel = document.querySelector("#goalFormPanel");
+const newGoalButton = document.querySelector("#newGoalButton");
+const goalFormTitle = document.querySelector("#goalFormTitle");
+const goalTargetDateField = document.querySelector("#goalTargetDateField");
+const goalYieldMode = document.querySelector("#goalYieldMode");
+const goalYieldPercentageField = document.querySelector("#goalYieldPercentageField");
+const cancelGoalEditButton = document.querySelector("#cancelGoalEditButton");
+const goalMessage = document.querySelector("#goalMessage");
+const financialGoalList = document.querySelector("#financialGoalList");
+const emergencyReserveTotal = document.querySelector("#emergencyReserveTotal");
+const emergencyReserveComponents = document.querySelector("#emergencyReserveComponents");
+const activeGoalsCount = document.querySelector("#activeGoalsCount");
+const goalsReservedTotal = document.querySelector("#goalsReservedTotal");
+const goalsMonthlyTotal = document.querySelector("#goalsMonthlyTotal");
+const uncoveredGoalsCount = document.querySelector("#uncoveredGoalsCount");
+const goalActionPanel = document.querySelector("#goalActionPanel");
+const goalActionEyebrow = document.querySelector("#goalActionEyebrow");
+const goalActionTitle = document.querySelector("#goalActionTitle");
+const closeGoalActionButton = document.querySelector("#closeGoalActionButton");
+const goalMovementForm = document.querySelector("#goalMovementForm");
+const goalFundingForm = document.querySelector("#goalFundingForm");
+const goalFundingSource = document.querySelector("#goalFundingSource");
+const goalActionMessage = document.querySelector("#goalActionMessage");
 const reportMonthLabel = document.querySelector("#reportMonthLabel");
 const previousReportMonthButton = document.querySelector("#previousReportMonthButton");
 const nextReportMonthButton = document.querySelector("#nextReportMonthButton");
@@ -530,7 +556,7 @@ const viewTitles = {
   cardLaunches: ["Lançamentos", "Fatura de Cartões"],
   transactions: ["Lançamentos", "Extrato de Contas"],
   portfolio: ["Gestão", "Portfólio"],
-  limits: ["Gestão", "Limite de gastos"],
+  limits: ["Gestão", "Limites"],
   simulations: ["Gestão", "Efeito Borboleta"],
   reports: ["Gestão", "Relatórios"],
   classifications: ["Gestão", "Categorias e tags"],
@@ -693,6 +719,12 @@ const limitsView = registerLimitsView({
     nextLimitMonthButton,
     cancelLimitEditButton,
     cockpitLimitAlert,
+    limitsTabButtons, limitsTabPanels, goalForm, goalFormPanel, newGoalButton, goalFormTitle, goalTargetDateField,
+    goalYieldMode, goalYieldPercentageField,
+    cancelGoalEditButton, goalMessage, financialGoalList, emergencyReserveTotal,
+    emergencyReserveComponents, activeGoalsCount, goalsReservedTotal, goalsMonthlyTotal,
+    uncoveredGoalsCount, goalActionPanel, goalActionEyebrow, goalActionTitle,
+    closeGoalActionButton, goalMovementForm, goalFundingForm, goalFundingSource, goalActionMessage,
   },
   navButtons,
   api,
@@ -1580,6 +1612,7 @@ function showModule(view) {
   }
   if (view === "limits") {
     limitsView.renderLimits();
+    limitsView.loadGoalDataIfNeeded().catch((error) => setMessage(goalMessage, error.message, "error"));
   }
   if (view === "simulations") {
     simulationsView.loadSimulationFormData().catch((error) => setMessage(simulationMessage, error.message, "error"));

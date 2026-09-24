@@ -75,7 +75,7 @@ if ! is_available; then
   cd "$PROJECT_DIR" || exit 1
   APP_HOST="$APP_HOST" APP_PORT="$APP_PORT" APP_URL="$URL" \
     APP_ALLOWED_HOSTS="$APP_ALLOWED_HOSTS" APP_ALLOWED_ORIGINS="$APP_ALLOWED_ORIGINS" \
-    /usr/bin/nohup /usr/bin/python3 "$PROJECT_DIR/app.py" >> "$LOG_FILE" 2>&1 </dev/null &
+    /usr/bin/nohup /usr/local/bin/python3 "$PROJECT_DIR/app.py" >> "$LOG_FILE" 2>&1 </dev/null &
 
   i=0
   while [ "$i" -lt 40 ]; do

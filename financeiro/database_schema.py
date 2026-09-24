@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 
 BASELINE_SCHEMA_VERSION = 20000
-SCHEMA_VERSION = 20003
+SCHEMA_VERSION = 20004
 
 
 MIGRATIONS_SCHEMA_SQL = """
@@ -403,6 +403,50 @@ CREATE TABLE IF NOT EXISTS spending_limits (
 """
 
 
+FINANCIAL_GOALS_SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS financial_goals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    objective_type TEXT NOT NULL CHECK (objective_type IN ('target', 'annual_provision', 'continuous_reserve')),
+    target_amount_cents INTEGER NOT NULL CHECK (target_amount_cents > 0),
+    target_date TEXT,
+    start_date TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused', 'completed', 'archived')),
+    yield_mode TEXT NOT NULL DEFAULT 'none' CHECK (yield_mode IN ('none', 'cdi_percentage', 'custom_annual_rate')),
+    yield_percentage_micros INTEGER NOT NULL DEFAULT 100000000 CHECK (yield_percentage_micros >= 0),
+    tax_treatment TEXT NOT NULL DEFAULT 'conservative' CHECK (tax_treatment IN ('conservative', 'taxable', 'exempt')),
+    safety_margin_bps INTEGER NOT NULL DEFAULT 0 CHECK (safety_margin_bps BETWEEN 0 AND 10000),
+    preferred_contribution_day INTEGER CHECK (preferred_contribution_day BETWEEN 1 AND 28),
+    notes TEXT,
+    archived_at TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS financial_goal_movements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    goal_id INTEGER NOT NULL REFERENCES financial_goals(id) ON DELETE CASCADE,
+    movement_type TEXT NOT NULL CHECK (movement_type IN ('contribution', 'withdrawal', 'adjustment')),
+    amount_cents INTEGER NOT NULL,
+    movement_date TEXT NOT NULL,
+    notes TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS financial_goal_funding_sources (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    goal_id INTEGER NOT NULL REFERENCES financial_goals(id) ON DELETE CASCADE,
+    source_type TEXT NOT NULL CHECK (source_type IN ('checking_account', 'investment_opening', 'investment_operation')),
+    source_id INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (user_id, source_type, source_id)
+);
+"""
+
+
 CACHE_SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS quote_cache (
     cache_key TEXT PRIMARY KEY,
@@ -561,6 +605,15 @@ WHERE subcategory_id IS NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_spending_limits_subcategory
 ON spending_limits (user_id, month, category_id, subcategory_id)
 WHERE subcategory_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_financial_goals_user_status
+ON financial_goals (user_id, status, target_date);
+
+CREATE INDEX IF NOT EXISTS idx_financial_goal_movements_goal_date
+ON financial_goal_movements (user_id, goal_id, movement_date DESC, id DESC);
+
+CREATE INDEX IF NOT EXISTS idx_financial_goal_funding_goal
+ON financial_goal_funding_sources (user_id, goal_id);
 
 CREATE INDEX IF NOT EXISTS idx_transactions_user_date
 ON transactions (user_id, date);
@@ -728,6 +781,7 @@ TABLES_BLOCKS = (
     TRANSACTIONS_SCHEMA_SQL,
     PORTFOLIO_SCHEMA_SQL,
     LIMITS_SCHEMA_SQL,
+    FINANCIAL_GOALS_SCHEMA_SQL,
     CACHE_SCHEMA_SQL,
     MARKET_CALENDAR_SCHEMA_SQL,
     AUDIT_SCHEMA_SQL,

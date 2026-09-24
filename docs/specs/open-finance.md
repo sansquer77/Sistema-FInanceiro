@@ -1,9 +1,9 @@
 ---
 tipo: spec
 area: open-finance
-status: rascunho
-versao: 0.8
-atualizado: 2026-09-05
+status: depreciado
+versao: 0.9
+atualizado: 2026-09-24
 relacionados:
   - "[[contas-correntes]]"
   - "[[importacao-dados]]"
@@ -13,14 +13,17 @@ relacionados:
   - "[[adr/0005-smtp-criptografado-local]]"
   - "[[requisitos]]"
   - "[[arquitetura]]"
-tags: [spec, "area/open-finance", "status/rascunho"]
+tags: [spec, "area/open-finance", "status/depreciado"]
 aliases: ["Open Finance", "Conector 200", "Meu Pluggy", "Pluggy"]
 ---
 
 # Open Finance
 
 > [!info] Status
-> **rascunho** · área: `open-finance` · atualizado em 2026-09-05 · relacionados: [[contas-correntes]], [[importacao-dados]], [[classificacao-assistida]], [[privacidade-valores]], [[adr/0005-smtp-criptografado-local]]
+> **depreciado** · área: `open-finance` · atualizado em 2026-09-24 · relacionados: [[contas-correntes]], [[importacao-dados]], [[classificacao-assistida]], [[privacidade-valores]], [[adr/0005-smtp-criptografado-local]]
+
+> [!warning] Decisão de não implementar
+> Esta proposta foi retirada do escopo atual. A spec não identificou um provedor com onboarding simples e adequado ao usuário padrão, e [[requisitos]] mantém Open Finance e integrações bancárias automáticas fora do escopo. O conteúdo permanece como registro de estudo, mas não autoriza implementação; uma retomada exige nova decisão de produto e atualização dos requisitos.
 
 ## Problema
 
@@ -196,6 +199,7 @@ Tabela afetada: `checking_accounts` (vínculo por `checking_account_id`), `trans
 
 ## Changelog
 
+- `0.9` — 2026-09-24 — Spec depreciada e retirada do escopo atual; a ausência de um provedor com onboarding simples e a exclusão explícita em [[requisitos]] impedem avançar com a proposta.
 - `0.8` — 2026-09-05 — Corrigida a spec para registrar que lançamentos já suportam múltiplas tags por relação própria, com entrada textual separada por `;`, `|`, vírgula ou quebra de linha; a decisão pendente passa a ser apenas a apresentação no staging.
 - `0.7` — 2026-09-05 — Spec permanece em rascunho e passa a definir o staging como camada de preservação da descrição bancária, normalização, memória local de classificação e tags de projeto; registra a ausência atual de uma API gratuita e simples de Open Finance e mantém Pluggy como candidato não decidido.
 - `0.6` — 2026-08-23 — Processo de importação Open Finance movido para uma aba dentro de **Gestão > Importações**; removida a ideia de botão no cabeçalho superior.

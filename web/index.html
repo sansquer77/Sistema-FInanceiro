@@ -1300,6 +1300,12 @@
         </section>
 
         <section class="module-view" id="limitsView" hidden>
+          <div class="portfolio-tabs limits-tabs" role="tablist" aria-label="Áreas de limites">
+            <button class="portfolio-tab active" type="button" role="tab" aria-selected="true" aria-controls="spendingLimitsPanel" data-limits-tab="spending">Gastos</button>
+            <button class="portfolio-tab" type="button" role="tab" aria-selected="false" aria-controls="financialGoalsPanel" data-limits-tab="goals" tabindex="-1">Objetivos</button>
+          </div>
+
+          <section id="spendingLimitsPanel" role="tabpanel" data-limits-panel="spending">
           <section class="panel">
             <div class="section-heading">
               <h2>Resumo mensal</h2>
@@ -1359,6 +1365,155 @@
               <div class="spending-limit-list" id="spendingLimitList"></div>
             </section>
           </div>
+          </section>
+
+          <section id="financialGoalsPanel" role="tabpanel" data-limits-panel="goals" hidden>
+            <section class="panel emergency-reserve-panel">
+              <div class="section-heading">
+                <div>
+                  <span class="eyebrow">Proteção financeira</span>
+                  <h2>Reserva de Emergência</h2>
+                </div>
+                <strong class="emergency-reserve-total" id="emergencyReserveTotal">R$ 0,00</strong>
+              </div>
+              <p class="muted-copy">Total dos investimentos marcados explicitamente como reserva no Portfólio.</p>
+              <div class="emergency-reserve-components" id="emergencyReserveComponents"></div>
+            </section>
+
+            <section class="goals-overview" aria-label="Resumo dos objetivos">
+              <article class="goal-kpi"><span>Objetivos ativos</span><strong id="activeGoalsCount">0</strong></article>
+              <article class="goal-kpi"><span>Total reservado</span><strong id="goalsReservedTotal">R$ 0,00</strong></article>
+              <article class="goal-kpi"><span>Aporte mensal sugerido</span><strong id="goalsMonthlyTotal">R$ 0,00</strong></article>
+              <article class="goal-kpi"><span>Sem cobertura vinculada</span><strong id="uncoveredGoalsCount">0</strong></article>
+            </section>
+
+            <section class="panel goal-form-panel" id="goalFormPanel" hidden>
+                <div class="section-heading">
+                  <div>
+                    <span class="eyebrow">Planejamento</span>
+                    <h2 id="goalFormTitle">Novo objetivo</h2>
+                  </div>
+                </div>
+                <form id="goalForm" class="form">
+                  <input type="hidden" name="id">
+                  <label>Nome do objetivo
+                    <input name="name" type="text" maxlength="80" placeholder="Ex.: IPVA 2027" required>
+                  </label>
+                  <div class="field-row">
+                    <label>Tipo
+                      <select name="objective_type" required>
+                        <option value="target">Meta</option>
+                        <option value="annual_provision">Provisão anual</option>
+                        <option value="continuous_reserve">Reserva contínua</option>
+                      </select>
+                    </label>
+                    <label>Valor-alvo
+                      <input name="target_amount" type="text" inputmode="decimal" placeholder="0,00" required>
+                    </label>
+                  </div>
+                  <div class="field-row">
+                    <label>Data inicial
+                      <input name="start_date" type="date" required>
+                    </label>
+                    <label id="goalTargetDateField">Data desejada
+                      <input name="target_date" type="date" required>
+                    </label>
+                  </div>
+                  <div class="field-row">
+                    <label>Estado
+                      <select name="status">
+                        <option value="active">Ativo</option>
+                        <option value="paused">Pausado</option>
+                        <option value="completed">Concluído</option>
+                      </select>
+                    </label>
+                    <label>Dia preferido do aporte
+                      <input name="preferred_contribution_day" type="number" min="1" max="28" placeholder="1 a 28">
+                    </label>
+                  </div>
+                  <label>Observações
+                    <textarea name="notes" rows="2" placeholder="Contexto opcional"></textarea>
+                  </label>
+                  <div class="field-row">
+                    <label>Projeção de rendimento
+                      <select name="yield_mode" id="goalYieldMode">
+                        <option value="none">Sem rendimento</option>
+                        <option value="cdi_percentage">Percentual do CDI</option>
+                        <option value="custom_annual_rate">Taxa anual personalizada</option>
+                      </select>
+                    </label>
+                    <label id="goalYieldPercentageField" hidden>Percentual
+                      <input name="yield_percentage" type="text" inputmode="decimal" value="100" placeholder="100,00">
+                    </label>
+                  </div>
+                  <input type="hidden" name="tax_treatment" value="conservative">
+                  <div class="form-actions">
+                    <button class="primary" type="submit">Salvar objetivo</button>
+                    <button class="ghost" id="cancelGoalEditButton" type="button">Cancelar</button>
+                  </div>
+                </form>
+            </section>
+            <p class="message goal-message" id="goalMessage" role="alert"></p>
+
+            <div class="workspace goals-workspace">
+              <section class="panel goals-list-panel">
+                <div class="section-heading">
+                  <div>
+                    <span class="eyebrow">Progresso</span>
+                    <h2>Seus objetivos</h2>
+                  </div>
+                  <div class="goal-list-heading-actions">
+                    <span class="muted-copy">Valores atualizados manualmente</span>
+                    <button class="primary" id="newGoalButton" type="button" aria-controls="goalFormPanel" aria-expanded="false">+ Novo objetivo</button>
+                  </div>
+                </div>
+                <div class="financial-goal-list" id="financialGoalList"></div>
+              </section>
+            </div>
+
+            <section class="panel goal-action-panel" id="goalActionPanel" hidden>
+              <div class="section-heading">
+                <div>
+                  <span class="eyebrow" id="goalActionEyebrow">Atualização manual</span>
+                  <h2 id="goalActionTitle">Registrar movimentação</h2>
+                </div>
+                <button class="ghost small-button" id="closeGoalActionButton" type="button">Fechar</button>
+              </div>
+              <div class="goal-action-content">
+                <form id="goalMovementForm" class="form">
+                  <input type="hidden" name="goal_id">
+                  <div class="field-row">
+                    <label>Movimentação
+                      <select name="movement_type">
+                        <option value="contribution">Aporte</option>
+                        <option value="withdrawal">Retirada</option>
+                        <option value="adjustment">Ajustar saldo</option>
+                      </select>
+                    </label>
+                    <label>Valor
+                      <input name="amount" type="text" inputmode="decimal" placeholder="0,00" required>
+                    </label>
+                    <label>Data
+                      <input name="movement_date" type="date" required>
+                    </label>
+                  </div>
+                  <label>Observação
+                    <input name="notes" type="text" maxlength="160" placeholder="Opcional">
+                  </label>
+                  <div class="form-actions"><button class="primary" type="submit">Registrar movimentação</button></div>
+                </form>
+                <form id="goalFundingForm" class="form" hidden>
+                  <input type="hidden" name="goal_id">
+                  <label>Origem do recurso
+                    <select name="source_key" id="goalFundingSource" required></select>
+                  </label>
+                  <p class="muted-copy">A origem inteira ficará reservada exclusivamente para este objetivo.</p>
+                  <div class="form-actions"><button class="primary" type="submit">Vincular origem</button></div>
+                </form>
+              </div>
+              <p class="message" id="goalActionMessage" role="alert"></p>
+            </section>
+          </section>
         </section>
 
         <section class="module-view" id="simulationsView" hidden>

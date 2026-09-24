@@ -2,8 +2,8 @@
 tipo: roadmap
 area: meta
 status: implementado
-versao: 1.8
-atualizado: 2026-08-30
+versao: 1.9
+atualizado: 2026-09-23
 relacionados:
   - "[[visao-produto]]"
   - "[[requisitos]]"
@@ -15,7 +15,7 @@ aliases: ["Roadmap", "Replicação Local"]
 # Roadmap
 
 > [!info] Status
-> **implementado** (módulos 1–12 concluídos; módulos 13, 14 e 15 descartados; módulo 16 implementado; módulo 17 planejado) · área: `meta` · atualizado em 2026-08-30
+> **implementado** (módulos 1–12 concluídos; módulos 13, 14 e 15 descartados; módulos 16–18 implementados) · área: `meta` · atualizado em 2026-09-23
 
 Este documento organiza a evolução do Sistema Financeiro e serve de histórico de decisões de sequenciamento. Módulos planejados que ainda não iniciaram ficam com status `planejado`.
 
@@ -50,7 +50,8 @@ Este documento organiza a evolução do Sistema Financeiro e serve de histórico
 | 14 | Exportação direta de dados em outros formatos. | ❌ Descartado — arquivo SQLite já é acessível por leitor genérico ou agente de IA, sem justificar dependência nova | [[exportacao-dados]] |
 | 15 | Imposto de Renda (IR): apuração mensal de DARF por classe de ativo do Portfólio e relatório anual de apoio à declaração IRPF. | ❌ Descartado — custo de manutenção das regras fiscais não compensa para uso familiar | [[imposto-renda]] |
 | 16 | Score de Saúde Financeira: indicador síntese (0 a 1000) e diagnóstico de 5 pilares de estabilidade financeira. | ✅ Implementado | [[specs/score-saude-financeira]] |
-| 17 | Fundação do frontend v2: ApexCharts vendorizado, IMask, Command Palette nativa e virtualização de listas extensas. | 📝 Planejado | [[specs/frontend-fundacao-v2]] |
+| 17 | Fundação do frontend v2: ApexCharts vendorizado, IMask, Command Palette nativa e virtualização de listas extensas. | ✅ Implementado | [[specs/frontend-fundacao-v2]] |
+| 18 | Objetivos financeiros e fundos de provisão com Reserva de Emergência, exclusividade de recursos e projeções comparativas. | ✅ Implementado | [[specs/objetivos-financeiros]] |
 
 ---
 
@@ -123,6 +124,7 @@ A implementação local não copia a interface de nenhum produto externo. Reprod
 
 ## Changelog
 
+- `1.9` — 2026-09-23 — Adicionado e implementado o módulo 18, Objetivos Financeiros e Fundos de Provisão, sobre a fundação gráfica da V2; módulo 17 sincronizado como implementado.
 - `1.8` — 2026-08-30 — Adicionado módulo 17, Fundação do frontend v2, em estado planejado; módulo 16 sincronizado como implementado.
 - `1.7` — 2026-07-27 — Adicionado módulo 16 (Score de Saúde Financeira) em status "Em implementação", com spec [[specs/score-saude-financeira]].
 - `1.6` — 2026-07-27 — Módulo 13 (Importação OFX) marcado como descartado antes da criação da spec: o arquivo OFX traz mais complexidade e riscos — um match errado é pior do que não conciliar, porque dá uma falsa sensação de precisão — do que ganhos. Sem spec criada.

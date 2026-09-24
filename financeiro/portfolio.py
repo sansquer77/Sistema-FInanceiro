@@ -308,6 +308,13 @@ def update_opening_position(user_id: int, position_id: object, data: dict) -> di
         ).fetchone()
         if not existing:
             raise PortfolioError("Posicao nao encontrada.", HTTPStatus.NOT_FOUND)
+        if position["emergency_reserve_eligible"]:
+            from financeiro.financial_goals import FinancialGoalError, ensure_not_linked_to_financial_goal
+
+            try:
+                ensure_not_linked_to_financial_goal(conn, user_id, "investment_opening", normalized_id)
+            except FinancialGoalError as exc:
+                raise PortfolioError(exc.message, exc.status) from exc
         account = conn.execute(
             """
             SELECT id, currency, account_type

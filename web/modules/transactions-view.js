@@ -138,6 +138,8 @@ export function registerTransactionsView({
     subcategoryInput: transactionSubcategory,
     messageElement: transactionClassificationSuggestion,
     renderSubcategories: renderTransactionSubcategories,
+    sourceType: "account",
+    getSourceId: () => transactionAccount.value,
     afterApply: investmentForm.updateFieldState,
     allowedTypes: ["expense", "income", "investment"],
   });
@@ -838,6 +840,7 @@ export function registerTransactionsView({
     applyWalletAccountDefault();
     applyWalletAccountRestrictions();
     updateTransactionTypeState();
+    classificationSuggestion.schedule();
     await loadSelectedTransactionSlice();
   }
 

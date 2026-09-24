@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 3.11
-atualizado: 2026-09-05
+versao: 3.13
+atualizado: 2026-09-23
 relacionados:
   - "[[arquitetura]]"
   - "[[visao-produto]]"
@@ -32,6 +32,7 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 - **Recorrência e Parcelamento**: suporte a séries de lançamentos periódicos ou parcelados com acompanhamento de índice de parcelas e conciliação bancária (`reconciled_at`). Ver [[lancamentos]].
 - **Cartões de Crédito**: cadastro de cartões com limite, emissor, bandeira, fechamento, vencimento e conta preferencial de pagamento. Lançamentos de despesas e receitas no cartão por fatura mensal (formato `AAAA-MM`), conciliação de lançamentos, compras parceladas/recorrentes, movimentação entre faturas e fluxo de pagamento de fatura (integral ou parcial, com saldo residual lançado na fatura seguinte) integrado às contas-correntes. Ver [[cartoes]].
 - **Limites de Gastos (Metas/Budgets)**: estabelecimento de limites de despesas mensais por categoria e subcategoria. Ver [[limites-gastos]].
+- **Objetivos Financeiros e Fundos de Provisão**: metas, provisões anuais e reservas contínuas com saldo atualizado manualmente, contribuição necessária, comparação entre projeção conservadora e com rendimento, resumo da Reserva de Emergência e exclusividade de recursos para impedir dupla contagem. Ver [[specs/objetivos-financeiros]].
 - **Portfólio de Investimentos**: posições iniciais (`opening positions`) e operações de investimento, autocomplete de ativos já utilizados, resgates por quantidade com baixa FIFO, histórico imutável de resultado realizado, metas percentuais por classe e agenda futura de eventos de ações/ETFs/BDRs consultada em B3/Nasdaq com fallback Yahoo e cache diário. A agenda inclui proventos, bonificações, desdobramentos e grupamentos informados pela B3, com Data ex ajustada pelo calendário nacional ANBIMA local, pagamento opcional fornecido pelo provedor, carteiras associadas, fonte explícita e sem estimativa de provento total ou conversão monetária de fatores societários. Ausência de anúncio futuro ou calendário não é apresentada como erro. Suporte a ações/ETFs/BDRs (`stock`), cripto volátil (`crypto`), stablecoins (`stablecoin`), fundos (`fund`), renda fixa (`fixed_income`), previdência privada (`private_pension`), poupança (`savings`) e outros (`other`). Ver [[investimentos-portfolio]].
 - **Precificação e Validação de Ativos**:
   - Integração com Yahoo Finance (ações e fundos) e CoinGecko/Yahoo (criptoativos) para cotações automáticas.
@@ -87,6 +88,7 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 - Relatórios e limites consideram lançamentos de cartão pela competência da fatura (`invoice_month`), não pela data da compra.
 - Cockpit considera receitas/despesas/aportes em múltiplas moedas no mês selecionado, e o planejamento recorrente inclui lançamentos recorrentes de cartões.
 - Cockpit considera faturas de cartão por competência (`invoice_month`) no mês selecionado, mantendo a fatura visível mesmo após pagamento e excluindo o pagamento agregado das despesas analíticas para evitar duplicidade.
+- Objetivos financeiros aceitam somente investimentos consolidados como cobertura; o valor atual de todos os movimentos do ativo, em BRL, compõe o saldo reservado e as projeções sem criar movimentação manual.
 
 ## Regras de segurança
 
@@ -135,6 +137,8 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 
 ## Changelog
 
+- `3.13` — 2026-09-23 — Especificada a cobertura de objetivos apenas por investimentos consolidados, com o valor atual do ativo compondo o saldo reservado e as projeções.
+- `3.12` — 2026-09-23 — Incluídos objetivos financeiros, fundos de provisão, resumo da Reserva de Emergência e comparação gráfica de cenários no escopo funcional da V2.
 - `3.11` — 2026-09-05 — Backup completo autenticado incorporado ao escopo e cenário doméstico com poucos usuários concorrentes explicitado como suportado, mantendo alta concorrência/Internet fora do contrato.
 - `3.10` — 2026-09-04 — Data ex derivada de eventos B3 passa a usar calendário nacional ANBIMA persistido localmente e atualizado anualmente sem fonte alternativa.
 - `3.9` — 2026-09-04 — Agenda B3 passa a incluir bonificações, desdobramentos e grupamentos, mantendo fonte explícita e sem converter fatores societários em valores monetários.

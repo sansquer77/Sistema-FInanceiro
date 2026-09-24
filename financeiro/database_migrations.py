@@ -11,6 +11,8 @@ from financeiro.database_compatibility import normalize_legacy_schema
 from financeiro.database_config import SQLITE_BUSY_TIMEOUT_MS
 from financeiro.database_schema import (
     BASELINE_SCHEMA_VERSION,
+    FINANCIAL_GOALS_SCHEMA_SQL,
+    INDEX_SCHEMA_SQL,
     MIGRATIONS_SCHEMA_SQL,
     create_baseline_indexes,
     create_baseline_tables,
@@ -33,7 +35,16 @@ INCREMENTAL_MIGRATIONS = {
     20001: ("sqlite_operational_hardening", lambda conn: conn.execute(MIGRATIONS_SCHEMA_SQL)),
     20002: ("backup_settings", lambda conn: _migrate_backup_settings(conn)),
     20003: ("portfolio_quantity_precision", lambda conn: _migrate_portfolio_quantity_precision(conn)),
+    20004: ("financial_goals", lambda conn: _migrate_financial_goals(conn)),
 }
+
+
+def _migrate_financial_goals(conn: sqlite3.Connection) -> None:
+    """Add financial goals without changing backup or portfolio data."""
+    for sql_block in (FINANCIAL_GOALS_SCHEMA_SQL, INDEX_SCHEMA_SQL):
+        for statement in sql_block.split(";"):
+            if statement.strip():
+                conn.execute(statement)
 
 
 def _migrate_portfolio_quantity_precision(conn: sqlite3.Connection) -> None:

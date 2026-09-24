@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 4.8
-atualizado: 2026-09-11
+versao: 4.12
+atualizado: 2026-09-24
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -90,7 +90,7 @@ Os assets normalizados do catálogo ficam em `web/assets/banks/` e `web/assets/b
 | `auth-view.js` | Login, cadastro, logout e recuperação de senha. |
 | `user-admin-view.js` | Preferências de usuário, tema, SMTP, IA, Mais Retorno, ativação/perfil do Consultor, limpeza e exclusão. |
 | `classifications-view.js` | Categorias, subcategorias e tags. |
-| `limits-view.js` | Limites de gastos e índice de consumo. |
+| `limits-view.js` | Limites de gastos; aba Objetivos com Reserva de Emergência, atualização manual, cobertura e comparação ApexCharts entre projeções conservadora e com rendimento. |
 | `reports-view.js` | Fachada compatível e coordenação de Relatórios: compõe subviews uma vez, delega demonstrativo/evolução e monta rankings extensos diretamente pela janela virtual, com detalhe sob demanda. |
 | `report-statement.js` | Controles, consulta assíncrona, estados e apresentação imprimível do demonstrativo; consome agregações Python sem regra financeira local. |
 | `report-evolution.js` | Drawer, consulta, formatação e ciclo de vida do ApexCharts da evolução; descarta respostas obsoletas, destrói instância ao fechar e não calcula SMA/fallback. |
@@ -186,7 +186,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `DELETE` | `/api/transactions/{id}` |
 | `PUT` | `/api/transactions/{id}/reconciliation` |
 | `GET` | `/api/exchange-rate?currency={origem}&target_currency={destino}&date={data}&amount={valor}&transfer_rate={cotacao_opcional}` |
-| `GET` | `/api/classification-suggestion?description={texto}&group_type={grupo}` |
+| `GET` | `/api/classification-suggestion?description={texto}&group_type={grupo}&source={origem}&source_id={id}` |
 
 #### Rotas — Cartões de Crédito → [[cartoes]]
 
@@ -229,6 +229,19 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `DELETE` | `/api/spending-limits/{id}` |
 
 `GET /api/spending-limits?month=AAAA-MM` inclui o consumo da competência agregado por categoria/subcategoria no SQLite, sem depender das listas detalhadas do frontend.
+
+#### Rotas — Objetivos Financeiros → [[specs/objetivos-financeiros]]
+
+| Método | Rota |
+|---|---|
+| `GET/POST` | `/api/financial-goals` |
+| `PUT/DELETE` | `/api/financial-goals/{id}` |
+| `GET/POST` | `/api/financial-goals/{id}/movements` |
+| `GET/POST` | `/api/financial-goals/{id}/funding-sources` |
+| `DELETE` | `/api/financial-goals/{id}/funding-sources/{link_id}` |
+| `GET` | `/api/financial-goals/emergency-reserve` |
+
+As projeções são calculadas em centavos por `financial_goals.py`. O saldo reservado combina movimentações manuais e valores atuais em BRL dos ativos de investimento consolidados vinculados; o frontend recebe cenários já discriminados e limita-se a renderizar o gráfico ApexCharts. Movimentações de objetivo não alteram automaticamente contas ou investimentos.
 
 #### Rota — Busca Global → [[specs/frontend-modularizacao]]
 
@@ -362,6 +375,7 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | `credit_cards.py` | Cartões, faturas mensais, transações e pagamentos. Ver [[cartoes]]. |
 | `credit_card_invoice.py` | Consulta agregada e serialização do recorte de fatura/histórico visual limitado. Ver [[cartoes]]. |
 | `spending_limits.py` | Metas recorrentes e consumo mensal agregado por categoria/subcategoria, incluindo competência de faturas e exclusão do pagamento agregado. Ver [[limites-gastos]]. |
+| `financial_goals.py` | Objetivos, provisões, livro de movimentações manuais, projeções, cobertura, Reserva de Emergência e exclusividade de origens. Ver [[specs/objetivos-financeiros]]. |
 | `global_search.py` | Busca histórica autenticada e paginada em lançamentos de contas/cartões, isolada por usuário e executada sob demanda pela Command Palette. |
 | `http_routes.py` | Tabela declarativa e resolução de rotas, independente do transporte HTTP. Ver [[specs/desconcentracao-arquitetura-v2]]. |
 | `cockpit.py` | Agregações de domínio do resumo mensal do Cockpit com `SUM`, `COUNT` e `GROUP BY` no SQLite, fora do adaptador HTTP e sem materializar lançamentos detalhados. |
@@ -415,7 +429,7 @@ O arquivo SQLite recebe `journal_mode=WAL` uma vez no ciclo de inicialização; 
 
 ### Baseline e migração para a linha v2
 
-O baseline inicial da v2 usa `PRAGMA user_version = 20000`; o endurecimento operacional do SQLite inaugura `20001`, a política global de backup usa `20002` e a precisão de oito casas das quantidades do Portfólio leva o schema atual a `20003`. A tabela `schema_migrations` registra baseline e passos posteriores, enquanto `user_version` seleciona e ordena as migrações. Banco ausente é criado diretamente na versão atual; bancos entre `20000` e `20002` avançam transacionalmente em ordem até `20003`; versões futuras ou intermediárias desconhecidas são recusadas. Um `finance.db` com `user_version = 0` continua tratado como legado: na abertura, `financeiro/database_migrations.py` orquestra a cópia de trabalho, as compatibilizações históricas via `financeiro/database_compatibility.py::normalize_legacy_schema`, o candidato compacto por `VACUUM INTO`, as validações de integridade/chaves estrangeiras/versão/contagens e a promoção recuperável. O original passa a `data/finance-v1.bkp`, que nunca é sobrescrito, enquanto o candidato mantém o nome ativo `data/finance.db`. Falhas anteriores à promoção preservam o nome original; falha na segunda renomeação tenta restaurá-lo. Ver [[specs/migracao-banco-v2]] e [[adr/0012-fundacao-v2-contrato-e-migracao-de-dados]].
+O baseline inicial da v2 usa `PRAGMA user_version = 20000`; o endurecimento operacional do SQLite inaugura `20001`, a política global de backup usa `20002`, a precisão de oito casas das quantidades do Portfólio usa `20003` e Objetivos Financeiros leva o schema atual a `20004`. A tabela `schema_migrations` registra baseline e passos posteriores, enquanto `user_version` seleciona e ordena as migrações. Banco ausente é criado diretamente na versão atual; bancos entre `20000` e `20003` avançam transacionalmente em ordem até `20004`; versões futuras ou intermediárias desconhecidas são recusadas. Um `finance.db` com `user_version = 0` continua tratado como legado: na abertura, `financeiro/database_migrations.py` orquestra a cópia de trabalho, as compatibilizações históricas via `financeiro/database_compatibility.py::normalize_legacy_schema`, o candidato compacto por `VACUUM INTO`, as validações de integridade/chaves estrangeiras/versão/contagens e a promoção recuperável. O original passa a `data/finance-v1.bkp`, que nunca é sobrescrito, enquanto o candidato mantém o nome ativo `data/finance.db`. Falhas anteriores à promoção preservam o nome original; falha na segunda renomeação tenta restaurá-lo. Ver [[specs/migracao-banco-v2]] e [[adr/0012-fundacao-v2-contrato-e-migracao-de-dados]].
 
 ### Tabelas
 
@@ -437,6 +451,9 @@ O baseline inicial da v2 usa `PRAGMA user_version = 20000`; o endurecimento oper
 | `transaction_tags` | `transactions.py` — Ver [[lancamentos]]. |
 | `credit_card_transaction_tags` | `credit_cards.py` — Ver [[cartoes]]. |
 | `spending_limits` | `spending_limits.py` — Ver [[limites-gastos]]. |
+| `financial_goals` | `financial_goals.py` — definição, estado e premissas de projeção. Ver [[specs/objetivos-financeiros]]. |
+| `financial_goal_movements` | `financial_goals.py` — livro auditável de aportes, retiradas e ajustes manuais. Ver [[specs/objetivos-financeiros]]. |
+| `financial_goal_funding_sources` | `financial_goals.py` — vínculos exclusivos a ativos de investimento consolidados, ancorados em uma entrada canônica; o saldo do ativo acompanha todos os lotes e movimentos. Ver [[specs/objetivos-financeiros]]. |
 | `investment_opening_positions` | `portfolio.py` — inclui `emergency_reserve_eligible`; desde o schema `20003`, `quantity_micros` preserva o nome legado, mas representa unidades de `1e-8`. Ver [[investimentos-portfolio]]. |
 | `investment_operations` | `transactions.py` grava aportes e `portfolio.py` consolida; inclui `emergency_reserve_eligible`; desde o schema `20003`, `quantity_micros` preserva o nome legado, mas representa unidades de `1e-8`. Ver [[investimentos-portfolio]]. |
 | `investment_redemptions` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
@@ -541,8 +558,8 @@ Ver [[lancamentos]].
 
 1. O frontend aguarda 300 ms após a digitação da descrição.
 2. `GET /api/classification-suggestion` normaliza descrição e grupo.
-3. SQLite busca correspondências exatas, isoladas por usuário, nos índices de lançamentos de conta e cartão.
-4. O backend agrega suporte por categoria/subcategoria e só retorna resultado com pelo menos 2 ocorrências e 80% de dominância.
+3. SQLite busca correspondências exatas, isoladas por usuário, nos índices de lançamentos de conta e cartão; se houver origem informada com pelo menos 2 confirmações, prioriza apenas essa conta ou cartão.
+4. Sem suporte contextual suficiente, o backend usa o histórico geral. Em ambos os casos agrega por categoria/subcategoria e só retorna resultado com pelo menos 2 ocorrências e 80% de dominância.
 5. O frontend preenche campos ainda não alterados manualmente e ignora respostas obsoletas; falhas nunca bloqueiam o cadastro.
 
 Ver [[classificacao-assistida]], [[adr/0006-classificacao-assistida-local]].
@@ -634,6 +651,10 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `4.12` — 2026-09-24 — Rota da classificação assistida documenta origem opcional e seleção contextual por conta/cartão.
+- `4.11` — 2026-09-24 — Documentada a prioridade contextual por conta/cartão na classificação assistida, mantendo fallback ao histórico geral.
+- `4.10` — 2026-09-23 — Objetivos passam a vincular ativos de investimento consolidados; o valor atual agregado compõe saldo e projeções, sem vínculo direto com contas.
+- `4.9` — 2026-09-23 — Adicionados schema `20004`, domínio, rotas e fluxo frontend de Objetivos Financeiros, com exclusividade em relação à Reserva de Emergência e projeções renderizadas pela fundação ApexCharts da V2.
 - `4.8` — 2026-09-11 — Resgates passam a reduzir o valor manual correspondente pelo bruto dentro da mesma transação SQLite da baixa FIFO e do crédito líquido, preservando rollback e isolamento por posição.
 - `4.7` — 2026-09-11 — Portfólio passa a preservar quantidades com oito casas no schema `20003`; o contrato separa a quantidade operacional exata da exibição arredondada e mantém o nome legado das colunas para compatibilidade.
 - `4.6` — 2026-09-05 — Documentada a arquitetura do backup completo da instalação: schema `20002`, política global multiusuário, cinco rotas, AES-256-GCM incremental, execução na abertura, retenção autenticada e restauração com salvaguarda e acesso exclusivo durante a promoção.

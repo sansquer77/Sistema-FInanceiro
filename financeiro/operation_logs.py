@@ -14,6 +14,7 @@ MODULES = {
     "imports",
     "classifications",
     "limits",
+    "financial_goals",
     "user_admin",
     "backup",
 }
@@ -46,6 +47,9 @@ ENTITY_TYPES = {
     "subcategory",
     "tag",
     "spending_limit",
+    "financial_goal",
+    "financial_goal_movement",
+    "financial_goal_funding_source",
     "user",
     "backup_policy",
     "backup_package",
