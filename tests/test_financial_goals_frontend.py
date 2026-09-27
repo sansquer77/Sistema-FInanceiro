@@ -28,8 +28,21 @@ class FinancialGoalsFrontendContractTest(unittest.TestCase):
         self.assertIn("Rendimento projetado", self.module)
         self.assertIn("Ainda descoberto", self.module)
 
+    def test_goal_cards_are_compact_and_explain_objective_types(self) -> None:
+        instructions = (ROOT / "web" / "modules" / "instructions-content.js").read_text(encoding="utf-8")
+        self.assertIn('class="goal-type-guide"', self.html)
+        for label in ("Meta", "Provisão anual", "Reserva contínua"):
+            self.assertIn(label, self.html)
+        self.assertIn('class="goal-more-details"', self.module)
+        self.assertIn("Ver composição, cobertura e projeção", self.module)
+        self.assertIn("projectionToggleBound", self.module)
+        self.assertIn("grid-template-columns: repeat(2, minmax(0, 1fr))", self.styles)
+        self.assertIn("@media (max-width: 1000px)", self.styles)
+        self.assertIn("despesa previsível que volta a cada ano", instructions)
+        self.assertIn("sem data final obrigatória", instructions)
+
     def test_goal_ui_uses_backend_for_mutations_and_funding_links(self) -> None:
-        self.assertIn('api("/api/financial-goals")', self.module)
+        self.assertIn('"/api/financial-goals"', self.module)
         self.assertIn("/movements`, { method: \"POST\"", self.module)
         self.assertIn("/funding-sources`, {", self.module)
         self.assertIn("/funding-sources/${linkId}", self.module)
@@ -42,7 +55,7 @@ class FinancialGoalsFrontendContractTest(unittest.TestCase):
         self.assertIn("current_value_brl", self.module)
 
     def test_emergency_reserve_summary_is_not_merged_into_goal_balance(self) -> None:
-        self.assertIn('api("/api/financial-goals/emergency-reserve")', self.module)
+        self.assertIn('api("/api/financial-goals/overview")', self.module)
         self.assertIn("renderEmergencyReserve", self.module)
         self.assertIn("Saldo sem cobertura conferível", self.module)
 

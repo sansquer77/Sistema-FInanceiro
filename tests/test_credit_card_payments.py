@@ -21,6 +21,7 @@ from financeiro.credit_cards import (
 from financeiro.categories import get_category_evolution
 from financeiro.database import get_connection, initialize_database
 from financeiro.transactions import list_transactions
+from financeiro.revolving_loans import list_revolving_loans
 
 class CreditCardPaymentAtomicityTest(unittest.TestCase):
     def setUp(self) -> None:
@@ -848,11 +849,51 @@ class CreditCardPartialPaymentTest(unittest.TestCase):
         self.assertEqual(payment_row["amount_cents"], 4000)
         self.assertEqual(carried_row["description"], "Saldo da fatura 06/2026")
         self.assertEqual(carried_row["invoice_month"], "2026-07")
-        self.assertEqual(carried_row["category_name"], "Empréstimos")
+        self.assertEqual(carried_row["category_name"], "Empréstimos e Financiamentos")
+        revolving = list_revolving_loans(user["id"])
+        self.assertEqual(len(revolving), 1)
+        self.assertEqual(revolving[0]["balance_cents"], 6000)
+        self.assertEqual(revolving[0]["source_residual_transaction_id"], int(carried["id"]))
+        with get_connection() as conn:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM transactions WHERE user_id=?", (user["id"],)).fetchone()[0], 1)
 
         with get_connection() as conn:
             self.assertTrue(is_invoice_paid(conn, user["id"], card["id"], "2026-06"))
             self.assertFalse(is_invoice_paid(conn, user["id"], card["id"], "2026-07"))
+
+    def test_full_payment_after_revolving_balance_closes_monitoring_without_duplicate_debt(self) -> None:
+        user, account, card, card_transaction = self._create_user_account_card("100,00")
+        partial = pay_credit_card_invoice(user["id"], {
+            "credit_card_id": str(card["id"]),
+            "invoice_month": card_transaction["invoice_month"],
+            "account_id": str(account["id"]),
+            "payment_date": "2026-06-20",
+            "amount": "40,00",
+        })
+        self.assertEqual(partial["carried_transaction"]["amount"], "60.00")
+        revolving_id = list_revolving_loans(user["id"])[0]["id"]
+
+        pay_credit_card_invoice(user["id"], {
+            "credit_card_id": str(card["id"]),
+            "invoice_month": "2026-07",
+            "account_id": str(account["id"]),
+            "payment_date": "2026-07-20",
+            "revolving_resolution": "swapped",
+        })
+
+        revolving = list_revolving_loans(user["id"])
+        self.assertEqual(len(revolving), 1)
+        self.assertEqual(revolving[0]["id"], revolving_id)
+        self.assertEqual(revolving[0]["status"], "swapped")
+        self.assertEqual(revolving[0]["closure_reason"], "swapped")
+        self.assertEqual(revolving[0]["balance_cents"], 6_000)
+        with get_connection() as conn:
+            self.assertEqual(conn.execute(
+                "SELECT COUNT(*) FROM transactions WHERE user_id=?", (user["id"],)
+            ).fetchone()[0], 2)
+            self.assertEqual(conn.execute(
+                "SELECT COUNT(*) FROM credit_card_transactions WHERE user_id=?", (user["id"],)
+            ).fetchone()[0], 2)
 
     def test_partial_payment_rejects_amount_equal_or_greater_than_balance(self) -> None:
         # spec: cartoes v2.14 — criterio 170

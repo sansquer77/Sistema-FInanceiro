@@ -2,8 +2,8 @@
 tipo: spec
 area: cartoes
 status: implementado
-versao: 2.22
-atualizado: 2026-09-05
+versao: 2.27
+atualizado: 2026-09-25
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -18,7 +18,7 @@ aliases: ["Cartões de Crédito", "Faturas"]
 # Cartões de Crédito
 
 > [!info] Status
-> **implementado** · versão: `2.22` · área: `cartoes` · atualizado em 2026-09-05 · relacionados: [[contas-correntes]], [[lancamentos]], [[limites-gastos]], [[relatorios]]
+> **implementado** · versão: `2.27` · área: `cartoes` · atualizado em 2026-09-25 · relacionados: [[contas-correntes]], [[lancamentos]], [[limites-gastos]], [[relatorios]]
 
 ## Problema
 
@@ -151,6 +151,12 @@ Qualquer usuário autenticado localmente que utilize cartões de crédito para d
 
 Tabelas: `credit_cards`, `credit_card_transactions`, `credit_card_payments`, `credit_card_transaction_tags`.
 
+## Evolução coordenada: Crédito Rotativo
+
+O pagamento parcial continua gerando o lançamento residual na próxima fatura. No acompanhamento de Crédito Rotativo descrito em [[emprestimos-quitacao#Proposta de desenho — Crédito Rotativo]], esse mesmo residual alimenta o saldo inicial de um card rotativo associado ao cartão. O contrato é um registro de acompanhamento, não uma nova despesa.
+
+O primeiro pagamento parcial cria o card rotativo e alerta que a taxa precisa ser completada. Pagamentos parciais posteriores atualizam o mesmo card com o novo residual. Ao pagar integralmente uma fatura com saldo rotativo, o fluxo pergunta se a dívida foi quitada definitivamente ou trocada por outra; ambas encerram o rotativo, e a troca gera um alerta para cadastrar manualmente o novo contrato Price. O fluxo de Cartões alimenta o monitoramento de Empréstimos, mas nenhuma ação do módulo de Empréstimos cria ou altera movimentos de cartão ou conta.
+
 ## Plano de implementação
 
 - [x] Manter o pagamento da fatura criando lançamento de conta para efeito de saldo.
@@ -204,6 +210,11 @@ Tabelas: `credit_cards`, `credit_card_transactions`, `credit_card_payments`, `cr
 
 ## Changelog
 
+- `2.27` — 2026-09-25 — Pagamentos parciais passam a iniciar ou atualizar o monitoramento rotativo com o residual já existente, sem duplicar lançamento; quitação integral de rotativo pede a resolução.
+- `2.26` — 2026-09-25 — Explicita a integração de mão única entre o processamento de faturas e o monitoramento futuro de Crédito Rotativo.
+- `2.25` — 2026-09-25 — Pagamento integral de fatura com rotativo pergunta se houve quitação definitiva ou troca de dívida; a troca gera alerta para cadastro manual do Price.
+- `2.24` — 2026-09-25 — Confirma que o residual já gerado pelo pagamento parcial será a origem do saldo de um card rotativo; posteriores parciais atualizam o mesmo contrato, sem duplicar movimentos.
+- `2.23` — 2026-09-25 — Registra a integração planejada entre pagamento parcial e acompanhamento de Crédito Rotativo, preservando o lançamento residual atual.
 - `2.22` — 2026-09-05 — Reforçada a presença do degradê contínuo sob a evolução das faturas no tema claro, preservando contraste da curva e da linha de média.
 - `2.21` — 2026-09-05 — Evolução de faturas passa a compartilhar o preenchimento vertical contínuo da Evolução de Relatórios; realizado e previsão permanecem na mesma cor, com previsão pontilhada, e a referência da média ganha linha contínua de 2 px e rótulo mais legível.
 - `2.20` — 2026-09-04 — Área do gráfico passou a ser uma camada contínua sob as duas séries, sem quebra visual na transição para a previsão.

@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 4.16
-atualizado: 2026-09-24
+versao: 4.39
+atualizado: 2026-09-27
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -19,7 +19,7 @@ tags: [arquitetura, meta]
 # Arquitetura
 
 > [!info] Status
-> **implementado** · versão: `4.16` · área: `meta` · atualizado em 2026-09-24 · relacionados: [[requisitos]], [[qualidade-codigo]], [[specs/emprestimos-quitacao]]
+> **implementado** · versão: `4.39` · área: `meta` · atualizado em 2026-09-27 · relacionados: [[requisitos]], [[qualidade-codigo]], [[specs/emprestimos-quitacao]], [[specs/backup-restauracao]], [[specs/alertas-cockpit]]
 
 ## Visão geral
 
@@ -40,7 +40,7 @@ O servidor HTTP revalida arquivos estáticos com `ETag` e `Last-Modified`; arqui
 
 As fronteiras de responsabilidade e os sinais de alerta para crescimento de módulos estão consolidados em [[qualidade-codigo]]. Além da revisão manual, `tests/test_code_quality.py` aplica um gate automatizado aos limites e às fronteiras arquiteturais verificáveis.
 
-O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Cockpit > Consultor**. Em Preferências, o usuário configura a IA geral, ativa o Consultor, aceita o consentimento de acesso aos dados e pode preencher/remover o Perfil Complementar criptografado. No Cockpit, a aba Consultor exibe os indicadores de atrasos/vencimentos, a subaba **Análises** com catálogo fechado de 9 análises em seletor (incluindo o card `evolucao_score_tempo` com seletor de 6/12 meses), botão único **Gerar** e a subaba **Histórico** com filtro textual. O módulo não possui prompt livre: cada execução envia apenas o contexto minimizado da análise escolhida e persiste somente respostas bem-sucedidas.
+O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Cockpit > Consultor**. Em Preferências, o usuário configura a IA geral, ativa o Consultor, aceita o consentimento de acesso aos dados e pode preencher/remover o Perfil Complementar criptografado. No Cockpit, a aba Consultor exibe os indicadores de atrasos/vencimentos, a subaba **Análises** com catálogo fechado de 9 análises em seletor (incluindo o card `evolucao_score_tempo` com seletor de 6/12 meses), botão único **Gerar** e a subaba **Histórico** com filtro textual. O módulo não possui prompt livre: cada execução envia apenas o contexto minimizado da análise escolhida e persiste somente respostas bem-sucedidas. Os cards de alocação e carteira também recebem agregados de metas/recursos comprometidos e empréstimos por moeda; o card de vencimentos acrescenta saldos correntes, lançamentos futuros registrados e faturas abertas por data e moeda.
 
 ---
 
@@ -76,13 +76,13 @@ O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Co
 | `privacy-utils.js` | Persistência local e aplicação do modo de ocultação de valores. |
 | `instructions-content.js` | Conteúdo estático, offline e versionado da central de ajuda. Ver [[instrucoes-app]]. |
 | `app-state.js` | Fábrica do estado inicial e reset puro dos dados de sessão, sem singleton, DOM ou API. |
-| `loans-view.js` | Cadastro recolhido sob demanda, acompanhamento de pagamentos e gráficos mensais; estudos no Efeito Borboleta; sem regra financeira no navegador. Ver [[specs/emprestimos-quitacao]]. |
+| `loans-view.js` | Cadastro recolhido sob demanda, acompanhamento de pagamentos e barra compacta de quitação; estudos no Efeito Borboleta; sem regra financeira no navegador. Ver [[specs/emprestimos-quitacao]]. |
 | `app-data-loader.js` | Coordenação dos carregamentos compartilhados por dependências explícitas e acesso tardio às views; o boot e o Cockpit mantêm somente recortes mensais, sem históricos integrais ou pagamentos globais. |
 | `bank-logos.js` | Catálogo e resolvedor compartilhado de logos de instituições e bandeiras, com normalização, aliases e fallback visual. Ver [[specs/bank-logos]]. |
 
 Os assets normalizados do catálogo ficam em `web/assets/banks/` e `web/assets/bandeiras/`, com nomes ASCII minúsculos. Contas e Cartões reutilizam o mesmo resolvedor; Cartões também exibem a bandeira quando catalogada.
 
-**Fundação da v2 em implementação:** os gráficos existentes já usam ApexCharts 4.7.0 vendorizado por meio de `chart-adapter.js`; máscaras monetárias usam IMask 7.6.1 vendorizado por meio de `input-mask.js`; a Command Palette nativa (`command-palette.js`) oferece experiência equivalente ao padrão cmdk sem React. [[specs/frontend-fundacao-v2]] mantém planejada a integração de Faturas/Histórico de Operações ao virtualizador compartilhado de listas de altura fixa. O frontend continua sem framework, bundler ou download de CDN. Ver [[adr/0013-dependencias-frontend-v2]].
+**Fundação v2 implementada, com adoção progressiva do virtualizador:** os gráficos existentes usam ApexCharts 4.7.0 vendorizado por meio de `chart-adapter.js`; máscaras monetárias usam IMask 7.6.1 vendorizado por meio de `input-mask.js`; e a Command Palette nativa (`command-palette.js`) oferece experiência equivalente ao padrão cmdk sem React. [[specs/frontend-fundacao-v2]] acompanha a integração ainda planejada de Faturas e Histórico de Operações ao virtualizador compartilhado de listas de altura fixa. O frontend continua sem framework, bundler ou download de CDN. Ver [[adr/0013-dependencias-frontend-v2]].
 
 **Views funcionais já extraídas:**
 
@@ -238,21 +238,37 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `GET/POST` | `/api/financial-goals` |
 | `PUT/DELETE` | `/api/financial-goals/{id}` |
 | `GET/POST` | `/api/financial-goals/{id}/movements` |
+| `POST` | `/api/financial-goals/{id}/reset-annual-provision` | Zera o saldo manual com histórico preservado, avança o ciclo e remove vínculos de investimentos sem saldo. |
 | `GET/POST` | `/api/financial-goals/{id}/funding-sources` |
 | `DELETE` | `/api/financial-goals/{id}/funding-sources/{link_id}` |
 | `GET` | `/api/financial-goals/emergency-reserve` |
+| `GET` | `/api/financial-goals/overview` | Fornece objetivos e Reserva de Emergência sobre um snapshot compartilhado do Portfólio. |
 
 ### Empréstimos e quitação
 
 | Método | Rota | Responsabilidade |
 |---|---|---|
 | `GET/POST` | `/api/loans` | Listar e cadastrar empréstimos manuais. |
-| `PUT/DELETE` | `/api/loans/{id}` | Atualizar ou arquivar contrato. |
+| `GET` | `/api/loans?include_archived=true` | Incluir contratos arquivados na leitura do histórico; a consulta padrão permanece limitada aos não arquivados. |
+| `PUT/DELETE` | `/api/loans/{id}` | Atualizar ou excluir definitivamente o contrato, validando senha e preservando lançamentos da conta. |
+| `POST` | `/api/loans/{id}/archive` | Arquivar contrato e preservar seu histórico e vínculos. |
 | `POST` | `/api/loans/{id}/payments` | Rota compatível para associar lançamento de conta existente, sem duplicá-lo; o fluxo principal também aceita `loan_id` ao criar/editar uma despesa avulsa em Lançamentos. |
-| `POST` | `/api/loans/simulate` | Calcular projeção hipotética Price sem persistir cenário. |
-| `POST` | `/api/loans/simulate-strategy` | Comparar avalanche/bola de neve dentro de uma moeda. |
+| `POST` | `/api/loans/simulate` | Calcular estudo de quitação integral usando o principal estimado e comparação CDI pelo mesmo valor, ou projeção de amortização Price/SAC com comparação opcional; nenhum cenário é persistido. |
+| `POST` | `/api/loans/simulate-strategy` | Comparar avalanche/bola de neve dentro de uma moeda; planos indexados consultam fatores oficiais fora de transações SQLite e usam a taxa acumulada dos últimos doze meses publicados como premissa futura estimada. |
+| `GET/POST` | `/api/revolving-loans` | Consultar/cadastrar acompanhamento manual de cheque especial; cartões rotativos são criados pelo fluxo de pagamento parcial da fatura. |
+| `PUT` | `/api/revolving-loans/{id}` | Revisar saldo/data-base, taxa e capitalização, preservando histórico de condições. |
+| `POST` | `/api/revolving-loans/{id}/close` | Encerrar como quitação, troca ou arquivamento sem criar movimentos financeiros. |
+| `POST` | `/api/revolving-loans/simulate` | Simular pagamentos rotativos por data e comparar opcionalmente uma proposta Price, sem persistir o cenário. |
 
-O domínio fica em `loans.py`; `loans` guarda contratos e `loan_payment_links` referencia lançamentos da conta. A validação e criação do vínculo ocorre na mesma transação SQLite da gravação do lançamento. Alterações/reconciliações/exclusões de transação invalidam o vínculo e marcam revisão manual. `cockpit_notifications.py` emite lembrete crítico no dia do vencimento, com navegação para Gestão → Empréstimos.
+O domínio fica em `loans.py`; `loans` guarda contratos e `loan_payment_links` referencia lançamentos da conta e indica se o pagamento já foi reconhecido. Lançamentos não conciliados permanecem pendentes sem reduzir o contrato; conciliá-los reconhece o pagamento uma única vez. Edição, reclassificação, desconciliação, estorno e exclusão invalidam o vínculo e marcam revisão manual. `cockpit_notifications.py` emite lembrete crítico no dia do vencimento, com navegação para Gestão → Empréstimos e Financiamentos.
+
+`GET /api/loans` também retorna, sem persistência adicional, principal e custo futuro estimados pelo cálculo Price ou SAC selecionado quando a taxa mensal está disponível; a interface os apresenta separados do compromisso nominal. `GET /api/loans?include_archived=true` alimenta a aba Histórico com contratos arquivados; contratos quitados são identificados pela ausência de parcelas restantes. O histórico preserva a exibição de pagamentos conciliados e pendentes, sem alterar lançamentos ou vínculos. Contratos arquivados com compromisso em aberto são explicitamente identificados como não quitados. Para contratos indexados, `loans.py` consulta via `portfolio.py` as observações oficiais dos últimos doze meses publicados para construir a taxa equivalente mensal dos períodos futuros, identificando-a como estimativa. Um pagamento conciliado posterior à data-base do principal marcado no contrato oculta o valor salvo como saldo atual e bloqueia novas projeções indexadas até revisão manual de principal e data-base com o demonstrativo do credor; nenhum schema ou lançamento é alterado por essa revisão.
+
+O endpoint de estudo individual aceita a comparação CDI. O domínio consulta a última taxa diária publicada da série CDI, anualiza pela convenção de 252 dias úteis e converte para taxa mensal equivalente constante até o prazo-base original. Exibe a data da observação e identifica a projeção como cenário hipotético, não previsão. Compara a economia nominal estimada de juros com o rendimento bruto acumulado dos mesmos aportes hipotéticos; impostos, IOF, tarifas e liquidez do produto não são modelados. Falha de consulta ao CDI não invalida o cálculo da quitação.
+
+O formulário do estudo individual primeiro separa **Quitar agora** de **Amortizar**. A primeira opção calcula o principal Price/SAC estimado ou usa o principal atualizado do contrato indexado, simula o custo financeiro futuro evitado (juros e correção quando aplicável) e investe hipoteticamente o mesmo valor a 100% CDI pelo prazo restante. A segunda revela os campos de pagamentos adicionais e mantém o comparativo CDI opcional.
+
+`revolving_loans.py` mantém saldos rotativos, histórico de premissas, cálculos e vínculos a pagamentos de conta já existentes. O schema `20010` adiciona `revolving_loans`, `revolving_loan_terms_history` e `revolving_loan_payment_links`. Pagamentos de conta só são reconhecidos após conciliação. O pagamento parcial em Cartões reutiliza o residual existente para iniciar/atualizar um único contrato por cartão. A via é de mão única: Empréstimos consulta e monitora; não cria, altera ou exclui lançamentos de conta/cartão. Os rotativos entram nas estratégias avalanche/bola de neve e têm estudo individual determinístico no Efeito Borboleta. A ação do alerta de troca prepara um rascunho Price editável com moeda e saldo estimado do rotativo; ao salvar, marca o lembrete como lido e remove a ação repetida. A validação completa da V1 segue pendente, conforme [[specs/emprestimos-quitacao]].
 
 As projeções são calculadas em centavos por `financial_goals.py`. O saldo reservado combina movimentações manuais e valores atuais em BRL dos ativos de investimento consolidados vinculados; o frontend recebe cenários já discriminados e limita-se a renderizar o gráfico ApexCharts. Movimentações de objetivo não alteram automaticamente contas ou investimentos.
 
@@ -389,7 +405,8 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | `credit_card_invoice.py` | Consulta agregada e serialização do recorte de fatura/histórico visual limitado. Ver [[cartoes]]. |
 | `spending_limits.py` | Metas recorrentes e consumo mensal agregado por categoria/subcategoria, incluindo competência de faturas e exclusão do pagamento agregado. Ver [[limites-gastos]]. |
 | `financial_goals.py` | Objetivos, provisões, livro de movimentações manuais, projeções, cobertura, Reserva de Emergência e exclusividade de origens. Ver [[specs/objetivos-financeiros]]. |
-| `loans.py` | Contratos, vínculo de pagamentos existentes, alertas de revisão e simulações Price/avalanche/bola de neve. Ver [[specs/emprestimos-quitacao]]. |
+| `loans.py` | Contratos, vínculo de pagamentos existentes, alertas de revisão e simulações Price/SAC/avalanche/bola de neve. Ver [[specs/emprestimos-quitacao]]. |
+| `revolving_loans.py` | Acompanhamento de cheque especial e rotativo de cartão, capitalização de juros, histórico de saldo/condições e vínculos a pagamentos existentes conciliados. Ver [[specs/emprestimos-quitacao]]. |
 | `global_search.py` | Busca histórica autenticada e paginada em lançamentos de contas/cartões, isolada por usuário e executada sob demanda pela Command Palette. |
 | `http_routes.py` | Tabela declarativa e resolução de rotas, independente do transporte HTTP. Ver [[specs/desconcentracao-arquitetura-v2]]. |
 | `cockpit.py` | Agregações de domínio do resumo mensal do Cockpit com `SUM`, `COUNT` e `GROUP BY` no SQLite, fora do adaptador HTTP e sem materializar lançamentos detalhados. |
@@ -415,7 +432,7 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | `consultor_catalog.py` | Catálogo fechado, perfis educacionais, períodos, validações de seleção, prompts e estrutura de resposta; sem persistência ou transporte. |
 | `consultor_errors.py` | Definição única de `ConsultorError`, reexportada pela fachada e compartilhada por catálogo/configurações sem importações circulares. |
 | `consultor_provider.py` | Mensagens minimizadas, payloads dos provedores e transporte HTTP; dependências injetáveis e erros traduzidos pela fachada. Valida o endpoint via `ai_endpoint_security` e bloqueia redirecionamentos. Sem acesso ao SQLite. |
-| `consultor_context.py` | Builders dos nove contextos, agregação e compactação dos dados e formatação monetária de borda; reutiliza serviços de domínio e posições recebidas. Não acessa configuração, histórico ou transporte de IA. A fachada valida a seleção via catálogo e enriquece o contexto com perfis via configurações; reexporta os builders. |
+| `consultor_context.py` | Builders dos nove contextos, agregação e compactação dos dados e formatação monetária de borda; reutiliza serviços de domínio e posições recebidas. Inclui compromissos de objetivos/empréstimos e linha do tempo de 90 dias por moeda para faturas abertas e lançamentos futuros em contas de liquidez/carteira digital, mantendo contas de investimento separadas. Não acessa configuração, histórico ou transporte de IA. |
 | `consultor_history.py` | Persistência/listagem/expurgo das análises, quota diária e cooldown de falhas, isolados do executor e da configuração. Ver [[specs/consultor]]. |
 | `imports.py` | Leitura de arquivos externos legados e planilhas modelo. Ver [[importacao-dados]]. |
 | `xlsx_security.py` | Fronteira defensiva dos pacotes XLSX: valida o contêiner ZIP, limita expansão e compressão, normaliza caminhos internos e faz leituras limitadas antes do parsing XML, sem persistência. Ver [[importacao-dados]]. |
@@ -443,7 +460,7 @@ O arquivo SQLite recebe `journal_mode=WAL` uma vez no ciclo de inicialização; 
 
 ### Baseline e migração para a linha v2
 
-O baseline inicial da v2 usa `PRAGMA user_version = 20000`; o endurecimento operacional do SQLite inaugura `20001`, a política global de backup usa `20002`, a precisão de oito casas das quantidades do Portfólio usa `20003`, Objetivos Financeiros usa `20004`, Empréstimos usa `20005` e a identidade estável de categorias usa `20006`. A tabela `schema_migrations` registra baseline e passos posteriores, enquanto `user_version` seleciona e ordena as migrações. Banco ausente é criado diretamente na versão atual; bancos entre `20000` e `20005` avançam transacionalmente em ordem até `20006`; versões futuras ou intermediárias desconhecidas são recusadas. Um `finance.db` com `user_version = 0` continua tratado como legado: na abertura, `financeiro/database_migrations.py` orquestra a cópia de trabalho, as compatibilizações históricas via `financeiro/database_compatibility.py::normalize_legacy_schema`, o candidato compacto por `VACUUM INTO`, as validações de integridade/chaves estrangeiras/versão/contagens e a promoção recuperável. O original passa a `data/finance-v1.bkp`, que nunca é sobrescrito, enquanto o candidato mantém o nome ativo `data/finance.db`. Falhas anteriores à promoção preservam o nome original; falha na segunda renomeação tenta restaurá-lo. Ver [[specs/migracao-banco-v2]] e [[adr/0012-fundacao-v2-contrato-e-migracao-de-dados]].
+O baseline inicial da v2 usa `PRAGMA user_version = 20000`; o endurecimento operacional do SQLite inaugura `20001`, a política global de backup usa `20002`, a precisão de oito casas das quantidades do Portfólio usa `20003`, Objetivos Financeiros usa `20004`, Empréstimos usa `20005` e a identidade estável de categorias usa `20006` e o reconhecimento de pagamentos após conciliação usa `20007`; `20008` adiciona `loans.amortization_system` (Price ou SAC), preservando contratos existentes como Price; `20009` acrescenta indexador, saldo principal/data-base e taxa remuneratória, com valores neutros ou nulos nos contratos existentes; `20010` cria tabelas para monitoramento de crédito rotativo, histórico de condições e vínculos a pagamentos existentes sem alterar os lançamentos legados. A tabela `schema_migrations` registra baseline e passos posteriores, enquanto `user_version` seleciona e ordena as migrações. Banco ausente é criado diretamente na versão atual; bancos entre `20000` e `20009` avançam transacionalmente em ordem até `20010`; versões futuras ou intermediárias desconhecidas são recusadas. Um `finance.db` com `user_version = 0` continua tratado como legado: na abertura, `financeiro/database_migrations.py` orquestra a cópia de trabalho, as compatibilizações históricas via `financeiro/database_compatibility.py::normalize_legacy_schema`, o candidato compacto por `VACUUM INTO`, as validações de integridade/chaves estrangeiras/versão/contagens e a promoção recuperável. O original passa a `data/finance-v1.bkp`, que nunca é sobrescrito, enquanto o candidato mantém o nome ativo `data/finance.db`. Falhas anteriores à promoção preservam o nome original; falha na segunda renomeação tenta restaurá-lo. Ver [[specs/migracao-banco-v2]] e [[adr/0012-fundacao-v2-contrato-e-migracao-de-dados]].
 
 ### Tabelas
 
@@ -468,8 +485,11 @@ O baseline inicial da v2 usa `PRAGMA user_version = 20000`; o endurecimento oper
 | `financial_goals` | `financial_goals.py` — definição, estado e premissas de projeção. Ver [[specs/objetivos-financeiros]]. |
 | `financial_goal_movements` | `financial_goals.py` — livro auditável de aportes, retiradas e ajustes manuais. Ver [[specs/objetivos-financeiros]]. |
 | `financial_goal_funding_sources` | `financial_goals.py` — vínculos exclusivos a ativos de investimento consolidados, ancorados em uma entrada canônica; o saldo do ativo acompanha todos os lotes e movimentos. Ver [[specs/objetivos-financeiros]]. |
-| `loans` | `loans.py` — contratos, compromisso nominal e taxa mensal; cálculos separados por moeda. Ver [[specs/emprestimos-quitacao]]. |
-| `loan_payment_links` | `loans.py` — referências aos lançamentos existentes; não cria movimentos financeiros duplicados. Ver [[specs/emprestimos-quitacao]]. |
+| `loans` | `loans.py` — contratos, sistema Price/SAC, indexador, principal informado/data-base, taxa remuneratória e compromisso nominal; cálculos separados por moeda. Ver [[specs/emprestimos-quitacao]]. |
+| `loan_payment_links` | `loans.py` — referências aos lançamentos existentes e estado de reconhecimento após conciliação; não cria movimentos financeiros duplicados. Ver [[specs/emprestimos-quitacao]]. |
+| `revolving_loans` | `revolving_loans.py` — saldos, taxas, data-base, modalidade, status e referência ao residual existente de cartão. Ver [[specs/emprestimos-quitacao]]. |
+| `revolving_loan_terms_history` | `revolving_loans.py` — histórico de saldo e premissas por data de vigência. Ver [[specs/emprestimos-quitacao]]. |
+| `revolving_loan_payment_links` | `revolving_loans.py` — associações a lançamentos de conta já existentes, reconhecidas após conciliação. Ver [[specs/emprestimos-quitacao]]. |
 | `investment_opening_positions` | `portfolio.py` — inclui `emergency_reserve_eligible`; desde o schema `20003`, `quantity_micros` preserva o nome legado, mas representa unidades de `1e-8`. Ver [[investimentos-portfolio]]. |
 | `investment_operations` | `transactions.py` grava aportes e `portfolio.py` consolida; inclui `emergency_reserve_eligible`; desde o schema `20003`, `quantity_micros` preserva o nome legado, mas representa unidades de `1e-8`. Ver [[investimentos-portfolio]]. |
 | `investment_redemptions` | `portfolio.py` — Ver [[investimentos-portfolio]]. |
@@ -493,7 +513,7 @@ O baseline inicial da v2 usa `PRAGMA user_version = 20000`; o endurecimento oper
 
 A chave mestra padrão de `secure_config.py` fica fora de `data/`, em `secure/config.key` ao lado da pasta de dados; `data/email_config.key` continua aceito e é copiado para o novo caminho no primeiro uso. Operações de servidor podem fixar o caminho com `SISTEMA_FINANCEIRO_CONFIG_KEY_PATH` ou fornecer o material diretamente por `SISTEMA_FINANCEIRO_CONFIG_KEY`.
 
-Após inicializar e migrar o banco, o processo verifica a política global de backup antes de abrir o servidor HTTP. Se ela estiver vencida e possuir senha lembrada, executa uma única cópia online consistente que inclui todos os usuários do SQLite. Travas em memória impedem criações/restaurações simultâneas no processo; o WAL mantém leituras disponíveis durante a cópia. A restauração exige validação autenticada, token efêmero vinculado ao responsável e nova confirmação com senha; a promoção só ocorre após criar um `.sfbackup` de segurança do estado ativo.
+Após inicializar e migrar o banco, o processo verifica a política global de backup antes de abrir o servidor HTTP. Se ela estiver vencida e possuir senha lembrada, executa uma única cópia online consistente que inclui todos os usuários do SQLite. Destinos indisponíveis registram falha e geram alerta crítico para o responsável, sem impedir a abertura do servidor. Travas em memória impedem criações/restaurações simultâneas no processo; o WAL mantém leituras disponíveis durante a cópia. A restauração exige validação autenticada, token efêmero vinculado ao responsável e nova confirmação com senha; a promoção só ocorre após criar um `.sfbackup` de segurança do estado ativo.
 
 ### Índices principais
 
@@ -667,6 +687,29 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `4.39` — 2026-09-27 — Documenta a rota de reinício de provisão anual, com ajuste auditável e manutenção de vínculos a investimentos com saldo.
+- `4.38` — 2026-09-27 — Documenta a aba Histórico, a listagem opcional de contratos arquivados e a preservação de pagamentos, distinguindo contratos arquivados com saldo em aberto.
+- `4.37` — 2026-09-27 — Documenta as jornadas separadas Quitar agora/Amortizar e o cálculo de quitação pelo principal atual estimado.
+- `4.36` — 2026-09-27 — Documenta o uso da última taxa diária CDI publicada como premissa constante, com data de referência e convenção de 252 dias úteis.
+- `4.35` — 2026-09-27 — Registra a comparação hipotética da economia de quitação com os mesmos aportes investidos a 100% CDI bruto.
+- `4.34` — 2026-09-26 — Documenta a estimativa futura de indexadores pela janela móvel de doze meses oficiais e a revisão obrigatória do principal após pagamento conciliado posterior à data-base.
+- `4.33` — 2026-09-25 — Registra que o alerta de troca fica lido após salvar o Price iniciado no rascunho e não repete o atalho.
+- `4.32` — 2026-09-25 — Documenta a ação do alerta de troca, que prepara um rascunho Price editável sem criar o contrato automaticamente.
+- `4.31` — 2026-09-25 — Atualiza detalhes do endpoint de estudo individual do rotativo, incluindo horizonte comum e limite da projeção.
+- `4.30` — 2026-09-25 — Documenta endpoint de estudo individual do rotativo e sua comparação determinística com proposta Price.
+- `4.29` — 2026-09-25 — Documenta schema `20010`, rotas iniciais e integrações unidirecionais do monitoramento de Crédito Rotativo.
+- `4.28` — 2026-09-25 — Registra a fronteira planejada do Crédito Rotativo: Contas/Cartões alimentam o monitoramento e Empréstimos não gera movimentos financeiros.
+- `4.27` — 2026-09-25 — Falha de backup automático não bloqueia a inicialização e aparece na Central de Notificações para o responsável.
+- `4.26` — 2026-09-25 — Estratégias de quitação incluem contratos indexados e apresentam correção estimada separadamente.
+- `4.25` — 2026-09-25 — Simulação individual de empréstimo calcula correção histórica e hipótese anual futura para contratos indexados.
+- `4.24` — 2026-09-25 — Schema `20009` documenta os dados contratuais para indexação; a projeção com fatores oficiais permanece em implementação.
+- `4.23` — 2026-09-25 — Schema `20008` persiste o sistema Price/SAC; a API de empréstimos e os estudos aplicam a amortização selecionada.
+- `4.22` — 2026-09-25 — A listagem de empréstimos expõe principal e juros Price estimados para o resumo de transparência da V1.1.
+- `4.21` — 2026-09-25 — Exclusão definitiva de empréstimo exige senha, remove associações sem apagar lançamentos; arquivamento usa rota própria.
+- `4.20` — 2026-09-25 — Pagamentos vinculados só amortizam o compromisso após conciliação; schema `20007` adiciona estado de reconhecimento idempotente.
+- `4.19` — 2026-09-25 — A aba Objetivos carrega objetivos e Reserva de Emergência em uma única rota e reutiliza o mesmo snapshot valorizado do Portfólio.
+- `4.18` — 2026-09-25 — Builders do Consultor documentados com agregados de metas/recursos reservados, empréstimos por moeda e projeção de 90 dias com faturas abertas e lançamentos futuros registrados.
+- `4.17` — 2026-09-25 — Documenta Empréstimos e Financiamentos como MVP implementado e corrige a descrição visual para a barra de quitação; versão do app `2.1.0`.
 - `4.16` — 2026-09-24 — Schema `20006` dá identidade estável à categoria de pagamentos de empréstimos; renomear a categoria não interrompe a associação.
 - `4.15` — 2026-09-24 — Formulário de Lançamentos passa a associar pagamentos aos empréstimos no backend; painel apresenta gráfico mensal e confirmação de arquivamento.
 

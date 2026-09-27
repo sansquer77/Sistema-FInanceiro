@@ -53,6 +53,7 @@ ENTITY_TYPES = {
     "financial_goal_funding_source",
     "loan",
     "loan_payment",
+    "revolving_loan",
     "user",
     "backup_policy",
     "backup_package",

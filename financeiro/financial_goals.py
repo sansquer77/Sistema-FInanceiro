@@ -7,7 +7,8 @@ import sqlite3
 
 from financeiro.accounts import cents_to_money, empty_to_none, money_to_cents
 from financeiro.categories import normalize_item_id
-from financeiro.database import get_connection, row_to_dict
+from financeiro.database import begin_immediate, get_connection, row_to_dict
+from financeiro.operation_logs import create_operation_log_with_conn
 from financeiro.portfolio_calculations import effective_asset_type, normalize_asset_identifier, normalize_indexer
 
 
@@ -26,7 +27,9 @@ class FinancialGoalError(Exception):
         super().__init__(message)
 
 
-def list_financial_goals(user_id: int, include_archived: bool = False) -> list[dict]:
+def list_financial_goals(
+    user_id: int, include_archived: bool = False, *, positions: list[dict] | None = None
+) -> list[dict]:
     archived_filter = "" if include_archived else "AND goals.archived_at IS NULL"
     with get_connection() as conn:
         rows = conn.execute(
@@ -43,12 +46,23 @@ def list_financial_goals(user_id: int, include_archived: bool = False) -> list[d
         ).fetchall()
         goals = [row_to_dict(row) for row in rows]
         sources_by_goal = funding_sources_by_goal(conn, user_id, [goal["id"] for goal in goals])
-    positions = None
-    if any(sources_by_goal.values()):
+    if positions is None and any(sources_by_goal.values()):
         from financeiro.portfolio import current_portfolio_positions
 
         positions = current_portfolio_positions(user_id, force_refresh=False)
     return [hydrate_goal(goal, sources_by_goal.get(goal["id"], []), user_id, positions) for goal in goals]
+
+
+def financial_goals_overview(user_id: int) -> dict:
+    """Build the goals tab payload from one shared portfolio snapshot."""
+    # spec: objetivos-financeiros v0.18 — critério 36
+    from financeiro.portfolio import current_portfolio_positions
+
+    positions = current_portfolio_positions(user_id, force_refresh=False)
+    return {
+        "goals": list_financial_goals(user_id, positions=positions),
+        "emergency_reserve": emergency_reserve_summary(user_id, positions=positions),
+    }
 
 
 def create_financial_goal(user_id: int, data: dict) -> dict:
@@ -163,6 +177,95 @@ def create_goal_movement(user_id: int, goal_id: object, data: dict) -> dict:
     return format_movement(row_to_dict(row))
 
 
+def reset_annual_provision(user_id: int, goal_id: object) -> dict:
+    """Start a new annual cycle while preserving the complete movement ledger."""
+    # spec: objetivos-financeiros v0.18 — critérios 41 a 44
+    normalized_id = normalize_item_id(goal_id, "Objetivo nao encontrado.")
+    today = date.today()
+    from financeiro.portfolio import current_portfolio_positions
+
+    positions = current_portfolio_positions(user_id, force_refresh=False)
+    with get_connection() as conn:
+        begin_immediate(conn)
+        ensure_goal_owner(conn, user_id, normalized_id)
+        goal_row = conn.execute(
+            "SELECT objective_type, target_date FROM financial_goals WHERE id = ? AND user_id = ?",
+            (normalized_id, user_id),
+        ).fetchone()
+        if goal_row["objective_type"] != "annual_provision":
+            raise FinancialGoalError("Somente uma provisao anual pode ser reiniciada.")
+        target_date = date.fromisoformat(goal_row["target_date"])
+        next_target = _next_annual_target(target_date, today)
+
+        links = funding_sources_by_goal(conn, user_id, [normalized_id]).get(normalized_id, [])
+        linked_values = enrich_funding_source_values(links, user_id, positions)
+        exhausted_link_ids = [
+            int(source["id"])
+            for source in linked_values
+            if not source.get("has_balance")
+        ]
+        if exhausted_link_ids:
+            placeholders = ", ".join("?" for _ in exhausted_link_ids)
+            conn.execute(
+                f"DELETE FROM financial_goal_funding_sources WHERE user_id = ? AND goal_id = ? AND id IN ({placeholders})",
+                (user_id, normalized_id, *exhausted_link_ids),
+            )
+
+        manual_balance = goal_balance(conn, user_id, normalized_id)
+        movement_id = None
+        if manual_balance:
+            cursor = conn.execute(
+                """
+                INSERT INTO financial_goal_movements (
+                    user_id, goal_id, movement_type, amount_cents, movement_date, notes
+                ) VALUES (?, ?, 'adjustment', ?, ?, ?)
+                """,
+                (user_id, normalized_id, -manual_balance, today.isoformat(), "Reinicio da provisao anual; historico preservado."),
+            )
+            movement_id = int(cursor.lastrowid)
+        conn.execute(
+            "UPDATE financial_goals SET start_date = ?, target_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?",
+            (today.isoformat(), next_target.isoformat(), normalized_id, user_id),
+        )
+        create_operation_log_with_conn(
+            conn,
+            user_id,
+            module="financial_goals",
+            operation_type="clear",
+            entity_type="financial_goal",
+            description="Provisao anual reiniciada",
+            entity_id=normalized_id,
+            metadata={
+                "manual_balance_cents_cleared": manual_balance,
+                "movement_id": movement_id,
+                "next_target_date": next_target.isoformat(),
+                "exhausted_investment_links_removed": len(exhausted_link_ids),
+            },
+        )
+    return {
+        "goal": fetch_goal(user_id, normalized_id),
+        "next_target_date": next_target.isoformat(),
+        "exhausted_links_removed": len(exhausted_link_ids),
+        "manual_balance_cleared_cents": manual_balance,
+    }
+
+
+def _next_annual_target(target_date: date, today: date) -> date:
+    year = target_date.year + 1
+    while True:
+        day = min(target_date.day, _days_in_month(year, target_date.month))
+        candidate = date(year, target_date.month, day)
+        if candidate > today:
+            return candidate
+        year += 1
+
+
+def _days_in_month(year: int, month: int) -> int:
+    if month == 12:
+        return 31
+    return (date(year, month + 1, 1) - date(year, month, 1)).days
+
+
 def list_goal_funding_sources(user_id: int, goal_id: object) -> list[dict]:
     normalized_id = normalize_item_id(goal_id, "Objetivo nao encontrado.")
     with get_connection() as conn:
@@ -187,7 +290,7 @@ def link_goal_funding_source(user_id: int, goal_id: object, data: dict) -> dict:
         members = matching_investment_sources(conn, user_id, identity)
         if not members:
             raise FinancialGoalError("Investimento nao encontrado na carteira.", HTTPStatus.NOT_FOUND)
-        # spec: objetivos-financeiros v0.11 — critérios 29 a 32
+        # spec: objetivos-financeiros v0.18 — critérios 29 a 32
         if any(member.get("emergency_reserve_eligible") for member in members):
             raise FinancialGoalError(
                 "Este investimento compoe a Reserva de Emergencia e nao pode financiar outro objetivo."
@@ -236,7 +339,7 @@ def unlink_goal_funding_source(user_id: int, goal_id: object, link_id: object) -
 
 def ensure_not_linked_to_financial_goal(conn, user_id: int, source_type: str, source_id: int) -> None:
     """Impede que uma fonte alocada seja reaproveitada na Reserva de Emergência."""
-    # spec: objetivos-financeiros v0.11 — critérios 31 e 32
+    # spec: objetivos-financeiros v0.18 — critérios 31 e 32
     source = fetch_funding_source(conn, user_id, source_type, source_id)
     identity = investment_asset_identity(source)
     rows = conn.execute(
@@ -410,7 +513,7 @@ def format_funding_source(link: dict, source: dict) -> dict:
 
 
 def hydrate_goal(goal: dict, sources: list[dict], user_id: int, positions: list[dict] | None = None) -> dict:
-    # spec: objetivos-financeiros v0.11 — critério 30
+    # spec: objetivos-financeiros v0.18 — critério 30
     manual_balance_cents = int(goal.get("reserved_balance_cents") or 0)
     sources = enrich_funding_source_values(sources, user_id, positions)
     linked_balance_cents = sum(int(source.get("current_value_brl_cents") or 0) for source in sources)
@@ -436,6 +539,12 @@ def enrich_funding_source_values(
         identity = investment_asset_identity(source)
         value_cents = sum(
             int(position.get("current_value_brl_cents") or 0)
+            for position in positions
+            if investment_asset_identity(position) == identity
+        )
+        # spec: objetivos-financeiros v0.18 — critérios 42 e 43; saldo é conferido na moeda original.
+        source["has_balance"] = any(
+            int(position.get("current_value_cents") or 0) > 0
             for position in positions
             if investment_asset_identity(position) == identity
         )
@@ -585,7 +694,7 @@ def format_goal(goal: dict) -> dict:
 
 def build_goal_projection(goal: dict, reserved: int, effective_target: int, months: int) -> dict:
     """Build conservative and yield scenarios without changing the reserved balance."""
-    # spec: objetivos-financeiros v0.11 — critérios 7, 8, 9, 11, 27, 28 e 30
+    # spec: objetivos-financeiros v0.18 — critérios 7, 8, 9, 11, 27, 28 e 30
     remaining = max(effective_target - reserved, 0)
     conservative_monthly = (remaining + months - 1) // months if months > 0 else remaining
     conservative_contributions = remaining

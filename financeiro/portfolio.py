@@ -141,7 +141,7 @@ def get_portfolio(user_id: int, force_refresh: bool = False) -> dict:
         redemption_rows = positions_store.load_redemption_history(conn, user_id)
 
     positions = assemble_portfolio_positions(inputs, user_id, force_refresh=force_refresh)
-    # spec: objetivos-financeiros v0.11 — critério 36
+    # spec: objetivos-financeiros v0.18 — critério 36
     # A origem vinculada é canônica, mas a marca acompanha todos os lotes do ativo consolidado.
     from financeiro.financial_goals import FinancialGoalError, fetch_funding_source, investment_asset_identity
 
@@ -1987,6 +1987,34 @@ def fetch_indexer_rate(indexer: str, force_refresh: bool = False) -> Decimal:
     return daily_percent / Decimal("100")
 
 
+def fetch_latest_cdi_assumption(force_refresh: bool = False) -> dict:
+    """Return the latest published CDI daily rate and equivalent annual/monthly rates."""
+    payload = cached_json_url(
+        BCB_SERIES_URL.format(series=INDEXER_SERIES["CDI"]),
+        "Não foi possível consultar o CDI mais recente.",
+        "bcb:last:CDI:assumption",
+        INDEXER_QUOTE_TTL_SECONDS,
+        force_refresh=force_refresh,
+    )
+    try:
+        row = payload[-1]
+        daily_rate = Decimal(str(row["valor"]).replace(",", ".")) / Decimal("100")
+        rate_date = parse_bcb_row_date(row["data"])
+    except (IndexError, KeyError, InvalidOperation, TypeError, ValueError) as exc:
+        raise PortfolioError("CDI mais recente indisponível") from exc
+    daily_factor = Decimal("1") + daily_rate
+    annual_factor = daily_factor ** Decimal("252")
+    if daily_factor <= 0 or annual_factor <= 0:
+        raise PortfolioError("A taxa CDI mais recente não permite calcular equivalentes")
+    monthly_rate = annual_factor ** (Decimal("1") / Decimal("12")) - Decimal("1")
+    return {
+        "daily_rate": daily_rate,
+        "annual_rate": annual_factor - Decimal("1"),
+        "monthly_rate": monthly_rate,
+        "rate_date": rate_date.isoformat(),
+    }
+
+
 def fetch_accumulated_indexer_factor(
     indexer: str,
     start_date: date,
@@ -2041,6 +2069,73 @@ def fetch_accumulated_indexer_factor(
     except (KeyError, InvalidOperation, TypeError, ValueError) as exc:
         raise PortfolioError("Indexador indisponivel") from exc
     return factor
+
+
+# spec: emprestimos-quitacao/emprestimos-quitacao v0.56 — critério 79
+def fetch_trailing_twelve_month_indexer_factor(
+    indexer: str,
+    as_of_date: date | None = None,
+    force_refresh: bool = False,
+) -> dict:
+    """Return an official accumulated factor and the observed dates for the latest twelve published months."""
+    normalized = normalize_indexer(indexer)
+    series = "195" if normalized == "POUPANCA" else INDEXER_SERIES.get(normalized)
+    if normalized not in {"CDI", "TR", "IPCA", "POUPANCA"} or not series:
+        raise PortfolioError("Indexador sem série oficial para a janela de doze meses.")
+    as_of = as_of_date or date.today()
+    query_start = as_of - timedelta(days=400)
+    url = BCB_SERIES_RANGE_URL.format(
+        series=series,
+        start=format_bcb_date(query_start),
+        end=format_bcb_date(as_of),
+    )
+    cache_key = f"bcb:trailing-12m:{normalized}:{query_start.isoformat()}:{as_of.isoformat()}"
+    payload = cached_json_url(
+        url,
+        "Não foi possível consultar o histórico oficial do indexador.",
+        cache_key,
+        bcb_range_ttl_seconds(as_of),
+        force_refresh=force_refresh,
+    )
+    try:
+        entries = sorted(
+            (
+                (parse_bcb_row_date(row["data"]), Decimal(str(row["valor"]).replace(",", ".")))
+                for row in payload
+                if parse_bcb_row_date(row["data"]) <= as_of
+            ),
+            key=lambda item: item[0],
+        )
+    except (KeyError, InvalidOperation, TypeError, ValueError) as exc:
+        raise PortfolioError("Histórico publicado do indexador inválido.") from exc
+    if not entries:
+        raise PortfolioError("Não há observações publicadas para calcular a janela do indexador.")
+
+    if normalized in {"CDI", "TR"}:
+        latest_date = entries[-1][0]
+        observation_start = add_months(latest_date, -12) + timedelta(days=1)
+        selected = [entry for entry in entries if observation_start <= entry[0] <= latest_date]
+        if (latest_date - selected[0][0]).days < 330:
+            raise PortfolioError("O histórico publicado da TR ainda não cobre doze meses completos.")
+    else:
+        latest_by_month: dict[tuple[int, int], tuple[date, Decimal]] = {}
+        for entry in entries:
+            latest_by_month[(entry[0].year, entry[0].month)] = entry
+        selected = list(latest_by_month.values())[-12:]
+        if len(selected) < 12:
+            raise PortfolioError("O histórico publicado do indexador ainda não cobre doze meses completos.")
+
+    factor = Decimal("1")
+    for _, monthly_percent in selected:
+        factor *= Decimal("1") + monthly_percent / Decimal("100")
+    if factor <= 0:
+        raise PortfolioError("A janela publicada do indexador não permite calcular uma taxa equivalente.")
+    return {
+        "factor": factor,
+        "period_start": selected[0][0].isoformat(),
+        "period_end": selected[-1][0].isoformat(),
+        "observations": len(selected),
+    }
 
 
 def parse_bcb_row_date(value: str) -> date:

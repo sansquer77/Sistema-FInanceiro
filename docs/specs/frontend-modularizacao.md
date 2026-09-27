@@ -2,8 +2,8 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 4.32
-atualizado: 2026-09-04
+versao: 4.33
+atualizado: 2026-09-25
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
   - "[[arquitetura]]"
@@ -15,7 +15,7 @@ aliases: ["Modularização Frontend", "ES Modules"]
 # Modularização do Frontend
 
 > [!info] Status
-> **implementado** · área: `frontend` · atualizado em 2026-09-04 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]], [[../qualidade-codigo]]
+> **implementado** · área: `frontend` · atualizado em 2026-09-25 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]], [[../qualidade-codigo]]
 
 ## Problema
 
@@ -99,6 +99,7 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `transactions-view.js` | Fachada compatível de Lançamentos; compõe lista, gráfico, formulário base/investimento e carregador. |
 | `operation-history-view.js` | Histórico de Operações: filtros, busca, agrupamentos e paginação incremental. |
 | `simulations-view.js` | Efeito Borboleta: formulário de cenário hipotético e projeções retornadas pelo backend. |
+| `loans-view.js` | Cadastro recolhido sob demanda, contratos, pagamentos vinculados, dívidas rotativas e alimentação dos estudos do Efeito Borboleta; sem regra financeira no navegador. |
 | `instructions-view.js` | Central de ajuda: busca, grupos, tópicos expansíveis e navegação contextual. |
 
 Views estáticas simples, como **Sobre**, podem permanecer declaradas no HTML e roteadas por `app.js` quando não possuem estado próprio, API ou lógica funcional dedicada.
@@ -344,6 +345,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Changelog
 
+- `4.33` — 2026-09-25 — Inventariado `loans-view.js` entre as views funcionais, registrando sua responsabilidade de apresentação e integração sem regras financeiras no navegador.
 - `4.32` — 2026-09-04 — Barra do Histórico de Operações ganhou distribuição responsiva; abas de Relatórios atualizam `aria-labelledby` conforme a seleção; Sobre ganhou grade de leitura mais equilibrada.
 
 ## Relacionados

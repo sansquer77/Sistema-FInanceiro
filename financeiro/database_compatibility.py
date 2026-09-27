@@ -398,7 +398,7 @@ def ensure_secure_configs(conn: sqlite3.Connection) -> None:
 
 
 def ensure_consultor_schema(conn: sqlite3.Connection) -> None:
-    # spec: consultor/consultor v2.0 - criterio 23
+    # spec: consultor/consultor v2.1 - criterio 23
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS consultor_settings (

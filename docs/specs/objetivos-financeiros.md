@@ -1,9 +1,9 @@
 ---
 tipo: spec
 area: objetivos-financeiros
-status: em-revisao
-versao: 0.11
-atualizado: 2026-09-24
+status: implementado
+versao: 0.18
+atualizado: 2026-09-27
 relacionados:
   - "[[limites-gastos]]"
   - "[[investimentos-portfolio]]"
@@ -11,14 +11,14 @@ relacionados:
   - "[[cockpit-calendario]]"
   - "[[historico-operacoes]]"
   - "[[arquitetura]]"
-tags: [spec, "area/objetivos-financeiros", "status/em-revisao"]
+tags: [spec, "area/objetivos-financeiros", "status/implementado"]
 aliases: ["Objetivos Financeiros", "Fundos de Provisão", "Cofrinhos"]
 ---
 
 # Objetivos Financeiros e Fundos de Provisão
 
 > [!info] Status
-> **em-revisao** · área: `objetivos-financeiros` · atualizado em 2026-09-24 · relacionados: [[limites-gastos]], [[investimentos-portfolio]], [[score-saude-financeira]], [[cockpit-calendario]], [[historico-operacoes]]
+> **implementado** · versão: `0.18` · área: `objetivos-financeiros` · atualizado em 2026-09-27 · relacionados: [[limites-gastos]], [[investimentos-portfolio]], [[score-saude-financeira]], [[cockpit-calendario]], [[historico-operacoes]]
 
 ## Problema
 
@@ -95,6 +95,11 @@ Um vínculo de cobertura representa o ativo financeiro inteiro na carteira selec
 - `target` representa uma meta com valor e data, como viagem ou entrada de imóvel.
 - `annual_provision` representa uma despesa previsível com vencimento, como IPVA, seguro ou matrícula.
 - `continuous_reserve` representa uma reserva sem data final obrigatória, como manutenção ou colchão financeiro adicional.
+- Meta e provisão anual exigem valor-alvo e data e usam o mesmo cálculo para progresso, valor restante e aporte recomendado; a categoria anual não inicia o próximo ciclo automaticamente.
+- Reserva contínua pode ter data opcional. Sem data, não há período para distribuir os aportes e o valor restante inteiro é mostrado como aporte mensal sugerido; com data, o valor é distribuído pelos meses restantes.
+- A provisão anual pode ser reiniciada ao começar um novo ciclo. A ação zera o saldo manual por meio de um ajuste auditável, avança o vencimento em um ano (ou até a próxima data futura) e define a data inicial do novo ciclo como hoje; o valor-alvo e as premissas permanecem.
+- O reinício não apaga as movimentações anteriores nem altera lançamentos de contas/cartões. O usuário deve confirmar que o saldo manual será zerado.
+- Investimentos vinculados são mantidos quando o saldo consolidado atual do ativo é positivo. Vínculos cujo ativo foi liquidado ou está sem saldo são removidos durante o reinício.
 - Objetivos concluídos podem ser reabertos; objetivos arquivados permanecem no histórico e não recebem novas movimentações.
 
 ### Saldo e atualização manual
@@ -149,11 +154,13 @@ Um vínculo de cobertura representa o ativo financeiro inteiro na carteira selec
 | Método | Rota | Finalidade |
 |---|---|---|
 | `GET` | `/api/financial-goals` | Lista objetivos com progresso, cobertura e projeções. |
+| `GET` | `/api/financial-goals/overview` | Retorna objetivos e Reserva de Emergência calculados sobre um único snapshot valorizado do Portfólio. |
 | `POST` | `/api/financial-goals` | Cria objetivo. |
 | `PUT` | `/api/financial-goals/{id}` | Edita, pausa, reabre ou conclui objetivo. |
 | `DELETE` | `/api/financial-goals/{id}` | Arquiva objetivo, preservando histórico. |
 | `GET` | `/api/financial-goals/{id}/movements` | Lista movimentações do objetivo. |
 | `POST` | `/api/financial-goals/{id}/movements` | Registra aporte, retirada ou ajuste manual. |
+| `POST` | `/api/financial-goals/{id}/reset-annual-provision` | Zera o saldo manual da provisão anual, inicia o próximo ciclo e remove vínculos de investimentos sem saldo. |
 | `DELETE` | `/api/financial-goals/{id}/movements/{movement_id}` | Estorna movimentação manual com auditoria. |
 | `GET` | `/api/financial-goals/{id}/funding-sources` | Lista as origens vinculadas ao objetivo. |
 | `POST` | `/api/financial-goals/{id}/funding-sources` | Vincula um investimento consolidado. |
@@ -206,11 +213,22 @@ As tabelas devem ser criadas pela migração incremental idempotente do schema v
 34. Dada a aba Objetivos, quando não há criação ou edição em andamento, então o formulário fica recolhido e há uma ação **+ Novo objetivo** em destaque; ao criar ou editar, o formulário abre sob demanda e pode ser cancelado sem salvar.
 35. Dada a aba Objetivos sem nenhum objetivo cadastrado, quando aberta, então a Reserva de Emergência é carregada e exibida normalmente, sem depender da criação de um objetivo.
 36. Dado um investimento vinculado a um objetivo, quando aparece no Portfólio, então recebe uma marca visual distinta da Reserva de Emergência, com o mesmo estilo compacto e identificação acessível, aplicada ao ativo consolidado e seus movimentos.
+37. Dado que o usuário abre a aba **Objetivos**, quando objetivos vinculados e Reserva de Emergência precisam de posições do Portfólio, então ambos são carregados pela mesma chamada e pelo mesmo snapshot valorizado, sem disparar cotações duplicadas para compor a tela.
+38. Dado um usuário com vários objetivos ativos, quando os cards são exibidos em uma tela ampla, então são organizados em duas colunas e mostram em primeiro plano progresso, saldo, falta acumular, aporte sugerido e prazo, reduzindo a rolagem vertical.
+39. Dado um card de objetivo, quando a tela é aberta, então composição detalhada, cobertura e gráfico de projeção ficam recolhidos sob demanda; ao expandir, o gráfico é carregado e continua acessível.
+40. Dado o usuário criando ou consultando objetivos, quando compara os tipos, então vê a diferença entre Meta (valor a alcançar até uma data), Provisão anual (despesa previsível recorrente) e Reserva contínua (saldo a manter/reforçar sem data final obrigatória).
+41. Dada uma provisão anual, quando o usuário confirma Reiniciar provisão anual, então o saldo manual fica zerado por um ajuste auditável, as movimentações anteriores permanecem no histórico, a data inicial passa a hoje e o vencimento avança para o próximo ciclo anual.
+42. Dada uma provisão anual reiniciada, quando há investimento vinculado com saldo consolidado positivo, então o vínculo permanece e seu valor continua compondo o saldo reservado.
+43. Dada uma provisão anual reiniciada, quando há investimento vinculado liquidado ou sem saldo, então o vínculo é removido sem alterar movimentações do Portfólio.
+44. Dada a ação de reinício, quando o usuário cancela o alerta de confirmação, então saldo, datas e vínculos permanecem inalterados.
+45. Dada uma Meta ou Provisão anual, quando cadastrada sem data, então o app rejeita o cadastro; ambas usam o mesmo cálculo de aporte quando têm a mesma data e o mesmo saldo restante.
+46. Dada uma Provisão anual que alcança o vencimento, quando o ciclo atual termina, então o app não cria automaticamente a provisão do ano seguinte nem zera o saldo manual.
+47. Dada uma Reserva contínua sem data, quando existe valor restante, então o aporte mensal sugerido é igual ao valor restante inteiro; com data, o aporte é distribuído pelo período.
+48. Dado um card de objetivo em coluna estreita, quando o gráfico de projeção é aberto, então textos, rótulos, legenda e SVG permanecem contidos na largura disponível, sem vazamento horizontal. Verificação visual manual.
 
 ## Pendências
 
-> [!question] Pendências
-> O vínculo por ativo consolidado aguarda validação em homologação. A possibilidade futura de dividir um mesmo ativo em frações destinadas a objetivos diferentes fica explicitamente fora deste MVP.
+Não há pendências abertas para o MVP aprovado. A possibilidade futura de dividir um mesmo ativo em frações destinadas a objetivos diferentes permanece fora deste escopo.
 
 ## Fora de escopo
 
@@ -239,9 +257,21 @@ As tabelas devem ser criadas pela migração incremental idempotente do schema v
 - [x] Passo 12 — Agrupar visualmente os componentes da Reserva por carteira, calcular subtotais no núcleo em centavos e permitir expansão/recolhimento de títulos excedentes. Fecha: critério 33.
 - [x] Passo 13 — Recolher o formulário de objetivo por padrão, abrir sob demanda pela ação primária e reutilizá-lo para edição com cancelamento acessível. Fecha: critério 34.
 - [x] Passo 14 — Desacoplar a carga e a renderização da Reserva de Emergência da resposta da lista de objetivos, mantendo a reserva visível mesmo quando a lista está vazia. Fecha: critério 35.
+- [x] Passo 15 — Consolidar a carga da aba em `/api/financial-goals/overview`, compartilhando um snapshot do Portfólio entre objetivos vinculados e Reserva de Emergência. Fecha: critério 37.
+- [x] Passo 16 — Compactar os cards em duas colunas, recolher gráfico/composição/cobertura com renderização do gráfico ao expandir e explicar visualmente os três tipos de objetivo. Fecha: critérios 38 a 40.
+- [x] Passo 17 — Reiniciar provisão anual com ajuste auditável, próximo ciclo e limpeza apenas de vínculos sem saldo. Fecha: critérios 41 a 44.
+- [x] Passo 18 — Documentar a equivalência de cálculo entre Meta e Provisão anual e o comportamento do aporte sugerido na Reserva contínua sem data. Fecha: critérios 45 a 47.
+- [x] Passo 19 — Tornar gráfico, eixos e legenda responsivos à largura reduzida do card. Fecha: critério 48.
 
 ## Changelog
 
+- `0.18` — 2026-09-27 — Ajusta gráfico de projeção e textos para se conterem na largura reduzida dos cards em duas colunas.
+- `0.17` — 2026-09-27 — Explicita o cálculo compartilhado de Meta e Provisão anual, a ausência de reinício automático e o aporte da Reserva contínua sem data.
+- `0.16` — 2026-09-27 — Adiciona reinício de provisão anual sem apagar o histórico e mantém vínculos apenas para investimentos com saldo.
+- `0.15` — 2026-09-27 — Compacta a lista de objetivos, carrega gráficos sob demanda e diferencia Meta, Provisão anual e Reserva contínua na tela.
+- `0.14` — 2026-09-25 — Carregamento consolidado de objetivos e Reserva de Emergência reutilizando um único snapshot do Portfólio para evitar consulta/cotação duplicada.
+- `0.13` — 2026-09-25 — Objetivos Financeiros confirmado como finalizado; status da spec sincronizado para implementado.
+- `0.12` — 2026-09-24 — Instruções de uso dos Objetivos Financeiros e da Reserva de Emergência adicionadas à Central de Ajuda.
 - `0.10` — 2026-09-24 — A Reserva de Emergência carrega e aparece ao abrir Objetivos mesmo sem objetivos cadastrados; suas falhas de carregamento são isoladas da lista.
 - `0.11` — 2026-09-24 — Define uma marca visual compacta e distinta no Portfólio para identificar ativos vinculados a objetivos, independente de qual objetivo.
 - `0.9` — 2026-09-24 — Formulário de criação deixa de ocupar espaço permanente; ação primária abre o formulário para criação e edição sob demanda.

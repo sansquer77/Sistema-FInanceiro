@@ -798,6 +798,7 @@ export function registerUserAdminView(context) {
     loadConsultorProfile,
     loadMaisRetornoConfigStatus,
     loadBackupSettings,
+    switchUserTab,
     syncThemePreference,
     syncDensityPreference,
   };

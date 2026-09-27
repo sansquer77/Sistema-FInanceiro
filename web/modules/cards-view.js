@@ -282,6 +282,26 @@ export function registerCardsView({
     const data = formData(cardInvoicePaymentForm);
     data.credit_card_id = state.selectedCreditCardId;
     data.invoice_month = state.cardInvoiceMonth;
+    try {
+      const { revolving_loans: revolvingLoans = [] } = await api("/api/revolving-loans");
+      const revolving = revolvingLoans.find((item) => String(item.source_card_id) === String(state.selectedCreditCardId) && item.status === "active");
+      if (revolving) {
+        const resolution = await decisionModal.choose({
+          title: "Como foi encerrado o rotativo?",
+          message: "A fatura será paga pela conta e o acompanhamento do saldo rotativo será encerrado. Escolha o motivo; nenhuma movimentação extra será criada.",
+          actions: [
+            { value: "paid", label: "Quitação definitiva", variant: "primary" },
+            { value: "swapped", label: "Troca de dívida", variant: "ghost" },
+            { value: null, label: "Voltar", variant: "ghost" },
+          ],
+        });
+        if (!resolution) return;
+        data.revolving_resolution = resolution;
+      }
+    } catch (error) {
+      setMessage(cardInvoiceMessage, error.message, "error");
+      return;
+    }
     setFormBusy(cardInvoicePaymentForm, true);
     try {
       await api("/api/credit-card-invoice/pay", { method: "POST", body: data });

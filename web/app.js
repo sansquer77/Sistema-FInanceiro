@@ -558,7 +558,7 @@ const viewTitles = {
   cardLaunches: ["Lançamentos", "Fatura de Cartões"],
   transactions: ["Lançamentos", "Extrato de Contas"],
   portfolio: ["Gestão", "Portfólio"],
-  loans: ["Gestão", "Empréstimos"],
+  loans: ["Gestão", "Empréstimos e Financiamentos"],
   limits: ["Gestão", "Limites"],
   simulations: ["Gestão", "Efeito Borboleta"],
   reports: ["Gestão", "Relatórios"],
@@ -942,6 +942,15 @@ const cockpitView = registerCockpitView({
     }
     if (action?.route === "loans") {
       showModule("loans");
+      if (params.revolving_loan_id) {
+        await loansView.openPriceConversionDraft(Number(params.revolving_loan_id));
+      }
+      return;
+    }
+    if (action?.route === "user") {
+      showModule("user");
+      await userAdminViewController.loadPreferences({ force: true });
+      userAdminViewController.switchUserTab(params.tab === "backup" ? "backup" : "geral");
       return;
     }
     if (action?.route === "cards") {
@@ -1109,6 +1118,7 @@ const transactionsView = registerTransactionsView({
     transactionCategory,
     transactionCategoryRow,
     transactionLoan: document.querySelector("#transactionLoan"),
+    transactionRevolvingLoan: document.querySelector("#transactionRevolvingLoan"),
     loanPaymentRow: document.querySelector("#loanPaymentRow"),
     transactionSubcategory,
     transactionClassificationSuggestion,
@@ -1200,7 +1210,7 @@ const simulationsView = registerSimulationsView({
     simulationModeTabs: document.querySelectorAll("[data-simulation-mode-tab]"),
     simulationModePanels: document.querySelectorAll("[data-simulation-mode-panel]"),
   },
-  loadLoanStudies: () => loansView.loadLoanStudies().catch((error) => { document.querySelector("#loanSimulationResult").textContent = error.message; }),
+  loadLoanStudies: () => loansView.loadLoanStudies().catch((error) => { document.querySelector("#loanStudyResult").textContent = error.message; }),
   formatMoney,
   setFormBusy,
 });
@@ -1303,10 +1313,13 @@ const loansView = registerLoansView({
     loanForm: document.querySelector("#loanForm"), loanMessage: document.querySelector("#loanMessage"),
     loanFormPanel: document.querySelector("#loanFormPanel"), newLoanButton: document.querySelector("#newLoanButton"),
     loanList: document.querySelector("#loanList"), simulationForm: document.querySelector("#loanSimulationForm"),
-    simulationTarget: document.querySelector("#loanSimulationTarget"), simulationResult: document.querySelector("#loanSimulationResult"),
+    loanHistoryList: document.querySelector("#loanHistoryList"), revolvingLoanHistoryList: document.querySelector("#revolvingLoanHistoryList"),
+    simulationTarget: document.querySelector("#loanSimulationTarget"), studyResult: document.querySelector("#loanStudyResult"),
     strategyForm: document.querySelector("#loanStrategyForm"), strategyCurrency: document.querySelector("#loanStrategyCurrency"),
-    strategyResult: document.querySelector("#loanStrategyResult"),
     loanCurrencyTotals: document.querySelector("#loanCurrencyTotals"),
+    revolvingLoanForm: document.querySelector("#revolvingLoanForm"), revolvingLoanFormPanel: document.querySelector("#revolvingLoanFormPanel"),
+    newRevolvingLoanButton: document.querySelector("#newRevolvingLoanButton"), cancelRevolvingLoanForm: document.querySelector("#cancelRevolvingLoanForm"),
+    revolvingLoanList: document.querySelector("#revolvingLoanList"), revolvingLoanMessage: document.querySelector("#revolvingLoanMessage"),
     loanFormTitle: document.querySelector("#loanFormTitle"), cancelLoanEdit: document.querySelector("#cancelLoanEdit"),
     decisionModal,
   },
@@ -1330,6 +1343,14 @@ contextualHelpButton?.addEventListener("click", () => {
   if (!topicId) {
     return;
   }
+  showModule("instructions");
+  instructionsView.openTopic(topicId);
+});
+document.addEventListener("click", (event) => {
+  const helpButton = event.target.closest("[data-open-instructions-topic]");
+  if (!helpButton) return;
+  const topicId = helpButton.dataset.openInstructionsTopic;
+  if (!topicId) return;
   showModule("instructions");
   instructionsView.openTopic(topicId);
 });
@@ -1493,14 +1514,14 @@ async function loadAppInfo() {
   try {
     state.appInfo = await api("/api/app-info");
   } catch (error) {
-    state.appInfo = { version: "2.0.2" };
+    state.appInfo = { version: "2.1.0" };
   }
   renderAppInfo();
 }
 
 function renderAppInfo() {
   if (aboutAppVersion) {
-    aboutAppVersion.textContent = state.appInfo?.version || "2.0.2";
+    aboutAppVersion.textContent = state.appInfo?.version || "2.1.0";
   }
 }
 
@@ -1645,7 +1666,7 @@ function showModule(view) {
   }
   if (view === "simulations") {
     simulationsView.loadSimulationFormData().catch((error) => setMessage(simulationMessage, error.message, "error"));
-    simulationsView.refreshActiveStudyData()?.catch((error) => { document.querySelector("#loanSimulationResult").textContent = error.message; });
+    simulationsView.refreshActiveStudyData()?.catch((error) => { document.querySelector("#loanStudyResult").textContent = error.message; });
   }
   if (view === "reports") {
     reportsView.renderReports();

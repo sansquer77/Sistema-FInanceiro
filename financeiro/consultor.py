@@ -110,7 +110,7 @@ def execute_consultor_analysis(
     now: datetime | None = None,
     portfolio_positions: list[dict] | None = None,
 ) -> dict:
-    # spec: consultor/consultor v2.0 - criterios 7, 8, 10, 13, 34 e 38
+    # spec: consultor/consultor v2.1 - critérios 40 a 43
     normalized_user_id = int(user_id)
     normalized_analysis_id = validate_analysis_id(analysis_id)
     current_time = now or datetime.now()
@@ -220,7 +220,7 @@ def failure_cooldown_remaining(user_id: int, analysis_id: str, current_time: dat
 
 
 def postprocess_consultor_output(output: object) -> str:
-    # spec: consultor/consultor v2.0 - criterios 11, 12, 14 e 15
+    # spec: consultor/consultor v2.1 - critérios 11, 12, 14 e 15
     text = str(output or "").strip()
     if not text:
         raise ConsultorError("O Consultor esta indisponivel no momento.")
@@ -237,7 +237,7 @@ def postprocess_consultor_output(output: object) -> str:
 
 
 def has_section(text: str, section: str) -> bool:
-    # spec: consultor/consultor v2.0 - cabeçalhos com acentos normalizados
+    # spec: consultor/consultor v2.1 - cabeçalhos com acentos normalizados
     normalized_text = normalize_text(text)
     escaped = re.escape(section)
     return bool(re.search(
@@ -248,7 +248,7 @@ def has_section(text: str, section: str) -> bool:
 
 
 def contains_forbidden_recommendation(normalized_text: str) -> bool:
-    # spec: consultor/consultor v2.0 - correcao de falso positivo
+    # spec: consultor/consultor v2.1 - correcao de falso positivo
     # Frases defensivas da IA ("nao constitui recomendacao de compra de acoes",
     # "sem recomendar compra de fundos", "evite comprar por impulso") casavam os
     # padroes vedados; o match so vale se nao houver negacao/ressalva na janela anterior.
@@ -346,7 +346,7 @@ def build_analysis_context(
     investor_profile: object | None = None,
     portfolio_positions: list[dict] | None = None,
 ) -> dict:
-    # spec: consultor/consultor v2.0 - criterios 7, 10, 27, 30, 34 e 38
+    # spec: consultor/consultor v2.1 - criterios 7, 10, 27, 30, 34 e 38
     normalized_analysis_id = validate_analysis_id(analysis_id)
     normalized_period = validate_period_window(period_window, analysis_id=normalized_analysis_id)
     # Otimização: calcula o portfólio uma única vez e repassa aos cards que o consomem,
@@ -375,7 +375,7 @@ def build_analysis_context(
     elif normalized_analysis_id == "score_saude_financeira":
         context = build_score_context(user_id, month=month, portfolio_positions=portfolio_positions)
     elif normalized_analysis_id == "evolucao_score_tempo":
-        # spec: consultor/consultor v2.0 — critério 10
+        # spec: consultor/consultor v2.1 — critério 10
         context = build_score_evolution_context(user_id, period_window=normalized_period or "6m", portfolio_positions=portfolio_positions)
     elif normalized_analysis_id == "sustentabilidade_padrao_vida":
         context = build_lifestyle_context(user_id, month=month, portfolio_positions=portfolio_positions)
@@ -383,7 +383,7 @@ def build_analysis_context(
         context = build_maturities_context(user_id, month=month, reference_date=reference_date, portfolio_positions=portfolio_positions)
     else:
         raise ConsultorError("Analise do Consultor invalida.")
-    # spec: consultor/consultor v2.0 - criterios 38 e 39
+    # spec: consultor/consultor v2.1 - criterios 38 e 39
     # Todos os cards recebem perfil de investidor e Perfil Complementar (quando preenchido)
     # para contextualizar a analise - nunca dados de outro usuario.
     if investor_profile is None:

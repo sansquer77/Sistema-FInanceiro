@@ -2,8 +2,8 @@
 tipo: spec
 area: usuario
 status: implementado
-versao: 1.9
-atualizado: 2026-08-22
+versao: 1.27
+atualizado: 2026-09-27
 relacionados:
   - "[[sobre-app]]"
   - "[[lancamentos]]"
@@ -11,6 +11,9 @@ relacionados:
   - "[[investimentos-portfolio]]"
   - "[[score-saude-financeira]]"
   - "[[specs/consultor]]"
+  - "[[objetivos-financeiros]]"
+  - "[[emprestimos-quitacao]]"
+  - "[[efeito-borboleta]]"
 tags: [spec, "area/usuario", "status/implementado"]
 aliases: ["Instruções do App", "Central de Ajuda Local"]
 ---
@@ -18,7 +21,7 @@ aliases: ["Instruções do App", "Central de Ajuda Local"]
 # Instruções do App
 
 > [!info] Status
-> **implementado** · área: `usuario` · atualizado em 2026-08-22 · relacionados: [[sobre-app]], [[lancamentos]], [[cartoes]], [[investimentos-portfolio]], [[score-saude-financeira]], [[specs/consultor]]
+> **implementado** · versão: `1.27` · área: `usuario` · atualizado em 2026-09-27 · relacionados: [[sobre-app]], [[lancamentos]], [[cartoes]], [[investimentos-portfolio]], [[score-saude-financeira]], [[specs/consultor]], [[objetivos-financeiros]], [[emprestimos-quitacao]], [[efeito-borboleta]]
 
 ### Problema
 
@@ -66,7 +69,7 @@ Também atende usuários novos que acabaram de instalar o app e precisam de uma 
 - Quando houver botão ou link contextual para um módulo funcional, a navegação deve ser interna e não deve alterar filtros ou dados do módulo de destino.
 - A primeira versão deve ter links internos “Ir para o módulo” nos tópicos que correspondem a módulos funcionais já implantados.
 - Cada tela funcional deve poder exibir futuramente um botão contextual `?` pequeno e discreto ao lado do nome da tela, abrindo diretamente o tópico correspondente em **Instruções**.
-- A primeira versão deve cobrir todos os módulos operacionais atualmente implantados: Cockpit, Minhas Contas, Meus Cartões, Extrato de Contas, Fatura de Cartões, Portfólio, Limites, Simulação, Relatórios, Categorias, Importação, Histórico, Preferências, Privacidade e Instruções.
+- A Central deve cobrir os módulos operacionais implantados, incluindo Objetivos Financeiros, Empréstimos e Financiamentos e seus estudos no Efeito Borboleta.
 - O módulo **Sobre** fica fora do conteúdo operacional, pois já é institucional e não exige instrução de uso.
 - O tópico de **Preferências** deve explicar as abas **Geral** (aparência, email, senha e recuperação SMTP), **APIs** (integrações opcionais de IA e Mais Retorno para cotas de fundos) e **Perigo** (apagar lançamentos e conta).
 - O tópico de **Preferências** deve explicar que a IA opcional também habilita o **Consultor**, desde que o usuário ative o módulo, aceite o consentimento de acesso aos dados e escolha o perfil de investidor.
@@ -78,6 +81,8 @@ Também atende usuários novos que acabaram de instalar o app e precisam de uma 
 - O tópico de **Renda fixa** deve diferenciar pré-fixada, pós-fixada e híbrida em linguagem prática.
 - O tópico de **Cartões** deve explicar diferença entre compra parcelada/recorrente, fatura, pagamento de fatura e antecipação de parcelas. Além disso, deixar claro que uma vez paga a fatura os dados não são alterados.
 - O tópico de **Lançamentos de contas** deve explicar diferença entre saldo previsto e saldo conciliado, além de entre compra parcelada/recorrente.
+- O grupo **Gestão** deve incluir instruções para **Objetivos Financeiros** (criação, Reserva de Emergência, atualização manual, vínculo de investimentos e ausência de movimentação financeira automática) e **Empréstimos e Financiamentos** (cadastro, pagamento vinculado ao lançamento de conta e estudos teóricos no Efeito Borboleta).
+- Os estudos de pagamento adicional e plano por estratégia de empréstimos devem possuir tópicos de ajuda próprios, acessíveis por botões `?` ao lado dos respectivos títulos.
 - O módulo deve respeitar o design system existente e a identidade visual do app, sem criar nova linguagem visual.
 
 ### Conteúdo inicial
@@ -393,6 +398,42 @@ A lista abaixo é a **versão de referência** para o conteúdo estático do mó
 
 #### Grupo `gestao`
 
+- **ID**: `objetivos-financeiros`
+  - **Título**: Objetivos financeiros e Reserva de Emergência
+  - **Resumo**: Separe recursos para metas e acompanhe a Reserva de Emergência sem duplicar valores investidos.
+  - **Conteúdo**: Em Gestão > Limites, abra Objetivos. Meta exige valor-alvo e data; o app calcula progresso, valor restante e aporte sugerido para chegar ao alvo (ex.: R$ 8.000 para uma viagem em julho) e marca a Meta como Concluída ao atingir o valor. Provisão anual também exige valor e data e usa o mesmo cálculo, mas o tipo apenas identifica uma despesa recorrente (ex.: R$ 2.400 de IPVA em janeiro, cerca de R$ 200 por mês em 12 meses); o próximo ciclo não começa automaticamente. Use Reiniciar provisão anual para avançar o vencimento e zerar o saldo manual, preservando histórico, valor-alvo e lançamentos de contas/cartões. Investimentos com saldo permanecem vinculados, portanto o saldo total pode continuar positivo; ativos sem saldo são desvinculados. Reserva contínua pode ficar sem data final; sem data, o aporte mensal sugerido é o valor restante inteiro (ex.: R$ 5.000 restantes aparecem como R$ 5.000/mês). Se uma data for definida, o restante é distribuído pelo período. A Reserva de Emergência aparece mesmo sem objetivos cadastrados. Os cards mostram saldo, falta acumular e aporte sugerido; composição, cobertura e gráfico ficam em detalhes expansíveis. Vínculos acompanham o valor consolidado do investimento e não movimentam dinheiro.
+  - **Termos de busca**: objetivos, meta financeira, reserva de emergência, aporte, saldo reservado, vincular investimento, provisão
+  - **Módulo relacionado**: Objetivos
+  - **Rota do módulo**: `limits`
+  - **Tópico contextual**: `objetivos-financeiros`
+
+- **ID**: `emprestimos-quitacao`
+  - **Título**: Empréstimos e Financiamentos
+  - **Resumo**: Cadastre dívidas contratuais, acompanhe parcelas pagas e associe pagamentos lançados na conta.
+  - **Conteúdo**: Em Gestão > Empréstimos e Financiamentos, clique em + Novo Empréstimo. Informe modalidade, moeda, parcela, parcelas restantes e próximo vencimento; taxa mensal ou CET anual são opcionais. Para registrar um pagamento, crie uma despesa em Lançamentos > Extrato de Contas com a categoria Empréstimos e Financiamentos e selecione o contrato correspondente. A moeda deve ser compatível e o vínculo não cria um segundo lançamento. Estudos de pagamento adicional, avalanche e bola de neve ficam em Gestão > Efeito Borboleta > Empréstimos e não alteram os dados reais.
+  - **Termos de busca**: empréstimos, financiamento, dívida, parcela, quitação, pagamento adicional, avalanche, bola de neve
+  - **Módulo relacionado**: Empréstimos e Financiamentos
+  - **Rota do módulo**: `loans`
+  - **Tópico contextual**: `emprestimos-quitacao`
+
+- **ID**: `estudo-pagamento-adicional`
+  - **Título**: Estudo de pagamento adicional
+  - **Resumo**: Veja como pagamentos extras podem reduzir o prazo ou o valor das parcelas e compare o custo estimado.
+  - **Conteúdo**: Em Gestão > Efeito Borboleta > Empréstimos, escolha um contrato ativo. Para Price/SAC, informe adicional mensal além da parcela contratual e, se quiser, amortização extraordinária única; reduzir prazo/parcela define o efeito da amortização. Para Crédito Rotativo, informe o total que pretende pagar por mês, a primeira data e, opcionalmente, amortização extraordinária com data. Não há parcela mínima presumida. O estudo compara saldo sem pagamento e plano informado no mesmo horizonte, e exibe prazo, juros e total quando houver quitação. Uma proposta Price pode ser comparada informando principal, taxa mensal e prazo; só será marcada como mais barata se seu custo total estimado for inferior ao cenário rotativo quitado. O cálculo é teórico e não usa conexão bancária. Nenhum estudo salva alterações, agenda pagamentos ou muda lançamentos/saldos. Para registrar pagamento real, use o lançamento da conta e associe-o ao contrato.
+  - **Termos de busca**: pagamento adicional, pagamento extra, amortização extraordinária, reduzir prazo, reduzir parcela, juros economizados, quitação
+  - **Módulo relacionado**: Efeito Borboleta · Empréstimos
+  - **Rota do módulo**: `simulations`
+  - **Tópico contextual**: `estudo-pagamento-adicional`
+
+- **ID**: `plano-estrategia-emprestimos`
+  - **Título**: Plano por estratégia: avalanche e bola de neve
+  - **Resumo**: Distribua um orçamento extra entre empréstimos da mesma moeda usando uma ordem de prioridade explícita.
+  - **Conteúdo**: Em Gestão > Efeito Borboleta > Empréstimos, escolha moeda, estratégia e orçamento extra mensal compartilhado. Dívidas rotativas ficam primeiro e exigem orçamento adicional positivo, pois o app não presume pagamento mínimo. Avalanche ordena as taxas rotativas conhecidas; se faltar taxa rotativa, a ordem por juros fica limitada e os juros não são estimados. Bola de neve prioriza o menor saldo rotativo. Depois, o plano segue entre Price/SAC: avalanche prioriza a maior taxa e bola de neve o menor principal estimado. Moedas são analisadas separadamente; taxa ausente limita o cálculo de juros. A simulação não altera contratos, distribui pagamentos reais nem cria lançamentos.
+  - **Termos de busca**: plano por estratégia, avalanche, bola de neve, orçamento compartilhado, múltiplos empréstimos, moeda, ordem de quitação
+  - **Módulo relacionado**: Efeito Borboleta · Empréstimos
+  - **Rota do módulo**: `simulations`
+  - **Tópico contextual**: `plano-estrategia-emprestimos`
+
 - **ID**: `limites-gastos`
   - **Título**: Limites de gastos
   - **Resumo**: Defina orçamentos mensais por categoria ou subcategoria.
@@ -531,6 +572,16 @@ A lista abaixo é a **versão de referência** para o conteúdo estático do mó
 - Dado um usuário lendo o tópico de Renda fixa, quando compara modalidades, então entende a diferença entre pré-fixada, pós-fixada e híbrida.
 - Dado um usuário lendo o tópico de Cartões, quando compara fatura e pagamento de fatura, então entende que o pagamento da fatura não substitui o histórico detalhado das compras.
 - Dado um usuário lendo o tópico de Lançamentos de contas, quando compara saldos diários, então entende a diferença entre previsto e conciliado.
+- Dado um usuário consultando as Instruções, quando busca por objetivos, então encontra criação de objetivos, Reserva de Emergência, atualização manual de saldo, vínculo de investimentos e a regra de não movimentação automática.
+- Dado um usuário consultando as Instruções, quando busca por empréstimos ou financiamentos, então encontra cadastro, registro de pagamento pelo lançamento de conta, compatibilidade de moeda e localização dos estudos no Efeito Borboleta.
+- Dado um usuário lendo as instruções de Empréstimos, quando decide entre Price e SAC, então encontra a diferença entre modalidade e sistema de amortização, um exemplo comparável e orientação para cadastrar indexadores com a taxa remuneratória separada do CET.
+- Dado o usuário no estudo de pagamento adicional, quando aciona `?`, então as Instruções explicam os campos, as duas opções para amortização extraordinária, a exigência de taxa e como interpretar a comparação estimada.
+- Dado um contrato indexado no estudo individual, quando consulta a premissa futura, então as Instruções explicam a taxa acumulada dos últimos 12 meses publicados e sua conversão mensal como estimativa, não previsão oficial.
+- Dado a comparação quitação × investimento, quando consulta as Instruções, então entende que o CDI usa a última taxa diária publicada, convertida pela convenção de 252 dias úteis e mantida constante como cenário hipotético, não previsão.
+- Dado um usuário no estudo Quitar ou investir, quando consulta as Instruções, então entende os aportes comparados, a última taxa diária CDI publicada usada como cenário hipotético constante, os itens tributários e de liquidez não incluídos e que o resultado não é recomendação.
+- Dado um usuário no estudo individual de empréstimo, quando escolhe Quitar agora ou Amortizar, então as Instruções explicam o saldo usado na quitação e os campos exibidos na amortização.
+- Dado o usuário no plano por estratégia, quando aciona `?`, então as Instruções diferenciam avalanche e bola de neve, explicam o orçamento extra por moeda, as taxas necessárias e os efeitos apenas simulados.
+- Dado um usuário que acessa o módulo de Empréstimos, quando lê o nome no menu ou no cabeçalho, então vê **Empréstimos e Financiamentos**.
 - Dado um usuário em tela estreita, quando acessa Instruções, então a navegação por grupos, busca e tópicos permanece legível sem rolagem horizontal.
 - Dado um usuário sem conexão com internet, quando acessa Instruções, então o conteúdo continua disponível.
 - Dado um visitante sem sessão válida, quando tenta acessar diretamente o módulo Instruções pelo app, então o comportamento segue a proteção normal de autenticação do aplicativo.
@@ -563,9 +614,29 @@ Nenhuma pendência conhecida.
 - [x] Passo 4 — Adicionar o item **Instruções** no menu **Usuário** e conectar a navegação em `web/app.js`. Fecha: critérios 1, 13 e 14.
 - [x] Passo 5 — Ajustar responsividade, estados vazios, acessibilidade básica, links internos, botões contextuais `?` e aderência ao design system. Fecha: critérios 5, 6, 11, 14 e 15.
 - [x] Passo 6 — Validar manualmente no app local/homologação os fluxos de menu, busca, accordion, sessão e responsividade. Fecha: todos os critérios.
+- [x] Passo 7 — Adicionar tópicos próprios para os estudos de pagamento adicional e plano por estratégia e conectar os botões `?` aos tópicos corretos. Fecha: critérios de ajuda contextual dos estudos.
 
 ### Changelog
 
+- `1.27` — 2026-09-27 — Especifica os campos obrigatórios, o cálculo compartilhado de Meta/Provisão anual, o reinício manual anual e o aporte sugerido da Reserva contínua sem data.
+- `1.26` — 2026-09-27 — Explica operacionalmente Meta, Provisão anual e Reserva contínua, incluindo o reinício do ciclo e a retenção de vínculos com saldo.
+- `1.25` — 2026-09-27 — Explica Meta, Provisão anual e Reserva contínua e informa onde encontrar a composição e projeção recolhidas nos cards.
+- `1.24` — 2026-09-27 — Explica a escolha entre estudo de quitação integral e amortização, incluindo o saldo estimado e os campos de cada jornada.
+- `1.23` — 2026-09-27 — Atualiza a comparação CDI para explicar a última taxa diária publicada e a projeção constante como cenário hipotético.
+- `1.22` — 2026-09-27 — Adiciona instruções da comparação de quitação com 100% CDI bruto, incluindo premissa, aportes, horizonte e limitações; atualiza a premissa futura dos indexadores.
+- `1.21` — 2026-09-25 — Explica que salvar o Price pelo rascunho marca o alerta de troca como lido e remove seu atalho repetido.
+- `1.20` — 2026-09-25 — Explica que a ação do alerta de troca abre rascunho Price editável com moeda e saldo estimado como referência, sem salvamento automático.
+- `1.19` — 2026-09-25 — Ajuda dos estudos de Empréstimos explica pagamento rotativo por datas, comparação com proposta Price e prioridade nas estratégias sem parcela mínima presumida.
+- `1.18` — 2026-09-25 — Ajuda do estudo individual explica fatores oficiais históricos e hipótese anual para períodos futuros de contratos indexados.
+
+- `1.17` — 2026-09-25 — Ajuda de empréstimos explica Price e SAC prefixado com exemplo comparável e alerta sobre indexadores.
+- `1.16` — 2026-09-25 — Instruções explicam a diferença entre compromisso nominal, principal Price estimado e juros futuros estimados no card do empréstimo.
+- `1.15` — 2026-09-25 — Instruções diferenciam arquivar de excluir contrato; exclusão valida a senha e preserva lançamentos e seus dados.
+- `1.14` — 2026-09-25 — Orienta que os dois estudos de empréstimos usam a mesma área de resultado e que uma nova simulação substitui a resposta anterior.
+- `1.13` — 2026-09-25 — Instruções distinguem adicional mensal pago além da parcela contratual da amortização extraordinária única e explicam como ler o desembolso mensal total.
+- `1.12` — 2026-09-25 — Explica que o pagamento adicional depende de taxa informada e que avalanche exige taxa em todos os contratos da moeda; bola de neve pode estimar prazo sem calcular juros se faltar taxa.
+- `1.11` — 2026-09-25 — Central de Ajuda explica detalhadamente os estudos de pagamento adicional e estratégia; botões `?` abrem o tópico de cada estudo.
+- `1.10` — 2026-09-24 — Central de Ajuda passa a explicar Objetivos Financeiros e Empréstimos e Financiamentos com atalhos para os módulos e orientação dos fluxos principais.
 - `1.9` — 2026-08-22 — Instruções do Consultor atualizadas: o usuário escolhe a análise em seletor fechado e aciona o botão **Gerar**; Ralos Financeiros mantém o período condicional ao lado.
 - `1.8` — 2026-08-10 — Conteúdo de ajuda atualizado para cobrir o uso do Consultor: ativação via Preferências > APIs, consentimento, perfil de investidor, cards pré-formatados no Cockpit, histórico e expurgo por privacidade.
 - `1.7` — 2026-08-10 — Textos de Portfólio e Investimento/Aporte expandidos em formato mais didático; novo tópico **Fundos: cotas e preço unitário** explica cotas, valor da cota, CNPJ, custo histórico editável e relação com a Mais Retorno.

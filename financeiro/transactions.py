@@ -94,6 +94,10 @@ def list_transactions(
                 investment_operations.emergency_reserve_eligible AS investment_emergency_reserve_eligible,
                 investment_operations.savings_anniversaries_json AS investment_savings_anniversaries_json,
                 credit_card_payments.id AS credit_card_payment_id,
+                (SELECT p.loan_id FROM loan_payment_links p WHERE p.user_id=transactions.user_id
+                  AND p.transaction_id=transactions.id AND p.valid=1) AS loan_id,
+                (SELECT p.revolving_loan_id FROM revolving_loan_payment_links p WHERE p.user_id=transactions.user_id
+                  AND p.transaction_id=transactions.id AND p.valid=1) AS revolving_loan_id,
                 GROUP_CONCAT(tags.name, '||') AS tag_names
             FROM transactions
             JOIN checking_accounts AS source
@@ -164,7 +168,7 @@ def create_transaction(user_id: int, data: dict) -> dict:
 def create_transaction_with_conn(conn: sqlite3.Connection, user_id: int, data: dict) -> dict:
     transaction = normalize_transaction_payload(data)
     begin_immediate(conn)
-    if transaction.get("loan_id") and transaction["series_kind"] != "single":
+    if (transaction.get("loan_id") or transaction.get("revolving_loan_id")) and transaction["series_kind"] != "single":
         raise TransactionError("Associe empréstimos somente a lançamentos avulsos.")
     source = get_active_account(conn, user_id, transaction["account_id"])
     if source["account_type"] == "wallet":
@@ -236,10 +240,13 @@ def create_transaction_with_conn(conn: sqlite3.Connection, user_id: int, data: d
     if destination:
         recompute_account_balance(conn, user_id, destination["id"])
     if transaction.get("loan_id"):
-        # spec: emprestimos-quitacao/emprestimos-quitacao v0.25 — critérios 24–25
+        # spec: emprestimos-quitacao/emprestimos-quitacao v0.54 — critérios 24–25
         # O vínculo nasce na mesma transação do lançamento, sem criar um segundo débito.
         from financeiro.loans import link_payment_with_conn
         link_payment_with_conn(conn, user_id, transaction["loan_id"], int(first_transaction_id))
+    if transaction.get("revolving_loan_id"):
+        from financeiro.revolving_loans import link_payment_with_conn
+        link_payment_with_conn(conn, user_id, transaction["revolving_loan_id"], int(first_transaction_id))
     return format_transaction(fetch_transaction(conn, user_id, first_transaction_id))
 
 
@@ -259,10 +266,12 @@ def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
         ).fetchone()
         if not existing:
             raise TransactionError("Lancamento nao encontrado.", HTTPStatus.NOT_FOUND)
-        if transaction.get("loan_id") and transaction["series_kind"] != "single":
+        if (transaction.get("loan_id") or transaction.get("revolving_loan_id")) and transaction["series_kind"] != "single":
             raise TransactionError("Associe empréstimos somente a lançamentos avulsos.")
         from financeiro.loans import invalidate_loan_payment_links
         invalidate_loan_payment_links(conn, user_id, normalized_id)
+        from financeiro.revolving_loans import invalidate_payment_links_with_conn
+        invalidate_payment_links_with_conn(conn, user_id, normalized_id)
         if "series_kind" not in data and "payment_mode" not in data:
             preserve_existing_series_metadata(transaction, existing, data)
         source = get_active_account(conn, user_id, transaction["account_id"])
@@ -352,6 +361,9 @@ def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
             # spec: lancamentos/lancamentos v3.39 — critério 61
             from financeiro.loans import link_payment_with_conn
             link_payment_with_conn(conn, user_id, transaction["loan_id"], normalized_id)
+        if transaction.get("revolving_loan_id"):
+            from financeiro.revolving_loans import link_payment_with_conn
+            link_payment_with_conn(conn, user_id, transaction["revolving_loan_id"], normalized_id)
         if additional_occurrences:
             insert_additional_series_occurrences(
                 conn, user_id, transaction, additional_occurrences, source, destination,
@@ -587,8 +599,10 @@ def delete_transaction(user_id: int, transaction_id: str, apply_to_future: bool 
         transactions = [transaction, *future_transactions_to_delete(conn, user_id, transaction, apply_to_future)]
         transaction_ids = [item["id"] for item in transactions]
         from financeiro.loans import invalidate_loan_payment_links
+        from financeiro.revolving_loans import invalidate_payment_links_with_conn
         for linked_transaction_id in transaction_ids:
             invalidate_loan_payment_links(conn, user_id, linked_transaction_id)
+            invalidate_payment_links_with_conn(conn, user_id, linked_transaction_id)
         conn.execute(
             f"""
             DELETE FROM transactions
@@ -630,8 +644,18 @@ def future_transactions_to_delete(conn, user_id: int, transaction, apply_to_futu
 
 def set_transaction_reconciled(user_id: int, transaction_id: str, reconciled: bool) -> dict:
     with get_connection() as conn:
-        from financeiro.loans import invalidate_loan_payment_links
-        invalidate_loan_payment_links(conn, user_id, int(transaction_id))
+        from financeiro.loans import invalidate_loan_payment_links, recognize_loan_payment_with_conn
+        from financeiro.revolving_loans import invalidate_payment_links_with_conn, recognize_payment_with_conn
+        begin_immediate(conn)
+        existing = conn.execute(
+            "SELECT reconciled_at FROM transactions WHERE id=? AND user_id=? AND archived_at IS NULL",
+            (transaction_id, user_id),
+        ).fetchone()
+        if not existing:
+            raise TransactionError("Lancamento nao encontrado.", HTTPStatus.NOT_FOUND)
+        if not reconciled:
+            invalidate_loan_payment_links(conn, user_id, int(transaction_id))
+            invalidate_payment_links_with_conn(conn, user_id, int(transaction_id))
         cursor = conn.execute(
             """
             UPDATE transactions
@@ -643,6 +667,9 @@ def set_transaction_reconciled(user_id: int, transaction_id: str, reconciled: bo
         )
         if cursor.rowcount == 0:
             raise TransactionError("Lancamento nao encontrado.", HTTPStatus.NOT_FOUND)
+        if reconciled and not existing["reconciled_at"]:
+            recognize_loan_payment_with_conn(conn, user_id, int(transaction_id))
+            recognize_payment_with_conn(conn, user_id, int(transaction_id))
         row = fetch_transaction(conn, user_id, int(transaction_id))
     return format_transaction(row)
 
@@ -662,6 +689,10 @@ def normalize_transaction_payload(data: dict) -> dict:
     amount_cents = money_to_cents(data.get("amount", "0"))
     if amount_cents <= 0:
         raise TransactionError("Informe um valor maior que zero.")
+    loan_id = normalize_id(data.get("loan_id"), "Empréstimo inválido.") if str(data.get("loan_id") or "").strip() else None
+    revolving_loan_id = normalize_id(data.get("revolving_loan_id"), "Dívida rotativa inválida.") if str(data.get("revolving_loan_id") or "").strip() else None
+    if loan_id and revolving_loan_id:
+        raise TransactionError("Associe o lançamento a apenas um contrato.")
     return {
         "type": transaction_type,
         "description": description,
@@ -674,7 +705,8 @@ def normalize_transaction_payload(data: dict) -> dict:
         "destination_account_id": destination_account_id,
         "exchange_rate": data.get("exchange_rate_to_brl") or data.get("exchange_rate"),
         "category": normalize_transaction_category(transaction_type, data.get("category")),
-        "loan_id": normalize_id(data.get("loan_id"), "Empréstimo inválido.") if str(data.get("loan_id") or "").strip() else None,
+        "loan_id": loan_id,
+        "revolving_loan_id": revolving_loan_id,
         "subcategory": normalize_optional_name(data.get("subcategory")) if transaction_type != "transfer" else None,
         "tags": normalize_optional_tags(data.get("tags") or data.get("tag")),
         "notes": empty_to_none(data.get("notes")),

@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 
 BASELINE_SCHEMA_VERSION = 20000
-SCHEMA_VERSION = 20006
+SCHEMA_VERSION = 20010
 
 
 MIGRATIONS_SCHEMA_SQL = """
@@ -594,12 +594,17 @@ CREATE TABLE IF NOT EXISTS loans (
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     loan_type TEXT NOT NULL DEFAULT 'other',
+    amortization_system TEXT NOT NULL DEFAULT 'price',
     currency TEXT NOT NULL DEFAULT 'BRL',
     installment_cents INTEGER NOT NULL CHECK (installment_cents > 0),
     remaining_installments INTEGER NOT NULL CHECK (remaining_installments >= 0),
     remaining_commitment_cents INTEGER NOT NULL CHECK (remaining_commitment_cents >= 0),
     monthly_rate_micros INTEGER,
     annual_cet_micros INTEGER,
+    indexer TEXT NOT NULL DEFAULT 'none',
+    principal_balance_cents INTEGER,
+    principal_balance_date TEXT,
+    remuneratory_rate_micros INTEGER,
     next_due_date TEXT NOT NULL,
     review_required INTEGER NOT NULL DEFAULT 0 CHECK (review_required IN (0, 1)),
     archived_at TEXT,
@@ -612,6 +617,7 @@ CREATE TABLE IF NOT EXISTS loan_payment_links (
     loan_id INTEGER NOT NULL REFERENCES loans(id) ON DELETE CASCADE,
     transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
     valid INTEGER NOT NULL DEFAULT 1 CHECK (valid IN (0, 1)),
+    recognized INTEGER NOT NULL DEFAULT 0 CHECK (recognized IN (0, 1)),
     linked_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, transaction_id)
 );
@@ -620,6 +626,62 @@ CREATE TABLE IF NOT EXISTS loan_payment_links (
 LOANS_INDEXES_SQL = """
 CREATE INDEX IF NOT EXISTS idx_loans_user_active ON loans(user_id, archived_at, currency);
 CREATE INDEX IF NOT EXISTS idx_loan_payment_links_loan ON loan_payment_links(user_id, loan_id, valid);
+"""
+
+
+REVOLVING_LOANS_SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS revolving_loans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    debt_type TEXT NOT NULL CHECK (debt_type IN ('overdraft', 'card_revolving')),
+    currency TEXT NOT NULL,
+    balance_cents INTEGER NOT NULL CHECK (balance_cents >= 0),
+    balance_date TEXT NOT NULL,
+    rate_micros INTEGER CHECK (rate_micros >= 0),
+    rate_period TEXT CHECK (rate_period IN ('daily', 'monthly')),
+    capitalization TEXT NOT NULL DEFAULT 'daily' CHECK (capitalization IN ('daily', 'monthly')),
+    source_card_id INTEGER REFERENCES credit_cards(id) ON DELETE SET NULL,
+    source_residual_transaction_id INTEGER REFERENCES credit_card_transactions(id) ON DELETE SET NULL,
+    review_required INTEGER NOT NULL DEFAULT 0 CHECK (review_required IN (0, 1)),
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paid', 'swapped', 'archived')),
+    closure_reason TEXT CHECK (closure_reason IN ('paid', 'swapped')),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CHECK ((rate_micros IS NULL AND rate_period IS NULL) OR (rate_micros IS NOT NULL AND rate_period IS NOT NULL)),
+    CHECK ((debt_type = 'card_revolving' AND source_card_id IS NOT NULL) OR debt_type = 'overdraft')
+);
+CREATE TABLE IF NOT EXISTS revolving_loan_terms_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    revolving_loan_id INTEGER NOT NULL REFERENCES revolving_loans(id) ON DELETE CASCADE,
+    effective_date TEXT NOT NULL,
+    balance_cents INTEGER NOT NULL CHECK (balance_cents >= 0),
+    rate_micros INTEGER CHECK (rate_micros >= 0),
+    rate_period TEXT CHECK (rate_period IN ('daily', 'monthly')),
+    capitalization TEXT NOT NULL CHECK (capitalization IN ('daily', 'monthly')),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS revolving_loan_payment_links (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    revolving_loan_id INTEGER NOT NULL REFERENCES revolving_loans(id) ON DELETE CASCADE,
+    transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+    valid INTEGER NOT NULL DEFAULT 1 CHECK (valid IN (0, 1)),
+    recognized INTEGER NOT NULL DEFAULT 0 CHECK (recognized IN (0, 1)),
+    linked_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, transaction_id)
+);
+"""
+
+REVOLVING_LOANS_INDEXES_SQL = """
+CREATE INDEX IF NOT EXISTS idx_revolving_loans_user_status ON revolving_loans(user_id, status, currency);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_revolving_loans_card_active ON revolving_loans(user_id, source_card_id)
+WHERE source_card_id IS NOT NULL AND status='active';
+CREATE INDEX IF NOT EXISTS idx_revolving_loan_terms_history_lookup
+ON revolving_loan_terms_history(user_id, revolving_loan_id, effective_date);
+CREATE INDEX IF NOT EXISTS idx_revolving_loan_payment_links_lookup
+ON revolving_loan_payment_links(user_id, revolving_loan_id, valid);
 """
 
 
@@ -825,6 +887,7 @@ TABLES_BLOCKS = (
     CONSULTOR_TABLES_SQL,
     NOTIFICATIONS_SCHEMA_SQL,
     LOANS_SCHEMA_SQL,
+    REVOLVING_LOANS_SCHEMA_SQL,
 )
 
 
@@ -832,6 +895,7 @@ INDEXES_BLOCKS = (
     CONSULTOR_INDEXES_SQL,
     INDEX_SCHEMA_SQL,
     LOANS_INDEXES_SQL,
+    REVOLVING_LOANS_INDEXES_SQL,
 )
 
 

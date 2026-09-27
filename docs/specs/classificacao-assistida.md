@@ -1,9 +1,9 @@
 ---
 tipo: spec
 area: classificacao
-status: em-revisao
-versao: 1.1
-atualizado: 2026-09-24
+status: implementado
+versao: 1.2
+atualizado: 2026-09-25
 relacionados:
   - "[[lancamentos]]"
   - "[[cartoes]]"
@@ -16,7 +16,7 @@ aliases: ["Classificação Assistida", "Sugestão de Categorias"]
 # Classificação Assistida
 
 > [!info] Status
-> **em-revisao** · área: `classificacao` · atualizado em 2026-09-24 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[../adr/0006-classificacao-assistida-local|ADR-0006]]
+> **implementado** · área: `classificacao` · atualizado em 2026-09-25 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[../adr/0006-classificacao-assistida-local|ADR-0006]]
 
 ## Problema
 
@@ -142,6 +142,7 @@ Uma integração opcional futura com API de IA deve usar rota separada, timeout 
 
 ## Changelog
 
+- `1.2` — 2026-09-25 — Status sincronizado como implementado após confirmação de conclusão da funcionalidade.
 - `1.1` — 2026-09-24 — Sugestões exatas passam a priorizar histórico confirmado na mesma conta ou cartão, com fallback seguro ao histórico geral quando não há suporte contextual suficiente.
 - `1.0` — 2026-07-23 — MVP implementado nos formulários de conta e cartão, com migração idempotente, índices dedicados, debounce e proteção da escolha manual.
 - `0.2` — 2026-07-23 — MVP aprovado e iniciado; persistência simplificada para descrições normalizadas indexadas nas tabelas de lançamentos, preservando consistência automática em edições e exclusões.

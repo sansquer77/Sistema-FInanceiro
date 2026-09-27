@@ -87,6 +87,7 @@ export function registerLimitsView({
   closeGoalActionButton.addEventListener("click", closeGoalAction);
 
   let goalDataLoaded = false;
+  let goalDataLoadedAt = 0;
   let goalDataRequest = null;
   const goalCharts = new Map();
   resetGoalForm();
@@ -105,25 +106,15 @@ export function registerLimitsView({
     if (goalDataLoaded && !force) return;
     if (goalDataRequest) return goalDataRequest;
     goalDataRequest = (async () => {
-      const [goalsResult, reserveResult] = await Promise.allSettled([
-        api("/api/financial-goals"),
-        api("/api/financial-goals/emergency-reserve"),
-      ]);
-      if (reserveResult.status === "fulfilled") {
-        state.emergencyReserve = reserveResult.value.emergency_reserve || { total_brl: "0.00", components: [] };
-      } else {
-        state.emergencyReserve ||= { total_brl: "0.00", components: [] };
-      }
+      const overviewResult = await api("/api/financial-goals/overview");
+      state.emergencyReserve = overviewResult.emergency_reserve || { total_brl: "0.00", components: [] };
       renderEmergencyReserve();
-      if (goalsResult.status === "fulfilled") {
-        state.financialGoals = goalsResult.value.goals || [];
-        renderGoalsOverview();
-        renderGoalList();
-        updateGoalDateRequirement();
-      }
-      const failedResult = [reserveResult, goalsResult].find((result) => result.status === "rejected");
-      goalDataLoaded = !failedResult;
-      if (failedResult) throw failedResult.reason;
+      state.financialGoals = overviewResult.goals || [];
+      renderGoalsOverview();
+      renderGoalList();
+      updateGoalDateRequirement();
+      goalDataLoaded = true;
+      goalDataLoadedAt = Date.now();
     })();
     try {
       await goalDataRequest;
@@ -133,7 +124,12 @@ export function registerLimitsView({
   }
 
   async function loadGoalDataIfNeeded() {
-    if (state.limitsTab === "goals") await loadGoalData({ force: true });
+    if (state.limitsTab !== "goals") return;
+    if (!goalDataLoaded) {
+      await loadGoalData();
+    } else if (Date.now() - goalDataLoadedAt > 60_000) {
+      await loadGoalData({ force: true });
+    }
   }
 
   function selectLimitsTab(tab) {
@@ -147,7 +143,7 @@ export function registerLimitsView({
     limitsTabPanels.forEach((panel) => { panel.hidden = panel.dataset.limitsPanel !== state.limitsTab; });
     if (state.limitsTab === "goals") {
       renderEmergencyReserve();
-      loadGoalData().catch((error) => setMessage(goalMessage, error.message, "error"));
+      loadGoalDataIfNeeded().catch((error) => setMessage(goalMessage, error.message, "error"));
     }
   }
 
@@ -297,6 +293,8 @@ export function registerLimitsView({
             <span><small>Aporte sugerido</small><b>${formatMoney(Number(goal.recommended_monthly_contribution), "BRL")}/mês</b></span>
             <span><small>Prazo</small><b>${formatGoalDate(goal.target_date)}</b></span>
           </div>
+          <details class="goal-more-details">
+            <summary>Ver composição, cobertura e projeção</summary>
           <div class="goal-projection-block">
             <div class="goal-projection-heading"><strong>Composição projetada</strong><small>${escapeHtml(goal.projection?.rate_label || "Sem rendimento")} · ref. ${formatGoalDate(goal.projection?.reference_date)}</small></div>
             <div class="goal-projection-chart" data-goal-chart="${goal.id}" role="img" aria-label="Comparação entre cenário conservador e cenário com rendimento para ${escapeHtml(goal.name)}"></div>
@@ -306,15 +304,18 @@ export function registerLimitsView({
             <span>${goal.coverage_status === "linked" ? "Cobertura vinculada" : "Saldo sem cobertura conferível"}</span>
             ${(goal.funding_sources || []).map((source) => `<button type="button" class="coverage-chip" data-unlink="${source.id}" title="Desvincular ${escapeHtml(source.label)}">${escapeHtml(source.label)} · ${formatMoney(Number(source.current_value_brl || 0), "BRL")} ×</button>`).join("")}
           </div>
+          </details>
           <div class="card-actions goal-card-actions">
             <button class="primary small-button" type="button" data-action="movement">Atualizar saldo</button>
             <button class="ghost small-button" type="button" data-action="funding">Vincular investimento</button>
+            ${goal.objective_type === "annual_provision" ? '<button class="ghost small-button" type="button" data-action="reset-annual">Reiniciar provisão anual</button>' : ""}
             <button class="ghost small-button" type="button" data-action="edit">Editar</button>
             <button class="danger small-button" type="button" data-action="archive">Arquivar</button>
           </div>
         </div>`;
       item.querySelector('[data-action="movement"]').addEventListener("click", () => openMovementAction(goal));
       item.querySelector('[data-action="funding"]').addEventListener("click", () => openFundingAction(goal));
+      item.querySelector('[data-action="reset-annual"]')?.addEventListener("click", () => resetAnnualProvision(goal));
       item.querySelector('[data-action="edit"]').addEventListener("click", () => editGoal(goal));
       item.querySelector('[data-action="archive"]').addEventListener("click", () => archiveGoal(goal));
       item.querySelectorAll("[data-unlink]").forEach((button) => button.addEventListener("click", () => unlinkFunding(goal, button.dataset.unlink)));
@@ -328,6 +329,17 @@ export function registerLimitsView({
     const host = item.querySelector(`[data-goal-chart="${goal.id}"]`);
     const legend = item.querySelector(`[data-goal-legend="${goal.id}"]`);
     if (!projection || !host) return;
+    const details = host.closest("details");
+    if (details && !details.open) {
+      if (!details.dataset.projectionToggleBound) {
+        details.dataset.projectionToggleBound = "true";
+        details.addEventListener("toggle", () => {
+          if (details.open) renderGoalProjectionChart(goal, item);
+        });
+      }
+      return;
+    }
+    if (host.dataset.chartRendered === "true") return;
     const scenarios = [projection.conservative, projection.with_yield];
     const values = (key) => scenarios.map((scenario) => Number(scenario[key] || 0));
     legend.innerHTML = `
@@ -335,6 +347,7 @@ export function registerLimitsView({
       <span><i class="yield"></i>Rendimento projetado</span><span><i class="uncovered"></i>Ainda descoberto</span>`;
     if (typeof window.ApexCharts !== "function") {
       host.innerHTML = `<p class="muted-copy">Conservador: ${formatMoney(Number(projection.conservative.projected_total), "BRL")} · Com rendimento: ${formatMoney(Number(projection.with_yield.projected_total), "BRL")}</p>`;
+      host.dataset.chartRendered = "true";
       return;
     }
     const css = getComputedStyle(document.documentElement);
@@ -342,7 +355,7 @@ export function registerLimitsView({
       style: "currency", currency: "BRL", notation: "compact", maximumFractionDigits: 1,
     }).format(Number(value || 0));
     const chart = new window.ApexCharts(host, {
-      chart: { type: "bar", height: 190, stacked: true, toolbar: { show: false }, animations: { enabled: !window.matchMedia("(prefers-reduced-motion: reduce)").matches } },
+      chart: { type: "bar", width: "100%", height: 190, stacked: true, redrawOnParentResize: true, redrawOnWindowResize: true, toolbar: { show: false }, animations: { enabled: !window.matchMedia("(prefers-reduced-motion: reduce)").matches } },
       series: [
         { name: "Reservado", data: values("reserved") },
         { name: "Aportes futuros", data: values("future_contributions") },
@@ -351,13 +364,16 @@ export function registerLimitsView({
       ],
       colors: [css.getPropertyValue("--primary").trim() || "#00328a", css.getPropertyValue("--chart-6").trim() || "#3b82f6", css.getPropertyValue("--color-success").trim() || "#10b981", css.getPropertyValue("--color-warning").trim() || "#f59e0b"],
       plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: "58%" } },
-      xaxis: { categories: ["Conservador", "Com rendimento"], tickAmount: 3, labels: { formatter: compactCurrency } },
+      xaxis: { categories: ["Conservador", "Com rendimento"], tickAmount: 3, labels: { formatter: compactCurrency, style: { fontSize: "10px" }, rotate: 0, hideOverlappingLabels: true } },
+      yaxis: { labels: { minWidth: 0, maxWidth: 88, style: { fontSize: "10px" }, offsetX: 0 } },
       dataLabels: { enabled: false }, legend: { show: false }, grid: { borderColor: css.getPropertyValue("--outline-variant").trim() || "#c3c6d6" },
+      responsive: [{ breakpoint: 560, options: { chart: { height: 160 }, xaxis: { labels: { style: { fontSize: "9px" } } }, yaxis: { labels: { maxWidth: 66, style: { fontSize: "9px" } } }, grid: { padding: { left: 0, right: 0 } } }],
       tooltip: { y: { formatter: (value) => formatMoney(value, "BRL") } },
       theme: { mode: document.documentElement.dataset.theme === "dark" ? "dark" : "light" },
     });
     chart.render();
     goalCharts.set(goal.id, chart);
+    host.dataset.chartRendered = "true";
   }
 
   function editGoal(goal) {
@@ -377,6 +393,16 @@ export function registerLimitsView({
       await api(`/api/financial-goals/${goal.id}`, { method: "DELETE" });
       await loadGoalData({ force: true });
       setMessage(goalMessage, "Objetivo arquivado e origem liberada.", "success");
+    } catch (error) { setMessage(goalMessage, error.message, "error"); }
+  }
+
+  async function resetAnnualProvision(goal) {
+    if (!window.confirm(`Reiniciar a provisão anual “${goal.name}”? O saldo manual será zerado e a data avançará para o próximo ciclo; o valor-alvo será mantido. O histórico será preservado; investimentos com saldo continuarão vinculados e os que estiverem sem saldo serão desvinculados. Lançamentos de contas e cartões não serão alterados.`)) return;
+    try {
+      const result = await api(`/api/financial-goals/${goal.id}/reset-annual-provision`, { method: "POST", body: {} });
+      await loadGoalData({ force: true });
+      const removed = Number(result.exhausted_links_removed || 0);
+      setMessage(goalMessage, `Provisão reiniciada. Próximo vencimento: ${formatGoalDate(result.next_target_date)}.${removed ? ` ${removed} investimento(s) sem saldo desvinculado(s).` : ""}`, "success");
     } catch (error) { setMessage(goalMessage, error.message, "error"); }
   }
 

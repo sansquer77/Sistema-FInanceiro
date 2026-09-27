@@ -15,6 +15,8 @@ from financeiro.database_schema import (
     INDEX_SCHEMA_SQL,
     LOANS_SCHEMA_SQL,
     LOANS_INDEXES_SQL,
+    REVOLVING_LOANS_SCHEMA_SQL,
+    REVOLVING_LOANS_INDEXES_SQL,
     MIGRATIONS_SCHEMA_SQL,
     create_baseline_indexes,
     create_baseline_tables,
@@ -40,6 +42,10 @@ INCREMENTAL_MIGRATIONS = {
     20004: ("financial_goals", lambda conn: _migrate_financial_goals(conn)),
     20005: ("loans", lambda conn: _migrate_loans(conn)),
     20006: ("category_system_keys", lambda conn: _migrate_category_system_keys(conn)),
+    20007: ("reconciled_loan_payments", lambda conn: _migrate_reconciled_loan_payments(conn)),
+    20008: ("loan_amortization_system", lambda conn: _migrate_loan_amortization_system(conn)),
+    20009: ("indexed_loan_contract_terms", lambda conn: _migrate_indexed_loan_contract_terms(conn)),
+    20010: ("revolving_loans", lambda conn: _migrate_revolving_loans(conn)),
 }
 
 
@@ -61,7 +67,7 @@ def _migrate_loans(conn: sqlite3.Connection) -> None:
 
 def _migrate_category_system_keys(conn: sqlite3.Connection) -> None:
     """Give the loan payment category a stable semantic identity across renames."""
-    # spec: migracao-dados/migracao-banco-v2 v1.10 — critério 20
+    # spec: migracao-dados/migracao-banco-v2 v1.11 — critério 20
     ensure_column(conn, "categories", "system_key", "TEXT")
     conn.execute(
         """UPDATE categories SET system_key='loan_payment'
@@ -87,6 +93,48 @@ def _migrate_category_system_keys(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migrate_reconciled_loan_payments(conn: sqlite3.Connection) -> None:
+    """Track which linked account payments have been recognized as paid."""
+    ensure_column(conn, "loan_payment_links", "recognized", "INTEGER NOT NULL DEFAULT 0")
+    conn.execute(
+        """UPDATE loan_payment_links SET recognized=1
+           WHERE valid=1 AND transaction_id IN (
+             SELECT id FROM transactions WHERE reconciled_at IS NOT NULL
+           )"""
+    )
+
+
+def _migrate_loan_amortization_system(conn: sqlite3.Connection) -> None:
+    """Preserve legacy loan behavior as Price when adding system selection."""
+    # spec: migracao-dados/migracao-banco-v2 v1.13 — critério 22
+    ensure_column(conn, "loans", "amortization_system", "TEXT NOT NULL DEFAULT 'price'")
+    # Legacy pending links may already have reduced a contract when they were
+    # associated. Preserve the user's data and require a manual review.
+    conn.execute(
+        """UPDATE loans SET review_required=1, updated_at=CURRENT_TIMESTAMP
+           WHERE id IN (
+             SELECT p.loan_id FROM loan_payment_links p
+             JOIN transactions t ON t.id=p.transaction_id AND t.user_id=p.user_id
+             WHERE p.valid=1 AND t.reconciled_at IS NULL
+           )"""
+    )
+
+
+def _migrate_indexed_loan_contract_terms(conn: sqlite3.Connection) -> None:
+    """Store indexation and lender-reported principal without changing legacy loans."""
+    # spec: migracao-dados/migracao-banco-v2 v1.14 — critério 23
+    ensure_column(conn, "loans", "indexer", "TEXT NOT NULL DEFAULT 'none'")
+    ensure_column(conn, "loans", "principal_balance_cents", "INTEGER")
+    ensure_column(conn, "loans", "principal_balance_date", "TEXT")
+    ensure_column(conn, "loans", "remuneratory_rate_micros", "INTEGER")
+
+
+def _migrate_revolving_loans(conn: sqlite3.Connection) -> None:
+    """Add independent revolving debt monitoring without changing ledger rows."""
+    for sql_block in (REVOLVING_LOANS_SCHEMA_SQL, REVOLVING_LOANS_INDEXES_SQL):
+        for statement in sql_block.split(";"):
+            if statement.strip():
+                conn.execute(statement)
 def _migrate_portfolio_quantity_precision(conn: sqlite3.Connection) -> None:
     """Move portfolio quantities from 1e-6 to 1e-8 without changing values."""
     columns = {
@@ -256,6 +304,14 @@ def migrate_legacy_database(
                 _migrate_portfolio_quantity_precision(conn)
             if target_version >= 20006:
                 _migrate_category_system_keys(conn)
+            if target_version >= 20007:
+                _migrate_reconciled_loan_payments(conn)
+            if target_version >= 20008:
+                _migrate_loan_amortization_system(conn)
+            if target_version >= 20009:
+                _migrate_indexed_loan_contract_terms(conn)
+            if target_version >= 20010:
+                _migrate_revolving_loans(conn)
             record_schema_history(conn, target_version)
         set_schema_version(paths.work, target_version, connection_factory=connection_factory)
         _validate_database(paths.work, target_version)

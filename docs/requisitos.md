@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 3.15
-atualizado: 2026-09-24
+versao: 3.34
+atualizado: 2026-09-27
 relacionados:
   - "[[arquitetura]]"
   - "[[visao-produto]]"
@@ -14,7 +14,7 @@ tags: [produto, meta]
 # Requisitos
 
 > [!info] Status
-> **implementado** (escopo vivo) · versão: `3.14` · área: `meta` · atualizado em 2026-09-24 · relacionados: [[arquitetura]], [[visao-produto]], [[specs/emprestimos-quitacao]]
+> **implementado** (escopo vivo) · versão: `3.34` · área: `meta` · atualizado em 2026-09-27 · relacionados: [[arquitetura]], [[visao-produto]], [[specs/emprestimos-quitacao]]
 
 ## Objetivo
 
@@ -32,7 +32,8 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 - **Recorrência e Parcelamento**: suporte a séries de lançamentos periódicos ou parcelados com acompanhamento de índice de parcelas e conciliação bancária (`reconciled_at`). Ver [[lancamentos]].
 - **Cartões de Crédito**: cadastro de cartões com limite, emissor, bandeira, fechamento, vencimento e conta preferencial de pagamento. Lançamentos de despesas e receitas no cartão por fatura mensal (formato `AAAA-MM`), conciliação de lançamentos, compras parceladas/recorrentes, movimentação entre faturas e fluxo de pagamento de fatura (integral ou parcial, com saldo residual lançado na fatura seguinte) integrado às contas-correntes. Ver [[cartoes]].
 - **Limites de Gastos (Metas/Budgets)**: estabelecimento de limites de despesas mensais por categoria e subcategoria. Ver [[limites-gastos]].
-- **Objetivos Financeiros e Fundos de Provisão**: metas, provisões anuais e reservas contínuas com saldo atualizado manualmente, contribuição necessária, comparação entre projeção conservadora e com rendimento, resumo da Reserva de Emergência e exclusividade de recursos para impedir dupla contagem. Ver [[specs/objetivos-financeiros]].
+- **Objetivos Financeiros e Fundos de Provisão**: metas, provisões anuais reiniciáveis com histórico auditável, reservas contínuas, contribuição necessária, comparação entre projeção conservadora e com rendimento, resumo da Reserva de Emergência e exclusividade de recursos para impedir dupla contagem. No reinício, vínculos de investimentos com saldo são preservados e os sem saldo são removidos. Ver [[specs/objetivos-financeiros]].
+- **Empréstimos e Financiamentos**: cadastro manual multimoeda e estudos determinísticos Price/SAC, correção por TR/IPCA/poupança e projeção futura pela janela oficial dos últimos 12 meses publicados. A tela separa contratos ativos e histórico de quitados/arquivados, preservando pagamentos e distinguindo saldo em aberto arquivado. Em implantação: comparação opcional entre juros economizados na quitação e rendimento bruto estimado dos mesmos aportes a 100% CDI no prazo original, usando a última taxa diária publicada como cenário constante, sem impostos, tarifas ou recomendação automática. Crédito Rotativo está em implantação, com monitoramento de saldo aberto, pagamento parcial integrado sem duplicação, prioridade nas estratégias, estudo individual datado, comparação opcional com Price e rascunho editável Price iniciado pelo alerta de troca. O módulo é de monitoramento e consulta: movimentos em Contas/Cartões podem atualizar o acompanhamento, mas nenhuma ação de Empréstimos cria ou altera lançamentos. MVP inicial aprovado na versão `2.1.0`. Ver [[specs/emprestimos-quitacao]] e [[specs/efeito-borboleta]].
 - **Portfólio de Investimentos**: posições iniciais (`opening positions`) e operações de investimento, autocomplete de ativos já utilizados, resgates por quantidade com baixa FIFO, histórico imutável de resultado realizado, metas percentuais por classe e agenda futura de eventos de ações/ETFs/BDRs consultada em B3/Nasdaq com fallback Yahoo e cache diário. A agenda inclui proventos, bonificações, desdobramentos e grupamentos informados pela B3, com Data ex ajustada pelo calendário nacional ANBIMA local, pagamento opcional fornecido pelo provedor, carteiras associadas, fonte explícita e sem estimativa de provento total ou conversão monetária de fatores societários. Ausência de anúncio futuro ou calendário não é apresentada como erro. Suporte a ações/ETFs/BDRs (`stock`), cripto volátil (`crypto`), stablecoins (`stablecoin`), fundos (`fund`), renda fixa (`fixed_income`), previdência privada (`private_pension`), poupança (`savings`) e outros (`other`). Ver [[investimentos-portfolio]].
 - **Precificação e Validação de Ativos**:
   - Integração com Yahoo Finance (ações e fundos) e CoinGecko/Yahoo (criptoativos) para cotações automáticas.
@@ -60,17 +61,13 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 - Operação como serviço multiusuário de alta concorrência ou exposto diretamente à internet. O uso doméstico em LAN confiável com poucos usuários e baixa concorrência é suportado pelo SQLite/WAL, sem prometer escala de servidor dedicado.
 - Suporte formal, SLA, consultoria, garantia de funcionamento ou compromisso de atendimento a usuários.
 
-## Escopo planejado da fundação v2
+## Fundação v2 e evolução contínua
 
-- **Gráficos compartilhados**: migrar progressivamente os gráficos para um adaptador ApexCharts local, preservando tokens, acessibilidade, tabelas alternativas e semântica financeira.
-- **Máscaras de entrada**: IMask local para dinheiro e datas adequadas, sem substituir validação do backend nem alterar contratos monetários.
+- **Gráficos compartilhados**: gráficos existentes usam o adaptador local ApexCharts, preservando tokens, acessibilidade, tabelas alternativas e semântica financeira.
+- **Máscaras de entrada**: IMask local apoia entradas monetárias e datas, sem substituir a validação do backend nem alterar contratos monetários.
 - **Command Palette**: lançador nativo por `Cmd+K`/`Ctrl+K`, com experiência equivalente ao padrão cmdk e sem introduzir React.
-- **Virtualização**: listas extensas renderizam apenas a janela visível e overscan, mantendo altura total por espaçadores e preservando filtros, ordenação, foco e acessibilidade.
+- **Virtualização**: adoção progressiva; Faturas e Histórico de Operações ainda aguardam integração às listas compartilhadas de altura fixa.
 - Ver [[specs/frontend-fundacao-v2]] e [[adr/0013-dependencias-frontend-v2]].
-
-## Funcionalidades em implantação
-
-- **Empréstimos e quitação**: Gestão concentra cadastro, acompanhamento e pagamentos vinculados a lançamentos existentes; os estudos determinísticos de quitação por moeda ficam na aba Empréstimos do Efeito Borboleta. Ver [[specs/emprestimos-quitacao]] e [[specs/efeito-borboleta]].
 
 ## Regras funcionais
 
@@ -141,6 +138,25 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 
 ## Changelog
 
+- `3.34` — 2026-09-27 — Inclui reinício de provisão anual com histórico preservado e vínculo condicionado a saldo de investimento.
+- `3.33` — 2026-09-27 — Inclui no escopo a aba Histórico de Empréstimos e Financiamentos, sem perda ou alteração dos lançamentos associados.
+- `3.32` — 2026-09-27 — Define a escolha inicial entre quitação integral e amortização e a comparação da quitação com CDI pelo mesmo principal.
+- `3.31` — 2026-09-27 — Define a última taxa diária CDI publicada como premissa constante e explícita para a comparação quitação × investimento.
+- `3.30` — 2026-09-27 — Especifica comparação indicativa entre amortizar uma dívida e investir os mesmos aportes a 100% CDI bruto no prazo original.
+- `3.29` — 2026-09-25 — Adiciona rascunho editável de novo Price a partir do alerta de troca do Crédito Rotativo, sem criação automática de contrato.
+- `3.28` — 2026-09-25 — Conclui a implementação do estudo individual de Crédito Rotativo definido na etapa anterior, sem gerar lançamentos.
+- `3.27` — 2026-09-25 — Inicia o estudo individual do Crédito Rotativo com pagamentos datados e comparação opcional com proposta Price, sempre sem gerar lançamentos.
+- `3.26` — 2026-09-25 — Registra o início da implementação do modelo rotativo e sua inclusão nas estratégias, mantendo o estudo individual pendente e a regra de mão única.
+- `3.25` — 2026-09-25 — Fecha critérios e plano do Crédito Rotativo e explicita que Empréstimos nunca gera lançamentos; a integração é de mão única.
+- `3.24` — 2026-09-25 — Fecha convenções de taxa e calendário do Crédito Rotativo; critérios da evolução e vigência de alterações seguem pendentes.
+- `3.23` — 2026-09-25 — Rotativos passam à frente de Price/SAC nas estratégias e encerramento por troca gera alerta de cadastro manual do novo Price.
+- `3.22` — 2026-09-25 — Define que o saldo residual de uma fatura parcialmente paga inicia/atualiza o acompanhamento de Crédito Rotativo sem novo lançamento.
+- `3.21` — 2026-09-25 — Crédito Rotativo inicia desenho como modelo próprio de saldo aberto, pagamentos conciliados e possível conversão para Price.
+- `3.20` — 2026-09-25 — Expansão de Empréstimos para sistemas Price/SAC indexados; Crédito Rotativo explicitado como escopo futuro separado.
+- `3.19` — 2026-09-25 — Empréstimos oferece seleção explícita entre Price e SAC prefixado, com explicação comparativa e estimativas pelo método escolhido.
+- `3.18` — 2026-09-25 — Empréstimos apresenta compromisso nominal, principal devedor estimado e juros futuros calculados pelo modelo Price.
+- `3.17` — 2026-09-25 — Empréstimos permite excluir o contrato com confirmação de senha e desvincular pagamentos sem alterar os lançamentos originais.
+- `3.16` — 2026-09-25 — Empréstimos e Financiamentos movido para o escopo implementado após aprovação do MVP na versão `2.1.0`.
 - `3.15` — 2026-09-24 — Esclarece a separação entre acompanhamento de dívidas em Empréstimos e estudos teóricos no Efeito Borboleta.
 - `3.14` — 2026-09-24 — Registra Empréstimos e quitação como funcionalidade em implantação.
 

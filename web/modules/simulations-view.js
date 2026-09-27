@@ -43,7 +43,7 @@ export function registerSimulationsView({
   let activeSimulationMode = "cashflow";
   const simulationModeButtons = Array.from(simulationModeTabs || []);
   const simulationModePanelElements = Array.from(simulationModePanels || []);
-  // spec: simulacoes/efeito-borboleta v2.0 — critérios 27–28
+  // spec: simulacoes/efeito-borboleta v2.15 — critérios 27–28
   bindRovingTablist(simulationModeButtons, {
     valueFor: (button) => button.dataset.simulationModeTab,
     onSelect: (mode) => {

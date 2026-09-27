@@ -617,6 +617,7 @@ def pay_credit_card_invoice(user_id: int, data: dict) -> dict:
     account_id = normalize_card_id(data.get("account_id"))
     payment_date = normalize_date(data.get("payment_date"))
     notes = empty_to_none(data.get("notes"))
+    revolving_resolution = str(data.get("revolving_resolution") or "").strip().lower() or None
     try:
         with get_connection() as conn:
             begin_immediate(conn)
@@ -643,6 +644,10 @@ def pay_credit_card_invoice(user_id: int, data: dict) -> dict:
             ).fetchone()
             if existing:
                 raise CreditCardError("Esta fatura ja foi paga.", HTTPStatus.CONFLICT)
+            active_revolving = conn.execute(
+                "SELECT id FROM revolving_loans WHERE user_id=? AND source_card_id=? AND status='active'",
+                (user_id, card_id),
+            ).fetchone()
             amount_cents = invoice_balance_cents(conn, user_id, card_id, invoice_month)
             if amount_cents <= 0:
                 raise CreditCardError("Nao ha valor em aberto para pagar nesta fatura.")
@@ -661,6 +666,8 @@ def pay_credit_card_invoice(user_id: int, data: dict) -> dict:
             else:
                 paid_cents = amount_cents
                 is_partial = False
+            if active_revolving and not is_partial and revolving_resolution not in {"paid", "swapped"}:
+                raise CreditCardError("Informe se o saldo rotativo foi quitado ou trocado por outra dívida.")
             payment_transaction = create_transaction_with_conn(
                 conn,
                 user_id,
@@ -709,7 +716,16 @@ def pay_credit_card_invoice(user_id: int, data: dict) -> dict:
                 #  Emprestimos, descricao padrao "Saldo da fatura MM/AAAA")
                 remainder_cents = amount_cents - paid_cents
                 next_invoice = first_open_invoice_month(conn, user_id, card_id, shift_month(invoice_month, 1))
-                category_id = get_or_create_category(conn, user_id, "Empréstimos", "expense")
+                loan_category = conn.execute(
+                    """SELECT id FROM categories WHERE user_id=? AND group_type='expense'
+                       AND system_key='loan_payment' ORDER BY id LIMIT 1""", (user_id,)
+                ).fetchone()
+                category_id = int(loan_category["id"]) if loan_category else get_or_create_category(
+                    conn, user_id, "Empréstimos e Financiamentos", "expense"
+                )
+                if not loan_category:
+                    conn.execute("UPDATE categories SET system_key='loan_payment' WHERE id=? AND user_id=?",
+                                 (category_id, user_id))
                 exchange_rate_micros = resolve_exchange_rate_micros(card["currency"], payment_date, None)
                 carried_cursor = conn.execute(
                     """
@@ -745,6 +761,13 @@ def pay_credit_card_invoice(user_id: int, data: dict) -> dict:
                 )
                 carried_row = fetch_card_transaction(conn, user_id, carried_cursor.lastrowid)
                 carried_transaction = format_card_transaction(carried_row, card["currency"])
+                from financeiro.revolving_loans import sync_card_partial_payment_with_conn
+                sync_card_partial_payment_with_conn(
+                    conn, user_id, card, int(carried_cursor.lastrowid), remainder_cents, payment_date
+                )
+            elif active_revolving:
+                from financeiro.revolving_loans import close_card_revolving_with_conn
+                close_card_revolving_with_conn(conn, user_id, card_id, revolving_resolution)
             row = conn.execute(
                 """
                 SELECT

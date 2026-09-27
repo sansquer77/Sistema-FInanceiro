@@ -30,10 +30,15 @@ from financeiro.cockpit import cockpit_payload
 from financeiro.cockpit import build_cockpit_summary
 from financeiro.cockpit_notifications import build_cockpit_notifications, mark_informational_seen
 from financeiro.open_debts import get_open_debts
-from financeiro.loans import LoanError, archive_loan, create_loan, link_payment, list_loans, project_payment_plan, project_payoff_strategy, update_loan
+from financeiro.loans import LoanError, archive_loan, create_loan, delete_loan, link_payment, list_loans, project_full_payoff, project_indexed_payment_plan, project_payment_plan, project_payoff_strategy, project_payoff_vs_cdi, update_loan
+from financeiro.revolving_loans import (RevolvingLoanError, close_revolving_loan_with_conn,
+    create_revolving_loan_with_conn, list_revolving_loans, simulate_revolving_repayment,
+    update_revolving_loan_with_conn)
+from financeiro.operation_logs import create_operation_log_with_conn
 from financeiro.global_search import GlobalSearchError, search_global
 from financeiro.reports import build_statement_report, build_evolution_presentation, build_report_overview
 from financeiro.auth import (
+    AuthError,
     clear_user_launches,
     create_public_user,
     create_session,
@@ -45,6 +50,7 @@ from financeiro.auth import (
     reset_password,
     update_user_email,
     update_user_password,
+    verify_current_password,
 )
 from financeiro.balance_projections import build_balance_projection, build_currency_totals_for_user
 from financeiro.backup_service import run_scheduled_backup_if_due
@@ -110,7 +116,7 @@ from financeiro.credit_cards import (
     update_credit_card_transaction,
     update_credit_card,
 )
-from financeiro.database import DB_PATH, get_connection, initialize_database
+from financeiro.database import DB_PATH, begin_immediate, get_connection, initialize_database
 from financeiro.market_calendar import refresh_anbima_calendar_if_due
 from financeiro.ai_summary import ai_summary_enabled, generate_ai_summary
 from financeiro.financial_health import (
@@ -119,14 +125,17 @@ from financeiro.financial_health import (
     calculate_financial_health_score_history,
 )
 from financeiro.financial_goals import (
+    FinancialGoalError,
     archive_financial_goal,
     create_financial_goal,
     create_goal_movement,
     emergency_reserve_summary,
+    financial_goals_overview,
     link_goal_funding_source,
     list_financial_goals,
     list_goal_funding_sources,
     list_goal_movements,
+    reset_annual_provision,
     unlink_goal_funding_source,
     update_financial_goal,
 )
@@ -899,7 +908,98 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def handle_list_loans(self) -> None:
         user = self.require_user()
-        self.send_json({"loans": list_loans(user["id"])})
+        query = parse_qs(urlsplit(self.path).query)
+        include_archived = (query.get("include_archived") or [""])[0].lower() in {"1", "true", "yes", "sim"}
+        self.send_json({"loans": list_loans(user["id"], include_archived=include_archived)})
+
+    def handle_list_revolving_loans(self) -> None:
+        user = self.require_user()
+        self.send_json({"revolving_loans": list_revolving_loans(user["id"])})
+
+    def handle_simulate_revolving_loan(self) -> None:
+        user = self.require_user()
+        try:
+            from financeiro.accounts import money_to_cents
+            data = self.read_json()
+            loan_id = int(data.get("revolving_loan_id") or 0)
+            loan = next((item for item in list_revolving_loans(user["id"])
+                         if int(item["id"]) == loan_id and item["status"] == "active"), None)
+            if not loan:
+                raise RevolvingLoanError("Dívida rotativa ativa não encontrada.", HTTPStatus.NOT_FOUND)
+            price_principal = str(data.get("price_principal") or "").strip()
+            price_rate = str(data.get("price_rate_percent") or "").strip()
+            price_term = str(data.get("price_installments") or "").strip()
+            result = simulate_revolving_repayment(
+                loan,
+                money_to_cents(data.get("monthly_payment")),
+                str(data.get("first_payment_date") or ""),
+                money_to_cents(data.get("extraordinary_payment") or 0),
+                str(data.get("extraordinary_payment_date") or "") or None,
+                money_to_cents(price_principal) if price_principal else None,
+                round(float(price_rate.replace(",", ".")) * 10_000) if price_rate else None,
+                int(price_term) if price_term else None,
+            )
+        except RevolvingLoanError as exc:
+            self.send_json({"error": str(exc)}, exc.status)
+            return
+        except (TypeError, ValueError, OverflowError):
+            self.send_json({"error": "Confira pagamentos, datas e condições da proposta Price."}, HTTPStatus.BAD_REQUEST)
+            return
+        self.send_json({"result": result})
+
+    def handle_create_revolving_loan(self) -> None:
+        user = self.require_user()
+        try:
+            data = self.read_json()
+            with get_connection() as conn:
+                begin_immediate(conn)
+                loan = create_revolving_loan_with_conn(conn, user["id"], data)
+                create_operation_log_with_conn(
+                    conn, user["id"], module="loans", operation_type="create",
+                    entity_type="revolving_loan", description="Dívida rotativa cadastrada para monitoramento",
+                    entity_id=loan["id"], metadata={"currency": loan["currency"], "debt_type": loan["debt_type"]},
+                )
+        except RevolvingLoanError as exc:
+            self.send_json({"error": str(exc)}, exc.status)
+            return
+        self.send_json({"revolving_loan": loan}, status=HTTPStatus.CREATED)
+
+    def handle_update_revolving_loan(self) -> None:
+        user = self.require_user()
+        try:
+            loan_id = int(self.route_path().split("/")[-1])
+            data = self.read_json()
+            with get_connection() as conn:
+                begin_immediate(conn)
+                loan = update_revolving_loan_with_conn(conn, user["id"], loan_id, data)
+                create_operation_log_with_conn(
+                    conn, user["id"], module="loans", operation_type="update",
+                    entity_type="revolving_loan", description="Premissas de dívida rotativa revisadas",
+                    entity_id=loan_id, metadata={"currency": loan["currency"], "debt_type": loan["debt_type"]},
+                )
+        except (RevolvingLoanError, TypeError, ValueError) as exc:
+            self.send_json({"error": str(exc)}, getattr(exc, "status", HTTPStatus.BAD_REQUEST))
+            return
+        self.send_json({"revolving_loan": loan})
+
+    def handle_close_revolving_loan(self) -> None:
+        user = self.require_user()
+        try:
+            loan_id = int(self.route_path().split("/")[-2])
+            data = self.read_json()
+            resolution = str(data.get("resolution") or "")
+            with get_connection() as conn:
+                begin_immediate(conn)
+                close_revolving_loan_with_conn(conn, user["id"], loan_id, resolution)
+                create_operation_log_with_conn(
+                    conn, user["id"], module="loans", operation_type="close",
+                    entity_type="revolving_loan", description="Acompanhamento de dívida rotativa encerrado",
+                    entity_id=loan_id, metadata={"resolution": resolution},
+                )
+        except (RevolvingLoanError, TypeError, ValueError) as exc:
+            self.send_json({"error": str(exc)}, getattr(exc, "status", HTTPStatus.BAD_REQUEST))
+            return
+        self.send_json({"ok": True})
 
     def handle_create_loan(self) -> None:
         user = self.require_user()
@@ -916,14 +1016,48 @@ class AppHandler(BaseHTTPRequestHandler):
         data = self.read_json()
         try:
             from financeiro.accounts import money_to_cents
-            installment_cents = int(data.get("installment_cents")) if data.get("installment_cents") is not None else money_to_cents(data.get("installment_amount"))
-            count = int(data.get("remaining_installments"))
-            extra_cents = money_to_cents(data.get("extra_monthly_payment") or 0)
-            extraordinary_cents = money_to_cents(data.get("extraordinary_payment") or 0)
-            rate_micros = data.get("monthly_rate_micros")
-            if installment_cents <= 0 or count < 1 or extra_cents < 0 or extraordinary_cents < 0:
-                raise ValueError("Valores da simulação inválidos.")
-            result = project_payment_plan(installment_cents, count, int(rate_micros) if rate_micros not in (None, "") else None, extra_cents, extraordinary_cents, str(data.get("amortization_mode") or "reduce_term"))
+            loan_id = int(data.get("loan_id") or 0)
+            loan = next((item for item in list_loans(user["id"]) if int(item["id"]) == loan_id), None) if loan_id else None
+            if loan_id and not loan:
+                raise LoanError("Empréstimo não encontrado.", HTTPStatus.NOT_FOUND)
+            if not loan_id and str(data.get("indexer") or "none").upper() not in {"NONE", ""}:
+                raise LoanError("Selecione um contrato indexado cadastrado para executar a simulação.")
+            study_type = str(data.get("study_type") or "amortize")
+            if study_type not in {"payoff", "amortize"}:
+                raise ValueError("Tipo de estudo inválido.")
+            if study_type == "payoff":
+                if not loan:
+                    raise LoanError("Selecione um contrato salvo para estudar a quitação.")
+                result = project_full_payoff(loan)
+            else:
+                extra_cents = money_to_cents(data.get("extra_monthly_payment") or 0)
+                extraordinary_cents = money_to_cents(data.get("extraordinary_payment") or 0)
+                if loan and str(loan.get("indexer") or "none") != "none":
+                    result = project_indexed_payment_plan(
+                        loan,
+                        extra_cents,
+                        extraordinary_cents,
+                        str(data.get("amortization_mode") or "reduce_term"),
+                    )
+                else:
+                    installment_cents = int(data.get("installment_cents")) if data.get("installment_cents") is not None else money_to_cents(data.get("installment_amount"))
+                    count = int(data.get("remaining_installments"))
+                    rate_micros = data.get("monthly_rate_micros")
+                    if installment_cents <= 0 or count < 1 or extra_cents < 0 or extraordinary_cents < 0:
+                        raise ValueError("Valores da simulação inválidos.")
+                    result = project_payment_plan(installment_cents, count, int(rate_micros) if rate_micros not in (None, "") else None, extra_cents, extraordinary_cents, str(data.get("amortization_mode") or "reduce_term"), str(data.get("amortization_system") or "price"))
+                result["study_type"] = study_type
+            compare_cdi = study_type != "payoff" and data.get("compare_cdi") in (True, 1, "1", "true", "on")
+            if compare_cdi:
+                if not loan:
+                    result["cdi_comparison"] = {"available": False, "message": "Selecione um contrato salvo para comparar com o CDI."}
+                elif str(loan.get("indexer") or "none").lower() in {"none", ""} and loan.get("monthly_rate_micros") is None:
+                    result["cdi_comparison"] = {"available": False, "message": "Informe e salve a taxa do contrato antes de comparar com o CDI."}
+                else:
+                    result["cdi_comparison"] = project_payoff_vs_cdi(result, extra_cents, extraordinary_cents)
+        except LoanError as exc:
+            self.send_json({"error": str(exc)}, exc.status)
+            return
         except (TypeError, ValueError, OverflowError):
             self.send_json({"error": "Confira os dados da simulação."}, HTTPStatus.BAD_REQUEST)
             return
@@ -936,8 +1070,10 @@ class AppHandler(BaseHTTPRequestHandler):
             data = self.read_json()
             currency = str(data.get("currency") or "").upper()
             group = [loan for loan in list_loans(user["id"]) if loan["currency"] == currency and loan["remaining_installments"] > 0]
-            result = project_payoff_strategy(group, str(data.get("strategy") or ""), money_to_cents(data.get("monthly_budget") or 0))
-        except LoanError as exc:
+            revolving_group = [loan for loan in list_revolving_loans(user["id"])
+                               if loan["currency"] == currency and loan["status"] == "active"]
+            result = project_payoff_strategy(group, str(data.get("strategy") or ""), money_to_cents(data.get("monthly_budget") or 0), revolving_group)
+        except (LoanError, RevolvingLoanError) as exc:
             self.send_json({"error": str(exc)}, exc.status)
             return
         except (TypeError, ValueError, OverflowError):
@@ -973,6 +1109,22 @@ class AppHandler(BaseHTTPRequestHandler):
         user = self.require_user()
         try:
             loan_id = int(self.route_path().split("/")[-1])
+            data = self.read_json()
+            verify_current_password(user["id"], str(data.get("current_password") or ""))
+            delete_loan(user["id"], loan_id)
+        except (LoanError, TypeError, ValueError) as exc:
+            self.send_json({"error": str(exc)}, getattr(exc, "status", HTTPStatus.BAD_REQUEST))
+            return
+        except AuthError as exc:
+            self.send_json({"error": str(exc)}, exc.status)
+            return
+        self.record_operation(user["id"], "loans", "delete", "loan", "Contrato de empréstimo excluído; lançamentos preservados", loan_id)
+        self.send_json({"ok": True})
+
+    def handle_loan_archive_route(self) -> None:
+        user = self.require_user()
+        try:
+            loan_id = int(self.route_path().split("/")[-2])
             archive_loan(user["id"], loan_id)
         except (LoanError, TypeError, ValueError) as exc:
             self.send_json({"error": str(exc)}, getattr(exc, "status", HTTPStatus.BAD_REQUEST))
@@ -983,6 +1135,10 @@ class AppHandler(BaseHTTPRequestHandler):
     def handle_emergency_reserve_summary(self) -> None:
         user = self.require_user()
         self.send_json({"emergency_reserve": emergency_reserve_summary(user["id"])})
+
+    def handle_financial_goals_overview(self) -> None:
+        user = self.require_user()
+        self.send_json(financial_goals_overview(user["id"]))
 
     def handle_list_goal_movements(self) -> None:
         user = self.require_user()
@@ -1013,6 +1169,16 @@ class AppHandler(BaseHTTPRequestHandler):
         movement = create_goal_movement(user["id"], goal_id, self.read_json())
         self.record_operation(user["id"], "financial_goals", "create", "financial_goal_movement", "Movimentacao de objetivo registrada", movement["id"], metadata={"goal_id": goal_id, "movement_type": movement.get("movement_type")})
         self.send_json({"movement": movement}, status=HTTPStatus.CREATED)
+
+    def handle_reset_annual_provision(self) -> None:
+        user = self.require_user()
+        goal_id = self.route_path().split("/")[-2]
+        try:
+            result = reset_annual_provision(user["id"], goal_id)
+        except FinancialGoalError as exc:
+            self.send_json({"error": exc.message}, exc.status)
+            return
+        self.send_json(result)
 
     def handle_link_goal_funding_source(self) -> None:
         user = self.require_user()

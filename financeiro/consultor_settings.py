@@ -110,7 +110,7 @@ def consultor_blocked_reason(settings: dict) -> str:
 
 
 def save_consultor_settings(user_id: int, data: dict) -> dict:
-    # spec: consultor/consultor v2.0 - criterios 1, 2, 3, 25, 26 e 32
+    # spec: consultor/consultor v2.1 - criterios 1, 2, 3, 25, 26 e 32
     normalized_user_id = int(user_id)
     current = get_consultor_settings(normalized_user_id)
     consultor_enabled = bool(data.get("consultor_enabled", current["consultor_enabled"]))
@@ -199,7 +199,7 @@ def get_complementary_profile(user_id: int) -> dict:
 
 
 def save_complementary_profile(user_id: int, data: dict) -> dict:
-    # spec: consultor/consultor v2.0 - criterios 22, 23, 24, 25 e 33
+    # spec: consultor/consultor v2.1 - criterios 22, 23, 24, 25 e 33
     current = get_complementary_profile(int(user_id))["profile"]
     normalized_patch = normalize_complementary_profile(data, partial=True)
     merged = {**current, **normalized_patch}
