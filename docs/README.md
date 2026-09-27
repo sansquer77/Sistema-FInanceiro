@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 16.13
+versao: 16.14
 atualizado: 2026-09-27
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -154,6 +154,7 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `16.14` — 2026-09-27 — [[specs/objetivos-financeiros]] v0.20 remove o rótulo redundante “atendido” do indicador de progresso.
 - `16.13` — 2026-09-27 — Corrige o carregamento da tela de Objetivos após erro de sintaxe no gráfico; hash CSP do script inline sincronizado.
 - `16.12` — 2026-09-27 — [[specs/objetivos-financeiros]] v0.18 ajusta o gráfico de projeção, eixos e legenda para cards em duas colunas.
 - `16.11` — 2026-09-27 — [[specs/objetivos-financeiros]] v0.17 e [[specs/instrucoes-app]] v1.27 documentam cálculo e comportamento operacional de Meta, Provisão anual e Reserva contínua.

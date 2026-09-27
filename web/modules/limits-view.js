@@ -277,8 +277,8 @@ export function registerLimitsView({
       item.className = `financial-goal-card pace-${goal.pace_status}`;
       item.innerHTML = `
         <div class="goal-card-visual">
-          <div class="goal-progress-ring" style="--goal-progress:${progress * 3.6}deg" role="img" aria-label="${progress.toLocaleString("pt-BR")}% da meta atendida">
-            <strong>${progress.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}%</strong><span>atendido</span>
+          <div class="goal-progress-ring" style="--goal-progress:${progress * 3.6}deg" role="img" aria-label="${progress.toLocaleString("pt-BR")}% da meta alcançado">
+            <strong>${progress.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}%</strong>
           </div>
         </div>
         <div class="goal-card-content">
