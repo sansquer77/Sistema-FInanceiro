@@ -951,6 +951,9 @@ const cockpitView = registerCockpitView({
       showModule("user");
       await userAdminViewController.loadPreferences({ force: true });
       userAdminViewController.switchUserTab(params.tab === "backup" ? "backup" : "geral");
+      if (params.section === "email-recovery") {
+        requestAnimationFrame(() => document.getElementById("emailConfigForm")?.scrollIntoView({ behavior: "smooth", block: "center" }));
+      }
       return;
     }
     if (action?.route === "cards") {

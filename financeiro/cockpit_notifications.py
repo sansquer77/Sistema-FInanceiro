@@ -10,6 +10,7 @@ from financeiro.calendar import get_cockpit_calendar
 from financeiro.database import get_connection
 from financeiro.money import cents_to_money, decimal_to_cents
 from financeiro.portfolio_positions import load_open_fixed_income_maturities
+from financeiro.secure_config import SecureConfigError, load_email_config
 from financeiro.spending_limits import list_spending_limits_with_consumption
 
 
@@ -43,6 +44,7 @@ def build_cockpit_notifications(
     critical.extend(_overdue_invoice_notifications(user_id, reference_date))
     critical.extend(_loan_due_notifications(user_id, reference_date))
     critical.extend(_backup_failure_notifications(user_id))
+    critical.extend(_password_recovery_notifications(user_id, reference_date))
 
     informational = _maturity_notifications(calendar.get("maturity_30_days") or [], reference_date)
     informational.extend(_portfolio_event_notifications(portfolio_events or [], reference_date))
@@ -84,7 +86,7 @@ def _loan_due_notifications(user_id: int, reference_date: date) -> list[dict]:
 
 
 def _backup_failure_notifications(user_id: int) -> list[dict]:
-    # spec: alertas-cockpit v1.4 — critério 15
+    # spec: cockpit/alertas-cockpit v1.5 — critério 15
     # Backup policy is installation-wide; only its responsible user can resolve settings.
     with get_connection() as conn:
         row = conn.execute(
@@ -100,6 +102,22 @@ def _backup_failure_notifications(user_id: int) -> list[dict]:
         "Backup automático não concluído",
         "Revise o destino e a política em Preferências > Backup. O sistema continua disponível.",
         failed_at, "Revisar backup", "user", {"tab": "backup"},
+    )]
+
+
+def _password_recovery_notifications(user_id: int, reference_date: date) -> list[dict]:
+    # spec: seguranca/recuperacao-senha v1.2 — critério 8
+    try:
+        config = load_email_config(user_id)
+    except SecureConfigError:
+        config = {}
+    if all(str(config.get(field) or "").strip() for field in ("sender", "password", "smtp_server")):
+        return []
+    return [_item(
+        "password_recovery_unconfigured", "password_recovery_unconfigured", "security",
+        "Configure a recuperação por e-mail",
+        "Sem uma senha de app SMTP configurada, você não poderá recuperar o acesso à conta se esquecer sua senha.",
+        reference_date.isoformat(), "Configurar recuperação", "user", {"tab": "geral", "section": "email-recovery"},
     )]
 
 
