@@ -2,8 +2,8 @@
 tipo: design
 area: meta
 status: implementado
-versao: 4.1
-atualizado: 2026-08-30
+versao: 4.2
+atualizado: 2026-09-27
 relacionados:
   - "[[arquitetura]]"
   - "[[specs/frontend-modularizacao]]"
@@ -15,7 +15,7 @@ aliases: ["Design System", "Tokens Visuais", "Precisão Institucional"]
 # Design System — Precisão Institucional
 
 > [!info] Status
-> **implementado** · área: `meta` · atualizado em 2026-08-30 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]], [[specs/frontend-fundacao-v2]]
+> **implementado** · versão: `4.2` · área: `meta` · atualizado em 2026-09-27 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]], [[specs/frontend-fundacao-v2]]
 
 ## Personalidade da marca
 
@@ -166,6 +166,8 @@ Grade de linha de base: **4px** (todos os valores são múltiplos de 4px).
 | Desktop | 12 colunas, largura 100% (sem `max-width`) | 24px lateral |
 | Tablet | 8 colunas | 24px lateral |
 | Mobile | 4 colunas fluidas | 16px lateral |
+
+- Navegação e painéis com conteúdo em colunas devem respeitar a largura útil do próprio container, que pode ser menor que o viewport por causa da sidebar aberta ou do zoom do navegador. Use truncamento acessível para rótulos da navegação e reorganize colunas conforme o espaço efetivo, evitando vazamento horizontal.
 
 ---
 
@@ -407,6 +409,7 @@ Padrão único em toda a aplicação, conforme o modelo usado no menu **Preferê
 
 ## Changelog
 
+- `4.2` — 2026-09-27 — Define adaptação por largura real dos containers, com sidebar e painéis sem overflow em telas ampliadas por zoom.
 - `4.1` — 2026-08-30 — Definidos contratos visuais da fundação v2 para gráficos ApexCharts, Command Palette e listas virtualizadas, preservando tokens, acessibilidade, densidade e semântica financeira.
 - `4.0` — 2026-08-29 — Define marcador e cores não financeiras para comparação de alocação atual versus meta.
 - `3.9` — 2026-08-29 — Contratos unificados para overlays, toast, cabeçalhos/atualização, tabelas/filtros e formulários progressivos.

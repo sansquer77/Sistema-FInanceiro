@@ -1406,7 +1406,7 @@ export function registerPortfolioView({
     return '<svg class="portfolio-emergency-shield" viewBox="0 0 24 24" width="12" height="12" role="img" aria-label="Reserva de emergência" title="Reserva de emergência" fill="currentColor"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5l8-3z"/></svg>';
   }
 
-  // spec: objetivos-financeiros v0.18 — critério 36
+  // spec: objetivos-financeiros v0.21 — critério 36
   function portfolioGoalFlagIcon() {
     return '<svg class="portfolio-goal-flag" viewBox="0 0 24 24" width="12" height="12" role="img" aria-label="Vinculado a objetivo" title="Vinculado a objetivo" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4m0 1c5-4 9 4 14 0v10c-5 4-9-4-14 0"/></svg>';
   }

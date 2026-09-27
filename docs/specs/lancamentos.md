@@ -2,8 +2,8 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 3.39
-atualizado: 2026-09-24
+versao: 3.40
+atualizado: 2026-09-27
 relacionados:
   - "[[contas-correntes]]"
   - "[[categorias-tags-gestao]]"
@@ -18,7 +18,7 @@ aliases: ["Lançamentos", "Transações"]
 # Lançamentos
 
 > [!info] Status
-> **implementado** · versão: `3.39` · área: `lancamentos` · atualizado em 2026-09-24 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]], [[emprestimos-quitacao]]
+> **implementado** · versão: `3.40` · área: `lancamentos` · atualizado em 2026-09-27 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]], [[emprestimos-quitacao]]
 
 ## Problema
 
@@ -77,6 +77,7 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 - **Exclusão em cascata** (`scope=future`): remove recursivamente todos os lançamentos futuros não conciliados da mesma série, revertendo os respectivos impactos nos saldos.
 - A escolha de edição/exclusão em cascata deve usar modal com ações explícitas, como `Apenas este lançamento`, `Este e os próximos`, `Excluir apenas este`, `Excluir este e os próximos` e `Voltar`.
 - A marcação de média (`use_average`) em lançamentos recorrentes é persistida em todas as ocorrências geradas da série.
+- Lançamentos recorrentes em contas podem usar a frequência diária, criando uma ocorrência em cada dia corrido a partir da data inicial, inclusive fins de semana e feriados. O valor segue as regras gerais: fixo ou média dos últimos lançamentos quando `use_average` está ativa.
 - Ao editar uma ocorrência de uma série recorrente, o checkbox de cálculo pela média permanece habilitado e reflete a marcação da ocorrência; o usuário pode ativar ou desativar a flag no próprio formulário de edição.
 - Se a flag de média for **alterada** ao salvar a edição de uma série recorrente — ativada agora (série sem a marcação) ou desmarcada (série que a tinha ativa) —, o sistema não exibe o modal de escopo e aplica a alteração automaticamente a todas as ocorrências futuras não conciliadas: ao ativar, a marcação é persistida nelas e seus valores são recalculados pela média dos últimos 12 lançamentos com a mesma descrição normalizada, mesmo tipo e mesma categoria/subcategoria; ao desmarcar, a marcação é removida e os valores mantêm o informado no formulário, sem recálculo.
 - Se a flag de média **não for alterada** na edição (permanecendo ativa ou inativa), o sistema mantém o modal de escopo (`Apenas este lançamento` / `Este e os próximos`); escolhendo os próximos em série com a flag ativa, os valores futuros são recalculados pela média; escolhendo apenas este, somente a ocorrência atual muda.
@@ -218,6 +219,8 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dado um mês recente em cache, quando o usuário retorna a ele, então o app reaproveita a fatia válida; uma resposta de outro mês não substitui o selecionado.
 - Dado uma conta com lançamentos em competências anteriores, quando o Extrato consulta `month` e `account_id`, então recebe apenas as linhas do mês solicitado e preserva os saldos acumulados fornecidos pela projeção backend.
 - Dado um lançamento avulso de despesa categorizado pela identidade estável `loan_payment`, quando a conta possui moeda compatível com empréstimos ativos, então o formulário permite associação opcional a um contrato mesmo que o usuário tenha renomeado a categoria, e a gravação cria apenas o lançamento original da conta.
+- Dado um lançamento de conta definido como recorrente diário, quando a série é gerada, então as datas avançam um dia corrido por ocorrência, inclusive fins de semana, mantendo o limite existente de 120 ocorrências.
+- Dado um lançamento recorrente diário de conta com cálculo pela média ativo, quando há histórico compatível, então todas as ocorrências geradas usam a média dos até 12 lançamentos mais recentes e preservam `use_average`; sem histórico, mantêm o valor informado.
 
 ## Plano de implementação desta correção
 
@@ -227,8 +230,15 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - [x] Implementar os comportamentos descritos sem alterar regras financeiras.
 - [x] Testar sucesso, falha, concorrência e contratos de apresentação aplicáveis.
 
+## Plano de implementação — recorrência diária
+
+- [x] Especificar a frequência diária como dias corridos e reutilizar o cálculo de média já existente.
+- [x] Habilitar a frequência no formulário de Lançamentos de Contas e no núcleo de recorrência, mantendo a série limitada a 120 ocorrências.
+- [x] Preservar compatibilidade de frequências e séries existentes; validar sintaxe do Python e JavaScript.
+
 ## Changelog
 
+- `3.40` — 2026-09-27 — Lançamentos de Contas passam a aceitar recorrência diária, inclusive fins de semana, com a opção existente de valor médio.
 - `3.39` — 2026-09-24 — Associação ao empréstimo identifica a categoria por ID/identidade semântica persistente, independente do texto exibido.
 - `3.38` — 2026-09-24 — Formulário de lançamento permite associar uma despesa avulsa da categoria Empréstimos ao contrato correspondente, sem criar movimento duplicado.
 

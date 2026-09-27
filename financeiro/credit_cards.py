@@ -14,7 +14,7 @@ from financeiro.database import begin_immediate, get_connection, row_to_dict
 from financeiro.identifiers import positive_int_id
 from financeiro.money import split_cents
 from financeiro.operation_logs import create_operation_log_with_conn
-from financeiro.recurrence import RECURRENCE_FREQUENCIES as CARD_RECURRENCE_FREQUENCIES
+from financeiro.recurrence import CARD_RECURRENCE_FREQUENCIES
 from financeiro.recurrence import SERIES_KINDS as CARD_SERIES_KINDS
 from financeiro.recurrence import add_recurrence
 from financeiro.transactions import (
