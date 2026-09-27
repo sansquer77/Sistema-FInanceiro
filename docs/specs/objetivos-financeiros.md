@@ -2,7 +2,7 @@
 tipo: spec
 area: objetivos-financeiros
 status: implementado
-versao: 0.18
+versao: 0.19
 atualizado: 2026-09-27
 relacionados:
   - "[[limites-gastos]]"
@@ -18,7 +18,7 @@ aliases: ["Objetivos Financeiros", "Fundos de Provisão", "Cofrinhos"]
 # Objetivos Financeiros e Fundos de Provisão
 
 > [!info] Status
-> **implementado** · versão: `0.18` · área: `objetivos-financeiros` · atualizado em 2026-09-27 · relacionados: [[limites-gastos]], [[investimentos-portfolio]], [[score-saude-financeira]], [[cockpit-calendario]], [[historico-operacoes]]
+> **implementado** · versão: `0.19` · área: `objetivos-financeiros` · atualizado em 2026-09-27 · relacionados: [[limites-gastos]], [[investimentos-portfolio]], [[score-saude-financeira]], [[cockpit-calendario]], [[historico-operacoes]]
 
 ## Problema
 
@@ -262,9 +262,11 @@ Não há pendências abertas para o MVP aprovado. A possibilidade futura de divi
 - [x] Passo 17 — Reiniciar provisão anual com ajuste auditável, próximo ciclo e limpeza apenas de vínculos sem saldo. Fecha: critérios 41 a 44.
 - [x] Passo 18 — Documentar a equivalência de cálculo entre Meta e Provisão anual e o comportamento do aporte sugerido na Reserva contínua sem data. Fecha: critérios 45 a 47.
 - [x] Passo 19 — Tornar gráfico, eixos e legenda responsivos à largura reduzida do card. Fecha: critério 48.
+- [x] Passo 20 — Corrigir a sintaxe da configuração responsiva do gráfico para que o módulo de Objetivos carregue em navegadores ES Module. Fecha: critério 48.
 
 ## Changelog
 
+- `0.19` — 2026-09-27 — Corrige erro de sintaxe na configuração responsiva que impedia o carregamento da tela de Objetivos.
 - `0.18` — 2026-09-27 — Ajusta gráfico de projeção e textos para se conterem na largura reduzida dos cards em duas colunas.
 - `0.17` — 2026-09-27 — Explicita o cálculo compartilhado de Meta e Provisão anual, a ausência de reinício automático e o aporte da Reserva contínua sem data.
 - `0.16` — 2026-09-27 — Adiciona reinício de provisão anual sem apagar o histórico e mantém vínculos apenas para investimentos com saldo.

@@ -367,7 +367,7 @@ export function registerLimitsView({
       xaxis: { categories: ["Conservador", "Com rendimento"], tickAmount: 3, labels: { formatter: compactCurrency, style: { fontSize: "10px" }, rotate: 0, hideOverlappingLabels: true } },
       yaxis: { labels: { minWidth: 0, maxWidth: 88, style: { fontSize: "10px" }, offsetX: 0 } },
       dataLabels: { enabled: false }, legend: { show: false }, grid: { borderColor: css.getPropertyValue("--outline-variant").trim() || "#c3c6d6" },
-      responsive: [{ breakpoint: 560, options: { chart: { height: 160 }, xaxis: { labels: { style: { fontSize: "9px" } } }, yaxis: { labels: { maxWidth: 66, style: { fontSize: "9px" } } }, grid: { padding: { left: 0, right: 0 } } }],
+      responsive: [{ breakpoint: 560, options: { chart: { height: 160 }, xaxis: { labels: { style: { fontSize: "9px" } } }, yaxis: { labels: { maxWidth: 66, style: { fontSize: "9px" } } }, grid: { padding: { left: 0, right: 0 } } } }],
       tooltip: { y: { formatter: (value) => formatMoney(value, "BRL") } },
       theme: { mode: document.documentElement.dataset.theme === "dark" ? "dark" : "light" },
     });
