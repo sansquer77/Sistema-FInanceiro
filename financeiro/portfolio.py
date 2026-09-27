@@ -141,7 +141,7 @@ def get_portfolio(user_id: int, force_refresh: bool = False) -> dict:
         redemption_rows = positions_store.load_redemption_history(conn, user_id)
 
     positions = assemble_portfolio_positions(inputs, user_id, force_refresh=force_refresh)
-    # spec: objetivos-financeiros v0.18 — critério 36
+    # spec: objetivos-financeiros v0.21 — critério 36
     # A origem vinculada é canônica, mas a marca acompanha todos os lotes do ativo consolidado.
     from financeiro.financial_goals import FinancialGoalError, fetch_funding_source, investment_asset_identity
 
@@ -1552,7 +1552,7 @@ def apply_fund_quote(position: dict, user_id: int | None = None, force_refresh: 
 
 
 def fetch_fund_quote_for_user(user_id: int, cnpj: str, force_refresh: bool = False) -> dict:
-    # spec: lancamentos v3.35 — criterio cota-fundo-lancamento
+    # spec: lancamentos v3.40 — criterio cota-fundo-lancamento
     # (busca assistida de cota de fundo no formulario de aporte; o preco segue editavel)
     identifier = mais_retorno_identifier_from_cnpj(cnpj)
     if not identifier:

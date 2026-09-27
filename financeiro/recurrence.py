@@ -6,11 +6,15 @@ from financeiro.calendar_rules import add_months
 
 
 SERIES_KINDS = frozenset({"single", "installment", "recurring"})
-RECURRENCE_FREQUENCIES = frozenset({"weekly", "monthly", "quarterly", "semiannual", "annual"})
+RECURRENCE_FREQUENCIES = frozenset({"daily", "weekly", "monthly", "quarterly", "semiannual", "annual"})
+CARD_RECURRENCE_FREQUENCIES = frozenset({"weekly", "monthly", "quarterly", "semiannual", "annual"})
 MONTHLY_RECURRENCE_FREQUENCIES = frozenset({"monthly"})
 
 
 def add_recurrence(start_date: date, frequency: str, index: int) -> date:
+    # spec: lancamentos v3.40 — critério 73
+    if frequency == "daily":
+        return start_date + timedelta(days=index)
     if frequency == "weekly":
         return start_date + timedelta(days=7 * index)
     months = {

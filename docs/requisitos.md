@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 3.34
+versao: 3.35
 atualizado: 2026-09-27
 relacionados:
   - "[[arquitetura]]"
@@ -29,7 +29,7 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 - **Recuperação de senha**: código temporário enviado por e-mail SMTP configurado localmente de forma segura, com assistente para Gmail e Outlook/Microsoft usando senha de app. Ver [[recuperacao-senha]].
 - **Contas-correntes**: cadastro, edição, listagem, arquivamento e restauração de contas com suporte a naturezas distintas (`liquidity` - liquidez, `wallet` - carteira física, `investment` - investimento) e moedas múltiplas (`BRL`, `USD`, `EUR`, `GBP`). Ver [[contas-correntes]].
 - **Lançamentos normais**: receitas, despesas, transferências, câmbio e investimentos manuais com impacto em saldo e suporte a taxas de câmbio históricas quando houver conversão entre moedas; lançamentos de conta ou cartão em moeda estrangeira sem cotação manual usam a última PTAX de venda disponível até a data do lançamento para normalização em BRL. Ver [[lancamentos]] e [[cartoes]].
-- **Recorrência e Parcelamento**: suporte a séries de lançamentos periódicos ou parcelados com acompanhamento de índice de parcelas e conciliação bancária (`reconciled_at`). Ver [[lancamentos]].
+- **Recorrência e Parcelamento**: suporte a séries de lançamentos periódicos — incluindo recorrência diária em contas — ou parcelados com acompanhamento de índice de parcelas e conciliação bancária (`reconciled_at`). Valores futuros podem usar a média dos lançamentos recentes compatíveis. Ver [[lancamentos]].
 - **Cartões de Crédito**: cadastro de cartões com limite, emissor, bandeira, fechamento, vencimento e conta preferencial de pagamento. Lançamentos de despesas e receitas no cartão por fatura mensal (formato `AAAA-MM`), conciliação de lançamentos, compras parceladas/recorrentes, movimentação entre faturas e fluxo de pagamento de fatura (integral ou parcial, com saldo residual lançado na fatura seguinte) integrado às contas-correntes. Ver [[cartoes]].
 - **Limites de Gastos (Metas/Budgets)**: estabelecimento de limites de despesas mensais por categoria e subcategoria. Ver [[limites-gastos]].
 - **Objetivos Financeiros e Fundos de Provisão**: metas, provisões anuais reiniciáveis com histórico auditável, reservas contínuas, contribuição necessária, comparação entre projeção conservadora e com rendimento, resumo da Reserva de Emergência e exclusividade de recursos para impedir dupla contagem. No reinício, vínculos de investimentos com saldo são preservados e os sem saldo são removidos. Ver [[specs/objetivos-financeiros]].
@@ -138,6 +138,7 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 
 ## Changelog
 
+- `3.35` — 2026-09-27 — Inclui recorrência diária de conta e aproveita a média histórica já disponível para séries recorrentes.
 - `3.34` — 2026-09-27 — Inclui reinício de provisão anual com histórico preservado e vínculo condicionado a saldo de investimento.
 - `3.33` — 2026-09-27 — Inclui no escopo a aba Histórico de Empréstimos e Financiamentos, sem perda ou alteração dos lançamentos associados.
 - `3.32` — 2026-09-27 — Define a escolha inicial entre quitação integral e amortização e a comparação da quitação com CDI pelo mesmo principal.

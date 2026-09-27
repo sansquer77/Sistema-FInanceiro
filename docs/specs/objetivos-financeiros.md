@@ -2,7 +2,7 @@
 tipo: spec
 area: objetivos-financeiros
 status: implementado
-versao: 0.20
+versao: 0.21
 atualizado: 2026-09-27
 relacionados:
   - "[[limites-gastos]]"
@@ -18,7 +18,7 @@ aliases: ["Objetivos Financeiros", "Fundos de Provisão", "Cofrinhos"]
 # Objetivos Financeiros e Fundos de Provisão
 
 > [!info] Status
-> **implementado** · versão: `0.20` · área: `objetivos-financeiros` · atualizado em 2026-09-27 · relacionados: [[limites-gastos]], [[investimentos-portfolio]], [[score-saude-financeira]], [[cockpit-calendario]], [[historico-operacoes]]
+> **implementado** · versão: `0.21` · área: `objetivos-financeiros` · atualizado em 2026-09-27 · relacionados: [[limites-gastos]], [[investimentos-portfolio]], [[score-saude-financeira]], [[cockpit-calendario]], [[historico-operacoes]]
 
 ## Problema
 
@@ -226,6 +226,7 @@ As tabelas devem ser criadas pela migração incremental idempotente do schema v
 47. Dada uma Reserva contínua sem data, quando existe valor restante, então o aporte mensal sugerido é igual ao valor restante inteiro; com data, o aporte é distribuído pelo período.
 48. Dado um card de objetivo em coluna estreita, quando o gráfico de projeção é aberto, então textos, rótulos, legenda e SVG permanecem contidos na largura disponível, sem vazamento horizontal. Verificação visual manual.
 49. Dado o indicador circular de progresso, quando exibido no card, então mostra apenas o percentual no centro, sem o rótulo redundante “atendido”.
+50. Dado o painel de Objetivos em uma área útil estreita, mesmo com viewport amplo, quando exibido, então KPIs, reserva e cards reorganizam suas colunas com base na largura disponível do painel sem gerar rolagem horizontal. Verificação visual manual.
 
 ## Pendências
 
@@ -265,9 +266,11 @@ Não há pendências abertas para o MVP aprovado. A possibilidade futura de divi
 - [x] Passo 19 — Tornar gráfico, eixos e legenda responsivos à largura reduzida do card. Fecha: critério 48.
 - [x] Passo 20 — Corrigir a sintaxe da configuração responsiva do gráfico para que o módulo de Objetivos carregue em navegadores ES Module. Fecha: critério 48.
 - [x] Passo 21 — Remover o texto redundante do indicador circular e preservar o percentual e a descrição acessível. Fecha: critério 49.
+- [x] Passo 22 — Fazer a composição de Objetivos responder à largura real do painel, não apenas à largura do viewport. Fecha: critério 50.
 
 ## Changelog
 
+- `0.21` — 2026-09-27 — Adapta os cards e resumos de Objetivos à largura real disponível no painel.
 - `0.20` — 2026-09-27 — Remove “atendido” do centro do indicador circular de progresso nos cards.
 - `0.19` — 2026-09-27 — Corrige erro de sintaxe na configuração responsiva que impedia o carregamento da tela de Objetivos.
 - `0.18` — 2026-09-27 — Ajusta gráfico de projeção e textos para se conterem na largura reduzida dos cards em duas colunas.

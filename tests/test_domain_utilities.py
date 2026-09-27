@@ -38,8 +38,7 @@ class DomainUtilitiesTest(unittest.TestCase):
         start = date(2024, 1, 31)
         self.assertEqual(add_recurrence(start, "monthly", 1), date(2024, 2, 29))
         self.assertEqual(add_recurrence(start, "weekly", 2), date(2024, 2, 14))
-        with self.assertRaises(ValueError):
-            add_recurrence(start, "daily", 1)
+        self.assertEqual(add_recurrence(start, "daily", 1), date(2024, 2, 1))
 
 
 if __name__ == "__main__":
