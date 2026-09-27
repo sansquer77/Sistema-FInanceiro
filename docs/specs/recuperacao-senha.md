@@ -2,8 +2,8 @@
 tipo: spec
 area: seguranca
 status: implementado
-versao: 1.1
-atualizado: 2026-07-05
+versao: 1.2
+atualizado: 2026-09-27
 relacionados:
   - "[[seguranca-autenticacao]]"
   - "[[adr/0005-smtp-criptografado-local]]"
@@ -57,6 +57,7 @@ Usuário local do Sistema Financeiro que protege dados financeiros sensíveis po
 - Configuração manual permite servidor SMTP, porta e uso de STARTTLS.
 - A configuração SMTP é isolada por usuário autenticado; um usuário não vê nem altera o remetente configurado por outro.
 - A solicitação de recuperação usa a configuração SMTP do usuário dono do e-mail informado.
+- Quando a configuração de recuperação por e-mail não existir, estiver ilegível ou não contiver remetente, senha de app e servidor SMTP, a Central de Notificações deve exibir um alerta persistente ao usuário autenticado. O alerta informa que não será possível recuperar o acesso caso ele esqueça a senha e oferece acesso direto a Preferências > Recuperação por email. Ele desaparece quando a configuração utilizável for salva.
 - O pacote distribuível não inclui credenciais SMTP. Ver [[adr/0005-smtp-criptografado-local]].
 
 ## Regras de segurança
@@ -86,6 +87,7 @@ Tabelas: `password_resets`, `sessions`.
 - Dado um código válido informado, quando usado para redefinição, a nova senha passa a funcionar e a senha anterior deixa de funcionar.
 - Dado um código expirado ou já usado, quando informado, a operação é bloqueada.
 - Dado a redefinição bem-sucedida, quando executada, as sessões anteriores do usuário são encerradas.
+- Dado que a configuração SMTP do usuário esteja ausente, ilegível ou sem senha de app, quando a Central de Notificações for consultada, então deve haver um alerta persistente que explique a indisponibilidade da recuperação e permita abrir a configuração; após salvar uma configuração utilizável, o alerta deixa de ser retornado.
 
 ## Fora de escopo
 
@@ -94,6 +96,7 @@ Tabelas: `password_resets`, `sessions`.
 
 ## Changelog
 
+- `1.2` — 2026-09-27 — Define alerta persistente na Central de Notificações quando a recuperação por e-mail não está utilizável.
 - `1.1` — 2026-07-05 — Configuração SMTP passa a ser isolada por usuário e o reset usa a configuração do dono do e-mail.
 - `1.0` — 2026-06-29 — Frontmatter e critérios formalizados.
 

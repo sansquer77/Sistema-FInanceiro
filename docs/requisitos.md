@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 3.35
+versao: 3.36
 atualizado: 2026-09-27
 relacionados:
   - "[[arquitetura]]"
@@ -27,6 +27,7 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 - **Autenticação local**: cadastro, login, logout e sessão por cookie HTTP-only. Ver [[seguranca-autenticacao]].
 - **Gestão de Perfil**: alteração de e-mail, alteração de senha e exclusão da conta do usuário autenticado.
 - **Recuperação de senha**: código temporário enviado por e-mail SMTP configurado localmente de forma segura, com assistente para Gmail e Outlook/Microsoft usando senha de app. Ver [[recuperacao-senha]].
+- **Alerta de recuperação de senha**: a Central de Notificações avisa o usuário enquanto não houver configuração SMTP utilizável, pois sem ela não será possível recuperar o acesso caso a senha seja esquecida. Ver [[specs/recuperacao-senha]] e [[specs/alertas-cockpit]].
 - **Contas-correntes**: cadastro, edição, listagem, arquivamento e restauração de contas com suporte a naturezas distintas (`liquidity` - liquidez, `wallet` - carteira física, `investment` - investimento) e moedas múltiplas (`BRL`, `USD`, `EUR`, `GBP`). Ver [[contas-correntes]].
 - **Lançamentos normais**: receitas, despesas, transferências, câmbio e investimentos manuais com impacto em saldo e suporte a taxas de câmbio históricas quando houver conversão entre moedas; lançamentos de conta ou cartão em moeda estrangeira sem cotação manual usam a última PTAX de venda disponível até a data do lançamento para normalização em BRL. Ver [[lancamentos]] e [[cartoes]].
 - **Recorrência e Parcelamento**: suporte a séries de lançamentos periódicos — incluindo recorrência diária em contas — ou parcelados com acompanhamento de índice de parcelas e conciliação bancária (`reconciled_at`). Valores futuros podem usar a média dos lançamentos recentes compatíveis. Ver [[lancamentos]].
@@ -138,6 +139,7 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 
 ## Changelog
 
+- `3.36` — 2026-09-27 — Inclui aviso persistente para configuração ausente de recuperação de senha por e-mail.
 - `3.35` — 2026-09-27 — Inclui recorrência diária de conta e aproveita a média histórica já disponível para séries recorrentes.
 - `3.34` — 2026-09-27 — Inclui reinício de provisão anual com histórico preservado e vínculo condicionado a saldo de investimento.
 - `3.33` — 2026-09-27 — Inclui no escopo a aba Histórico de Empréstimos e Financiamentos, sem perda ou alteração dos lançamentos associados.

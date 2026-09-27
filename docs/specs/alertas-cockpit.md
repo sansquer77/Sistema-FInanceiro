@@ -2,8 +2,8 @@
 tipo: spec
 area: cockpit
 status: implementado
-versao: 1.4
-atualizado: 2026-09-25
+versao: 1.5
+atualizado: 2026-09-27
 relacionados:
   - "[[cockpit-calendario]]"
   - "[[limites-gastos]]"
@@ -20,7 +20,7 @@ aliases: ["Alertas e Notificações do Cockpit", "Alertas Cockpit", "Central de 
 # Alertas e Notificações do Cockpit
 
 > [!info] Status
-> **implementado** · versão: `1.4` · área: `cockpit` · atualizado em 2026-09-25 · relacionados: [[cockpit-calendario]], [[limites-gastos]], [[cartoes]], [[lancamentos]], [[investimentos-portfolio]], [[backup-restauracao]], [[specs/emprestimos-quitacao]], [[arquitetura]], [[requisitos]]
+> **implementado** · versão: `1.5` · área: `cockpit` · atualizado em 2026-09-27 · relacionados: [[cockpit-calendario]], [[limites-gastos]], [[cartoes]], [[lancamentos]], [[investimentos-portfolio]], [[backup-restauracao]], [[specs/emprestimos-quitacao]], [[arquitetura]], [[requisitos]]
 
 ### Problema
 
@@ -132,6 +132,7 @@ Restrição de unicidade: `PRIMARY KEY (user_id, notification_id)`.
     2. **Saldo negativo previsto**: projeção diária de caixa que entra em terreno negativo dentro do horizonte de liquidez (ver [[tendencias-saude-financeira]]).
     3. **Faturas ou contas vencidas**: faturas de cartão com vencimento anterior à data atual sem registro de pagamento integral/parcial (ver [[cartoes]]), ou despesas em contas com data anterior a hoje não conciliadas (ver [[cockpit-calendario]]).
     4. **Problemas que exigem ação corretiva explícita**: ex.: inconsistências críticas de conciliação.
+    5. **Recuperação de senha indisponível**: configuração SMTP ausente, ilegível ou incompleta para o usuário autenticado. O alerta explica o risco de perder o acesso caso a senha seja esquecida e oferece atalho para Preferências > Recuperação por email; permanece até existir uma configuração utilizável.
   - **Restrição de criticidade**: A cor vermelha **nunca** deve ser utilizada para indisponibilidade temporária de APIs externas (ex.: cotações Yahoo/CoinGecko/PTAX offline), falhas passageiras de rede ou avisos meramente informativos.
 - **Informativos (Amarelo)**:
   - Destinados a acontecimentos, novidades e eventos com vigência semanal/temporal sem necessidade de correção imediata:
@@ -214,6 +215,7 @@ Restrição de unicidade: `PRIMARY KEY (user_id, notification_id)`.
 - Dado que há uma nova versão do sistema disponível, quando o usuário acessa o Cockpit, então o banner de nova versão (`cockpitVersionAlert`) continua sendo renderizado no topo do painel executivo com seu botão de dispensar, sem ser incorporado ao flyout de notificações financeiras.
 - Dado um empréstimo ativo cuja próxima parcela vence hoje, quando o usuário consulta a Central de Notificações, então há um alerta com ação para abrir Gestão → Empréstimos.
 - Dado que o backup automático da instalação falhou, quando o responsável consulta a Central de Notificações, então vê um alerta crítico persistente com ação para abrir Preferências > Backup; o alerta some após um backup concluído com sucesso.
+- Dado que a configuração SMTP de recuperação do usuário está ausente, ilegível ou sem remetente, senha de app ou servidor, quando ele consulta a Central de Notificações, então vê um alerta crítico persistente com ação para abrir Preferências > Recuperação por email; após salvar uma configuração utilizável, o alerta deixa de aparecer.
 
 ### Pendências
 
@@ -239,6 +241,7 @@ Restrição de unicidade: `PRIMARY KEY (user_id, notification_id)`.
 
 ### Changelog
 
+- `1.5` — 2026-09-27 — Inclui alerta persistente para lembrar que a conta não pode ser recuperada sem configuração utilizável de e-mail.
 - `1.4` — 2026-09-25 — Central passa a alertar o responsável quando o backup automático falha, com atalho para Preferências > Backup.
 - `1.3` — 2026-09-24 — Adiciona lembrete crítico na data do vencimento de um empréstimo, com ação para abrir Gestão → Empréstimos.
 
