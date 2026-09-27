@@ -2,8 +2,8 @@
 tipo: spec
 area: historico-operacoes
 status: implementado
-versao: 1.4
-atualizado: 2026-08-30
+versao: 1.5
+atualizado: 2026-09-25
 relacionados:
   - "[[sdd]]"
   - "[[templates/spec-template|Template de spec]]"
@@ -12,6 +12,7 @@ relacionados:
   - "[[cartoes]]"
   - "[[investimentos-portfolio]]"
   - "[[importacao-dados]]"
+  - "[[emprestimos-quitacao]]"
 tags: [spec, "area/historico-operacoes", auditoria]
 aliases: ["Histórico de Operações", "Historico de Operacoes", "Auditoria de Operações"]
 ---
@@ -19,7 +20,7 @@ aliases: ["Histórico de Operações", "Historico de Operacoes", "Auditoria de O
 # Histórico de Operações
 
 > [!info] Status
-> **implementado** · área: `historico-operacoes` · atualizado em 2026-07-09 · relacionados: [[sdd]], [[templates/spec-template|Template de spec]], [[arquitetura]], [[lancamentos]], [[cartoes]], [[investimentos-portfolio]], [[importacao-dados]]
+> **implementado** · área: `historico-operacoes` · atualizado em 2026-09-25 · relacionados: [[sdd]], [[templates/spec-template|Template de spec]], [[arquitetura]], [[lancamentos]], [[cartoes]], [[investimentos-portfolio]], [[importacao-dados]], [[emprestimos-quitacao]]
 
 ## Problema
 
@@ -44,9 +45,9 @@ Usuário autenticado que administra seus dados financeiros e precisa auditar aç
 | `operation_logs.id` | inteiro | Identificador único do registro de operação. |
 | `operation_logs.user_id` | inteiro | Usuário proprietário da operação. Obrigatório e usado em todos os filtros. |
 | `operation_logs.operation_batch_id` | texto nullable | Identificador comum para operações em lote, como importações, recorrências e parcelamentos. |
-| `operation_logs.module` | enum/texto | Módulo funcional: `accounts`, `transactions`, `cards`, `portfolio`, `imports`, `classifications`, `limits`, `user_admin`. |
+| `operation_logs.module` | enum/texto | Módulo funcional: `accounts`, `transactions`, `cards`, `portfolio`, `imports`, `classifications`, `limits`, `financial_goals`, `loans`, `user_admin`, `backup`; `loans` reúne contratos Price/SAC e Crédito Rotativo. |
 | `operation_logs.operation_type` | enum/texto | Tipo de operação: `create`, `update`, `delete`, `archive`, `restore`, `reconcile`, `unreconcile`, `move`, `pay`, `import`, `redeem`, `close`, `value_update`, `clear`. |
-| `operation_logs.entity_type` | enum/texto | Tipo da entidade afetada: `account`, `transaction`, `credit_card`, `credit_card_transaction`, `credit_card_payment`, `portfolio_position`, `portfolio_redemption`, `category`, `subcategory`, `tag`, `spending_limit`, `user`. |
+| `operation_logs.entity_type` | enum/texto | Tipo da entidade afetada: `account`, `transaction`, `credit_card`, `credit_card_transaction`, `credit_card_payment`, `portfolio_position`, `portfolio_redemption`, `portfolio_allocation_goals`, `category`, `subcategory`, `tag`, `spending_limit`, `financial_goal`, `financial_goal_movement`, `financial_goal_funding_source`, `loan`, `loan_payment`, `revolving_loan`, `user`, `backup_policy`, `backup_package`. |
 | `operation_logs.entity_id` | texto nullable | Identificador da entidade principal afetada. Pode ficar nulo quando a ação for global ou em lote. |
 | `operation_logs.account_id` | inteiro nullable | Conta relacionada, quando aplicável. |
 | `operation_logs.credit_card_id` | inteiro nullable | Cartão relacionado, quando aplicável. |
@@ -189,6 +190,8 @@ O menu lateral inclui **Histórico** no grupo Gestão, com ícone de histórico/
 - Armazenar payload completo de arquivos importados.
 
 ## Changelog
+
+- `1.5` — 2026-09-25 — Documenta Crédito Rotativo sob o módulo `loans` e a entidade auditável `revolving_loan`; mutações e auditoria compartilham transação.
 
 - `1.4` — 2026-08-30 — Concluído cache curto por filtros, compartilhamento de requisição em andamento, invalidação global após mutações e reset entre sessões.
 - `1.3` — 2026-08-30 — Iniciada política de snapshot recente, invalidação após mutações e compartilhamento de requisição em andamento.

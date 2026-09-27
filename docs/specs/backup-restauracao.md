@@ -1,9 +1,9 @@
 ---
 tipo: spec
 area: backup-restauracao
-status: em-revisao
-versao: 1.0
-atualizado: 2026-09-05
+status: implementado
+versao: 1.2
+atualizado: 2026-09-25
 relacionados:
   - "[[migracao-banco-v2]]"
   - "[[privacidade-valores]]"
@@ -11,14 +11,14 @@ relacionados:
   - "[[../adr/0010-segredos-criptografados-sqlite]]"
   - "[[../adr/0018-backup-completo-criptografado]]"
   - "[[../arquitetura]]"
-tags: [spec, "area/backup-restauracao", "status/em-revisao"]
+tags: [spec, "area/backup-restauracao", "status/implementado"]
 aliases: ["Backup e Restauração"]
 ---
 
 # Backup e Restauração
 
 > [!info] Status
-> **em revisão** · versão: `1.0` · área: `backup-restauracao` · atualizado em 2026-09-05 · relacionados: [[migracao-banco-v2]], [[privacidade-valores]], [[../adr/0018-backup-completo-criptografado]]
+> **implementado** · versão: `1.2` · área: `backup-restauracao` · atualizado em 2026-09-25 · relacionados: [[migracao-banco-v2]], [[privacidade-valores]], [[../adr/0018-backup-completo-criptografado]], [[alertas-cockpit]]
 
 ## Problema
 
@@ -100,6 +100,7 @@ Usuário local que quer proteger seus dados contra falha do disco, perda do comp
 - Dado um backup válido, quando o usuário solicita restauração, então o app valida o pacote em área temporária antes de pedir confirmação de substituição.
 - Dado um ambiente ativo antes da restauração, quando a substituição é confirmada, então o estado anterior é preservado em uma cópia recuperável.
 - Dado o backup automático vencido, quando o usuário abre o app, então uma nova execução ocorre conforme frequência e retenção configuradas.
+- Dado que o destino do backup automático não existe ou está inacessível, quando a execução vence durante a inicialização, então a falha é registrada, o app continua iniciando e o responsável vê um alerta na Central de Notificações.
 - Dado que a senha foi alterada, quando um novo backup é gerado, então os pacotes futuros usam a nova senha e os anteriores permanecem inalterados.
 - Dado um pacote inválido entre versões retidas, quando a retenção é executada, então o app não remove o último pacote válido por engano.
 - Dado um destino igual ao diretório ativo ou temporário, quando o usuário tenta salvá-lo, então a configuração é rejeitada.
@@ -116,6 +117,8 @@ Usuário local que quer proteger seus dados contra falha do disco, perda do comp
 - [x] Definir se o diretório será escolhido nativamente em cada plataforma ou informado como caminho validado: caminho absoluto validado nesta versão.
 - [ ] Definir agendamento posterior com o sistema operacional quando o app estiver fechado.
 - [x] Definir o contrato de restauração entre versões incompatíveis do schema: a versão inicial aceita somente o schema corrente.
+
+> A validação da funcionalidade de Backup foi concluída e confirmada pelo responsável do produto em 2026-09-24. O agendamento com o app fechado permanece como evolução futura fora do escopo desta versão.
 
 ## Fora de escopo
 
@@ -135,6 +138,8 @@ Usuário local que quer proteger seus dados contra falha do disco, perda do comp
 
 ## Changelog
 
+- `1.2` — 2026-09-25 — Falhas de destino do backup automático não bloqueiam a inicialização e geram alerta crítico para o responsável da instalação.
+- `1.1` — 2026-09-24 — Validação do Backup confirmada pelo responsável do produto; spec marcada como implementada. Agendamento com o app fechado permanece como evolução futura.
 - `1.0` — 2026-09-05 — Implementação concluída e em revisão de distribuição: política global segura para ambiente multiusuário, backup online autenticado, restauração em duas fases com acesso exclusivo na promoção, salvaguarda, agendamento na abertura, retenção validada, interface e testes de falha/round-trip.
 - `0.2` — 2026-09-05 — Iniciada a implementação; fechados formato, criptografia, senha, persistência, rotas, seleção por caminho absoluto e compatibilidade de schema.
 - `0.1` — 2026-09-05 — Rascunho inicial do módulo completo de Backup e Restauração, com pacote ZIP criptografado, senha configurável em Preferências, validação, retenção e execução recorrente na abertura.

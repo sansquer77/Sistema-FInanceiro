@@ -13,6 +13,34 @@ MODULE_ROOT = WEB_ROOT / "modules"
 
 
 class FrontendModuleContractTest(unittest.TestCase):
+    def test_loan_active_and_history_tabs_preserve_distinct_statuses(self) -> None:
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        app = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+        loans = (MODULE_ROOT / "loans-view.js").read_text(encoding="utf-8")
+        for expected in (
+            'data-loan-tab="active"', 'data-loan-tab="history"',
+            'id="loanActivePanel"', 'id="loanHistoryPanel"',
+            'id="loanHistoryList"', 'id="revolvingLoanHistoryList"',
+        ):
+            self.assertIn(expected, index)
+        self.assertIn('loanHistoryList: document.querySelector("#loanHistoryList")', app)
+        self.assertIn('api("/api/loans?include_archived=true")', loans)
+        self.assertIn("Arquivado · saldo em aberto", loans)
+        self.assertIn("Trocado por outra dívida", loans)
+        self.assertIn("bindRovingTablist", loans)
+
+    def test_loan_amortization_result_explains_payment_path_before_cdi_notes(self) -> None:
+        loans = (MODULE_ROOT / "loans-view.js").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+        self.assertIn("O prazo cai de ${result.baseline_months} para ${result.months} meses", loans)
+        self.assertIn('"Amortização extraordinária agora"', loans)
+        self.assertIn('"Prazo sem amortização"', loans)
+        self.assertIn('"Prazo com esta amortização"', loans)
+        self.assertIn("loan-study-result-primary", loans)
+        self.assertIn("loan-study-result-footnote", loans)
+        self.assertLess(loans.index("${primaryMessage ?"), loans.index("${notes.map"))
+        self.assertIn("font-weight: 650", styles)
+
     def test_backup_preferences_expose_full_validated_flow(self) -> None:
         index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
         app_source = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
@@ -762,10 +790,29 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("/api/portfolio/allocation-goals", portfolio)
         self.assertIn('data-portfolio-tab="goals"', index)
         self.assertIn('id="portfolioGoalsForm"', index)
-        self.assertIn('portfolio-view.js?v=163', app_source)
+        self.assertRegex(app_source, r'portfolio-view\.js\?v=\d+')
         transition_start = portfolio.index("transitionView(() => {")
         transition_end = portfolio.index("  };", transition_start)
         self.assertIn("renderActivePortfolioTab();", portfolio[transition_start:transition_end])
+
+    def test_loan_study_exposes_optional_gross_cdi_comparison_and_limitations(self) -> None:
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        loans = (MODULE_ROOT / "loans-view.js").read_text(encoding="utf-8")
+        instructions = (MODULE_ROOT / "instructions-content.js").read_text(encoding="utf-8")
+
+        self.assertIn('id="loanCdiComparisonFields"', index)
+        self.assertIn('name="compare_cdi" type="checkbox"', index)
+        self.assertIn('id="loanStudyActionFields"', index)
+        self.assertIn('name="loan_study_type" type="radio" value="payoff"', index)
+        self.assertIn('id="loanAmortizeStudyFields" hidden', index)
+        self.assertIn('study_type: studyType', loans)
+        self.assertIn('Estudo: quitar ou investir', loans)
+        self.assertIn('compare_cdi: studyType === "payoff" || Boolean(formData.get("compare_cdi"))', loans)
+        self.assertIn("cdiComparisonMetrics(result.cdi_comparison, loan.currency)", loans)
+        self.assertIn("taxa CDI diária mais recente publicada", index)
+        self.assertIn("cenário hipotético, não uma previsão", index)
+        self.assertIn("O comparativo CDI é bruto", instructions)
+        self.assertIn("sem recomendar automaticamente quitar ou investir", instructions)
 
 
 if __name__ == "__main__":

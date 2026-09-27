@@ -11,7 +11,9 @@ from financeiro.accounts import create_checking_account
 from financeiro.auth import create_user
 from financeiro.categories import create_category
 from financeiro.cockpit_notifications import build_cockpit_notifications, mark_informational_seen
+from financeiro.backup_settings import record_backup_result
 from financeiro.spending_limits import create_spending_limit, list_spending_limits_with_consumption
+from financeiro.revolving_loans import close_revolving_loan, create_revolving_loan
 import app
 
 
@@ -128,6 +130,35 @@ class CockpitNotificationsTest(unittest.TestCase):
         self.assertEqual(len(overdue), 1)
         self.assertEqual(overdue[0]["action"]["params"], {"card_id": card_id, "month": "2026-08"})
 
+    def test_failed_automatic_backup_creates_actionable_critical_notification(self):
+        with database.get_connection() as conn:
+            conn.execute(
+                """INSERT INTO backup_settings (
+                       id, backup_directory, schedule_frequency, configured_by_user_id,
+                       last_backup_status, updated_at
+                   ) VALUES (1, '/missing-backup-destination', 'on_start', ?, 'failed', '2026-09-03 12:00:00')""",
+                (self.user["id"],),
+            )
+
+        payload = self.build()
+        notification = next(item for item in payload["critical"] if item["type"] == "backup_failure")
+        self.assertEqual(notification["title"], "Backup automático não concluído")
+        self.assertEqual(notification["action"], {
+            "label": "Revisar backup", "route": "user", "params": {"tab": "backup"},
+        })
+        self.assertIn("sistema continua disponível", notification["description"])
+        other = create_user("Bob", "bob@example.com", "strong-password")
+        other_payload = build_cockpit_notifications(
+            other["id"], reference_date=self.today,
+            limits_loader=lambda _user, _month: [], totals_loader=lambda _user, _month: [],
+            calendar_loader=lambda _user, **_kwargs: {"overdue_payables": [], "maturity_30_days": []},
+        )
+        self.assertFalse(any(item["type"] == "backup_failure" for item in other_payload["critical"]))
+
+        record_backup_result(success=True, filename="sistema-financeiro-teste.sfbackup")
+        recovered = self.build()
+        self.assertFalse(any(item["type"] == "backup_failure" for item in recovered["critical"]))
+
     def test_seen_state_is_isolated_by_user(self):
         other = create_user("Bob", "bob@example.com", "strong-password")
         event = {"id": "shared", "asset_identifier": "ITUB4", "payment_date": "2026-09-05"}
@@ -192,6 +223,24 @@ class CockpitNotificationsTest(unittest.TestCase):
     def test_mark_seen_rejects_oversized_identifier(self):
         with self.assertRaises(ValueError):
             mark_informational_seen(self.user["id"], ["x" * 201])
+
+    def test_revolving_swap_reminder_loses_action_after_being_marked_seen(self):
+        loan = create_revolving_loan(self.user["id"], {
+            "name": "Cheque especial", "debt_type": "overdraft", "currency": "BRL",
+            "balance": "500,00", "balance_date": self.today.isoformat(),
+            "rate_percent": "8", "rate_period": "monthly", "capitalization": "daily",
+        })
+        close_revolving_loan(self.user["id"], loan["id"], "swapped")
+
+        initial = self.build()
+        reminder = next(item for item in initial["informational"] if item["type"] == "revolving_swap")
+        self.assertEqual(reminder["action"]["route"], "loans")
+        mark_informational_seen(self.user["id"], [reminder["id"]])
+
+        updated = self.build()
+        reminder = next(item for item in updated["informational"] if item["type"] == "revolving_swap")
+        self.assertTrue(reminder["seen"])
+        self.assertIsNone(reminder["action"])
 
 
 if __name__ == "__main__":

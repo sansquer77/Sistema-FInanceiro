@@ -2,8 +2,8 @@
 tipo: spec
 area: migracao-dados
 status: implementado
-versao: 1.8
-atualizado: 2026-09-11
+versao: 1.14
+atualizado: 2026-09-25
 relacionados:
   - "[[../arquitetura]]"
   - "[[importacao-dados]]"
@@ -16,7 +16,7 @@ aliases: ["Migração do banco para a v2", "Banco v2"]
 # Migração do banco para a v2
 
 > [!info] Status
-> **implementado** · área: `migracao-dados` · atualizado em 2026-09-11 · relacionados: [[../arquitetura]], [[importacao-dados]], [[../adr/0003-sqlite-fonte-de-verdade]], [[../adr/0012-fundacao-v2-contrato-e-migracao-de-dados]]
+> **implementado** · versão: `1.13` · área: `migracao-dados` · atualizado em 2026-09-25 · relacionados: [[../arquitetura]], [[importacao-dados]], [[../adr/0003-sqlite-fonte-de-verdade]], [[../adr/0012-fundacao-v2-contrato-e-migracao-de-dados]]
 
 ## Problema
 
@@ -71,7 +71,7 @@ Usuário existente que atualiza o aplicativo para a linha v2 e usuário novo que
 - `financeiro/database_schema.py` descreve canonicamente o baseline v2: tabelas, constraints, chaves estrangeiras, índices obrigatórios e `PERFORMANCE_INDEXES`. Oferece:
   ```python
   BASELINE_SCHEMA_VERSION = 20000
-  SCHEMA_VERSION = 20003
+  SCHEMA_VERSION = 20009
 
   def create_baseline_tables(conn: sqlite3.Connection) -> None:
       ...
@@ -127,6 +127,12 @@ Usuário existente que atualiza o aplicativo para a linha v2 e usuário novo que
 15. Dado banco criado ou atualizado, quando a inicialização termina, então o arquivo permanece em WAL e o planner recebe `PRAGMA optimize=0x10002`.
 16. Dado banco na versão `20000` ou `20001`, quando o app inicia com a funcionalidade de backup, então aplica em ordem os passos pendentes até `20002`, cria a política global idempotente e amplia `secure_configs` sem perder os segredos existentes.
 17. Dado banco na versão `20002`, quando o app inicia, então migra as quantidades de investimentos de seis para oito casas sem alterar seus valores econômicos nem repetir a multiplicação em aberturas posteriores.
+18. Dado banco na versão `20003`, quando o app inicia, então aplica a migração `20004`, cria idempotentemente as tabelas e índices de objetivos financeiros e preserva todos os dados existentes.
+19. Dado banco na versão `20004`, quando o app inicia, então aplica a migração `20005` de empréstimos e preserva os lançamentos existentes.
+20. Dado banco na versão `20005`, quando o app inicia, então aplica a migração `20006`, adiciona identidade semântica às categorias, associa o nome padrão **Empréstimos e Financiamentos** e preserva IDs, lançamentos e vínculos.
+21. Dado banco na versão `20006`, quando o app inicia, então aplica a migração `20007`, registra pagamentos conciliados, sinaliza contratos com vínculos pendentes legados para revisão manual e preserva os valores existentes sem rollback inferido.
+22. Dado banco na versão `20007`, quando o app inicia, então aplica a migração `20008`, adiciona `loans.amortization_system` com `price` aos contratos existentes sem modificar parcela, prazo, taxa, pagamentos ou compromisso.
+23. Dado banco na versão `20008`, quando o app inicia, então aplica a migração `20009` para indexador, saldo principal/data-base e taxa remuneratória, preservando todos os dados financeiros existentes.
 
 ## Fora de escopo
 
@@ -149,9 +155,21 @@ Usuário existente que atualiza o aplicativo para a linha v2 e usuário novo que
 - [x] Passo 9 — inaugurar migrações incrementais rastreáveis (`20000` → `20001`), fixar `synchronous=FULL`, configurar WAL apenas na inicialização e otimizar estatísticas do planner. Fecha: critérios 13 a 15.
 - [x] Passo 10 — adicionar a migração incremental `20002` para a política global de backup e a senha opcional protegida, preservando bancos compartilhados e segredos existentes. Fecha: critério 16.
 - [x] Passo 11 — adicionar a migração incremental `20003` para quantidades de oito casas no Portfólio, preservando atomicamente posições, resgates, históricos e snapshots existentes. Fecha: critério 17.
+- [x] Passo 12 — adicionar a migração incremental `20004` para objetivos financeiros, movimentações manuais e vínculos exclusivos de cobertura. Fecha: critério 18.
+- [x] Passo 13 — adicionar migração incremental `20005` para empréstimos e vínculos a lançamentos existentes. Fecha: critério 19.
+- [x] Passo 14 — adicionar migração incremental `20007` com estado idempotente de reconhecimento dos pagamentos conciliados e sinalização de revisão para contratos com vínculos pendentes legados. Fecha: critério 21.
+- [x] Passo 14 — adicionar identidade semântica estável para categorias e mapear nomes legado/atual sem alterar IDs. Fecha: critério 20.
+- [x] Passo 15 — adicionar migração incremental idempotente `20008`, preservando contratos anteriores como Price. Fecha: critério 22.
+- [x] Passo 16 — adicionar migração incremental idempotente `20009` para termos de contratos indexados. Fecha: critério 23.
 
 ## Changelog
 
+- `1.14` — 2026-09-25 — Documenta schema `20009` com indexador, saldo principal/data-base e juros remuneratórios separados do CET.
+- `1.13` — 2026-09-25 — Critério `20008` documenta que contratos existentes recebem sistema Price sem mudança nos dados financeiros.
+- `1.12` — 2026-09-25 — Schema `20008` adiciona seleção Price/SAC e mantém os contratos existentes no sistema Price.
+- `1.11` — 2026-09-25 — Schema `20007` adiciona o estado de reconhecimento dos pagamentos de empréstimos após conciliação e marca contratos com vínculos pendentes legados para revisão manual.
+- `1.10` — 2026-09-24 — Schema atual avançado a `20006`; categoria de pagamento de empréstimos recebe identidade estável durante a migração e o nome padrão oficial é atualizado.
+- `1.9` — 2026-09-23 — Schema atual avançado a `20004` com migração incremental idempotente das tabelas e índices de Objetivos Financeiros.
 - `1.8` — 2026-09-11 — Schema atual avançado a `20003`; quantidades do Portfólio passam de seis para oito casas por migração incremental atômica, sem alterar valores existentes.
 - `1.7` — 2026-09-05 — Schema atual avançado a `20002` pela política global de backup; migração incremental preserva instalações compartilhadas e amplia `secure_configs` sem expor ou perder segredos.
 - `1.6` — 2026-09-05 — Evolução pós-baseline passa a usar `user_version` incremental e `schema_migrations`; WAL sai do caminho de cada conexão, durabilidade fica explícita em `FULL` e a inicialização executa `PRAGMA optimize` controlado.

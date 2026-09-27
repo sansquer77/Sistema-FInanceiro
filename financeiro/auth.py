@@ -123,6 +123,13 @@ def delete_user_account(user_id: int, current_password: str) -> None:
         conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
 
 
+def verify_current_password(user_id: int, current_password: str) -> None:
+    with get_connection() as conn:
+        row = conn.execute("SELECT password_hash FROM users WHERE id = ?", (user_id,)).fetchone()
+        if not row or not verify_password(current_password, row["password_hash"]):
+            raise AuthError("Senha atual inválida.")
+
+
 def clear_user_launches(user_id: int, current_password: str) -> None:
     with get_connection() as conn:
         row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()

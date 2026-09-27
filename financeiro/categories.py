@@ -173,6 +173,7 @@ def list_category_items(user_id: int, group_type: object | None = None) -> list[
                     categories.id,
                     categories.name,
                     categories.group_type,
+                    categories.system_key,
                     categories.created_at,
                     (
                         SELECT COUNT(*)
@@ -200,6 +201,7 @@ def list_category_items(user_id: int, group_type: object | None = None) -> list[
                     categories.id,
                     categories.name,
                     categories.group_type,
+                    categories.system_key,
                     categories.created_at,
                     (
                         SELECT COUNT(*)
@@ -630,7 +632,7 @@ DEFAULT_CATEGORIES = {
             "Livros, Apostilas e Material Escolar",
             "Mensalidade Escolar / Faculdade / Pós",
         ],
-        "Empréstimos": [],
+        "Empréstimos e Financiamentos": [],
         "Habitação": [
             "Aluguel / Prestação do Imóvel",
             "Condomínio",
@@ -761,9 +763,11 @@ DEFAULT_CATEGORIES = {
 def seed_default_categories(conn, user_id: int) -> None:
     for group_type, categories in DEFAULT_CATEGORIES.items():
         for category_name, subcategories in categories.items():
+            # spec: categorias-tags-gestao v1.3 — critério 2
+            system_key = "loan_payment" if group_type == "expense" and category_name == "Empréstimos e Financiamentos" else None
             cursor = conn.execute(
-                "INSERT INTO categories (user_id, name, group_type) VALUES (?, ?, ?)",
-                (user_id, category_name, group_type)
+                "INSERT INTO categories (user_id, name, group_type, system_key) VALUES (?, ?, ?, ?)",
+                (user_id, category_name, group_type, system_key)
             )
             category_id = cursor.lastrowid
             for subcategory_name in subcategories:

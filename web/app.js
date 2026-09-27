@@ -66,10 +66,11 @@ import { registerImportsView } from "./modules/imports-view.js";
 import { registerCockpitView } from "./modules/cockpit-view.js";
 import { registerAccountsView } from "./modules/accounts-view.js";
 import { registerCardsView } from "./modules/cards-view.js";
-import { registerPortfolioView } from "./modules/portfolio-view.js?v=163";
+import { registerPortfolioView } from "./modules/portfolio-view.js?v=164";
 import { registerTransactionsView } from "./modules/transactions-view.js";
-import { registerSimulationsView } from "./modules/simulations-view.js";
+import { registerSimulationsView } from "./modules/simulations-view.js?v=2";
 import { registerOperationHistoryView } from "./modules/operation-history-view.js";
+import { registerLoansView } from "./modules/loans-view.js?v=2";
 import { registerInstructionsView } from "./modules/instructions-view.js";
 import { registerGlobalSearch } from "./modules/global-search.js";
 import { registerCommandPalette } from "./modules/command-palette.js";
@@ -190,6 +191,32 @@ const spendingLimitList = document.querySelector("#spendingLimitList");
 const previousLimitMonthButton = document.querySelector("#previousLimitMonthButton");
 const nextLimitMonthButton = document.querySelector("#nextLimitMonthButton");
 const cancelLimitEditButton = document.querySelector("#cancelLimitEditButton");
+const limitsTabButtons = document.querySelectorAll("[data-limits-tab]");
+const limitsTabPanels = document.querySelectorAll("[data-limits-panel]");
+const goalForm = document.querySelector("#goalForm");
+const goalFormPanel = document.querySelector("#goalFormPanel");
+const newGoalButton = document.querySelector("#newGoalButton");
+const goalFormTitle = document.querySelector("#goalFormTitle");
+const goalTargetDateField = document.querySelector("#goalTargetDateField");
+const goalYieldMode = document.querySelector("#goalYieldMode");
+const goalYieldPercentageField = document.querySelector("#goalYieldPercentageField");
+const cancelGoalEditButton = document.querySelector("#cancelGoalEditButton");
+const goalMessage = document.querySelector("#goalMessage");
+const financialGoalList = document.querySelector("#financialGoalList");
+const emergencyReserveTotal = document.querySelector("#emergencyReserveTotal");
+const emergencyReserveComponents = document.querySelector("#emergencyReserveComponents");
+const activeGoalsCount = document.querySelector("#activeGoalsCount");
+const goalsReservedTotal = document.querySelector("#goalsReservedTotal");
+const goalsMonthlyTotal = document.querySelector("#goalsMonthlyTotal");
+const uncoveredGoalsCount = document.querySelector("#uncoveredGoalsCount");
+const goalActionPanel = document.querySelector("#goalActionPanel");
+const goalActionEyebrow = document.querySelector("#goalActionEyebrow");
+const goalActionTitle = document.querySelector("#goalActionTitle");
+const closeGoalActionButton = document.querySelector("#closeGoalActionButton");
+const goalMovementForm = document.querySelector("#goalMovementForm");
+const goalFundingForm = document.querySelector("#goalFundingForm");
+const goalFundingSource = document.querySelector("#goalFundingSource");
+const goalActionMessage = document.querySelector("#goalActionMessage");
 const reportMonthLabel = document.querySelector("#reportMonthLabel");
 const previousReportMonthButton = document.querySelector("#previousReportMonthButton");
 const nextReportMonthButton = document.querySelector("#nextReportMonthButton");
@@ -512,6 +539,7 @@ const moduleViews = {
   cardLaunches: document.querySelector("#cardLaunchesView"),
   transactions: document.querySelector("#transactionsView"),
   portfolio: document.querySelector("#portfolioView"),
+  loans: document.querySelector("#loansView"),
   limits: document.querySelector("#limitsView"),
   simulations: document.querySelector("#simulationsView"),
   reports: document.querySelector("#reportsView"),
@@ -530,7 +558,8 @@ const viewTitles = {
   cardLaunches: ["Lançamentos", "Fatura de Cartões"],
   transactions: ["Lançamentos", "Extrato de Contas"],
   portfolio: ["Gestão", "Portfólio"],
-  limits: ["Gestão", "Limite de gastos"],
+  loans: ["Gestão", "Empréstimos e Financiamentos"],
+  limits: ["Gestão", "Limites"],
   simulations: ["Gestão", "Efeito Borboleta"],
   reports: ["Gestão", "Relatórios"],
   classifications: ["Gestão", "Categorias e tags"],
@@ -548,6 +577,7 @@ const CONTEXTUAL_HELP_TOPICS = {
   cardLaunches: "lancar-compras-cartao",
   transactions: "primeiro-lancamento",
   portfolio: "entender-portfolio",
+  loans: "emprestimos-quitacao",
   limits: "limites-gastos",
   simulations: "simulacao-borboleta",
   reports: "relatorios",
@@ -693,6 +723,12 @@ const limitsView = registerLimitsView({
     nextLimitMonthButton,
     cancelLimitEditButton,
     cockpitLimitAlert,
+    limitsTabButtons, limitsTabPanels, goalForm, goalFormPanel, newGoalButton, goalFormTitle, goalTargetDateField,
+    goalYieldMode, goalYieldPercentageField,
+    cancelGoalEditButton, goalMessage, financialGoalList, emergencyReserveTotal,
+    emergencyReserveComponents, activeGoalsCount, goalsReservedTotal, goalsMonthlyTotal,
+    uncoveredGoalsCount, goalActionPanel, goalActionEyebrow, goalActionTitle,
+    closeGoalActionButton, goalMovementForm, goalFundingForm, goalFundingSource, goalActionMessage,
   },
   navButtons,
   api,
@@ -904,6 +940,19 @@ const cockpitView = registerCockpitView({
       showModule("transactions");
       return;
     }
+    if (action?.route === "loans") {
+      showModule("loans");
+      if (params.revolving_loan_id) {
+        await loansView.openPriceConversionDraft(Number(params.revolving_loan_id));
+      }
+      return;
+    }
+    if (action?.route === "user") {
+      showModule("user");
+      await userAdminViewController.loadPreferences({ force: true });
+      userAdminViewController.switchUserTab(params.tab === "backup" ? "backup" : "geral");
+      return;
+    }
     if (action?.route === "cards") {
       if (isValidMonthValue(params.month)) state.cardInvoiceMonth = params.month;
       if (params.card_id) state.selectedCreditCardId = String(params.card_id);
@@ -1068,6 +1117,9 @@ const transactionsView = registerTransactionsView({
     investmentFixedIncomePreview,
     transactionCategory,
     transactionCategoryRow,
+    transactionLoan: document.querySelector("#transactionLoan"),
+    transactionRevolvingLoan: document.querySelector("#transactionRevolvingLoan"),
+    loanPaymentRow: document.querySelector("#loanPaymentRow"),
     transactionSubcategory,
     transactionClassificationSuggestion,
     seriesKind,
@@ -1155,7 +1207,10 @@ const simulationsView = registerSimulationsView({
     simulationEmptyState,
     simulationResultsContent,
     resetSimulationButton,
+    simulationModeTabs: document.querySelectorAll("[data-simulation-mode-tab]"),
+    simulationModePanels: document.querySelectorAll("[data-simulation-mode-panel]"),
   },
+  loadLoanStudies: () => loansView.loadLoanStudies().catch((error) => { document.querySelector("#loanStudyResult").textContent = error.message; }),
   formatMoney,
   setFormBusy,
 });
@@ -1250,6 +1305,25 @@ const portfolioView = registerPortfolioView({
 });
 
 navButtons.forEach((button) => button.addEventListener("click", () => showModule(button.dataset.view)));
+const loansView = registerLoansView({
+  api,
+  fetchAllListed,
+  escapeHtml,
+  elements: {
+    loanForm: document.querySelector("#loanForm"), loanMessage: document.querySelector("#loanMessage"),
+    loanFormPanel: document.querySelector("#loanFormPanel"), newLoanButton: document.querySelector("#newLoanButton"),
+    loanList: document.querySelector("#loanList"), simulationForm: document.querySelector("#loanSimulationForm"),
+    loanHistoryList: document.querySelector("#loanHistoryList"), revolvingLoanHistoryList: document.querySelector("#revolvingLoanHistoryList"),
+    simulationTarget: document.querySelector("#loanSimulationTarget"), studyResult: document.querySelector("#loanStudyResult"),
+    strategyForm: document.querySelector("#loanStrategyForm"), strategyCurrency: document.querySelector("#loanStrategyCurrency"),
+    loanCurrencyTotals: document.querySelector("#loanCurrencyTotals"),
+    revolvingLoanForm: document.querySelector("#revolvingLoanForm"), revolvingLoanFormPanel: document.querySelector("#revolvingLoanFormPanel"),
+    newRevolvingLoanButton: document.querySelector("#newRevolvingLoanButton"), cancelRevolvingLoanForm: document.querySelector("#cancelRevolvingLoanForm"),
+    revolvingLoanList: document.querySelector("#revolvingLoanList"), revolvingLoanMessage: document.querySelector("#revolvingLoanMessage"),
+    loanFormTitle: document.querySelector("#loanFormTitle"), cancelLoanEdit: document.querySelector("#cancelLoanEdit"),
+    decisionModal,
+  },
+});
 document.querySelectorAll(".nav-group-toggle").forEach((toggle) => {
   toggle.addEventListener("click", () => {
     const group = toggle.closest(".nav-group");
@@ -1269,6 +1343,14 @@ contextualHelpButton?.addEventListener("click", () => {
   if (!topicId) {
     return;
   }
+  showModule("instructions");
+  instructionsView.openTopic(topicId);
+});
+document.addEventListener("click", (event) => {
+  const helpButton = event.target.closest("[data-open-instructions-topic]");
+  if (!helpButton) return;
+  const topicId = helpButton.dataset.openInstructionsTopic;
+  if (!topicId) return;
   showModule("instructions");
   instructionsView.openTopic(topicId);
 });
@@ -1432,14 +1514,14 @@ async function loadAppInfo() {
   try {
     state.appInfo = await api("/api/app-info");
   } catch (error) {
-    state.appInfo = { version: "2.0.2" };
+    state.appInfo = { version: "2.1.0" };
   }
   renderAppInfo();
 }
 
 function renderAppInfo() {
   if (aboutAppVersion) {
-    aboutAppVersion.textContent = state.appInfo?.version || "2.0.2";
+    aboutAppVersion.textContent = state.appInfo?.version || "2.1.0";
   }
 }
 
@@ -1580,9 +1662,11 @@ function showModule(view) {
   }
   if (view === "limits") {
     limitsView.renderLimits();
+    limitsView.loadGoalDataIfNeeded().catch((error) => setMessage(goalMessage, error.message, "error"));
   }
   if (view === "simulations") {
     simulationsView.loadSimulationFormData().catch((error) => setMessage(simulationMessage, error.message, "error"));
+    simulationsView.refreshActiveStudyData()?.catch((error) => { document.querySelector("#loanStudyResult").textContent = error.message; });
   }
   if (view === "reports") {
     reportsView.renderReports();
@@ -1590,6 +1674,7 @@ function showModule(view) {
   if (view === "portfolio") {
     portfolioView.onEnter().catch((error) => setMessage(portfolioMessage, error.message, "error"));
   }
+  if (view === "loans") loansView.loadLoans().catch((error) => { document.querySelector("#loanMessage").textContent = error.message; });
   if (view === "creditCards") {
     renderCreditCards();
     if (!state.cardDataLoaded) {

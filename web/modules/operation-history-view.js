@@ -11,6 +11,7 @@ const MODULE_LABELS = {
   imports: "Importação",
   classifications: "Categorias",
   limits: "Limites",
+  loans: "Empréstimos e financiamentos",
   user_admin: "Usuário",
 };
 

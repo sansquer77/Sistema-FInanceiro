@@ -2,14 +2,15 @@
 tipo: spec
 area: simulacoes
 status: implementado
-versao: 1.9
-atualizado: 2026-09-04
+versao: 2.16
+atualizado: 2026-09-27
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
   - "[[cartoes]]"
   - "[[limites-gastos]]"
   - "[[relatorios]]"
+  - "[[emprestimos-quitacao]]"
   - "[[arquitetura]]"
 tags: [spec, "area/simulacoes", "status/implementado"]
 aliases: ["Efeito Borboleta", "Simulador Financeiro"]
@@ -18,15 +19,15 @@ aliases: ["Efeito Borboleta", "Simulador Financeiro"]
 # Efeito Borboleta
 
 > [!info] Status
-> **implementado** · área: `simulacoes` · atualizado em 2026-09-04 · relacionados: [[contas-correntes]], [[lancamentos]], [[cartoes]], [[limites-gastos]], [[relatorios]]
+> **implementado** · versão: `2.16` · área: `simulacoes` · atualizado em 2026-09-27 · relacionados: [[contas-correntes]], [[lancamentos]], [[cartoes]], [[limites-gastos]], [[relatorios]], [[emprestimos-quitacao]]
 
 ## Problema
 
-O usuário precisa avaliar o impacto de uma possível receita ou despesa antes de assumir o compromisso financeiro, sem criar lançamentos reais, alterar saldos, afetar faturas ou poluir relatórios históricos.
+O usuário precisa avaliar o impacto de uma possível receita, despesa ou estratégia de quitação antes de assumir o compromisso financeiro, sem criar lançamentos reais, alterar saldos ou poluir relatórios históricos.
 
 ## Usuário
 
-Qualquer usuário autenticado localmente que queira testar cenários financeiros hipotéticos, como uma compra planejada, uma renda extra, uma despesa emergencial ou a antecipação de uma decisão de consumo.
+Qualquer usuário autenticado localmente que queira testar cenários financeiros hipotéticos de receitas, despesas e quitação de empréstimos.
 
 ## Jornada
 
@@ -36,6 +37,8 @@ Qualquer usuário autenticado localmente que queira testar cenários financeiros
 4. O sistema calcula o impacto projetado sem gravar nenhum lançamento.
 5. O usuário visualiza comparativos entre a situação atual e o cenário simulado.
 6. O usuário descarta a simulação ao sair, limpar o formulário ou iniciar outro cenário.
+7. No Efeito Borboleta, o usuário alterna entre as abas **Receitas/Despesas** e **Empréstimos** para acessar estudos teóricos independentes.
+8. Na aba **Empréstimos**, simula pagamento adicional por contrato e compara planos avalanche/bola de neve sem alterar o cadastro, os lançamentos ou saldos reais.
 
 ## Dados
 
@@ -114,6 +117,10 @@ Resposta esperada:
 | `virtual_items` | Lista de parcelas ou ocorrências virtuais usadas para calcular a projeção. Permanência no contrato da API; não é listada na interface. |
 | `warnings` | Alertas não bloqueantes, como saldo projetado negativo ou limite ultrapassado. |
 
+## Evolução em estudo
+
+A aba **Empréstimos** inclui o estudo individual do Crédito Rotativo: pagamento mensal planejado com data, amortização extraordinária opcional e comparação facultativa com proposta Price informada pelo usuário. O cenário Price só é marcado como mais barato se o custo total estimado for menor que o cenário rotativo quitado. Rotativos também têm prioridade nas estratégias avalanche e bola de neve. Pagamentos parciais de fatura alimentam o card rotativo pelo residual existente em Cartões. Todas as simulações são somente leitura: lançamentos conciliados e Cartões alimentam o acompanhamento; Empréstimos não gera movimentos financeiros. A validação completa da V1 permanece em andamento.
+
 ## Critérios de aceite
 
 - Dado uma conta com saldo de R$ 1.000,00, quando o usuário simula uma despesa de R$ 250,00, então o sistema mostra saldo projetado de R$ 750,00 sem alterar o saldo real da conta.
@@ -142,6 +149,23 @@ Resposta esperada:
 - Dado uma simulação válida, quando a projeção diária é renderizada, então ela possui 15 colunas e três linhas: Previsto, Simulado e Diferença.
 - Dado `simulations-view.js` atualizado com um `app.js` ou HTML anterior ainda em cache, quando o contêiner semanal não é injetado ou não existe, então a simulação continua renderizando os demais resultados sem erro de JavaScript.
 - Dado o módulo aberto sem simulação válida, quando a tela é exibida, então as seções de resultados, gráfico, projeção e alertas permanecem ocultas e um único estado informativo orienta o usuário.
+- Dado o módulo Efeito Borboleta, quando aberto, então oferece abas acessíveis **Receitas/Despesas** e **Empréstimos**, mantendo os estudos de dívidas organizados em uma única área de simulações.
+- Dado a aba **Empréstimos** aberta, quando o usuário executa estudo de pagamento adicional ou plano por estratégia, então usa os cálculos determinísticos de empréstimos sem alterar contratos, lançamentos, contas ou saldos.
+- Dado o estudo de pagamento adicional, quando o usuário aciona seu botão `?`, então as Instruções abrem o tópico que explica os parâmetros, as opções de amortização, a interpretação dos resultados e a ausência de efeitos financeiros reais.
+- Dado o plano por estratégia, quando o usuário aciona seu botão `?`, então as Instruções abrem o tópico que explica avalanche, bola de neve, orçamento por moeda e a ausência de efeitos financeiros reais.
+- Dado o estudo de pagamento adicional, quando o resultado é exibido, então separa a parcela contratual, o adicional mensal e o desembolso mensal total; explica que reduzir parcela ou prazo se aplica à amortização extraordinária de pagamento único.
+- Dado os dois estudos de empréstimos, quando os formulários são exibidos, então há uma única área de resultado abaixo deles; cada nova análise substitui a resposta anterior e identifica o estudo executado.
+- Dado um contrato Price/SAC elegível no estudo individual, quando a comparação estiver ativa, então a área compartilhada apresenta lado a lado a economia estimada de juros e o saldo bruto projetado a 100% CDI para os mesmos aportes até o prazo-base original.
+- Dado a comparação CDI, quando os resultados são exibidos, então mostram principal aportado, rendimento bruto, data da última taxa diária publicada e a premissa constante identificada como cenário hipotético.
+- Dado os valores do investimento de comparação, quando apresentados, então informam que impostos, IOF, tarifas e liquidez do produto real não foram considerados e não recomendam automaticamente quitar ou investir.
+- Dado uma falha ao consultar o CDI, quando a simulação é concluída, então a projeção de quitação permanece visível e o comparativo informa indisponibilidade sem descartar os demais resultados.
+- Dado contrato rotativo ou dados incompletos/desatualizados, quando a opção CDI é exibida, então ela fica indisponível com orientação para completar ou revisar um contrato Price/SAC.
+- Dado contrato Price/SAC selecionado no estudo individual, quando a pessoa não escolheu uma finalidade, então a interface solicita primeiro **Quitar agora** ou **Amortizar**.
+- Dado que a pessoa escolheu **Quitar agora**, quando simula, então a área compartilhada mostra o valor de quitação estimado, o custo financeiro futuro evitado e a comparação com o investimento a 100% CDI do mesmo valor pelo prazo restante.
+- Dado que a pessoa escolheu **Amortizar**, quando simula, então vê os campos para adicional mensal e pagamento extraordinário; a comparação CDI pode ser ativada para esses mesmos aportes.
+- Dado um estudo de amortização com redução de prazo, quando o resultado aparece, então informa em destaque o valor amortizado agora, a parcela que continuará sendo paga, o prazo anterior e o novo prazo, além de esclarecer que a última parcela pode ser menor.
+- Dado um estudo de amortização com redução de parcela, quando o resultado aparece, então informa em destaque o valor amortizado agora, a nova parcela estimada e que o prazo original será mantido.
+- Dado um resultado com premissas e ressalvas do CDI, quando o card é exibido, então a orientação principal e os pagamentos aparecem antes, com maior destaque visual que disclaimers, que ficam em texto secundário.
 
 - Dado um cenário exibido, quando o comparativo é renderizado, então os cards mensais ficam acima da área exclusiva do gráfico e a tabela diária permanece abaixo da legenda, sem sobreposição (estrutura automatizada; aparência em Safari requer validação manual).
 
@@ -150,13 +174,18 @@ Resposta esperada:
 - Uso de LLM local, Gemini ou qualquer API externa para interpretar texto livre.
 - Criação automática de lançamentos reais a partir de uma simulação.
 - Persistência de cenários simulados, histórico de simulações ou comparação entre múltiplos cenários salvos.
-- Simulações de transferências, câmbio, investimentos, resgates e encerramentos de posições.
+- Simulações de transferências, câmbio, movimentações reais de investimentos, resgates e encerramentos de posições. A comparação teórica de quitação com CDI bruto não cria ordens nem movimenta posições.
 - Simulações avançadas de cartão de crédito e fatura na primeira entrega.
 - Recomendações financeiras automáticas ou aconselhamento financeiro personalizado.
 
 ## Plano de implementação
 
-- [x] Passo 6 — Separar cards e plot em linhas de layout, manter tabela no fluxo e verificar o contrato de apresentação. Fecha: critério 26. Teste estrutural automatizado aprovado; validação visual no Safari pendente.
+- [x] Passo 10 — Integrar o comparativo quitação × investimento bruto a 100% CDI ao estudo individual, renderizar premissas e limitações na área compartilhada sem persistir cenários ou gerar ação financeira. Validação visual na homologação segue manual.
+- [x] Passo 11 — Explicitar a sequência de pagamentos após amortização (aporte extraordinário, parcela, prazo antes/depois) e reduzir a ênfase visual das ressalvas do comparativo.
+- [x] Passo 9 — Esclarecer que o adicional mensal é pago além da parcela contratual, identificar a amortização extraordinária como pagamento único e organizar as respostas dos dois estudos em uma área comum abaixo dos formulários, substituída a cada análise. Fecha: critérios 32 e 33.
+- [x] Passo 8 — Adicionar ajuda contextual independente aos estudos de pagamento adicional e plano por estratégia, com tópicos correspondentes na Central de Ajuda. Fecha: critérios 30 e 31.
+- [x] Passo 7 — Reunir os estudos de quitação na aba Empréstimos, preservando os formulários teóricos e os cálculos do backend. Fecha: critérios 27 e 28.
+- [x] Passo 6 — Separar cards e plot em linhas de layout, manter tabela no fluxo e verificar o contrato de apresentação. Fecha: critério 26. Teste estrutural automatizado e validação visual em Safari concluídos.
 - [x] Passo 1 — Preservar o núcleo determinístico, isolamento, moedas, validações e projeção mensal existentes. Fecha: critérios 1–18.
 - [x] Passo 2 — Substituir os cortes semanais por janela diária dinâmica e resumo de risco no backend. Fecha: critérios 19–24.
 - [x] Passo 3 — Renderizar a linha do tempo diária e mensagens de causa/prevenção de saldo negativo no frontend. Fecha: critérios 19, 22–24.
@@ -165,6 +194,23 @@ Resposta esperada:
 
 ## Changelog
 
+- `2.16` — 2026-09-27 — Resultado de amortização passa a explicar em destaque a parcela após o aporte, prazo antes/depois e a redução de ênfase das ressalvas.
+- `2.15` — 2026-09-27 — Separa o estudo individual entre quitação integral e amortização; apresenta comparação automática quitação × CDI no primeiro fluxo.
+- `2.14` — 2026-09-27 — Define que o comparativo CDI usa a última taxa diária publicada, projetada constante como cenário hipotético pelo prazo restante.
+- `2.13` — 2026-09-27 — Implementa o comparativo opcional de quitação e investimento bruto a 100% CDI na aba Empréstimos, com mesmos aportes e prazo original.
+- `2.12` — 2026-09-25 — Adiciona estudo individual de Crédito Rotativo com pagamentos datados, cenário sem pagamento e comparação opcional com oferta Price.
+- `2.11` — 2026-09-25 — Inicia a inclusão dos rotativos nas estratégias de quitação; registra o fluxo unidirecional já conectado e o estudo individual ainda pendente.
+- `2.10` — 2026-09-25 — Alinha o estudo futuro de Crédito Rotativo à regra de mão única e ao plano de implementação definido.
+- `2.9` — 2026-09-25 — Sincroniza a convenção de taxa e calendário do estudo futuro de Crédito Rotativo com a spec de Empréstimos.
+- `2.8` — 2026-09-25 — Estudos de rotativo incluem prioridade nas estratégias e comparação somente leitura com proposta de conversão Price informada pelo usuário.
+- `2.7` — 2026-09-25 — Estudo futuro de Crédito Rotativo passa a considerar o card criado pelo residual de pagamento parcial de fatura e alerta para completar dados.
+- `2.6` — 2026-09-25 — Registra a evolução em estudo de Crédito Rotativo na aba Empréstimos, preservando o caráter somente leitura e vinculando às decisões pendentes da spec de Empréstimos.
+- `2.5` — 2026-09-25 — Estudos de empréstimos compartilham uma única área de resultado abaixo dos formulários, que exibe apenas a análise mais recente; pagamento adicional mensal e amortização extraordinária ficam diferenciados.
+- `2.4` — 2026-09-25 — Resultados dos estudos de empréstimos passam para cards abaixo dos formulários; pagamento adicional mensal e amortização extraordinária são diferenciados e o desembolso total fica explícito.
+- `2.3` — 2026-09-25 — Validação visual do critério 26 confirmada em Safari; spec promovida para implementado.
+- `2.2` — 2026-09-25 — Checklist mantém pendente a validação visual em Safari do critério 26, ainda necessária para concluir a entrega geral do módulo.
+- `2.1` — 2026-09-25 — Estudos de pagamento adicional e plano por estratégia ganham botões `?` que abrem instruções específicas sobre parâmetros, resultados e caráter apenas teórico.
+- `2.0` — 2026-09-24 — Efeito Borboleta passa a reunir estudos de Receitas/Despesas e Empréstimos em abas distintas; simulações de quitação permanecem teóricas e sem efeitos financeiros.
 - `1.9` — 2026-09-04 — Resultado inicial usa um único estado informativo; conteúdo dependente fica oculto até simulação válida.
 
 - `1.8` — 2026-08-31 — Comparativo mensal com cards acima do gráfico e tabela diária abaixo; rolagem horizontal interna em áreas estreitas. Corrigida descrição antiga que omitia a tabela abaixo do gráfico.

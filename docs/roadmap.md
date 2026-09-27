@@ -2,8 +2,8 @@
 tipo: roadmap
 area: meta
 status: implementado
-versao: 1.8
-atualizado: 2026-08-30
+versao: 1.27
+atualizado: 2026-09-25
 relacionados:
   - "[[visao-produto]]"
   - "[[requisitos]]"
@@ -15,7 +15,7 @@ aliases: ["Roadmap", "Replicação Local"]
 # Roadmap
 
 > [!info] Status
-> **implementado** (módulos 1–12 concluídos; módulos 13, 14 e 15 descartados; módulo 16 implementado; módulo 17 planejado) · área: `meta` · atualizado em 2026-08-30
+> **implementado** (módulos 1–12 e 16–19 concluídos; módulos 13–15 descartados) · área: `meta` · atualizado em 2026-09-25
 
 Este documento organiza a evolução do Sistema Financeiro e serve de histórico de decisões de sequenciamento. Módulos planejados que ainda não iniciaram ficam com status `planejado`.
 
@@ -50,7 +50,10 @@ Este documento organiza a evolução do Sistema Financeiro e serve de histórico
 | 14 | Exportação direta de dados em outros formatos. | ❌ Descartado — arquivo SQLite já é acessível por leitor genérico ou agente de IA, sem justificar dependência nova | [[exportacao-dados]] |
 | 15 | Imposto de Renda (IR): apuração mensal de DARF por classe de ativo do Portfólio e relatório anual de apoio à declaração IRPF. | ❌ Descartado — custo de manutenção das regras fiscais não compensa para uso familiar | [[imposto-renda]] |
 | 16 | Score de Saúde Financeira: indicador síntese (0 a 1000) e diagnóstico de 5 pilares de estabilidade financeira. | ✅ Implementado | [[specs/score-saude-financeira]] |
-| 17 | Fundação do frontend v2: ApexCharts vendorizado, IMask, Command Palette nativa e virtualização de listas extensas. | 📝 Planejado | [[specs/frontend-fundacao-v2]] |
+| 17 | Fundação do frontend v2: ApexCharts vendorizado, IMask, Command Palette nativa e virtualização de listas extensas. | ✅ Implementado | [[specs/frontend-fundacao-v2]] |
+| 18 | Objetivos financeiros e fundos de provisão com Reserva de Emergência, exclusividade de recursos e projeções comparativas. | ✅ Implementado | [[specs/objetivos-financeiros]] |
+| 19 | Empréstimos e quitação: contratos e pagamentos vinculados; estudos Price/SAC em todas as moedas; evolução atual para TR, IPCA e poupança indexados. | 🚧 Em implementação | [[specs/emprestimos-quitacao]] |
+| 20 | Crédito Rotativo: cheque especial e rotativo de cartão com juros compostos sobre saldo aberto, pagamento parcial integrado, prioridade nas estratégias e quitação/troca para Price. | 🚧 Em implantação — monitoramento, integração unidirecional, estratégias, estudo individual e rascunho Price após troca implementados; validação completa pendente | [[specs/emprestimos-quitacao#Proposta de desenho — Crédito Rotativo]] |
 
 ---
 
@@ -68,7 +71,7 @@ Este documento organiza a evolução do Sistema Financeiro e serve de histórico
 
 ## Próximas prioridades sugeridas
 
-1. 🚧 Score de Saúde Financeira: indicador de 0 a 1000, 5 pilares e recomendações acionáveis. Ver [[specs/score-saude-financeira]].
+Nenhuma prioridade adicional foi confirmada. Defina a próxima iniciativa na próxima revisão de produto.
 
 Antes de iniciar qualquer item acima, criar spec em `specs/` seguindo [[sdd]] e atualizar esta tabela.
 
@@ -123,6 +126,26 @@ A implementação local não copia a interface de nenhum produto externo. Reprod
 
 ## Changelog
 
+- `1.27` — 2026-09-25 — Adiciona atalho editável para iniciar cadastro Price após troca do rotativo; validação completa da V1 ainda pendente.
+- `1.26` — 2026-09-25 — Registra conclusão da etapa de estudo individual no Efeito Borboleta; validação completa da V1 ainda pendente.
+- `1.25` — 2026-09-25 — Estudo individual de rotativo implementado no Efeito Borboleta; validação completa da V1 ainda pendente.
+- `1.24` — 2026-09-25 — Inicia implementação do Crédito Rotativo; monitoramento, integração unidirecional e prioridade estratégica avançam, enquanto o estudo individual segue pendente.
+- `1.23` — 2026-09-25 — Crédito Rotativo pronto para implantação após fechar critérios, plano e regra de mão única sem geração de lançamentos.
+- `1.22` — 2026-09-25 — Fecha convenções de taxa e calendário do Crédito Rotativo; detalhamento de critérios, plano e experiência permanece pendente.
+- `1.21` — 2026-09-25 — Define prioridade rotativa em avalanche/bola de neve e fluxo de quitação definitiva ou troca com alerta para contrato Price.
+- `1.20` — 2026-09-25 — Confirma residual da fatura parcial como saldo inicial do card rotativo, com alerta para complementar dados contratuais.
+- `1.19` — 2026-09-25 — Iniciado o desenho do Crédito Rotativo em Empréstimos, com acompanhamento de saldo, juros compostos, pagamentos e conversão para Price.
+- `1.18` — 2026-09-25 — Indexação de contratos entra em implementação; Crédito Rotativo é separado como próxima evolução do módulo.
+- `1.17` — 2026-09-25 — Empréstimos passa a aceitar SAC prefixado além de Price, incluindo explicações e cálculos determinísticos.
+- `1.16` — 2026-09-25 — Ajusta a apresentação da V1.1 para sinalizar quando os campos de estimativa não chegam do backend.
+- `1.15` — 2026-09-25 — V1.1 de Empréstimos apresenta no card compromisso nominal, principal estimado e custo financeiro futuro Price.
+- `1.14` — 2026-09-25 — Melhorias dos cards do Consultor concluídas; próxima prioridade fica para decisão em revisão de produto.
+- `1.13` — 2026-09-25 — Efeito Borboleta concluído após validação Safari; próxima prioridade sugerida: enriquecer análises do Consultor com metas e obrigações financeiras.
+- `1.12` — 2026-09-25 — Módulo 19 Empréstimos e quitação aprovado como implementado; próxima prioridade corrigida para a validação visual ainda pendente do Efeito Borboleta.
+- `1.11` — 2026-09-24 — Reorganiza Empréstimos: cadastro/acompanhamento no módulo próprio e estudos na aba de Empréstimos do Efeito Borboleta.
+- `1.10` — 2026-09-24 — Inicia o módulo 19 Empréstimos e quitação após fechamento das decisões da V1.
+
+- `1.9` — 2026-09-23 — Adicionado e implementado o módulo 18, Objetivos Financeiros e Fundos de Provisão, sobre a fundação gráfica da V2; módulo 17 sincronizado como implementado.
 - `1.8` — 2026-08-30 — Adicionado módulo 17, Fundação do frontend v2, em estado planejado; módulo 16 sincronizado como implementado.
 - `1.7` — 2026-07-27 — Adicionado módulo 16 (Score de Saúde Financeira) em status "Em implementação", com spec [[specs/score-saude-financeira]].
 - `1.6` — 2026-07-27 — Módulo 13 (Importação OFX) marcado como descartado antes da criação da spec: o arquivo OFX traz mais complexidade e riscos — um match errado é pior do que não conciliar, porque dá uma falsa sensação de precisão — do que ganhos. Sem spec criada.

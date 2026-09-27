@@ -17,7 +17,7 @@ from financeiro.backup_service import (
     run_scheduled_backup_if_due,
     validate_restore_package,
 )
-from financeiro.backup_settings import save_backup_settings
+from financeiro.backup_settings import BackupSettingsError, save_backup_settings
 
 
 class BackupServiceTests(unittest.TestCase):
@@ -143,6 +143,21 @@ class BackupServiceTests(unittest.TestCase):
             result = run_scheduled_backup_if_due()
         self.assertEqual(result["status"], "success")
         self.assertTrue(Path(result["package_path"]).exists())
+
+    def test_scheduled_backup_with_unavailable_destination_does_not_block_startup(self) -> None:
+        with (
+            mock.patch("financeiro.backup_service.backup_is_due", return_value=True),
+            mock.patch("financeiro.backup_service.load_remembered_password", return_value="strong-password"),
+            mock.patch("financeiro.backup_service.create_backup", side_effect=BackupSettingsError("Diretorio indisponivel.")),
+        ):
+            result = run_scheduled_backup_if_due()
+
+        self.assertEqual(result["status"], "failed")
+        with database.get_connection() as conn:
+            state = conn.execute(
+                "SELECT last_backup_status, last_error FROM backup_settings WHERE id=1"
+            ).fetchone()
+        self.assertEqual(tuple(state), ("failed", "Diretorio indisponivel."))
 
 if __name__ == "__main__":
     unittest.main()

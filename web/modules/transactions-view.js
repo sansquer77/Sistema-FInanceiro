@@ -81,6 +81,9 @@ export function registerTransactionsView({
     investmentFixedIncomePreview,
     transactionCategory,
     transactionCategoryRow,
+    transactionLoan,
+    transactionRevolvingLoan,
+    loanPaymentRow,
     transactionSubcategory,
     transactionClassificationSuggestion,
     seriesKind,
@@ -138,6 +141,8 @@ export function registerTransactionsView({
     subcategoryInput: transactionSubcategory,
     messageElement: transactionClassificationSuggestion,
     renderSubcategories: renderTransactionSubcategories,
+    sourceType: "account",
+    getSourceId: () => transactionAccount.value,
     afterApply: investmentForm.updateFieldState,
     allowedTypes: ["expense", "income", "investment"],
   });
@@ -169,7 +174,10 @@ export function registerTransactionsView({
     classificationSuggestion.markSelectionTouched();
     renderTransactionSubcategories();
     updateInvestmentFieldState();
+    refreshLoanPaymentOptions();
   });
+  transactionLoan.addEventListener("change", () => { if (transactionLoan.value) transactionRevolvingLoan.value = ""; });
+  transactionRevolvingLoan.addEventListener("change", () => { if (transactionRevolvingLoan.value) transactionLoan.value = ""; });
   transactionSubcategory.addEventListener("change", () => {
     classificationSuggestion.markSelectionTouched();
     updateInvestmentFieldState();
@@ -247,6 +255,10 @@ export function registerTransactionsView({
       if (data.type === "investment") {
         data.amount = data.investment_amount || data.amount;
       }
+      if (!data.loan_id) delete data.loan_id;
+      if (!data.revolving_loan_id) delete data.revolving_loan_id;
+      if (data.loan_id) data.revolving_loan_id = "";
+      if (data.revolving_loan_id) data.loan_id = "";
       if (data.type === "exchange") {
         data.type = "transfer";
         data.tags = data.tags || "Câmbio";
@@ -448,6 +460,7 @@ export function registerTransactionsView({
       transactionSubcategory.value = transaction.subcategory_name;
     }
     updateInvestmentFieldState();
+    refreshLoanPaymentOptions(transaction.loan_id, transaction.revolving_loan_id);
     transactionFormTitle.textContent = "Editar lançamento";
     cancelTransactionEditButton.hidden = false;
     transactionForm.querySelector('button[type="submit"]').textContent = "Salvar alterações";
@@ -824,10 +837,35 @@ export function registerTransactionsView({
     transactionCategory.required = needsCategory;
     transactionSubcategory.disabled = !needsCategory;
     renderTransactionCategories();
+    refreshLoanPaymentOptions();
     updateSeriesState();
     updateInvestmentFieldState();
     updateExchangeRateState();
     updateTransferExchangeRateState();
+  }
+
+  async function refreshLoanPaymentOptions(selectedLoanId = null, selectedRevolvingLoanId = null) {
+    const eligible = transactionType.value === "expense" && selectedTransactionCategory()?.system_key === "loan_payment";
+    loanPaymentRow.hidden = !eligible;
+    if (!eligible) {
+      transactionLoan.innerHTML = '<option value="">Sem associação</option>';
+      transactionRevolvingLoan.innerHTML = '<option value="">Sem associação</option>';
+      return;
+    }
+    const account = state.accounts.find((entry) => String(entry.id) === String(transactionAccount.value));
+    try {
+      const { loans = [] } = await api("/api/loans");
+      const matching = loans.filter((loan) => String(loan.currency).toUpperCase() === String(account?.currency || "BRL").toUpperCase());
+      transactionLoan.innerHTML = '<option value="">Sem associação</option>' + matching.map((loan) => `<option value="${Number(loan.id)}">${escapeHtml(loan.name)} (${escapeHtml(loan.currency)})</option>`).join("");
+      if (selectedLoanId && matching.some((loan) => String(loan.id) === String(selectedLoanId))) transactionLoan.value = String(selectedLoanId);
+      const { revolving_loans: revolvingLoans = [] } = await api("/api/revolving-loans");
+      const matchingRevolving = revolvingLoans.filter((loan) => loan.status === "active" && String(loan.currency).toUpperCase() === String(account?.currency || "BRL").toUpperCase());
+      transactionRevolvingLoan.innerHTML = '<option value="">Sem associação</option>' + matchingRevolving.map((loan) => `<option value="${Number(loan.id)}">${escapeHtml(loan.name)} (${escapeHtml(loan.currency)})</option>`).join("");
+      if (selectedRevolvingLoanId && matchingRevolving.some((loan) => String(loan.id) === String(selectedRevolvingLoanId))) transactionRevolvingLoan.value = String(selectedRevolvingLoanId);
+    } catch {
+      transactionLoan.innerHTML = '<option value="">Empréstimos indisponíveis</option>';
+      transactionRevolvingLoan.innerHTML = '<option value="">Dívidas indisponíveis</option>';
+    }
   }
 
   async function handleTransactionAccountChange() {
@@ -838,6 +876,7 @@ export function registerTransactionsView({
     applyWalletAccountDefault();
     applyWalletAccountRestrictions();
     updateTransactionTypeState();
+    classificationSuggestion.schedule();
     await loadSelectedTransactionSlice();
   }
 
@@ -946,9 +985,8 @@ export function registerTransactionsView({
   }
 
   function selectedTransactionCategory() {
-    return state.categories.find((category) => (
-      category.group_type === selectedTransactionGroup() && category.name === transactionCategory.value
-    ));
+    const selectedCategoryId = transactionCategory.selectedOptions?.[0]?.dataset.categoryId;
+    return state.categories.find((category) => String(category.id) === String(selectedCategoryId));
   }
 
   async function updateExchangeRateState() {

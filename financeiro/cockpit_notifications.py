@@ -41,10 +41,16 @@ def build_cockpit_notifications(
     calendar = calendar_loader(user_id, reference_date=reference_date, portfolio_positions=positions)
     critical.extend(_overdue_account_notifications(calendar.get("overdue_payables") or []))
     critical.extend(_overdue_invoice_notifications(user_id, reference_date))
+    critical.extend(_loan_due_notifications(user_id, reference_date))
+    critical.extend(_backup_failure_notifications(user_id))
 
     informational = _maturity_notifications(calendar.get("maturity_30_days") or [], reference_date)
     informational.extend(_portfolio_event_notifications(portfolio_events or [], reference_date))
+    informational.extend(_revolving_swap_notifications(user_id))
     _apply_seen_state(user_id, informational)
+    for item in informational:
+        if item["type"] == "revolving_swap" and item["seen"]:
+            item["action"] = None
 
     critical.sort(key=lambda item: (item["date_or_period"], item["id"]))
     informational.sort(key=lambda item: (item["date_or_period"], item["id"]))
@@ -55,6 +61,64 @@ def build_cockpit_notifications(
         "informational_count": sum(not item["seen"] for item in informational),
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     }
+
+
+def _loan_due_notifications(user_id: int, reference_date: date) -> list[dict]:
+    due_date = reference_date.isoformat()
+    with get_connection() as conn:
+        rows = conn.execute(
+            """SELECT id, name, currency FROM loans
+               WHERE user_id=? AND archived_at IS NULL AND next_due_date=?
+                 AND remaining_installments > 0""",
+            (user_id, due_date),
+        ).fetchall()
+    return [
+        _item(
+            f"loan_due:{row['id']}:{due_date}", "loan_due", "loans",
+            f"Parcela de {row['name']} vence hoje",
+            f"Confira o pagamento do empréstimo em {row['currency']} e associe o lançamento da conta.",
+            due_date, "Ver empréstimo", "loans", {"loan_id": row["id"]},
+        )
+        for row in rows
+    ]
+
+
+def _backup_failure_notifications(user_id: int) -> list[dict]:
+    # spec: alertas-cockpit v1.4 — critério 15
+    # Backup policy is installation-wide; only its responsible user can resolve settings.
+    with get_connection() as conn:
+        row = conn.execute(
+            """SELECT updated_at FROM backup_settings
+               WHERE id=1 AND configured_by_user_id=? AND last_backup_status='failed'""",
+            (user_id,),
+        ).fetchone()
+    if not row:
+        return []
+    failed_at = str(row["updated_at"] or "")[:10] or date.today().isoformat()
+    return [_item(
+        "backup_failure", "backup_failure", "backup",
+        "Backup automático não concluído",
+        "Revise o destino e a política em Preferências > Backup. O sistema continua disponível.",
+        failed_at, "Revisar backup", "user", {"tab": "backup"},
+    )]
+
+
+def _revolving_swap_notifications(user_id: int) -> list[dict]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            """SELECT id, name, currency, updated_at FROM revolving_loans
+               WHERE user_id=? AND status='swapped' ORDER BY updated_at DESC""", (user_id,)
+        ).fetchall()
+    return [
+        _item(
+            f"revolving_swap:{row['id']}", "revolving_swap", "loans",
+            f"Cadastre o novo contrato de {row['name']}",
+            f"A dívida rotativa em {row['currency']} foi marcada como troca. Confira o demonstrativo do credor e cadastre manualmente o novo contrato Price em Empréstimos e Financiamentos.",
+            str(row["updated_at"] or date.today().isoformat())[:10],
+            "Cadastrar contrato", "loans", {"revolving_loan_id": row["id"]},
+        )
+        for row in rows
+    ]
 
 
 def mark_informational_seen(user_id: int, notification_ids: Iterable[str]) -> int:

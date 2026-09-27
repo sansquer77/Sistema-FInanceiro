@@ -564,6 +564,14 @@ def run_scheduled_backup_if_due() -> dict:
         return {"status": "failed"}
     try:
         return create_backup(password)
+    except BackupSettingsError as exc:
+        # spec: backup-restauracao v1.2 — critério 15
+        # A stale or unavailable backup destination must not prevent the app from starting.
+        try:
+            record_backup_result(success=False, error=str(exc))
+        except (OSError, sqlite3.DatabaseError):
+            pass
+        return {"status": "failed"}
     except BackupError:
         return {"status": "failed"}
 

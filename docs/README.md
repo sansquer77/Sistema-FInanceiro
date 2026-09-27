@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 12.59
-atualizado: 2026-09-18
+versao: 16.12
+atualizado: 2026-09-27
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -43,6 +43,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[specs/categorias-tags-gestao]] | ✅ implementado | Classificação |
 | [[specs/cartoes]] | ✅ implementado | Cartões |
 | [[specs/limites-gastos]] | ✅ implementado | Limites |
+| [[specs/objetivos-financeiros]] | ✅ implementado | Objetivos financeiros |
 | [[specs/classificacao-assistida]] | ✅ implementado | Classificação |
 | [[specs/investimentos-portfolio]] | ✅ implementado | Investimentos |
 | [[specs/relatorios]] | ✅ implementado | Relatórios |
@@ -63,7 +64,6 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[specs/privacidade-valores]] | ✅ implementado | Privacidade |
 | [[specs/alerta-nova-versao]] | ✅ implementado | Atualização |
 | [[specs/rentabilidade-portfolio]] | ✅ implementado | Investimentos |
-| [[specs/efeito-borboleta]] | ✅ implementado | Simulações |
 | [[specs/cockpit-calendario]] | ✅ implementado | Cockpit |
 | [[specs/Update Server]] | ✅ implementado | Distribuição |
 | [[distribuição]] | ✅ implementado | Distribuição |
@@ -74,6 +74,9 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[specs/desconcentracao-arquitetura-v2]] | ✅ implementado | Arquitetura v2 |
 | [[specs/alertas-cockpit]] | ✅ implementado | Cockpit |
 | [[specs/frontend-fundacao-v2]] | ✅ implementado | Frontend v2 |
+| [[specs/backup-restauracao]] | ✅ implementado | Backup e restauração |
+| [[specs/emprestimos-quitacao]] | 🚧 em implementação | Empréstimos e Financiamentos |
+| [[specs/efeito-borboleta]] | ✅ implementado | Simulações |
 
 ---
 
@@ -83,8 +86,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 
 | Spec | Status | Área |
 |---|---|---|
-| [[specs/open-finance]] | 📝 rascunho | Open Finance |
-| [[specs/backup-restauracao]] | 🔎 em revisão | Backup e restauração |
+| [[specs/open-finance]] | ❌ depreciado — provedor adequado ao usuário padrão não definido; integração continua fora do escopo atual | Open Finance |
 | [[specs/consolidacao-familiar]] | 📝 rascunho | Consolidação Familiar |
 | [[specs/imposto-renda]] | ❌ depreciado — custo de manter regras fiscais atualizadas não compensa para uso familiar | Investimentos |
 | [[specs/exportacao-dados]] | ❌ depreciado — arquivo SQLite já acessível por leitor genérico ou agente de IA | Exportação |
@@ -111,7 +113,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[adr/0014-desconcentracao-fachadas-e-roteamento]] | Fachadas compatíveis, roteamento declarativo e responsabilidades internas menores na fundação v2. |
 | [[adr/0015-ssrf-ai-endpoints]] | Validação de endpoints configuráveis de IA contra SSRF, com opt-in por env para provedores locais. |
 | [[adr/0016-calendario-mercado-anbima]] | Calendário nacional ANBIMA persistido localmente como fonte única para dias úteis derivados de eventos B3. |
-| [[adr/0018-backup-completo-criptografado]] | Decisão em revisão do pacote completo de backup com container ZIP e payload criptografado autenticado. |
+| [[adr/0018-backup-completo-criptografado]] | Pacote completo de backup com container ZIP e payload criptografado autenticado, validado nos runtimes distribuídos. |
 
 ---
 
@@ -152,6 +154,92 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `16.12` — 2026-09-27 — [[specs/objetivos-financeiros]] v0.18 ajusta o gráfico de projeção, eixos e legenda para cards em duas colunas.
+- `16.11` — 2026-09-27 — [[specs/objetivos-financeiros]] v0.17 e [[specs/instrucoes-app]] v1.27 documentam cálculo e comportamento operacional de Meta, Provisão anual e Reserva contínua.
+- `16.10` — 2026-09-27 — [[specs/objetivos-financeiros]] v0.16 define reinício auditável de provisão anual e retenção de investimentos com saldo; [[specs/instrucoes-app]] v1.26 sincronizada; arquitetura v4.39 e requisitos v3.34 atualizados.
+- `16.9` — 2026-09-27 — [[specs/objetivos-financeiros]] v0.15 compacta os cards e explica os tipos de objetivo; [[specs/instrucoes-app]] v1.25 sincronizada.
+- `16.8` — 2026-09-27 — [[specs/efeito-borboleta]] v2.16 esclarece o resultado de amortização e reduz a ênfase das ressalvas CDI.
+- `16.7` — 2026-09-27 — [[specs/emprestimos-quitacao]] v0.57 adiciona a aba Histórico para contratos quitados/arquivados e pagamentos preservados; arquitetura v4.38 e requisitos v3.33 atualizados.
+- `16.6` — 2026-09-27 — [[specs/emprestimos-quitacao]] v0.56 e [[specs/efeito-borboleta]] v2.15 separam o estudo entre quitar agora (com comparação CDI automática) e amortizar (com parâmetros adicionais).
+- `16.5` — 2026-09-27 — [[specs/emprestimos-quitacao]] v0.55 e [[specs/efeito-borboleta]] v2.14 simplificam a premissa CDI para a última taxa diária publicada, mantida constante como cenário hipotético.
+- `16.4` — 2026-09-27 — [[specs/emprestimos-quitacao]] v0.54 e [[specs/efeito-borboleta]] v2.13 implementam a comparação indicativa entre quitação e investimento bruto dos mesmos aportes a 100% CDI no prazo original.
+- `16.3` — 2026-09-26 — [[specs/emprestimos-quitacao]] v0.53 implementa a premissa automática de indexadores com histórico oficial de doze meses e sinaliza/bloqueia o principal indexado desatualizado após pagamento conciliado.
+- `16.2` — 2026-09-26 — [[specs/emprestimos-quitacao]] v0.52 define a premissa futura dos indexadores pela taxa efetiva acumulada dos últimos 12 meses publicados, sinaliza revisão do principal após pagamento conciliado e amplia os testes Price/SAC × TR/IPCA/poupança.
+- `16.1` — 2026-09-25 — [[specs/emprestimos-quitacao]] v0.51 torna auditoria transacional no Crédito Rotativo e corrige avalanche/bola de neve com rotativos; [[specs/historico-operacoes]] v1.5 documenta o módulo e entidade.
+- `16.0` — 2026-09-25 — Registra o ciclo do alerta de troca: rascunho Price editável e lembrete marcado como lido após salvar o novo contrato.
+- `15.9` — 2026-09-25 — Registra o atalho editável para abrir cadastro Price a partir do alerta de troca do Crédito Rotativo.
+- `15.8` — 2026-09-25 — Registra etapa concluída do estudo individual do rotativo e atualização das instruções para pagamentos datados e comparação opcional Price.
+- `15.7` — 2026-09-25 — Atualiza [[specs/efeito-borboleta]] e [[specs/emprestimos-quitacao]] com estudo individual de rotativo e comparação opcional Price.
+- `15.6` — 2026-09-25 — [[specs/emprestimos-quitacao]] inicia o acompanhamento rotativo e inclui os contratos nas estratégias; estudo individual permanece em implementação.
+- `15.5` — 2026-09-25 — Documenta o início da implantação de Crédito Rotativo em Empréstimos e a integração unidirecional com Conta/Cartão.
+- `15.4` — 2026-09-25 — [[specs/emprestimos-quitacao]] fecha critérios e plano do Crédito Rotativo com regra explícita de mão única; [[specs/cartoes]] sincronizada.
+- `15.3` — 2026-09-25 — [[specs/emprestimos-quitacao]] define convenção de taxa diária/mensal, base de dias, data de pagamento e arredondamento para Crédito Rotativo.
+- `15.2` — 2026-09-25 — Rotativos têm prioridade nos estudos avalanche/bola de neve e podem ser encerrados como quitação ou troca, com alerta para cadastrar manualmente o Price.
+- `15.1` — 2026-09-25 — Pagamento parcial de fatura passa a ser a origem desenhada do saldo de um card rotativo, com alerta de dados incompletos e sem duplicação contábil.
+- `15.0` — 2026-09-25 — Iniciado na spec de Empréstimos o desenho do Crédito Rotativo para cheque especial e cartão, separando-o dos modelos Price/SAC.
+- `14.9` — 2026-09-25 — Backup automático com destino inválido deixa de bloquear a inicialização e gera alerta na Central de Notificações.
+- `14.8` — 2026-09-25 — Estratégias avalanche/bola de neve passam a incluir contratos indexados e destacar a correção estimada.
+- `14.7` — 2026-09-25 — Estudo individual aplica fatores históricos TR/IPCA/poupança e mostra a hipótese anual usada para períodos futuros.
+- `14.6` — 2026-09-25 — Schema `20009` e cadastro inicial de dados contratuais para indexadores; cálculos seguem em implementação.
+- `14.5` — 2026-09-25 — Spec de Empréstimos reaberta para indexação TR/IPCA/poupança; Crédito Rotativo fica registrado como evolução futura própria.
+- `14.4` — 2026-09-25 — Empréstimos passa a selecionar Price ou SAC prefixado, com migração compatível e guia comparativo no cadastro e na Central de Ajuda.
+- `14.3` — 2026-09-25 — Cards de empréstimos deixam de interpretar campos de estimativa ausentes como valores zerados.
+- `14.2` — 2026-09-25 — Central de Ajuda explica a leitura dos valores nominais e estimados do painel de empréstimos.
+- `14.1` — 2026-09-25 — Central de Ajuda explica a leitura do compromisso nominal, principal e juros estimados no painel de empréstimos.
+- `14.0` — 2026-09-25 — Empréstimos passa a distinguir no card compromisso nominal, principal estimado e juros futuros do modelo Price.
+- `13.9` — 2026-09-25 — Empréstimos posiciona editar, arquivar e excluir no topo do card; exclusão valida senha e preserva os lançamentos associados.
+- `13.8` — 2026-09-25 — Empréstimos agrupa gestão no cabeçalho dos cards e permite excluir contratos com senha, preservando os lançamentos da conta.
+- `13.7` — 2026-09-25 — Estudos de empréstimos passam a compartilhar uma área de resultado abaixo dos formulários; cada nova simulação substitui a anterior.
+- `13.6` — 2026-09-25 — A Central de Ajuda explica que o adicional mensal é somado à parcela contratual, enquanto a opção de redução se aplica à amortização extraordinária única.
+- `13.5` — 2026-09-25 — Efeito Borboleta separa parcela, adicional e desembolso total, além de exibir os resultados abaixo dos formulários.
+- `13.4` — 2026-09-25 — Empréstimos reconhecem pagamentos apenas após conciliação; schema `20007` mantém a migração segura e sinaliza vínculos pendentes legados para revisão.
+- `13.3` — 2026-09-25 — Spec de Objetivos v0.14 registra a rota de visão consolidada e o compartilhamento do snapshot do Portfólio para reduzir o tempo de abertura.
+- `13.2` — 2026-09-25 — Consultor distingue por moeda recursos reservados, dívidas e liquidez prevista; o destino de vencimentos considera faturas abertas e a sequência diária dos recebimentos/pagamentos. Guardrail permite análise educacional de quitação sem recomendar ativos específicos.
+- `13.1` — 2026-09-25 — Efeito Borboleta validado visualmente no Safari; Consultor passa a cruzar Objetivos, Empréstimos e faturas abertas nos cards de carteira e vencimentos.
+- `13.0` — 2026-09-25 — MVP de Empréstimos e Financiamentos aprovado; specs de Objetivos, Classificação e Empréstimos sincronizadas como implementadas; app atualizado para `2.1.0`.
+- `12.99` — 2026-09-25 — [[specs/efeito-borboleta]] e [[specs/instrucoes-app]] adicionam ajuda contextual específica aos estudos de pagamento adicional e plano por estratégia.
+- `12.98` — 2026-09-24 — [[specs/instrucoes-app]] documenta Objetivos e Empréstimos; título do módulo passa a ser **Empréstimos e Financiamentos** no menu e na tela.
+- `12.97` — 2026-09-24 — [[specs/instrucoes-app]] inclui orientação geral para Objetivos Financeiros e Empréstimos.
+- `12.96` — 2026-09-24 — [[specs/emprestimos-quitacao]] diferencia o ícone de Empréstimos do Portfólio com moeda, seta de pagamento e mão simplificada.
+- `12.95` — 2026-09-24 — [[specs/categorias-tags-gestao]] e [[specs/emprestimos-quitacao]] definem **Empréstimos e Financiamentos** com identidade estável, preservada ao renomear.
+- `12.94` — 2026-09-24 — [[specs/emprestimos-quitacao]] mostra a jornada de quitação em barra 100% preenchida pelos pagamentos, com total pago e parcelas no hover.
+- `12.93` — 2026-09-24 — [[specs/emprestimos-quitacao]] alinha o formulário de cadastro e suas ações ao padrão da aba Objetivos, abrindo-o no topo do painel.
+- `12.92` — 2026-09-24 — [[specs/emprestimos-quitacao]] simplifica associação pelo lançamento, recolhe o cadastro e adiciona evolução mensal de pagamentos e explicação ao arquivar.
+- `12.91` — 2026-09-24 — [[specs/efeito-borboleta]] reúne estudos de Receitas/Despesas e Empréstimos em abas; cadastro e acompanhamento das dívidas permanecem em Empréstimos.
+- `12.90` — 2026-09-24 — Portfólio identifica visualmente ativos vinculados a objetivos com uma bandeira compacta distinta do escudo da Reserva de Emergência.
+- `12.89` — 2026-09-24 — [[specs/alertas-cockpit]] v1.3 integra lembrete de vencimento de empréstimo à Central, com navegação para o novo módulo.
+
+- `12.88` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.19 aprovada para implementação; inicia persistência, rotas, tela Gestão → Empréstimos e simulação Price.
+
+- `12.87` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.18 adiciona lembrete de vencimento na Central e aviso de pagamento não registrado com revisão manual.
+- `12.86` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.17 invalida vínculos de pagamentos alterados e sinaliza revisão manual no empréstimo.
+- `12.85` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.16 oferece redução de prazo ou de parcela para amortização extraordinária.
+- `12.84` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.15 calcula automaticamente o compromisso nominal pelas parcelas restantes, com ajuste de última parcela.
+- `12.83` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.14 esclarece que prazo e pagamentos sem taxa ou principal não identificam juros e registra possível campo para saldo principal.
+- `12.82` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.13 torna obrigatória a quantidade de parcelas restantes e elimina a inferência do prazo.
+- `12.81` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.12 aceita taxa efetiva mensal ou CET efetivo anual com conversão equivalente para a simulação.
+- `12.80` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.11 mantém seguros e tarifas embutidos na parcela e identifica a projeção Price como estimativa simplificada.
+- `12.79` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.10 define compromisso nominal restante como saldo exibido e data da próxima parcela como início do cronograma.
+- `12.78` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.9 explicita as pendências sobre saldo-base, data-base e encargos das parcelas.
+- `12.77` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.8 mantém quitação dentro de Empréstimos e explicita o Efeito Borboleta como estudo visual sem ações.
+- `12.76` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.7 define taxa mensal como fonte de verdade e prazo informado como referência de consistência.
+- `12.75` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.6 exige tratamento independente por moeda, inclusive nas estratégias e nos vínculos a pagamentos.
+- `12.74` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.5 delimita o módulo a empréstimos e dívidas contratuais relevantes, excluindo compras parceladas de consumo.
+- `12.73` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.4 delimita a V1 ao sistema Price prefixado e explicita SAC e contratos indexados como fora de escopo.
+- `12.72` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.3 define cadastro do saldo atual, prestação, taxa mensal e prazo restante, exigindo taxa ou prazo no mínimo.
+- `12.71` — 2026-09-24 — [[specs/emprestimos-quitacao]] v0.2 define decomposição estimada de parcelas Price usando taxa mensal ou prazo restante junto do saldo e da prestação.
+- `12.70` — 2026-09-24 — Criado rascunho da spec [[specs/emprestimos-quitacao]] para cadastro manual, vinculação de pagamentos existentes e estratégias de quitação.
+- `12.69` — 2026-09-24 — Backup e ADR-0018 marcados como implementados após confirmação de que os testes foram concluídos.
+
+- `12.68` — 2026-09-24 — [[specs/open-finance]] v0.9 depreciada por ausência de provedor com onboarding adequado e por permanecer fora do escopo do produto.
+- `12.67` — 2026-09-24 — [[specs/classificacao-assistida]] v1.1 adiciona contexto de conta/cartão; [[arquitetura]] v4.12 documenta os parâmetros da rota.
+- `12.66` — 2026-09-24 — [[specs/classificacao-assistida]] v1.1 prioriza exemplos confirmados na mesma conta/cartão; [[arquitetura]] v4.11 sincronizada.
+- `12.65` — 2026-09-24 — [[specs/objetivos-financeiros]] v0.10 garante que a Reserva de Emergência carregue sem depender de objetivos cadastrados.
+- `12.64` — 2026-09-24 — [[specs/objetivos-financeiros]] v0.9 recolhe o formulário e o abre sob demanda pelo botão **+ Novo objetivo**, mantendo o fluxo de edição.
+- `12.63` — 2026-09-24 — [[specs/objetivos-financeiros]] v0.8 agrupa componentes da Reserva de Emergência por carteira, com subtotal e expansão sob demanda.
+- `12.62` — 2026-09-24 — [[specs/objetivos-financeiros]] v0.7 troca o roxo dos aportes futuros por azul claro via token `--chart-6`.
+- `12.61` — 2026-09-23 — [[specs/objetivos-financeiros]] v0.6 consolida vínculos por investimento, incorpora saldo atual do ativo ao objetivo e remove contas correntes das origens elegíveis.
+- `12.60` — 2026-09-23 — [[specs/objetivos-financeiros]] v0.5 porta objetivos, provisões, Reserva de Emergência e comparação gráfica de projeções para a arquitetura e os gráficos ApexCharts da V2.
 - `12.59` — 2026-09-18 — [[specs/investimentos-portfolio]] v2.65 consolida a consulta mensal de IPCA/IGP-M e diferencia competência ainda não publicada de indisponibilidade real do SGS.
 - `12.58` — 2026-09-11 — [[specs/investimentos-portfolio]] v2.64 melhora o espaçamento de quantidades longas e corrige a unidade exibida nos resgates do Histórico.
 - `12.57` — 2026-09-11 — [[specs/investimentos-portfolio]] v2.63 faz o resgate descontar atomicamente o valor bruto do valor manual e padroniza a exibição de cripto e stablecoins com oito casas.

@@ -2,14 +2,15 @@
 tipo: spec
 area: cockpit
 status: implementado
-versao: 1.2
-atualizado: 2026-09-04
+versao: 1.4
+atualizado: 2026-09-25
 relacionados:
   - "[[cockpit-calendario]]"
   - "[[limites-gastos]]"
   - "[[cartoes]]"
   - "[[lancamentos]]"
   - "[[investimentos-portfolio]]"
+  - "[[backup-restauracao]]"
   - "[[arquitetura]]"
   - "[[requisitos]]"
 tags: [spec, "area/cockpit", "status/implementado"]
@@ -19,7 +20,7 @@ aliases: ["Alertas e Notificações do Cockpit", "Alertas Cockpit", "Central de 
 # Alertas e Notificações do Cockpit
 
 > [!info] Status
-> **implementado** · versão: `1.2` · área: `cockpit` · atualizado em 2026-09-04 · relacionados: [[cockpit-calendario]], [[limites-gastos]], [[cartoes]], [[lancamentos]], [[investimentos-portfolio]], [[arquitetura]], [[requisitos]]
+> **implementado** · versão: `1.4` · área: `cockpit` · atualizado em 2026-09-25 · relacionados: [[cockpit-calendario]], [[limites-gastos]], [[cartoes]], [[lancamentos]], [[investimentos-portfolio]], [[backup-restauracao]], [[specs/emprestimos-quitacao]], [[arquitetura]], [[requisitos]]
 
 ### Problema
 
@@ -211,6 +212,8 @@ Restrição de unicidade: `PRIMARY KEY (user_id, notification_id)`.
 - Dado um usuário não autenticado, quando uma requisição for enviada para `GET /api/cockpit/notifications`, então o servidor retorna status HTTP 401 Unauthorized e nenhum dado é exposto.
 - Dado que o usuário marcou informativos como vistos, quando uma nova requisição a `GET /api/cockpit/notifications` é realizada (inclusive após novo login ou recarga da página), então os itens correspondentes retornam com `seen: true` e não contabilizam no `informational_count` não lido.
 - Dado que há uma nova versão do sistema disponível, quando o usuário acessa o Cockpit, então o banner de nova versão (`cockpitVersionAlert`) continua sendo renderizado no topo do painel executivo com seu botão de dispensar, sem ser incorporado ao flyout de notificações financeiras.
+- Dado um empréstimo ativo cuja próxima parcela vence hoje, quando o usuário consulta a Central de Notificações, então há um alerta com ação para abrir Gestão → Empréstimos.
+- Dado que o backup automático da instalação falhou, quando o responsável consulta a Central de Notificações, então vê um alerta crítico persistente com ação para abrir Preferências > Backup; o alerta some após um backup concluído com sucesso.
 
 ### Pendências
 
@@ -232,8 +235,12 @@ Restrição de unicidade: `PRIMARY KEY (user_id, notification_id)`.
 - [x] Passo 5 — Frontend: integrar os botões de Alertas Críticos e Informativos na barra de abas do Cockpit (`web/modules/cockpit-view.js` e `web/index.html`), mantendo o banner de nova versão independente e suportando modo condensado responsivo. Fecha: critérios 1, 2, 5, 7, 12.
 - [x] Passo 6 — Frontend: implementar a navegação contextual das ações de cada card de notificação e o fluxo de marcar informativos como lidos. Fecha: critérios 2, 6.
 - [x] Passo 7 — Testes automatizados: criar testes unitários e de integração em `tests/test_cockpit_notifications.py` cobrindo cálculo de alertas, persistência na `notification_reads`, tolerância a falhas de cotação e controle de autenticação. Fecha: critérios 1, 3, 4, 10, 11, 12.
+- [x] Passo 8 — Integrar falha do backup automático à seção crítica, restrita ao responsável da instalação, e navegar diretamente para a aba Backup nas Preferências.
 
 ### Changelog
+
+- `1.4` — 2026-09-25 — Central passa a alertar o responsável quando o backup automático falha, com atalho para Preferências > Backup.
+- `1.3` — 2026-09-24 — Adiciona lembrete crítico na data do vencimento de um empréstimo, com ação para abrir Gestão → Empréstimos.
 
 - `1.2` — 2026-09-04 — Informativos de proventos passam a usar o calendário futuro compartilhado da aba Eventos, mantendo a filtragem da semana corrente.
 - `1.1` — 2026-09-04 — A consulta externa de proventos do Cockpit fica limitada à semana corrente, sem carregar o histórico completo usado pela aba Eventos.
