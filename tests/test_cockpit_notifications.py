@@ -14,6 +14,7 @@ from financeiro.cockpit_notifications import build_cockpit_notifications, mark_i
 from financeiro.backup_settings import record_backup_result
 from financeiro.spending_limits import create_spending_limit, list_spending_limits_with_consumption
 from financeiro.revolving_loans import close_revolving_loan, create_revolving_loan
+from financeiro.secure_config import save_email_config
 import app
 
 
@@ -23,11 +24,20 @@ class CockpitNotificationsTest(unittest.TestCase):
         self.old_paths = database.DATA_DIR, database.DB_PATH
         database.DATA_DIR = Path(self.tempdir.name)
         database.DB_PATH = database.DATA_DIR / "notifications.db"
+        self.key_env_patch = mock.patch.dict(
+            "os.environ",
+            {"SISTEMA_FINANCEIRO_CONFIG_KEY_PATH": str(database.DATA_DIR / "secure/config.key")},
+        )
+        self.key_env_patch.start()
         database.initialize_database()
         self.user = create_user("Alice", "alice@example.com", "strong-password")
+        save_email_config(self.user["id"], {
+            "provider": "gmail", "sender": "alice-smtp@example.com", "password": "app-password",
+        })
         self.today = date(2026, 9, 3)
 
     def tearDown(self):
+        self.key_env_patch.stop()
         database.DATA_DIR, database.DB_PATH = self.old_paths
         self.tempdir.cleanup()
 
@@ -59,7 +69,7 @@ class CockpitNotificationsTest(unittest.TestCase):
         })
 
     def test_limit_exceeded_alert_uses_real_spending_limits_loader(self):
-        # spec: cockpit/alertas-cockpit v1.2 — critério 1
+        # spec: cockpit/alertas-cockpit v1.5 — critério 1
         # Regressão: list_spending_limits_with_consumption preserva limit_amount_cents
         # para que o alerta de estouro seja detectado pelo backend.
         account = create_checking_account(self.user["id"], {
@@ -158,6 +168,25 @@ class CockpitNotificationsTest(unittest.TestCase):
         record_backup_result(success=True, filename="sistema-financeiro-teste.sfbackup")
         recovered = self.build()
         self.assertFalse(any(item["type"] == "backup_failure" for item in recovered["critical"]))
+
+    def test_missing_recovery_email_configuration_creates_persistent_actionable_alert(self):
+        with database.get_connection() as conn:
+            conn.execute("DELETE FROM secure_configs WHERE user_id=? AND config_type='email'", (self.user["id"],))
+
+        payload = self.build()
+        notification = next(item for item in payload["critical"] if item["type"] == "password_recovery_unconfigured")
+        self.assertEqual(notification["action"], {
+            "label": "Configurar recuperação", "route": "user",
+            "params": {"tab": "geral", "section": "email-recovery"},
+        })
+        self.assertIn("não poderá recuperar o acesso", notification["description"])
+        self.assertTrue(any(item["type"] == "password_recovery_unconfigured" for item in self.build()["critical"]))
+
+        save_email_config(self.user["id"], {
+            "provider": "gmail", "sender": "alice-smtp@example.com", "password": "app-password",
+        })
+        configured = self.build()
+        self.assertFalse(any(item["type"] == "password_recovery_unconfigured" for item in configured["critical"]))
 
     def test_seen_state_is_isolated_by_user(self):
         other = create_user("Bob", "bob@example.com", "strong-password")

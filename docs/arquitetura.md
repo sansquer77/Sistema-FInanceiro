@@ -2,7 +2,7 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 4.39
+versao: 4.40
 atualizado: 2026-09-27
 relacionados:
   - "[[requisitos]]"
@@ -638,7 +638,7 @@ Ver [[investimentos-portfolio]].
 7. Lançamentos de cartão entram em relatórios e limites pela competência da fatura.
 8. `GET /api/reports/category-evolution` retorna séries mensais por categoria/subcategoria para o drawer de evolução, com `periodo` igual a `3m`, `6m`, `12m`, `ytd` ou `all`. `categories.py` preserva a leitura/competência; `reports.build_evolution_presentation` acrescenta `total_cents`, `trend_percent` (nullable) e `forecast` (12 pontos SMA), mantendo `evolution` compatível. Frontend apenas seleciona o horizonte e formata/desenha.
 9. O consolidado `currency_totals` do Cockpit usa três consultas agregadas e limitadas ao usuário/competência: saldos por conta, faturas do mês por cartão e reservas conciliadas ainda não pagas. A rota não chama os leitores detalhados de lançamentos, compras ou pagamentos e não constrói o mapa de datas da projeção do Extrato.
-10. A Central de Notificações do Cockpit expõe `GET /api/cockpit/notifications` compilando no backend os alertas críticos (limites excedidos, saldo negativo projetado, contas/faturas vencidas) e informativos periódicos (dividendos e vencimentos da semana), mantendo o frontend em `web/` puramente de apresentação para os indicadores de abas e o flyout global em camada superior de sobreposição (evitando problemas de z-index/clipping). `POST /api/cockpit/notifications/mark-seen` registra leitura de informativos por usuário; o `app.js` traduz somente os metadados de ação em navegação contextual para Limites, Extrato, Cartões, Calendário ou Portfólio.
+10. A Central de Notificações do Cockpit expõe `GET /api/cockpit/notifications` compilando no backend os alertas críticos (limites excedidos, saldo negativo projetado, contas/faturas vencidas, falha de backup para o responsável e indisponibilidade de recuperação de senha por falta de configuração SMTP utilizável) e informativos periódicos (dividendos e vencimentos da semana). O alerta de recuperação é individual por usuário, consulta a configuração SMTP criptografada sem expor a senha de app e direciona a Preferências > Recuperação por email; desaparece quando remetente, senha e servidor SMTP estão configurados. O frontend em `web/` permanece de apresentação para os indicadores e flyout global; `POST /api/cockpit/notifications/mark-seen` registra leitura de informativos por usuário; o `app.js` traduz os metadados de ação em navegação contextual para Limites, Extrato, Cartões, Calendário, Portfólio ou Preferências.
 
 Ver [[relatorios]], [[limites-gastos]], [[specs/cockpit-calendario]], [[specs/alertas-cockpit]].
 
@@ -687,6 +687,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `4.40` — 2026-09-27 — Documenta o alerta individual de recuperação de senha na Central, a verificação SMTP criptografada e o atalho para Preferências.
 - `4.39` — 2026-09-27 — Documenta a rota de reinício de provisão anual, com ajuste auditável e manutenção de vínculos a investimentos com saldo.
 - `4.38` — 2026-09-27 — Documenta a aba Histórico, a listagem opcional de contratos arquivados e a preservação de pagamentos, distinguindo contratos arquivados com saldo em aberto.
 - `4.37` — 2026-09-27 — Documenta as jornadas separadas Quitar agora/Amortizar e o cálculo de quitação pelo principal atual estimado.
