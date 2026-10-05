@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 3.36
-atualizado: 2026-09-27
+versao: 3.38
+atualizado: 2026-10-05
 relacionados:
   - "[[arquitetura]]"
   - "[[visao-produto]]"
@@ -14,7 +14,7 @@ tags: [produto, meta]
 # Requisitos
 
 > [!info] Status
-> **implementado** (escopo vivo) · versão: `3.34` · área: `meta` · atualizado em 2026-09-27 · relacionados: [[arquitetura]], [[visao-produto]], [[specs/emprestimos-quitacao]]
+> **implementado** (escopo vivo) · versão: `3.38` · área: `meta` · atualizado em 2026-10-05 · relacionados: [[arquitetura]], [[visao-produto]], [[specs/emprestimos-quitacao]]
 
 ## Objetivo
 
@@ -45,8 +45,9 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 - **Classificação Assistida**: sugestão local de categoria e subcategoria por correspondência exata normalizada com o histórico do próprio usuário, sem dependência de internet. Ver [[classificacao-assistida]].
 - **Cockpit e Relatórios**: resumo financeiro mensal com seletor de mês, saldos por moeda, planejamento recorrente, dívidas parceladas, portfólio por tipo, maiores receitas/despesas, relatórios por categoria, subcategoria, conta, tag e fluxo diário. Alertas do Cockpit organizados em indicadores dedicados (críticos e informativos) via flyout global. Ver [[specs/alertas-cockpit]], [[relatorios]] e [[arquitetura]].
 - **Importação de Dados**:
-  - Leitura e importação de extratos externos em formato `.csv` ou `.xls`.
+  - Leitura e revisão de extratos externos em formato `.csv`, `.xls`, `.ofx` ou `.qfx`.
   - Importação de lançamentos por meio de planilhas de modelo do sistema (`.xlsx`) para contas e cartões.
+  - Aprendizado local de correções confirmadas de descrição/classificação, isolado por usuário e conta/cartão, aplicado com identificação na próxima prévia.
   - Ver [[importacao-dados]].
 - **Histórico de Operações**: auditoria funcional somente leitura com filtros, busca, agrupamentos e rastreio de lotes por `operation_batch_id`. Ver [[historico-operacoes]].
 - **Consultor**: análises pré-formatadas por IA na aba Consultor do Cockpit, mediante IA geral configurada, ativação explícita e consentimento de acesso aos dados financeiros do usuário. Usa catálogo fechado em seletor, contexto minimizado, Perfil Complementar criptografado em SQLite, histórico por usuário e expurgo automático quando IA/Consultor/consentimento são desabilitados. Ver [[specs/consultor]].
@@ -84,7 +85,8 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 - Operações financeiras e administrativas relevantes devem gerar registro no Histórico de Operações, sem armazenar senhas, tokens ou segredos.
 - Categorias, subcategorias e tags em uso por lançamentos não podem ser excluídas.
 - Sugestões de classificação devem ser isoladas por usuário e grupo, não sobrescrever escolhas manuais e só preencher os campos quando houver suporte e dominância suficientes.
-- Importações podem criar categorias, subcategorias e tags inexistentes para o usuário autenticado.
+- Na prévia de importação, categoria e subcategoria devem ser selecionadas entre as opções existentes e compatíveis com o tipo do lançamento; somente tags novas podem ser criadas nesse fluxo.
+- A importação deve detectar possíveis duplicatas pela igualdade de instrumento, tipo, data, valor, categoria e subcategoria, oferecendo ignorar ou substituir um lançamento existente. Se houver múltiplos candidatos, o usuário deve escolher qual substituir.
 - Linhas importadas com situação diferente de `Pago` são ignoradas e reportadas.
 - Pagamento de fatura de cartão de crédito só é permitido em contas da mesma moeda do cartão e gera uma transação de despesa automática na conta escolhida.
 - Relatórios e limites consideram lançamentos de cartão pela competência da fatura (`invoice_month`), não pela data da compra.
@@ -139,6 +141,8 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 
 ## Changelog
 
+- `3.38` — 2026-10-05 — Exige classificação existente compatível na importação e define revisão de duplicatas com opção de ignorar ou substituir lançamento existente.
+- `3.37` — 2026-10-05 — Inclui revisão de arquivos OFX e aprendizado contextual de ajustes de importação por conta/cartão.
 - `3.36` — 2026-09-27 — Inclui aviso persistente para configuração ausente de recuperação de senha por e-mail.
 - `3.35` — 2026-09-27 — Inclui recorrência diária de conta e aproveita a média histórica já disponível para séries recorrentes.
 - `3.34` — 2026-09-27 — Inclui reinício de provisão anual com histórico preservado e vínculo condicionado a saldo de investimento.

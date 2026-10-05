@@ -295,6 +295,7 @@ const portfolioGoalsMessage = document.querySelector("#portfolioGoalsMessage");
 const portfolioGroupFilter = document.querySelector("#portfolioGroupFilter");
 const portfolioTabButtons = document.querySelectorAll("[data-portfolio-tab]");
 const importForm = document.querySelector("#importForm");
+const importSource = document.querySelector("#importSource");
 const importTarget = document.querySelector("#importTarget");
 const importAccount = document.querySelector("#importAccount");
 const importAccountLabel = document.querySelector("#importAccountLabel");
@@ -784,6 +785,7 @@ const importsView = registerImportsView({
   state,
   elements: {
     importForm,
+    importSource,
     importTarget,
     importAccount,
     importAccountLabel,

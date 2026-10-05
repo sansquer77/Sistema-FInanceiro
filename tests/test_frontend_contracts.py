@@ -814,6 +814,46 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("O comparativo CDI é bruto", instructions)
         self.assertIn("sem recomendar automaticamente quitar ou investir", instructions)
 
+    def test_import_review_displays_contextual_learned_adjustments(self) -> None:
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        imports = (MODULE_ROOT / "imports-view.js").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn('id="importSource"', index)
+        self.assertIn('value="legacy">Planilha externa (.xls/.csv)', index)
+        self.assertIn('value="ofx">Extrato bancário OFX', index)
+        self.assertIn("Ajustado nesta revisão", imports)
+        self.assertIn("Já ajustado", imports)
+        self.assertIn("edited_fields: row.editedFields || []", imports)
+        self.assertIn('data-field="categoria"', imports)
+        self.assertIn('data-field="subcategoria"', imports)
+        self.assertIn('data-field="tags" list="${tagListId}"', imports)
+        self.assertIn('descricao_original: "Descrição do arquivo (original)"', imports)
+        self.assertIn('value="${escapeHtml(value || "")}" readonly aria-readonly="true"', imports)
+        self.assertIn('descricao: "Descrição Lançamento"', imports)
+        self.assertIn("function normalizePreviewValues(row)", imports)
+        self.assertIn("row.raw?.description", imports)
+        self.assertIn('querySelectorAll("[data-field]")', imports)
+        self.assertIn("classification_options", imports)
+        self.assertIn('value="replace"', imports)
+        self.assertIn("data-duplicate-target", imports)
+        self.assertIn('data-preview-action', imports)
+        self.assertIn("Substituir campos do lançamento existente", imports)
+        self.assertIn(".import-preview-duplicate", styles)
+        self.assertIn(".import-preview-adjustment", styles)
+
+    def test_import_result_lists_every_row_in_a_compact_single_line(self) -> None:
+        imports = (MODULE_ROOT / "imports-view.js").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn("const importedRows = (result.rows || []).map", imports)
+        self.assertIn("const skippedRows = errors.map", imports)
+        self.assertIn("const rowResults = [...importedRows, ...skippedRows]", imports)
+        self.assertIn('class="import-result-list"', imports)
+        self.assertIn('class="import-result-list__status"', imports)
+        self.assertIn("grid-template-columns: auto minmax(100px, 0.8fr) auto minmax(120px, 1.2fr)", styles)
+        self.assertIn("white-space: nowrap", styles)
+
 
 if __name__ == "__main__":
     unittest.main()
