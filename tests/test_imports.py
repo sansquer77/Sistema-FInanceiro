@@ -600,6 +600,95 @@ CHARSET:1252
         self.assertEqual(saved["category"], revised_category["name"])
         self.assertEqual(saved["subcategory"], revised_subcategory)
 
+    def test_ignored_ofx_duplicate_learns_reviewed_category_without_changing_transaction(self) -> None:
+        category = next(
+            item for item in imports_module.list_categories(self.user["id"])
+            if item["group_type"] == "expense" and item["subcategories"]
+        )
+        subcategory = category["subcategories"][0]["name"]
+        existing = create_transaction(self.user["id"], {
+            "account_id": self.account["id"], "type": "expense", "date": "2026-06-08",
+            "description": "Compra já lançada", "amount": "10,00",
+            "category": category["name"], "subcategory": subcategory,
+        })
+        ofx_content = b'''<OFX><BANKMSGSRSV1><STMTTRNRS><STMTRS><BANKTRANLIST>
+<STMTTRN><DTPOSTED>20260608000000<TRNAMT>-10.00<NAME>OFX Loja 88</STMTTRN>
+</BANKTRANLIST></STMTRS></STMTTRNRS></BANKMSGSRSV1></OFX>'''
+        first_preview = preview_legacy_transactions(
+            self.user["id"], self.account["id"], ofx_content, "extrato.ofx",
+        )
+        row = first_preview["preview"][0]
+        self.assertEqual(row["duplicate_matches"], [])
+        row["values"]["categoria"] = category["name"]
+        row["values"]["subcategoria"] = subcategory
+        row["values"]["descricao"] = "Compra de mercado"
+        row["edited_fields"] = ["categoria", "subcategoria", "descricao"]
+        row["duplicate_action"] = "ignore"
+        checked = imports_module.check_import_duplicates(
+            self.user["id"], "account", self.account["id"], [row], is_legacy=True,
+        )
+        self.assertEqual([item["id"] for item in checked[0]["matches"]], [existing["id"]])
+
+        result = import_legacy_transactions(
+            self.user["id"], self.account["id"], b"", "preview.ofx", [row],
+        )
+        self.assertEqual((result["imported"], result["skipped"]), (0, 1))
+        next_preview = preview_legacy_transactions(
+            self.user["id"], self.account["id"], ofx_content, "extrato.ofx",
+        )
+        learned = next_preview["preview"][0]
+        self.assertTrue(learned["learned_adjustment"])
+        self.assertEqual(learned["values"]["categoria"], category["name"])
+        self.assertEqual(learned["values"]["subcategoria"], subcategory)
+        self.assertEqual(learned["values"]["descricao"], "Compra de mercado")
+        self.assertEqual([item["id"] for item in learned["duplicate_matches"]], [existing["id"]])
+        with get_connection() as conn:
+            saved = conn.execute(
+                "SELECT description FROM transactions WHERE id=?", (existing["id"],),
+            ).fetchone()
+        self.assertEqual(saved["description"], "Compra já lançada")
+
+    def test_ignored_duplicate_is_not_learned_if_candidate_disappears_before_confirmation(self) -> None:
+        category = next(
+            item for item in imports_module.list_categories(self.user["id"])
+            if item["group_type"] == "expense" and item["subcategories"]
+        )
+        subcategory = category["subcategories"][0]
+        existing = create_transaction(self.user["id"], {
+            "account_id": self.account["id"], "type": "expense", "date": "2026-06-09",
+            "description": "Compra removida", "amount": "11,00",
+            "category": category["name"], "subcategory": subcategory["name"],
+        })
+        source = (
+            "data;tipo;descricao;valor;categoria;subcategoria\n"
+            "2026-06-09;expense;OFX Removido 89;11,00;Outras Despesas;"
+        ).encode("utf-8")
+        row = imports_module.preview_system_template(
+            self.user["id"], "account", self.account["id"], source, "modelo.csv",
+        )["preview"][0]
+        row["values"]["categoria"] = category["name"]
+        row["values"]["subcategoria"] = subcategory["name"]
+        row["edited_fields"] = ["categoria", "subcategoria"]
+        row["duplicate_action"] = "ignore"
+        self.assertEqual(
+            [item["id"] for item in imports_module.check_import_duplicates(
+                self.user["id"], "account", self.account["id"], [row],
+            )[0]["matches"]],
+            [existing["id"]],
+        )
+        with database.get_connection() as conn:
+            conn.execute("UPDATE transactions SET archived_at=CURRENT_TIMESTAMP WHERE id=?", (existing["id"],))
+
+        result = import_system_template(
+            self.user["id"], "account", self.account["id"], b"", "preview.csv", [row],
+        )
+
+        self.assertEqual(result["imported"], 0)
+        self.assertIn("duplicidade não está mais presente", result["errors"][0]["reason"])
+        with get_connection() as conn:
+            learned_count = conn.execute("SELECT COUNT(*) FROM import_adjustments").fetchone()[0]
+        self.assertEqual(learned_count, 0)
+
     def test_duplicate_import_can_replace_one_matching_account_transaction_or_ignore(self) -> None:
         category = next(
             item
@@ -686,6 +775,60 @@ CHARSET:1252
         self.assertEqual(total, 1)
         self.assertEqual(description, "Descrição substituída")
 
+    def test_ignored_duplicate_learns_user_corrected_classification_for_next_preview(self) -> None:
+        category = next(
+            item
+            for item in imports_module.list_categories(self.user["id"])
+            if item["group_type"] == "expense" and item["subcategories"]
+        )
+        subcategory = category["subcategories"][0]
+        existing = create_transaction(self.user["id"], {
+            "account_id": self.account["id"], "type": "expense", "date": "2026-06-08",
+            "description": "Compra já lançada", "amount": "10,00",
+            "category": category["name"], "subcategory": subcategory["name"],
+        })
+        source = (
+            "data;tipo;descricao;valor;categoria;subcategoria\n"
+            "2026-06-08;expense;OFX Loja 88;10,00;Outras Despesas;"
+        ).encode("utf-8")
+        preview = imports_module.preview_system_template(
+            self.user["id"], "account", self.account["id"], source, "modelo.csv",
+        )
+        row = preview["preview"][0]
+        self.assertEqual(row["duplicate_matches"], [])
+
+        row["values"]["descricao"] = "Compra mercado"
+        row["values"]["categoria"] = category["name"]
+        row["values"]["subcategoria"] = subcategory["name"]
+        row["edited_fields"] = ["descricao", "categoria", "subcategoria"]
+        row["duplicate_action"] = "ignore"
+        checked = imports_module.check_import_duplicates(
+            self.user["id"], "account", self.account["id"], [row],
+        )
+        self.assertEqual([item["id"] for item in checked[0]["matches"]], [existing["id"]])
+
+        result = import_system_template(
+            self.user["id"], "account", self.account["id"], b"", "preview.csv", [row],
+        )
+        self.assertEqual(result["imported"], 0)
+        self.assertEqual(result["skipped"], 1)
+        self.assertEqual(result["errors"][0]["reason"], "Linha ignorada conforme sua escolha.")
+
+        next_preview = imports_module.preview_system_template(
+            self.user["id"], "account", self.account["id"], source, "modelo.csv",
+        )
+        learned = next_preview["preview"][0]
+        self.assertTrue(learned["learned_adjustment"])
+        self.assertEqual(learned["values"]["descricao"], "Compra mercado")
+        self.assertEqual(learned["values"]["categoria"], category["name"])
+        self.assertEqual(learned["values"]["subcategoria"], subcategory["name"])
+        self.assertEqual([item["id"] for item in learned["duplicate_matches"]], [existing["id"]])
+        with get_connection() as conn:
+            existing_description = conn.execute(
+                "SELECT description FROM transactions WHERE id=?", (existing["id"],),
+            ).fetchone()["description"]
+        self.assertEqual(existing_description, "Compra já lançada")
+
     def test_import_result_returns_all_skipped_rows_above_previous_limit(self) -> None:
         preview = imports_module.preview_system_template(
             self.user["id"],
@@ -694,6 +837,12 @@ CHARSET:1252
             b"data;tipo;descricao;valor;categoria\n2026-06-02;expense;Ignorada;10,00;Outras Despesas",
             "modelo.csv",
         )
+        for index in range(51):
+            create_transaction(self.user["id"], {
+                "account_id": self.account["id"], "type": "expense", "date": "2026-06-02",
+                "description": f"Duplicata {index}", "amount": "10,00",
+                "category": "Outras Despesas", "subcategory": "",
+            })
         selected_rows = [
             {
                 **preview["preview"][0],

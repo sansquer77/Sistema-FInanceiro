@@ -365,8 +365,18 @@ def import_system_template(user_id: int, target: str, target_id: object, file_by
                             payload["subcategory"],
                             payload["type"],
                         )
+                    # spec: importacao/importacao-dados v1.16 — critério 43
                     if raw.get("_duplicate_action") == "ignore":
-                        conn.execute("ROLLBACK TO SAVEPOINT import_row")
+                        if not has_import_duplicate(
+                            conn, user_id, "credit_card", int(target_id), payload["type"], payload["date"],
+                            money_decimal_to_cents(normalize_amount(payload["amount"])),
+                            payload["category"], payload["subcategory"],
+                        ):
+                            raise ImportError("A duplicidade não está mais presente; revise a linha antes de ignorar.")
+                        learn_import_adjustment_from_row(
+                            conn, user_id, "credit_card", int(target_id), raw, payload["type"],
+                            payload["description"], payload["category"], payload["subcategory"], payload["tags"],
+                        )
                         conn.execute("RELEASE SAVEPOINT import_row")
                         skipped.append({
                             "row": raw.get("row", ""),
@@ -414,8 +424,18 @@ def import_system_template(user_id: int, target: str, target_id: object, file_by
                             payload["subcategory"],
                             payload["type"],
                         )
+                    # spec: importacao/importacao-dados v1.16 — critério 43
                     if raw.get("_duplicate_action") == "ignore":
-                        conn.execute("ROLLBACK TO SAVEPOINT import_row")
+                        if not has_import_duplicate(
+                            conn, user_id, "account", int(target_id), payload["type"], payload["date"],
+                            money_decimal_to_cents(normalize_amount(payload["amount"])),
+                            payload["category"], payload["subcategory"],
+                        ):
+                            raise ImportError("A duplicidade não está mais presente; revise a linha antes de ignorar.")
+                        learn_import_adjustment_from_row(
+                            conn, user_id, "account", int(target_id), raw, payload["type"],
+                            payload["description"], payload["category"], payload["subcategory"], payload["tags"],
+                        )
                         conn.execute("RELEASE SAVEPOINT import_row")
                         skipped.append({
                             "row": raw.get("row", ""),
@@ -551,7 +571,7 @@ def apply_import_adjustment_to_row(row: dict, adjustment: dict) -> None:
         row[key] = "; ".join(value) if field == "tags" else value
 
 
-# spec: importacao-dados v1.14 — critérios 14 a 17
+# spec: importacao/importacao-dados v1.16 — critérios 14 a 17
 def learn_import_adjustment_from_row(
     conn,
     user_id: int,
@@ -573,6 +593,9 @@ def learn_import_adjustment_from_row(
     original_description = original.get("description") or original.get("descricao")
     if not str(original_description or "").strip():
         return
+    normalized_tags = tags if isinstance(tags, list) else (
+        normalize_tags(tags) if str(tags or "").strip() else []
+    )
     save_import_adjustment(
         conn,
         user_id,
@@ -583,7 +606,7 @@ def learn_import_adjustment_from_row(
         description,
         category,
         subcategory,
-        tags if isinstance(tags, list) else normalize_tags(tags),
+        normalized_tags,
     )
 
 
@@ -638,7 +661,7 @@ def normalize_system_account_row(row: dict, account_id: object) -> dict:
     if payload["type"] == "transfer":
         payload["category"] = ""
         payload["subcategory"] = ""
-        # spec: importacao-dados v1.14 — regras de repetição
+        # spec: importacao/importacao-dados v1.16 — regras de repetição
         # (transferencias e cambio sao sempre avulsos, mesmo se a linha trouxer repeticao)
         payload["series_kind"] = "single"
         payload["installment_count"] = None
@@ -664,7 +687,7 @@ def normalize_system_card_row(row: dict, card_id: object) -> dict:
 
 
 def normalize_system_series(row: dict) -> dict:
-    # spec: importacao-dados v1.14 — regras de repetição
+    # spec: importacao/importacao-dados v1.16 — regras de repetição
     # (avulso padrao; parcelado exige parcelas 2-120; recorrente exige frequencia;
     #  media so se aplica a recorrentes)
     series_kind = SERIES_KIND_ALIASES.get(normalize_key(row.get("repeticao") or row.get("series_kind")), "single")
@@ -870,7 +893,7 @@ def xlsx_column_name(index: int) -> str:
 
 
 def parse_xlsx_rows(file_bytes: bytes, sheet_name: str) -> list[list[str]]:
-    # spec: importacao-dados v1.14 — limites de segurança do contêiner e da worksheet
+    # spec: importacao/importacao-dados v1.16 — limites de segurança do contêiner e da worksheet
     try:
         validate_xlsx_file(file_bytes)
         with zipfile.ZipFile(BytesIO(file_bytes)) as archive:
@@ -1095,7 +1118,17 @@ def import_legacy_transactions(
                 transaction["tags"] = tags
                 duplicate_action = raw.get("_duplicate_action")
                 if duplicate_action == "ignore":
-                    conn.execute("ROLLBACK TO SAVEPOINT import_row")
+                    # spec: importacao/importacao-dados v1.16 — critério 43
+                    if not get_import_duplicate_candidates(
+                        conn, user_id, "account", normalized_account_id, transaction["type"], transaction["date"],
+                        transaction["amount_cents"], transaction["category"], transaction["subcategory"],
+                    ):
+                        raise ImportError("A duplicidade não está mais presente; revise a linha antes de ignorar.")
+                    learn_import_adjustment_from_row(
+                        conn, user_id, "account", normalized_account_id, raw, transaction["type"],
+                        transaction["description"], transaction["category"], transaction["subcategory"],
+                        transaction["tags"],
+                    )
                     conn.execute("RELEASE SAVEPOINT import_row")
                     skipped.append({
                         "row": raw.get("row", ""),
@@ -1410,7 +1443,7 @@ def parse_legacy_file(file_bytes: bytes, filename: str) -> list[dict]:
 
 
 def parse_ofx_rows(file_bytes: bytes) -> list[dict]:
-    # spec: importacao-dados v1.14 — critério 4
+    # spec: importacao/importacao-dados v1.16 — critério 4
     header = file_bytes[:2048].decode("ascii", errors="ignore")
     charset_match = re.search(r"(?im)^\s*CHARSET\s*:\s*([^\s]+)", header)
     declared_charset = charset_match.group(1).upper() if charset_match else ""
@@ -1637,7 +1670,7 @@ def resolve_import_classification(conn, user_id: int, transaction: dict) -> tupl
     return group, category, subcategory, tags
 
 
-# spec: importacao-dados v1.14 — critério 33
+# spec: importacao/importacao-dados v1.16 — critério 33
 def validate_reviewed_classification(
     conn,
     user_id: int,
@@ -1690,7 +1723,7 @@ def validate_reviewed_classification(
     return category["group_type"], category["name"], matched_subcategory
 
 
-# spec: importacao-dados v1.14 — critérios 34 e 38
+# spec: importacao/importacao-dados v1.16 — critérios 34 e 38
 def get_import_duplicate_candidates(
     conn,
     user_id: int,
@@ -1806,7 +1839,7 @@ def has_import_duplicate(
     return any(candidate["id"] == normalized_id for candidate in candidates)
 
 
-# spec: importacao-dados v1.14 — critérios 35 a 37
+# spec: importacao/importacao-dados v1.16 — critérios 35 a 37
 def replace_duplicate_import(
     conn,
     user_id: int,

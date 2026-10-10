@@ -6,7 +6,7 @@ import sqlite3
 from financeiro.classification_suggestions import normalize_description
 
 
-# spec: importacao-dados v1.14 — critérios 14 a 17
+# spec: importacao/importacao-dados v1.16 — critérios 14 a 17
 LEARNABLE_IMPORT_FIELDS = {"descricao", "categoria", "subcategoria", "tags"}
 
 

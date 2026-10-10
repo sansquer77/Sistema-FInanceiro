@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 4.45
-atualizado: 2026-10-05
+versao: 4.46
+atualizado: 2026-10-10
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -374,7 +374,7 @@ As projeções são calculadas em centavos por `financial_goals.py`. O saldo res
 | Método | Rota |
 |---|---|
 | `POST` | `/api/import/legacy-transactions` — parsing e prévia (`preview=true`) de `.xls`, `.csv`, `.ofx` e `.qfx`; confirmação seletiva (`preview_rows`). A prévia inclui descrição original e editável e opções existentes de classificação para a revisão. |
-| `POST` | `/api/import/system-template` — parsing e prévia de modelo; confirmação seletiva, aprendizado por conta/cartão que localiza descrição original e editada, e opções existentes de classificação. |
+| `POST` | `/api/import/system-template` — parsing e prévia de modelo; confirmação seletiva, aprendizado por conta/cartão em linhas importadas ou duplicidades revalidadas e ignoradas, e opções existentes de classificação. |
 | `GET` | `/api/import/template` |
 
 ---
@@ -435,7 +435,7 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | `consultor_context.py` | Builders dos nove contextos, agregação e compactação dos dados e formatação monetária de borda; reutiliza serviços de domínio e posições recebidas. Inclui compromissos de objetivos/empréstimos e linha do tempo de 90 dias por moeda para faturas abertas e lançamentos futuros em contas de liquidez/carteira digital, mantendo contas de investimento separadas. Não acessa configuração, histórico ou transporte de IA. |
 | `consultor_history.py` | Persistência/listagem/expurgo das análises, quota diária e cooldown de falhas, isolados do executor e da configuração. Ver [[specs/consultor]]. |
 | `imports.py` | Leitura, prévia e importação de arquivos externos legados e planilhas modelo. Ver [[importacao-dados]]. |
-| `import_adjustments.py` | Aprendizado local de correções da prévia de importação, isolado por usuário, conta/cartão, descrição original normalizada e tipo. |
+| `import_adjustments.py` | Aprendizado local de correções importadas ou explicitamente ignoradas como duplicidade, isolado por usuário, conta/cartão, descrição original normalizada e tipo. |
 | `xlsx_security.py` | Fronteira defensiva dos pacotes XLSX: valida o contêiner ZIP, limita expansão e compressão, normaliza caminhos internos e faz leituras limitadas antes do parsing XML, sem persistência. Ver [[importacao-dados]]. |
 | `operation_logs.py` | Auditoria funcional das operações do usuário. Ver [[historico-operacoes]]. |
 | `emailer.py` | Envio SMTP do código de recuperação de senha. Ver [[recuperacao-senha]]. |
@@ -507,11 +507,11 @@ O baseline inicial da v2 usa `PRAGMA user_version = 20000`; o endurecimento oper
 | `consultor_analyses` | `database.py` — histórico de execuções bem-sucedidas do Consultor, indexado por usuário, data e `analysis_id` para leitura e quota diária. Ver [[specs/consultor]]. |
 | `consultor_perfil_complementar` | `database.py` — payload criptografado do Perfil Complementar por usuário (`payload_enc`, `schema_version`). Ver [[specs/consultor]]. |
 | `notification_reads` | `database.py` — registro de leitura de informativos do Cockpit por usuário (`user_id`, `notification_id`, `seen_at`). Ver [[specs/alertas-cockpit]]. |
-| `import_adjustments` | `import_adjustments.py` — correções confirmadas de descrição/classificação para prévias futuras, por usuário e origem financeira. |
+| `import_adjustments` | `import_adjustments.py` — correções de descrição/classificação para prévias futuras após importação bem-sucedida ou duplicidade explicitamente ignorada, por usuário e origem financeira. |
 
 `transactions` e `credit_card_transactions` persistem `normalized_description` para a classificação assistida. Ambas também mantêm valor normalizado em BRL (`amount_brl_cents`); em moedas estrangeiras sem cotação manual, a normalização usa a última PTAX de venda disponível até a data do lançamento. Bancos existentes são retroalimentados de forma idempotente durante a inicialização.
 
-`import_adjustments` guarda somente correções de descrição, categoria, subcategoria e tags feitas na revisão e importadas com sucesso. A chave primária de busca é a descrição original normalizada, com um alias normalizado da descrição editada; ambas são limitadas ao usuário, tipo de lançamento e conta ou cartão. As regras locais são reaplicadas na próxima prévia e não gravam correções de linhas desmarcadas ou rejeitadas.
+`import_adjustments` guarda correções de descrição, categoria, subcategoria e tags feitas na revisão quando a linha é importada com sucesso ou explicitamente ignorada como duplicidade ativa. A confirmação revalida a duplicidade antes de salvar o aprendizado; ignorar não cria nem altera lançamento. A chave primária de busca é a descrição original normalizada, com um alias normalizado da descrição editada; ambas são limitadas ao usuário, tipo de lançamento e conta ou cartão. As regras locais são reaplicadas na próxima prévia e não gravam correções de linhas apenas desmarcadas ou rejeitadas.
 
 `user_ai_settings` armazena somente provedor, endpoint/base URL, modelo, estado ligado/desligado, autenticação e parâmetros operacionais. Chaves de API de IA, senha SMTP e chaves de integrações opcionais são salvas em `secure_configs.payload_enc` como envelopes criptografados por usuário; APIs nunca devem retornar o segredo. Instalações antigas com `data/*_config_user_{id}.enc` continuam legíveis: o payload criptografado é copiado para `secure_configs` no primeiro uso, sem exigir que o usuário recadastre a chave.
 
@@ -650,7 +650,7 @@ Ver [[relatorios]], [[limites-gastos]], [[specs/cockpit-calendario]], [[specs/al
 
 1. `imports.py` lê arquivos externos (`.xls`/`.csv`/`.ofx`/`.qfx`) e modelos `.xlsx` do sistema, exibindo prévia seletiva antes de persistir.
 2. A revisão valida categorias/subcategorias existentes e compatíveis com o tipo; tags existentes podem ser sugeridas e tags novas podem ser criadas pelo usuário.
-3. Ajustes confirmados de descrição/classificação são aprendidos por usuário e instrumento em `import_adjustments`.
+3. Ajustes confirmados de descrição/classificação são aprendidos por usuário e instrumento em `import_adjustments`, tanto em importações bem-sucedidas quanto em linhas explicitamente ignoradas após revalidar a duplicidade; ignorar não altera lançamentos.
 4. A prévia identifica duplicatas apenas por igualdade de instrumento, tipo, data, valor, categoria e subcategoria. O usuário pode ignorar ou substituir descrição/classificação/tags/observações do candidato; múltiplos candidatos exigem seleção. A confirmação revalida o candidato na transação de importação e não altera os campos que identificam a duplicidade.
 5. A consulta dinâmica de candidatos é feita nas rotas existentes de importação por meio do modo `duplicate_check`, sem novo endpoint nem conciliação automática.
 6. A confirmação retorna os detalhes de todas as linhas importadas e ignoradas; o frontend apresenta cada resultado em uma linha compacta e mantém os motivos de descarte sem limite de 50 itens.
@@ -695,6 +695,7 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `4.46` — 2026-10-10 — Documenta aprendizado de correções em duplicidades ignoradas, com revalidação e sem escrita financeira.
 - `4.45` — 2026-10-05 — Documenta retorno integral e apresentação compacta das linhas importadas e ignoradas.
 - `4.44` — 2026-10-05 — Documenta validação de classificação compatível e detecção/substituição seletiva de duplicatas na prévia de importação.
 - `4.43` — 2026-10-05 — Documenta descrição original e editável na prévia, busca de aprendizado pela descrição corrigida e sugestões de tags em uma linha.

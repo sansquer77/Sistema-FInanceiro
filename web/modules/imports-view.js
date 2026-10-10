@@ -294,7 +294,7 @@ export function registerImportsView({
   }
 
   function collectSelectedRows() {
-    // spec: importacao-dados v1.14 — critério 40
+    // spec: importacao/importacao-dados v1.16 — critério 40
     return importPreviewRows
       .filter((row) => row.selected !== false)
       .map((row) => {
@@ -398,7 +398,7 @@ export function registerImportsView({
                     </label>
                   `;
                 }
-                // spec: importacao-dados v1.14 — critério 33
+                // spec: importacao/importacao-dados v1.16 — critério 33
                 if (field === "categoria") {
                   const categoryGroup = categoryGroupForRow(row.values);
                   return `
@@ -488,7 +488,7 @@ export function registerImportsView({
   }
 
   function normalizePreviewValues(row) {
-    // spec: importacao-dados v1.14 — critério 39
+    // spec: importacao/importacao-dados v1.16 — critério 39
     const values = { ...(row.values || {}) };
     if (!String(values.descricao_original || "").trim()) {
       values.descricao_original = row.raw?.original_description
@@ -550,7 +550,7 @@ export function registerImportsView({
       .toLocaleLowerCase();
   }
 
-  // spec: importacao-dados v1.14 — critérios 34 a 38
+  // spec: importacao/importacao-dados v1.16 — critérios 34 a 38
   function renderDuplicatePanel(row) {
     if (!row.duplicateMatches?.length) {
       return "";

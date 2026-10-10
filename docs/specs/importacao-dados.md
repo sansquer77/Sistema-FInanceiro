@@ -2,8 +2,8 @@
 tipo: spec
 area: importacao
 status: implementado
-versao: 1.15
-atualizado: 2026-10-05
+versao: 1.16
+atualizado: 2026-10-10
 relacionados:
   - "[[contas-correntes]]"
   - "[[cartoes]]"
@@ -18,7 +18,7 @@ aliases: ["Importação", "Importação de dados"]
 # Importação de dados
 
 > [!info] Status
-> **implementado** · área: `importacao` · atualizado em 2026-10-05 · relacionados: [[contas-correntes]], [[cartoes]], [[categorias-tags-gestao]], [[adr/0004-importador-xls-sem-dependencia]]
+> **implementado** · área: `importacao` · atualizado em 2026-10-10 · relacionados: [[contas-correntes]], [[cartoes]], [[categorias-tags-gestao]], [[adr/0004-importador-xls-sem-dependencia]]
 
 ## Problema
 
@@ -35,7 +35,7 @@ Usuário que está migrando dados de outro sistema ou que deseja lançar movimen
 3. Seleciona a conta ou cartão de destino.
 4. Faz upload do arquivo compatível com a origem escolhida (`.xls`, `.csv`, `.xlsx` ou `.ofx`/`.qfx`).
 5. Revisa, edita e seleciona as transações antes de confirmar a importação.
-6. Se uma linha editada for importada com sucesso, o sistema aprende a descrição e classificação corrigidas para aquela conta ou cartão.
+6. Se uma linha editada for importada com sucesso ou explicitamente ignorada como duplicidade, o sistema aprende a descrição e classificação corrigidas para aquela conta ou cartão, sem alterar lançamentos no caso de ignorar.
 7. Em arquivos seguintes do mesmo instrumento, as correções aprendidas aparecem aplicadas e identificadas na prévia.
 8. O sistema exibe o resumo: total lido, novos, substituídos e ignorados, além de uma lista compacta em linha única para cada lançamento importado ou ignorado, com descrição e motivo quando houver.
 
@@ -80,7 +80,7 @@ Usuário que está migrando dados de outro sistema ou que deseja lançar movimen
 - A prévia exibe a descrição original do arquivo em campo somente de leitura e uma descrição separada editável chamada **Descrição Lançamento**, usada no lançamento. A origem é preservada mesmo quando há correção aprendida anteriormente.
 - Na prévia de importação, categoria e subcategoria são seletores limitados às opções existentes do usuário; subcategorias são oferecidas conforme a categoria escolhida. Tags usam uma única linha com sugestões das opções existentes, permitindo digitar uma nova tag.
 - OFX destina-se à importação em conta corrente; cartão não é um destino disponível nesse modo.
-- Correções feitas em descrição, categoria, subcategoria ou tags são aprendidas somente após a linha selecionada ser importada com sucesso. Edições de data/valor e linhas desmarcadas ou rejeitadas não atualizam o aprendizado.
+- Correções feitas em descrição, categoria, subcategoria ou tags são aprendidas após a linha selecionada ser importada com sucesso ou quando o usuário escolhe explicitamente **Ignorar esta linha** para uma duplicidade validada novamente na confirmação. Nesse caso, o aprendizado não cria nem altera lançamentos. Edições de data/valor, linhas apenas desmarcadas ou rejeitadas não atualizam o aprendizado.
 - O aprendizado usa correspondência exata após normalização sem distinção de maiúsculas/minúsculas e acentos, preservando números, e é isolado por usuário, conta ou cartão e tipo de lançamento. Uma correção posterior bem-sucedida para a mesma chave substitui a anterior.
 - A regra aprendida mantém a descrição original como chave principal e também permite localizar pela descrição editável corrigida; a correção contém os valores finais importados.
 - Quando a descrição original ou a descrição editável previamente corrigida reaparece no mesmo instrumento, a prévia aplica a descrição, categoria, subcategoria e tags aprendidas e marca a linha como **Já ajustado**; o usuário ainda decide se importa.
@@ -160,6 +160,7 @@ Tabelas: `transactions`, `credit_card_transactions`, `transaction_tags`, `credit
 - Dado que o usuário altere a categoria na prévia, inclusive em uma linha com ajuste aprendido, quando confirmar a importação, então a categoria selecionada na tela é a categoria persistida.
 - Dado uma importação com linhas importadas e ignoradas, quando o resultado é exibido, então cada linha aparece em uma faixa compacta de uma única linha, com sua descrição, situação e, para ignoradas, o motivo.
 - Dado que o arquivo tenha mais de 50 linhas ignoradas, quando o resultado é exibido, então todas as linhas ignoradas são retornadas e listadas.
+- Dado que uma linha tenha uma correção manual de descrição/classificação e corresponda a uma duplicidade ativa, quando o usuário escolhe explicitamente ignorá-la, então a correção é aprendida para a próxima prévia sem criar ou alterar lançamentos; se a duplicidade deixar de existir antes da confirmação, o aprendizado não é salvo.
 
 ## Plano de implementação
 
@@ -172,9 +173,11 @@ Tabelas: `transactions`, `credit_card_transactions`, `transaction_tags`, `credit
 - [x] Passo 7 — detectar duplicatas por igualdade integral, oferecer ignorar/substituir, permitir escolher o candidato ambíguo e revalidar na confirmação. Fecha: critérios 34 a 38.
 - [x] Passo 8 — manter a descrição original visível quando houver aprendizado e serializar os valores atuais da revisão na confirmação. Fecha: critérios 39 e 40.
 - [x] Passo 9 — listar todos os itens importados/ignorados em linhas compactas e remover o truncamento das mensagens por linha. Fecha: critérios 41 e 42.
+- [x] Passo 10 — aprender correções de linhas explicitamente ignoradas como duplicadas, validando novamente a duplicidade e preservando os lançamentos. Fecha: critério 43.
 
 ## Changelog
 
+- `1.16` — 2026-10-10 — Correções de linhas explicitamente ignoradas como duplicadas passam a alimentar o aprendizado local, após revalidar a duplicidade e sem alterar lançamentos.
 - `1.15` — 2026-10-05 — Resultado passa a listar cada lançamento importado ou ignorado em uma única linha compacta e deixa de limitar as mensagens de linhas ignoradas a 50.
 - `1.14` — 2026-10-05 — Preserva a descrição do arquivo na prévia quando existe aprendizado, renomeia o campo editável para Descrição Lançamento e envia os valores atuais da linha confirmada.
 - `1.13` — 2026-10-05 — Corrige persistência de classificação escolhida e adiciona alerta de duplicidade com ignorar, substituir existente e seleção explícita entre candidatos.
