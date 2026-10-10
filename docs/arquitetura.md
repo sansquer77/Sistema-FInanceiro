@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 4.39
-atualizado: 2026-09-27
+versao: 4.46
+atualizado: 2026-10-10
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -19,7 +19,7 @@ tags: [arquitetura, meta]
 # Arquitetura
 
 > [!info] Status
-> **implementado** · versão: `4.39` · área: `meta` · atualizado em 2026-09-27 · relacionados: [[requisitos]], [[qualidade-codigo]], [[specs/emprestimos-quitacao]], [[specs/backup-restauracao]], [[specs/alertas-cockpit]]
+> **implementado** · versão: `4.41` · área: `meta` · atualizado em 2026-10-05 · relacionados: [[requisitos]], [[qualidade-codigo]], [[specs/emprestimos-quitacao]], [[specs/backup-restauracao]], [[specs/alertas-cockpit]]
 
 ## Visão geral
 
@@ -373,8 +373,8 @@ As projeções são calculadas em centavos por `financial_goals.py`. O saldo res
 
 | Método | Rota |
 |---|---|
-| `POST` | `/api/import/legacy-transactions` |
-| `POST` | `/api/import/system-template` |
+| `POST` | `/api/import/legacy-transactions` — parsing e prévia (`preview=true`) de `.xls`, `.csv`, `.ofx` e `.qfx`; confirmação seletiva (`preview_rows`). A prévia inclui descrição original e editável e opções existentes de classificação para a revisão. |
+| `POST` | `/api/import/system-template` — parsing e prévia de modelo; confirmação seletiva, aprendizado por conta/cartão em linhas importadas ou duplicidades revalidadas e ignoradas, e opções existentes de classificação. |
 | `GET` | `/api/import/template` |
 
 ---
@@ -434,7 +434,8 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | `consultor_provider.py` | Mensagens minimizadas, payloads dos provedores e transporte HTTP; dependências injetáveis e erros traduzidos pela fachada. Valida o endpoint via `ai_endpoint_security` e bloqueia redirecionamentos. Sem acesso ao SQLite. |
 | `consultor_context.py` | Builders dos nove contextos, agregação e compactação dos dados e formatação monetária de borda; reutiliza serviços de domínio e posições recebidas. Inclui compromissos de objetivos/empréstimos e linha do tempo de 90 dias por moeda para faturas abertas e lançamentos futuros em contas de liquidez/carteira digital, mantendo contas de investimento separadas. Não acessa configuração, histórico ou transporte de IA. |
 | `consultor_history.py` | Persistência/listagem/expurgo das análises, quota diária e cooldown de falhas, isolados do executor e da configuração. Ver [[specs/consultor]]. |
-| `imports.py` | Leitura de arquivos externos legados e planilhas modelo. Ver [[importacao-dados]]. |
+| `imports.py` | Leitura, prévia e importação de arquivos externos legados e planilhas modelo. Ver [[importacao-dados]]. |
+| `import_adjustments.py` | Aprendizado local de correções importadas ou explicitamente ignoradas como duplicidade, isolado por usuário, conta/cartão, descrição original normalizada e tipo. |
 | `xlsx_security.py` | Fronteira defensiva dos pacotes XLSX: valida o contêiner ZIP, limita expansão e compressão, normaliza caminhos internos e faz leituras limitadas antes do parsing XML, sem persistência. Ver [[importacao-dados]]. |
 | `operation_logs.py` | Auditoria funcional das operações do usuário. Ver [[historico-operacoes]]. |
 | `emailer.py` | Envio SMTP do código de recuperação de senha. Ver [[recuperacao-senha]]. |
@@ -506,8 +507,11 @@ O baseline inicial da v2 usa `PRAGMA user_version = 20000`; o endurecimento oper
 | `consultor_analyses` | `database.py` — histórico de execuções bem-sucedidas do Consultor, indexado por usuário, data e `analysis_id` para leitura e quota diária. Ver [[specs/consultor]]. |
 | `consultor_perfil_complementar` | `database.py` — payload criptografado do Perfil Complementar por usuário (`payload_enc`, `schema_version`). Ver [[specs/consultor]]. |
 | `notification_reads` | `database.py` — registro de leitura de informativos do Cockpit por usuário (`user_id`, `notification_id`, `seen_at`). Ver [[specs/alertas-cockpit]]. |
+| `import_adjustments` | `import_adjustments.py` — correções de descrição/classificação para prévias futuras após importação bem-sucedida ou duplicidade explicitamente ignorada, por usuário e origem financeira. |
 
 `transactions` e `credit_card_transactions` persistem `normalized_description` para a classificação assistida. Ambas também mantêm valor normalizado em BRL (`amount_brl_cents`); em moedas estrangeiras sem cotação manual, a normalização usa a última PTAX de venda disponível até a data do lançamento. Bancos existentes são retroalimentados de forma idempotente durante a inicialização.
+
+`import_adjustments` guarda correções de descrição, categoria, subcategoria e tags feitas na revisão quando a linha é importada com sucesso ou explicitamente ignorada como duplicidade ativa. A confirmação revalida a duplicidade antes de salvar o aprendizado; ignorar não cria nem altera lançamento. A chave primária de busca é a descrição original normalizada, com um alias normalizado da descrição editada; ambas são limitadas ao usuário, tipo de lançamento e conta ou cartão. As regras locais são reaplicadas na próxima prévia e não gravam correções de linhas apenas desmarcadas ou rejeitadas.
 
 `user_ai_settings` armazena somente provedor, endpoint/base URL, modelo, estado ligado/desligado, autenticação e parâmetros operacionais. Chaves de API de IA, senha SMTP e chaves de integrações opcionais são salvas em `secure_configs.payload_enc` como envelopes criptografados por usuário; APIs nunca devem retornar o segredo. Instalações antigas com `data/*_config_user_{id}.enc` continuam legíveis: o payload criptografado é copiado para `secure_configs` no primeiro uso, sem exigir que o usuário recadastre a chave.
 
@@ -638,14 +642,18 @@ Ver [[investimentos-portfolio]].
 7. Lançamentos de cartão entram em relatórios e limites pela competência da fatura.
 8. `GET /api/reports/category-evolution` retorna séries mensais por categoria/subcategoria para o drawer de evolução, com `periodo` igual a `3m`, `6m`, `12m`, `ytd` ou `all`. `categories.py` preserva a leitura/competência; `reports.build_evolution_presentation` acrescenta `total_cents`, `trend_percent` (nullable) e `forecast` (12 pontos SMA), mantendo `evolution` compatível. Frontend apenas seleciona o horizonte e formata/desenha.
 9. O consolidado `currency_totals` do Cockpit usa três consultas agregadas e limitadas ao usuário/competência: saldos por conta, faturas do mês por cartão e reservas conciliadas ainda não pagas. A rota não chama os leitores detalhados de lançamentos, compras ou pagamentos e não constrói o mapa de datas da projeção do Extrato.
-10. A Central de Notificações do Cockpit expõe `GET /api/cockpit/notifications` compilando no backend os alertas críticos (limites excedidos, saldo negativo projetado, contas/faturas vencidas) e informativos periódicos (dividendos e vencimentos da semana), mantendo o frontend em `web/` puramente de apresentação para os indicadores de abas e o flyout global em camada superior de sobreposição (evitando problemas de z-index/clipping). `POST /api/cockpit/notifications/mark-seen` registra leitura de informativos por usuário; o `app.js` traduz somente os metadados de ação em navegação contextual para Limites, Extrato, Cartões, Calendário ou Portfólio.
+10. A Central de Notificações do Cockpit expõe `GET /api/cockpit/notifications` compilando no backend os alertas críticos (limites excedidos, saldo negativo projetado, contas/faturas vencidas, falha de backup para o responsável e indisponibilidade de recuperação de senha por falta de configuração SMTP utilizável) e informativos periódicos (dividendos e vencimentos da semana). O alerta de recuperação é individual por usuário, consulta a configuração SMTP criptografada sem expor a senha de app e direciona a Preferências > Recuperação por email; desaparece quando remetente, senha e servidor SMTP estão configurados. O frontend em `web/` permanece de apresentação para os indicadores e flyout global; `POST /api/cockpit/notifications/mark-seen` registra leitura de informativos por usuário; o `app.js` traduz os metadados de ação em navegação contextual para Limites, Extrato, Cartões, Calendário, Portfólio ou Preferências.
 
 Ver [[relatorios]], [[limites-gastos]], [[specs/cockpit-calendario]], [[specs/alertas-cockpit]].
 
 ### Importação de Arquivos
 
-1. Parser de arquivos externos legados (`.xls`/`.csv`) em `imports.py`.
-2. Importação estruturada via modelos `.xlsx` do próprio sistema.
+1. `imports.py` lê arquivos externos (`.xls`/`.csv`/`.ofx`/`.qfx`) e modelos `.xlsx` do sistema, exibindo prévia seletiva antes de persistir.
+2. A revisão valida categorias/subcategorias existentes e compatíveis com o tipo; tags existentes podem ser sugeridas e tags novas podem ser criadas pelo usuário.
+3. Ajustes confirmados de descrição/classificação são aprendidos por usuário e instrumento em `import_adjustments`, tanto em importações bem-sucedidas quanto em linhas explicitamente ignoradas após revalidar a duplicidade; ignorar não altera lançamentos.
+4. A prévia identifica duplicatas apenas por igualdade de instrumento, tipo, data, valor, categoria e subcategoria. O usuário pode ignorar ou substituir descrição/classificação/tags/observações do candidato; múltiplos candidatos exigem seleção. A confirmação revalida o candidato na transação de importação e não altera os campos que identificam a duplicidade.
+5. A consulta dinâmica de candidatos é feita nas rotas existentes de importação por meio do modo `duplicate_check`, sem novo endpoint nem conciliação automática.
+6. A confirmação retorna os detalhes de todas as linhas importadas e ignoradas; o frontend apresenta cada resultado em uma linha compacta e mantém os motivos de descarte sem limite de 50 itens.
 
 Ver [[importacao-dados]].
 
@@ -687,6 +695,13 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `4.46` — 2026-10-10 — Documenta aprendizado de correções em duplicidades ignoradas, com revalidação e sem escrita financeira.
+- `4.45` — 2026-10-05 — Documenta retorno integral e apresentação compacta das linhas importadas e ignoradas.
+- `4.44` — 2026-10-05 — Documenta validação de classificação compatível e detecção/substituição seletiva de duplicatas na prévia de importação.
+- `4.43` — 2026-10-05 — Documenta descrição original e editável na prévia, busca de aprendizado pela descrição corrigida e sugestões de tags em uma linha.
+- `4.42` — 2026-10-05 — Documenta opções de classificação devolvidas pela prévia de importação para seleção de categorias, subcategorias e tags.
+- `4.41` — 2026-10-05 — Documenta `import_adjustments`, o módulo de aprendizado por instrumento e a reaplicação de correções somente após importação bem-sucedida.
+- `4.40` — 2026-09-27 — Documenta o alerta individual de recuperação de senha na Central, a verificação SMTP criptografada e o atalho para Preferências.
 - `4.39` — 2026-09-27 — Documenta a rota de reinício de provisão anual, com ajuste auditável e manutenção de vínculos a investimentos com saldo.
 - `4.38` — 2026-09-27 — Documenta a aba Histórico, a listagem opcional de contratos arquivados e a preservação de pagamentos, distinguindo contratos arquivados com saldo em aberto.
 - `4.37` — 2026-09-27 — Documenta as jornadas separadas Quitar agora/Amortizar e o cálculo de quitação pelo principal atual estimado.

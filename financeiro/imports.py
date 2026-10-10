@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import re
 import struct
 import unicodedata
 import zipfile
@@ -14,9 +15,21 @@ from xml.etree import ElementTree
 from xml.sax.saxutils import escape as xml_escape
 
 from financeiro.accounts import recompute_account_balance
-from financeiro.categories import ClassificationError, get_or_create_category, get_or_create_subcategory, get_or_create_tag, normalize_name
+from financeiro.categories import (
+    ClassificationError,
+    get_or_create_category,
+    get_or_create_subcategory,
+    get_or_create_tag,
+    list_categories,
+    list_tags,
+    normalize_name,
+)
 from financeiro.classification_suggestions import normalize_description
-from financeiro.credit_cards import create_credit_card_transaction_with_conn
+from financeiro.credit_cards import (
+    create_credit_card_transaction_with_conn,
+    get_active_credit_card,
+    replace_credit_card_transaction_tags,
+)
 from financeiro.identifiers import positive_int_id
 from financeiro.money import decimal_to_cents
 from financeiro.transactions import (
@@ -28,6 +41,11 @@ from financeiro.transactions import (
     resolve_exchange_rate_micros,
 )
 from financeiro.database import begin_immediate, get_connection, row_to_dict
+from financeiro.import_adjustments import (
+    LEARNABLE_IMPORT_FIELDS,
+    find_import_adjustment,
+    save_import_adjustment,
+)
 from financeiro.xlsx_security import (
     XlsxSecurityError,
     normalize_xlsx_worksheet_target,
@@ -258,9 +276,77 @@ def system_import_template(user_id: int, target: str) -> bytes:
     ])
 
 
-def import_system_template(user_id: int, target: str, target_id: object, file_bytes: bytes, filename: str) -> dict:
+def preview_system_template(user_id: int, target: str, target_id: object, file_bytes: bytes, filename: str) -> dict:
     normalized_target = normalize_import_target(target)
     rows = parse_system_template_file(file_bytes, filename)
+    source_type = "credit_card" if normalized_target == "card" else "account"
+    preview_rows = []
+    errors = []
+    with get_connection() as conn:
+        for raw in rows:
+            original_raw = dict(raw)
+            try:
+                if normalized_target == "card":
+                    payload = normalize_system_card_row(raw, target_id)
+                else:
+                    payload = normalize_system_account_row(raw, target_id)
+                adjustment = find_import_adjustment(
+                    conn,
+                    user_id,
+                    source_type,
+                    int(target_id),
+                    original_raw.get("descricao") or original_raw.get("description"),
+                    payload["type"],
+                )
+                if adjustment:
+                    apply_import_adjustment_to_row(raw, adjustment)
+                    if normalized_target == "card":
+                        payload = normalize_system_card_row(raw, target_id)
+                    else:
+                        payload = normalize_system_account_row(raw, target_id)
+                preview_rows.append({
+                    "row": original_raw.get("row", ""),
+                    "selected": True,
+                    "raw": original_raw,
+                    "values": preview_row_from_payload(
+                        payload,
+                        original_raw.get("descricao") or original_raw.get("description"),
+                    ),
+                    "learned_adjustment": adjustment is not None,
+                })
+            except (ImportError, ValueError) as exc:
+                errors.append({
+                    "row": raw.get("row", ""),
+                    "description": raw.get("descricao") or raw.get("description") or "",
+                    "reason": getattr(exc, "message", str(exc)),
+                })
+        duplicate_rows = find_preview_duplicate_matches(
+            conn,
+            user_id,
+            source_type,
+            int(target_id),
+            preview_rows,
+            is_legacy=False,
+        )
+    for preview_row, matches in zip(preview_rows, duplicate_rows):
+        preview_row["duplicate_matches"] = matches
+    return {
+        "preview": preview_rows,
+        "errors": errors[:50],
+        "total_rows": len(rows),
+        "imported": 0,
+        "skipped": 0,
+        "selected_rows": len(preview_rows),
+        "classification_options": {
+            "categories": list_categories(user_id),
+            "tags": list_tags(user_id),
+        },
+    }
+
+
+def import_system_template(user_id: int, target: str, target_id: object, file_bytes: bytes, filename: str, selected_rows: list[dict] | None = None) -> dict:
+    normalized_target = normalize_import_target(target)
+    rows = parse_system_template_file(file_bytes, filename) if selected_rows is None else [coerce_preview_row_to_raw(row) for row in selected_rows if row.get("selected", True)]
     operation_batch_id = str(uuid4())
     imported = []
     skipped = []
@@ -271,12 +357,141 @@ def import_system_template(user_id: int, target: str, target_id: object, file_by
             try:
                 if normalized_target == "card":
                     payload = normalize_system_card_row(raw, target_id)
-                    created = create_credit_card_transaction_with_conn(conn, user_id, payload)
+                    if raw.get("_preview_reviewed"):
+                        _, payload["category"], payload["subcategory"] = validate_reviewed_classification(
+                            conn,
+                            user_id,
+                            payload["category"],
+                            payload["subcategory"],
+                            payload["type"],
+                        )
+                    # spec: importacao/importacao-dados v1.16 — critério 43
+                    if raw.get("_duplicate_action") == "ignore":
+                        if not has_import_duplicate(
+                            conn, user_id, "credit_card", int(target_id), payload["type"], payload["date"],
+                            money_decimal_to_cents(normalize_amount(payload["amount"])),
+                            payload["category"], payload["subcategory"],
+                        ):
+                            raise ImportError("A duplicidade não está mais presente; revise a linha antes de ignorar.")
+                        learn_import_adjustment_from_row(
+                            conn, user_id, "credit_card", int(target_id), raw, payload["type"],
+                            payload["description"], payload["category"], payload["subcategory"], payload["tags"],
+                        )
+                        conn.execute("RELEASE SAVEPOINT import_row")
+                        skipped.append({
+                            "row": raw.get("row", ""),
+                            "description": payload["description"],
+                            "reason": "Linha ignorada conforme sua escolha.",
+                        })
+                        continue
+                    if raw.get("_duplicate_action") == "replace":
+                        created = replace_duplicate_import(
+                            conn,
+                            user_id,
+                            "credit_card",
+                            int(target_id),
+                            raw,
+                            payload["type"],
+                            payload["date"],
+                            money_decimal_to_cents(normalize_amount(payload["amount"])),
+                            payload["category"],
+                            payload["subcategory"],
+                            payload["description"],
+                            payload["tags"],
+                            payload["notes"],
+                        )
+                    elif has_import_duplicate(
+                        conn,
+                        user_id,
+                        "credit_card",
+                        int(target_id),
+                        payload["type"],
+                        payload["date"],
+                        money_decimal_to_cents(normalize_amount(payload["amount"])),
+                        payload["category"],
+                        payload["subcategory"],
+                    ):
+                        raise ImportError("Linha duplicada; escolha substituir ou ignorar na prévia.")
+                    else:
+                        created = create_credit_card_transaction_with_conn(conn, user_id, payload)
                 else:
                     payload = normalize_system_account_row(raw, target_id)
-                    created = create_transaction_with_conn(conn, user_id, payload)
+                    if raw.get("_preview_reviewed"):
+                        _, payload["category"], payload["subcategory"] = validate_reviewed_classification(
+                            conn,
+                            user_id,
+                            payload["category"],
+                            payload["subcategory"],
+                            payload["type"],
+                        )
+                    # spec: importacao/importacao-dados v1.16 — critério 43
+                    if raw.get("_duplicate_action") == "ignore":
+                        if not has_import_duplicate(
+                            conn, user_id, "account", int(target_id), payload["type"], payload["date"],
+                            money_decimal_to_cents(normalize_amount(payload["amount"])),
+                            payload["category"], payload["subcategory"],
+                        ):
+                            raise ImportError("A duplicidade não está mais presente; revise a linha antes de ignorar.")
+                        learn_import_adjustment_from_row(
+                            conn, user_id, "account", int(target_id), raw, payload["type"],
+                            payload["description"], payload["category"], payload["subcategory"], payload["tags"],
+                        )
+                        conn.execute("RELEASE SAVEPOINT import_row")
+                        skipped.append({
+                            "row": raw.get("row", ""),
+                            "description": payload["description"],
+                            "reason": "Linha ignorada conforme sua escolha.",
+                        })
+                        continue
+                    if raw.get("_duplicate_action") == "replace":
+                        created = replace_duplicate_import(
+                            conn,
+                            user_id,
+                            "account",
+                            int(target_id),
+                            raw,
+                            payload["type"],
+                            payload["date"],
+                            money_decimal_to_cents(normalize_amount(payload["amount"])),
+                            payload["category"],
+                            payload["subcategory"],
+                            payload["description"],
+                            payload["tags"],
+                            payload["notes"],
+                        )
+                    elif has_import_duplicate(
+                        conn,
+                        user_id,
+                        "account",
+                        int(target_id),
+                        payload["type"],
+                        payload["date"],
+                        money_decimal_to_cents(normalize_amount(payload["amount"])),
+                        payload["category"],
+                        payload["subcategory"],
+                    ):
+                        raise ImportError("Linha duplicada; escolha substituir ou ignorar na prévia.")
+                    else:
+                        created = create_transaction_with_conn(conn, user_id, payload)
+                learn_import_adjustment_from_row(
+                    conn,
+                    user_id,
+                    "credit_card" if normalized_target == "card" else "account",
+                    int(target_id),
+                    raw,
+                    payload["type"],
+                    payload["description"],
+                    payload["category"],
+                    payload["subcategory"],
+                    payload["tags"],
+                )
                 conn.execute("RELEASE SAVEPOINT import_row")
-                imported.append({"row": raw["row"], "id": created["id"], "description": payload["description"]})
+                imported.append({
+                    "row": raw["row"],
+                    "id": created["id"],
+                    "description": payload["description"],
+                    "replaced": raw.get("_duplicate_action") == "replace",
+                })
             except Exception as exc:
                 conn.execute("ROLLBACK TO SAVEPOINT import_row")
                 conn.execute("RELEASE SAVEPOINT import_row")
@@ -291,8 +506,108 @@ def import_system_template(user_id: int, target: str, target_id: object, file_by
         "skipped": len(skipped),
         "total_rows": len(rows),
         "rows": imported,
-        "errors": skipped[:50],
+        "errors": skipped,
     }
+
+
+def preview_row_from_payload(payload: dict, original_description: object = None) -> dict:
+    return {
+        "data": payload.get("date") or "",
+        "tipo": payload.get("type") or "",
+        "descricao_original": original_description or payload.get("description") or "",
+        "descricao": payload.get("description") or "",
+        "valor": payload.get("amount") or "",
+        "categoria": payload.get("category") or "",
+        "subcategoria": payload.get("subcategory") or "",
+        "tags": payload.get("tags") or "",
+        "repeticao": payload.get("series_kind") or "single",
+        "parcelas": payload.get("installment_count") or "",
+        "recorrencia": payload.get("recurrence_frequency") or "",
+        "media": "sim" if payload.get("use_average") else "nao",
+        "observacoes": payload.get("notes") or "",
+        "competencia_fatura": payload.get("invoice_month") or "",
+        "conta_destino_id": payload.get("destination_account_id") or "",
+        "valor_destino": payload.get("destination_amount") or "",
+        "cotacao_cambio": payload.get("transfer_exchange_rate") or "",
+        "cotacao_brl": payload.get("exchange_rate_to_brl") or "",
+    }
+
+
+def coerce_preview_row_to_raw(row: dict) -> dict:
+    values = dict(row.get("values") or {})
+    raw = dict(row.get("raw") or {})
+    raw["row"] = row.get("row", raw.get("row", ""))
+    raw["_import_original"] = dict(row.get("raw") or {})
+    raw["_preview_reviewed"] = True
+    raw["_duplicate_action"] = row.get("duplicate_action")
+    raw["_duplicate_target_id"] = row.get("duplicate_target_id")
+    edited_fields = row.get("edited_fields", [])
+    raw["_edited_fields"] = [
+        field for field in edited_fields
+        if field in LEARNABLE_IMPORT_FIELDS
+    ] if isinstance(edited_fields, list) else []
+    for key, value in values.items():
+        if key == "descricao_original":
+            continue
+        if value == "":
+            raw[key] = ""
+        else:
+            raw[key] = value
+    return raw
+
+
+def apply_import_adjustment_to_row(row: dict, adjustment: dict) -> None:
+    field_names = {
+        "description": ("descricao", "description"),
+        "category": ("categoria", "category"),
+        "subcategory": ("subcategoria", "subcategory"),
+        "tags": ("tags", "tag"),
+    }
+    for field, value in adjustment.items():
+        if field not in field_names:
+            continue
+        candidates = field_names[field]
+        key = next((candidate for candidate in candidates if candidate in row), candidates[0])
+        row[key] = "; ".join(value) if field == "tags" else value
+
+
+# spec: importacao/importacao-dados v1.16 — critérios 14 a 17
+def learn_import_adjustment_from_row(
+    conn,
+    user_id: int,
+    source_type: str,
+    source_id: int,
+    row: dict,
+    transaction_type: str,
+    description: object,
+    category: object,
+    subcategory: object,
+    tags: list[str],
+) -> None:
+    original = row.get("_import_original")
+    edited_fields = row.get("_edited_fields")
+    if not isinstance(original, dict) or not isinstance(edited_fields, list):
+        return
+    if not LEARNABLE_IMPORT_FIELDS.intersection(edited_fields):
+        return
+    original_description = original.get("description") or original.get("descricao")
+    if not str(original_description or "").strip():
+        return
+    normalized_tags = tags if isinstance(tags, list) else (
+        normalize_tags(tags) if str(tags or "").strip() else []
+    )
+    save_import_adjustment(
+        conn,
+        user_id,
+        source_type,
+        source_id,
+        original_description,
+        transaction_type,
+        description,
+        category,
+        subcategory,
+        normalized_tags,
+    )
 
 
 def parse_system_template_file(file_bytes: bytes, filename: str) -> list[dict]:
@@ -346,7 +661,7 @@ def normalize_system_account_row(row: dict, account_id: object) -> dict:
     if payload["type"] == "transfer":
         payload["category"] = ""
         payload["subcategory"] = ""
-        # spec: importacao-dados v1.6 — regras de repetição
+        # spec: importacao/importacao-dados v1.16 — regras de repetição
         # (transferencias e cambio sao sempre avulsos, mesmo se a linha trouxer repeticao)
         payload["series_kind"] = "single"
         payload["installment_count"] = None
@@ -372,7 +687,7 @@ def normalize_system_card_row(row: dict, card_id: object) -> dict:
 
 
 def normalize_system_series(row: dict) -> dict:
-    # spec: importacao-dados v1.6 — regras de repetição
+    # spec: importacao/importacao-dados v1.16 — regras de repetição
     # (avulso padrao; parcelado exige parcelas 2-120; recorrente exige frequencia;
     #  media so se aplica a recorrentes)
     series_kind = SERIES_KIND_ALIASES.get(normalize_key(row.get("repeticao") or row.get("series_kind")), "single")
@@ -578,7 +893,7 @@ def xlsx_column_name(index: int) -> str:
 
 
 def parse_xlsx_rows(file_bytes: bytes, sheet_name: str) -> list[list[str]]:
-    # spec: importacao-dados v1.6 — limites de segurança do contêiner e da worksheet
+    # spec: importacao/importacao-dados v1.16 — limites de segurança do contêiner e da worksheet
     try:
         validate_xlsx_file(file_bytes)
         with zipfile.ZipFile(BytesIO(file_bytes)) as archive:
@@ -753,9 +1068,19 @@ def xlsx_column_index(cell_ref: str) -> int:
     return index
 
 
-def import_legacy_transactions(user_id: int, account_id: object, file_bytes: bytes, filename: str) -> dict:
+def import_legacy_transactions(
+    user_id: int,
+    account_id: object,
+    file_bytes: bytes,
+    filename: str,
+    selected_rows: list[dict] | None = None,
+) -> dict:
     normalized_account_id = normalize_account_id(account_id)
-    raw_rows = parse_legacy_file(file_bytes, filename)
+    raw_rows = (
+        parse_legacy_file(file_bytes, filename)
+        if selected_rows is None
+        else [legacy_preview_row_to_raw(row) for row in selected_rows if row.get("selected", True)]
+    )
     operation_batch_id = str(uuid4())
     imported = []
     skipped = []
@@ -777,39 +1102,117 @@ def import_legacy_transactions(user_id: int, account_id: object, file_bytes: byt
             begin_immediate(conn)
             conn.execute("SAVEPOINT import_row")
             try:
-                category_group, category_name, subcategory_name, tags = resolve_import_classification(conn, user_id, transaction)
+                if raw.get("_preview_reviewed"):
+                    category_group, category_name, subcategory_name = validate_reviewed_classification(
+                        conn,
+                        user_id,
+                        transaction["category"],
+                        transaction["subcategory"],
+                        transaction["type"],
+                    )
+                    tags = transaction["tags"]
+                else:
+                    category_group, category_name, subcategory_name, tags = resolve_import_classification(conn, user_id, transaction)
                 transaction["category"] = category_name
                 transaction["subcategory"] = subcategory_name
                 transaction["tags"] = tags
-                category_id = get_or_create_category(conn, user_id, transaction["category"], category_group)
-                subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
-                tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
-                cursor = conn.execute(
-                    """
-                    INSERT INTO transactions (
-                        user_id, type, description, normalized_description, amount_cents, exchange_rate_micros, amount_brl_cents, date, account_id,
-                        category_id, subcategory_id, notes
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
+                duplicate_action = raw.get("_duplicate_action")
+                if duplicate_action == "ignore":
+                    # spec: importacao/importacao-dados v1.16 — critério 43
+                    if not get_import_duplicate_candidates(
+                        conn, user_id, "account", normalized_account_id, transaction["type"], transaction["date"],
+                        transaction["amount_cents"], transaction["category"], transaction["subcategory"],
+                    ):
+                        raise ImportError("A duplicidade não está mais presente; revise a linha antes de ignorar.")
+                    learn_import_adjustment_from_row(
+                        conn, user_id, "account", normalized_account_id, raw, transaction["type"],
+                        transaction["description"], transaction["category"], transaction["subcategory"],
+                        transaction["tags"],
+                    )
+                    conn.execute("RELEASE SAVEPOINT import_row")
+                    skipped.append({
+                        "row": raw.get("row", ""),
+                        "description": transaction["description"],
+                        "reason": "Linha ignorada conforme sua escolha.",
+                    })
+                    continue
+                if duplicate_action == "replace":
+                    created = replace_duplicate_import(
+                        conn,
                         user_id,
-                        transaction["type"],
-                        transaction["description"],
-                        normalize_description(transaction["description"]),
-                        transaction["amount_cents"],
-                        exchange_rate_micros,
-                        amount_brl_cents,
-                        transaction["date"],
+                        "account",
                         normalized_account_id,
-                        category_id,
-                        subcategory_id,
+                        raw,
+                        transaction["type"],
+                        transaction["date"],
+                        transaction["amount_cents"],
+                        transaction["category"],
+                        transaction["subcategory"],
+                        transaction["description"],
+                        transaction["tags"],
                         transaction["notes"],
-                    ),
+                    )
+                else:
+                    duplicate_matches = get_import_duplicate_candidates(
+                        conn,
+                        user_id,
+                        "account",
+                        normalized_account_id,
+                        transaction["type"],
+                        transaction["date"],
+                        transaction["amount_cents"],
+                        transaction["category"],
+                        transaction["subcategory"],
+                    )
+                    if duplicate_matches:
+                        raise ImportError("Linha duplicada; escolha substituir ou ignorar na prévia.")
+                    category_id = get_or_create_category(conn, user_id, transaction["category"], category_group)
+                    subcategory_id = get_or_create_subcategory(conn, user_id, category_id, transaction["subcategory"])
+                    tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
+                    cursor = conn.execute(
+                        """
+                        INSERT INTO transactions (
+                            user_id, type, description, normalized_description, amount_cents, exchange_rate_micros, amount_brl_cents, date, account_id,
+                            category_id, subcategory_id, notes
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            user_id,
+                            transaction["type"],
+                            transaction["description"],
+                            normalize_description(transaction["description"]),
+                            transaction["amount_cents"],
+                            exchange_rate_micros,
+                            amount_brl_cents,
+                            transaction["date"],
+                            normalized_account_id,
+                            category_id,
+                            subcategory_id,
+                            transaction["notes"],
+                        ),
+                    )
+                    created = {"id": cursor.lastrowid}
+                    replace_transaction_tags(conn, cursor.lastrowid, tag_ids)
+                    recompute_account_balance(conn, user_id, normalized_account_id)
+                learn_import_adjustment_from_row(
+                    conn,
+                    user_id,
+                    "account",
+                    normalized_account_id,
+                    raw,
+                    transaction["type"],
+                    transaction["description"],
+                    transaction["category"],
+                    transaction["subcategory"],
+                    transaction["tags"],
                 )
-                replace_transaction_tags(conn, cursor.lastrowid, tag_ids)
-                recompute_account_balance(conn, user_id, normalized_account_id)
                 conn.execute("RELEASE SAVEPOINT import_row")
-                imported.append({"row": raw["row"], "id": cursor.lastrowid, "description": transaction["description"]})
+                imported.append({
+                    "row": raw["row"],
+                    "id": created["id"],
+                    "description": transaction["description"],
+                    "replaced": duplicate_action == "replace",
+                })
             except Exception as exc:
                 conn.execute("ROLLBACK TO SAVEPOINT import_row")
                 conn.execute("RELEASE SAVEPOINT import_row")
@@ -824,21 +1227,345 @@ def import_legacy_transactions(user_id: int, account_id: object, file_bytes: byt
         "skipped": len(skipped),
         "total_rows": len(raw_rows),
         "rows": imported,
-        "errors": skipped[:50],
+        "errors": skipped,
     }
+
+
+def preview_legacy_transactions(user_id: int, account_id: object, file_bytes: bytes, filename: str) -> dict:
+    normalized_account_id = normalize_account_id(account_id)
+    with get_connection() as conn:
+        get_active_account(conn, user_id, normalized_account_id)
+    raw_rows = parse_legacy_file(file_bytes, filename)
+    preview_rows = []
+    errors = []
+    adjustments = {}
+    with get_connection() as conn:
+        for index, raw in enumerate(raw_rows):
+            try:
+                amount = normalize_amount(raw.get("amount"))
+            except ImportError:
+                continue
+            transaction_type = "income" if amount > 0 else "expense"
+            adjustment = find_import_adjustment(
+                conn,
+                user_id,
+                "account",
+                normalized_account_id,
+                raw.get("description"),
+                transaction_type,
+            )
+            if adjustment:
+                adjustments[index] = adjustment
+    for index, raw in enumerate(raw_rows):
+        try:
+            original_raw = dict(raw)
+            adjustment = adjustments.get(index)
+            if adjustment:
+                apply_import_adjustment_to_row(raw, adjustment)
+            transaction = normalize_imported_transaction(raw)
+            signed_amount = transaction["amount_cents"] * (1 if transaction["type"] == "income" else -1)
+            preview_rows.append({
+                "row": raw["row"],
+                "selected": True,
+                "raw": original_raw,
+                "values": {
+                    "data": transaction["date"],
+                    "descricao_original": original_raw.get("description") or "",
+                    "descricao": transaction["description"],
+                    "valor": f"{Decimal(signed_amount) / Decimal(100):.2f}".replace(".", ","),
+                    "categoria": transaction["category"],
+                    "subcategoria": transaction["subcategory"] or "",
+                    "tags": "; ".join(transaction["tags"]),
+                    "observacoes": transaction["notes"] or "",
+                },
+                "learned_adjustment": adjustment is not None,
+            })
+        except ImportError as exc:
+            errors.append({
+                "row": raw.get("row", ""),
+                "description": raw.get("description", ""),
+                "reason": exc.message,
+            })
+    with get_connection() as conn:
+        duplicate_rows = find_preview_duplicate_matches(
+            conn,
+            user_id,
+            "account",
+            normalized_account_id,
+            preview_rows,
+            is_legacy=True,
+        )
+    for preview_row, matches in zip(preview_rows, duplicate_rows):
+        preview_row["duplicate_matches"] = matches
+    return {
+        "preview": preview_rows,
+        "errors": errors[:50],
+        "total_rows": len(raw_rows),
+        "imported": 0,
+        "skipped": len(errors),
+        "selected_rows": len(preview_rows),
+        "classification_options": {
+            "categories": list_categories(user_id),
+            "tags": list_tags(user_id),
+        },
+    }
+
+
+def find_preview_duplicate_matches(
+    conn,
+    user_id: int,
+    source_type: str,
+    source_id: int,
+    preview_rows: list[dict],
+    *,
+    is_legacy: bool,
+) -> list[list[dict]]:
+    matches_by_row = []
+    for row in preview_rows:
+        try:
+            raw = legacy_preview_row_to_raw(row) if is_legacy else coerce_preview_row_to_raw(row)
+            if is_legacy:
+                payload = normalize_imported_transaction(raw)
+                transaction_type = payload["type"]
+                transaction_date = payload["date"]
+                amount_cents = payload["amount_cents"]
+                category = payload["category"]
+                subcategory = payload["subcategory"]
+            else:
+                payload = (
+                    normalize_system_card_row(raw, source_id)
+                    if source_type == "credit_card"
+                    else normalize_system_account_row(raw, source_id)
+                )
+                transaction_type = payload["type"]
+                transaction_date = payload["date"]
+                amount_cents = money_decimal_to_cents(normalize_amount(payload["amount"]))
+                category = payload["category"]
+                subcategory = payload["subcategory"]
+            if not category:
+                matches_by_row.append([])
+                continue
+            _, category, subcategory = validate_reviewed_classification(
+                conn,
+                user_id,
+                category,
+                subcategory,
+                transaction_type,
+            )
+            matches = get_import_duplicate_candidates(
+                conn,
+                user_id,
+                source_type,
+                source_id,
+                transaction_type,
+                transaction_date,
+                amount_cents,
+                category,
+                subcategory,
+            )
+            matches_by_row.append(matches)
+        except (ImportError, ValueError):
+            matches_by_row.append([])
+    return matches_by_row
+
+
+def check_import_duplicates(
+    user_id: int,
+    target: str,
+    target_id: object,
+    preview_rows: list[dict],
+    *,
+    is_legacy: bool = False,
+) -> list[dict]:
+    normalized_target = normalize_import_target(target)
+    normalized_id = positive_int_id(target_id)
+    source_type = "credit_card" if normalized_target == "card" else "account"
+    with get_connection() as conn:
+        if normalized_target == "card":
+            get_active_credit_card(conn, user_id, normalized_id)
+        else:
+            get_active_account(conn, user_id, normalized_id)
+        matches = find_preview_duplicate_matches(
+            conn,
+            user_id,
+            source_type,
+            normalized_id,
+            preview_rows,
+            is_legacy=is_legacy,
+        )
+    return [
+        {"row": row.get("row"), "matches": row_matches}
+        for row, row_matches in zip(preview_rows, matches)
+    ]
+
+
+def legacy_preview_row_to_raw(row: dict) -> dict:
+    values = row.get("values")
+    original = row.get("raw")
+    if not isinstance(values, dict) or (original is not None and not isinstance(original, dict)):
+        raise ImportError("Dados de revisão inválidos para importação.")
+    raw = dict(original or {})
+    raw["_import_original"] = dict(original or {})
+    raw["_preview_reviewed"] = True
+    raw["_duplicate_action"] = row.get("duplicate_action")
+    raw["_duplicate_target_id"] = row.get("duplicate_target_id")
+    edited_fields = row.get("edited_fields", [])
+    raw["_edited_fields"] = [
+        field for field in edited_fields
+        if field in LEARNABLE_IMPORT_FIELDS
+    ] if isinstance(edited_fields, list) else []
+    raw.update({
+        "row": row.get("row", raw.get("row", "")),
+        "date": values.get("data", ""),
+        "description": values.get("descricao", ""),
+        "amount": values.get("valor", ""),
+        "category": values.get("categoria", ""),
+        "subcategory": values.get("subcategoria", ""),
+        "tag": values.get("tags", ""),
+        "notes": values.get("observacoes", ""),
+    })
+    return raw
 
 
 def parse_legacy_file(file_bytes: bytes, filename: str) -> list[dict]:
     if not file_bytes:
         raise ImportError("Envie um arquivo para importar.")
     name = filename.lower()
+    if name.endswith(".ofx") or name.endswith(".qfx"):
+        return parse_ofx_rows(file_bytes)
     if name.endswith(".xls") or file_bytes.startswith(OLE_MAGIC):
         rows = parse_xls_rows(file_bytes)
     elif name.endswith(".csv"):
         rows = parse_csv_rows(file_bytes)
     else:
-        raise ImportError("Formato nao suportado. Envie um arquivo .xls ou .csv para importacao.")
+        raise ImportError("Formato nao suportado. Envie um arquivo .xls, .csv ou .ofx para importacao.")
     return rows_to_transactions(rows)
+
+
+def parse_ofx_rows(file_bytes: bytes) -> list[dict]:
+    # spec: importacao/importacao-dados v1.16 — critério 4
+    header = file_bytes[:2048].decode("ascii", errors="ignore")
+    charset_match = re.search(r"(?im)^\s*CHARSET\s*:\s*([^\s]+)", header)
+    declared_charset = charset_match.group(1).upper() if charset_match else ""
+    charset_aliases = {
+        "1252": "cp1252",
+        "WINDOWS-1252": "cp1252",
+        "8859-1": "latin-1",
+        "ISO-8859-1": "latin-1",
+        "UTF-8": "utf-8-sig",
+        "65001": "utf-8-sig",
+        "USASCII": "ascii",
+    }
+    encodings = [charset_aliases[declared_charset]] if declared_charset in charset_aliases else []
+    encodings.extend(["utf-8-sig", "cp1252"])
+    payload = None
+    for encoding in encodings:
+        try:
+            payload = file_bytes.decode(encoding)
+            break
+        except UnicodeDecodeError:
+            continue
+    if payload is None:
+        payload = file_bytes.decode("utf-8", errors="replace")
+    headerless = payload
+    header_fields = {
+        "OFXHEADER",
+        "DATA",
+        "VERSION",
+        "SECURITY",
+        "ENCODING",
+        "CHARSET",
+        "COMPRESSION",
+        "OLDFILEUID",
+        "NEWFILEUID",
+        "RESTRICTED",
+        "APPLICATION",
+        "SUBJECT",
+        "MSGSET",
+    }
+    if payload.lstrip().upper().startswith("OFXHEADER:"):
+        lines = []
+        for line in payload.splitlines():
+            match = re.match(r"^\s*([\w]+)\s*:", line)
+            field = match.group(1).upper() if match else ""
+            if field in header_fields:
+                continue
+            lines.append(line)
+        headerless = "\n".join(lines)
+    if not headerless.strip():
+        raise ImportError("Arquivo OFX vazio.")
+    xml_payload = re.sub(
+        r"&(?!#\d+;|#x[0-9a-f]+;|(?:amp|lt|gt|quot|apos);)",
+        "&amp;",
+        headerless,
+        flags=re.IGNORECASE,
+    )
+    leaf_tag = re.compile(r"<([A-Za-z][\w:.-]*)>([^<]*)(?=<)")
+
+    def close_ofx_leaf(match: re.Match[str]) -> str:
+        tag_name = match.group(1)
+        value = match.group(2)
+        next_tag = xml_payload[match.end():]
+        if not value.strip() or re.match(rf"</{re.escape(tag_name)}\s*>", next_tag, re.IGNORECASE):
+            return match.group(0)
+        return f"<{tag_name}>{value}</{tag_name}>"
+
+    xml_payload = leaf_tag.sub(close_ofx_leaf, xml_payload)
+    try:
+        root = ElementTree.fromstring(xml_payload)
+    except ElementTree.ParseError as exc:
+        raise ImportError("Arquivo OFX invalido.") from exc
+    transactions = []
+    statement_nodes = [
+        node for node in root.iter()
+        if node.tag.rsplit("}", 1)[-1].upper() == "STMTTRN"
+    ]
+    for index, node in enumerate(statement_nodes, start=1):
+        date_raw = first_ofx_value(node, "DTPOSTED", "DTUSER", "DATE", "DTSTART")
+        amount_raw = first_ofx_value(node, "TRNAMT")
+        if not date_raw or amount_raw is None:
+            continue
+        description = first_ofx_value(node, "NAME", "MEMO", "DESCR") or "Movimento OFX"
+        category = "Outras Receitas" if normalize_amount(amount_raw) > 0 else "Outras Despesas"
+        transactions.append({
+            "row": index,
+            "date": format_ofx_date(date_raw),
+            "description": " ".join(description.split()),
+            "category": category,
+            "subcategory": "",
+            "amount": str(normalize_amount(amount_raw)),
+            "status": "Pago",
+            "tag": "",
+            "notes": first_ofx_value(node, "MEMO") or "",
+        })
+    if not transactions:
+        raise ImportError("Nenhuma transacao valida encontrada no arquivo OFX.")
+    return transactions
+
+
+def first_ofx_value(node: ElementTree.Element, *names: str) -> str:
+    for name in names:
+        for child in node.iter():
+            if child.tag.rsplit("}", 1)[-1].upper() == name.upper():
+                value = (child.text or "").strip()
+                if value:
+                    return value
+    return ""
+
+
+def format_ofx_date(value: object) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        raise ImportError("Data invalida.")
+    cleaned = raw.upper().replace("[", "").replace("]", "")
+    match = re.search(r"(\d{8})", cleaned)
+    if not match:
+        raise ImportError("Data invalida.")
+    date_text = match.group(1)
+    try:
+        return datetime.strptime(date_text, "%Y%m%d").date().isoformat()
+    except ValueError as exc:
+        raise ImportError("Data invalida.") from exc
 
 
 def rows_to_transactions(rows: list[list[object]]) -> list[dict]:
@@ -941,6 +1668,269 @@ def resolve_import_classification(conn, user_id: int, transaction: dict) -> tupl
     subcategory = match_existing_subcategory(conn, user_id, group, category, subcategory)
     tags = [match_existing_tag(conn, user_id, tag) for tag in tags]
     return group, category, subcategory, tags
+
+
+# spec: importacao/importacao-dados v1.16 — critério 33
+def validate_reviewed_classification(
+    conn,
+    user_id: int,
+    category_name: object,
+    subcategory_name: object,
+    transaction_type: str,
+) -> tuple[str, str, str | None]:
+    if transaction_type in {"transfer", "exchange"} and not str(category_name or "").strip():
+        return "expense", "", None
+
+    normalized_category = normalize_key(category_name)
+    allowed_groups = {
+        "income": {"income"},
+        "investment": {"investment"},
+        "expense": {"expense"},
+    }.get(transaction_type, set())
+    categories = conn.execute(
+        "SELECT id, name, group_type FROM categories WHERE user_id = ?",
+        (user_id,),
+    ).fetchall()
+    category = next(
+        (
+            item
+            for item in categories
+            if item["group_type"] in allowed_groups
+            and normalize_key(item["name"]) == normalized_category
+        ),
+        None,
+    )
+    if category is None:
+        raise ImportError("Escolha uma categoria existente compatível com o tipo do lançamento.")
+
+    normalized_subcategory = normalize_key(subcategory_name)
+    if not normalized_subcategory:
+        return category["group_type"], category["name"], None
+    subcategory = conn.execute(
+        """
+        SELECT name
+        FROM subcategories
+        WHERE user_id = ? AND category_id = ?
+        """,
+        (user_id, category["id"]),
+    ).fetchall()
+    matched_subcategory = next(
+        (item["name"] for item in subcategory if normalize_key(item["name"]) == normalized_subcategory),
+        None,
+    )
+    if matched_subcategory is None:
+        raise ImportError("Escolha uma subcategoria existente para a categoria selecionada.")
+    return category["group_type"], category["name"], matched_subcategory
+
+
+# spec: importacao/importacao-dados v1.16 — critérios 34 e 38
+def get_import_duplicate_candidates(
+    conn,
+    user_id: int,
+    source_type: str,
+    source_id: int,
+    transaction_type: str,
+    transaction_date: str,
+    amount_cents: int,
+    category_name: object,
+    subcategory_name: object,
+) -> list[dict]:
+    if transaction_type not in {"income", "expense", "investment"}:
+        return []
+    category_id = None
+    subcategory_id = None
+    if str(category_name or "").strip():
+        category_group = {
+            "income": "income",
+            "expense": "expense",
+            "investment": "investment",
+        }[transaction_type]
+        category = conn.execute(
+            """
+            SELECT id FROM categories
+            WHERE user_id = ? AND group_type = ? AND name = ? COLLATE NOCASE
+            """,
+            (user_id, category_group, str(category_name).strip()),
+        ).fetchone()
+        if category is None:
+            return []
+        category_id = category["id"]
+        if str(subcategory_name or "").strip():
+            subcategory = conn.execute(
+                """
+                SELECT id FROM subcategories
+                WHERE user_id = ? AND category_id = ? AND name = ? COLLATE NOCASE
+                """,
+                (user_id, category_id, str(subcategory_name).strip()),
+            ).fetchone()
+            if subcategory is None:
+                return []
+            subcategory_id = subcategory["id"]
+
+    if source_type == "account":
+        table = "transactions"
+        source_column = "account_id"
+    elif source_type == "credit_card":
+        table = "credit_card_transactions"
+        source_column = "credit_card_id"
+    else:
+        return []
+    rows = conn.execute(
+        f"""
+        SELECT
+            existing.id,
+            existing.description,
+            existing.date,
+            existing.amount_cents,
+            existing.type,
+            categories.name AS category,
+            subcategories.name AS subcategory
+        FROM {table} AS existing
+        LEFT JOIN categories ON categories.id = existing.category_id
+        LEFT JOIN subcategories ON subcategories.id = existing.subcategory_id
+        WHERE existing.user_id = ? AND existing.{source_column} = ?
+            AND existing.archived_at IS NULL
+            AND existing.type = ? AND existing.date = ? AND existing.amount_cents = ?
+            AND existing.category_id IS ? AND existing.subcategory_id IS ?
+        ORDER BY existing.id
+        """,
+        (
+            user_id,
+            source_id,
+            transaction_type,
+            transaction_date,
+            amount_cents,
+            category_id,
+            subcategory_id,
+        ),
+    ).fetchall()
+    return [row_to_dict(row) for row in rows]
+
+
+def has_import_duplicate(
+    conn,
+    user_id: int,
+    source_type: str,
+    source_id: int,
+    transaction_type: str,
+    transaction_date: str,
+    amount_cents: int,
+    category_name: object,
+    subcategory_name: object,
+    selected_id: object = None,
+) -> bool:
+    candidates = get_import_duplicate_candidates(
+        conn,
+        user_id,
+        source_type,
+        source_id,
+        transaction_type,
+        transaction_date,
+        amount_cents,
+        category_name,
+        subcategory_name,
+    )
+    if selected_id is None or selected_id == "":
+        return bool(candidates)
+    try:
+        normalized_id = positive_int_id(selected_id)
+    except ValueError:
+        return False
+    return any(candidate["id"] == normalized_id for candidate in candidates)
+
+
+# spec: importacao/importacao-dados v1.16 — critérios 35 a 37
+def replace_duplicate_import(
+    conn,
+    user_id: int,
+    source_type: str,
+    source_id: int,
+    raw: dict,
+    transaction_type: str,
+    transaction_date: str,
+    amount_cents: int,
+    category_name: object,
+    subcategory_name: object,
+    description: object,
+    tags: object,
+    notes: object,
+) -> dict:
+    selected_id = raw.get("_duplicate_target_id")
+    candidates = get_import_duplicate_candidates(
+        conn,
+        user_id,
+        source_type,
+        source_id,
+        transaction_type,
+        transaction_date,
+        amount_cents,
+        category_name,
+        subcategory_name,
+    )
+    try:
+        selected_id = positive_int_id(selected_id)
+    except ValueError as exc:
+        raise ImportError("Selecione o lançamento duplicado que deseja substituir.") from exc
+    if not any(candidate["id"] == selected_id for candidate in candidates):
+        raise ImportError("O lançamento escolhido não corresponde mais à duplicidade detectada.")
+
+    category_group, normalized_category, normalized_subcategory = validate_reviewed_classification(
+        conn,
+        user_id,
+        category_name,
+        subcategory_name,
+        transaction_type,
+    )
+    category_id = get_or_create_category(conn, user_id, normalized_category, category_group)
+    subcategory_id = get_or_create_subcategory(conn, user_id, category_id, normalized_subcategory)
+    if isinstance(tags, list):
+        normalized_tags = tags
+    elif not str(tags or "").strip():
+        normalized_tags = []
+    else:
+        normalized_tags = normalize_tags(tags)
+    tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in normalized_tags]
+    if source_type == "account":
+        conn.execute(
+            """
+            UPDATE transactions
+            SET description = ?, normalized_description = ?, category_id = ?, subcategory_id = ?,
+                notes = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND user_id = ? AND account_id = ? AND archived_at IS NULL
+            """,
+            (
+                " ".join(str(description or "").split()),
+                normalize_description(description),
+                category_id,
+                subcategory_id,
+                " ".join(str(notes or "").split()) or None,
+                selected_id,
+                user_id,
+                source_id,
+            ),
+        )
+        replace_transaction_tags(conn, selected_id, tag_ids)
+    else:
+        conn.execute(
+            """
+            UPDATE credit_card_transactions
+            SET description = ?, normalized_description = ?, category_id = ?, subcategory_id = ?,
+                notes = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND user_id = ? AND credit_card_id = ? AND archived_at IS NULL
+            """,
+            (
+                " ".join(str(description or "").split()),
+                normalize_description(description),
+                category_id,
+                subcategory_id,
+                " ".join(str(notes or "").split()) or None,
+                selected_id,
+                user_id,
+                source_id,
+            ),
+        )
+        replace_credit_card_transaction_tags(conn, selected_id, tag_ids)
+    return {"id": selected_id}
 
 
 def semantic_classification(raw_category, raw_subcategory, hint, category_aliases, hint_aliases, fallback_category, fallback_subcategory):

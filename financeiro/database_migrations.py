@@ -20,6 +20,7 @@ from financeiro.database_schema import (
     MIGRATIONS_SCHEMA_SQL,
     create_baseline_indexes,
     create_baseline_tables,
+    ensure_import_adjustments_schema,
 )
 
 
@@ -292,6 +293,7 @@ def migrate_legacy_database(
         _copy_database(paths.active, paths.work)
         with connection_factory(paths.work) as conn:
             create_baseline_tables(conn)
+            ensure_import_adjustments_schema(conn)
         with connection_factory(paths.work) as conn:
             normalize_legacy_schema(conn)
         with connection_factory(paths.work) as conn:

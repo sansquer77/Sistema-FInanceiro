@@ -2,8 +2,8 @@
 tipo: roadmap
 area: meta
 status: implementado
-versao: 1.27
-atualizado: 2026-09-25
+versao: 1.30
+atualizado: 2026-10-05
 relacionados:
   - "[[visao-produto]]"
   - "[[requisitos]]"
@@ -43,10 +43,10 @@ Este documento organiza a evolução do Sistema Financeiro e serve de histórico
 | 7 | Relatórios avançados e Cockpit integrando contas, cartões, limites, dívidas e portfólio. | ✅ Implementado | [[relatorios]] |
 | 8 | Segurança: bloqueio de tentativas, cookie seguro, headers defensivos, validação de origem. | ✅ Implementado | [[seguranca-autenticacao]] |
 | 9 | Recuperação de senha com configuração SMTP local criptografada e assistente para Gmail/Outlook. | ✅ Implementado | [[recuperacao-senha]] |
-| 10 | Importação de arquivos externos legados e planilhas modelo do sistema (`.xlsx`). | ✅ Implementado | [[importacao-dados]] |
+| 10 | Importação revisável de arquivos externos e planilhas modelo, com aprendizado local por conta/cartão, classificação validada e revisão de duplicatas. | ✅ Implementado | [[importacao-dados]] |
 | 11 | Modularização do frontend em ES Modules nativos sem build step. | ✅ Implementado | [[adr/0002-modularizacao-frontend]] |
 | 12 | Distribuição desktop macOS/Windows, instaladores, zips limpos e launchers local/LAN. | ✅ Implementado | [[distribuição]] |
-| 13 | Conciliação automática de arquivos OFX bancários. | ❌ Descartado — OFX parece padrão, mas na prática bancos exportam com diferenças de encoding, campos ausentes, datas estranhas, sinal de valor inconsistente e descrições muito sujas. | — |
+| 13 | Importação revisável de extratos OFX bancários. | ✅ Implementado — modo explícito de OFX, prévia editável, confirmação seletiva, reaplicação contextual de correções aprendidas e revisão de duplicatas; não faz conciliação automática. | [[importacao-dados]] |
 | 14 | Exportação direta de dados em outros formatos. | ❌ Descartado — arquivo SQLite já é acessível por leitor genérico ou agente de IA, sem justificar dependência nova | [[exportacao-dados]] |
 | 15 | Imposto de Renda (IR): apuração mensal de DARF por classe de ativo do Portfólio e relatório anual de apoio à declaração IRPF. | ❌ Descartado — custo de manutenção das regras fiscais não compensa para uso familiar | [[imposto-renda]] |
 | 16 | Score de Saúde Financeira: indicador síntese (0 a 1000) e diagnóstico de 5 pilares de estabilidade financeira. | ✅ Implementado | [[specs/score-saude-financeira]] |
@@ -126,6 +126,9 @@ A implementação local não copia a interface de nenhum produto externo. Reprod
 
 ## Changelog
 
+- `1.30` — 2026-10-05 — Registra persistência de classificação compatível e revisão de duplicatas com opção de ignorar/substituir.
+- `1.29` — 2026-10-05 — Importação aprende correções bem-sucedidas de descrição/classificação isoladas por conta ou cartão.
+- `1.28` — 2026-10-05 — Módulo 13 passa a registrar a importação revisável de OFX como implementada, sem conciliação automática.
 - `1.27` — 2026-09-25 — Adiciona atalho editável para iniciar cadastro Price após troca do rotativo; validação completa da V1 ainda pendente.
 - `1.26` — 2026-09-25 — Registra conclusão da etapa de estudo individual no Efeito Borboleta; validação completa da V1 ainda pendente.
 - `1.25` — 2026-09-25 — Estudo individual de rotativo implementado no Efeito Borboleta; validação completa da V1 ainda pendente.

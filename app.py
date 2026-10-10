@@ -139,7 +139,14 @@ from financeiro.financial_goals import (
     unlink_goal_funding_source,
     update_financial_goal,
 )
-from financeiro.imports import import_legacy_transactions, import_system_template, system_import_template
+from financeiro.imports import (
+    check_import_duplicates,
+    import_legacy_transactions,
+    import_system_template,
+    preview_legacy_transactions,
+    preview_system_template,
+    system_import_template,
+)
 from financeiro.http_routes import dispatch_route
 from financeiro.operation_logs import create_operation_log, get_operation_log, list_operation_logs
 from financeiro.portfolio import close_position, create_opening_position, current_portfolio_positions, delete_opening_position, delete_position_value_override, fetch_fund_quote_for_user, get_portfolio, get_portfolio_events, get_portfolio_returns, redeem_position, save_allocation_goals, update_opening_position, update_position_value_override
@@ -569,7 +576,7 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_json(payload)
 
     def handle_cockpit_notifications(self) -> None:
-        # spec: cockpit/alertas-cockpit v1.2 — critérios 5, 6, 10 e 11
+        # spec: cockpit/alertas-cockpit v1.5 — critérios 5, 6, 10 e 11
         if not self.validate_read_source():
             return
         user = self.require_user()
@@ -582,7 +589,7 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_json(build_cockpit_notifications(user["id"], portfolio_events=portfolio_events))
 
     def handle_mark_cockpit_notifications_seen(self) -> None:
-        # spec: cockpit/alertas-cockpit v1.1 — critérios 6 e 11
+        # spec: cockpit/alertas-cockpit v1.5 — critérios 6 e 11
         user = self.require_user()
         payload = self.read_json()
         notification_ids = payload.get("notification_ids") if isinstance(payload, dict) else None
@@ -1662,38 +1669,131 @@ class AppHandler(BaseHTTPRequestHandler):
         user = self.require_user()
         form = self.read_multipart()
         uploaded = form["files"].get("file")
-        if not uploaded:
-            raise ApiError("Envie o arquivo para importacao.")
-        result = import_legacy_transactions(
-            user["id"],
-            form["fields"].get("account_id", ""),
-            uploaded["content"],
-            uploaded["filename"],
-        )
+        account_id = form["fields"].get("account_id", "")
+        preview_rows = form["fields"].get("preview_rows")
+        if form["fields"].get("duplicate_check") == "true":
+            try:
+                rows_to_check = json.loads(preview_rows or "[]")
+            except json.JSONDecodeError as exc:
+                raise ApiError("Dados de revisão inválidos para verificar duplicidades.") from exc
+            if not isinstance(rows_to_check, list) or any(not isinstance(row, dict) for row in rows_to_check):
+                raise ApiError("Dados de revisão inválidos para verificar duplicidades.")
+            result = check_import_duplicates(
+                user["id"],
+                "account",
+                account_id,
+                rows_to_check,
+                is_legacy=True,
+            )
+            self.send_json({"duplicate_matches": result})
+            return
+        if form["fields"].get("preview") == "true":
+            if not uploaded:
+                raise ApiError("Envie o extrato OFX para visualizar antes da importacao.")
+            result = preview_legacy_transactions(
+                user["id"],
+                account_id,
+                uploaded["content"],
+                uploaded["filename"],
+            )
+            self.send_json(result)
+            return
+        if preview_rows is not None:
+            try:
+                selected_rows = json.loads(preview_rows)
+            except json.JSONDecodeError as exc:
+                raise ApiError("Dados de revisao invalidos para importacao.") from exc
+            if not isinstance(selected_rows, list) or any(not isinstance(row, dict) for row in selected_rows):
+                raise ApiError("Dados de revisao invalidos para importacao.")
+            result = import_legacy_transactions(
+                user["id"],
+                account_id,
+                b"",
+                "preview.ofx",
+                selected_rows,
+            )
+            filename = form["fields"].get("source_filename", "extrato OFX")
+        else:
+            if not uploaded:
+                raise ApiError("Envie o arquivo para importacao.")
+            result = import_legacy_transactions(
+                user["id"],
+                account_id,
+                uploaded["content"],
+                uploaded["filename"],
+            )
+            filename = uploaded["filename"]
         self.record_operation(
             user["id"], "imports", "import", "transaction",
             f"Importacao legada: {result.get('imported', 0)} lancamentos importados", None,
-            account_id=form["fields"].get("account_id", ""),
+            account_id=account_id,
             operation_batch_id=result.get("operation_batch_id"),
-            metadata={"filename": uploaded["filename"], "imported": result.get("imported"), "skipped": result.get("skipped")},
+            metadata={"filename": filename, "imported": result.get("imported"), "skipped": result.get("skipped")},
         )
         self.send_json(result, status=HTTPStatus.CREATED)
 
     def handle_import_system_template(self) -> None:
         user = self.require_user()
         form = self.read_multipart()
+        target = form["fields"].get("target", "account")
+        target_id = form["fields"].get("target_id") or form["fields"].get("account_id") or form["fields"].get("credit_card_id") or ""
+        preview_rows = form["fields"].get("preview_rows")
+        if form["fields"].get("duplicate_check") == "true":
+            try:
+                rows_to_check = json.loads(preview_rows or "[]")
+            except json.JSONDecodeError as exc:
+                raise ApiError("Dados de revisão inválidos para verificar duplicidades.") from exc
+            if not isinstance(rows_to_check, list) or any(not isinstance(row, dict) for row in rows_to_check):
+                raise ApiError("Dados de revisão inválidos para verificar duplicidades.")
+            result = check_import_duplicates(user["id"], target, target_id, rows_to_check)
+            self.send_json({"duplicate_matches": result})
+            return
+        if preview_rows is not None:
+            try:
+                selected_rows = json.loads(preview_rows)
+            except json.JSONDecodeError as exc:
+                raise ApiError("Dados de revisao invalidos para importacao.") from exc
+            if not isinstance(selected_rows, list) or any(not isinstance(row, dict) for row in selected_rows):
+                raise ApiError("Dados de revisao invalidos para importacao.")
+            result = import_system_template(
+                user["id"],
+                target,
+                target_id,
+                b"",
+                "preview.csv",
+                selected_rows,
+            )
+            self.record_operation(
+                user["id"], "imports", "import", "transaction",
+                f"Importacao de modelo: {result.get('imported', 0)} lancamentos importados", None,
+                account_id=target_id if target == "account" else None,
+                credit_card_id=target_id if target == "card" else None,
+                operation_batch_id=result.get("operation_batch_id"),
+                metadata={"target": target, "imported": result.get("imported"), "skipped": result.get("skipped")},
+            )
+            self.send_json(result, status=HTTPStatus.CREATED)
+            return
+
         uploaded = form["files"].get("file")
         if not uploaded:
             raise ApiError("Envie o modelo preenchido.")
+        if form["fields"].get("preview") == "true":
+            result = preview_system_template(
+                user["id"],
+                target,
+                target_id,
+                uploaded["content"],
+                uploaded["filename"],
+            )
+            self.send_json(result)
+            return
         result = import_system_template(
             user["id"],
-            form["fields"].get("target", "account"),
-            form["fields"].get("target_id") or form["fields"].get("account_id") or form["fields"].get("credit_card_id") or "",
+            target,
+            target_id,
             uploaded["content"],
             uploaded["filename"],
         )
-        target = form["fields"].get("target", "account")
-        target_id = form["fields"].get("target_id") or form["fields"].get("account_id") or form["fields"].get("credit_card_id") or ""
         self.record_operation(
             user["id"], "imports", "import", "transaction",
             f"Importacao de modelo: {result.get('imported', 0)} lancamentos importados", None,

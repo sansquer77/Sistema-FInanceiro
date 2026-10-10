@@ -170,6 +170,25 @@ CREATE TABLE IF NOT EXISTS tags (
 );
 """
 
+IMPORT_ADJUSTMENTS_SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS import_adjustments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    account_id INTEGER REFERENCES checking_accounts(id) ON DELETE CASCADE,
+    credit_card_id INTEGER REFERENCES credit_cards(id) ON DELETE CASCADE,
+    normalized_description TEXT NOT NULL,
+    normalized_corrected_description TEXT,
+    transaction_type TEXT NOT NULL CHECK (transaction_type IN ('income', 'expense')),
+    corrected_description TEXT NOT NULL,
+    category TEXT NOT NULL,
+    subcategory TEXT,
+    tags_json TEXT NOT NULL DEFAULT '[]',
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CHECK ((account_id IS NOT NULL AND credit_card_id IS NULL)
+        OR (account_id IS NULL AND credit_card_id IS NOT NULL))
+);
+"""
+
 
 TRANSACTIONS_SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS transactions (
@@ -696,6 +715,22 @@ CREATE TABLE IF NOT EXISTS notification_reads (
 
 
 INDEX_SCHEMA_SQL = """
+CREATE INDEX IF NOT EXISTS idx_import_adjustments_account_corrected
+ON import_adjustments (user_id, account_id, normalized_corrected_description, transaction_type)
+WHERE account_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_import_adjustments_card_corrected
+ON import_adjustments (user_id, credit_card_id, normalized_corrected_description, transaction_type)
+WHERE credit_card_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_import_adjustments_account_source
+ON import_adjustments (user_id, account_id, normalized_description, transaction_type)
+WHERE account_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_import_adjustments_card_source
+ON import_adjustments (user_id, credit_card_id, normalized_description, transaction_type)
+WHERE credit_card_id IS NOT NULL;
+
 CREATE UNIQUE INDEX IF NOT EXISTS idx_spending_limits_category
 ON spending_limits (user_id, month, category_id)
 WHERE subcategory_id IS NULL;
@@ -876,6 +911,7 @@ TABLES_BLOCKS = (
     ACCOUNTS_SCHEMA_SQL,
     CARDS_SCHEMA_SQL,
     CATEGORIES_SCHEMA_SQL,
+    IMPORT_ADJUSTMENTS_SCHEMA_SQL,
     TRANSACTIONS_SCHEMA_SQL,
     PORTFOLIO_SCHEMA_SQL,
     LIMITS_SCHEMA_SQL,
@@ -923,4 +959,16 @@ def create_baseline_indexes(conn: sqlite3.Connection) -> None:
 def create_baseline_schema(conn: sqlite3.Connection) -> None:
     """Apply the canonical v2 baseline schema to an empty connection."""
     create_baseline_tables(conn)
+    ensure_import_adjustments_schema(conn)
     create_baseline_indexes(conn)
+
+
+def ensure_import_adjustments_schema(conn: sqlite3.Connection) -> None:
+    columns = {
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(import_adjustments)").fetchall()
+    }
+    if "normalized_corrected_description" not in columns:
+        conn.execute(
+            "ALTER TABLE import_adjustments ADD COLUMN normalized_corrected_description TEXT",
+        )

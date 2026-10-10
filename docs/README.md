@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 16.18
-atualizado: 2026-09-27
+versao: 16.19
+atualizado: 2026-10-10
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -154,6 +154,7 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `16.19` — 2026-10-10 — [[specs/importacao-dados]] v1.16 aprende correções de linhas ignoradas como duplicidades, após revalidação e sem escrita de lançamentos; arquitetura v4.46.
 - `16.18` — 2026-09-27 — [[specs/recuperacao-senha]] v1.2 e [[specs/alertas-cockpit]] v1.5 definem alerta persistente quando não há recuperação por e-mail utilizável.
 - `16.17` — 2026-09-27 — [[specs/lancamentos]] v3.40 e [[requisitos]] v3.35 incluem recorrência diária de conta com a opção de média histórica.
 - `16.16` — 2026-09-27 — [[specs/lancamentos]] v3.40 adiciona recorrência diária de conta, incluindo média histórica.

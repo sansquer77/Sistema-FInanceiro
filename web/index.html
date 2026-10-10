@@ -1938,6 +1938,13 @@
             <section class="transaction-form-panel">
               <h2>Nova importação</h2>
               <form id="importForm" class="form">
+                <label>Origem do arquivo
+                  <select name="import_source" id="importSource">
+                    <option value="template">Modelo do sistema</option>
+                    <option value="legacy">Planilha externa (.xls/.csv)</option>
+                    <option value="ofx">Extrato bancário OFX</option>
+                  </select>
+                </label>
                 <label>Destino
                   <select name="target" id="importTarget">
                     <option value="account">Conta</option>
@@ -1950,7 +1957,8 @@
                 <label id="importCardLabel" hidden>Cartão
                   <select id="importCreditCard"></select>
                 </label>
-                <label>Modelo preenchido
+                <label id="importFileLabel">
+                  <span>Modelo preenchido</span>
                   <input name="file" type="file" accept=".xlsx,.csv" required>
                 </label>
                 <button class="ghost" id="downloadImportTemplateButton" type="button">Baixar modelo</button>

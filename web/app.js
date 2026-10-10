@@ -295,6 +295,7 @@ const portfolioGoalsMessage = document.querySelector("#portfolioGoalsMessage");
 const portfolioGroupFilter = document.querySelector("#portfolioGroupFilter");
 const portfolioTabButtons = document.querySelectorAll("[data-portfolio-tab]");
 const importForm = document.querySelector("#importForm");
+const importSource = document.querySelector("#importSource");
 const importTarget = document.querySelector("#importTarget");
 const importAccount = document.querySelector("#importAccount");
 const importAccountLabel = document.querySelector("#importAccountLabel");
@@ -784,6 +785,7 @@ const importsView = registerImportsView({
   state,
   elements: {
     importForm,
+    importSource,
     importTarget,
     importAccount,
     importAccountLabel,
@@ -1517,14 +1519,14 @@ async function loadAppInfo() {
   try {
     state.appInfo = await api("/api/app-info");
   } catch (error) {
-    state.appInfo = { version: "2.1.0" };
+    state.appInfo = { version: "2.1.1" };
   }
   renderAppInfo();
 }
 
 function renderAppInfo() {
   if (aboutAppVersion) {
-    aboutAppVersion.textContent = state.appInfo?.version || "2.1.0";
+    aboutAppVersion.textContent = state.appInfo?.version || "2.1.1";
   }
 }
 
