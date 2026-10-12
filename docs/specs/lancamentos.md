@@ -2,8 +2,8 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 3.40
-atualizado: 2026-09-27
+versao: 3.41
+atualizado: 2026-10-12
 relacionados:
   - "[[contas-correntes]]"
   - "[[categorias-tags-gestao]]"
@@ -18,7 +18,7 @@ aliases: ["Lançamentos", "Transações"]
 # Lançamentos
 
 > [!info] Status
-> **implementado** · versão: `3.40` · área: `lancamentos` · atualizado em 2026-09-27 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]], [[emprestimos-quitacao]]
+> **implementado** · versão: `3.41` · área: `lancamentos` · atualizado em 2026-10-12 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]], [[emprestimos-quitacao]]
 
 ## Problema
 
@@ -66,6 +66,7 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 - **Câmbio**: movimentação entre contas de moedas diferentes; registra valor de origem, valor de destino e cotação ajustável.
 - A prévia cambial entre duas contas é calculada no backend com precisão decimal; a interface apenas apresenta a cotação e o valor de destino devolvidos pela API.
 - Lançamentos em conta de moeda estrangeira normalizam o valor em BRL pela cotação informada manualmente; quando ela não for informada, o sistema consulta a última PTAX de venda disponível até a data do lançamento. Se a PTAX estiver indisponível, o usuário deve informar a cotação manualmente.
+- Na listagem do Extrato de Contas, lançamentos de contas em moeda estrangeira exibem apenas o valor na moeda configurada da conta, sem linha auxiliar de conversão para BRL. A normalização em BRL continua sendo usada internamente para cálculos, projeções e relatórios.
 - Valor deve ser maior que zero.
 - Categoria é obrigatória para receitas, despesas e investimentos. Transferências e câmbio não exigem categoria.
 - Em novos lançamentos, descrições com histórico exato e confiança suficiente podem preencher categoria e subcategoria sem sobrescrever escolhas manuais. Ver [[classificacao-assistida]].
@@ -153,6 +154,7 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dado um lançamento em moeda estrangeira sem cotação manual, quando criado ou importado, então o valor em BRL usa a última PTAX de venda disponível até a data do lançamento.
 - Dado um lançamento em conta de moeda estrangeira, quando o formulário é aberto, então a cotação é pré-preenchida com a última PTAX disponível até a data; se a PTAX estiver indisponível, um campo de cotação manual visível aparece com a moeda da conta e nenhum valor falso (ex.: 1,0) é enviado.
 - Dado um lançamento em moeda estrangeira sendo editado, quando a data ou a conta mudam, então a cotação armazenada é preservada e não é sobrescrita automaticamente pela PTAX.
+- Dado um lançamento em conta de moeda estrangeira, quando exibido na listagem do Extrato de Contas, então mostra somente o valor na moeda da conta e não exibe uma segunda linha convertida para BRL.
 - Dado um lançamento excluído, quando consultado, o saldo volta ao estado anterior.
 - Dado `scope=future` na exclusão, quando executado, as parcelas/recorrências futuras não conciliadas são removidas e os saldos revertidos.
 - Dado `apply_to_future` na edição, quando executado, os dados e saldos das ocorrências futuras não conciliadas são atualizados.
@@ -238,6 +240,7 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 
 ## Changelog
 
+- `3.41` — 2026-10-12 — Listagem do Extrato de Contas para contas em moeda estrangeira passa a exibir apenas o valor na moeda configurada da conta, removendo a linha auxiliar de conversão para BRL.
 - `3.40` — 2026-09-27 — Lançamentos de Contas passam a aceitar recorrência diária, inclusive fins de semana, com a opção existente de valor médio.
 - `3.39` — 2026-09-24 — Associação ao empréstimo identifica a categoria por ID/identidade semântica persistente, independente do texto exibido.
 - `3.38` — 2026-09-24 — Formulário de lançamento permite associar uma despesa avulsa da categoria Empréstimos ao contrato correspondente, sem criar movimento duplicado.

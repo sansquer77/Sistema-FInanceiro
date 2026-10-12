@@ -125,6 +125,7 @@ class DatabaseIndexTest(unittest.TestCase):
                 "consented_at",
                 "created_at",
                 "updated_at",
+                "execution_priority",
             },
             settings_columns,
         )

@@ -1,5 +1,6 @@
 import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";
 import { createLoadPolicy } from "./load-policy.js";
+import { clearLocalModel, getLocalModelStatus, prepareLocalModel } from "./webllm-client.js?v=175";
 
 export function registerUserAdminView(context) {
   const {
@@ -171,7 +172,11 @@ export function registerUserAdminView(context) {
     const customProvider = isAICustomProvider();
     const preset = currentAIPreset();
     const authType = elements.aiConfigAuthType?.value || preset?.auth_type || "bearer";
-    const requiresApiKey = authType === "bearer";
+    const remoteProvider = ["openai", "anthropic", "google"].includes(elements.aiConfigProvider?.value);
+    // spec: tendencias-saude-financeira v2.26 — critério 2
+    // Provedores remotos conhecidos sempre precisam expor a chave, ainda que
+    // uma configuração anterior tenha deixado o seletor de autenticação em estado local.
+    const requiresApiKey = remoteProvider || authType === "bearer";
     elements.aiConfigCustomFields.hidden = false;
     setAIFieldVisibility(elements.aiConfigBaseUrlField, customProvider);
     setAIFieldVisibility(elements.aiConfigAuthTypeField, customProvider);
@@ -198,12 +203,82 @@ export function registerUserAdminView(context) {
     }
   }
 
+  function setLocalModelStatus(text, tone = "") {
+    if (!elements.aiLocalModelStatus) return;
+    elements.aiLocalModelStatus.textContent = text;
+    elements.aiLocalModelStatus.className = `form-help ${tone}`.trim();
+  }
+
+  function setLocalModelControls({ cached = false, loading = false } = {}) {
+    if (elements.aiLocalModelDownload) {
+      elements.aiLocalModelDownload.disabled = cached || loading;
+    }
+    if (elements.aiLocalModelClear) {
+      elements.aiLocalModelClear.disabled = !cached || loading;
+    }
+  }
+
+  function waitForNextPaint() {
+    return new Promise((resolve) => {
+      requestAnimationFrame(() => setTimeout(resolve, 0));
+    });
+  }
+
+  async function refreshLocalModelStatus() {
+    if (!elements.aiLocalModelStatus) return;
+    try {
+      const status = await getLocalModelStatus();
+      if (!status.supported) {
+        setLocalModelStatus("WebGPU não está disponível neste navegador. Use o botão para verificar novamente após habilitá-la.", "error");
+      } else if (status.cached) {
+        setLocalModelStatus("Modelo local pronto neste navegador.", "success");
+      } else {
+        setLocalModelStatus("Modelo local ainda não foi baixado neste navegador.");
+      }
+      setLocalModelControls(status);
+    } catch (error) {
+      setLocalModelStatus("Não foi possível verificar o modelo local. Clique em Baixar modelo local para tentar o preparo.", "error");
+      setLocalModelControls();
+    }
+  }
+
+  async function handleLocalModelDownload() {
+    setLocalModelControls({ loading: true });
+    setLocalModelStatus("Iniciando o modelo local… o navegador pode levar alguns segundos para preparar o download.");
+    // spec: consultor/consultor v2.13 — critério de preparo explícito do modelo local
+    // Safari pode bloquear a pintura enquanto cria um module worker pesado. Ceder um frame
+    // deixa o estado de preparo visível antes de carregar o runtime do WebLLM.
+    await waitForNextPaint();
+    try {
+      await prepareLocalModel((progress) => setLocalModelStatus(progress));
+      setLocalModelStatus("Modelo local pronto neste navegador.", "success");
+      await refreshLocalModelStatus();
+    } catch (error) {
+      setLocalModelStatus(error.message, "error");
+      setLocalModelControls();
+    }
+  }
+
+  async function handleLocalModelClear() {
+    setLocalModelControls({ loading: true });
+    try {
+      await clearLocalModel();
+      setLocalModelStatus("Modelo local removido deste navegador.", "success");
+      await refreshLocalModelStatus();
+    } catch (error) {
+      setLocalModelStatus("Não foi possível remover o modelo local deste navegador.", "error");
+      setLocalModelControls();
+    }
+  }
+
   async function loadAIConfigStatus({ loadConsultor = true } = {}) {
     if (!elements.aiConfigForm) {
       return;
     }
     try {
-      const status = await api("/api/ai-settings");
+      const [status, execution] = await Promise.all([
+        api("/api/ai-settings"), api("/api/ai-execution-settings"),
+      ]);
       aiConfigPresets = status.presets || [];
       elements.aiConfigEnabled.checked = status.enabled === true;
       elements.aiConfigProvider.value = status.provider || "custom";
@@ -220,7 +295,11 @@ export function registerUserAdminView(context) {
       if (elements.aiConfigMaxTokens) {
         elements.aiConfigMaxTokens.value = String(status.max_tokens || 700);
       }
+      if (elements.consultorExecutionPriority) {
+        elements.consultorExecutionPriority.value = execution.execution_priority || "local_primeiro";
+      }
       renderAIConfigFields();
+      await refreshLocalModelStatus();
       if (status.configured && status.enabled) {
         setMessage(elements.aiConfigMessage, "IA ativada para reescrita de resumo.", "success");
       } else if (status.configured) {
@@ -253,8 +332,19 @@ export function registerUserAdminView(context) {
       data.base_url = "";
       data.auth_type = aiConfigPresets.find((item) => item.provider === data.provider)?.auth_type || "bearer";
     }
+    const priority = elements.consultorExecutionPriority?.value || "local_primeiro";
+    const needsRemoteConsent = data.enabled && priority !== "somente_local";
+    const consent = needsRemoteConsent ? await aiRemoteConsentAccepted() : false;
+    if (needsRemoteConsent && !consent) {
+      setMessage(elements.aiConfigMessage, "A IA remota não foi ativada sem consentimento.", "error");
+      return;
+    }
     try {
       const status = await api("/api/ai-settings", { method: "PUT", body: data });
+      await api("/api/ai-execution-settings", {
+        method: "PUT",
+        body: { execution_priority: priority, data_access_consent: consent },
+      });
       elements.aiConfigApiKey.value = "";
       aiConfigPresets = status.presets || aiConfigPresets;
       await loadAIConfigStatus();
@@ -272,20 +362,14 @@ export function registerUserAdminView(context) {
     try {
       const status = await api("/api/consultor/config");
       consultorSettings = status;
-      const aiReady = status.ai_configured && status.ai_enabled;
       elements.consultorEnabled.checked = status.consultor_enabled === true;
       elements.consultorInvestorProfile.value = status.investor_profile || "moderado";
-      setConsultorConfigEnabled(aiReady);
+      setConsultorConfigEnabled(true);
       if (status.available) {
         setMessage(elements.consultorConfigMessage, "Consultor ativado.", "success");
-      } else if (!aiReady) {
-        setMessage(elements.consultorConfigMessage, "Configure e ative a IA antes de habilitar o Consultor.", "");
       } else if (!status.consultor_enabled) {
-        setMessage(elements.consultorConfigMessage, "Consultor desligado.", "");
-      } else if (!status.data_access_consent) {
-        setMessage(elements.consultorConfigMessage, "Consentimento de dados pendente.", "");
       } else {
-        setMessage(elements.consultorConfigMessage, "Consultor indisponível.", "");
+        setMessage(elements.consultorConfigMessage, "Consultor usa a IA local quando disponível.", "");
       }
     } catch (error) {
       setMessage(elements.consultorConfigMessage, error.message, "error");
@@ -305,23 +389,23 @@ export function registerUserAdminView(context) {
     }
   }
 
-  async function consultorConsentAccepted() {
-    if (consultorSettings?.data_access_consent) {
+  async function aiRemoteConsentAccepted() {
+    const execution = await api("/api/ai-execution-settings");
+    if (execution.data_access_consent) {
       return true;
     }
     if (!decisionModal?.choose) {
       return false;
     }
     const choice = await decisionModal.choose({
-      title: "Habilitar Consultor",
+      title: "Autorizar IA remota",
       message: (
-        "O Consultor enviará para a IA configurada apenas dados financeiros agregados e minimizados do app, "
-        + "como carteira, score, tendências, vencimentos e limites relevantes ao card escolhido. "
-        + "Senhas, chaves de API e o Perfil Complementar criptografado em repouso não são enviados integralmente. "
+        "As funções que precisarem de fallback remoto enviarão apenas dados financeiros agregados e minimizados do app. "
+        + "Senhas, chaves de API e dados criptografados em repouso não são enviados integralmente. "
         + "As respostas têm caráter educacional e não executam alterações nos seus dados."
       ),
       actions: [
-        { value: true, label: "Aceitar e habilitar", variant: "primary" },
+        { value: true, label: "Aceitar e autorizar", variant: "primary" },
         { value: false, label: "Cancelar", variant: "ghost" },
       ],
     });
@@ -331,10 +415,6 @@ export function registerUserAdminView(context) {
   async function handleConsultorConfigSubmit(event) {
     event.preventDefault();
     setMessage(elements.consultorConfigMessage, "");
-    if (!(consultorSettings?.ai_configured && consultorSettings?.ai_enabled)) {
-      setMessage(elements.consultorConfigMessage, "Configure e ative a IA antes de habilitar o Consultor.", "error");
-      return;
-    }
     const wantsEnabled = elements.consultorEnabled ? elements.consultorEnabled.checked : false;
     if (!wantsEnabled && consultorSettings?.consultor_enabled) {
       const confirmed = await confirmConsultorDisable();
@@ -344,19 +424,12 @@ export function registerUserAdminView(context) {
         return;
       }
     }
-    const consent = wantsEnabled ? await consultorConsentAccepted() : false;
-    if (wantsEnabled && !consent) {
-      elements.consultorEnabled.checked = false;
-      setMessage(elements.consultorConfigMessage, "Consultor não habilitado sem consentimento.", "error");
-      return;
-    }
     try {
       const status = await api("/api/consultor/config", {
         method: "POST",
         body: {
           consultor_enabled: wantsEnabled,
           investor_profile: elements.consultorInvestorProfile ? elements.consultorInvestorProfile.value : "moderado",
-          data_access_consent: consent,
         },
       });
       consultorSettings = status;
@@ -755,6 +828,8 @@ export function registerUserAdminView(context) {
     if (elements.aiConfigAuthType) {
       elements.aiConfigAuthType.addEventListener("change", renderAIConfigFields);
     }
+    elements.aiLocalModelDownload?.addEventListener("click", handleLocalModelDownload);
+    elements.aiLocalModelClear?.addEventListener("click", handleLocalModelClear);
   }
   if (elements.consultorConfigForm) {
     elements.consultorConfigForm.addEventListener("submit", handleConsultorConfigSubmit);

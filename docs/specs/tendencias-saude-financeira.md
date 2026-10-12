@@ -1,9 +1,9 @@
 ---
 tipo: spec
 area: tendencias-saude-financeira
-status: implementado
-versao: 2.25
-atualizado: 2026-09-13
+status: em-implementacao
+versao: 2.26
+atualizado: 2026-10-10
 relacionados:
   - "[[score-saude-financeira]]"
   - "[[relatorios]]"
@@ -20,7 +20,7 @@ aliases: ["Tendências de Saúde Financeira", "Achados Financeiros", "Insights F
 # Tendências e Achados de Saúde Financeira
 
 > [!info] Status
-> **implementado** · área: `tendencias-saude-financeira` · atualizado em 2026-09-13 · relacionados: [[score-saude-financeira]], [[relatorios]], [[lancamentos]], [[cartoes]]
+> **em-implementacao** · área: `tendencias-saude-financeira` · atualizado em 2026-10-10 · relacionados: [[score-saude-financeira]], [[relatorios]], [[lancamentos]], [[cartoes]], [[../adr/0019-inferencia-local-webllm|ADR-0019]]
 
 ## Problema
 
@@ -40,6 +40,7 @@ Usuário autenticado que consulta o Cockpit e deseja entender, em linguagem simp
 6. Quando o histórico for curto, o sistema informa a confiança reduzida da análise.
 7. Quando houver eventos pontuais conhecidos, como férias, PLR, bônus ou antecipação de parcelas, o sistema explica que o mês pode estar distorcido por fatores não recorrentes.
 8. Se o usuário tiver ativado IA nas Preferências, o sistema pode usar a IA apenas para redigir melhor o resumo, mantendo os cálculos e achados estruturados sob controle local.
+9. A política compartilhada de execução tenta IA local, IA remota e resumo determinístico na ordem escolhida pelo usuário; a ordem padrão é IA local, IA remota consentida e resumo determinístico.
 9. Se a IA estiver desligada, indisponível ou sem chave válida, o sistema continua exibindo a análise local determinística.
 
 ## Dados
@@ -63,6 +64,7 @@ Usuário autenticado que consulta o Cockpit e deseja entender, em linguagem simp
 | `resumo_ia` | texto opcional | Texto reescrito por IA, quando ativado explicitamente e disponível. |
 | `ia_ativa` | booleano | Indica se a preferência do usuário permite uso de IA para esta função. |
 | `ia_fornecedor` | texto opcional | Fornecedor configurado: `openai`, `anthropic`, `google`, `custom` ou `local`. |
+| `ia_origem` | texto | `local`, `remota` ou `deterministica`, conforme a fonte efetiva do resumo exibido. |
 
 ## Regras
 
@@ -107,6 +109,9 @@ Usuário autenticado que consulta o Cockpit e deseja entender, em linguagem simp
 - A análise local deve usar timeout curto e fallback imediato quando a IA estiver indisponível.
 - Nenhuma chamada de IA pode manter conexão SQLite aberta durante a requisição externa.
 - O usuário deve conseguir desligar a IA sem perder a análise local.
+- A ordem de execução é uma preferência única por usuário e é consumida por Tendências, Consultor e futuros recursos de IA; ela não pertence a uma tela específica.
+- A ordem padrão é `local_primeiro`: IA local, IA remota quando configurada e consentida, e resumo determinístico. `remota_primeiro` inverte apenas as duas primeiras fontes; `somente_local` usa IA local e depois resumo determinístico; `somente_remota` usa IA remota consentida e depois resumo determinístico.
+- Qualquer caminho que possa enviar dados a uma IA remota, inclusive fallback, exige consentimento explícito salvo em `ai_execution_settings`; sem esse consentimento a fonte remota é removida da ordem.
 - Quando a IA estiver ligada e corretamente configurada, a reescrita do resumo deve ser acionada automaticamente ao carregar o bloco **Tendências e achados**, sem exigir um botão adicional.
 - A reescrita automática por IA deve preservar o fallback local: se a chamada falhar, expirar ou retornar conteúdo inválido, o usuário visualiza o resumo local determinístico.
 - Textos enviados à IA devem ser minimizados: somente achados estruturados necessários, sem enviar histórico completo, senhas, tokens, caminhos locais ou dados de outros usuários.
@@ -155,11 +160,14 @@ Proposta para implementação futura:
 | `GET` | `/api/financial-health-trends?month=AAAA-MM` | Retorna série mensal, Budget x Realizado, achados estruturados, confiança, eventos pontuais e resumo local determinístico. |
 | `GET` | `/api/ai-settings` | Retorna o estado configurado da integração de IA sem expor segredos. |
 | `PUT` | `/api/ai-settings` | Atualiza fornecedor, endpoint, modelo, estado ligado/desligado e chave criptografada. |
+| `GET`/`PUT` | `/api/ai-execution-settings` | Retorna ou atualiza a ordem central de execução e o consentimento para IA remota, sem expor segredos. |
 | `POST` | `/api/financial-health-trends/ai-summary` | Reescreve achados estruturados com IA quando a configuração estiver ativa. |
+| `POST` | `/api/financial-health-trends/prepare-local-summary` | Monta no backend o prompt minimizado para o worker WebLLM. |
 
 Tabelas:
 
 - `user_ai_settings`: configuração por usuário para provedor de IA, endpoint/base URL, modelo, estado ligado/desligado e metadados não secretos.
+- `ai_execution_settings`: preferência central por usuário (`execution_priority`, `data_access_consent`, `consented_at`) compartilhada por todos os recursos de IA.
 - `data/ai_config_user_{id}.enc`: arquivo local criptografado por usuário para armazenar o segredo de API, seguindo o padrão de chave local de [[../adr/0005-smtp-criptografado-local|ADR-0005]].
 - Reuso das tabelas `transactions`, `credit_card_transactions`, `credit_card_payments`, `categories`, `subcategories`, `tags`, `operation_logs`, `checking_accounts` e `credit_cards`.
 
@@ -208,6 +216,10 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 ## Critérios de aceite
 
 - Dado um usuário com IA desligada nas Preferências, quando consulta a aba **Tendências** no Cockpit, então o bloco **Tendências e achados** é gerado localmente e exibido sem chamada externa.
+- Dado um usuário com a prioridade padrão, quando a IA local estiver disponível, então Tendências usa a IA local antes de considerar a IA remota.
+- Dado um usuário com IA remota configurada, quando a prioridade permitir IA remota mas não houver consentimento, então Tendências não envia dados ao provedor e usa IA local ou resumo determinístico.
+- Dado indisponibilidade da IA local e remota autorizada, quando Tendências carrega, então usa a IA remota como fallback; sem IA remota autorizada, exibe o resumo determinístico.
+- Dado uma síntese exibida por Tendências, quando a fonte for local, remota ou determinística, então a interface informa essa origem de forma clara.
 - Dado um usuário que acessa o Cockpit, quando visualiza as abas principais, então **Tendências** aparece como aba própria separada de **Situação do mês** e **Saúde Financeira**.
 - Dado um usuário que acessa o Cockpit, quando visualiza as abas principais, então a ordem exibida é **Situação**, **Tendências** e **Saúde Financeira**.
 - Dado um usuário com lançamentos em mais de um mês, quando consulta a aba **Tendências**, então visualiza um gráfico misto mês a mês com barras agrupadas de receitas/despesas e linha de saldo líquido.
@@ -298,6 +310,8 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 - [x] Passo 9 — Detectar limites de gastos ultrapassados em 3 meses consecutivos e exibir achado estruturado `limite_recorrente` sugerindo revisão do valor. Fecha: novos critérios de limite recorrente.
 
 ## Changelog
+
+- `2.26` — 2026-10-10 — Inicia centralização da política local/remota/determinística em `ai_execution_settings`; Tendências passa a consumir a mesma ordem do Consultor e a expor a origem efetiva do resumo.
 
 - `2.25` — 2026-09-13 — Corrigida detecção de antecipação de parcelas para considerar apenas o destino final quando uma parcela é movida em cascata por várias faturas, evitando cards falsos nos meses intermediários.
 - `2.24` — 2026-09-04 — Adicionada detecção de limites de gastos ultrapassados em 3 meses consecutivos, gerando achado estruturado `limite_recorrente` que sugere revisar o valor do limite.

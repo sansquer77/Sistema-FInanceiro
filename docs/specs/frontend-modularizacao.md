@@ -2,8 +2,8 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 4.33
-atualizado: 2026-09-25
+versao: 4.34
+atualizado: 2026-10-11
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
   - "[[arquitetura]]"
@@ -59,6 +59,8 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `bank-logos.js` | Catálogo compartilhado de logos de instituições financeiras com normalização de nomes e fallback visual. |
 | `input-mask.js` | Adaptador local sobre IMask para campos monetários e de data, preservando parsers e formato brasileiro enviado ao backend. |
 | `command-palette.js` | Command Palette nativa em ES Modules: comandos de navegação, preferências e busca, sem regras de domínio e sem consulta à rede. |
+| `webllm-client.js` | Cliente de inferência local WebLLM: detecção de capacidade, preparo/remoção do modelo e troca de mensagens com o worker. |
+| `webllm-worker.js` | Worker dedicado ao runtime WebLLM; executa o modelo localmente e reporta progresso/erros ao cliente. |
 
 ## Views funcionais
 
@@ -345,6 +347,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Changelog
 
+- `4.34` — 2026-10-11 — Inventariados `webllm-client.js` e `webllm-worker.js` como módulos utilitários da inferência local; documentada a origem de `theme-init.js` para inicialização de tema/privacidade/densidade sem script inline.
 - `4.33` — 2026-09-25 — Inventariado `loans-view.js` entre as views funcionais, registrando sua responsabilidade de apresentação e integração sem regras financeiras no navegador.
 - `4.32` — 2026-09-04 — Barra do Histórico de Operações ganhou distribuição responsiva; abas de Relatórios atualizam `aria-labelledby` conforme a seleção; Sobre ganhou grade de leitura mais equilibrada.
 

@@ -18,14 +18,23 @@ class ConsultorContextTest(unittest.TestCase):
             for i in range(15)
         ]
         original = copy.deepcopy(positions)
-        summary = context.summarize_portfolio(positions)
-        self.assertEqual(summary["total_brl_cents"], 10605)
-        self.assertEqual(summary["position_count"], 15)
-        self.assertEqual(len(summary["positions"]), 12)
-        self.assertEqual(summary["positions"][0]["current_value_brl_cents"], 1414)
-        for row in summary["positions"]:
+        compacted = context.compact_positions(positions)
+        self.assertEqual(len(compacted), 6)
+        self.assertEqual(compacted[0]["current_value_brl_cents"], 1414)
+        for row in compacted:
             self.assertTrue({"id", "name", "ticker"}.isdisjoint(row))
         self.assertEqual(positions, original)
+
+    def test_summarize_portfolio_returns_aggregates_without_individual_positions(self):
+        positions = [
+            {"current_value_brl_cents": 1000, "asset_type_label": "Renda Fixa", "currency": "BRL"},
+            {"current_value_brl_cents": 2000, "asset_type_label": "Renda Variavel", "currency": "BRL"},
+        ]
+        summary = context.summarize_portfolio(positions)
+        self.assertEqual(summary["total_brl_cents"], 3000)
+        self.assertEqual(summary["position_count"], 2)
+        self.assertIn("by_asset_type", summary)
+        self.assertNotIn("positions", summary)
 
     def test_supplied_empty_positions_are_not_reloaded(self):
         with patch("financeiro.portfolio.current_portfolio_positions") as loader:
@@ -53,6 +62,39 @@ class ConsultorContextTest(unittest.TestCase):
         self.assertEqual(enriched["items"][0]["amount_display"], "R$ -123,45")
         self.assertEqual(enriched["total_display"], "R$ 0,00")
         self.assertEqual(payload, original)
+
+    def test_invalid_money_display_logs_only_field_path_and_type(self):
+        payload = {"portfolio": {"value_cents": {"invalid": "private"}}}
+        with patch.object(context.LOGGER, "warning") as warning:
+            with self.assertRaises(TypeError):
+                context.add_money_displays(payload)
+
+        warning.assert_called_once_with(
+            "consultor invalid monetary context field path=%s value_type=%s",
+            "$.portfolio.value_cents",
+            "dict",
+        )
+        self.assertNotIn("private", str(warning.call_args))
+
+    def test_financial_commitment_asset_type_list_is_not_treated_as_money(self):
+        with patch("financeiro.financial_goals.list_financial_goals", return_value=[]), \
+                patch("financeiro.loans.list_loans", return_value=[]):
+            commitments = context.build_financial_commitments_context(7, [], goals=[])
+
+        goals = commitments["goals"]
+        self.assertEqual(goals["linked_investments_by_asset_type"], [])
+        self.assertNotIn("linked_investments_by_asset_type_brl_cents", goals)
+        enriched = context.add_money_displays({
+            "financial_commitments": {
+                "goals": {
+                    "linked_investments_by_asset_type": [
+                        {"asset_type": "fixed_income", "current_value_brl_cents": 12345}
+                    ]
+                }
+            }
+        })
+        linked = enriched["financial_commitments"]["goals"]["linked_investments_by_asset_type"]
+        self.assertEqual(linked[0]["current_value_brl_display"], "R$ 123,45")
 
 
 if __name__ == "__main__":

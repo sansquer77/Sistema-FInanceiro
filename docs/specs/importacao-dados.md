@@ -2,8 +2,8 @@
 tipo: spec
 area: importacao
 status: implementado
-versao: 1.16
-atualizado: 2026-10-10
+versao: 1.17
+atualizado: 2026-10-12
 relacionados:
   - "[[contas-correntes]]"
   - "[[cartoes]]"
@@ -18,7 +18,7 @@ aliases: ["Importação", "Importação de dados"]
 # Importação de dados
 
 > [!info] Status
-> **implementado** · área: `importacao` · atualizado em 2026-10-10 · relacionados: [[contas-correntes]], [[cartoes]], [[categorias-tags-gestao]], [[adr/0004-importador-xls-sem-dependencia]]
+> **implementado** · versão: `1.17` · área: `importacao` · atualizado em 2026-10-12 · relacionados: [[contas-correntes]], [[cartoes]], [[categorias-tags-gestao]], [[adr/0004-importador-xls-sem-dependencia]], [[desacoplamento-importacao-parsers]]
 
 ## Problema
 
@@ -117,6 +117,13 @@ Usuário que está migrando dados de outro sistema ou que deseja lançar movimen
 
 Tabelas: `transactions`, `credit_card_transactions`, `transaction_tags`, `credit_card_transaction_tags`, `categories`, `subcategories`, `tags`, `checking_accounts`, `credit_cards`, `import_adjustments`.
 
+Módulos de domínio:
+- `financeiro/import_utils.py` — utilitários puros compartilhados (`ImportError`, normalização de chave, data, valor monetário).
+- `financeiro/import_parsers.py` — leitura de formatos tabulares (`.xls`, `.xlsx`, `.csv`) e helpers de cabeçalho/célula.
+- `financeiro/import_ofx.py` — leitura de extratos `.ofx`/`.qfx`.
+- `financeiro/import_templates.py` — geração de modelos `.xlsx` do sistema.
+- `financeiro/imports.py` — orquestração do pipeline de importação (prévia, validação, deduplicação, aprendizado e persistência).
+
 ## Critérios de aceite
 
 - Dado um arquivo `.xls` legado de exportação externa, quando importado, é lido sem instalação manual de pacote externo.
@@ -176,6 +183,8 @@ Tabelas: `transactions`, `credit_card_transactions`, `transaction_tags`, `credit
 - [x] Passo 10 — aprender correções de linhas explicitamente ignoradas como duplicadas, validando novamente a duplicidade e preservando os lançamentos. Fecha: critério 43.
 
 ## Changelog
+
+- `1.17` — 2026-10-12 — Refatoração interna: parsers de formatos tabulares, parser OFX, gerador de templates e utilitários compartilhados extraídos para módulos especializados (`import_parsers.py`, `import_ofx.py`, `import_templates.py`, `import_utils.py`); `imports.py` permanece como orquestrador. Sem mudança de comportamento observável nem de contratos. Ver [[desacoplamento-importacao-parsers]].
 
 - `1.16` — 2026-10-10 — Correções de linhas explicitamente ignoradas como duplicadas passam a alimentar o aprendizado local, após revalidar a duplicidade e sem alterar lançamentos.
 - `1.15` — 2026-10-05 — Resultado passa a listar cada lançamento importado ou ignorado em uma única linha compacta e deixa de limitar as mensagens de linhas ignoradas a 50.

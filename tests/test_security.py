@@ -221,6 +221,12 @@ class BruteForceProtectionTest(IsolatedDatabaseTest):
 
 
 class HttpCachingAndCompressionTest(unittest.TestCase):
+    def test_csp_allows_wasm_runtime_without_javascript_eval(self) -> None:
+        policy = app.SECURITY_HEADERS["Content-Security-Policy"]
+
+        self.assertIn("script-src 'self' 'wasm-unsafe-eval'", policy)
+        self.assertNotIn("'unsafe-eval'", policy)
+
     def test_send_json_gzips_large_payload_when_client_accepts_it(self) -> None:
         handler = object.__new__(app.AppHandler)
         handler.headers = {"Accept-Encoding": "br, gzip"}

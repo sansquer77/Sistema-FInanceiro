@@ -1,6 +1,7 @@
 // spec: cockpit-calendario v0.9 — critérios 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17 e 18
-// spec: consultor/consultor v1.7 — view de análises, histórico e integração com o calendário
+// spec: consultor/consultor v2.16 — view de análises, pesquisa macro e fontes
 import { stateMarkup } from "./dom-utils.js";
+import { runLocalConsultor } from "./webllm-client.js?v=177";
 export function registerConsultorView({
   elements,
   api,
@@ -36,6 +37,7 @@ export function registerConsultorView({
   let runningAnalysisId = "";
   let selectedAnalysisId = "";
   let selectedPeriodWindow = "3m";
+  let macroResearch = null;
   let activeConsultorTab = "analyses";
   let historyFilter = "";
   let loading = false;
@@ -241,7 +243,7 @@ export function registerConsultorView({
   }
 
   function renderAnalysisSelector(cards) {
-    // spec: consultor/consultor v1.7 — critérios 8, 9 e 14
+    // spec: consultor/consultor v2.13 — critérios 8, 9 e 14
     // (o catálogo permanece fechado; a interface concentra a escolha em um
     // seletor e renderiza as opções de período declaradas pelo backend para
     // cada card que exige período — ralos usa 3/6/12/YTD; evolução do score
@@ -294,20 +296,48 @@ export function registerConsultorView({
       return;
     }
     runningAnalysisId = analysisId;
+    macroResearch = null;
     renderConsultor();
+    let localFailure = "";
     const card = (consultorConfig?.cards || []).find((item) => item.analysis_id === analysisId);
     const body = { analysis_id: analysisId };
     if (card?.requires_period_window) {
       body.period_window = selectedPeriodWindow;
     }
     try {
-      const result = await api("/api/consultor/analyze", { method: "POST", body });
-      renderAnalysisOutput(result);
+      let result;
+      const order = consultorConfig?.order || ["local", "deterministica"];
+      for (const source of order) {
+        if (source === "deterministica" || result) break;
+        if (source === "local") {
+          try {
+          const prepared = await api("/api/consultor/prepare-local", { method: "POST", body });
+          macroResearch = prepared.macro_research || null;
+          const output = await runLocalConsultor(prepared.messages, prepared, (progress) => {
+            if (consultorOutput) { consultorOutput.hidden = false; consultorOutput.innerHTML = stateMarkup(progress, { kind: "loading" }); }
+          });
+          result = await api("/api/consultor/complete-local", { method: "POST", body: { ...body, output } });
+          } catch (localError) {
+            localFailure = localError.message || "A IA local não está disponível neste dispositivo.";
+            if (!order.includes("remota")) throw localError;
+          }
+        }
+        if (source === "remota") {
+          result = await api("/api/consultor/analyze", { method: "POST", body });
+          macroResearch = result.macro_research || macroResearch;
+        }
+      }
+      if (!result) throw new Error("Nenhuma fonte de IA está disponível para esta configuração.");
+      renderAnalysisOutput(result, localFailure, macroResearch);
       await loadConsultor();
     } catch (err) {
       if (consultorOutput) {
         consultorOutput.hidden = false;
-        consultorOutput.innerHTML = stateMarkup(err.message || "O Consultor está indisponível no momento.", { kind: "error" });
+        const remoteFailure = err.message || "O Consultor está indisponível no momento.";
+        const errorMessage = localFailure
+          ? `A IA local não concluiu a análise: ${localFailure} O fallback remoto também falhou: ${remoteFailure}`
+          : remoteFailure;
+        consultorOutput.innerHTML = stateMarkup(errorMessage, { kind: "error" });
       }
     } finally {
       runningAnalysisId = "";
@@ -315,7 +345,7 @@ export function registerConsultorView({
     }
   }
 
-  function renderAnalysisOutput(result) {
+  function renderAnalysisOutput(result, localFailure = "", research = null) {
     if (!consultorOutput) {
       return;
     }
@@ -326,7 +356,27 @@ export function registerConsultorView({
         <span>${escapeHtml(result.created_at || "")}</span>
       </div>
       <div class="consultor-response">${formatConsultorText(result.output || "")}</div>
+      <p class="form-help consultor-generation-source">Gerada com ${escapeHtml(result.provider === "webllm" ? "IA local" : "IA remota")}.</p>
+      ${localFailure && result.provider !== "webllm" ? `<p class="form-help">${escapeHtml(localFailure)} Foi usado o fallback remoto.</p>` : ""}
+      ${renderMacroResearchSources(research)}
     `;
+  }
+
+  function renderMacroResearchSources(research) {
+    if (!research) {
+      return "";
+    }
+    if (research.status !== "available" || !Array.isArray(research.sources) || !research.sources.length) {
+      return '<p class="form-help">Pesquisa macroeconômica atual não disponível; a análise foi gerada sem esse enriquecimento.</p>';
+    }
+    const sources = research.sources
+      .filter((source) => typeof source?.url === "string" && source.url.startsWith("https://"))
+      .map((source) => `<li>[${escapeHtml(source.id || "")}] <a href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.title || source.url)}</a></li>`)
+      .join("");
+    if (!sources) {
+      return '<p class="form-help">Pesquisa macroeconômica atual não disponível; a análise foi gerada sem esse enriquecimento.</p>';
+    }
+    return `<div class="form-help consultor-macro-sources"><strong>Fontes do cenário (consulta em ${escapeHtml(research.researched_at || "")})</strong><ul>${sources}</ul></div>`;
   }
 
   function renderConsultorHistory() {
@@ -424,6 +474,11 @@ export function registerConsultorView({
     }
     flushTable();
     return html
+      .replace(/https:\/\/[^\s<>"']+/g, (url) => {
+        const cleanUrl = url.replace(/[),.;!?]+$/, "");
+        const suffix = url.slice(cleanUrl.length);
+        return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer">${cleanUrl}</a>${suffix}`;
+      })
       .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
       .replace(/\n{2,}/g, "</p><p>")
       .replace(/\n/g, "<br>")

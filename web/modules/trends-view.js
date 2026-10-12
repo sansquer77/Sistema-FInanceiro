@@ -1,6 +1,7 @@
-// spec: tendencias-saude-financeira v2.23 — critérios 1, 2, 3, 4, 5, 6, 7, 10, 12, 13, 14, 16, 17, 20, 21, 25, 26, 27, 28, 32, 33 e 34
+// spec: tendencias-saude-financeira v2.26 — critérios 1, 2, 3, 4, 5, 6, 7, 10, 12, 13, 14, 16, 17, 20, 21, 25, 26, 27, 28, 32, 33 e 34
 import { stateMarkup } from "./dom-utils.js";
 import { chartToken, renderChart } from "./chart-adapter.js";
+import { runLocalInference } from "./webllm-client.js?v=175";
 export function registerTrendsView({
   elements,
   api,
@@ -55,7 +56,7 @@ export function registerTrendsView({
         return;
       }
       currentData = response;
-      if (currentData.ia_ativa) {
+      if ((currentData.ia_execution?.order || []).some((source) => source !== "deterministica")) {
         await loadAISummary(requestId, month);
       } else {
         currentData.ia_usada = false;
@@ -75,19 +76,44 @@ export function registerTrendsView({
   }
 
   async function loadAISummary(requestId, month) {
+    const order = currentData.ia_execution?.order || ["deterministica"];
     try {
-      const aiResponse = await api("/api/financial-health-trends/ai-summary", {
-        method: "POST",
-        body: { month },
-      });
-      if (requestId !== trendsRequestId) {
-        return;
+      for (const source of order) {
+        if (source === "deterministica") break;
+        if (source === "local") {
+          try {
+            const prepared = await api("/api/financial-health-trends/prepare-local-summary", {
+              method: "POST", body: { month },
+            });
+            if (!prepared.available) continue;
+            const output = await runLocalInference(prepared.messages, prepared, () => {});
+            if (output?.trim()) {
+              currentData.ia_usada = true;
+              currentData.ia_resumo = output.trim();
+              currentData.ia_origem = "local";
+              return;
+            }
+          } catch (localError) {
+            currentData.ia_local_error = localError.message || "A IA local não está disponível neste dispositivo.";
+            continue;
+          }
+        }
+        if (source === "remota") {
+          const aiResponse = await api("/api/financial-health-trends/ai-summary", {
+            method: "POST", body: { month },
+          });
+          if (requestId !== trendsRequestId) return;
+          if (aiResponse.ia_usada && aiResponse.resumo_ia) {
+            currentData.ia_usada = true;
+            currentData.ia_resumo = aiResponse.resumo_ia;
+            currentData.ia_origem = aiResponse.ia_origem || "remota";
+            return;
+          }
+        }
       }
-      currentData.ia_usada = aiResponse.ia_usada === true;
-      currentData.ia_resumo = aiResponse.resumo_ia || null;
-      if (aiResponse.resumo_local && !currentData.resumo_local) {
-        currentData.resumo_local = aiResponse.resumo_local;
-      }
+      currentData.ia_usada = false;
+      currentData.ia_resumo = null;
+      currentData.ia_origem = "deterministica";
     } catch (err) {
       if (requestId !== trendsRequestId) {
         return;
@@ -352,11 +378,11 @@ export function registerTrendsView({
     const hasIaSummary = currentData.ia_usada && currentData.ia_resumo;
     const summaryText = hasIaSummary ? currentData.ia_resumo : currentData.resumo_local;
     const aiSummaryMarker = hasIaSummary
-      ? `<span class="trends-ai-summary-marker" title="Resumo reescrito por IA" aria-label="Resumo reescrito por IA">✨ IA</span>`
+      ? `<span class="trends-ai-summary-marker" title="Resumo reescrito por IA ${escapeHtml(currentData.ia_origem || "")}" aria-label="Resumo reescrito por IA">✨ IA</span>`
       : "";
-    const aiNotice = currentData.ia_ativa && !currentData.ia_usada
-      ? `<small class="trends-ai-notice">Resumo local — IA não respondeu ou está desligada.</small>`
-      : "";
+    const sourceNotice = hasIaSummary
+      ? `<small class="trends-ai-notice">${currentData.ia_local_error ? `${escapeHtml(currentData.ia_local_error)} Foi usado o fallback remoto. ` : ""}Resumo gerado com IA ${escapeHtml(currentData.ia_origem === "local" ? "local" : "remota")}.</small>`
+      : `<small class="trends-ai-notice">Resumo determinístico local.</small>`;
     if (cardFindings.length === 0 && !summaryText) {
       return `
         <section class="trends-findings-section">
@@ -369,7 +395,7 @@ export function registerTrendsView({
       <section class="trends-findings-section">
         <h3 class="trends-findings-title">Tendências e achados ${aiSummaryMarker}</h3>
         ${summaryText ? renderSummaryText(summaryText) : ""}
-        ${aiNotice}
+        ${sourceNotice}
         ${cardFindings.length ? `
           <div class="trends-findings-list">
             ${cardFindings.map((finding) => {

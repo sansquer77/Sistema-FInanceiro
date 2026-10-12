@@ -21,7 +21,7 @@ class ConsultorCatalogTest(unittest.TestCase):
             "profiles": catalog.INVESTOR_PROFILES,
         }
         digest = hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
-        self.assertEqual(digest, "2d0d347d6e1e11290bd82cd8a0038f492c3f1e763af8c146387431f70a290e5f")
+        self.assertEqual(digest, "652598fbfa20dd979217fbfe1925b80720cbbcfbbb428c9c9ebd0b5941034425")
 
     def test_public_contract_and_exception_identity(self):
         self.assertIs(consultor.ConsultorError, ConsultorError)

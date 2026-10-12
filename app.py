@@ -3,11 +3,13 @@ from __future__ import annotations
 import gzip
 import hashlib
 import json
+import logging
 import mimetypes
 import os
 import re
 import sqlite3
 import sys
+import traceback
 from datetime import date, timedelta
 from email.utils import formatdate, parsedate_to_datetime
 from http import HTTPStatus
@@ -90,6 +92,8 @@ from financeiro.consultor import (
     delete_complementary_profile,
     delete_consultor_history,
     execute_consultor_analysis,
+    prepare_local_analysis,
+    complete_local_analysis,
     get_complementary_profile,
     get_consultor_settings,
     list_analysis_cards,
@@ -118,7 +122,8 @@ from financeiro.credit_cards import (
 )
 from financeiro.database import DB_PATH, begin_immediate, get_connection, initialize_database
 from financeiro.market_calendar import refresh_anbima_calendar_if_due
-from financeiro.ai_summary import ai_summary_enabled, generate_ai_summary
+from financeiro.ai_summary import ai_summary_enabled, generate_ai_summary, prepare_local_summary
+from financeiro.ai_execution import AIExecutionError, get_ai_execution_settings, save_ai_execution_settings
 from financeiro.financial_health import (
     FinancialHealthError,
     calculate_financial_health_score,
@@ -206,13 +211,17 @@ MAX_JSON_BODY_BYTES = 1 * 1024 * 1024
 GZIP_MIN_BYTES = 1024
 SESSION_COOKIE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60
 SECURITY_HEADERS = {
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Cross-Origin-Embedder-Policy": "require-corp",
     "Content-Security-Policy": (
         "default-src 'self'; "
-        "script-src 'self' https://cdnjs.buymeacoffee.com 'sha256-LYQeGTINNCcWlu3qrC+EtcZ8rMb+O8RgOsOWrRBQ7EM='; "
+        # spec: seguranca/seguranca-autenticacao v1.7 — critério de WebAssembly local
+        # WebLLM compila o runtime WASM no navegador; esta exceção não habilita eval JavaScript.
+        "script-src 'self' 'wasm-unsafe-eval' https://cdnjs.buymeacoffee.com; worker-src 'self' blob:; "
         "style-src 'self' 'unsafe-inline'; "
         "img-src 'self' data: blob: https://cdn.buymeacoffee.com; "
         "font-src 'self' data:; "
-        "connect-src 'self'; "
+        "connect-src 'self' https://huggingface.co https://*.hf.co https://raw.githubusercontent.com; "
         "base-uri 'self'; "
         "form-action 'self'; "
         "frame-ancestors 'none'; "
@@ -222,6 +231,7 @@ SECURITY_HEADERS = {
     "Referrer-Policy": "same-origin",
     "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
 }
+LOGGER = logging.getLogger("sistema_financeiro")
 
 
 def normalize_netloc(value: str) -> str:
@@ -630,7 +640,7 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_json({"error": exc.message}, exc.status)
 
     def handle_financial_health_trends(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critérios 1, 3, 4, 5, 6, 7, 13, 17, 25, 26, 27 e 28
+        # spec: tendencias-saude-financeira v2.26 — critérios 1, 3, 4, 5, 6, 7, 13, 17, 25, 26, 27 e 28
         if not self.validate_read_source():
             return
         user = self.require_user()
@@ -638,26 +648,40 @@ class AppHandler(BaseHTTPRequestHandler):
         month = (query.get("month") or [date.today().strftime("%Y-%m")])[0]
         try:
             payload = calculate_trends(user["id"], month)
+            execution = get_ai_execution_settings(user["id"])
             payload["ia_ativa"] = ai_summary_enabled(user["id"])
+            payload["ia_execution"] = execution
             self.send_json(payload)
         except TrendsError as exc:
             self.send_json({"error": exc.message}, exc.status)
 
     def handle_ai_settings_status(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critérios 17, 18 e 19
+        # spec: tendencias-saude-financeira v2.26 — critérios 17, 18 e 19
         if not self.validate_read_source():
             return
         user = self.require_user()
         self.send_json(ai_settings_status(user["id"]))
 
     def handle_save_ai_settings(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critérios 17, 18, 19, 21, 23, 27 e 28
+        # spec: tendencias-saude-financeira v2.26 — critérios 17, 18, 19, 21, 23, 27 e 28
         user = self.require_user()
         data = self.read_json()
         try:
             self.send_json(save_ai_settings(user["id"], data))
         except SecureConfigError as exc:
             self.send_json({"error": str(exc) or "Configuracao de IA invalida."}, HTTPStatus.BAD_REQUEST)
+
+    def handle_ai_execution_settings(self) -> None:
+        if not self.validate_read_source():
+            return
+        self.send_json(get_ai_execution_settings(self.require_user()["id"]))
+
+    def handle_save_ai_execution_settings(self) -> None:
+        user = self.require_user()
+        try:
+            self.send_json(save_ai_execution_settings(user["id"], self.read_json()))
+        except AIExecutionError as exc:
+            self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
 
     def handle_mais_retorno_config_status(self) -> None:
         # spec: preferencias-abas v0.8 — critérios 6 e 8
@@ -734,7 +758,7 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
 
     def handle_ai_summary(self) -> None:
-        # spec: tendencias-saude-financeira v2.22 — critérios 12, 13, 14, 16 e 17
+        # spec: tendencias-saude-financeira v2.26 — critérios 12, 13, 14, 16 e 17
         user = self.require_user()
         data = self.read_json()
         month = data.get("month") or date.today().strftime("%Y-%m")
@@ -748,10 +772,20 @@ class AppHandler(BaseHTTPRequestHandler):
             "resumo_ia": summary,
             "resumo_local": trends["resumo_local"],
             "ia_usada": summary is not None,
+            "ia_origem": "remota" if summary is not None else "deterministica",
         })
 
+    def handle_prepare_local_ai_summary(self) -> None:
+        user = self.require_user()
+        data = self.read_json()
+        month = data.get("month") or date.today().strftime("%Y-%m")
+        try:
+            self.send_json(prepare_local_summary(user["id"], calculate_trends(user["id"], month)))
+        except TrendsError as exc:
+            self.send_json({"error": exc.message}, exc.status)
+
     def handle_consultor_config(self) -> None:
-        # spec: consultor/consultor v1.7 - criterios 1, 2, 3, 25, 26 e 32
+        # spec: consultor/consultor v2.13 - criterios 1, 2, 3, 25, 26 e 32
         if not self.validate_read_source():
             return
         user = self.require_user()
@@ -760,7 +794,7 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_json(payload)
 
     def handle_save_consultor_config(self) -> None:
-        # spec: consultor/consultor v1.7 - criterios 1, 2, 3, 25, 26 e 32
+        # spec: consultor/consultor v2.13 - criterios 1, 2, 3, 25, 26 e 32
         user = self.require_user()
         try:
             self.send_json(save_consultor_settings(user["id"], self.read_json()))
@@ -768,14 +802,14 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_consultor_error(exc)
 
     def handle_consultor_complementary_profile(self) -> None:
-        # spec: consultor/consultor v1.7 - criterios 22, 23, 24, 25 e 33
+        # spec: consultor/consultor v2.13 - criterios 22, 23, 24, 25 e 33
         if not self.validate_read_source():
             return
         user = self.require_user()
         self.send_json(get_complementary_profile(user["id"]))
 
     def handle_save_consultor_complementary_profile(self) -> None:
-        # spec: consultor/consultor v1.7 - criterios 22, 23, 24, 25 e 33
+        # spec: consultor/consultor v2.13 - criterios 22, 23, 24, 25 e 33
         user = self.require_user()
         try:
             self.send_json(save_complementary_profile(user["id"], self.read_json()))
@@ -783,29 +817,68 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_consultor_error(exc)
 
     def handle_delete_consultor_complementary_profile(self) -> None:
-        # spec: consultor/consultor v1.7 - criterios 22, 23, 24, 25 e 33
+        # spec: consultor/consultor v2.13 - criterios 22, 23, 24, 25 e 33
         user = self.require_user()
         self.send_json({"deleted": delete_complementary_profile(user["id"])})
 
     def handle_consultor_analyze(self) -> None:
-        # spec: consultor/consultor v1.7 - criterios 7, 10, 13, 27, 29, 30, 31 e 34
+        # spec: consultor/consultor v2.13 - criterios 7, 10, 13, 27, 29, 30, 31 e 34
         user = self.require_user()
         data = self.read_json()
+        failure_stage = "portfolio_positions"
         try:
             # Otimização: calcula o portfólio uma única vez por requisição.
             positions = current_portfolio_positions(user["id"], force_refresh=False)
-            self.send_json(execute_consultor_analysis(
+            failure_stage = "consultor_execution"
+            result = execute_consultor_analysis(
                 user["id"],
                 data.get("analysis_id"),
                 month=data.get("month"),
                 period_window=data.get("period_window"),
                 portfolio_positions=positions,
-            ), status=HTTPStatus.CREATED)
+            )
+            failure_stage = "response_serialization"
+            self.send_json(result, status=HTTPStatus.CREATED)
+        except ConsultorError as exc:
+            self.send_consultor_error(exc)
+        except Exception as exc:
+            # spec: consultor/consultor v2.13 — falha remota não expõe detalhes internos
+            # O contexto e a configuração segura podem falhar antes do adaptador do provedor.
+            # Registra-se estágio e locais dos frames, nunca mensagem, prompt ou dados do usuário.
+            traceback_locations = " > ".join(
+                f"{Path(frame.filename).name}:{frame.lineno}:{frame.name}"
+                for frame in traceback.extract_tb(exc.__traceback__)[-8:]
+            )
+            LOGGER.error(
+                "consultor analysis failed route=%s stage=%s error_type=%s traceback=%s",
+                urlsplit(self.path).path,
+                failure_stage,
+                type(exc).__name__,
+                traceback_locations,
+            )
+            self.send_consultor_error(ConsultorError("O Consultor esta indisponivel no momento."))
+
+    def handle_prepare_local_consultor_analysis(self) -> None:
+        user = self.require_user()
+        data = self.read_json()
+        try:
+            positions = current_portfolio_positions(user["id"], force_refresh=False)
+            self.send_json(prepare_local_analysis(user["id"], data.get("analysis_id"),
+                period_window=data.get("period_window"), portfolio_positions=positions))
+        except ConsultorError as exc:
+            self.send_consultor_error(exc)
+
+    def handle_complete_local_consultor_analysis(self) -> None:
+        user = self.require_user()
+        data = self.read_json()
+        try:
+            self.send_json(complete_local_analysis(user["id"], data.get("analysis_id"), data.get("output"),
+                period_window=data.get("period_window")), status=HTTPStatus.CREATED)
         except ConsultorError as exc:
             self.send_consultor_error(exc)
 
     def handle_consultor_history(self) -> None:
-        # spec: consultor/consultor v1.7 - criterios 16, 17 e 30
+        # spec: consultor/consultor v2.13 - criterios 16, 17 e 30
         if not self.validate_read_source():
             return
         user = self.require_user()
@@ -817,7 +890,7 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_json({"history": list_consultor_history(user["id"], limit=limit)})
 
     def handle_delete_consultor_history(self) -> None:
-        # spec: consultor/consultor v1.7 - criterios 16, 17 e 30
+        # spec: consultor/consultor v2.13 - criterios 16, 17 e 30
         user = self.require_user()
         self.send_json({"deleted": delete_consultor_history(user["id"])})
 
@@ -2136,6 +2209,11 @@ def audit_value(value: object) -> str:
 
 
 def main() -> None:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
     initialize_database()
     run_scheduled_backup_if_due()
     refresh_anbima_calendar_if_due(DB_PATH, connection_factory=get_connection)

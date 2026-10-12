@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 3.38
-atualizado: 2026-10-05
+versao: 3.42
+atualizado: 2026-10-11
 relacionados:
   - "[[arquitetura]]"
   - "[[visao-produto]]"
@@ -14,7 +14,7 @@ tags: [produto, meta]
 # Requisitos
 
 > [!info] Status
-> **implementado** (escopo vivo) · versão: `3.38` · área: `meta` · atualizado em 2026-10-05 · relacionados: [[arquitetura]], [[visao-produto]], [[specs/emprestimos-quitacao]]
+> **implementado** (escopo vivo) · versão: `3.42` · área: `meta` · atualizado em 2026-10-11 · relacionados: [[arquitetura]], [[visao-produto]], [[specs/consultor]], [[specs/tendencias-saude-financeira]]
 
 ## Objetivo
 
@@ -50,7 +50,7 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
   - Aprendizado local de correções confirmadas de descrição/classificação, isolado por usuário e conta/cartão, aplicado com identificação na próxima prévia.
   - Ver [[importacao-dados]].
 - **Histórico de Operações**: auditoria funcional somente leitura com filtros, busca, agrupamentos e rastreio de lotes por `operation_batch_id`. Ver [[historico-operacoes]].
-- **Consultor**: análises pré-formatadas por IA na aba Consultor do Cockpit, mediante IA geral configurada, ativação explícita e consentimento de acesso aos dados financeiros do usuário. Usa catálogo fechado em seletor, contexto minimizado, Perfil Complementar criptografado em SQLite, histórico por usuário e expurgo automático quando IA/Consultor/consentimento são desabilitados. Ver [[specs/consultor]].
+- **Consultor**: análises pré-formatadas por IA na aba Consultor do Cockpit, com IA local WebLLM como prioridade padrão e IA remota opt-in como prioridade alternativa ou fallback consentido. Preferências permitem preparar, conferir e remover o modelo no cache privado de cada navegador; pesos não ficam no app, SQLite, backup ou servidor. Usa catálogo fechado em seletor, contexto minimizado montado no backend, Perfil Complementar criptografado em SQLite, histórico por usuário e expurgo automático quando o Consultor ou o consentimento remoto são desabilitados. A Análise da Carteira pode incluir pesquisa macroeconômica web sem dados do usuário antes da inferência, se a política permitir e o provedor oferecer busca compatível. Ver [[specs/consultor]], [[adr/0019-inferencia-local-webllm]] e [[adr/0020-pesquisa-macro-consultor]].
 - **Sobre o app**: tela informativa no grupo Usuário com objetivo, funcionalidades, tecnologias, contato e infraestrutura mínima. Ver [[sobre-app]].
 - **Interface web estática**: painéis locais em `web/`, sem framework ou build step; dependências browser aprovadas são fixadas, auditadas e distribuídas localmente para manter operação offline. Ver [[arquitetura]], [[adr/0002-modularizacao-frontend]] e [[adr/0013-dependencias-frontend-v2]].
 - **Distribuição desktop**: pacotes macOS e Windows com instaladores, modo local e launchers opcionais para rede local confiável. Ver [[distribuição]].
@@ -140,6 +140,12 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 - A documentação de arquitetura ([[arquitetura]]) deve ser atualizada quando endpoints, tabelas ou fluxos centrais mudarem.
 
 ## Changelog
+
+- `3.42` — 2026-10-11 — Registra o enriquecimento opcional da Análise da Carteira com cenário macroeconômico pesquisado sem contexto do usuário.
+- `3.41` — 2026-10-10 — Define que o preparo manual do modelo local ocorre no cache privado de cada navegador, sem consumo de armazenamento no servidor.
+- `3.40` — 2026-10-10 — A seleção de IA é centralizada por usuário: local primeiro por padrão, remota somente com consentimento inclusive como fallback, e resumo determinístico como último recurso para Consultor e Tendências.
+
+- `3.39` — 2026-10-10 — Consultor inicia evolução para inferência local WebLLM, com prioridade local padrão, download do modelo no primeiro uso e fallback remoto somente com consentimento. Ver [[specs/consultor]].
 
 - `3.38` — 2026-10-05 — Exige classificação existente compatível na importação e define revisão de duplicatas com opção de ignorar ou substituir lançamento existente.
 - `3.37` — 2026-10-05 — Inclui revisão de arquivos OFX e aprendizado contextual de ajustes de importação por conta/cartão.

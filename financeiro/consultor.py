@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+import logging
 from datetime import date, datetime
 from financeiro.ai_endpoint_security import ai_urlopen
 
@@ -19,6 +20,7 @@ from financeiro.consultor_context import (
     _compact_pillars,
     build_lifestyle_context,
     build_maturities_context,
+    build_financial_commitments_context,
     _load_portfolio_positions,
     money_context,
     summarize_portfolio,
@@ -37,6 +39,7 @@ from financeiro.consultor_context import (
     compact_named_amounts,
     compact_maturities,
 )
+from financeiro.consultor_cashflow import build_maturity_cashflow_context
 from financeiro import consultor_history as history_store
 from financeiro import consultor_provider as provider_adapter
 from financeiro.ai_summary import ai_ssl_context, extract_summary_text
@@ -75,28 +78,37 @@ from financeiro.consultor_settings import (
     normalize_profile_enum,
 )
 from financeiro.consultor_errors import ConsultorError
+from financeiro.ai_execution import get_ai_execution_settings
 
 
 REFUSAL_MESSAGE = (
-    "Nao posso apresentar recomendacao direta de compra ou venda de ativos especificos. "
-    "Esta analise deve permanecer educacional e informativa."
+    "Nao posso recomendar a venda ou o resgate de investimentos, nem garantir "
+    "retornos ou ausencia de risco. Esta analise deve permanecer educacional e informativa."
+)
+_FORBIDDEN_SALE_ACTION = r"(?:venda|vender|venderia|liquide|liquidar|resgate|resgatar|desfaca|desfazer)"
+# Portfolio context omits position names and tickers, so explicit investment sales fail closed.
+_FORBIDDEN_TICKER_SALE_PATTERN = (
+    r"\b(?i:" + _FORBIDDEN_SALE_ACTION + r")"
+    + r"\s+(?:(?:o|a|os|as|um|uma|de|do|da|das|dos|seu|sua|seus|suas)\s+)?"
+    + r"[A-Z]{2,6}\d{0,2}\b"
 )
 FORBIDDEN_OUTPUT_PATTERNS = (
-    r"\b(compre|comprar|compraria|compra)\b.*\b(acao|acoes|ativo|ticker|fundo|etf|fii|cripto|bitcoin|cdb|lci|lca|tesouro)\b",
-    r"\b(venda|vender|venderia|liquide|liquidar)\b.*\b(acao|acoes|ativo|ticker|fundo|etf|fii|cripto|bitcoin|cdb|lci|lca|tesouro)\b",
-    r"\brecomendo\s+(comprar|vender|aplicar|investir)\b",
+    r"\b" + _FORBIDDEN_SALE_ACTION + r"\b.*\b(acao|acoes|ativo|ativos|ticker|fundo|fundos|etf|etfs|fii|fiis|cripto|bitcoin|cdb|lci|lca|tesouro|investimento|investimentos|posicao|posicoes|carteira)\b",
+    r"\b(recomendo|sugiro|indico|aconselho|deveria|deve|vale a pena|considere)\b.{0,60}\b" + _FORBIDDEN_SALE_ACTION + r"\b",
     r"\b(retorno|rentabilidade)\s+(garantido|garantida|garantidos|garantidas)\b",
     r"\b(sem risco|risco zero)\b",
 )
 _FORBIDDEN_NEGATION_WINDOW = (
-    r"\b(nao|nunca|sem|evite|evitar|evitando|desaconselho|desaconselha|desaconselhar|apenas|somente)"
+    r"\b(nao|nunca|sem|evite|evitar|evitando|desaconselho|desaconselha|desaconselhar)"
     r"|deixe\s+de|deixa\s+de|deixar\s+de"
 )
 CONSULTOR_MAX_TOKENS = 900
+ANALISE_CARTEIRA_MAX_TOKENS = 2500
 CONSULTOR_MIN_TIMEOUT_SECONDS = 20
 CONSULTOR_DAILY_QUOTA = history_store.CONSULTOR_DAILY_QUOTA
 CONSULTOR_FAILURE_COOLDOWN_SECONDS = history_store.CONSULTOR_FAILURE_COOLDOWN_SECONDS
 DEFAULT_TEMPERATURE = provider_adapter.DEFAULT_TEMPERATURE
+LOGGER = logging.getLogger(__name__)
 
 
 def execute_consultor_analysis(
@@ -110,20 +122,29 @@ def execute_consultor_analysis(
     now: datetime | None = None,
     portfolio_positions: list[dict] | None = None,
 ) -> dict:
-    # spec: consultor/consultor v2.1 - critérios 40 a 43
+    # spec: consultor/consultor v2.16 - critérios 40 a 43, 64 a 68
     normalized_user_id = int(user_id)
     normalized_analysis_id = validate_analysis_id(analysis_id)
     current_time = now or datetime.now()
     consultor_settings = get_consultor_settings(normalized_user_id)
     if not consultor_settings["available"]:
         raise ConsultorError("O Consultor nao esta disponivel. Verifique as Preferencias.")
+    normalized_period = validate_period_window(period_window, analysis_id=normalized_analysis_id)
+    if "remota" not in get_ai_execution_settings(normalized_user_id)["order"]:
+        raise ConsultorError("A política atual não permite IA remota para o Consultor.")
     assert_not_in_failure_cooldown(normalized_user_id, normalized_analysis_id, current_time)
     assert_daily_quota_available(normalized_user_id, current_time.date())
 
     ai_settings = load_ai_settings(normalized_user_id)
     max_tokens = normalize_consultor_max_tokens(ai_settings.get("max_tokens"))
+    if normalized_analysis_id == "analise_carteira":
+        max_tokens = max(max_tokens, ANALISE_CARTEIRA_MAX_TOKENS)
     timeout_seconds = normalize_consultor_timeout(ai_settings.get("timeout_seconds"))
-    normalized_period = validate_period_window(period_window, analysis_id=normalized_analysis_id)
+    macro_research = (
+        collect_portfolio_macro_research(ai_settings, timeout_seconds=timeout_seconds)
+        if normalized_analysis_id == "analise_carteira"
+        else None
+    )
     context = build_analysis_context(
         normalized_user_id,
         normalized_analysis_id,
@@ -133,6 +154,8 @@ def execute_consultor_analysis(
         investor_profile=consultor_settings["investor_profile"],
         portfolio_positions=portfolio_positions,
     )
+    if macro_research is not None:
+        context["macro_research"] = macro_research
     system_prompt = build_system_prompt(
         normalized_analysis_id,
         investor_profile=consultor_settings["investor_profile"],
@@ -140,6 +163,7 @@ def execute_consultor_analysis(
     )
     messages = build_ai_messages(system_prompt, context)
     client = ai_client or call_consultor_ai_provider
+    failure_stage = "provider_request"
     try:
         output = client(
             ai_settings,
@@ -147,11 +171,43 @@ def execute_consultor_analysis(
             max_tokens=max_tokens,
             timeout_seconds=timeout_seconds,
         )
+        failure_stage = "output_validation"
         text = str(output or "").strip()
         if not text:
             raise ConsultorError("O Consultor esta indisponivel no momento.")
         text = postprocess_consultor_output(text)
     except ConsultorError as exc:
+        root_cause = exc
+        provider_error_reason = ""
+        provider_diagnostics = {}
+        while root_cause.__cause__ is not None and root_cause.__cause__ is not root_cause:
+            cause = root_cause.__cause__
+            provider_error_reason = provider_error_reason or str(getattr(cause, "reason", "") or "")
+            if not provider_diagnostics:
+                cause_diagnostics = getattr(cause, "diagnostics", None)
+                if isinstance(cause_diagnostics, dict):
+                    provider_diagnostics = cause_diagnostics
+            root_cause = root_cause.__cause__
+        provider_error_reason = provider_adapter.safe_provider_error_reason(
+            provider_error_reason or getattr(root_cause, "reason", "")
+        )
+        if not provider_diagnostics:
+            root_diagnostics = getattr(root_cause, "diagnostics", None)
+            if isinstance(root_diagnostics, dict):
+                provider_diagnostics = root_diagnostics
+        http_status = getattr(root_cause, "code", None)
+        LOGGER.warning(
+            "consultor analysis failed provider=%s model=%s base_url=%s stage=%s error_type=%s "
+            "provider_error_reason=%s provider_diagnostics=%s http_status=%s",
+            str(ai_settings.get("provider") or "custom"),
+            str(ai_settings.get("model") or ""),
+            str(ai_settings.get("base_url") or ""),
+            failure_stage,
+            type(root_cause).__name__,
+            provider_error_reason,
+            provider_adapter.format_safe_provider_diagnostics(provider_diagnostics),
+            http_status if isinstance(http_status, int) else "",
+        )
         register_failure_cooldown(normalized_user_id, normalized_analysis_id, current_time)
         raise ConsultorError("O Consultor esta indisponivel no momento.") from exc
     execution = persist_consultor_analysis(
@@ -173,7 +229,80 @@ def execute_consultor_analysis(
         "model": ai_settings.get("model") or "",
         "max_tokens": max_tokens,
         "timeout_seconds": timeout_seconds,
+        "macro_research": context.get("macro_research"),
     }
+
+
+def prepare_local_analysis(user_id: int, analysis_id: object, *, period_window: object | None = None,
+                           portfolio_positions: list[dict] | None = None) -> dict:
+    """Monta no backend o único prompt/contexto que o worker local pode receber."""
+    settings = get_consultor_settings(int(user_id))
+    if not settings["consultor_enabled"]:
+        raise ConsultorError("O Consultor nao esta disponivel. Verifique as Preferencias.")
+    execution_settings = get_ai_execution_settings(int(user_id))
+    if "local" not in execution_settings["order"]:
+        raise ConsultorError("A política atual não permite IA local para o Consultor.")
+    normalized_id = validate_analysis_id(analysis_id)
+    normalized_period = validate_period_window(period_window, analysis_id=normalized_id)
+    macro_research = None
+    if normalized_id == "analise_carteira":
+        macro_research = {"status": "unavailable", "summary": "", "sources": []}
+        if "remota" in execution_settings["order"]:
+            remote_settings = load_ai_settings(int(user_id))
+            macro_research = collect_portfolio_macro_research(
+                remote_settings,
+                timeout_seconds=normalize_consultor_timeout(remote_settings.get("timeout_seconds")),
+            )
+    context = build_analysis_context(int(user_id), normalized_id, period_window=normalized_period,
+        investor_profile=settings["investor_profile"], portfolio_positions=portfolio_positions)
+    if macro_research is not None:
+        context["macro_research"] = macro_research
+    return {
+        "analysis_id": normalized_id,
+        "period_window": normalized_period,
+        "messages": build_ai_messages(build_system_prompt(normalized_id, investor_profile=settings["investor_profile"], period_window=normalized_period), context),
+        "max_tokens": 900,
+        "temperature": 0.2,
+        "macro_research": macro_research,
+    }
+
+
+# spec: consultor/consultor v2.16 — critérios 64 a 68
+def collect_portfolio_macro_research(ai_settings: dict, *, timeout_seconds: int) -> dict:
+    try:
+        research = provider_adapter.call_consultor_market_research(
+            ai_settings,
+            timeout_seconds=min(int(timeout_seconds), 30),
+            opener=ai_urlopen,
+            ssl_context_factory=ai_ssl_context,
+        )
+    except provider_adapter.ConsultorProviderError as exc:
+        LOGGER.warning(
+            "consultor macro research unavailable provider=%s error_type=%s provider_error_reason=%s "
+            "provider_diagnostics=%s",
+            str(ai_settings.get("provider") or "custom"),
+            type(exc).__name__,
+            provider_adapter.safe_provider_error_reason(exc.reason),
+            provider_adapter.format_safe_provider_diagnostics(exc),
+        )
+        research = None
+    if research:
+        return research
+    return {"status": "unavailable", "summary": "", "sources": []}
+
+
+def complete_local_analysis(user_id: int, analysis_id: object, output: object, *, period_window: object | None = None,
+                            now: datetime | None = None) -> dict:
+    current_time = now or datetime.now()
+    normalized_id = validate_analysis_id(analysis_id)
+    normalized_period = validate_period_window(period_window, analysis_id=normalized_id)
+    assert_daily_quota_available(int(user_id), current_time.date())
+    text = postprocess_consultor_output(output)
+    execution = persist_consultor_analysis(int(user_id), normalized_id, normalized_period, text, current_time)
+    clear_failure_cooldown(int(user_id), normalized_id)
+    return {"analysis_execution_id": execution["id"], "analysis_id": normalized_id,
+            "period_window": normalized_period, "output": text, "created_at": execution["created_at"],
+            "provider": "webllm", "model": "Qwen2.5-3B-Instruct-q4f16_1-MLC"}
 
 
 def assert_daily_quota_available(user_id: int, current_date: date) -> None:
@@ -220,24 +349,28 @@ def failure_cooldown_remaining(user_id: int, analysis_id: str, current_time: dat
 
 
 def postprocess_consultor_output(output: object) -> str:
-    # spec: consultor/consultor v2.1 - critérios 11, 12, 14 e 15
+    # spec: consultor/consultor v2.15 - critérios 62 e 63
     text = str(output or "").strip()
     if not text:
         raise ConsultorError("O Consultor esta indisponivel no momento.")
+    text = remove_internal_cent_summary_lines(text)
     normalized = normalize_text(text)
-    if contains_forbidden_recommendation(normalized):
+    if contains_forbidden_recommendation(normalized, original_text=text):
         return refusal_response()
     missing_sections = [section for section in RESPONSE_SECTIONS if not has_section(text, section)]
     missing_without_disclaimer = [section for section in missing_sections if section != "Disclaimer"]
     if missing_without_disclaimer:
+        LOGGER.warning(
+            "consultor output validation failed missing_sections=%s output_prefix=%s",
+            ",".join(missing_without_disclaimer),
+            text[:800].replace("\n", " "),
+        )
         raise ConsultorError("O Consultor esta indisponivel no momento.")
-    if "Disclaimer" in missing_sections or normalize_text(DISCLAIMER) not in normalized:
-        text = append_consultor_disclaimer(text)
-    return text
+    return replace_consultor_disclaimer(text)
 
 
 def has_section(text: str, section: str) -> bool:
-    # spec: consultor/consultor v2.1 - cabeçalhos com acentos normalizados
+    # spec: consultor/consultor v2.14 - cabeçalhos com acentos normalizados
     normalized_text = normalize_text(text)
     escaped = re.escape(section)
     return bool(re.search(
@@ -247,20 +380,33 @@ def has_section(text: str, section: str) -> bool:
     ))
 
 
-def contains_forbidden_recommendation(normalized_text: str) -> bool:
-    # spec: consultor/consultor v2.1 - correcao de falso positivo
-    # Frases defensivas da IA ("nao constitui recomendacao de compra de acoes",
-    # "sem recomendar compra de fundos", "evite comprar por impulso") casavam os
-    # padroes vedados; o match so vale se nao houver negacao/ressalva na janela anterior.
-    # O padrao "recomendo <verbo>" usa janela curta para nao engolir idiomas
-    # afirmativos como "sem duvida, recomendo comprar".
+def contains_forbidden_recommendation(normalized_text: str, *, original_text: str | None = None) -> bool:
+    # spec: consultor/consultor v2.14 - bloqueia indicacoes de venda, nao de compra
+    # Frases preventivas sobre venda continuam permitidas quando a negacao vem antes do verbo.
     for pattern in FORBIDDEN_OUTPUT_PATTERNS:
-        window = 10 if pattern.startswith(r"\brecomendo") else 60
         for match in re.finditer(pattern, normalized_text):
-            before = normalized_text[max(0, match.start() - window):match.start()]
+            action_match = re.search(r"\b" + _FORBIDDEN_SALE_ACTION + r"\b", match.group())
+            action_start = match.start() + action_match.start() if action_match else match.start()
+            before = normalized_text[max(0, action_start - 60):action_start]
+            before = re.split(r"[.!?;,\n]", before)[-1]
             if re.search(_FORBIDDEN_NEGATION_WINDOW, before):
                 continue
+            LOGGER.warning(
+                "consultor forbidden recommendation detected pattern=%s match=%s",
+                pattern,
+                match.group()[:200],
+            )
             return True
+    if original_text:
+        for match in re.finditer(_FORBIDDEN_TICKER_SALE_PATTERN, original_text):
+            before = normalize_text(original_text[max(0, match.start() - 60):match.start()])
+            before = re.split(r"[.!?;,\n]", before)[-1]
+            if not re.search(_FORBIDDEN_NEGATION_WINDOW, before):
+                LOGGER.warning(
+                    "consultor forbidden ticker sale detected match=%s",
+                    match.group()[:200],
+                )
+                return True
     return False
 
 
@@ -270,6 +416,31 @@ def has_risk_level(normalized_text: str) -> bool:
 
 def append_consultor_disclaimer(text: str) -> str:
     return f"{text.rstrip()}\n\nDisclaimer\n{DISCLAIMER}"
+
+
+def remove_internal_cent_summary_lines(text: str) -> str:
+    filtered_lines = []
+    for line in text.splitlines():
+        label = normalize_text(line).lstrip(" -*#").replace("*", "").strip()
+        if re.match(r"total\s+(?:em|in)\s+(?:cents|centavos)\b", label):
+            continue
+        filtered_lines.append(line)
+    return "\n".join(filtered_lines).strip()
+
+
+def replace_consultor_disclaimer(text: str) -> str:
+    lines = text.rstrip().splitlines()
+    disclaimer_start = next(
+        (index for index, line in enumerate(lines) if has_section(line, "Disclaimer")),
+        None,
+    )
+    if disclaimer_start is not None:
+        prefix = "\n".join(lines[:disclaimer_start]).rstrip()
+        heading = lines[disclaimer_start].strip()
+        if prefix:
+            return f"{prefix}\n\n{heading}\n{DISCLAIMER}"
+        return f"{heading}\n{DISCLAIMER}"
+    return append_consultor_disclaimer(text)
 
 
 def refusal_response() -> str:
@@ -346,7 +517,7 @@ def build_analysis_context(
     investor_profile: object | None = None,
     portfolio_positions: list[dict] | None = None,
 ) -> dict:
-    # spec: consultor/consultor v2.1 - criterios 7, 10, 27, 30, 34 e 38
+    # spec: consultor/consultor v2.14 - criterios 7, 10, 27, 30, 34 e 38
     normalized_analysis_id = validate_analysis_id(analysis_id)
     normalized_period = validate_period_window(period_window, analysis_id=normalized_analysis_id)
     # Otimização: calcula o portfólio uma única vez e repassa aos cards que o consomem,
@@ -375,15 +546,27 @@ def build_analysis_context(
     elif normalized_analysis_id == "score_saude_financeira":
         context = build_score_context(user_id, month=month, portfolio_positions=portfolio_positions)
     elif normalized_analysis_id == "evolucao_score_tempo":
-        # spec: consultor/consultor v2.1 — critério 10
+        # spec: consultor/consultor v2.14 — critério 10
         context = build_score_evolution_context(user_id, period_window=normalized_period or "6m", portfolio_positions=portfolio_positions)
     elif normalized_analysis_id == "sustentabilidade_padrao_vida":
         context = build_lifestyle_context(user_id, month=month, portfolio_positions=portfolio_positions)
     elif normalized_analysis_id == "destino_vencimentos":
-        context = build_maturities_context(user_id, month=month, reference_date=reference_date, portfolio_positions=portfolio_positions)
+        from financeiro.calendar import get_cockpit_calendar
+
+        positions = _load_portfolio_positions(user_id, portfolio_positions)
+        calendar = get_cockpit_calendar(user_id, reference_date=reference_date, portfolio_positions=positions)
+        reference_date_value = date.fromisoformat(calendar.get("reference_date") or date.today().isoformat())
+        cashflow = build_maturity_cashflow_context(user_id, reference_date_value)
+        context = build_maturities_context(
+            user_id,
+            month=month,
+            reference_date=reference_date,
+            portfolio_positions=portfolio_positions,
+            maturity_cashflow=cashflow,
+        )
     else:
         raise ConsultorError("Analise do Consultor invalida.")
-    # spec: consultor/consultor v2.1 - criterios 38 e 39
+    # spec: consultor/consultor v2.14 - criterios 38 e 39
     # Todos os cards recebem perfil de investidor e Perfil Complementar (quando preenchido)
     # para contextualizar a analise - nunca dados de outro usuario.
     if investor_profile is None:

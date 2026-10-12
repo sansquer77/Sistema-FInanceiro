@@ -961,6 +961,13 @@ class TrendsRouteTest(unittest.TestCase):
             stack.enter_context(mock.patch.object(app.AppHandler, "require_user", return_value=user))
         return stack
 
+    def _enable_ai_remote(self, user_id: int) -> None:
+        from financeiro.ai_execution import save_ai_execution_settings
+        save_ai_execution_settings(user_id, {
+            "execution_priority": "somente_remota",
+            "data_access_consent": True,
+        })
+
     def test_financial_health_trends_requires_session_user(self) -> None:
         # spec: tendencias-saude-financeira v2.23 — critério 28
         handler = self._handler("/api/financial-health-trends?month=2026-07")
@@ -1096,6 +1103,7 @@ class TrendsRouteTest(unittest.TestCase):
             "model": "llama",
             "auth_type": "none",
         })
+        self._enable_ai_remote(user["id"])
 
         handler = self._handler("/api/financial-health-trends/ai-summary", user=user, body={"month": "2026-07"})
         fake_response = {"choices": [{"message": {"content": "Resumo reescrito pela IA."}}]}
@@ -1129,6 +1137,7 @@ class TrendsRouteTest(unittest.TestCase):
             "temperature": 0.1,
             "max_tokens": 321,
         })
+        self._enable_ai_remote(user["id"])
         trends_payload = {
             "month": "2026-07",
             "confianca": "baixa",
@@ -1190,6 +1199,7 @@ class TrendsRouteTest(unittest.TestCase):
                 "temperature": 0.1,
                 "max_tokens": 321,
             })
+        self._enable_ai_remote(user["id"])
         fake_response = {"candidates": [{"content": {"parts": [{"text": "Resumo Gemini."}]}}]}
         response_mock = mock.Mock()
         response_mock.__enter__ = mock.Mock(return_value=response_mock)
@@ -1224,6 +1234,7 @@ class TrendsRouteTest(unittest.TestCase):
                 "model": "models/gemini-1.5-flash",
                 "api_key": "gemini-secret",
             })
+        self._enable_ai_remote(user["id"])
         fake_response = {"candidates": [{"content": {"parts": [{"text": "Resumo Gemini."}]}}]}
         response_mock = mock.Mock()
         response_mock.__enter__ = mock.Mock(return_value=response_mock)
@@ -1255,6 +1266,7 @@ class TrendsRouteTest(unittest.TestCase):
                 "temperature": 0.1,
                 "max_tokens": 321,
             })
+        self._enable_ai_remote(user["id"])
         fake_response = {"content": [{"type": "text", "text": "Resumo Claude."}]}
         response_mock = mock.Mock()
         response_mock.__enter__ = mock.Mock(return_value=response_mock)

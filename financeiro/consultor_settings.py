@@ -5,6 +5,7 @@ from financeiro import consultor_history as history_store
 from financeiro.consultor_catalog import validate_investor_profile
 from financeiro.consultor_errors import ConsultorError
 from financeiro.database import get_connection
+from financeiro.ai_execution import get_ai_execution_settings, save_ai_execution_settings
 from financeiro.secure_config import (
     SecureConfigError,
     ai_settings_status,
@@ -55,27 +56,26 @@ COMPLEMENTARY_PROFILE_ENUMS = {
 DEFAULT_SETTINGS = {
     "consultor_enabled": False,
     "investor_profile": "moderado",
-    "data_access_consent": False,
-    "consented_at": "",
     "available": False,
     "blocked_reason": "ai_not_configured",
 }
 
 
 def get_consultor_settings(user_id: int) -> dict:
-    sync_consultor_with_ai_settings(user_id)
     with get_connection() as conn:
         row = conn.execute(
             """
-            SELECT consultor_enabled, investor_profile, data_access_consent, consented_at
+            SELECT consultor_enabled, investor_profile
             FROM consultor_settings
             WHERE user_id = ?
             """,
             (int(user_id),),
         ).fetchone()
     status = ai_settings_status(int(user_id))
+    execution = get_ai_execution_settings(int(user_id))
     if row is None:
         settings = dict(DEFAULT_SETTINGS)
+        settings.update(execution)
         settings["ai_configured"] = bool(status["configured"])
         settings["ai_enabled"] = bool(status["enabled"])
         settings["available"] = False
@@ -84,77 +84,72 @@ def get_consultor_settings(user_id: int) -> dict:
     settings = {
         "consultor_enabled": bool(row["consultor_enabled"]),
         "investor_profile": validate_investor_profile(row["investor_profile"]),
-        "data_access_consent": bool(row["data_access_consent"]),
-        "consented_at": str(row["consented_at"] or ""),
+        **execution,
         "ai_configured": bool(status["configured"]),
         "ai_enabled": bool(status["enabled"]),
     }
     settings["available"] = (
         settings["consultor_enabled"]
-        and settings["data_access_consent"]
-        and settings["ai_configured"]
-        and settings["ai_enabled"]
+        and settings.get("ai_configured")
+        and settings.get("ai_enabled")
+        and bool(settings["order"])
     )
     settings["blocked_reason"] = consultor_blocked_reason(settings)
+    if settings["consultor_enabled"] and (not settings["ai_configured"] or not settings["ai_enabled"]):
+        history_store.delete_history(int(user_id))
     return settings
 
 
 def consultor_blocked_reason(settings: dict) -> str:
-    if not bool(settings.get("ai_configured")) or not bool(settings.get("ai_enabled")):
+    if not settings.get("ai_configured") or not settings.get("ai_enabled"):
+        return "ai_not_configured"
+    if not settings.get("order"):
         return "ai_not_configured"
     if not bool(settings.get("consultor_enabled")):
         return "consultor_disabled"
-    if not bool(settings.get("data_access_consent")):
-        return "consent_required"
     return ""
 
 
 def save_consultor_settings(user_id: int, data: dict) -> dict:
-    # spec: consultor/consultor v2.1 - criterios 1, 2, 3, 25, 26 e 32
+    # spec: consultor/consultor v2.14 - criterios 1, 2, 3, 25, 26 e 32
     normalized_user_id = int(user_id)
     current = get_consultor_settings(normalized_user_id)
     consultor_enabled = bool(data.get("consultor_enabled", current["consultor_enabled"]))
     investor_profile = validate_investor_profile(data.get("investor_profile", current["investor_profile"]))
-    data_access_consent = bool(data.get("data_access_consent", current["data_access_consent"]))
-    ai_status = ai_settings_status(normalized_user_id)
-    if consultor_enabled and (not ai_status["configured"] or not ai_status["enabled"]):
-        raise ConsultorError("Conclua e habilite a configuracao de IA antes de ativar o Consultor.")
-    if consultor_enabled and not data_access_consent:
-        raise ConsultorError("Aceite o consentimento de acesso aos dados para ativar o Consultor.")
-    should_purge_history = (
-        (current["consultor_enabled"] and not consultor_enabled)
-        or (current["data_access_consent"] and not data_access_consent)
-    )
+    data_access_consent = bool(data.get("data_access_consent", current.get("data_access_consent", False)))
+    should_purge_history = current["consultor_enabled"] and not consultor_enabled
+
+    if consultor_enabled:
+        if not current["ai_configured"] or not current["ai_enabled"]:
+            raise ConsultorError("Configure e habilite uma IA nas Preferencias antes de ativar o Consultor.")
+        if not data_access_consent:
+            raise ConsultorError("Aceite o consentimento de uso de IA para ativar o Consultor.")
+        save_ai_execution_settings(normalized_user_id, {
+            "execution_priority": "remota_primeiro",
+            "data_access_consent": True,
+        })
+    else:
+        save_ai_execution_settings(normalized_user_id, {
+            "execution_priority": "somente_local",
+            "data_access_consent": False,
+        })
+
     with get_connection() as conn:
         conn.execute(
             """
             INSERT INTO consultor_settings (
-                user_id, consultor_enabled, investor_profile, data_access_consent, consented_at
+                user_id, consultor_enabled, investor_profile
             )
-            VALUES (
-                ?, ?, ?, ?,
-                CASE WHEN ? = 1 THEN COALESCE(
-                    (SELECT consented_at FROM consultor_settings WHERE user_id = ?),
-                    CURRENT_TIMESTAMP
-                ) ELSE NULL END
-            )
+            VALUES (?, ?, ?)
             ON CONFLICT(user_id) DO UPDATE SET
                 consultor_enabled = excluded.consultor_enabled,
                 investor_profile = excluded.investor_profile,
-                data_access_consent = excluded.data_access_consent,
-                consented_at = CASE
-                    WHEN excluded.data_access_consent = 1 THEN COALESCE(consultor_settings.consented_at, CURRENT_TIMESTAMP)
-                    ELSE NULL
-                END,
                 updated_at = CURRENT_TIMESTAMP
             """,
             (
                 normalized_user_id,
                 1 if consultor_enabled else 0,
                 investor_profile,
-                1 if data_access_consent else 0,
-                1 if data_access_consent else 0,
-                normalized_user_id,
             ),
         )
     if should_purge_history:
@@ -163,10 +158,10 @@ def save_consultor_settings(user_id: int, data: dict) -> dict:
 
 
 def sync_consultor_with_ai_settings(user_id: int) -> None:
+    """Expurga histórico do Consultor quando a IA está desabilitada ou ausente."""
     status = ai_settings_status(int(user_id))
-    if status["configured"] and status["enabled"]:
-        return
-    history_store.delete_history(int(user_id))
+    if not status.get("configured") or not status.get("enabled"):
+        history_store.delete_history(int(user_id))
 
 
 def get_complementary_profile(user_id: int) -> dict:
@@ -199,7 +194,7 @@ def get_complementary_profile(user_id: int) -> dict:
 
 
 def save_complementary_profile(user_id: int, data: dict) -> dict:
-    # spec: consultor/consultor v2.1 - criterios 22, 23, 24, 25 e 33
+    # spec: consultor/consultor v2.14 - criterios 22, 23, 24, 25 e 33
     current = get_complementary_profile(int(user_id))["profile"]
     normalized_patch = normalize_complementary_profile(data, partial=True)
     merged = {**current, **normalized_patch}

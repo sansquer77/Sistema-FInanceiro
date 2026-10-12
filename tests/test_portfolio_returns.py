@@ -44,6 +44,18 @@ class PortfolioReturnsTest(unittest.TestCase):
 
         return mock.patch("financeiro.portfolio.fetch_accumulated_indexer_factor", side_effect=side_effect)
 
+    def _mock_today(self, year: int = 2026, month: int = 9, day: int = 15) -> mock._patch:
+        from datetime import date
+
+        fixed = date(year, month, day)
+
+        class FixedDate(date):
+            @classmethod
+            def today(cls):
+                return fixed
+
+        return mock.patch("financeiro.portfolio.date", FixedDate)
+
     def _create_fixed_position(self, user_id, account_id, name, cost, mode="post", indexer="CDI"):
         create_opening_position(user_id, {
             "account_id": str(account_id),
@@ -175,7 +187,7 @@ class PortfolioReturnsTest(unittest.TestCase):
         self._create_fixed_position(user["id"], account["id"], "CDB-REPETIDO", "1000,00")
         self._create_fixed_position(user["id"], account["id"], "CDB-REPETIDO", "500,00")
 
-        with self._mock_benchmarks():
+        with self._mock_benchmarks(), self._mock_today():
             get_portfolio_returns(user["id"])
 
         with get_connection() as conn:
@@ -205,7 +217,7 @@ class PortfolioReturnsTest(unittest.TestCase):
                 {**base, "snapshot_month": "2026-08", "as_of_date": "2026-08-31", "market_value_cents": 110_000},
             ])
 
-        with self._mock_benchmarks():
+        with self._mock_benchmarks(), self._mock_today():
             result = get_portfolio_returns(user["id"])
 
         august = next(entry for entry in result["series"] if entry["month"] == "2026-08")
