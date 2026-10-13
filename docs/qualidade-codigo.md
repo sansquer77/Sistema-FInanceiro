@@ -2,14 +2,15 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 1.14
-atualizado: 2026-08-31
+versao: 1.15
+atualizado: 2026-10-12
 relacionados:
   - "[[arquitetura]]"
   - "[[sdd]]"
   - "[[adr/0001-stack-local-sem-framework]]"
   - "[[adr/0002-modularizacao-frontend]]"
   - "[[adr/0003-sqlite-fonte-de-verdade]]"
+  - "[[specs/desacoplamento-importacao-parsers]]"
 tags: [arquitetura, meta, "status/implementado"]
 aliases: ["Qualidade de Código", "Padrões de Qualidade", "Convenções de Código", "Limites de Módulo"]
 ---
@@ -17,7 +18,7 @@ aliases: ["Qualidade de Código", "Padrões de Qualidade", "Convenções de Cód
 # Qualidade de Código
 
 > [!info] Status
-> **implementado** · área: `meta` · versão: `1.14` · atualizado em 2026-08-31 · relacionados: [[arquitetura]], [[sdd]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]], [[adr/0003-sqlite-fonte-de-verdade]]
+> **implementado** · área: `meta` · versão: `1.15` · atualizado em 2026-10-12 · relacionados: [[arquitetura]], [[sdd]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]], [[adr/0003-sqlite-fonte-de-verdade]], [[specs/desacoplamento-importacao-parsers]]
 
 ## Objetivo
 
@@ -83,7 +84,7 @@ Primeira aplicação desta política: a análise estática apontou reexports nã
 
 ### Ativação dos limites e da validação automatizada
 
-Os limites numéricos da seção "Sinais de alerta" são verificados pelo teste `tests/test_code_quality.py`. O teste permite explicitamente os módulos grandes já revisados e falha quando surge um novo módulo acima do limite ou quando um módulo revisado cresce além do tamanho registrado. As extrações necessárias estão documentadas em [[specs/desconcentracao-arquitetura-v2]] e [[specs/frontend-modularizacao]].
+Os limites numéricos da seção "Sinais de alerta" são verificados pelo teste `tests/test_code_quality.py`. O teste permite explicitamente os módulos grandes já revisados e falha quando surge um novo módulo acima do limite ou quando um módulo revisado cresce além do tamanho registrado. As extrações necessárias estão documentadas em [[specs/desconcentracao-arquitetura-v2]], [[specs/frontend-modularizacao]] e [[specs/desacoplamento-importacao-parsers]].
 
 ## Pendências
 
@@ -116,6 +117,7 @@ Os limites numéricos da seção "Sinais de alerta" são verificados pelo teste 
 - `1.6` — 2026-08-31 — Sincronizados frontmatter e callout de status; arquitetura passa a reconhecer explicitamente o gate automatizado já aplicado por `tests/test_code_quality.py`.
 - `1.5` — 2026-08-30 — Atualizada referência de tamanho de `cards-view.js` para 1.209 linhas após adição do badge de bandeira; módulo mantido no conjunto revisado do teste de qualidade.
 - `1.4` — 2026-08-30 — Atualizada referência de tamanho de `cards-view.js` para 1.205 linhas após adição do badge de logo compartilhado; módulo registrado no conjunto revisado do teste de qualidade.
+- `1.15` — 2026-10-12 — Referenciada a extração de `financeiro/imports.py` em [[specs/desacoplamento-importacao-parsers]] como exemplo de divisão por sub-responsabilidade dentro do domínio de importação.
 - `1.3` — 2026-08-30 — Criado `tests/test_code_quality.py` para verificar fronteiras das raízes, detectar cálculo financeiro residual e controlar crescimento de módulos acima do limite revisado.
 - `1.2` — 2026-08-30 — Spec incorporada ao vault e promovida para `implementado`, com pendências encerradas e referências às extrações arquiteturais concluídas.
 - `1.1` — 2026-08-30 — Adicionada a seção de ativação dos limites numéricos e da validação automatizada após as limpezas arquiteturais.
@@ -130,3 +132,4 @@ Os limites numéricos da seção "Sinais de alerta" são verificados pelo teste 
 - [[adr/0003-sqlite-fonte-de-verdade]]
 - [[specs/desconcentracao-arquitetura-v2]]
 - [[specs/frontend-modularizacao]]
+- [[specs/desacoplamento-importacao-parsers]]

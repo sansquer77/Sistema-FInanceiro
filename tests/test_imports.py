@@ -18,7 +18,8 @@ from financeiro.auth import create_user
 from financeiro.credit_cards import create_credit_card, create_credit_card_transaction
 from financeiro.database import get_connection, initialize_database
 from financeiro.database_schema import ensure_import_adjustments_schema
-from financeiro.imports import import_legacy_transactions, import_system_template, parse_xlsx_rows, preview_legacy_transactions, system_import_template
+from financeiro.import_parsers import parse_xlsx_rows
+from financeiro.imports import import_legacy_transactions, import_system_template, preview_legacy_transactions, system_import_template
 from financeiro.transactions import create_transaction
 
 

@@ -97,7 +97,7 @@ def download_anbima_xls(*, opener=urlopen) -> bytes:
 
 def parse_anbima_holidays(payload: bytes) -> list[tuple[str, str]]:
     # Import tardio evita acoplamento circular durante a inicialização do banco.
-    from financeiro.imports import parse_xls_rows
+    from financeiro.import_parsers import parse_xls_rows
 
     rows = parse_xls_rows(payload)
     holidays: dict[str, str] = {}
