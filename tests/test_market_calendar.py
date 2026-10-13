@@ -44,7 +44,7 @@ class MarketCalendarTest(unittest.TestCase):
             [Decimal("46023"), "quinta-feira", "Confraternização Universal"],
             ["nota", "", ""],
         ]
-        with mock.patch("financeiro.imports.parse_xls_rows", return_value=rows):
+        with mock.patch("financeiro.import_parsers.parse_xls_rows", return_value=rows):
             parsed = market_calendar.parse_anbima_holidays(b"xls")
         self.assertEqual(parsed, [("2026-01-01", "Confraternização Universal")])
 

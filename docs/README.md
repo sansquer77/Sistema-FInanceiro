@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 16.19
-atualizado: 2026-10-10
+versao: 16.27
+atualizado: 2026-10-11
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -58,9 +58,9 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[specs/preferencias-abas]] | ✅ implementado | Usuário |
 | [[specs/frontend-modularizacao]] | ✅ implementado | Frontend |
 | [[specs/bank-logos]] | ✅ implementado | Frontend |
-| [[specs/tendencias-saude-financeira]] | ✅ implementado | Diagnóstico |
+| [[specs/tendencias-saude-financeira]] | 🚧 em implementação | Diagnóstico |
 | [[specs/score-saude-financeira]] | ✅ implementado | Diagnóstico |
-| [[specs/consultor]] | ✅ implementado | Consultor |
+| [[specs/consultor]] | 🚧 em implementação | Consultor |
 | [[specs/privacidade-valores]] | ✅ implementado | Privacidade |
 | [[specs/alerta-nova-versao]] | ✅ implementado | Atualização |
 | [[specs/rentabilidade-portfolio]] | ✅ implementado | Investimentos |
@@ -72,6 +72,7 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[specs/manutencao-cache-cotacoes]] | ✅ implementado | Persistência |
 | [[specs/utilitarios-dominio]] | ✅ implementado | Arquitetura |
 | [[specs/desconcentracao-arquitetura-v2]] | ✅ implementado | Arquitetura v2 |
+| [[specs/desacoplamento-importacao-parsers]] | ✅ implementado | Arquitetura / Importação |
 | [[specs/alertas-cockpit]] | ✅ implementado | Cockpit |
 | [[specs/frontend-fundacao-v2]] | ✅ implementado | Frontend v2 |
 | [[specs/backup-restauracao]] | ✅ implementado | Backup e restauração |
@@ -113,6 +114,8 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[adr/0014-desconcentracao-fachadas-e-roteamento]] | Fachadas compatíveis, roteamento declarativo e responsabilidades internas menores na fundação v2. |
 | [[adr/0015-ssrf-ai-endpoints]] | Validação de endpoints configuráveis de IA contra SSRF, com opt-in por env para provedores locais. |
 | [[adr/0016-calendario-mercado-anbima]] | Calendário nacional ANBIMA persistido localmente como fonte única para dias úteis derivados de eventos B3. |
+| [[adr/0019-inferencia-local-webllm]] | Inferência local WebLLM compartilhada, com prioridade local/remota e fallback consentido. |
+| [[adr/0020-pesquisa-macro-consultor]] | Pesquisa macroeconômica web sem dados do usuário para enriquecer a Análise da Carteira. |
 | [[adr/0018-backup-completo-criptografado]] | Pacote completo de backup com container ZIP e payload criptografado autenticado, validado nos runtimes distribuídos. |
 
 ---
@@ -153,6 +156,18 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 O Sistema Financeiro é disponibilizado gratuitamente como projeto open source sob a **Apache License 2.0** (`Apache-2.0`). Consulte o arquivo [`LICENSE`](../LICENSE) na raiz do repositório.
 
 ## Changelog
+
+- `16.28` — 2026-10-12 — [[specs/desacoplamento-importacao-parsers]] v1.0 implementa a separação de `financeiro/imports.py` em `import_utils.py`, `import_parsers.py`, `import_ofx.py` e `import_templates.py`; [[specs/importacao-dados]] v1.17 e [[arquitetura]] v4.51 sincronizados.
+
+- `16.27` — 2026-10-11 — Remove o script inline de inicialização do `index.html` para `web/theme-init.js`, respeitando a CSP sem adicionar exceções; elimina a referência ao source map ausente do IMask para evitar erro 404 no console.
+- `16.26` — 2026-10-11 — [[specs/consultor]] v2.17 registra logging operacional seguro para diagnosticar falhas remotas sem expor dados financeiros ou conteúdo da IA.
+- `16.25` — 2026-10-11 — [[specs/consultor]] v2.16 especifica pesquisa macroeconômica remota sem dados do usuário para a Análise da Carteira; [[arquitetura]] v4.50 e [[requisitos]] v3.42 sincronizados; decisão registrada em [[adr/0020-pesquisa-macro-consultor]].
+- `16.24` — 2026-10-11 — [[specs/consultor]] v2.15 elimina disclaimers duplicados e instrui a IA a não exibir valores monetários internos em centavos.
+- `16.23` — 2026-10-11 — [[specs/consultor]] v2.14 permite recomendações educacionais de compra, veda recomendações de venda de ativos da carteira e atualiza o disclaimer.
+- `16.22` — 2026-10-10 — [[specs/consultor]] v2.5 e [[adr/0019-inferencia-local-webllm]] v0.4 registram os controles do modelo local no cache privado do navegador e o comportamento em instalações por servidor.
+- `16.21` — 2026-10-10 — [[specs/tendencias-saude-financeira]] v2.26 e [[specs/consultor]] v2.4 centralizam a política de IA para os dois recursos; arquitetura v4.48.
+
+- `16.20` — 2026-10-10 — [[specs/consultor]] v2.2 e [[adr/0019-inferencia-local-webllm]] iniciam a implantação da IA local WebLLM, com download no primeiro uso e prioridade local padrão.
 
 - `16.19` — 2026-10-10 — [[specs/importacao-dados]] v1.16 aprende correções de linhas ignoradas como duplicidades, após revalidação e sem escrita de lançamentos; arquitetura v4.46.
 - `16.18` — 2026-09-27 — [[specs/recuperacao-senha]] v1.2 e [[specs/alertas-cockpit]] v1.5 definem alerta persistente quando não há recuperação por e-mail utilizável.

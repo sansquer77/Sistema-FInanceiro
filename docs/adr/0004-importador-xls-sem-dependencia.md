@@ -2,8 +2,8 @@
 tipo: adr
 area: importacao
 status: implementado
-versao: 1.0
-atualizado: 2026-06-29
+versao: 1.1
+atualizado: 2026-10-12
 relacionados:
   - "[[specs/importacao-dados]]"
   - "[[arquitetura]]"
@@ -14,7 +14,7 @@ aliases: ["ADR-0004", "Parser XLS sem dependência"]
 # ADR-0004 — Parser `.xls` implementado sem dependência externa
 
 > [!info] Status
-> **implementado** · tipo: `adr` · atualizado em 2026-06-29
+> **implementado** · tipo: `adr` · versão: `1.1` · atualizado em 2026-10-12
 
 ## Contexto
 
@@ -22,7 +22,7 @@ A importação de arquivos externos legados requer leitura de arquivos `.xls` (f
 
 ## Decisão
 
-Implementar um **parser `.xls` mínimo internamente** em `financeiro/imports.py`, sem instalar `xlrd` ou qualquer outra biblioteca externa.
+Implementar um **parser `.xls` mínimo internamente**, sem instalar `xlrd` ou qualquer outra biblioteca externa. O parser vive em `financeiro/import_parsers.py` (extraído de `financeiro/imports.py` em 2026-10-12), mantendo a decisão de zero dependência externa.
 
 ## Consequências positivas
 
@@ -44,7 +44,13 @@ Implementar um **parser `.xls` mínimo internamente** em `financeiro/imports.py`
 | Exigir que o usuário converta para `.csv` antes | Piora a experiência; algumas exportações legadas vêm em `.xls` por padrão. |
 | `openpyxl` | Não lê `.xls` (apenas `.xlsx`); não resolve o problema. |
 
+## Changelog
+
+- `1.1` — 2026-10-12 — Atualizado o local do parser: após a refatoração documentada em [[specs/desacoplamento-importacao-parsers]], o parser `.xls` passou de `financeiro/imports.py` para `financeiro/import_parsers.py`; a decisão de zero dependência externa permanece inalterada.
+- `1.0` — 2026-06-29 — Decisão inicial registrada.
+
 ## Relacionados
 
 - [[specs/importacao-dados]]
+- [[specs/desacoplamento-importacao-parsers]]
 - [[arquitetura]]

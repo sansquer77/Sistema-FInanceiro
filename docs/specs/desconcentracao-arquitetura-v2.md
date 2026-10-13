@@ -2,14 +2,15 @@
 tipo: spec
 area: arquitetura-v2
 status: implementado
-versao: 2.3
-atualizado: 2026-08-31
+versao: 2.4
+atualizado: 2026-10-12
 relacionados:
   - "[[../arquitetura]]"
   - "[[../adr/0014-desconcentracao-fachadas-e-roteamento]]"
   - "[[investimentos-portfolio]]"
   - "[[frontend-modularizacao]]"
   - "[[../qualidade-codigo]]"
+  - "[[desacoplamento-importacao-parsers]]"
 tags: [spec, "area/arquitetura-v2", "status/implementado"]
 aliases: ["Desconcentração arquitetural da v2"]
 ---
@@ -17,7 +18,7 @@ aliases: ["Desconcentração arquitetural da v2"]
 # Desconcentração arquitetural da v2
 
 > [!info] Status
-> **implementado** · área: `arquitetura-v2` · atualizado em 2026-08-31 · relacionados: [[../arquitetura]], [[../adr/0014-desconcentracao-fachadas-e-roteamento]], [[investimentos-portfolio]], [[frontend-modularizacao]], [[../qualidade-codigo]]
+> **implementado** · área: `arquitetura-v2` · versão: `2.4` · atualizado em 2026-10-12 · relacionados: [[../arquitetura]], [[../adr/0014-desconcentracao-fachadas-e-roteamento]], [[investimentos-portfolio]], [[frontend-modularizacao]], [[../qualidade-codigo]], [[desacoplamento-importacao-parsers]]
 
 ## Problema
 
@@ -93,7 +94,7 @@ Usuários da v2 que precisam manter os fluxos e dados atuais estáveis enquanto 
 
 - `consultor.py`: extrações de histórico, provedor, contexto, configurações e catálogo concluídas. A fachada mantém composição, execução e pós-processamento; não há nova divisão prevista nesta etapa.
 - `database.py`: separar conexão/manutenção, baseline do schema e catálogo de migrações.
-- `imports.py`: separar parsers de formato, normalização e orquestração transacional.
+- `imports.py`: extração concluída — parsers de formatos tabulares (`import_parsers.py`), parser OFX (`import_ofx.py`), normalização compartilhada (`import_utils.py`) e geração de modelos (`import_templates.py`) foram separados da orquestração transacional (`imports.py`). Ver [[desacoplamento-importacao-parsers]].
 - `transactions.py` e `credit_cards.py`: avaliar se partes internas do serviço de projeções devem ser aproximadas desses domínios sem duplicar cálculos.
 - `web/app.js`: wrappers de views e o bloco legado de projeção financeira foram removidos; o arquivo permanece como composição do contrato backend.
 
@@ -127,6 +128,7 @@ Usuários da v2 que precisam manter os fluxos e dados atuais estáveis enquanto 
 
 ## Changelog
 
+- `2.4` — 2026-10-12 — Atualizada lista de candidatos auditados: `imports.py` marcado como extração concluída, com parsers e templates desacoplados em módulos especializados conforme [[desacoplamento-importacao-parsers]]. Nenhum critério de aceite alterado; sem incremento de versão do produto.
 - `2.3` — 2026-08-31 — Separadas valorização por data (`portfolio_valuation.py`) e rentabilidade histórica (`portfolio_returns.py`), preservando regras, contratos e caches locais; testes de fronteira adicionados. Aplicação de cotações de mercado/fundos continua na fachada.
 
 - `2.2` — 2026-08-31 — Transferidos transporte HTTP/JSON, caches de cotação/câmbio, persistência, locks, TTL, expurgo/LRU e fallback para `portfolio_quotes.py`. Fachada compatível e dependências injetadas sem ciclo. Testes de domínio, transporte/cache e fronteira transacional aprovados; sem incremento de produto. Retry SSL legado preservado e sinalizado no ADR-0014 para revisão própria.

@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: servidor
 status: implementado
-versao: 1.6
-atualizado: 2026-09-06
+versao: 1.8
+atualizado: 2026-10-10
 relacionados:
   - "[[sdd]]"
   - "[[arquitetura]]"
@@ -17,7 +17,7 @@ aliases: ["Servidor", "Server Setup", "Configuração do Servidor"]
 # Configuração do Servidor
 
 > [!info] Status
-> **implementado** · área: `servidor` · atualizado em 2026-09-06 · relacionados: [[sdd]], [[arquitetura]], [[distribuição]], [[specs/Update Server]], [[specs/seguranca-autenticacao]]
+> **implementado** · área: `servidor` · atualizado em 2026-10-10 · relacionados: [[sdd]], [[arquitetura]], [[distribuição]], [[specs/Update Server]], [[specs/seguranca-autenticacao]], [[adr/0019-inferencia-local-webllm]]
 
 Este documento descreve como instalar, configurar e manter o Sistema Financeiro rodando em um servidor Linux dedicado (`192.168.1.212`), acessível por `https://sistema-financeiro.net:8030`. Cobre variáveis de ambiente, systemd, Nginx com HTTPS, certificado SSL, configuração dos clientes e o processo `deploysf`.
 
@@ -338,6 +338,12 @@ sudo ufw status
 ```
 
 Não libere `8010/tcp`: essa porta é interna entre Nginx e Python. Se o servidor precisar ser acessível fora da LAN, a regra de firewall e a exposição no roteador exigem uma avaliação de segurança própria.
+
+### WebLLM nos clientes
+
+O WebLLM roda no navegador do cliente, não no processo Python nem no host Linux. O botão de preparo em Preferências baixa o modelo para o cache privado daquele perfil e origem. Assim, em um servidor compartilhado, cada navegador compatível faz seu próprio download uma única vez e o servidor não recebe pesos, não precisa de diretório adicional e não inclui o modelo em backups.
+
+O acesso externo deve usar HTTPS. O Nginx deve preservar os cabeçalhos enviados pelo backend, em especial `Cross-Origin-Opener-Policy`, `Cross-Origin-Embedder-Policy` e a `Content-Security-Policy`; não configure `add_header` com versões que os substituam. A CSP inclui `wasm-unsafe-eval`, estritamente para compilar o runtime WebAssembly do WebLLM; não substitua por `unsafe-eval`. Os clientes também precisam alcançar os hosts de distribuição permitidos pela CSP para baixar o modelo no primeiro preparo.
 
 ### O que cada diretiva faz
 
@@ -736,6 +742,8 @@ openssl x509 -in /etc/ssl/certs/sistema-financeiro.crt -noout -dates
 
 ## Changelog
 
+- `1.8` — 2026-10-10 — Documenta a preservação de `wasm-unsafe-eval` na CSP para que o WebLLM compile no navegador sem liberar `unsafe-eval` JavaScript.
+- `1.7` — 2026-10-10 — Documenta que o WebLLM baixa o modelo por perfil de navegador e que o proxy deve preservar os cabeçalhos de isolamento enviados pelo app.
 - `1.6` — 2026-09-06 — Eliminada a segunda chamada privilegiada de validação no cliente; o script remoto confirma o serviço e devolve o resultado ao `deploysf`.
 - `1.5` — 2026-09-06 — Scripts Mac e Linux passam a compartilhar exclusões, remover código obsoleto, propagar falhas e confirmar o serviço ativo; documentada a instalação da fonte versionada do `deploysf`.
 - `1.4` — 2026-09-06 — Explicitada a instalação manual inicial e recorrente do script remoto versionado, sem alterar o fluxo cotidiano do `deploysf`.

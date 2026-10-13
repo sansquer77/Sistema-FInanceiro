@@ -133,14 +133,7 @@ FX_MEMORY_CACHE = _quote_cache.fx_memory
 FX_MEMORY_CACHE_LOCK = _quote_cache.fx_lock
 
 
-def get_portfolio(user_id: int, force_refresh: bool = False) -> dict:
-    # spec: arquitetura-v2/desconcentracao-arquitetura-v2 v2.3 — critérios 12–14
-    with get_connection() as conn:
-        conn.execute("BEGIN")
-        inputs = positions_store.load_position_inputs(conn, user_id)
-        redemption_rows = positions_store.load_redemption_history(conn, user_id)
-
-    positions = assemble_portfolio_positions(inputs, user_id, force_refresh=force_refresh)
+def _apply_goal_links(positions: list[dict], user_id: int) -> None:
     # spec: objetivos-financeiros v0.21 — critério 36
     # A origem vinculada é canônica, mas a marca acompanha todos os lotes do ativo consolidado.
     from financeiro.financial_goals import FinancialGoalError, fetch_funding_source, investment_asset_identity
@@ -150,7 +143,7 @@ def get_portfolio(user_id: int, force_refresh: bool = False) -> dict:
             "SELECT source_type, source_id FROM financial_goal_funding_sources WHERE user_id = ?",
             (user_id,),
         ).fetchall()
-        linked_identities = set()
+        linked_identities: set[tuple] = set()
         for row in linked_rows:
             try:
                 source = fetch_funding_source(conn, user_id, row["source_type"], row["source_id"])
@@ -159,6 +152,17 @@ def get_portfolio(user_id: int, force_refresh: bool = False) -> dict:
             linked_identities.add(investment_asset_identity(source))
     for position in positions:
         position["goal_linked"] = investment_asset_identity(position) in linked_identities
+
+
+def get_portfolio(user_id: int, force_refresh: bool = False) -> dict:
+    # spec: arquitetura-v2/desconcentracao-arquitetura-v2 v2.3 — critérios 12–14
+    with get_connection() as conn:
+        conn.execute("BEGIN")
+        inputs = positions_store.load_position_inputs(conn, user_id)
+        redemption_rows = positions_store.load_redemption_history(conn, user_id)
+
+    positions = assemble_portfolio_positions(inputs, user_id, force_refresh=force_refresh)
+    _apply_goal_links(positions, user_id)
     closed_rows = sorted(inputs["closed"], key=lambda row: (row["closed_at"], row["id"]), reverse=True)
     result = {
         "positions": [format_quoted_position(position) for position in positions],
@@ -868,7 +872,9 @@ def prepare_portfolio_positions(user_id: int, force_refresh: bool = False) -> tu
     with get_connection() as conn:
         conn.execute("BEGIN")
         inputs = positions_store.load_position_inputs(conn, user_id)
-    return inputs, assemble_portfolio_positions(inputs, user_id, force_refresh=force_refresh)
+    positions = assemble_portfolio_positions(inputs, user_id, force_refresh=force_refresh)
+    _apply_goal_links(positions, user_id)
+    return inputs, positions
 
 
 def assemble_portfolio_positions(inputs: dict, user_id: int, force_refresh: bool = False) -> list[dict]:

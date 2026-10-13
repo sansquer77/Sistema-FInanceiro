@@ -135,12 +135,12 @@ def save_encrypted_config(config: dict, path: Path, key_path: Path | None = None
 
 
 def encrypt_json_for_storage(config: dict, key_path: Path | None = None) -> str:
-    # spec: consultor/consultor v2.1 - criterio 23
+    # spec: consultor/consultor v2.14 - criterio 23
     return json.dumps(encrypt_config_payload(config, key_path), indent=2, sort_keys=True)
 
 
 def decrypt_json_from_storage(payload_text: str, key_path: Path | None = None) -> dict:
-    # spec: consultor/consultor v2.1 - criterio 23
+    # spec: consultor/consultor v2.14 - criterio 23
     if not str(payload_text or "").strip():
         raise SecureConfigError("Configuracao criptografada nao encontrada.")
     try:
@@ -362,7 +362,7 @@ def save_ai_settings(user_id: int, data: dict) -> dict:
     elif auth_type == "none":
         delete_secure_config(user_id, "ai")
 
-    # spec: tendencias-saude-financeira v2.25 — critérios 17, 21, 23, 27 e 28
+    # spec: tendencias-saude-financeira v2.26 — critérios 17, 21, 23, 27 e 28
     with database.get_connection() as conn:
         conn.execute(
             """

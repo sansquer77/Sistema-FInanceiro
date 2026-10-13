@@ -696,13 +696,10 @@ export function registerTransactionsView({
       : `${escapeHtml(transaction.account_name)}${destination}`;
     const typeLabel = isExchangeTransfer(transaction) ? "Câmbio" : isInvestmentTransaction(transaction) ? "Investimento" : transactionTypeLabel(transaction.type);
     const isReconciled = Boolean(transaction.reconciled_at);
-    const convertedAmount = transaction.account_currency === "BRL" ? "" : `
-          <span>${formatMoney(transaction.amount_brl, "BRL")}</span>
-        `;
     const destinationConvertedAmount = isExchangeTransfer(transaction) ? `
           <span>+${formatMoney(transaction.destination_amount, transaction.destination_account_currency)}</span>
         ` : "";
-    const conversionDetails = isDestinationView ? convertedAmount : `${destinationConvertedAmount}${convertedAmount}`;
+    const conversionDetails = isDestinationView ? "" : destinationConvertedAmount;
     return `
       <article class="transaction-row ${signal} ${String(transaction.id) === state.transactionHighlightId ? "recently-saved" : ""}" data-rendered-transaction-id="${transaction.id}">
         <div>

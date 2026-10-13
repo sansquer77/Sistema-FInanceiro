@@ -4667,6 +4667,20 @@ padding: 8px 16px;
   margin-inline-start: auto;
 }
 
+.local-model-controls {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-subtle);
+}
+
+.local-model-controls h3,
+.local-model-controls p {
+  margin: 0;
+}
+
 .field-validation {
   display: block;
   width: 100%;

@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 4.46
-atualizado: 2026-10-10
+versao: 4.51
+atualizado: 2026-10-12
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -19,7 +19,7 @@ tags: [arquitetura, meta]
 # Arquitetura
 
 > [!info] Status
-> **implementado** · versão: `4.41` · área: `meta` · atualizado em 2026-10-05 · relacionados: [[requisitos]], [[qualidade-codigo]], [[specs/emprestimos-quitacao]], [[specs/backup-restauracao]], [[specs/alertas-cockpit]]
+> **implementado** · versão: `4.51` · área: `meta` · atualizado em 2026-10-12 · relacionados: [[requisitos]], [[qualidade-codigo]], [[specs/consultor]], [[specs/tendencias-saude-financeira]], [[adr/0019-inferencia-local-webllm]], [[adr/0020-pesquisa-macro-consultor]], [[specs/desacoplamento-importacao-parsers]]
 
 ## Visão geral
 
@@ -40,7 +40,7 @@ O servidor HTTP revalida arquivos estáticos com `ETag` e `Last-Modified`; arqui
 
 As fronteiras de responsabilidade e os sinais de alerta para crescimento de módulos estão consolidados em [[qualidade-codigo]]. Além da revisão manual, `tests/test_code_quality.py` aplica um gate automatizado aos limites e às fronteiras arquiteturais verificáveis.
 
-O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Cockpit > Consultor**. Em Preferências, o usuário configura a IA geral, ativa o Consultor, aceita o consentimento de acesso aos dados e pode preencher/remover o Perfil Complementar criptografado. No Cockpit, a aba Consultor exibe os indicadores de atrasos/vencimentos, a subaba **Análises** com catálogo fechado de 9 análises em seletor (incluindo o card `evolucao_score_tempo` com seletor de 6/12 meses), botão único **Gerar** e a subaba **Histórico** com filtro textual. O módulo não possui prompt livre: cada execução envia apenas o contexto minimizado da análise escolhida e persiste somente respostas bem-sucedidas. Os cards de alocação e carteira também recebem agregados de metas/recursos comprometidos e empréstimos por moeda; o card de vencimentos acrescenta saldos correntes, lançamentos futuros registrados e faturas abertas por data e moeda.
+O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Cockpit > Consultor**. Em Preferências, o usuário ativa o Consultor, escolhe a prioridade local/remota, configura opcionalmente o provedor remoto, pode preparar/remover o modelo WebLLM e pode preencher/remover o Perfil Complementar criptografado. No Cockpit, a aba Consultor exibe os indicadores de atrasos/vencimentos, a subaba **Análises** com catálogo fechado de 9 análises em seletor (incluindo o card `evolucao_score_tempo` com seletor de 6/12 meses), botão único **Gerar** e a subaba **Histórico** com filtro textual. A prioridade padrão executa WebLLM no navegador e baixa o modelo uma vez; o fallback para provedor externo exige configuração e consentimento prévios. O cache do modelo pertence ao perfil e origem do navegador, portanto não ocupa espaço no host que serve o app. O módulo não possui prompt livre: o backend monta apenas o contexto minimizado da análise escolhida, e recebe de volta a saída local para aplicar os mesmos guardrails e persistir somente respostas bem-sucedidas. Na `analise_carteira`, se a política central permitir uso remoto, o backend pode executar antes uma pesquisa web nativa do provedor remoto com tópico macroeconômico fixo e sem contexto do usuário; o resumo datado e as fontes entram no prompt da carteira antes da inferência local ou remota, e a interface exibe as fontes retornadas como links HTTPS. Provedores customizados/locais sem busca web compatível e falhas na pesquisa seguem sem enriquecimento, sem impedir a análise.
 
 ---
 
@@ -113,6 +113,7 @@ Os assets normalizados do catálogo ficam em `web/assets/banks/` e `web/assets/b
 | `operation-history-view.js` | Histórico de Operações: filtros, busca, agrupamentos e paginação. |
 | `simulations-view.js` | Efeito Borboleta: abas Receitas/Despesas e Empréstimos; formulários e renderização dos estudos calculados pelo backend. |
 | `load-policy.js` | Política compartilhada de cache curto, invalidação, chave contextual e deduplicação de requisições em andamento. |
+| `webllm-client.js` / `webllm-worker.js` | Cliente e worker WebLLM: verificam, preparam e removem o cache do modelo do perfil do navegador, e executam inferência local sem transferir pesos ao servidor. |
 | `transaction-slice-loader.js` | Coordena lançamentos/projeção por conta+mês com até quatro snapshots recentes e requisições independentes por chave; revisão invalida respostas anteriores a mutações/logout. |
 | `transaction-reconciliation.js` | Aplica a resposta confirmada à lista imediatamente, protege clique duplicado e recarrega saldos sem aguardar Cockpit ou histórico global. |
 | `transaction-refresh.js` | Confirmação imediata de salvar/excluir, recarga prioritária da fatia e atualização auxiliar de contas/histórico protegida por revisão e sessão. Cockpit é invalidado para a próxima entrada. |
@@ -323,7 +324,10 @@ As projeções são calculadas em centavos por `financial_goals.py`. O saldo res
 | `GET` | `/api/financial-health-trends?month=AAAA-MM` |
 | `GET` | `/api/ai-settings` |
 | `PUT` | `/api/ai-settings` |
+| `GET` | `/api/ai-execution-settings` |
+| `PUT` | `/api/ai-execution-settings` |
 | `POST` | `/api/financial-health-trends/ai-summary` |
+| `POST` | `/api/financial-health-trends/prepare-local-summary` |
 
 #### Rotas — Consultor → [[specs/consultor]]
 
@@ -335,6 +339,8 @@ As projeções são calculadas em centavos por `financial_goals.py`. O saldo res
 | `POST` | `/api/consultor/perfil-complementar` |
 | `DELETE` | `/api/consultor/perfil-complementar` |
 | `POST` | `/api/consultor/analyze` |
+| `POST` | `/api/consultor/prepare-local` |
+| `POST` | `/api/consultor/complete-local` |
 | `GET` | `/api/consultor/history` |
 | `DELETE` | `/api/consultor/history` |
 
@@ -434,7 +440,11 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | `consultor_provider.py` | Mensagens minimizadas, payloads dos provedores e transporte HTTP; dependências injetáveis e erros traduzidos pela fachada. Valida o endpoint via `ai_endpoint_security` e bloqueia redirecionamentos. Sem acesso ao SQLite. |
 | `consultor_context.py` | Builders dos nove contextos, agregação e compactação dos dados e formatação monetária de borda; reutiliza serviços de domínio e posições recebidas. Inclui compromissos de objetivos/empréstimos e linha do tempo de 90 dias por moeda para faturas abertas e lançamentos futuros em contas de liquidez/carteira digital, mantendo contas de investimento separadas. Não acessa configuração, histórico ou transporte de IA. |
 | `consultor_history.py` | Persistência/listagem/expurgo das análises, quota diária e cooldown de falhas, isolados do executor e da configuração. Ver [[specs/consultor]]. |
-| `imports.py` | Leitura, prévia e importação de arquivos externos legados e planilhas modelo. Ver [[importacao-dados]]. |
+| `imports.py` | Orquestração do fluxo de importação: prévia, validação, deduplicação, aprendizado de ajustes e persistência de arquivos externos legados e planilhas modelo. Ver [[importacao-dados]], [[desacoplamento-importacao-parsers]]. |
+| `import_utils.py` | Utilitários puros compartilhados pela importação: normalização de chave, data, valor monetário e exceção `ImportError`. |
+| `import_parsers.py` | Leitura de formatos tabulares (`.xls`, `.xlsx`, `.csv`) e helpers de cabeçalho/célula. Sem acesso ao banco. Ver [[importacao-dados]], [[desacoplamento-importacao-parsers]]. |
+| `import_ofx.py` | Leitura de extratos `.ofx`/`.qfx`. Sem acesso ao banco. Ver [[importacao-dados]], [[desacoplamento-importacao-parsers]]. |
+| `import_templates.py` | Geração de modelos `.xlsx` do sistema. Sem acesso ao banco. Ver [[importacao-dados]], [[desacoplamento-importacao-parsers]]. |
 | `import_adjustments.py` | Aprendizado local de correções importadas ou explicitamente ignoradas como duplicidade, isolado por usuário, conta/cartão, descrição original normalizada e tipo. |
 | `xlsx_security.py` | Fronteira defensiva dos pacotes XLSX: valida o contêiner ZIP, limita expansão e compressão, normaliza caminhos internos e faz leituras limitadas antes do parsing XML, sem persistência. Ver [[importacao-dados]]. |
 | `operation_logs.py` | Auditoria funcional das operações do usuário. Ver [[historico-operacoes]]. |
@@ -501,9 +511,10 @@ O baseline inicial da v2 usa `PRAGMA user_version = 20000`; o endurecimento oper
 | `market_holidays` | `market_calendar.py` — calendário nacional ANBIMA atual, sem histórico de versões. Ver [[investimentos-portfolio]], [[adr/0016-calendario-mercado-anbima]]. |
 | `market_calendar_state` | `market_calendar.py` — controle da fonte, última tentativa/importação, ano verificado, hash e quantidade de feriados. |
 | `user_ai_settings` | `secure_config.py` — metadados não secretos de configuração opcional de IA por usuário; segredo fica em `secure_configs`. Ver [[tendencias-saude-financeira]]. |
+| `ai_execution_settings` | `ai_execution.py` — política compartilhada por usuário: prioridade local/remota, consentimento de transporte remoto e ordem efetiva com fallback determinístico. |
 | `secure_configs` | `secure_config.py` — envelopes criptografados por usuário para SMTP, IA, Mais Retorno e senha lembrada do backup; `source_path` indica arquivo legado migrado quando aplicável. Ver [[specs/preferencias-abas]], [[adr/0010-segredos-criptografados-sqlite]]. |
 | `backup_settings` | `backup_settings.py` — política única da instalação, usuário responsável, frequência, retenção e estado da última execução; nunca contém senha em claro. |
-| `consultor_settings` | `database.py` — configuração do Consultor por usuário (`consultor_enabled`, `investor_profile`, `data_access_consent`). Ver [[specs/consultor]]. |
+| `consultor_settings` | `consultor_settings.py` — configuração do Consultor por usuário (`consultor_enabled`, `investor_profile`); a política de IA fica em `ai_execution_settings`. Ver [[specs/consultor]]. |
 | `consultor_analyses` | `database.py` — histórico de execuções bem-sucedidas do Consultor, indexado por usuário, data e `analysis_id` para leitura e quota diária. Ver [[specs/consultor]]. |
 | `consultor_perfil_complementar` | `database.py` — payload criptografado do Perfil Complementar por usuário (`payload_enc`, `schema_version`). Ver [[specs/consultor]]. |
 | `notification_reads` | `database.py` — registro de leitura de informativos do Cockpit por usuário (`user_id`, `notification_id`, `seen_at`). Ver [[specs/alertas-cockpit]]. |
@@ -648,12 +659,13 @@ Ver [[relatorios]], [[limites-gastos]], [[specs/cockpit-calendario]], [[specs/al
 
 ### Importação de Arquivos
 
-1. `imports.py` lê arquivos externos (`.xls`/`.csv`/`.ofx`/`.qfx`) e modelos `.xlsx` do sistema, exibindo prévia seletiva antes de persistir.
-2. A revisão valida categorias/subcategorias existentes e compatíveis com o tipo; tags existentes podem ser sugeridas e tags novas podem ser criadas pelo usuário.
-3. Ajustes confirmados de descrição/classificação são aprendidos por usuário e instrumento em `import_adjustments`, tanto em importações bem-sucedidas quanto em linhas explicitamente ignoradas após revalidar a duplicidade; ignorar não altera lançamentos.
-4. A prévia identifica duplicatas apenas por igualdade de instrumento, tipo, data, valor, categoria e subcategoria. O usuário pode ignorar ou substituir descrição/classificação/tags/observações do candidato; múltiplos candidatos exigem seleção. A confirmação revalida o candidato na transação de importação e não altera os campos que identificam a duplicidade.
-5. A consulta dinâmica de candidatos é feita nas rotas existentes de importação por meio do modo `duplicate_check`, sem novo endpoint nem conciliação automática.
-6. A confirmação retorna os detalhes de todas as linhas importadas e ignoradas; o frontend apresenta cada resultado em uma linha compacta e mantém os motivos de descarte sem limite de 50 itens.
+1. `import_parsers.py` lê formatos tabulares (`.xls`, `.xlsx`, `.csv`); `import_ofx.py` lê `.ofx`/`.qfx`; `import_templates.py` gera modelos `.xlsx` do sistema.
+2. `imports.py` orquestra a prévia seletiva, validação, deduplicação, aprendizado de ajustes e persistência, usando os parsers e o gerador de templates como dependências puras.
+3. A revisão valida categorias/subcategorias existentes e compatíveis com o tipo; tags existentes podem ser sugeridas e tags novas podem ser criadas pelo usuário.
+4. Ajustes confirmados de descrição/classificação são aprendidos por usuário e instrumento em `import_adjustments`, tanto em importações bem-sucedidas quanto em linhas explicitamente ignoradas após revalidar a duplicidade; ignorar não altera lançamentos.
+5. A prévia identifica duplicatas apenas por igualdade de instrumento, tipo, data, valor, categoria e subcategoria. O usuário pode ignorar ou substituir descrição/classificação/tags/observações do candidato; múltiplos candidatos exigem seleção. A confirmação revalida o candidato na transação de importação e não altera os campos que identificam a duplicidade.
+6. A consulta dinâmica de candidatos é feita nas rotas existentes de importação por meio do modo `duplicate_check`, sem novo endpoint nem conciliação automática.
+7. A confirmação retorna os detalhes de todas as linhas importadas e ignoradas; o frontend apresenta cada resultado em uma linha compacta e mantém os motivos de descarte sem limite de 50 itens.
 
 Ver [[importacao-dados]].
 
@@ -694,6 +706,12 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 - [[adr/0014-desconcentracao-fachadas-e-roteamento]] — Fachadas compatíveis, roteamento declarativo e módulos internos menores para a fundação v2.
 
 ## Changelog
+
+- `4.50` — 2026-10-11 — Documenta a pesquisa web macroeconômica sem dados do usuário, restrita à preparação de Análise da Carteira e condicionada à política de IA.
+
+- `4.49` — 2026-10-10 — Documenta os controles de preparo, estado e remoção do modelo WebLLM no cache do navegador; instalações por servidor não armazenam nem compartilham pesos.
+- `4.48` — 2026-10-10 — Centraliza em `ai_execution.py` a política de IA local/remota/determinística, consumida por Consultor e Tendências; adiciona rotas de preferência e preparo local de Tendências.
+- `4.47` — 2026-10-10 — Documenta a implantação em andamento da inferência local WebLLM no Consultor, suas rotas de preparação/conclusão e a prioridade local/remota por usuário. Ver [[specs/consultor]] e [[adr/0019-inferencia-local-webllm]].
 
 - `4.46` — 2026-10-10 — Documenta aprendizado de correções em duplicidades ignoradas, com revalidação e sem escrita financeira.
 - `4.45` — 2026-10-05 — Documenta retorno integral e apresentação compacta das linhas importadas e ignoradas.
@@ -764,6 +782,8 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 - `3.86` — 2026-09-03 — Adicionada fronteira `financeiro/ai_endpoint_security.py` para proteger endpoints configuráveis de IA contra SSRF, com DNS pinning, validação da URL final e variáveis de ambiente `AI_ALLOW_PRIVATE_ENDPOINTS`, `AI_ALLOWED_LOCAL_HOSTS` e `AI_ALLOWED_LOCAL_ENDPOINTS` para operadores.
 
 - `3.85` — 2026-09-03 — Transporte externo passa a falhar fechado em erros TLS de cotações e centraliza leitura JSON limitada para cotações, PTAX, IA, Consultor e versão.
+
+- `4.51` — 2026-10-12 — `financeiro/imports.py` desacoplado em `import_utils.py`, `import_parsers.py` (XLS/XLSX/CSV), `import_ofx.py` e `import_templates.py`; `imports.py` mantém a orquestração do pipeline e reexports compatíveis. Ver [[specs/desacoplamento-importacao-parsers]].
 
 - `3.84` — 2026-09-03 — Lançamentos de Cartões carregam apenas a fatura ativa e cinco totais mensais agregados por `credit_card_invoice.py`; o relatório mensal de tags separa o SQL com competência para preservar o uso dos índices temporais.
 

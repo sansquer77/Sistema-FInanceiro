@@ -58,7 +58,7 @@ import {
 import { applyTheme, setTheme, storedTheme, toggleTheme } from "./modules/theme-utils.js";
 import { applyDensity, setDensity, storedDensity, toggleDensity } from "./modules/density-utils.js";
 import { registerAuthView } from "./modules/auth-view.js";
-import { registerUserAdminView } from "./modules/user-admin-view.js";
+import { registerUserAdminView } from "./modules/user-admin-view.js?v=175";
 import { registerClassificationsView } from "./modules/classifications-view.js";
 import { registerLimitsView } from "./modules/limits-view.js";
 import { registerReportsView } from "./modules/reports-view.js";
@@ -353,10 +353,14 @@ const aiConfigTimeout = document.querySelector("#aiConfigTimeout");
 const aiConfigTemperature = document.querySelector("#aiConfigTemperature");
 const aiConfigMaxTokens = document.querySelector("#aiConfigMaxTokens");
 const aiConfigMessage = document.querySelector("#aiConfigMessage");
+const aiLocalModelStatus = document.querySelector("#aiLocalModelStatus");
+const aiLocalModelDownload = document.querySelector("#aiLocalModelDownload");
+const aiLocalModelClear = document.querySelector("#aiLocalModelClear");
 const userPrefTabs = document.querySelector(".user-pref-tabs");
 const consultorConfigForm = document.querySelector("#consultorConfigForm");
 const consultorEnabled = document.querySelector("#consultorEnabled");
 const consultorInvestorProfile = document.querySelector("#consultorInvestorProfile");
+const consultorExecutionPriority = document.querySelector("#consultorExecutionPriority");
 const consultorConfigMessage = document.querySelector("#consultorConfigMessage");
 const consultorProfileForm = document.querySelector("#consultorProfileForm");
 const consultorProfileAge = document.querySelector("#consultorProfileAge");
@@ -1431,9 +1435,13 @@ const userAdminViewController = registerUserAdminView({
     aiConfigTimeout,
     aiConfigTemperature,
     aiConfigMaxTokens,
+    aiLocalModelStatus,
+    aiLocalModelDownload,
+    aiLocalModelClear,
     consultorConfigForm,
     consultorEnabled,
     consultorInvestorProfile,
+    consultorExecutionPriority,
     consultorConfigMessage,
     consultorProfileForm,
     consultorProfileAge,

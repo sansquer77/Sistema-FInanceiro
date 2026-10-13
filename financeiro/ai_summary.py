@@ -18,6 +18,7 @@ from financeiro.secure_config import (
     ai_settings_status,
     load_ai_settings,
 )
+from financeiro.ai_execution import get_ai_execution_settings
 
 MAX_SUMMARY_TOKENS = 700
 DEFAULT_TEMPERATURE = 0.2
@@ -36,17 +37,20 @@ SYSTEM_PROMPT = (
 
 def generate_ai_summary(user_id: int, trends_payload: dict) -> str | None:
     """
-    spec: tendencias-saude-financeira v2.25 — critérios 12, 13, 14, 16 e 17
+    spec: tendencias-saude-financeira v2.26 — critérios 12, 13, 14, 16 e 17
     Reescreve o resumo local com IA, usando payload minimizado, timeout curto e
     fallback imediato para None quando a IA estiver indisponível ou retornar conteúdo inválido.
     """
+    execution = get_ai_execution_settings(user_id)
+    if "remota" not in execution["order"]:
+        return None
     settings = ai_settings_status(user_id)
     if not settings["enabled"] or not settings["configured"]:
         return None
 
     api_key = ""
     if settings["has_api_key"]:
-        # spec: tendencias-saude-financeira v2.25 — critério 28
+        # spec: tendencias-saude-financeira v2.26 — critério 28
         # O segredo nunca deve transitar na API; aqui é usado apenas para a requisição externa.
         full = load_ai_settings(user_id)
         api_key = str(full.get("api_key") or "").strip()
@@ -71,7 +75,7 @@ def generate_ai_summary(user_id: int, trends_payload: dict) -> str | None:
         method="POST",
     )
 
-    # spec: tendencias-saude-financeira v2.25 — critério 16
+    # spec: tendencias-saude-financeira v2.26 — critério 16
     # Nenhuma chamada de IA pode manter conexão SQLite aberta durante a requisição externa.
     # (a conexão já foi fechada antes de chamar esta função)
     timeout = int(settings.get("timeout_seconds") or SUMMARY_TIMEOUT_SECONDS)
@@ -82,6 +86,22 @@ def generate_ai_summary(user_id: int, trends_payload: dict) -> str | None:
         return None
 
     return extract_summary_text(payload, provider=str(settings.get("provider") or "custom"))
+
+
+def prepare_local_summary(user_id: int, trends_payload: dict) -> dict:
+    """Entrega ao worker somente o prompt fechado e o recorte já minimizado."""
+    execution = get_ai_execution_settings(user_id)
+    if "local" not in execution["order"]:
+        return {"available": False}
+    return {
+        "available": True,
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": json.dumps(minimize_trends_payload(trends_payload), ensure_ascii=False)},
+        ],
+        "temperature": DEFAULT_TEMPERATURE,
+        "max_tokens": MAX_SUMMARY_TOKENS,
+    }
 
 
 def ai_ssl_context() -> ssl.SSLContext:
@@ -99,7 +119,7 @@ def build_ai_request(settings: dict, api_key: str, minimized_payload: dict) -> d
     temperature = float(settings.get("temperature") or DEFAULT_TEMPERATURE)
     max_tokens = int(settings.get("max_tokens") or MAX_SUMMARY_TOKENS)
     if provider == "google":
-        # spec: tendencias-saude-financeira v2.25 — critérios 12, 24 e 32
+        # spec: tendencias-saude-financeira v2.26 — critérios 12, 24 e 32
         # Google/Gemini não usa o contrato OpenAI-compatible; usa generateContent.
         gemini_model = model.removeprefix("models/")
         headers = {"Content-Type": "application/json"}
@@ -123,7 +143,7 @@ def build_ai_request(settings: dict, api_key: str, minimized_payload: dict) -> d
             },
         }
     if provider == "anthropic":
-        # spec: tendencias-saude-financeira v2.25 — critérios 12, 24 e 32
+        # spec: tendencias-saude-financeira v2.26 — critérios 12, 24 e 32
         # Anthropic/Claude usa a Messages API nativa, não Chat Completions.
         headers = {
             "Content-Type": "application/json",

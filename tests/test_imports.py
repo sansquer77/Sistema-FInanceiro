@@ -12,12 +12,14 @@ from unittest import mock
 from financeiro import database
 from financeiro import xlsx_security
 import financeiro.imports as imports_module
+from financeiro import import_parsers as import_parsers_module
 from financeiro.accounts import create_checking_account
 from financeiro.auth import create_user
 from financeiro.credit_cards import create_credit_card, create_credit_card_transaction
 from financeiro.database import get_connection, initialize_database
 from financeiro.database_schema import ensure_import_adjustments_schema
-from financeiro.imports import import_legacy_transactions, import_system_template, parse_xlsx_rows, preview_legacy_transactions, system_import_template
+from financeiro.import_parsers import parse_xlsx_rows
+from financeiro.imports import import_legacy_transactions, import_system_template, preview_legacy_transactions, system_import_template
 from financeiro.transactions import create_transaction
 
 
@@ -1142,12 +1144,12 @@ CHARSET:1252
 
     def test_xlsx_rejects_rows_cells_and_distant_columns(self) -> None:
         rows_workbook = imports_module.create_xlsx_workbook([("Lançamentos", [["data"], ["1"], ["2"]])])
-        with mock.patch.object(imports_module, "MAX_XLSX_ROWS", 2):
+        with mock.patch.object(import_parsers_module, "MAX_XLSX_ROWS", 2):
             with self.assertRaisesRegex(imports_module.ImportError, "limites seguros"):
                 parse_xlsx_rows(rows_workbook, "Lançamentos")
 
         cells_workbook = imports_module.create_xlsx_workbook([("Lançamentos", [["a", "b", "c", "d"]])])
-        with mock.patch.object(imports_module, "MAX_XLSX_CELLS", 3):
+        with mock.patch.object(import_parsers_module, "MAX_XLSX_CELLS", 3):
             with self.assertRaisesRegex(imports_module.ImportError, "limites seguros"):
                 parse_xlsx_rows(cells_workbook, "Lançamentos")
 
@@ -1165,9 +1167,9 @@ CHARSET:1252
             archive.writestr("xl/sharedStrings.xml", shared_strings)
         with zipfile.ZipFile(BytesIO(output.getvalue())) as archive:
             xlsx_security.validate_xlsx_archive(archive)
-            with mock.patch.object(imports_module, "MAX_XLSX_SHARED_STRINGS", 1):
+            with mock.patch.object(import_parsers_module, "MAX_XLSX_SHARED_STRINGS", 1):
                 with self.assertRaisesRegex(imports_module.ImportError, "limites seguros"):
-                    imports_module.xlsx_shared_strings(archive)
+                    import_parsers_module.xlsx_shared_strings(archive)
 
 
 if __name__ == "__main__":

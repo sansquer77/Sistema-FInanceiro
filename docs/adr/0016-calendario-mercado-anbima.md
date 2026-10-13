@@ -2,8 +2,8 @@
 tipo: adr
 area: investimentos
 status: implementado
-versao: 1.0
-atualizado: 2026-09-04
+versao: 1.1
+atualizado: 2026-10-12
 relacionados:
   - "[[../specs/investimentos-portfolio]]"
   - "[[../arquitetura]]"
@@ -16,7 +16,7 @@ aliases: ["ADR-0016", "Calendário ANBIMA"]
 # ADR-0016 — Calendário nacional ANBIMA persistido localmente
 
 > [!info] Status
-> **implementado** · área: `investimentos` · atualizado em 2026-09-04 · relacionados: [[../specs/investimentos-portfolio]], [[0003-sqlite-fonte-de-verdade]], [[0004-importador-xls-sem-dependencia]]
+> **implementado** · área: `investimentos` · versão: `1.1` · atualizado em 2026-10-12 · relacionados: [[../specs/investimentos-portfolio]], [[0003-sqlite-fonte-de-verdade]], [[0004-importador-xls-sem-dependencia]]
 
 ## Problema
 
@@ -28,7 +28,7 @@ Usar exclusivamente a planilha nacional publicada pela ANBIMA como calendário o
 
 - baixar o XLS oficial na primeira inicialização do aplicativo;
 - validar TLS, `Content-Length`, tamanho efetivamente lido e estrutura XLS;
-- reutilizar o parser BIFF/OLE interno, sem dependência externa;
+- reutilizar o parser BIFF/OLE interno de `financeiro/import_parsers.py` (anteriormente em `financeiro/imports.py`), sem dependência externa;
 - substituir os registros em uma transação somente depois da validação completa;
 - persistir apenas o calendário vigente, sem histórico de arquivos;
 - verificar atualização no máximo uma vez por ano e não repetir falha mais de uma vez no mesmo dia;
@@ -68,7 +68,8 @@ Usar exclusivamente a planilha nacional publicada pela ANBIMA como calendário o
 
 ## Changelog
 
-- `1.0` — 2026-09-04 — Adotada a planilha ANBIMA como fonte única, local e atualizável do calendário nacional usado na derivação de datas de eventos B3.
+- `1.1` — 2026-10-12 — Atualizado o local do parser XLS reutilizado: `financeiro/market_calendar.py` agora importa `parse_xls_rows` de `financeiro/import_parsers.py` após a refatoração documentada em [[../specs/desacoplamento-importacao-parsers]]. A decisão de reutilizar o parser interno sem dependência externa permanece inalterada.
+- `1.0` — 2026-09-04 — Adotada a planilha ANBIMA como fonte única, local e atualizável do calendário nacional usada na derivação de datas de eventos B3.
 
 ## Relacionados
 

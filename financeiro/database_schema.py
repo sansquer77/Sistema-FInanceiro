@@ -563,12 +563,24 @@ CREATE TABLE IF NOT EXISTS backup_settings (
 
 
 CONSULTOR_TABLES_SQL = """
+CREATE TABLE IF NOT EXISTS ai_execution_settings (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    execution_priority TEXT NOT NULL DEFAULT 'local_primeiro'
+        CHECK (execution_priority IN ('local_primeiro', 'remota_primeiro', 'somente_local', 'somente_remota')),
+    data_access_consent INTEGER NOT NULL DEFAULT 0 CHECK (data_access_consent IN (0, 1)),
+    consented_at TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS consultor_settings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     consultor_enabled INTEGER NOT NULL DEFAULT 0 CHECK (consultor_enabled IN (0, 1)),
     investor_profile TEXT NOT NULL DEFAULT 'moderado' CHECK (investor_profile IN ('conservador', 'moderado', 'arrojado')),
     data_access_consent INTEGER NOT NULL DEFAULT 0 CHECK (data_access_consent IN (0, 1)),
+    execution_priority TEXT NOT NULL DEFAULT 'local_primeiro'
+        CHECK (execution_priority IN ('local_primeiro', 'remota_primeiro', 'somente_local', 'somente_remota')),
     consented_at TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -960,7 +972,29 @@ def create_baseline_schema(conn: sqlite3.Connection) -> None:
     """Apply the canonical v2 baseline schema to an empty connection."""
     create_baseline_tables(conn)
     ensure_import_adjustments_schema(conn)
+    ensure_consultor_settings_schema(conn)
+    ensure_ai_execution_settings_schema(conn)
     create_baseline_indexes(conn)
+
+
+def ensure_consultor_settings_schema(conn: sqlite3.Connection) -> None:
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(consultor_settings)").fetchall()}
+    if "execution_priority" not in columns:
+        conn.execute(
+            "ALTER TABLE consultor_settings ADD COLUMN execution_priority TEXT NOT NULL DEFAULT 'local_primeiro' "
+            "CHECK (execution_priority IN ('local_primeiro', 'remota_primeiro', 'somente_local', 'somente_remota'))"
+        )
+
+
+def ensure_ai_execution_settings_schema(conn: sqlite3.Connection) -> None:
+    """Preserva a preferência do Consultor ao migrá-la para a política compartilhada."""
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO ai_execution_settings (user_id, execution_priority, data_access_consent, consented_at)
+        SELECT user_id, execution_priority, data_access_consent, consented_at
+        FROM consultor_settings
+        """
+    )
 
 
 def ensure_import_adjustments_schema(conn: sqlite3.Connection) -> None:

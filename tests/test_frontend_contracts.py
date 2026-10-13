@@ -690,12 +690,13 @@ class FrontendModuleContractTest(unittest.TestCase):
 
     def test_density_preference_is_local_persistent_and_layout_safe(self) -> None:
         index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        theme_init = (WEB_ROOT / "theme-init.js").read_text(encoding="utf-8")
         app_source = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
         styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
         density_utils = (MODULE_ROOT / "density-utils.js").read_text(encoding="utf-8")
         user_admin = (MODULE_ROOT / "user-admin-view.js").read_text(encoding="utf-8")
 
-        self.assertIn('localStorage.getItem("sistemaFinanceiro.density")', index)
+        self.assertIn('localStorage.getItem("sistemaFinanceiro.density")', theme_init)
         self.assertIn('id="densityPreference"', index)
         self.assertIn('data-density-option="comfortable"', index)
         self.assertIn('data-density-option="compact"', index)
