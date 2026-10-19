@@ -516,6 +516,31 @@ class IdorProtectionTest(IsolatedDatabaseTest):
         self.assertEqual([(row["month"], row["limit_amount"]) for row in june_limits], [("2026-06", "500.00")])
         self.assertEqual([(row["month"], row["limit_amount"]) for row in july_limits], [("2026-07", "750.00")])
 
+    def test_editing_an_inherited_limit_does_not_overwrite_another_future_category_limit(self) -> None:
+        user = create_user("Alice", "alice@example.com", "strong-password")
+        food = create_category(user["id"], "Alimentacao", "expense")
+        travel = create_category(user["id"], "Viagem", "expense")
+        inherited = create_spending_limit(user["id"], {
+            "month": "2026-06", "category_id": str(food["id"]), "limit_amount": "500,00", "notes": "Comida",
+        })
+        existing_future = create_spending_limit(user["id"], {
+            "month": "2026-07", "category_id": str(travel["id"]), "limit_amount": "900,00", "notes": "Ferias",
+        })
+
+        with self.assertRaises(SpendingLimitError) as conflict:
+            update_spending_limit(user["id"], str(inherited["id"]), {
+                "month": "2026-07", "category_id": str(travel["id"]),
+                "limit_amount": "750,00", "notes": "Comida",
+            })
+
+        self.assertEqual(conflict.exception.status, HTTPStatus.CONFLICT)
+        july_limits = list_spending_limits(user["id"], "2026-07")
+        self.assertEqual(len(july_limits), 2)
+        travel_limit = next(row for row in july_limits if row["category_id"] == travel["id"])
+        self.assertEqual(travel_limit["id"], existing_future["id"])
+        self.assertEqual(travel_limit["limit_amount"], "900.00")
+        self.assertEqual(travel_limit["notes"], "Ferias")
+
     def test_future_limit_definition_remains_effective_in_following_months(self) -> None:
         user = create_user("Alice", "alice@example.com", "strong-password")
         category = create_category(user["id"], "Restaurantes", "expense")

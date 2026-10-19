@@ -79,7 +79,7 @@ def list_spending_limits_with_consumption(user_id: int, month: object | None) ->
         return limits
     month_start = f"{normalized_month}-01"
     month_end = f"{normalized_month}-31"
-    # spec: limites/limites-gastos v1.6 — consumo independe das listas mensais
+    # spec: limites/limites-gastos v1.10 — consumo independe das listas mensais
     # residentes no frontend e exclui o débito agregado de pagamentos de fatura.
     with get_connection() as conn:
         rows = conn.execute(
@@ -188,7 +188,7 @@ def update_spending_limit(user_id: int, limit_id: str, data: dict) -> dict:
         if not current:
             raise SpendingLimitError("Limite nao encontrado.", HTTPStatus.NOT_FOUND)
 
-        # spec: limites/limites-gastos v1.9 — editar um limite herdado em um
+        # spec: limites/limites-gastos v1.10 — editar um limite herdado em um
         # mês posterior cria a nova vigência sem mover a definição histórica.
         if spending_limit["month"] > current["month"]:
             existing_future = fetch_existing_limit(
@@ -199,9 +199,11 @@ def update_spending_limit(user_id: int, limit_id: str, data: dict) -> dict:
                 spending_limit["subcategory_id"],
             )
             if existing_future:
-                row = update_limit_row(conn, user_id, existing_future["id"], spending_limit)
-            else:
-                row = insert_limit_row(conn, user_id, spending_limit)
+                raise SpendingLimitError(
+                    "Ja existe um limite independente para esta categoria e mes. Edite esse limite separadamente.",
+                    HTTPStatus.CONFLICT,
+                )
+            row = insert_limit_row(conn, user_id, spending_limit)
         else:
             row = update_limit_row(conn, user_id, normalized_id, spending_limit)
     return format_spending_limit(row)
@@ -374,7 +376,7 @@ def normalize_optional_id(value: object) -> int | None:
 
 
 def format_spending_limit(spending_limit: dict) -> dict:
-    # spec: limites/limites-gastos v1.6 — mantém limit_amount_cents para consumidores
+    # spec: limites/limites-gastos v1.10 — mantém limit_amount_cents para consumidores
     # internos (ex.: alertas do cockpit) além do limit_amount legível na interface.
     spending_limit["limit_amount"] = cents_to_money(spending_limit["limit_amount_cents"])
     return spending_limit
