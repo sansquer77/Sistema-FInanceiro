@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 16.32
+versao: 16.33
 atualizado: 2026-10-19
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -157,6 +157,7 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `16.33` — 2026-10-19 — [[specs/limites-gastos]] v1.10 impede sobrescrever definição futura independente ao editar limite herdado para outra categoria.
 - `16.32` — 2026-10-19 — [[specs/seguranca-autenticacao]] v1.8 e [[arquitetura]] v4.53 passam a exigir `Cache-Control: no-store` e `Pragma: no-cache` nas respostas JSON da API.
 - `16.31` — 2026-10-18 — [[specs/objetivos-financeiros]] v0.23 define e implementa o status de ritmo pela necessidade de aporte atual contra o plano original, com atenção até 20%.
 - `16.30` — 2026-10-18 — Sincroniza o inventário frontend em [[specs/frontend-modularizacao]] v4.35, corrige metadados de specs e registra [[arquitetura]] v4.52 com as mudanças atuais em Limites e Objetivos.

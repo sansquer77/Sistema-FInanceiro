@@ -2,7 +2,7 @@
 tipo: spec
 area: limites
 status: implementado
-versao: 1.9
+versao: 1.10
 atualizado: 2026-10-18
 relacionados:
   - "[[categorias-tags-gestao]]"
@@ -17,7 +17,7 @@ aliases: ["Limites de Gastos", "Budgets", "Metas"]
 # Limites de Gastos
 
 > [!info] Status
-> **implementado** · versão: `1.9` · área: `limites` · atualizado em 2026-10-18 · relacionados: [[categorias-tags-gestao]], [[cartoes]], [[relatorios]], [[alertas-cockpit]]
+> **implementado** · versão: `1.10` · área: `limites` · atualizado em 2026-10-19 · relacionados: [[categorias-tags-gestao]], [[cartoes]], [[relatorios]], [[alertas-cockpit]]
 
 ## Problema
 
@@ -50,6 +50,7 @@ Qualquer usuário autenticado localmente que queira controlar seu orçamento de 
 - Um limite definido em um mês continua vigente nos meses seguintes até ser substituído por uma definição mais recente para a mesma categoria/subcategoria.
 - Ao consultar um mês, o sistema usa o limite mais recente com `month <= mês consultado`.
 - Criar um limite para um mês posterior funciona como reajuste recorrente a partir daquele mês, sem apagar o histórico do limite anterior.
+- Ao editar um limite herdado para outra categoria/subcategoria em um mês posterior, se já houver uma definição para a nova identidade nesse mês, a operação retorna conflito e preserva ambas as definições existentes; a outra definição deve ser editada separadamente.
 - O consumo considera despesas em contas pelo mês da data do lançamento.
 - O consumo considera despesas em cartões pela fatura aberta do mês (`invoice_month`), mesmo quando a data da compra pertence ao mês anterior. Ver [[cartoes]].
 - Pagamentos de fatura não removem o consumo do limite — o limite mede competência/gasto da fatura, não a quitação.
@@ -82,6 +83,7 @@ Tabelas: `spending_limits`, `categories`, `subcategories`.
 - Dado o usuário visualizando o seletor mensal de Limites, quando o mês é exibido, então o rótulo usa o formato `MM/AAAA`.
 - Dado o usuário navegando entre competências de Limites, quando o mês muda, então cada limite apresenta o consumo daquele mês mesmo que nenhuma lista detalhada dessa competência esteja carregada no navegador.
 - Dado o usuário criando ou ajustando um limite, quando o formulário é exibido, então o mês de início da vigência aparece como campo editável e é enviado como a competência da definição.
+- Dado um limite herdado de uma categoria e uma definição futura existente para outra categoria, quando a edição tenta transferir o limite herdado para a identidade e mês já ocupados, então a API retorna conflito sem alterar valor, observações ou identidade do registro futuro.
 
 ## Changelog
 
@@ -92,6 +94,7 @@ Tabelas: `spending_limits`, `categories`, `subcategories`.
 
 ## Changelog
 
+- `1.10` — 2026-10-19 — Impede que a edição de um limite herdado sobrescreva uma definição futura independente de outra categoria/subcategoria; retorna conflito para edição explícita do registro existente.
 - `1.9` — 2026-10-18 — Reforçada a regressão que mantém a definição futura vigente nos meses seguintes até novo reajuste.
 - `1.8` — 2026-10-18 — Alterar o mês no formulário não recarrega nem limpa a edição; o novo mês é aplicado somente ao salvar.
 
