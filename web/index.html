@@ -1440,7 +1440,9 @@
               <h2 id="limitFormTitle">Novo limite</h2>
               <form id="limitForm" class="form">
                 <input type="hidden" name="id">
-                <input type="hidden" name="month" id="limitMonthInput">
+                <label>Vigência a partir de
+                  <input name="month" id="limitMonthInput" type="month" required>
+                </label>
                 <label>Categoria
                   <select name="category_id" id="limitCategory" required></select>
                 </label>

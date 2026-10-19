@@ -2,8 +2,8 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 4.34
-atualizado: 2026-10-11
+versao: 4.35
+atualizado: 2026-10-18
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
   - "[[arquitetura]]"
@@ -15,7 +15,7 @@ aliases: ["Modularização Frontend", "ES Modules"]
 # Modularização do Frontend
 
 > [!info] Status
-> **implementado** · área: `frontend` · atualizado em 2026-09-25 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]], [[../qualidade-codigo]]
+> **implementado** · versão: `4.35` · área: `frontend` · atualizado em 2026-10-18 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]], [[../qualidade-codigo]]
 
 ## Problema
 
@@ -53,6 +53,11 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `density-utils.js` | Preferência visual local de densidade e aplicação de `data-density` no documento. |
 | `overlay-utils.js` | Semântica, foco e teclado compartilhados por drawers e overlays persistentes. |
 | `data-ux.js` | Ordenação local, contagem de linhas e chips removíveis para tabelas e filtros. |
+| `portfolio-chart.js` | Renderização e ciclo de vida do gráfico de rentabilidade do Portfólio. |
+| `portfolio-grouping.js` | Identidade estável de agrupamentos visuais de posições, sem cálculo de consolidação. |
+| `portfolio-preview.js` | Coordenação das prévias no servidor e descarte de respostas obsoletas antes da confirmação. |
+| `portfolio-form.js` | Normalização dos payloads de formulários e ações de posição no Portfólio. |
+| `portfolio-events.js` | Consulta, cache de sessão e apresentação sob demanda de eventos históricos do Portfólio. |
 | `virtual-list.js` | Janela visível com overscan para coleções extensas de altura fixa; usado em Lançamentos, Relatórios, Portfólio, Faturas e Histórico de Operações. |
 | `asset-autocomplete.js` | Sugestões de ativos existentes por `datalist`, preenchimento de metadados e preservação da digitação livre. |
 | `instructions-content.js` | Conteúdo estático, offline e versionado da central de ajuda. |
@@ -347,6 +352,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Changelog
 
+- `4.35` — 2026-10-18 — Inventaria explicitamente os módulos do Portfólio usados pelo app e cobertos pelos contratos frontend.
 - `4.34` — 2026-10-11 — Inventariados `webllm-client.js` e `webllm-worker.js` como módulos utilitários da inferência local; documentada a origem de `theme-init.js` para inicialização de tema/privacidade/densidade sem script inline.
 - `4.33` — 2026-09-25 — Inventariado `loans-view.js` entre as views funcionais, registrando sua responsabilidade de apresentação e integração sem regras financeiras no navegador.
 - `4.32` — 2026-09-04 — Barra do Histórico de Operações ganhou distribuição responsiva; abas de Relatórios atualizam `aria-labelledby` conforme a seleção; Sobre ganhou grade de leitura mais equilibrada.

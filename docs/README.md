@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 16.27
-atualizado: 2026-10-11
+versao: 16.32
+atualizado: 2026-10-19
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -157,6 +157,10 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `16.32` — 2026-10-19 — [[specs/seguranca-autenticacao]] v1.8 e [[arquitetura]] v4.53 passam a exigir `Cache-Control: no-store` e `Pragma: no-cache` nas respostas JSON da API.
+- `16.31` — 2026-10-18 — [[specs/objetivos-financeiros]] v0.23 define e implementa o status de ritmo pela necessidade de aporte atual contra o plano original, com atenção até 20%.
+- `16.30` — 2026-10-18 — Sincroniza o inventário frontend em [[specs/frontend-modularizacao]] v4.35, corrige metadados de specs e registra [[arquitetura]] v4.52 com as mudanças atuais em Limites e Objetivos.
+- `16.29` — 2026-10-18 — [[specs/objetivos-financeiros]] v0.22 mantém aportes iguais nos cenários, destaca o valor planejado e confirma o uso do saldo presente dos investimentos vinculados no aporte sugerido.
 - `16.28` — 2026-10-12 — [[specs/desacoplamento-importacao-parsers]] v1.0 implementa a separação de `financeiro/imports.py` em `import_utils.py`, `import_parsers.py`, `import_ofx.py` e `import_templates.py`; [[specs/importacao-dados]] v1.17 e [[arquitetura]] v4.51 sincronizados.
 
 - `16.27` — 2026-10-11 — Remove o script inline de inicialização do `index.html` para `web/theme-init.js`, respeitando a CSP sem adicionar exceções; elimina a referência ao source map ausente do IMask para evitar erro 404 no console.

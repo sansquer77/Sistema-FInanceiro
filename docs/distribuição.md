@@ -3,7 +3,7 @@ tipo: spec
 area: distribuicao
 status: implementado
 versao: 2.8
-atualizado: 2026-09-06
+atualizado: 2026-10-18
 relacionados:
   - "[[sdd]]"
   - "[[templates/spec-template|Template de spec]]"
@@ -16,7 +16,7 @@ aliases: ["Distribuicao", "Pacotes de Distribuicao", "Instalador macOS", "Instal
 # Distribuicao
 
 > [!info] Status
-> **implementado** · versão: `2.7` · área: `distribuicao` · atualizado em 2026-09-05 · relacionados: [[sdd]], [[arquitetura]], [[requisitos]], [[specs/backup-restauracao]]
+> **implementado** · versão: `2.8` · área: `distribuicao` · atualizado em 2026-10-18 · relacionados: [[sdd]], [[arquitetura]], [[requisitos]], [[specs/backup-restauracao]]
 
 ## Problema
 

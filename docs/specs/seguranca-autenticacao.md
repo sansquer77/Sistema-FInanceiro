@@ -2,8 +2,8 @@
 tipo: spec
 area: seguranca
 status: implementado
-versao: 1.7
-atualizado: 2026-10-10
+versao: 1.8
+atualizado: 2026-10-19
 relacionados:
   - "[[recuperacao-senha]]"
   - "[[adr/0005-smtp-criptografado-local]]"
@@ -15,7 +15,7 @@ aliases: ["Segurança", "Autenticação"]
 # Segurança de Autenticação
 
 > [!info] Status
-> **implementado** · área: `seguranca` · atualizado em 2026-10-10 · relacionados: [[recuperacao-senha]], [[arquitetura]], [[adr/0019-inferencia-local-webllm]]
+> **implementado** · área: `seguranca` · atualizado em 2026-10-19 · relacionados: [[recuperacao-senha]], [[arquitetura]], [[adr/0019-inferencia-local-webllm]]
 
 ## Problema
 
@@ -68,6 +68,7 @@ Usuários locais do Sistema Financeiro que protegem dados financeiros sensíveis
 - Hosts adicionais podem ser definidos em `APP_ALLOWED_HOSTS` como CSV; valores sem porta também aceitam `APP_PORT`.
 - Origens adicionais podem ser definidas em `APP_ALLOWED_ORIGINS` como CSV; valores sem esquema assumem `http://` e valores sem porta assumem `APP_PORT`.
 - Respostas JSON e arquivos estáticos enviam headers defensivos:
+  - Respostas JSON enviam `Cache-Control: no-store` e `Pragma: no-cache`, evitando retenção de dados da API após logout.
   - `Content-Security-Policy` restritivo, permitindo scripts e imagens apenas de origens controladas; exceção explícita para o widget voluntário de contribuição no `Buy Me a Coffee` (`https://cdnjs.buymeacoffee.com` e `https://cdn.buymeacoffee.com`). `script-src` permite somente `wasm-unsafe-eval` adicional para compilar o runtime WebAssembly vendorizado do WebLLM; `unsafe-eval` para JavaScript continua proibido.
   - `X-Content-Type-Options: nosniff`
   - `Referrer-Policy: same-origin`
@@ -100,6 +101,7 @@ Rotas afetadas:
 - Dado um host/origem de LAN configurado por `APP_ALLOWED_HOSTS`/`APP_ALLOWED_ORIGINS`, quando uma mutação vem dessa origem, a validação aceita a requisição.
 - Dado um navegador compatível que prepara o WebLLM, quando o runtime WebAssembly é criado, então a CSP permite `wasm-unsafe-eval` sem liberar `unsafe-eval` para JavaScript.
 - Dado qualquer resposta JSON ou arquivo estático, quando entregue, os headers defensivos estão presentes.
+- Dada qualquer resposta JSON da API, quando entregue, então contém `Cache-Control: no-store` e `Pragma: no-cache`.
 - Dado tentativas de alterar recursos de outro usuário, quando feitas, retornam `404`.
 - Dado um token de sessão emitido, quando o banco é consultado, somente seu hash está armazenado.
 - Dada uma troca ou recuperação de senha, quando qualquer sessão anterior é reutilizada, ela não autentica.
@@ -117,6 +119,7 @@ Rotas afetadas:
 
 ## Changelog
 
+- `1.8` — 2026-10-19 — Respostas JSON da API passam a exigir `Cache-Control: no-store` e `Pragma: no-cache` para impedir retenção de dados sensíveis após logout.
 - `1.7` — 2026-10-10 — Libera exclusivamente `wasm-unsafe-eval` na CSP para a compilação local do runtime WebLLM, mantendo `unsafe-eval` bloqueado.
 - `1.6` — 2026-09-01 — Cadastro público passa a reservar orçamento persistente por origem, limitando cinco tentativas em 60 minutos antes da criação do usuário; abusos inválidos também consomem a janela.
 - `1.5` — 2026-08-30 — CSP ajustado para permitir o widget voluntário de contribuição do Buy Me a Coffee (`cdnjs.buymeacoffee.com` para scripts e `cdn.buymeacoffee.com` para imagens).

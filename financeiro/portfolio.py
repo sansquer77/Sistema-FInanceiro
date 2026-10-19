@@ -134,7 +134,7 @@ FX_MEMORY_CACHE_LOCK = _quote_cache.fx_lock
 
 
 def _apply_goal_links(positions: list[dict], user_id: int) -> None:
-    # spec: objetivos-financeiros v0.21 — critério 36
+    # spec: objetivos-financeiros v0.23 — critério 36
     # A origem vinculada é canônica, mas a marca acompanha todos os lotes do ativo consolidado.
     from financeiro.financial_goals import FinancialGoalError, fetch_funding_source, investment_asset_identity
 

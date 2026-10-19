@@ -55,7 +55,7 @@ def list_financial_goals(
 
 def financial_goals_overview(user_id: int) -> dict:
     """Build the goals tab payload from one shared portfolio snapshot."""
-    # spec: objetivos-financeiros v0.21 — critério 36
+    # spec: objetivos-financeiros v0.23 — critério 36
     from financeiro.portfolio import current_portfolio_positions
 
     positions = current_portfolio_positions(user_id, force_refresh=False)
@@ -179,7 +179,7 @@ def create_goal_movement(user_id: int, goal_id: object, data: dict) -> dict:
 
 def reset_annual_provision(user_id: int, goal_id: object) -> dict:
     """Start a new annual cycle while preserving the complete movement ledger."""
-    # spec: objetivos-financeiros v0.21 — critérios 41 a 44
+    # spec: objetivos-financeiros v0.23 — critérios 41 a 44
     normalized_id = normalize_item_id(goal_id, "Objetivo nao encontrado.")
     today = date.today()
     from financeiro.portfolio import current_portfolio_positions
@@ -290,7 +290,7 @@ def link_goal_funding_source(user_id: int, goal_id: object, data: dict) -> dict:
         members = matching_investment_sources(conn, user_id, identity)
         if not members:
             raise FinancialGoalError("Investimento nao encontrado na carteira.", HTTPStatus.NOT_FOUND)
-        # spec: objetivos-financeiros v0.21 — critérios 29 a 32
+        # spec: objetivos-financeiros v0.23 — critérios 29 a 32
         if any(member.get("emergency_reserve_eligible") for member in members):
             raise FinancialGoalError(
                 "Este investimento compoe a Reserva de Emergencia e nao pode financiar outro objetivo."
@@ -339,7 +339,7 @@ def unlink_goal_funding_source(user_id: int, goal_id: object, link_id: object) -
 
 def ensure_not_linked_to_financial_goal(conn, user_id: int, source_type: str, source_id: int) -> None:
     """Impede que uma fonte alocada seja reaproveitada na Reserva de Emergência."""
-    # spec: objetivos-financeiros v0.21 — critérios 31 e 32
+    # spec: objetivos-financeiros v0.23 — critérios 31 e 32
     source = fetch_funding_source(conn, user_id, source_type, source_id)
     identity = investment_asset_identity(source)
     rows = conn.execute(
@@ -513,7 +513,7 @@ def format_funding_source(link: dict, source: dict) -> dict:
 
 
 def hydrate_goal(goal: dict, sources: list[dict], user_id: int, positions: list[dict] | None = None) -> dict:
-    # spec: objetivos-financeiros v0.21 — critério 30
+    # spec: objetivos-financeiros v0.23 — critério 30
     manual_balance_cents = int(goal.get("reserved_balance_cents") or 0)
     sources = enrich_funding_source_values(sources, user_id, positions)
     linked_balance_cents = sum(int(source.get("current_value_brl_cents") or 0) for source in sources)
@@ -542,7 +542,7 @@ def enrich_funding_source_values(
             for position in positions
             if investment_asset_identity(position) == identity
         )
-        # spec: objetivos-financeiros v0.21 — critérios 42 e 43; saldo é conferido na moeda original.
+        # spec: objetivos-financeiros v0.23 — critérios 42 e 43; saldo é conferido na moeda original.
         source["has_balance"] = any(
             int(position.get("current_value_cents") or 0) > 0
             for position in positions
@@ -694,21 +694,20 @@ def format_goal(goal: dict) -> dict:
 
 def build_goal_projection(goal: dict, reserved: int, effective_target: int, months: int) -> dict:
     """Build conservative and yield scenarios without changing the reserved balance."""
-    # spec: objetivos-financeiros v0.21 — critérios 7, 8, 9, 11, 27, 28 e 30
+    # spec: objetivos-financeiros v0.23 — critérios 7, 8, 9, 11, 27, 28 e 30
     remaining = max(effective_target - reserved, 0)
     conservative_monthly = (remaining + months - 1) // months if months > 0 else remaining
     conservative_contributions = remaining
     annual_rate, rate_label = projection_annual_rate(goal)
+    # spec: objetivos-financeiros v0.23 — critérios 51 e 52
+    # Os dois cenários usam os mesmos aportes; o rendimento estima o saldo final, não reduz o plano.
+    yield_contributions = conservative_contributions
     if months <= 0 or annual_rate <= 0 or remaining <= 0:
-        yield_contributions = conservative_contributions
         projected_yield = 0
     else:
         monthly_factor = (Decimal("1") + annual_rate) ** (Decimal("1") / Decimal("12"))
         reserved_future = Decimal(reserved) * (monthly_factor ** months)
         annuity_factor = sum((monthly_factor ** period for period in range(1, months + 1)), Decimal("0"))
-        required = max(Decimal(effective_target) - reserved_future, Decimal("0"))
-        yield_monthly = int((required / annuity_factor).quantize(Decimal("1"), rounding=ROUND_HALF_UP)) if annuity_factor else 0
-        yield_contributions = max(yield_monthly, 0) * months
         projected_total = reserved_future + Decimal(yield_contributions) / Decimal(months) * annuity_factor if months else reserved_future
         projected_yield = max(int(projected_total.quantize(Decimal("1"), rounding=ROUND_HALF_UP)) - reserved - yield_contributions, 0)
     yield_total = reserved + yield_contributions + projected_yield
@@ -756,14 +755,30 @@ def format_movement(movement: dict) -> dict:
 
 
 def calculate_pace_status(goal: dict, reserved: int, effective_target: int) -> str:
+    # spec: objetivos-financeiros v0.23 — critérios 54 a 57
     if goal.get("status") == "paused":
         return "paused"
     if reserved >= effective_target:
         return "completed"
     target_date = goal.get("target_date")
-    if target_date and target_date < date.today().isoformat():
+    today = date.today()
+    if target_date and target_date < today.isoformat():
         return "overdue"
-    return "on_track"
+    if not target_date:
+        return "on_track"
+
+    total_months = contribution_months(goal.get("start_date"), target_date)
+    remaining_months = contribution_months(today.isoformat(), target_date)
+    if total_months <= 0 or remaining_months <= 0:
+        return "late"
+
+    planned_monthly = (effective_target + total_months - 1) // total_months
+    required_monthly = (max(effective_target - reserved, 0) + remaining_months - 1) // remaining_months
+    if required_monthly <= planned_monthly:
+        return "on_track"
+    if required_monthly * 100 <= planned_monthly * 120:
+        return "attention"
+    return "late"
 
 
 def contribution_months(start_value: str | None, target_value: str | None) -> int:
