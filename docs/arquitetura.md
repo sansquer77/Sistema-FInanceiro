@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 4.51
-atualizado: 2026-10-12
+versao: 4.53
+atualizado: 2026-10-19
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -19,7 +19,7 @@ tags: [arquitetura, meta]
 # Arquitetura
 
 > [!info] Status
-> **implementado** · versão: `4.51` · área: `meta` · atualizado em 2026-10-12 · relacionados: [[requisitos]], [[qualidade-codigo]], [[specs/consultor]], [[specs/tendencias-saude-financeira]], [[adr/0019-inferencia-local-webllm]], [[adr/0020-pesquisa-macro-consultor]], [[specs/desacoplamento-importacao-parsers]]
+> **implementado** · versão: `4.53` · área: `meta` · atualizado em 2026-10-19 · relacionados: [[requisitos]], [[qualidade-codigo]], [[specs/consultor]], [[specs/tendencias-saude-financeira]], [[adr/0019-inferencia-local-webllm]], [[adr/0020-pesquisa-macro-consultor]], [[specs/desacoplamento-importacao-parsers]]
 
 ## Visão geral
 
@@ -36,7 +36,7 @@ secure/             Chave mestra local de segredos criptografados (não versiona
 docs/               Requisitos, arquitetura, specs e referências
 ```
 
-O servidor HTTP revalida arquivos estáticos com `ETag` e `Last-Modified`; arquivos não versionados usam `Cache-Control: no-cache` para permitir `304 Not Modified` sem cache agressivo. Respostas JSON acima de 1 KB podem ser comprimidas com gzip quando o cliente envia `Accept-Encoding: gzip`.
+O servidor HTTP revalida arquivos estáticos com `ETag` e `Last-Modified`; arquivos não versionados usam `Cache-Control: no-cache` para permitir `304 Not Modified` sem cache agressivo. Respostas JSON da API usam `Cache-Control: no-store` e `Pragma: no-cache`; acima de 1 KB podem ser comprimidas com gzip quando o cliente envia `Accept-Encoding: gzip`.
 
 As fronteiras de responsabilidade e os sinais de alerta para crescimento de módulos estão consolidados em [[qualidade-codigo]]. Além da revisão manual, `tests/test_code_quality.py` aplica um gate automatizado aos limites e às fronteiras arquiteturais verificáveis.
 
@@ -91,7 +91,7 @@ Os assets normalizados do catálogo ficam em `web/assets/banks/` e `web/assets/b
 | `auth-view.js` | Login, cadastro, logout e recuperação de senha. |
 | `user-admin-view.js` | Preferências de usuário, tema, SMTP, IA, Mais Retorno, ativação/perfil do Consultor, limpeza e exclusão. |
 | `classifications-view.js` | Categorias, subcategorias e tags. |
-| `limits-view.js` | Limites de gastos; aba Objetivos com Reserva de Emergência, atualização manual, cobertura e comparação ApexCharts entre projeções conservadora e com rendimento. |
+| `limits-view.js` | Limites de gastos; mês inicial de vigência editável e atualização recorrente sem apagar o histórico; aba Objetivos com Reserva de Emergência, atualização manual, cobertura e comparação ApexCharts com linha do valor planejado e cenários conservador/com rendimento usando os mesmos aportes. |
 | `reports-view.js` | Fachada compatível e coordenação de Relatórios: compõe subviews uma vez, delega demonstrativo/evolução e monta rankings extensos diretamente pela janela virtual, com detalhe sob demanda. |
 | `report-statement.js` | Controles, consulta assíncrona, estados e apresentação imprimível do demonstrativo; consome agregações Python sem regra financeira local. |
 | `report-evolution.js` | Drawer, consulta, formatação e ciclo de vida do ApexCharts da evolução; descarta respostas obsoletas, destrói instância ao fechar e não calcula SMA/fallback. |
@@ -707,6 +707,9 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `4.53` — 2026-10-19 — Documenta os headers `Cache-Control: no-store` e `Pragma: no-cache` aplicados às respostas JSON da API.
+- `4.52` — 2026-10-18 — Atualiza a arquitetura da view de Limites/Objetivos e sincroniza a versão com as specs revisadas de frontend, limites e objetivos.
+- `4.51` — 2026-10-12 — Documentada a separação de `financeiro/imports.py` em `import_utils.py`, `import_parsers.py`, `import_ofx.py` e `import_templates.py`.
 - `4.50` — 2026-10-11 — Documenta a pesquisa web macroeconômica sem dados do usuário, restrita à preparação de Análise da Carteira e condicionada à política de IA.
 
 - `4.49` — 2026-10-10 — Documenta os controles de preparo, estado e remoção do modelo WebLLM no cache do navegador; instalações por servidor não armazenam nem compartilham pesos.

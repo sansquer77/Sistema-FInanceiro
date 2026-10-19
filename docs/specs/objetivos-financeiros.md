@@ -2,8 +2,8 @@
 tipo: spec
 area: objetivos-financeiros
 status: implementado
-versao: 0.21
-atualizado: 2026-09-27
+versao: 0.23
+atualizado: 2026-10-18
 relacionados:
   - "[[limites-gastos]]"
   - "[[investimentos-portfolio]]"
@@ -18,7 +18,7 @@ aliases: ["Objetivos Financeiros", "Fundos de Provisão", "Cofrinhos"]
 # Objetivos Financeiros e Fundos de Provisão
 
 > [!info] Status
-> **implementado** · versão: `0.21` · área: `objetivos-financeiros` · atualizado em 2026-09-27 · relacionados: [[limites-gastos]], [[investimentos-portfolio]], [[score-saude-financeira]], [[cockpit-calendario]], [[historico-operacoes]]
+> **implementado** · versão: `0.23` · área: `objetivos-financeiros` · atualizado em 2026-10-18 · relacionados: [[limites-gastos]], [[investimentos-portfolio]], [[score-saude-financeira]], [[cockpit-calendario]], [[historico-operacoes]]
 
 ## Problema
 
@@ -125,6 +125,8 @@ Um vínculo de cobertura representa o ativo financeiro inteiro na carteira selec
 - A margem de segurança aumenta somente o alvo efetivo de cálculo, sem alterar o valor nominal informado pelo usuário.
 - O gráfico de projeção apenas apresenta valores calculados pelo núcleo Python; o frontend não recalcula juros, aportes ou cobertura.
 - O cenário conservador desconsidera rendimento. O cenário com rendimento preserva os mesmos aportes futuros e apresenta o rendimento potencial separadamente, sem incorporá-lo ao saldo manual.
+- O comparativo mantém iguais os aportes futuros nos dois cenários. O cenário com rendimento projeta o saldo final estimado com essa mesma cadência de aportes; o aporte mensal sugerido continua conservador e não é reduzido pelo rendimento estimado.
+- O gráfico mostra uma linha de referência no valor planejado efetivo e informa que o rendimento é uma estimativa calculada com a taxa e os dados disponíveis na data de referência.
 
 ### Reserva de Emergência e exclusividade
 
@@ -144,9 +146,13 @@ Um vínculo de cobertura representa o ativo financeiro inteiro na carteira selec
 - `completed`: saldo reservado igual ou superior ao alvo efetivo.
 - `overdue`: data desejada passou e o objetivo não foi concluído.
 - `paused`: objetivo explicitamente suspenso; não cobra aporte enquanto pausado.
-- `on_track`: saldo atual e aportes futuros recomendados permitem alcançar o alvo na data.
-- `attention`: existe insuficiência recuperável com aumento de até 20% sobre o aporte planejado atual.
-- `late`: exige aumento superior a 20% ou aporte imediato para atingir o alvo.
+- Para objetivos com data, o aporte planejado de referência é o alvo efetivo dividido pelos meses entre `start_date` e `target_date`, contando ambos os meses.
+- O aporte mensal necessário é o valor restante atual dividido pelos meses entre o mês atual e o prazo, contando ambos os meses; o arredondamento é para cima em centavos.
+- `on_track`: o aporte mensal necessário não supera o aporte planejado de referência.
+- `attention`: o aporte mensal necessário supera o planejado em até 20%, inclusive.
+- `late`: o aporte mensal necessário supera o planejado em mais de 20%.
+- `continuous_reserve` sem data permanece em andamento (`on_track`) enquanto não atingir o alvo; não há prazo para comparar com o plano original.
+- O cálculo do ritmo é conservador e não desconta rendimento projetado. Saldo atual de investimentos vinculados integra o saldo reservado utilizado no cálculo.
 - Estados e projeções são recalculados automaticamente após movimentação, alteração do objetivo ou atualização das referências financeiras.
 
 ## API e dados
@@ -227,6 +233,13 @@ As tabelas devem ser criadas pela migração incremental idempotente do schema v
 48. Dado um card de objetivo em coluna estreita, quando o gráfico de projeção é aberto, então textos, rótulos, legenda e SVG permanecem contidos na largura disponível, sem vazamento horizontal. Verificação visual manual.
 49. Dado o indicador circular de progresso, quando exibido no card, então mostra apenas o percentual no centro, sem o rótulo redundante “atendido”.
 50. Dado o painel de Objetivos em uma área útil estreita, mesmo com viewport amplo, quando exibido, então KPIs, reserva e cards reorganizam suas colunas com base na largura disponível do painel sem gerar rolagem horizontal. Verificação visual manual.
+51. Dado um objetivo com rendimento configurado, quando os cenários são calculados, então ambos usam o mesmo total de aportes futuros, e o cenário com rendimento apresenta o rendimento estimado sem reduzir o aporte mensal conservador.
+52. Dado o gráfico de projeção, quando exibido, então apresenta uma linha identificada pelo valor planejado e informa que o rendimento é estimado com base na referência atual. Verificação visual manual.
+53. Dado um objetivo com investimentos vinculados, quando o aporte sugerido é calculado, então o valor atual consolidado desses investimentos já reduz o restante a acumular e o aporte usa esse saldo presente.
+54. Dado um objetivo com data, quando o aporte mensal necessário atual é igual ou menor que o aporte planejado desde o início, então o status é `on_track`.
+55. Dado um objetivo com data, quando o aporte mensal necessário atual supera o planejado em até 20%, então o status é `attention`.
+56. Dado um objetivo com data, quando o aporte mensal necessário atual supera o planejado em mais de 20%, então o status é `late`.
+57. Dado um objetivo sem prazo, pausado, concluído ou vencido, quando o status é calculado, então preserva respectivamente os estados `on_track`, `paused`, `completed` ou `overdue` conforme suas condições prioritárias.
 
 ## Pendências
 
@@ -267,9 +280,14 @@ Não há pendências abertas para o MVP aprovado. A possibilidade futura de divi
 - [x] Passo 20 — Corrigir a sintaxe da configuração responsiva do gráfico para que o módulo de Objetivos carregue em navegadores ES Module. Fecha: critério 48.
 - [x] Passo 21 — Remover o texto redundante do indicador circular e preservar o percentual e a descrição acessível. Fecha: critério 49.
 - [x] Passo 22 — Fazer a composição de Objetivos responder à largura real do painel, não apenas à largura do viewport. Fecha: critério 50.
+- [x] Passo 23 — Preservar a mesma cadência conservadora de aportes no cenário com rendimento, identificar no gráfico o valor planejado e explicitar o caráter estimado do rendimento. Fecha: critérios 51 e 52.
+- [x] Passo 24 — Confirmar que o aporte sugerido usa o saldo presente consolidado das posições vinculadas, já incluído no saldo reservado do núcleo. Fecha: critério 53.
+- [x] Passo 25 — Comparar o aporte mensal necessário na data atual com o plano mensal original e derivar `on_track`, `attention` ou `late`, preservando estados prioritários e excluindo rendimento estimado. Fecha: critérios 54 a 57.
 
 ## Changelog
 
+- `0.23` — 2026-10-18 — Implementa o status de ritmo pela comparação entre o aporte mensal necessário hoje e o aporte planejado no início, com faixa de atenção de até 20%.
+- `0.22` — 2026-10-18 — Compara cenários com os mesmos aportes futuros, mostra o valor planejado no gráfico e esclarece que o rendimento é estimado; confirma o uso do saldo atual dos investimentos vinculados no aporte sugerido.
 - `0.21` — 2026-09-27 — Adapta os cards e resumos de Objetivos à largura real disponível no painel.
 - `0.20` — 2026-09-27 — Remove “atendido” do centro do indicador circular de progresso nos cards.
 - `0.19` — 2026-09-27 — Corrige erro de sintaxe na configuração responsiva que impedia o carregamento da tela de Objetivos.

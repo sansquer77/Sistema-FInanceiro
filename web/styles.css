@@ -5084,6 +5084,7 @@ form[aria-busy="true"] .form-actions {
 .goal-projection-heading strong,
 .goal-projection-heading small { min-width: 0; overflow-wrap: anywhere; }
 .goal-projection-heading small { color: var(--muted); text-align: right; }
+.goal-projection-note { margin: 5px 0 0; color: var(--muted); font-size: 11px; line-height: 1.4; }
 .goal-projection-chart { box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; min-height: 160px; overflow: hidden; margin-top: 4px; }
 .goal-projection-chart .apexcharts-canvas,
 .goal-projection-chart .apexcharts-svg { max-width: 100% !important; }
@@ -5093,6 +5094,7 @@ form[aria-busy="true"] .form-actions {
 .goal-projection-legend i.contributions { background: var(--chart-6); }
 .goal-projection-legend i.yield { background: var(--color-success); }
 .goal-projection-legend i.uncovered { background: var(--color-warning); }
+.goal-projection-legend i.target { width: 2px; height: 12px; border-radius: 0; background: var(--color-warning); }
 .goal-coverage { justify-content: flex-start; flex-wrap: wrap; margin-top: 12px; color: var(--muted); font-size: 12px; font-weight: 800; }
 .goal-coverage.unlinked { color: var(--color-warning); }
 .coverage-chip { padding: 4px 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-low); color: var(--ink); cursor: pointer; font: inherit; font-size: 11px; }

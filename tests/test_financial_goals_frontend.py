@@ -20,13 +20,22 @@ class FinancialGoalsFrontendContractTest(unittest.TestCase):
         self.assertIn('data-limits-tab="goals"', self.html)
         self.assertIn('data-limits-panel="goals"', self.html)
 
+    def test_limit_form_exposes_effective_month(self) -> None:
+        self.assertIn('name="month" id="limitMonthInput" type="month" required', self.html)
+        self.assertIn('data.month = limitMonthInput.value || state.limitMonth;', self.module)
+        self.assertIn('state.limitMonth = data.month;', self.module)
+        self.assertNotIn('handleLimitMonthChange', self.module)
+
     def test_goal_cards_expose_progress_ring_and_textual_percentage(self) -> None:
         self.assertIn('class="goal-progress-ring"', self.module)
         self.assertIn('aria-label="${progress.toLocaleString("pt-BR")}% da meta atendida"', self.module)
         self.assertIn("conic-gradient", self.styles)
         self.assertIn("new window.ApexCharts", self.module)
-        self.assertIn("Rendimento projetado", self.module)
+        self.assertIn("Rendimento estimado", self.module)
         self.assertIn("Ainda descoberto", self.module)
+        self.assertIn("Valor planejado", self.module)
+        self.assertIn("annotations: { xaxis:", self.module)
+        self.assertIn("mantém os mesmos aportes", self.module)
 
     def test_goal_cards_are_compact_and_explain_objective_types(self) -> None:
         instructions = (ROOT / "web" / "modules" / "instructions-content.js").read_text(encoding="utf-8")

@@ -215,7 +215,7 @@ SECURITY_HEADERS = {
     "Cross-Origin-Embedder-Policy": "require-corp",
     "Content-Security-Policy": (
         "default-src 'self'; "
-        # spec: seguranca/seguranca-autenticacao v1.7 — critério de WebAssembly local
+        # spec: seguranca/seguranca-autenticacao v1.8 — critério de WebAssembly local
         # WebLLM compila o runtime WASM no navegador; esta exceção não habilita eval JavaScript.
         "script-src 'self' 'wasm-unsafe-eval' https://cdnjs.buymeacoffee.com; worker-src 'self' blob:; "
         "style-src 'self' 'unsafe-inline'; "
@@ -1887,6 +1887,7 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
         self.send_header("Cache-Control", "no-store")
+        self.send_header("Pragma", "no-cache")
         self.send_header("Content-Length", str(len(body)))
         self.send_security_headers()
         self.end_headers()
@@ -2044,6 +2045,8 @@ class AppHandler(BaseHTTPRequestHandler):
             body = gzip.compress(body)
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Pragma", "no-cache")
         if use_gzip:
             self.send_header("Content-Encoding", "gzip")
             self.send_header("Vary", "Accept-Encoding")

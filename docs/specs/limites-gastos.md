@@ -2,8 +2,8 @@
 tipo: spec
 area: limites
 status: implementado
-versao: 1.5
-atualizado: 2026-09-13
+versao: 1.9
+atualizado: 2026-10-18
 relacionados:
   - "[[categorias-tags-gestao]]"
   - "[[cartoes]]"
@@ -17,7 +17,7 @@ aliases: ["Limites de Gastos", "Budgets", "Metas"]
 # Limites de Gastos
 
 > [!info] Status
-> **implementado** · versão: `1.5` · área: `limites` · atualizado em 2026-09-13 · relacionados: [[categorias-tags-gestao]], [[cartoes]], [[relatorios]], [[alertas-cockpit]]
+> **implementado** · versão: `1.9` · área: `limites` · atualizado em 2026-10-18 · relacionados: [[categorias-tags-gestao]], [[cartoes]], [[relatorios]], [[alertas-cockpit]]
 
 ## Problema
 
@@ -74,12 +74,14 @@ Tabelas: `spending_limits`, `categories`, `subcategories`.
 
 - Dado a criação de uma meta de R$ 500,00 para "Alimentação" em "2026-06", quando julho de 2026 é consultado sem nova definição, então ela aparece como limite vigente com consumo de julho.
 - Dado uma nova definição de R$ 750,00 para "Alimentação" em "2026-07", quando julho de 2026 é consultado, então o limite vigente é R$ 750,00.
+- Dado um limite de R$ 500,00 vigente desde "2026-06", quando ele é alterado para R$ 750,00 a partir de "2026-07", então junho mantém a definição de R$ 500,00 e julho e os meses seguintes usam R$ 750,00.
 - Dado uma tentativa de cadastrar meta duplicada para o mesmo mês inicial/categoria, quando executada, o sistema atualiza a meta existente ou retorna erro de conflito.
 - Dado a exclusão de um limite, quando executada, nenhuma transação financeira é afetada.
 - Dado despesas de cartão na fatura aberta do mês, quando computadas, impactam o limite da categoria/subcategoria correspondente.
 - Dado um limite ultrapassado no mês corrente, quando exibido, o menu de Limites e o Cockpit exibem alertas visuais.
 - Dado o usuário visualizando o seletor mensal de Limites, quando o mês é exibido, então o rótulo usa o formato `MM/AAAA`.
 - Dado o usuário navegando entre competências de Limites, quando o mês muda, então cada limite apresenta o consumo daquele mês mesmo que nenhuma lista detalhada dessa competência esteja carregada no navegador.
+- Dado o usuário criando ou ajustando um limite, quando o formulário é exibido, então o mês de início da vigência aparece como campo editável e é enviado como a competência da definição.
 
 ## Changelog
 
@@ -89,6 +91,13 @@ Tabelas: `spending_limits`, `categories`, `subcategories`.
 - `1.0` — 2026-06-29 — Frontmatter e critérios formalizados.
 
 ## Changelog
+
+- `1.9` — 2026-10-18 — Reforçada a regressão que mantém a definição futura vigente nos meses seguintes até novo reajuste.
+- `1.8` — 2026-10-18 — Alterar o mês no formulário não recarrega nem limpa a edição; o novo mês é aplicado somente ao salvar.
+
+- `1.7` — 2026-10-18 — Campo de mês de início da vigência passa a ser visível e editável no formulário de limites.
+
+- `1.6` — 2026-10-18 — Edição de um limite em mês posterior preserva a definição histórica e cria ou atualiza apenas a vigência futura.
 
 - `1.5` — 2026-09-13 — Corrigida a ausência de `limit_amount_cents` no retorno de `list_spending_limits_with_consumption`, que impedia o alerta de limite estourado na central de mensagens do Cockpit.
 - `1.4` — 2026-09-04 — Limites entre 80% e 100% exibem estado textual e visual de atenção antes do estouro.

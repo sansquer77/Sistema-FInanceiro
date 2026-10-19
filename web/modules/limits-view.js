@@ -297,6 +297,7 @@ export function registerLimitsView({
             <summary>Ver composição, cobertura e projeção</summary>
           <div class="goal-projection-block">
             <div class="goal-projection-heading"><strong>Composição projetada</strong><small>${escapeHtml(goal.projection?.rate_label || "Sem rendimento")} · ref. ${formatGoalDate(goal.projection?.reference_date)}</small></div>
+            <p class="goal-projection-note">O cenário com rendimento é uma estimativa baseada na referência atual e mantém os mesmos aportes do cenário conservador.</p>
             <div class="goal-projection-chart" data-goal-chart="${goal.id}" role="img" aria-label="Comparação entre cenário conservador e cenário com rendimento para ${escapeHtml(goal.name)}"></div>
             <div class="goal-projection-legend" data-goal-legend="${goal.id}"></div>
           </div>
@@ -343,8 +344,9 @@ export function registerLimitsView({
     const scenarios = [projection.conservative, projection.with_yield];
     const values = (key) => scenarios.map((scenario) => Number(scenario[key] || 0));
     legend.innerHTML = `
-      <span><i class="reserved"></i>Reservado</span><span><i class="contributions"></i>Aportes futuros</span>
-      <span><i class="yield"></i>Rendimento projetado</span><span><i class="uncovered"></i>Ainda descoberto</span>`;
+      <span><i class="reserved"></i>Saldo atual</span><span><i class="contributions"></i>Aportes futuros</span>
+      <span><i class="yield"></i>Rendimento estimado</span><span><i class="uncovered"></i>Ainda descoberto</span>
+      <span><i class="target"></i>Valor planejado</span>`;
     if (typeof window.ApexCharts !== "function") {
       host.innerHTML = `<p class="muted-copy">Conservador: ${formatMoney(Number(projection.conservative.projected_total), "BRL")} · Com rendimento: ${formatMoney(Number(projection.with_yield.projected_total), "BRL")}</p>`;
       host.dataset.chartRendered = "true";
@@ -357,14 +359,15 @@ export function registerLimitsView({
     const chart = new window.ApexCharts(host, {
       chart: { type: "bar", width: "100%", height: 190, stacked: true, redrawOnParentResize: true, redrawOnWindowResize: true, toolbar: { show: false }, animations: { enabled: !window.matchMedia("(prefers-reduced-motion: reduce)").matches } },
       series: [
-        { name: "Reservado", data: values("reserved") },
+        { name: "Saldo atual", data: values("reserved") },
         { name: "Aportes futuros", data: values("future_contributions") },
-        { name: "Rendimento projetado", data: values("projected_yield") },
+        { name: "Rendimento estimado", data: values("projected_yield") },
         { name: "Ainda descoberto", data: values("uncovered") },
       ],
       colors: [css.getPropertyValue("--primary").trim() || "#00328a", css.getPropertyValue("--chart-6").trim() || "#3b82f6", css.getPropertyValue("--color-success").trim() || "#10b981", css.getPropertyValue("--color-warning").trim() || "#f59e0b"],
       plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: "58%" } },
       xaxis: { categories: ["Conservador", "Com rendimento"], tickAmount: 3, labels: { formatter: compactCurrency, style: { fontSize: "10px" }, rotate: 0, hideOverlappingLabels: true } },
+      annotations: { xaxis: [{ x: Number(goal.effective_target_amount || goal.target_amount || 0), borderColor: css.getPropertyValue("--color-warning").trim() || "#f59e0b", strokeDashArray: 0, label: { text: `Planejado ${formatMoney(Number(goal.effective_target_amount || goal.target_amount || 0), "BRL")}`, orientation: "horizontal", style: { background: css.getPropertyValue("--color-warning").trim() || "#f59e0b", color: "#111" } } }] },
       yaxis: { labels: { minWidth: 0, maxWidth: 88, style: { fontSize: "10px" }, offsetX: 0 } },
       dataLabels: { enabled: false }, legend: { show: false }, grid: { borderColor: css.getPropertyValue("--outline-variant").trim() || "#c3c6d6" },
       responsive: [{ breakpoint: 560, options: { chart: { height: 160 }, xaxis: { labels: { style: { fontSize: "9px" } } }, yaxis: { labels: { maxWidth: 66, style: { fontSize: "9px" } } }, grid: { padding: { left: 0, right: 0 } } } }],
@@ -537,7 +540,8 @@ export function registerLimitsView({
     event.preventDefault();
     setMessage(limitMessage, "");
     const data = formData(limitForm);
-    data.month = state.limitMonth;
+    data.month = limitMonthInput.value || state.limitMonth;
+    state.limitMonth = data.month;
     const isEditing = Boolean(data.id);
     setFormBusy(limitForm, true);
     try {

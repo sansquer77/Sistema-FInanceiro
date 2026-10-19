@@ -14,6 +14,7 @@ from financeiro.financial_goals import (
     archive_financial_goal,
     create_financial_goal,
     create_goal_movement,
+    calculate_pace_status,
     emergency_reserve_summary,
     link_goal_funding_source,
     list_financial_goals,
@@ -156,10 +157,39 @@ class FinancialGoalsTest(unittest.TestCase):
 
         self.assertEqual(projection["conservative"]["reserved"], "3000.00")
         self.assertGreater(float(projection["with_yield"]["projected_yield"]), 0)
-        self.assertLess(
-            float(projection["with_yield"]["future_contributions"]),
-            float(projection["conservative"]["future_contributions"]),
+        self.assertEqual(
+            projection["with_yield"]["future_contributions"],
+            projection["conservative"]["future_contributions"],
         )
+        self.assertGreater(float(projection["with_yield"]["projected_total"]), 12000)
+
+    def test_goal_pace_compares_required_monthly_saving_with_original_plan(self) -> None:
+        from datetime import date as RealDate
+
+        class FrozenDate(RealDate):
+            @classmethod
+            def today(cls):
+                return cls(2026, 7, 10)
+
+        goal = {"status": "active", "start_date": "2026-01-01", "target_date": "2026-12-01"}
+        with patch("financeiro.financial_goals.date", FrozenDate):
+            self.assertEqual(calculate_pace_status(goal, 600_000, 1_200_000), "on_track")
+            self.assertEqual(calculate_pace_status(goal, 540_000, 1_200_000), "attention")
+            self.assertEqual(calculate_pace_status(goal, 480_000, 1_200_000), "attention")
+            self.assertEqual(calculate_pace_status(goal, 479_900, 1_200_000), "late")
+            self.assertEqual(calculate_pace_status(goal, 1_200_000, 1_200_000), "completed")
+
+    def test_goal_pace_prioritizes_paused_and_overdue_states(self) -> None:
+        from datetime import date as RealDate
+
+        class FrozenDate(RealDate):
+            @classmethod
+            def today(cls):
+                return cls(2026, 7, 10)
+
+        with patch("financeiro.financial_goals.date", FrozenDate):
+            self.assertEqual(calculate_pace_status({"status": "paused", "target_date": "2026-06-01"}, 0, 100), "paused")
+            self.assertEqual(calculate_pace_status({"status": "active", "target_date": "2026-06-01"}, 0, 100), "overdue")
 
     def test_cdi_projection_exposes_reference_and_does_not_change_balance(self) -> None:
         create_financial_goal(self.user["id"], {

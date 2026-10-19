@@ -3,7 +3,7 @@ tipo: spec
 area: migracao-dados
 status: implementado
 versao: 1.14
-atualizado: 2026-09-25
+atualizado: 2026-10-18
 relacionados:
   - "[[../arquitetura]]"
   - "[[importacao-dados]]"
@@ -16,7 +16,7 @@ aliases: ["Migração do banco para a v2", "Banco v2"]
 # Migração do banco para a v2
 
 > [!info] Status
-> **implementado** · versão: `1.13` · área: `migracao-dados` · atualizado em 2026-09-25 · relacionados: [[../arquitetura]], [[importacao-dados]], [[../adr/0003-sqlite-fonte-de-verdade]], [[../adr/0012-fundacao-v2-contrato-e-migracao-de-dados]]
+> **implementado** · versão: `1.14` · área: `migracao-dados` · atualizado em 2026-10-18 · relacionados: [[../arquitetura]], [[importacao-dados]], [[../adr/0003-sqlite-fonte-de-verdade]], [[../adr/0012-fundacao-v2-contrato-e-migracao-de-dados]]
 
 ## Problema
 

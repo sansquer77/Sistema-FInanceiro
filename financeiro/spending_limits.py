@@ -79,7 +79,7 @@ def list_spending_limits_with_consumption(user_id: int, month: object | None) ->
         return limits
     month_start = f"{normalized_month}-01"
     month_end = f"{normalized_month}-31"
-    # spec: limites/limites-gastos v1.5 — consumo independe das listas mensais
+    # spec: limites/limites-gastos v1.6 — consumo independe das listas mensais
     # residentes no frontend e exclui o débito agregado de pagamentos de fatura.
     with get_connection() as conn:
         rows = conn.execute(
@@ -177,7 +177,33 @@ def update_spending_limit(user_id: int, limit_id: str, data: dict) -> dict:
     spending_limit = normalize_spending_limit_payload(data)
     with get_connection() as conn:
         ensure_expense_category(conn, user_id, spending_limit["category_id"], spending_limit["subcategory_id"])
-        row = update_limit_row(conn, user_id, normalized_id, spending_limit)
+        current = conn.execute(
+            """
+            SELECT id, month
+            FROM spending_limits
+            WHERE id = ? AND user_id = ?
+            """,
+            (normalized_id, user_id),
+        ).fetchone()
+        if not current:
+            raise SpendingLimitError("Limite nao encontrado.", HTTPStatus.NOT_FOUND)
+
+        # spec: limites/limites-gastos v1.9 — editar um limite herdado em um
+        # mês posterior cria a nova vigência sem mover a definição histórica.
+        if spending_limit["month"] > current["month"]:
+            existing_future = fetch_existing_limit(
+                conn,
+                user_id,
+                spending_limit["month"],
+                spending_limit["category_id"],
+                spending_limit["subcategory_id"],
+            )
+            if existing_future:
+                row = update_limit_row(conn, user_id, existing_future["id"], spending_limit)
+            else:
+                row = insert_limit_row(conn, user_id, spending_limit)
+        else:
+            row = update_limit_row(conn, user_id, normalized_id, spending_limit)
     return format_spending_limit(row)
 
 
@@ -218,6 +244,30 @@ def update_limit_row(conn, user_id: int, limit_id: int, spending_limit: dict) ->
     if cursor.rowcount == 0:
         raise SpendingLimitError("Limite nao encontrado.", HTTPStatus.NOT_FOUND)
     return fetch_limit(conn, user_id, limit_id)
+
+
+def insert_limit_row(conn, user_id: int, spending_limit: dict) -> dict:
+    try:
+        cursor = conn.execute(
+            """
+            INSERT INTO spending_limits (
+                user_id, month, category_id, subcategory_id, limit_amount_cents, notes
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                user_id,
+                spending_limit["month"],
+                spending_limit["category_id"],
+                spending_limit["subcategory_id"],
+                spending_limit["limit_amount_cents"],
+                spending_limit["notes"],
+            ),
+        )
+    except Exception as exc:
+        if "UNIQUE constraint failed" in str(exc):
+            raise SpendingLimitError("Ja existe um limite para este item neste mes.", HTTPStatus.CONFLICT) from exc
+        raise
+    return fetch_limit(conn, user_id, cursor.lastrowid)
 
 
 def fetch_existing_limit(conn, user_id: int, month: str, category_id: int, subcategory_id: int | None):
@@ -324,7 +374,7 @@ def normalize_optional_id(value: object) -> int | None:
 
 
 def format_spending_limit(spending_limit: dict) -> dict:
-    # spec: limites/limites-gastos v1.5 — mantém limit_amount_cents para consumidores
+    # spec: limites/limites-gastos v1.6 — mantém limit_amount_cents para consumidores
     # internos (ex.: alertas do cockpit) além do limit_amount legível na interface.
     spending_limit["limit_amount"] = cents_to_money(spending_limit["limit_amount_cents"])
     return spending_limit

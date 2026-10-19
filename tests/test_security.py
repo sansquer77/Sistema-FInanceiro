@@ -243,6 +243,36 @@ class HttpCachingAndCompressionTest(unittest.TestCase):
         decompressed = gzip.decompress(handler.wfile.getvalue()).decode("utf-8")
         self.assertIn('"items"', decompressed)
 
+    def test_send_json_disables_caching_for_api_responses(self) -> None:
+        handler = object.__new__(app.AppHandler)
+        handler.headers = {}
+        handler.wfile = BytesIO()
+        handler.send_response = mock.Mock()
+        handler.send_header = mock.Mock()
+        handler.end_headers = mock.Mock()
+
+        handler.send_json({"user": {"id": 1}})
+
+        header_calls = handler.send_header.call_args_list
+        self.assertIn(mock.call("Cache-Control", "no-store"), header_calls)
+        self.assertIn(mock.call("Pragma", "no-cache"), header_calls)
+
+    def test_authenticated_import_template_download_disables_caching(self) -> None:
+        handler = object.__new__(app.AppHandler)
+        handler.path = "/api/import/template?target=account"
+        handler.wfile = BytesIO()
+        handler.send_response = mock.Mock()
+        handler.send_header = mock.Mock()
+        handler.end_headers = mock.Mock()
+        handler.require_user = mock.Mock(return_value={"id": 7})
+
+        with mock.patch("app.system_import_template", return_value=b"template"):
+            handler.handle_import_template_download()
+
+        header_calls = handler.send_header.call_args_list
+        self.assertIn(mock.call("Cache-Control", "no-store"), header_calls)
+        self.assertIn(mock.call("Pragma", "no-cache"), header_calls)
+
     def test_static_file_returns_not_modified_with_matching_etag(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             web_root = Path(tmpdir)
@@ -467,6 +497,43 @@ class IdorProtectionTest(IsolatedDatabaseTest):
         self.assertEqual(len(july_limits), 1)
         self.assertEqual(july_limits[0]["month"], "2026-07")
         self.assertEqual(july_limits[0]["limit_amount"], "750.00")
+
+    def test_editing_a_limit_in_a_later_month_preserves_the_historical_definition(self) -> None:
+        user = create_user("Alice", "alice@example.com", "strong-password")
+        category = create_category(user["id"], "Restaurantes", "expense")
+        original = create_spending_limit(user["id"], spending_limit_payload(category["id"]))
+
+        updated = update_spending_limit(user["id"], str(original["id"]), {
+            "month": "2026-07",
+            "category_id": str(category["id"]),
+            "limit_amount": "750,00",
+        })
+
+        self.assertEqual(updated["month"], "2026-07")
+        self.assertEqual(updated["limit_amount"], "750.00")
+        june_limits = list_spending_limits(user["id"], "2026-06")
+        july_limits = list_spending_limits(user["id"], "2026-07")
+        self.assertEqual([(row["month"], row["limit_amount"]) for row in june_limits], [("2026-06", "500.00")])
+        self.assertEqual([(row["month"], row["limit_amount"]) for row in july_limits], [("2026-07", "750.00")])
+
+    def test_future_limit_definition_remains_effective_in_following_months(self) -> None:
+        user = create_user("Alice", "alice@example.com", "strong-password")
+        category = create_category(user["id"], "Restaurantes", "expense")
+        create_spending_limit(user["id"], {
+            "month": "2026-10",
+            "category_id": str(category["id"]),
+            "limit_amount": "500,00",
+        })
+        create_spending_limit(user["id"], {
+            "month": "2026-11",
+            "category_id": str(category["id"]),
+            "limit_amount": "750,00",
+        })
+
+        december_limits = list_spending_limits(user["id"], "2026-12")
+        january_limits = list_spending_limits(user["id"], "2027-01")
+        self.assertEqual([(row["month"], row["limit_amount"]) for row in december_limits], [("2026-11", "750.00")])
+        self.assertEqual([(row["month"], row["limit_amount"]) for row in january_limits], [("2026-11", "750.00")])
 
     def test_category_evolution_rejects_foreign_category(self) -> None:
         owner = create_user("Owner", "owner@example.com", "strong-password")
