@@ -1,6 +1,6 @@
 import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";
 import { createLoadPolicy } from "./load-policy.js";
-import { clearLocalModel, getLocalModelStatus, prepareLocalModel } from "./webllm-client.js?v=175";
+import { clearLocalModel, getLocalModelStatus, prepareLocalModel } from "./webllm-client.js?v=179";
 
 export function registerUserAdminView(context) {
   const {
@@ -182,7 +182,8 @@ export function registerUserAdminView(context) {
     setAIFieldVisibility(elements.aiConfigAuthTypeField, customProvider);
     setAIFieldVisibility(elements.aiConfigModelField, true);
     setAIFieldVisibility(elements.aiConfigApiKeyField, requiresApiKey);
-    setAIFieldVisibility(elements.aiConfigTimeoutField, customProvider);
+    // spec: tendencias-saude-financeira v2.27 — timeout visível também para provedores remotos predefinidos
+    setAIFieldVisibility(elements.aiConfigTimeoutField, customProvider || remoteProvider);
     setAIFieldVisibility(elements.aiConfigTemperatureField, customProvider);
     setAIFieldVisibility(elements.aiConfigMaxTokensField, customProvider);
   }

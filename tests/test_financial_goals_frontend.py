@@ -58,8 +58,8 @@ class FinancialGoalsFrontendContractTest(unittest.TestCase):
 
     def test_funding_options_are_consolidated_investments_without_checking_accounts(self) -> None:
         self.assertNotIn("state.accounts.map((account)", self.module)
-        self.assertIn("const assets = new Map()", self.module)
-        self.assertIn("position.sources || []", self.module)
+        self.assertIn('"/api/financial-goals/funding-options"', self.module)
+        self.assertNotIn("const assets = new Map()", self.module)
         self.assertIn("Vincular investimento", self.module)
         self.assertIn("current_value_brl", self.module)
 

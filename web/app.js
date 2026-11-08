@@ -58,7 +58,7 @@ import {
 import { applyTheme, setTheme, storedTheme, toggleTheme } from "./modules/theme-utils.js";
 import { applyDensity, setDensity, storedDensity, toggleDensity } from "./modules/density-utils.js";
 import { registerAuthView } from "./modules/auth-view.js";
-import { registerUserAdminView } from "./modules/user-admin-view.js?v=175";
+import { registerUserAdminView } from "./modules/user-admin-view.js?v=176";
 import { registerClassificationsView } from "./modules/classifications-view.js";
 import { registerLimitsView } from "./modules/limits-view.js";
 import { registerReportsView } from "./modules/reports-view.js";
@@ -411,6 +411,7 @@ const transferExchangeRate = document.querySelector("#transferExchangeRate");
 const investmentOperationFields = document.querySelector("#investmentOperationFields");
 const investmentAmount = document.querySelector("#investmentAmount");
 const investmentAmountRow = document.querySelector("#investmentAmountRow");
+const investmentGrossReference = document.querySelector("#investmentGrossReference");
 const investmentFundFields = document.querySelector("#investmentFundFields");
 const fetchInvestmentFundQuoteButton = document.querySelector("#fetchInvestmentFundQuoteButton");
 const investmentFundQuoteHint = document.querySelector("#investmentFundQuoteHint");
@@ -1111,6 +1112,7 @@ const transactionsView = registerTransactionsView({
     investmentOperationFields,
     investmentAmount,
     investmentAmountRow,
+    investmentGrossReference,
     investmentFundFields,
     fetchInvestmentFundQuoteButton,
     investmentFundQuoteHint,

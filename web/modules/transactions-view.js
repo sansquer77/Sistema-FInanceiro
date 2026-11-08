@@ -131,6 +131,8 @@ export function registerTransactionsView({
     moneyInputValue,
     decimalInputValue,
     formatDate,
+    formatMoney,
+    getCurrency: () => state.accounts.find((account) => String(account.id) === transactionAccount.value)?.currency || "BRL",
   });
   const baseTransactionForm = createTransactionForm({ state, elements, api });
   const classificationSuggestion = createClassificationSuggestion({

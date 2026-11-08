@@ -2,8 +2,8 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 3.41
-atualizado: 2026-10-12
+versao: 3.43
+atualizado: 2026-10-20
 relacionados:
   - "[[contas-correntes]]"
   - "[[categorias-tags-gestao]]"
@@ -18,7 +18,7 @@ aliases: ["Lançamentos", "Transações"]
 # Lançamentos
 
 > [!info] Status
-> **implementado** · versão: `3.41` · área: `lancamentos` · atualizado em 2026-10-12 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]], [[emprestimos-quitacao]]
+> **implementado** · versão: `3.43` · área: `lancamentos` · atualizado em 2026-10-20 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]], [[emprestimos-quitacao]]
 
 ## Problema
 
@@ -88,7 +88,9 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 - A tela de Lançamentos organiza o formulário em uma composição compacta, mantendo todos os campos relevantes visíveis na edição, sem blocos contextuais escurecidos (inclusive nos campos de renda fixa).
 - A modalidade de renda fixa (Pós-fixada, Pré-fixada, Híbrida) é escolhida em combo na linha do Indexador, com o botão de ajuda (?) alinhado inline ao rótulo Modalidade.
 - O formulário de renda fixa não exibe os atalhos de presets (100% do CDI, 120% do CDI, IPCA + 6,5%) — a modalidade, o indexador e a taxa são preenchidos diretamente; marcadores tipo checkbox (média histórica e reserva de emergência) aparecem como checkbox simples, sem moldura tipo pill.
-- O campo Valor fica logo abaixo da Descrição e acima de Categoria/Subcategoria, mantendo posição estável no formulário independentemente do tipo de lançamento; em investimento, o campo **Valor investido** ocupa exatamente a mesma posição (o campo Valor fica oculto), de forma que o valor aparece na mesma altura em todos os tipos de lançamento.
+- O campo Valor fica logo abaixo da Descrição e acima de Categoria/Subcategoria, mantendo posição estável no formulário independentemente do tipo de lançamento; em investimento, **Total debitado da conta** ocupa exatamente a mesma posição (o campo Valor fica oculto), de forma que o valor aparece na mesma altura em todos os tipos de lançamento.
+- Em investimento, o campo é rotulado **Total debitado da conta** e representa o valor efetivamente descontado do saldo, já incluindo corretagem, emolumentos, impostos da operação e outros custos. Um ícone de informação junto ao rótulo explica que os campos de custos opcionais apenas detalham esse total e não são somados novamente ao custo da posição; podem ficar em branco ou zero quando não houver cobrança.
+- Quando quantidade e preço unitário estão disponíveis em um aporte, o formulário exibe apenas o produto como referência compacta do valor bruto negociado. Um ícone de informação explica a comparação com o total debitado e os custos; essa referência é informativa e não altera os valores persistidos.
 - Câmbio, transferência e o agrupamento geral de investimento não usam bloco contextual: os campos aparecem como linhas diretas, como as demais linhas simples do formulário.
 - Linhas simples do formulário (Valor, Repetição, Recorrência e Média) dispensam o bloco contextual escurecido e o título em caixa alta, aparecendo como linhas de campo diretas para aumentar a densidade e reduzir repetição de rótulos — os blocos ficam reservados a grupos com múltiplos campos.
 - O formulário de lançamento fica mais largo que o padrão (até 460px) e equilibra os espaços laterais: o mesmo espaço à esquerda entre o formulário e o menu e à direita entre o formulário e o extrato, sem encostar no menu.
@@ -145,7 +147,6 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, `subcategories`, `tags`.
 
 ## Critérios de aceite
-
 
 - Dado uma receita criada, quando listado, o saldo da conta aumenta pelo valor informado.
 - Dado uma despesa criada, quando listada, o saldo da conta diminui pelo valor informado.
@@ -223,6 +224,18 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dado um lançamento avulso de despesa categorizado pela identidade estável `loan_payment`, quando a conta possui moeda compatível com empréstimos ativos, então o formulário permite associação opcional a um contrato mesmo que o usuário tenha renomeado a categoria, e a gravação cria apenas o lançamento original da conta.
 - Dado um lançamento de conta definido como recorrente diário, quando a série é gerada, então as datas avançam um dia corrido por ocorrência, inclusive fins de semana, mantendo o limite existente de 120 ocorrências.
 - Dado um lançamento recorrente diário de conta com cálculo pela média ativo, quando há histórico compatível, então todas as ocorrências geradas usam a média dos até 12 lançamentos mais recentes e preservam `use_average`; sem histórico, mantêm o valor informado.
+- Dado o tipo Investimento, quando o formulário é exibido, então o valor aparece como `Total debitado da conta`, acompanhado de ícone de informação focável que explica a inclusão e o detalhamento dos custos sem soma duplicada.
+- Dado um aporte com quantidade e preço unitário preenchidos, quando qualquer um desses campos muda, então a referência quantidade × preço é atualizada e apresentada de forma compacta como valor bruto informativo na moeda da conta; um ícone de informação explica seu uso.
+- Dado os campos de custos de um aporte, quando o usuário não teve cobrança, então pode deixá-los em branco ou zero; o campo de impostos é identificado como `Impostos da operação` e o título dos custos oferece essa orientação por ícone de informação.
+- Dado o formulário de aporte, quando as orientações sobre total, referência bruta ou custos são necessárias, então elas aparecem ao passar o ponteiro ou focar por teclado o ícone `i`, sem texto auxiliar permanente ocupando espaço.
+
+## Plano de implementação — clareza de custos em aportes
+
+- [x] Exibir as orientações de total, valor bruto e custos sob demanda em ícones de informação focáveis, removendo as linhas de texto auxiliares permanentes.
+
+- [x] Identificar o campo como total debitado e associar a orientação de inclusão dos custos.
+- [x] Exibir quantidade × preço como referência informativa quando ambos forem preenchidos.
+- [x] Explicitar opcionalidade dos custos e identificar impostos da operação, sem alterar regras financeiras ou dados persistidos.
 
 ## Plano de implementação desta correção
 
@@ -240,6 +253,9 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 
 ## Changelog
 
+- `3.43` — 2026-10-20 — Move orientações do formulário de aportes para tooltips acessíveis e reduz a referência bruta ao valor calculado.
+
+- `3.42` — 2026-10-20 — Formulário de aporte identifica o total debitado da conta, explica o detalhamento dos custos opcionais e apresenta referência bruta por quantidade × preço unitário.
 - `3.41` — 2026-10-12 — Listagem do Extrato de Contas para contas em moeda estrangeira passa a exibir apenas o valor na moeda configurada da conta, removendo a linha auxiliar de conversão para BRL.
 - `3.40` — 2026-09-27 — Lançamentos de Contas passam a aceitar recorrência diária, inclusive fins de semana, com a opção existente de valor médio.
 - `3.39` — 2026-09-24 — Associação ao empréstimo identifica a categoria por ID/identidade semântica persistente, independente do texto exibido.

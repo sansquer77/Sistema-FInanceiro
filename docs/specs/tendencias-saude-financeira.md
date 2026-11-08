@@ -2,8 +2,8 @@
 tipo: spec
 area: tendencias-saude-financeira
 status: em-implementacao
-versao: 2.26
-atualizado: 2026-10-10
+versao: 2.27
+atualizado: 2026-11-01
 relacionados:
   - "[[score-saude-financeira]]"
   - "[[relatorios]]"
@@ -20,7 +20,7 @@ aliases: ["Tendências de Saúde Financeira", "Achados Financeiros", "Insights F
 # Tendências e Achados de Saúde Financeira
 
 > [!info] Status
-> **em-implementacao** · área: `tendencias-saude-financeira` · atualizado em 2026-10-10 · relacionados: [[score-saude-financeira]], [[relatorios]], [[lancamentos]], [[cartoes]], [[../adr/0019-inferencia-local-webllm|ADR-0019]]
+> **em-implementacao** · área: `tendencias-saude-financeira` · atualizado em 2026-11-01 · relacionados: [[score-saude-financeira]], [[relatorios]], [[lancamentos]], [[cartoes]], [[../adr/0019-inferencia-local-webllm|ADR-0019]]
 
 ## Problema
 
@@ -255,6 +255,7 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 - Dado um usuário com despesas recorrentes mensais na categoria `Assinaturas e Serviços`, quando consulta a aba **Tendências**, então o sistema exibe o custo mensal agregado por subcategoria como achado estruturado em centavos, sem recomendar cancelamento.
 - Dado um usuário que acessa Preferências de IA, quando abre o campo de provedor, então visualiza as opções principais `OpenAI / ChatGPT`, `Anthropic / Claude`, `Google / Gemini` e `Custom / Local`.
 - Dado um usuário que seleciona `OpenAI / ChatGPT`, `Anthropic / Claude` ou `Google / Gemini`, quando a tela de configuração é exibida, então visualiza os campos `Modelo` e `API key`, sem precisar configurar endpoint ou tipo de autenticação.
+- Dado um usuário que seleciona `OpenAI / ChatGPT`, `Anthropic / Claude` ou `Google / Gemini`, quando a tela de configuração é exibida, então também visualiza o campo `Timeout (segundos)`, de 1 a 60, e o valor salvo é o tempo limite usado nas chamadas a esse provedor.
 - Dado um usuário que seleciona `Custom / Local` como provedor de IA, quando a tela de configuração é exibida, então campos adicionais de endpoint/base URL, modelo, autenticação e contrato de payload ficam disponíveis.
 - Dado um usuário que seleciona `Custom / Local`, quando configura a integração, então o endpoint deve ser tratado como compatível com OpenAI Chat Completions em `{base_url}/chat/completions`.
 - Dado um usuário que seleciona `Google / Gemini`, quando a reescrita por IA é executada, então o sistema envia payload para `models/{model}:generateContent` e lê apenas o texto retornado em `candidates[0].content.parts`.
@@ -306,11 +307,13 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 - [x] Passo 5 — Adicionar UI em Preferências para ligar/desligar IA, escolher provedor em combo e salvar configuração sem expor segredos. Fecha: critérios 10, 11, 12, 13, 15, 16 e 20.
 - [x] Passo 6 — Adicionar aba **Tendências** no Cockpit, com gráfico mês a mês, tabela Budget x Realizado e bloco **Tendências e achados**, preservando identidade visual e leitura local sem IA. Fecha: critérios 1, 2, 3, 4, 5, 6, 7, 10, 20, 21, 25, 26, 27 e 28.
 - [x] Passo 7 — Implementar reescrita automática opcional por IA com payload minimizado, timeout curto e fallback local. Fecha: critérios 12, 13, 14, 16 e 17.
+- [x] Passo 8 — Exibir o campo `Timeout (segundos)` também para os provedores predefinidos (OpenAI, Anthropic e Google), mantendo-o oculto apenas quando nenhum provedor remoto estiver selecionado. Fecha: critério de timeout visível para provedores remotos.
 - [x] Passo 8 — Criar testes automatizados para núcleo local, segurança de preferências, fallback de IA e isolamento por usuário. Fecha: critérios 1 a 28.
 - [x] Passo 9 — Detectar limites de gastos ultrapassados em 3 meses consecutivos e exibir achado estruturado `limite_recorrente` sugerindo revisão do valor. Fecha: novos critérios de limite recorrente.
 
 ## Changelog
 
+- `2.27` — 2026-11-01 — Preferências de IA passam a exibir o campo Timeout (segundos) para os provedores remotos predefinidos (OpenAI, Anthropic e Google), não apenas para Custom / Local, permitindo aumentar o tempo limite das análises remotas.
 - `2.26` — 2026-10-10 — Inicia centralização da política local/remota/determinística em `ai_execution_settings`; Tendências passa a consumir a mesma ordem do Consultor e a expor a origem efetiva do resumo.
 
 - `2.25` — 2026-09-13 — Corrigida detecção de antecipação de parcelas para considerar apenas o destino final quando uma parcela é movida em cascata por várias faturas, evitando cards falsos nos meses intermediários.

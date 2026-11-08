@@ -1,3 +1,5 @@
+import { parseDecimalInput } from "./money-utils.js";
+
 export function createTransactionInvestmentForm({
   elements,
   api,
@@ -6,6 +8,8 @@ export function createTransactionInvestmentForm({
   moneyInputValue,
   decimalInputValue,
   formatDate,
+  formatMoney,
+  getCurrency,
 }) {
   const {
     transactionForm, transactionType, transactionCategory, transactionSubcategory,
@@ -15,11 +19,16 @@ export function createTransactionInvestmentForm({
     investmentTaxCostFields, investmentFixedIncomeMode, investmentFixedIncomeIndexer,
     investmentFixedIncomeRateLabel, investmentFixedIncomeRate, investmentFixedIncomePreview,
   } = elements;
+  const investmentGrossReference = elements.investmentGrossReference;
+  const investmentGrossReferenceValue = transactionForm.querySelector("#investmentGrossReferenceValue");
+  const investmentCostsHeading = transactionForm.querySelector("#investmentCostsHeading");
 
   fetchInvestmentFundQuoteButton?.addEventListener("click", fetchFundQuote);
   investmentFixedIncomeMode.addEventListener("change", syncFixedIncomeRateHint);
   investmentFixedIncomeIndexer.addEventListener("change", syncFixedIncomeRateHint);
   investmentFixedIncomeRate.addEventListener("input", syncFixedIncomeRateHint);
+  transactionForm.elements.investment_quantity.addEventListener("input", updateGrossReference);
+  transactionForm.elements.investment_unit_price.addEventListener("input", updateGrossReference);
   transactionForm.elements.investment_asset_identifier.addEventListener("input", syncFixedIncomeRateHint);
   transactionForm.elements.investment_asset_name.addEventListener("input", syncFixedIncomeRateHint);
   transactionForm.querySelectorAll("[data-mode-target='investment'][data-fixed-income-mode]").forEach((button) => {
@@ -69,6 +78,7 @@ export function createTransactionInvestmentForm({
     investmentPricingFields.hidden = isInvestment && (category === "Renda Fixa" || savings);
     if (investmentTradingCostFields) investmentTradingCostFields.hidden = !isInvestment || savings;
     if (investmentTaxCostFields) investmentTaxCostFields.hidden = !isInvestment || savings;
+    if (investmentCostsHeading) investmentCostsHeading.hidden = !isInvestment || savings;
     if (investmentEmergencyReserveFields) investmentEmergencyReserveFields.hidden = !canBeReserve;
     toggleFields(investmentOperationFields, !isInvestment);
     toggleFields(investmentFundFields, !isInvestment || investmentFundFields.hidden);
@@ -89,6 +99,20 @@ export function createTransactionInvestmentForm({
     }
     investmentAmount.required = isInvestment;
     investmentAmount.disabled = !isInvestment;
+    updateGrossReference();
+  }
+
+  function updateGrossReference() {
+    if (!investmentGrossReference) return;
+    const isInvestment = transactionType.value === "investment";
+    const quantity = parseDecimalInput(transactionForm.elements.investment_quantity.value);
+    const unitPrice = parseDecimalInput(transactionForm.elements.investment_unit_price.value);
+    const visible = isInvestment && !investmentPricingFields.hidden && quantity > 0 && unitPrice > 0;
+    investmentGrossReference.hidden = !visible;
+    if (!visible) return;
+    const grossAmount = Math.round(quantity * unitPrice * 100) / 100;
+    const currency = getCurrency?.() || "BRL";
+    if (investmentGrossReferenceValue) investmentGrossReferenceValue.textContent = `Valor bruto de referência: ${formatMoney(grossAmount, currency)}`;
   }
 
   function toggleFields(container, disabled) {

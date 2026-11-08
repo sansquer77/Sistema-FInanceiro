@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 16.33
-atualizado: 2026-10-19
+versao: 16.40
+atualizado: 2026-11-01
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -116,6 +116,8 @@ Este é o **Map of Content (MoC)** do vault. Cada link leva ao documento canôni
 | [[adr/0016-calendario-mercado-anbima]] | Calendário nacional ANBIMA persistido localmente como fonte única para dias úteis derivados de eventos B3. |
 | [[adr/0019-inferencia-local-webllm]] | Inferência local WebLLM compartilhada, com prioridade local/remota e fallback consentido. |
 | [[adr/0020-pesquisa-macro-consultor]] | Pesquisa macroeconômica web sem dados do usuário para enriquecer a Análise da Carteira. |
+| [[adr/0021-janela-contexto-local-consultor]] | Janela de contexto do WebLLM no Consultor, limite do payload local e repetição de erros transitórios da IA remota. |
+| [[adr/0022-orcamento-tokens-saida-consultor]] | Orçamento de tokens de saída do Consultor remoto: piso de 2500 e teto de 4000, contra o truncamento causado pelo raciocínio interno do Gemini. |
 | [[adr/0018-backup-completo-criptografado]] | Pacote completo de backup com container ZIP e payload criptografado autenticado, validado nos runtimes distribuídos. |
 
 ---
@@ -157,6 +159,14 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `16.40` — 2026-11-01 — [[specs/consultor]] v2.36 e v2.37: prompt local acima da janela de 11.000 caracteres usa a IA remota quando permitida; a chamada remota repete erros transitórios em até 3 tentativas; e o orçamento de saída remoto sobe para piso 2500 / teto 4000 tokens. [[adr/0021-janela-contexto-local-consultor]] v0.3, [[adr/0022-orcamento-tokens-saida-consultor]] e [[arquitetura]] v4.57 registram as decisões.
+- `16.39` — 2026-10-31 — [[specs/consultor]] v2.34 limita o payload do card Melhor Destino enviado ao modelo local e solicita janela de 8192 tokens; [[adr/0021-janela-contexto-local-consultor]] e [[arquitetura]] v4.56 registram a decisão.
+- `16.38` — 2026-10-27 — [[specs/objetivos-financeiros]] v0.24 e [[arquitetura]] v4.54 documentam a identidade persistente dos ativos vinculados a objetivos e a migração de schema `20011`.
+- `16.37` — 2026-10-20 — [[specs/sobre-app]] v1.13 registra a versão do produto `2.1.2` (PATCH).
+- `16.36` — 2026-10-20 — [[specs/investimentos-portfolio]] v2.69 e [[specs/lancamentos]] v3.43 movem orientações dos aportes para ícones de informação e simplificam a referência bruta.
+
+- `16.35` — 2026-10-20 — [[specs/investimentos-portfolio]] v2.68 implementa a isenção de IR estimado para LCI/LCA e explicita a apuração de renda fixa por lote; IOF zera ao completar 30 dias.
+- `16.34` — 2026-10-20 — [[specs/investimentos-portfolio]] v2.67 e [[specs/lancamentos]] v3.42 esclarecem o total debitado nos aportes, custos opcionais e referência do valor bruto negociado.
 - `16.33` — 2026-10-19 — [[specs/limites-gastos]] v1.10 impede sobrescrever definição futura independente ao editar limite herdado para outra categoria.
 - `16.32` — 2026-10-19 — [[specs/seguranca-autenticacao]] v1.8 e [[arquitetura]] v4.53 passam a exigir `Cache-Control: no-store` e `Pragma: no-cache` nas respostas JSON da API.
 - `16.31` — 2026-10-18 — [[specs/objetivos-financeiros]] v0.23 define e implementa o status de ritmo pela necessidade de aporte atual contra o plano original, com atenção até 20%.

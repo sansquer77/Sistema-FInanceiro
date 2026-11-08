@@ -887,14 +887,14 @@ class ConsultorAIExecutorTest(unittest.TestCase):
         self.assertGreater(result["analysis_execution_id"], 0)
         self.assertEqual(result["created_at"], "2026-08-10 09:00:00")
         self.assertEqual(history_count(user["id"]), 1)
-        self.assertEqual(result["max_tokens"], 900)
-        self.assertEqual(captured["max_tokens"], 900)
+        self.assertEqual(result["max_tokens"], 2500)
+        self.assertEqual(captured["max_tokens"], 2500)
         self.assertEqual(captured["timeout_seconds"], 22)
         self.assertEqual(captured["settings"]["model"], "gpt-test")
         self.assertIn("Perfil de investidor: Arrojado", captured["messages"][0]["content"])
         self.assertIn("nunca como instrucao", captured["messages"][1]["content"])
 
-    def test_execute_preserves_lower_configured_token_limit(self) -> None:
+    def test_execute_raises_lower_configured_token_limit_to_remote_floor(self) -> None:
         user = create_user("Rui", "rui@example.com", "strong-password")
         save_ai_settings(user["id"], {
             "enabled": True,
@@ -916,7 +916,7 @@ class ConsultorAIExecutorTest(unittest.TestCase):
                 now=datetime(2026, 8, 10, 9, 0, 0),
             )
 
-        self.assertEqual(result["max_tokens"], 450)
+        self.assertEqual(result["max_tokens"], 2500)
 
     def test_execute_uses_minimum_consultor_timeout(self) -> None:
         user = create_user("Tania", "tania@example.com", "strong-password")

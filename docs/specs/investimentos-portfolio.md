@@ -2,8 +2,8 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.66
-atualizado: 2026-09-24
+versao: 2.69
+atualizado: 2026-10-20
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -16,7 +16,7 @@ aliases: ["Investimentos", "Portfólio"]
 # Investimentos e Portfólio
 
 > [!info] Status
-> **implementado** · área: `investimentos` · atualizado em 2026-09-11 · relacionados: [[contas-correntes]], [[lancamentos]], [[relatorios]]
+> **implementado** · versão: `2.69` · área: `investimentos` · atualizado em 2026-10-20 · relacionados: [[contas-correntes]], [[lancamentos]], [[relatorios]]
 
 ## Problema
 
@@ -58,6 +58,8 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 - As barras dos cards de consolidação usam sempre o valor atual normalizado para BRL apenas para escala visual; para moedas diferentes de BRL, a normalização usa a cotação do fechamento anterior.
 - Posição inicial cadastrada no Portfólio não movimenta conta.
 - Operação de investimento criada por lançamento de conta afeta o saldo da conta.
+- Em aportes registrados por Lançamentos, o valor informado é o total efetivamente debitado da conta e inclui os custos da operação. Corretagem, emolumentos, impostos da operação e outros custos são detalhamento desse total, não são somados novamente ao custo da posição e podem ficar em branco ou zero quando não houver cobrança.
+- Quando quantidade e preço unitário são aplicáveis e informados, a interface apresenta o produto como referência do valor bruto negociado; o usuário pode compará-lo com o total debitado e os custos. A referência é informativa e não altera o valor nem valida a operação.
 - Posições iniciais e operações de aporte elegíveis podem ser marcadas explicitamente como parte da reserva de emergência para uso analítico pelo [[score-saude-financeira]]; nenhuma posição ou aporte entra automaticamente nessa reserva.
 
 **Renda Fixa:**
@@ -70,6 +72,9 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 - O formulário de posição (Renda Fixa) do Portfólio segue a mesma linguagem do formulário de Lançamentos: modalidade em combo com o ícone de ajuda (?) ao lado do rótulo, sem controles segmentados, chips, presets ou checkboxes com moldura pill.
 - Campos de quantidade e preço médio/unitário não devem ser exibidos para renda fixa, pois o custo total/aporte é a base de cálculo relevante.
 - O sistema calcula e deduz estimativas de IOF (até 30 dias) e IR (tabela regressiva de 22,5% a 15%).
+- O IR estimado não é aplicado a LCI ou LCA, identificadas pela subcategoria do lançamento e pelo subtipo/código da posição inicial.
+- Para as demais operações de renda fixa, valorização e impostos são calculados por aporte/lote, usando a data individual de cada lançamento para determinar idade, IOF e alíquota de IR; a apresentação pode consolidar os lotes depois de calculados.
+- O IOF regressivo de renda fixa é limitado ao rendimento e fica zerado quando o lote completa 30 dias (`days >= 30`); até 29 dias, usa a tabela regressiva vigente no código. LCI/LCA não têm IR estimado, mas a regra de IOF continua sendo aplicada quando cabível antes do 30º dia.
 - Para títulos do Tesouro Direto, o sistema mantém o cálculo de rentabilidade **na curva**, usando a taxa contratada cadastrada, sem tentar igualar a marcação a mercado exibida pelo site do Tesouro em resgate antecipado.
 - Para títulos do Tesouro Direto padrão (Prefixado, IPCA+ e Selic), o sistema calcula e deduz uma **Taxa B3 estimada** de 0,20% a.a. pro rata sobre o valor da posição estimado na curva. Para Tesouro Selic, aplica isenção simplificada até R$ 10.000,00 sobre a posição; acima desse valor, a estimativa incide apenas sobre o excedente. Para Tesouro RendA+ e Tesouro Educa+, o sistema não calcula automaticamente a taxa B3 na primeira versão, pois essas modalidades possuem regras específicas por prazo, resgate antecipado e faixa de recebimento.
 - O módulo Portfólio deve exibir nota discreta informando que diferenças frente ao site do Tesouro podem ocorrer por marcação a mercado em resgate antecipado, provisão oficial de taxas e regras específicas do título.
@@ -155,6 +160,11 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 
 ## Plano de implementação
 
+- [x] Identificar LCI/LCA a partir da subcategoria do lançamento e do subtipo/código da posição inicial, sem depender somente da descrição livre.
+- [x] Suprimir somente o IR de LCI/LCA; manter IOF regressivo por lote até 29 dias e zero a partir de 30 dias.
+- [x] Preservar a valorização e os impostos por lote/data de aporte antes de consolidar valores na apresentação.
+- [x] Esclarecer no formulário que o aporte é o total debitado da conta e que os campos de custos são apenas seu detalhamento, sem soma duplicada.
+- [x] Exibir a referência informativa de quantidade × preço unitário e identificar custos opcionais e impostos da operação, sem alterar a gravação.
 - [x] Rejeitar snapshots sem apresentação compatível antes de reutilizar/renderizar; informar necessidade de reiniciar servidor desatualizado sem retry automático em loop. Virtualização monta HTML somente das linhas visíveis e não materializa grupos recolhidos; cancelar listeners/frames ao substituir, sair ou trocar de aba. Testes com snapshot antigo, 10 mil posições e mil fontes; consumo real do Safari requer validação no ambiente do usuário.
 
 - [x] Centralizar resultados/percentuais de posições e fontes, agregações, composição e desvios de metas no núcleo Python; preservar moedas nativas, normalizando grupos mistos em BRL.
@@ -298,6 +308,14 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado que o calendário ANBIMA ainda não foi importado, quando o app inicia com rede disponível, então baixa a planilha oficial com TLS verificado e limite de tamanho e persiste somente datas válidas no SQLite.
 - Dado que já existe um calendário ANBIMA válido, quando a atualização anual falha, então os registros existentes são preservados e a abertura do app continua normalmente.
 - Dado uma tentativa de atualização já realizada no dia, quando o app reinicia, então não repete a requisição externa no mesmo dia.
+- Dado uma LCI ou LCA identificada em um aporte ou posição inicial, quando o Portfólio calcula o valor líquido, então não estima IR sobre seu rendimento.
+- Dado uma LCI ou LCA com menos de 30 dias e rendimento positivo, quando o Portfólio calcula o valor líquido, então ainda pode aplicar IOF regressivo limitado ao rendimento, mas mantém o IR em zero.
+- Dado uma operação de renda fixa tributável, quando o Portfólio calcula o valor líquido, então determina rendimento, IOF e alíquota de IR a partir do custo e da data de aquisição daquele lançamento/lote, sem usar a idade de outro aporte do mesmo ativo.
+- Dado um lote de renda fixa com 30 dias ou mais, quando o Portfólio calcula tributos, então o IOF do lote é zero; no dia 30 a alíquota já é zero.
+- Dado um aporte de investimento em Lançamentos, quando o formulário é exibido, então o campo `Total debitado da conta` tem um ícone de informação focável que explica que o total inclui os custos e que o detalhamento abaixo não será somado novamente.
+- Dado um ativo ao qual se aplicam quantidade e preço unitário, quando ambos têm valores positivos, então o formulário exibe somente o valor bruto de referência e um ícone de informação explica a fórmula e a comparação com o total debitado, sem alterar os valores submetidos.
+- Dado um aporte com custos opcionais, quando o formulário é exibido, então o título tem um ícone de informação focável que explica que os campos podem ficar em branco ou zero sem cobrança e que os impostos são da operação; quando não se aplicam à Poupança, esses campos permanecem ocultos/desabilitados.
+- Dado o formulário de aporte, quando as orientações sobre total debitado, referência bruta ou custos são necessárias, então elas aparecem sob demanda ao passar o ponteiro ou focar por teclado o ícone `i`, sem parágrafos auxiliares permanentes.
 
 ## Plano de implementação — transações sem rede
 
@@ -315,6 +333,10 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 
 ## Changelog
 
+- `2.69` — 2026-10-20 — Reduz a poluição visual do formulário de aporte, movendo orientações para ícones de informação e mantendo apenas o valor bruto de referência visível.
+
+- `2.68` — 2026-10-20 — Implementa a isenção de IR estimado para LCI/LCA e registra tributos de renda fixa por lote, com IOF zerado ao completar 30 dias.
+- `2.67` — 2026-10-20 — Formulário de aportes esclarece que o valor é o total debitado incluindo custos, mostra referência bruta por quantidade × preço e identifica os custos opcionais e impostos da operação.
 - `2.66` — 2026-09-24 — Ativos vinculados a objetivos recebem uma marca compacta em forma de bandeira no Portfólio, distinta do escudo da Reserva de Emergência e propagada pelo ativo consolidado.
 - `2.65` — 2026-09-18 — IPCA e IGP-M passam a usar consulta mensal consolidada e cacheada do SGS; a ausência da competência corrente deixa de ser apresentada como indisponibilidade do Banco Central.
 - `2.64` — 2026-09-11 — A coluna de quantidade ganha espaço para oito casas e o Histórico passa a identificar quantidades pelo código do ativo, não pela moeda da carteira.

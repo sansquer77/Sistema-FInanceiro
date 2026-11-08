@@ -23,7 +23,8 @@ from financeiro.financial_goals import (
     unlink_goal_funding_source,
     update_financial_goal,
 )
-from financeiro.portfolio import PortfolioError, update_opening_position
+from financeiro.portfolio import PortfolioError, _apply_goal_links, update_opening_position
+from financeiro.transactions import create_transaction
 
 
 class FinancialGoalsTest(unittest.TestCase):
@@ -264,6 +265,74 @@ class FinancialGoalsTest(unittest.TestCase):
             link_goal_funding_source(self.user["id"], self.create_goal()["id"], {
                 "source_type": "investment_opening", "source_id": source_id,
             })
+
+    def test_later_investment_contribution_stays_linked_to_consolidated_goal_asset(self) -> None:
+        source_id, payload = self.create_investment_source()
+        goal = self.create_goal()
+        initial_position = {
+            "account_id": payload["account_id"], "currency": "BRL", "asset_type": "savings",
+            "asset_identifier": "POUPANCA", "asset_name": "Poupança Objetivos", "cnpj": "",
+            "fixed_income_indexer": "", "fixed_income_maturity_date": "",
+            "current_value_cents": 100_000, "current_value_brl_cents": 100_000,
+        }
+        with patch("financeiro.portfolio.current_portfolio_positions", return_value=[initial_position]):
+            link_goal_funding_source(self.user["id"], goal["id"], {
+                "source_type": "investment_opening", "source_id": source_id,
+            })
+
+        transaction = create_transaction(self.user["id"], {
+            "type": "investment", "description": "Aporte posterior", "amount": "500,00",
+            "investment_amount": "500,00", "date": "2026-09-24",
+            "account_id": str(payload["account_id"]), "category": "Poupança",
+            "investment_asset_identifier": "POUPANCA",
+            "investment_asset_name": "Poupança Objetivos",
+        })
+        with get_connection() as conn:
+            operation_id = conn.execute(
+                "SELECT id FROM investment_operations WHERE transaction_id = ?",
+                (transaction["id"],),
+            ).fetchone()["id"]
+
+        later_position = {
+            **initial_position,
+            "current_value_cents": 50_000,
+            "current_value_brl_cents": 50_000,
+        }
+        positions = [initial_position.copy(), later_position]
+        with patch("financeiro.portfolio.current_portfolio_positions", return_value=positions):
+            current = next(item for item in list_financial_goals(self.user["id"]) if item["id"] == goal["id"])
+        _apply_goal_links(positions, self.user["id"])
+
+        self.assertEqual(current["linked_reserved_balance"], "1500.00")
+        self.assertTrue(all(position["goal_linked"] for position in positions))
+        with self.assertRaisesRegex(FinancialGoalError, "ja esta vinculado"):
+            link_goal_funding_source(self.user["id"], self.create_goal()["id"], {
+                "source_type": "investment_operation", "source_id": operation_id,
+            })
+
+    def test_funding_options_list_each_consolidated_investment_once(self) -> None:
+        from financeiro.financial_goals import available_funding_sources
+
+        base = {
+            "account_id": 7, "currency": "BRL", "asset_type": "savings", "asset_identifier": "POUPANCA",
+            "asset_name": "Poupança Objetivos", "cnpj": "", "fixed_income_indexer": "",
+            "fixed_income_maturity_date": "", "emergency_reserve_eligible": False, "goal_linked": False,
+        }
+        lots = [
+            {**base, "current_value_brl_cents": 100_000,
+             "sources": [{"source_type": "opening", "source_id": 5, "emergency_reserve_eligible": False}]},
+            {**base, "current_value_brl_cents": 50_000,
+             "sources": [{"source_type": "operation", "source_id": 9, "emergency_reserve_eligible": False}]},
+        ]
+        with patch("financeiro.portfolio.current_portfolio_positions", return_value=lots):
+            options = available_funding_sources(self.user["id"])
+            self.assertEqual(len(options), 1)
+            self.assertEqual(options[0]["key"], "investment_opening:5")
+            self.assertEqual(options[0]["current_value_brl"], "1500.00")
+
+            linked_lots = [{**lot, "goal_linked": True} for lot in lots]
+            with patch("financeiro.portfolio.current_portfolio_positions", return_value=linked_lots):
+                self.assertEqual(available_funding_sources(self.user["id"]), [])
 
     def test_tesouro_prefixado_links_all_lots_despite_different_purchase_rates(self) -> None:
         account = create_checking_account(self.user["id"], {

@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from http import HTTPStatus
+import json
 import sqlite3
 
 from financeiro.accounts import cents_to_money, empty_to_none, money_to_cents
@@ -55,7 +56,7 @@ def list_financial_goals(
 
 def financial_goals_overview(user_id: int) -> dict:
     """Build the goals tab payload from one shared portfolio snapshot."""
-    # spec: objetivos-financeiros v0.23 — critério 36
+    # spec: objetivos-financeiros v0.24 — critério 36
     from financeiro.portfolio import current_portfolio_positions
 
     positions = current_portfolio_positions(user_id, force_refresh=False)
@@ -179,7 +180,7 @@ def create_goal_movement(user_id: int, goal_id: object, data: dict) -> dict:
 
 def reset_annual_provision(user_id: int, goal_id: object) -> dict:
     """Start a new annual cycle while preserving the complete movement ledger."""
-    # spec: objetivos-financeiros v0.23 — critérios 41 a 44
+    # spec: objetivos-financeiros v0.24 — critérios 41 a 44
     normalized_id = normalize_item_id(goal_id, "Objetivo nao encontrado.")
     today = date.today()
     from financeiro.portfolio import current_portfolio_positions
@@ -274,6 +275,39 @@ def list_goal_funding_sources(user_id: int, goal_id: object) -> list[dict]:
     return enrich_funding_source_values(sources, user_id)
 
 
+def available_funding_sources(user_id: int) -> list[dict]:
+    """List consolidated investments that can still back a goal, one entry per asset."""
+    # spec: objetivos-financeiros v0.25 — critério 59
+    from financeiro.portfolio import current_portfolio_positions
+
+    assets: dict[str, dict] = {}
+    for position in current_portfolio_positions(user_id, force_refresh=False):
+        key = investment_asset_key(position)
+        asset = assets.setdefault(key, {"position": position, "sources": set(), "blocked": False, "value_cents": 0})
+        asset["value_cents"] += int(position.get("current_value_brl_cents") or 0)
+        asset["blocked"] |= bool(position.get("emergency_reserve_eligible") or position.get("goal_linked"))
+        for source in position.get("sources") or []:
+            asset["blocked"] |= bool(source.get("emergency_reserve_eligible") or source.get("goal_linked"))
+            if source.get("source_type") in {"opening", "operation"} and source.get("source_id"):
+                asset["sources"].add((source["source_type"], int(source["source_id"])))
+    options = []
+    for asset in assets.values():
+        if asset["blocked"] or not asset["sources"]:
+            continue
+        source_type, source_id = min(asset["sources"], key=lambda item: (item[0] != "opening", item[1]))
+        position = asset["position"]
+        label = position.get("asset_name") or position.get("asset_identifier") or "Investimento"
+        options.append({
+            "key": f"{'investment_opening' if source_type == 'opening' else 'investment_operation'}:{source_id}",
+            "label": label,
+            "account_name": position.get("account_name") or "",
+            "currency": position.get("currency") or "BRL",
+            "current_value_brl_cents": asset["value_cents"],
+            "current_value_brl": cents_to_money(asset["value_cents"]),
+        })
+    return sorted(options, key=lambda option: option["label"].casefold())
+
+
 def link_goal_funding_source(user_id: int, goal_id: object, data: dict) -> dict:
     normalized_goal_id = normalize_item_id(goal_id, "Objetivo nao encontrado.")
     source_type = normalize_choice(
@@ -287,32 +321,36 @@ def link_goal_funding_source(user_id: int, goal_id: object, data: dict) -> dict:
         if source.get("archived_at"):
             raise FinancialGoalError("Uma origem arquivada nao pode ser vinculada ao objetivo.")
         identity = investment_asset_identity(source)
+        asset_key = investment_asset_key(source)
         members = matching_investment_sources(conn, user_id, identity)
         if not members:
             raise FinancialGoalError("Investimento nao encontrado na carteira.", HTTPStatus.NOT_FOUND)
-        # spec: objetivos-financeiros v0.23 — critérios 29 a 32
+        # spec: objetivos-financeiros v0.24 — critérios 29 a 32
         if any(member.get("emergency_reserve_eligible") for member in members):
             raise FinancialGoalError(
                 "Este investimento compoe a Reserva de Emergencia e nao pode financiar outro objetivo."
             )
         for row in conn.execute(
-            "SELECT source_type, source_id FROM financial_goal_funding_sources WHERE user_id = ?",
+            "SELECT source_type, source_id, asset_key FROM financial_goal_funding_sources WHERE user_id = ?",
             (user_id,),
         ).fetchall():
             if row["source_type"] not in FUNDING_SOURCE_TYPES:
                 continue
-            existing = fetch_funding_source(conn, user_id, row["source_type"], row["source_id"])
-            if investment_asset_identity(existing) == identity:
+            existing_key = str(row["asset_key"] or "")
+            if not existing_key:
+                existing = fetch_funding_source(conn, user_id, row["source_type"], row["source_id"])
+                existing_key = investment_asset_key(existing)
+            if existing_key == asset_key:
                 raise FinancialGoalError("Este investimento ja esta vinculado a outro objetivo ativo.")
         canonical = min(members, key=lambda member: (0 if member["source_type"] == "investment_opening" else 1, int(member["id"])))
         canonical["label"] = canonical.get("asset_name") or canonical.get("asset_identifier") or "Investimento"
         try:
             cursor = conn.execute(
                 """
-                INSERT INTO financial_goal_funding_sources (user_id, goal_id, source_type, source_id)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO financial_goal_funding_sources (user_id, goal_id, source_type, source_id, asset_key)
+                VALUES (?, ?, ?, ?, ?)
                 """,
-                (user_id, normalized_goal_id, canonical["source_type"], canonical["id"]),
+                (user_id, normalized_goal_id, canonical["source_type"], canonical["id"], asset_key),
             )
         except sqlite3.IntegrityError as exc:
             raise FinancialGoalError("Esta origem de recurso ja esta vinculada a outro objetivo ativo.") from exc
@@ -339,7 +377,7 @@ def unlink_goal_funding_source(user_id: int, goal_id: object, link_id: object) -
 
 def ensure_not_linked_to_financial_goal(conn, user_id: int, source_type: str, source_id: int) -> None:
     """Impede que uma fonte alocada seja reaproveitada na Reserva de Emergência."""
-    # spec: objetivos-financeiros v0.23 — critérios 31 e 32
+    # spec: objetivos-financeiros v0.24 — critérios 31 e 32
     source = fetch_funding_source(conn, user_id, source_type, source_id)
     identity = investment_asset_identity(source)
     rows = conn.execute(
@@ -493,11 +531,13 @@ def fetch_funding_source(conn, user_id: int, source_type: str, source_id: int) -
 
 
 def format_funding_source(link: dict, source: dict) -> dict:
+    asset_key = str(link.get("asset_key") or investment_asset_key(source))
     return {
         "id": link["id"],
         "goal_id": link["goal_id"],
         "source_type": link["source_type"],
         "source_id": link["source_id"],
+        "asset_key": asset_key,
         "label": source.get("label") or "Origem de recurso",
         "account_name": source.get("account_name") or source.get("name") or "",
         "account_id": source.get("account_id"),
@@ -513,7 +553,7 @@ def format_funding_source(link: dict, source: dict) -> dict:
 
 
 def hydrate_goal(goal: dict, sources: list[dict], user_id: int, positions: list[dict] | None = None) -> dict:
-    # spec: objetivos-financeiros v0.23 — critério 30
+    # spec: objetivos-financeiros v0.24 — critério 30
     manual_balance_cents = int(goal.get("reserved_balance_cents") or 0)
     sources = enrich_funding_source_values(sources, user_id, positions)
     linked_balance_cents = sum(int(source.get("current_value_brl_cents") or 0) for source in sources)
@@ -536,18 +576,19 @@ def enrich_funding_source_values(
 
         positions = current_portfolio_positions(user_id, force_refresh=False)
     for source in sources:
-        identity = investment_asset_identity(source)
+        asset_key = str(source.get("asset_key") or investment_asset_key(source))
         value_cents = sum(
             int(position.get("current_value_brl_cents") or 0)
             for position in positions
-            if investment_asset_identity(position) == identity
+            if investment_asset_key(position) == asset_key
         )
-        # spec: objetivos-financeiros v0.23 — critérios 42 e 43; saldo é conferido na moeda original.
+        # spec: objetivos-financeiros v0.24 — critérios 42 e 43; saldo é conferido na moeda original.
         source["has_balance"] = any(
             int(position.get("current_value_cents") or 0) > 0
             for position in positions
-            if investment_asset_identity(position) == identity
+            if investment_asset_key(position) == asset_key
         )
+        source["asset_key"] = asset_key
         source["current_value_brl_cents"] = value_cents
         source["current_value_brl"] = cents_to_money(value_cents)
     return sources
@@ -566,6 +607,11 @@ def investment_asset_identity(source: dict) -> tuple:
         normalize_indexer(source.get("fixed_income_indexer")) if fixed_income else "",
         str(source.get("fixed_income_maturity_date") or "").strip() if fixed_income else "",
     )
+
+
+def investment_asset_key(source: dict) -> str:
+    """Serialize the consolidated investment identity for durable goal links."""
+    return json.dumps(investment_asset_identity(source), ensure_ascii=False, separators=(",", ":"))
 
 
 def matching_investment_sources(conn, user_id: int, identity: tuple) -> list[dict]:
@@ -694,12 +740,12 @@ def format_goal(goal: dict) -> dict:
 
 def build_goal_projection(goal: dict, reserved: int, effective_target: int, months: int) -> dict:
     """Build conservative and yield scenarios without changing the reserved balance."""
-    # spec: objetivos-financeiros v0.23 — critérios 7, 8, 9, 11, 27, 28 e 30
+    # spec: objetivos-financeiros v0.24 — critérios 7, 8, 9, 11, 27, 28 e 30
     remaining = max(effective_target - reserved, 0)
     conservative_monthly = (remaining + months - 1) // months if months > 0 else remaining
     conservative_contributions = remaining
     annual_rate, rate_label = projection_annual_rate(goal)
-    # spec: objetivos-financeiros v0.23 — critérios 51 e 52
+    # spec: objetivos-financeiros v0.24 — critérios 51 e 52
     # Os dois cenários usam os mesmos aportes; o rendimento estima o saldo final, não reduz o plano.
     yield_contributions = conservative_contributions
     if months <= 0 or annual_rate <= 0 or remaining <= 0:
@@ -755,7 +801,7 @@ def format_movement(movement: dict) -> dict:
 
 
 def calculate_pace_status(goal: dict, reserved: int, effective_target: int) -> str:
-    # spec: objetivos-financeiros v0.23 — critérios 54 a 57
+    # spec: objetivos-financeiros v0.24 — critérios 54 a 58
     if goal.get("status") == "paused":
         return "paused"
     if reserved >= effective_target:

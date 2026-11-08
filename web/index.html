@@ -738,7 +738,7 @@
                   <input name="description" type="text" placeholder="Ex.: Mercado, salário, transferência..." required>
                 </label>
                 <div class="field-row" id="investmentAmountRow" hidden>
-                  <label>Valor investido
+                  <label><span class="field-label-title">Total debitado da conta <button class="inline-help-icon" type="button" aria-label="Ajuda sobre o total debitado da conta" title="Ajuda sobre o total debitado da conta" data-tooltip="Informe o valor efetivamente debitado, incluindo os custos da operação. Os campos de custos abaixo apenas detalham esse total e não são somados novamente.">i</button></span>
                     <input name="investment_amount" id="investmentAmount" type="text" inputmode="decimal" placeholder="0,00" data-mask="money">
                   </label>
                 </div>
@@ -826,17 +826,22 @@
                   </div>
                   <div class="field-row" id="investmentPricingFields">
                     <label>Quantidade
-                      <input name="investment_quantity" id="investmentQuantity" type="text" inputmode="decimal" placeholder="0,000000" data-mask="money" data-mask-scale="6" data-mask-signed="false">
+                      <input name="investment_quantity" id="investmentQuantity" type="text" inputmode="decimal" placeholder="0,000000" data-mask="money" data-mask-scale="6" data-mask-signed="false" aria-describedby="investmentGrossReference">
                     </label>
                     <label>Preço unitário
-                      <input name="investment_unit_price" id="investmentUnitPrice" type="text" inputmode="decimal" placeholder="0,00" data-mask="money">
+                      <input name="investment_unit_price" id="investmentUnitPrice" type="text" inputmode="decimal" placeholder="0,00" data-mask="money" aria-describedby="investmentGrossReference">
                     </label>
                   </div>
+                  <p class="field-hint investment-gross-reference" id="investmentGrossReference" aria-live="polite" hidden>
+                    <span id="investmentGrossReferenceValue"></span>
+                    <button class="inline-help-icon" type="button" aria-label="Sobre o valor bruto de referência" title="Sobre o valor bruto de referência" data-tooltip="Calculado por quantidade × preço unitário. A diferença em relação ao total debitado ajuda a conferir os custos da operação. É apenas uma referência e não altera o lançamento.">i</button>
+                  </p>
                   <div class="field-row" id="investmentEmergencyReserveFields" hidden>
                     <label class="checkbox-label">Usar este aporte como reserva de emergência
                       <input name="investment_emergency_reserve_eligible" type="checkbox" value="1">
                     </label>
                   </div>
+                  <h3 class="investment-cost-heading" id="investmentCostsHeading">Custos da operação (opcionais) <button class="inline-help-icon" type="button" aria-label="Ajuda sobre custos da operação" title="Ajuda sobre custos da operação" data-tooltip="Deixe em branco ou informe zero quando não houver cobrança. Impostos são os da operação.">i</button></h3>
                   <div class="field-row" id="investmentTradingCostFields">
                     <label>Tx. corretagem
                       <input name="investment_brokerage_fee" type="text" inputmode="decimal" placeholder="0,00" data-mask="money">
@@ -846,7 +851,7 @@
                     </label>
                   </div>
                   <div class="field-row" id="investmentTaxCostFields">
-                    <label>Impostos
+                    <label>Impostos da operação
                       <input name="investment_tax" type="text" inputmode="decimal" placeholder="0,00" data-mask="money">
                     </label>
                     <label>Outros custos

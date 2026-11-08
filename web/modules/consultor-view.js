@@ -1,7 +1,7 @@
 // spec: cockpit-calendario v0.9 — critérios 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17 e 18
 // spec: consultor/consultor v2.16 — view de análises, pesquisa macro e fontes
 import { stateMarkup } from "./dom-utils.js";
-import { runLocalConsultor } from "./webllm-client.js?v=177";
+import { runLocalConsultor } from "./webllm-client.js?v=179";
 export function registerConsultorView({
   elements,
   api,

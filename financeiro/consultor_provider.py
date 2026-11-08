@@ -297,7 +297,56 @@ def _dict_items(value: object) -> list[dict]:
     return [item for item in value if isinstance(item, dict)]
 
 
+RETRYABLE_CONSULTOR_STATUS = {408, 429, 500, 502, 503, 504}
+CONSULTOR_MAX_ATTEMPTS = 3
+CONSULTOR_RETRY_BACKOFF_SECONDS = (2, 4)
+
+
+def _is_retryable_consultor_error(exc: ConsultorProviderError) -> bool:
+    """Repete apenas erros transitórios do provedor; timeouts não são repetidos para não multiplicar a espera."""
+    # spec: consultor/consultor v2.36 — critérios 77 e 78
+    cause = exc.__cause__
+    if isinstance(cause, HTTPError):
+        return int(cause.code) in RETRYABLE_CONSULTOR_STATUS
+    if exc.reason == "provider_error_payload":
+        code = exc.diagnostics.get("provider_code")
+        return isinstance(code, int) and code in RETRYABLE_CONSULTOR_STATUS
+    return False
+
+
 def call_consultor_ai_provider(
+    ai_settings: dict,
+    messages: list[dict],
+    *,
+    max_tokens: int,
+    timeout_seconds: int,
+    opener=None,
+    ssl_context_factory=None,
+    text_extractor=None,
+    request_builder=None,
+) -> str:
+    from time import sleep
+
+    for attempt in range(1, CONSULTOR_MAX_ATTEMPTS + 1):
+        try:
+            return _call_consultor_ai_provider_once(
+                ai_settings,
+                messages,
+                max_tokens=max_tokens,
+                timeout_seconds=timeout_seconds,
+                opener=opener,
+                ssl_context_factory=ssl_context_factory,
+                text_extractor=text_extractor,
+                request_builder=request_builder,
+            )
+        except ConsultorProviderError as exc:
+            if attempt < CONSULTOR_MAX_ATTEMPTS and _is_retryable_consultor_error(exc):
+                sleep(CONSULTOR_RETRY_BACKOFF_SECONDS[attempt - 1])
+                continue
+            raise
+
+
+def _call_consultor_ai_provider_once(
     ai_settings: dict,
     messages: list[dict],
     *,

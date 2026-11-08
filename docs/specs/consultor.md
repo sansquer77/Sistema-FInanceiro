@@ -2,8 +2,8 @@
 tipo: spec
 area: consultor
 status: em-implementacao
-versao: 2.33
-atualizado: 2026-10-12
+versao: 2.37
+atualizado: 2026-11-01
 relacionados:
   - "[[instrucoes-app]]"
   - "[[investimentos-portfolio]]"
@@ -17,7 +17,7 @@ aliases: ["Consultor Virtual", "Assistente de Investimentos", "Especialista em F
 # Consultor Virtual de Investimentos e Planejamento Financeiro
 
 > [!info] Status
-> **em-implementacao** · versão: `2.33` · área: `consultor` · atualizado em 2026-10-12 · relacionados: [[instrucoes-app]], [[investimentos-portfolio]], [[score-saude-financeira]], [[tendencias-saude-financeira]], [[cockpit-calendario]], [[objetivos-financeiros]], [[emprestimos-quitacao]], [[cartoes]], [[../adr/0019-inferencia-local-webllm]], [[../adr/0020-pesquisa-macro-consultor]]
+> **em-implementacao** · versão: `2.37` · área: `consultor` · atualizado em 2026-11-01 · relacionados: [[instrucoes-app]], [[investimentos-portfolio]], [[score-saude-financeira]], [[tendencias-saude-financeira]], [[cockpit-calendario]], [[objetivos-financeiros]], [[emprestimos-quitacao]], [[cartoes]], [[../adr/0019-inferencia-local-webllm]], [[../adr/0020-pesquisa-macro-consultor]], [[../adr/0021-janela-contexto-local-consultor]], [[../adr/0022-orcamento-tokens-saida-consultor]]
 
 > [!warning] Pivô arquitetural (v0.13, refinado em v0.14/v0.15)
 > A partir desta versão, o Consultor **não possui campo de prompt livre**. O usuário interage exclusivamente através de um **catálogo de análises pré-formatadas** (cards). Essa mudança é uma decisão de **Security by Design**: eliminar a superfície de entrada de texto livre remove pela raiz os vetores de vazamento acidental de dados sensíveis (PII) e de *prompt injection* via chat. As seções "Prevenção de vazamento de dados no prompt (DLP)" e "Blindagem de prompt injection" da v0.12 são **removidas** desta spec — ver "Segurança by Design" e "Nota de segurança residual" abaixo para o que substitui essas salvaguardas.
@@ -297,7 +297,7 @@ Toda análise deve encerrar com o disclaimer:
 - Em telas largas, a subtab **Análises** deve usar layout em duas colunas: catálogo compacto alinhado à esquerda e painel de resposta à direita, reduzindo rolagem para leitura após gerar uma análise; em telas estreitas, o layout volta para coluna única.
 - Nos cards de Portfólio e Risco, o payload enviado à IA deve explicitar que campos `_cents` estão em centavos e também incluir valores em reais já convertidos/formatados, reduzindo risco de a IA interpretar centavos como reais.
 - O card **Termômetro de Assinaturas e Recorrências** deve consumir o formato atual do módulo Tendências para `assinaturas_e_servicos`, que é uma lista de itens por subcategoria com `valor_cents`, mantendo compatibilidade com o formato legado em objeto.
-- O card **Análise da Carteira** deve enviar à IA o perfil de investidor configurado, o Perfil Complementar (quando preenchido) e o pilar Reserva do Score em meses, para que a seção **Adequação ao Perfil Configurado** da resposta reflita o perfil cadastrado no app — nunca um perfil fixo. A resposta deste card é detalhada por natureza: a restrição de concisão dos demais cards não se aplica a ele. O teto de tokens de saída para este card é de 1500 (superior aos 900 dos demais cards), e o prompt deve orientar a IA a encerrar **todas** as seções obrigatórias dentro desse limite, encurtando justificativas da tabela (até ~8 palavras por célula) e bullets quando necessário — nunca deixando uma seção pela metade, para a resposta não ser bloqueada pelo pós-processamento por seções ausentes.
+- O card **Análise da Carteira** deve enviar à IA o perfil de investidor configurado, o Perfil Complementar (quando preenchido) e o pilar Reserva do Score em meses, para que a seção **Adequação ao Perfil Configurado** da resposta reflita o perfil cadastrado no app — nunca um perfil fixo. A resposta deste card é detalhada por natureza: a restrição de concisão dos demais cards não se aplica a ele. O limite de tokens de saída remotos é o mesmo dos demais cards (piso de 2500, ver v2.37), e o prompt deve orientar a IA a encerrar **todas** as seções obrigatórias dentro desse limite, encurtando justificativas da tabela (até ~8 palavras por célula) e bullets quando necessário — nunca deixando uma seção pela metade, para a resposta não ser bloqueada pelo pós-processamento por seções ausentes.
 - **Todos os cards** do catálogo devem incluir no payload `investor_profile` e o Perfil Complementar (quando preenchido), para que a IA contextualize cada análise com o perfil e os dados complementares cadastrados no app; quando o Perfil Complementar não está preenchido, o payload carrega apenas `investor_profile`.
 - Tabelas markdown nas respostas do Consultor devem ser renderizadas como tabelas HTML na aba **Consultor** (primeira linha como cabeçalho), não como texto cru.
 - O card **Detecção de Anomalias e "Ralos" Financeiros** deve consumir o formato atual de `antecipacao_parcelas` em lista, somando `valor_cents` e contando os itens sem depender do formato legado agregado.
@@ -310,7 +310,7 @@ Toda análise deve encerrar com o disclaimer:
 
 | Limite | Valor | Comportamento |
 |---|---|---|
-| Resposta | cap de `max_tokens` das Preferências, limitado a **900** | O teto de tokens de saída por análise jamais excede 900. |
+| Resposta | `max_tokens` das Preferências, com piso de **2500** e teto de **4000** nas análises remotas | O piso garante espaço para o raciocínio interno de modelos Gemini (que consomem o mesmo limite de saída) e para todas as seções obrigatórias. A análise local mantém o limite de 900 tokens. |
 | Timeout | valor das Preferências, com piso operacional de **20s** | Evita falhas prematuras em cards que exigem mais tempo de resposta, mantendo o timeout configurado quando ele for maior que o piso. |
 | Contexto de dados | minimizado (padrão `minimize_trends_payload`) | Apenas agregados de carteira/lançamentos/score relevantes ao `analysis_id`, sem transações cruas desnecessárias. |
 | Quota diária | **20 execuções/usuário/dia** | Contadas em `consultor_analyses` por `created_at`; ao atingir o limite, aviso amigável e bloqueio até o dia seguinte. |
@@ -411,7 +411,8 @@ Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regr
 - Dado um usuário ativando a IA nas Preferências, quando o pop-up de consentimento de acesso a dados é apresentado e recusado, então o Consultor permanece **desabilitado**.
 - Dado um usuário com a IA habilitada, quando uma análise cita cotações de mercado, então os valores usam as mesmas fontes do módulo de **Portfólio** (Yahoo Finance, CoinGecko e PTAX, via `quote_cache`) e não divergem dos valores exibidos no app.
 - Dado um usuário com IA configurada nas Preferências, quando aciona qualquer card, então a mesma configuração de IA das Preferências é utilizada, sem configuração própria do módulo.
-- Dado uma execução de card, quando gera resposta, então o número de tokens de saída é limitado ao `max_tokens` das Preferências ou a 900, o que for menor.
+- Dado uma execução remota de card, quando gera resposta, então o número de tokens de saída é o `max_tokens` das Preferências, com piso de 2500 e teto de 4000; dado uma execução local, o limite permanece 900.
+- Dado que o modelo remoto consome tokens de raciocínio do mesmo limite de saída (por exemplo, 450 tokens antes de um texto de 160), quando uma análise remota é gerada com a configuração de 700 tokens das Preferências, então o sistema usa 2500 tokens e não entrega a resposta truncada no meio das seções.
 - Dado um usuário que atingiu 20 execuções no dia, quando tenta acionar um novo card, então o módulo bloqueia com aviso amigável e libera no dia seguinte.
 - Dado uma chamada à API do provedor de IA que falha, quando o usuário aciona um card, então o sistema exibe a mensagem padronizada "O Consultor está indisponível no momento", não persiste a execução em `consultor_analyses` e não desconta da quota diária.
 - Dado uma falha recente da API do provedor, quando o usuário tenta reacionar o mesmo card durante o cooldown de 30 segundos, então o acionamento permanece bloqueado; ao encerrar o cooldown, o acionamento é liberado normalmente.
@@ -450,6 +451,17 @@ Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regr
 - Dado que a execução local falhe e o fallback remoto também falhe, quando o erro é exibido, então a interface preserva a causa informada pela tentativa local e a indisponibilidade remota, sem ocultar a primeira falha.
 - Dado que o runtime local carregue o modelo mas a geração falhe, quando o erro é exibido, então a mensagem identifica falha de inferência e não afirma que Safari ou WebGPU são incompatíveis; o Console registra apenas a etapa e o tipo de erro, sem prompt ou resposta.
 - Dado que a análise local exceda a janela de contexto, quando o erro é registrado ou exibido, então o Consultor identifica essa causa e registra apenas a contagem de tokens e o limite quando disponíveis, sem registrar o prompt.
+- Dado o card **Melhor Destino para Investimentos a Vencer** com mais de 4 datas com lançamentos futuros numa moeda, quando o contexto é montado, então a linha do tempo envia apenas os 4 eventos mais próximos por moeda, informa `omitted_events` e mantém o saldo projetado ao fim do horizonte; valores zerados de cada evento não são enviados, e a projeção mensal envia no máximo 3 meses por moeda com `omitted_months` informando os meses omitidos com movimento.
+- Dado o card **Melhor Destino para Investimentos a Vencer** com mais de 5 faturas abertas, quando o contexto é montado, então envia as 5 faturas com vencimento mais próximo, informa `omitted_open_card_invoices` e mantém o total por vencimento e moeda que já alimenta a projeção; com até 5 faturas, nenhuma é omitida.
+- Dado o card **Melhor Destino para Investimentos a Vencer** com lançamentos futuros e faturas extensos, quando o prompt local é preparado, então o payload de dados enviado ao modelo local não ultrapassa 8.000 caracteres, sem remover guardrails nem campos `_display`.
+- Dado o modelo local WebLLM, quando o engine é criado no modo Worker ou na página, então solicita a janela de contexto padrão do modelo (4096 tokens), sem aumentá-la, pois 8192 tokens causou perda do dispositivo GPU por falta de memória no navegador (ver [[adr/0021-janela-contexto-local-consultor]] v0.2).
+- Dado que a geração local falha com perda do dispositivo GPU ("Device was lost", por falta de memória), quando o erro é classificado, então a categoria é `gpu_memory_or_device_lost` e a mensagem exibida informa que a GPU ficou sem memória, sem cair no texto genérico de falha de geração.
+- Dado que a geração local falha por memória da GPU ou por janela de contexto excedida e a IA remota está configurada e permitida pela política de execução, quando o Consultor executa, então usa a IA remota automaticamente e a interface exibe a falha local antes do resultado.
+- Dado que a geração local falha e a política é somente local, quando o Consultor executa, então nenhuma chamada à IA remota é feita e a falha local é exibida.
+- Dado um prompt local (instruções e dados) com mais de 11.000 caracteres e IA remota configurada e permitida pela política, quando o Consultor prepara a análise local, então não tenta a geração local, informa que o contexto excede a janela da IA local e usa a IA remota.
+- Dado um prompt local acima de 11.000 caracteres e política somente local (ou sem IA remota permitida), quando o Consultor prepara a análise, então tenta a geração local mesmo assim, pois não há alternativa.
+- Dado que o provedor remoto responde com erro transitório (HTTP 408, 429, 500, 502, 503 ou 504, inclusive quando o código vem no corpo da resposta), quando o Consultor executa a análise, então repete a chamada até 3 tentativas, com espera de 2s e 4s entre elas.
+- Dado que o provedor remoto excede o tempo limite, quando o Consultor executa a análise, então não repete a chamada, para não multiplicar a espera, e segue o fluxo de indisponibilidade.
 - Dado uma resposta vazia do provider remoto, quando o erro é registrado, então o log distingue resposta vazia de falha de transporte sem registrar corpo, prompt ou chave.
 - Dado uma resposta Gemini sem texto utilizável, quando o Consultor registra a falha, então o log inclui somente motivos/estados padronizados e contagens de tokens do provedor, sem conteúdo de prompt, resposta, chave ou dados financeiros.
 - Dado uma resposta Gemini sem candidatos que contenha um objeto `error`, quando o Consultor registra a falha, então o log registra apenas código numérico e status padronizado do provedor, sem mensagem ou corpo da resposta.
@@ -499,6 +511,17 @@ Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regr
 - [x] Passo 28 — Implementar adaptadores de pesquisa web nativa apenas para provedores oficiais suportados e a consulta estática, limitada e sem dados do usuário; manter falha da pesquisa não bloqueante. Fecha: critérios 64 e 67.
 - [x] Passo 29 — Incorporar resumo, data e fontes somente no contexto de `analise_carteira`, cobrindo preparação local e execução remota/fallback sob a política central; exibir fontes como links HTTPS na interface. Fecha: critérios 65, 66 e 68.
 - [x] Passo 30 — Cobrir privacidade do payload de pesquisa, citações, provedores não suportados, falhas e os fluxos local/remoto com testes automatizados. Fecha: critérios 64 a 68.
+- [x] Passo 31 — Limitar em `financeiro/consultor_cashflow.py` a linha do tempo, as faturas abertas e os meses enviados ao card `destino_vencimentos`, preservando o saldo projetado final e a contagem de itens omitidos. Fecha: critérios 69 e 70.
+- [x] Passo 32 — Solicitar ao WebLLM a janela de contexto em `web/modules/webllm-client.js`, nos modos Worker e página, sem trocar o modelo; alinhar as importações de `webllm-client.js` na versão `v=178`. Fecha: critério 71 (revisado na v2.35).
+- [x] Passo 33 — Cobrir limites do payload, itens omitidos e janela solicitada com testes automatizados (`tests/test_consultor_destino_payload.py` e `tests/test_frontend_contracts.py`). Fecha: critérios 69 a 72.
+- [x] Passo 34 — Registrar a decisão de janela e orçamento de tokens em [[adr/0021-janela-contexto-local-consultor]] e sincronizar a arquitetura. Fecha: critério 71.
+- [x] Passo 35 — Reverter a janela de contexto local para 4096 tokens, reconhecer `Device was lost` como falha de memória da GPU e garantir o fallback remoto nesse caso quando a política permitir. Fecha: critérios 71 a 74 (revisados).
+- [x] Passo 36 — Atualizar testes de contrato e o ADR-0021 (v0.2) e sincronizar `docs/arquitetura.md`. Fecha: critérios 71 a 74.
+- [x] Passo 37 — No `financeiro/consultor.py`, pular a geração local quando o prompt exceder 11.000 caracteres e a IA remota estiver permitida, informando o motivo; manter a tentativa local quando não houver alternativa. Fecha: critérios 75 e 76.
+- [x] Passo 38 — Em `financeiro/consultor_provider.py`, repetir a chamada remota em erros transitórios (HTTP e código no corpo), com 3 tentativas e esperas de 2s e 4s, sem repetir timeouts. Fecha: critérios 77 e 78.
+- [x] Passo 39 — Cobrir os quatro critérios com testes automatizados (`tests/test_consultor_fallbacks.py`). Fecha: critérios 75 a 78.
+- [x] Passo 40 — Em `financeiro/consultor.py`, elevar o limite de saída remoto do Consultor para piso 2500 e teto 4000, mantendo 900 na análise local. Fecha: critérios 79 e 80.
+- [x] Passo 41 — Atualizar os testes do limite de tokens e cobrir a configuração de 700 tokens com piso de 2500. Fecha: critérios 79 e 80.
 
 ### Checklist de homologação do Passo 19
 
@@ -548,6 +571,10 @@ _Nenhuma pendência em aberto._
 
 ## Changelog
 
+- `2.37` — 2026-11-01 — Análises remotas passam a usar limite de saída com piso de 2500 e teto de 4000 (a análise local mantém 900), porque o raciocínio interno do Gemini consumia o limite de 700–900 e truncava as seções obrigatórias.
+- `2.36` — 2026-11-01 — Prompt local acima de 11.000 caracteres usa a IA remota quando permitida, em vez de tentar a janela local; a chamada remota repete erros transitórios (HTTP e código no corpo) em até 3 tentativas, sem repetir timeouts.
+- `2.35` — 2026-11-01 — Reverte a janela de contexto local para 4096 tokens após perda da GPU com 8192; reconhece `Device was lost` como falha de memória da GPU e explicita o fallback remoto quando a política permitir, mantendo `somente_local` sem chamada remota.
+- `2.34` — 2026-10-31 — Limita a linha do tempo (4 datas por moeda), os meses (3) e as faturas (5) do card Melhor Destino enviados ao modelo local, omite valores zerados e solicita janela de contexto de 8192 tokens ao WebLLM, com [[adr/0021-janela-contexto-local-consultor]].
 - `2.32` — 2026-10-11 — Pesquisa macroeconômica passa a fazer até 3 tentativas com backoff (1s, 2s) em erros transitórios do provedor (HTTP 408/429/5xx, timeout, erro de rede), continuando indisponível apenas após esgotar as tentativas.
 - `2.31` — 2026-10-11 — Adiciona log de diagnóstico quando o pós-processamento detecta recomendação de venda/resgate proibida, registrando o padrão e o trecho sem expor dados do usuário.
 - `2.30` — 2026-10-11 — Adiciona ao prompt do Consultor a estrutura exata de resposta em Markdown (`### Resumo`, `### Analise de Dados`, etc.) para reforçar a geração de todas as seções obrigatórias.

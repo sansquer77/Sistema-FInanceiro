@@ -5,6 +5,23 @@ from datetime import date, timedelta
 from financeiro.balance_projections import card_invoice_date
 from financeiro.database import get_connection
 
+# spec: consultor/consultor v2.34 — critérios 69 e 70
+MAX_TIMELINE_EVENTS_PER_CURRENCY = 4
+MAX_FORECAST_MONTHS = 3
+MAX_OPEN_INVOICES = 5
+
+
+def amount_fields(name: str, amount: int, currency: str) -> dict:
+    """Valores zerados não são enviados à IA; o total de cada linha continua calculado."""
+    from financeiro.consultor_context import format_currency_minor_units
+
+    if not amount:
+        return {}
+    return {
+        f"{name}_minor_units": amount,
+        f"{name}_display": format_currency_minor_units(amount, currency),
+    }
+
 
 def build_maturity_cashflow_context(user_id: int, reference_date: date) -> dict:
     """Projeção curta a partir de saldos efetivos e compromissos explicitamente registrados."""
@@ -112,27 +129,34 @@ def build_maturity_cashflow_context(user_id: int, reference_date: date) -> dict:
 
     currencies = sorted(set(balances) | {currency for currency, _ in events})
     forecast = []
+    omitted_months = 0
     for currency in currencies:
         running = balances.get(currency, 0)
+        shown_months = 0
         month = reference_date.strftime("%Y-%m")
         last_month = horizon.strftime("%Y-%m")
         while month <= last_month:
             event = events.get((currency, month), {})
-            running += int(event.get("planned_income_minor_units") or 0)
-            running -= int(event.get("planned_expense_minor_units") or 0)
-            running -= int(event.get("open_card_invoices_minor_units") or 0)
-            forecast.append({
-                "currency": currency, "month": month,
-                "opening_balance_minor_units": balances.get(currency, 0) if month == reference_date.strftime("%Y-%m") else None,
-                "planned_income_minor_units": int(event.get("planned_income_minor_units") or 0),
-                "planned_income_display": format_currency_minor_units(int(event.get("planned_income_minor_units") or 0), currency),
-                "planned_expense_minor_units": int(event.get("planned_expense_minor_units") or 0),
-                "planned_expense_display": format_currency_minor_units(int(event.get("planned_expense_minor_units") or 0), currency),
-                "open_card_invoices_minor_units": int(event.get("open_card_invoices_minor_units") or 0),
-                "open_card_invoices_display": format_currency_minor_units(int(event.get("open_card_invoices_minor_units") or 0), currency),
-                "projected_balance_after_recorded_bills_minor_units": running,
-                "projected_balance_display": format_currency_minor_units(running, currency),
-            })
+            income = int(event.get("planned_income_minor_units") or 0)
+            expense = int(event.get("planned_expense_minor_units") or 0)
+            invoices_due = int(event.get("open_card_invoices_minor_units") or 0)
+            running += income - expense - invoices_due
+            is_reference_month = month == reference_date.strftime("%Y-%m")
+            if (is_reference_month or (currency, month) in events) and shown_months < MAX_FORECAST_MONTHS:
+                shown_months += 1
+                forecast.append({
+                    "currency": currency, "month": month,
+                    **({"opening_balance_minor_units": balances.get(currency, 0),
+                        "opening_balance_display": format_currency_minor_units(balances.get(currency, 0), currency)}
+                       if is_reference_month else {}),
+                    **amount_fields("planned_income", income, currency),
+                    **amount_fields("planned_expense", expense, currency),
+                    **amount_fields("open_card_invoices", invoices_due, currency),
+                    "projected_balance_after_recorded_bills_minor_units": running,
+                    "projected_balance_display": format_currency_minor_units(running, currency),
+                })
+            elif is_reference_month or (currency, month) in events:
+                omitted_months += 1
             year, number = int(month[:4]), int(month[5:7])
             month = f"{year + (number == 12):04d}-{(number % 12) + 1:02d}"
 
@@ -149,12 +173,9 @@ def build_maturity_cashflow_context(user_id: int, reference_date: date) -> dict:
             running += income - expense - invoices_due
             cash_events.append({
                 "date": event_date,
-                "planned_income_minor_units": income,
-                "planned_income_display": format_currency_minor_units(income, currency),
-                "planned_expense_minor_units": expense,
-                "planned_expense_display": format_currency_minor_units(expense, currency),
-                "open_card_invoices_minor_units": invoices_due,
-                "open_card_invoices_display": format_currency_minor_units(invoices_due, currency),
+                **amount_fields("planned_income", income, currency),
+                **amount_fields("planned_expense", expense, currency),
+                **amount_fields("open_card_invoices", invoices_due, currency),
                 "projected_balance_after_recorded_bills_minor_units": running,
                 "projected_balance_display": format_currency_minor_units(running, currency),
             })
@@ -162,8 +183,14 @@ def build_maturity_cashflow_context(user_id: int, reference_date: date) -> dict:
             "currency": currency,
             "opening_balance_minor_units": balances.get(currency, 0),
             "opening_balance_display": format_currency_minor_units(balances.get(currency, 0), currency),
-            "events": cash_events,
+            "projected_balance_at_horizon_minor_units": running,
+            "projected_balance_at_horizon_display": format_currency_minor_units(running, currency),
+            "events": cash_events[:MAX_TIMELINE_EVENTS_PER_CURRENCY],
+            "omitted_events": max(len(cash_events) - MAX_TIMELINE_EVENTS_PER_CURRENCY, 0),
         })
+
+    invoices.sort(key=lambda item: item["due_date"])
+    shown_invoices = invoices[:MAX_OPEN_INVOICES]
 
     return {
         "horizon_days": 90,
@@ -179,6 +206,8 @@ def build_maturity_cashflow_context(user_id: int, reference_date: date) -> dict:
             for currency, amount in sorted(investment_balances.items())
         ],
         "months_by_currency": forecast,
+        "omitted_months": omitted_months,
         "timeline_by_currency": timelines,
-        "open_card_invoices": invoices,
+        "open_card_invoices": shown_invoices,
+        "omitted_open_card_invoices": max(len(invoices) - MAX_OPEN_INVOICES, 0),
     }

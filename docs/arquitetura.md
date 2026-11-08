@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 4.53
-atualizado: 2026-10-19
+versao: 4.57
+atualizado: 2026-11-01
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -19,7 +19,7 @@ tags: [arquitetura, meta]
 # Arquitetura
 
 > [!info] Status
-> **implementado** · versão: `4.53` · área: `meta` · atualizado em 2026-10-19 · relacionados: [[requisitos]], [[qualidade-codigo]], [[specs/consultor]], [[specs/tendencias-saude-financeira]], [[adr/0019-inferencia-local-webllm]], [[adr/0020-pesquisa-macro-consultor]], [[specs/desacoplamento-importacao-parsers]]
+> **implementado** · versão: `4.56` · área: `meta` · atualizado em 2026-10-31 · relacionados: [[requisitos]], [[qualidade-codigo]], [[specs/consultor]], [[specs/tendencias-saude-financeira]], [[adr/0019-inferencia-local-webllm]], [[adr/0020-pesquisa-macro-consultor]], [[specs/desacoplamento-importacao-parsers]]
 
 ## Visão geral
 
@@ -244,6 +244,7 @@ O modo local mantém `APP_HOST=127.0.0.1` e permite HTTP. O modo rede/LAN dos pa
 | `DELETE` | `/api/financial-goals/{id}/funding-sources/{link_id}` |
 | `GET` | `/api/financial-goals/emergency-reserve` |
 | `GET` | `/api/financial-goals/overview` | Fornece objetivos e Reserva de Emergência sobre um snapshot compartilhado do Portfólio. |
+| `GET` | `/api/financial-goals/funding-options` | Lista investimentos consolidados disponíveis para vínculo, um item por ativo, montados em `financial_goals.py`. |
 
 ### Empréstimos e quitação
 
@@ -471,7 +472,7 @@ O arquivo SQLite recebe `journal_mode=WAL` uma vez no ciclo de inicialização; 
 
 ### Baseline e migração para a linha v2
 
-O baseline inicial da v2 usa `PRAGMA user_version = 20000`; o endurecimento operacional do SQLite inaugura `20001`, a política global de backup usa `20002`, a precisão de oito casas das quantidades do Portfólio usa `20003`, Objetivos Financeiros usa `20004`, Empréstimos usa `20005` e a identidade estável de categorias usa `20006` e o reconhecimento de pagamentos após conciliação usa `20007`; `20008` adiciona `loans.amortization_system` (Price ou SAC), preservando contratos existentes como Price; `20009` acrescenta indexador, saldo principal/data-base e taxa remuneratória, com valores neutros ou nulos nos contratos existentes; `20010` cria tabelas para monitoramento de crédito rotativo, histórico de condições e vínculos a pagamentos existentes sem alterar os lançamentos legados. A tabela `schema_migrations` registra baseline e passos posteriores, enquanto `user_version` seleciona e ordena as migrações. Banco ausente é criado diretamente na versão atual; bancos entre `20000` e `20009` avançam transacionalmente em ordem até `20010`; versões futuras ou intermediárias desconhecidas são recusadas. Um `finance.db` com `user_version = 0` continua tratado como legado: na abertura, `financeiro/database_migrations.py` orquestra a cópia de trabalho, as compatibilizações históricas via `financeiro/database_compatibility.py::normalize_legacy_schema`, o candidato compacto por `VACUUM INTO`, as validações de integridade/chaves estrangeiras/versão/contagens e a promoção recuperável. O original passa a `data/finance-v1.bkp`, que nunca é sobrescrito, enquanto o candidato mantém o nome ativo `data/finance.db`. Falhas anteriores à promoção preservam o nome original; falha na segunda renomeação tenta restaurá-lo. Ver [[specs/migracao-banco-v2]] e [[adr/0012-fundacao-v2-contrato-e-migracao-de-dados]].
+O baseline inicial da v2 usa `PRAGMA user_version = 20000`; o endurecimento operacional do SQLite inaugura `20001`, a política global de backup usa `20002`, a precisão de oito casas das quantidades do Portfólio usa `20003`, Objetivos Financeiros usa `20004`, Empréstimos usa `20005` e a identidade estável de categorias usa `20006` e o reconhecimento de pagamentos após conciliação usa `20007`; `20008` adiciona `loans.amortization_system` (Price ou SAC), preservando contratos existentes como Price; `20009` acrescenta indexador, saldo principal/data-base e taxa remuneratória, com valores neutros ou nulos nos contratos existentes; `20010` cria tabelas para monitoramento de crédito rotativo, histórico de condições e vínculos a pagamentos existentes sem alterar os lançamentos legados; `20011` persiste `asset_key` e seu índice de exclusividade em `financial_goal_funding_sources`, mantendo os vínculos antigos pela referência canônica. A tabela `schema_migrations` registra baseline e passos posteriores, enquanto `user_version` seleciona e ordena as migrações. Banco ausente é criado diretamente na versão atual; bancos entre `20000` e `20010` avançam transacionalmente em ordem até `20011`; versões futuras ou intermediárias desconhecidas são recusadas. Um `finance.db` com `user_version = 0` continua tratado como legado: na abertura, `financeiro/database_migrations.py` orquestra a cópia de trabalho, as compatibilizações históricas via `financeiro/database_compatibility.py::normalize_legacy_schema`, o candidato compacto por `VACUUM INTO`, as validações de integridade/chaves estrangeiras/versão/contagens e a promoção recuperável. O original passa a `data/finance-v1.bkp`, que nunca é sobrescrito, enquanto o candidato mantém o nome ativo `data/finance.db`. Falhas anteriores à promoção preservam o nome original; falha na segunda renomeação tenta restaurá-lo. Ver [[specs/migracao-banco-v2]] e [[adr/0012-fundacao-v2-contrato-e-migracao-de-dados]].
 
 ### Tabelas
 
@@ -495,7 +496,7 @@ O baseline inicial da v2 usa `PRAGMA user_version = 20000`; o endurecimento oper
 | `spending_limits` | `spending_limits.py` — Ver [[limites-gastos]]. |
 | `financial_goals` | `financial_goals.py` — definição, estado e premissas de projeção. Ver [[specs/objetivos-financeiros]]. |
 | `financial_goal_movements` | `financial_goals.py` — livro auditável de aportes, retiradas e ajustes manuais. Ver [[specs/objetivos-financeiros]]. |
-| `financial_goal_funding_sources` | `financial_goals.py` — vínculos exclusivos a ativos de investimento consolidados, ancorados em uma entrada canônica; o saldo do ativo acompanha todos os lotes e movimentos. Ver [[specs/objetivos-financeiros]]. |
+| `financial_goal_funding_sources` | `financial_goals.py` — vínculos exclusivos por `asset_key` do ativo consolidado; `source_type/source_id` mantêm a referência canônica legada e o saldo acompanha todos os lotes e movimentos, inclusive aportes posteriores. Ver [[specs/objetivos-financeiros]]. |
 | `loans` | `loans.py` — contratos, sistema Price/SAC, indexador, principal informado/data-base, taxa remuneratória e compromisso nominal; cálculos separados por moeda. Ver [[specs/emprestimos-quitacao]]. |
 | `loan_payment_links` | `loans.py` — referências aos lançamentos existentes e estado de reconhecimento após conciliação; não cria movimentos financeiros duplicados. Ver [[specs/emprestimos-quitacao]]. |
 | `revolving_loans` | `revolving_loans.py` — saldos, taxas, data-base, modalidade, status e referência ao residual existente de cartão. Ver [[specs/emprestimos-quitacao]]. |
@@ -707,6 +708,10 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `4.57` — 2026-11-01 — O Consultor remoto passa a usar orçamento de saída com piso de 2500 e teto de 4000 tokens (`CONSULTOR_REMOTE_MIN_OUTPUT_TOKENS`/`CONSULTOR_REMOTE_MAX_OUTPUT_TOKENS` em `financeiro/consultor.py`), porque o raciocínio interno do Gemini consome o mesmo limite e truncava as seções obrigatórias com 700–900 tokens; a análise local mantém 900. Ver [[adr/0022-orcamento-tokens-saida-consultor]] e [[specs/consultor]] v2.37.
+- `4.56` — 2026-10-31 — Documenta o limite de itens enviados pelo card Melhor Destino ao modelo local e a janela de contexto de 8192 tokens do WebLLM, com [[adr/0021-janela-contexto-local-consultor]] e [[specs/consultor]] v2.34.
+- `4.55` — 2026-10-28 — Documenta a rota `/api/financial-goals/funding-options`, que centraliza no núcleo a lista de origens para vínculo de objetivos.
+- `4.54` — 2026-10-27 — Documenta o schema `20011` e a identidade persistente dos ativos vinculados a objetivos.
 - `4.53` — 2026-10-19 — Documenta os headers `Cache-Control: no-store` e `Pragma: no-cache` aplicados às respostas JSON da API.
 - `4.52` — 2026-10-18 — Atualiza a arquitetura da view de Limites/Objetivos e sincroniza a versão com as specs revisadas de frontend, limites e objetivos.
 - `4.51` — 2026-10-12 — Documentada a separação de `financeiro/imports.py` em `import_utils.py`, `import_parsers.py`, `import_ofx.py` e `import_templates.py`.

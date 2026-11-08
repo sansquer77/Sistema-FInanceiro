@@ -32,6 +32,7 @@ EXACT_ROUTES: dict[str, dict[str, str]] = {
         "/api/loans": "handle_list_loans",
         "/api/revolving-loans": "handle_list_revolving_loans",
         "/api/financial-goals/emergency-reserve": "handle_emergency_reserve_summary",
+        "/api/financial-goals/funding-options": "handle_available_goal_funding_sources",
         "/api/global-search": "handle_global_search",
         "/api/cockpit": "handle_cockpit",
         "/api/cockpit/calendar": "handle_cockpit_calendar",
