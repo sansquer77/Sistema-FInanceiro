@@ -2081,7 +2081,7 @@ def fetch_accumulated_indexer_factor(
     return factor
 
 
-# spec: emprestimos-quitacao/emprestimos-quitacao v0.56 — critério 79
+# spec: emprestimos-quitacao/emprestimos-quitacao v0.61 — critério 79
 def fetch_trailing_twelve_month_indexer_factor(
     indexer: str,
     as_of_date: date | None = None,

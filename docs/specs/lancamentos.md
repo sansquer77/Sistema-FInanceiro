@@ -2,8 +2,8 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 3.43
-atualizado: 2026-10-20
+versao: 3.44
+atualizado: 2026-11-11
 relacionados:
   - "[[contas-correntes]]"
   - "[[categorias-tags-gestao]]"
@@ -18,7 +18,7 @@ aliases: ["Lançamentos", "Transações"]
 # Lançamentos
 
 > [!info] Status
-> **implementado** · versão: `3.43` · área: `lancamentos` · atualizado em 2026-10-20 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]], [[emprestimos-quitacao]]
+> **implementado** · versão: `3.44` · área: `lancamentos` · atualizado em 2026-11-11 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]], [[emprestimos-quitacao]]
 
 ## Problema
 
@@ -228,6 +228,7 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dado um aporte com quantidade e preço unitário preenchidos, quando qualquer um desses campos muda, então a referência quantidade × preço é atualizada e apresentada de forma compacta como valor bruto informativo na moeda da conta; um ícone de informação explica seu uso.
 - Dado os campos de custos de um aporte, quando o usuário não teve cobrança, então pode deixá-los em branco ou zero; o campo de impostos é identificado como `Impostos da operação` e o título dos custos oferece essa orientação por ícone de informação.
 - Dado o formulário de aporte, quando as orientações sobre total, referência bruta ou custos são necessárias, então elas aparecem ao passar o ponteiro ou focar por teclado o ícone `i`, sem texto auxiliar permanente ocupando espaço.
+- Dado uma parcela de série de despesa categorizada como `loan_payment`, quando o usuário edita essa parcela e a associa a um empréstimo, então somente essa ocorrência recebe o vínculo, sem alterar as demais parcelas; lançamentos de série de outras categorias continuam sem associação a empréstimos. Ver [[emprestimos-quitacao]] v0.61.
 
 ## Plano de implementação — clareza de custos em aportes
 
@@ -253,6 +254,7 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 
 ## Changelog
 
+- `3.44` — 2026-11-11 — Parcelas de série da categoria `loan_payment` podem ser associadas a um contrato de empréstimo ao serem editadas individualmente ([[emprestimos-quitacao]] v0.61).
 - `3.43` — 2026-10-20 — Move orientações do formulário de aportes para tooltips acessíveis e reduz a referência bruta ao valor calculado.
 
 - `3.42` — 2026-10-20 — Formulário de aporte identifica o total debitado da conta, explica o detalhamento dos custos opcionais e apresenta referência bruta por quantidade × preço unitário.

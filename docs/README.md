@@ -189,6 +189,9 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 - `16.17` — 2026-09-27 — [[specs/lancamentos]] v3.40 e [[requisitos]] v3.35 incluem recorrência diária de conta com a opção de média histórica.
 - `16.16` — 2026-09-27 — [[specs/lancamentos]] v3.40 adiciona recorrência diária de conta, incluindo média histórica.
 - `16.15` — 2026-09-27 — [[specs/objetivos-financeiros]] v0.21 adapta cards à largura útil; [[design/design-system]] v4.2 define reflow por container e contenção da navegação lateral.
+- `16.17` — 2026-11-11 — [[specs/emprestimos-quitacao]] v0.61 e [[specs/lancamentos]] v3.44 permitem associar a um empréstimo cada parcela de série da categoria `loan_payment`, editada individualmente.
+- `16.16` — 2026-11-11 — [[specs/emprestimos-quitacao]] v0.60 faz pagamento conciliado reduzir o contrato mesmo com revisão pendente; `adm/reparar_emprestimo_pagamento.py` ajusta contratos com pagamento reconhecido sem redução (dry-run por padrão).
+- `16.15` — 2026-11-11 — [[specs/emprestimos-quitacao]] v0.58 corrige o reconhecimento de parcela vinculada editada antes da conciliação, que deixava o contrato sem atualizar parcelas restantes.
 - `16.14` — 2026-09-27 — [[specs/objetivos-financeiros]] v0.20 remove o rótulo redundante “atendido” do indicador de progresso.
 - `16.13` — 2026-09-27 — Corrige o carregamento da tela de Objetivos após erro de sintaxe no gráfico; hash CSP do script inline sincronizado.
 - `16.12` — 2026-09-27 — [[specs/objetivos-financeiros]] v0.18 ajusta o gráfico de projeção, eixos e legenda para cards em duas colunas.

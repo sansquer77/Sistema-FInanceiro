@@ -27,7 +27,9 @@ from financeiro.loans import (
     _latest_indexer_projection_assumption,
     update_loan,
 )
-from financeiro.transactions import create_transaction, set_transaction_reconciled
+from financeiro.transactions import (
+    TransactionError, create_transaction, list_transactions, set_transaction_reconciled, update_transaction,
+)
 
 
 class LoansTest(unittest.TestCase):
@@ -119,7 +121,7 @@ class LoansTest(unittest.TestCase):
         self.assertGreater(result["indexation_cents"], 0)
         self.assertEqual(result["months"], 2)
 
-    # spec: emprestimos-quitacao/emprestimos-quitacao v0.57 — critério 61
+    # spec: emprestimos-quitacao/emprestimos-quitacao v0.61 — critério 61
     def test_indexed_projection_matrix_covers_price_and_sac_with_all_supported_indexers(self) -> None:
         """Exercise historical correction across both schedules and all supported indexes."""
         cases = (
@@ -272,7 +274,7 @@ class LoansTest(unittest.TestCase):
         self.assertEqual(tr["observations"], 365)
         self.assertAlmostEqual(float(tr["factor"]), 1.0001**365, places=10)
 
-    # spec: emprestimos-quitacao/emprestimos-quitacao v0.57 — critério 79
+    # spec: emprestimos-quitacao/emprestimos-quitacao v0.61 — critério 79
     def test_latest_cdi_assumption_uses_latest_published_daily_rate_and_252_days(self) -> None:
         from financeiro.portfolio import fetch_latest_cdi_assumption
 
@@ -285,7 +287,7 @@ class LoansTest(unittest.TestCase):
         self.assertEqual(cdi["annual_rate"], annual_factor - 1)
         self.assertEqual(cdi["monthly_rate"], annual_factor ** (Decimal("1") / Decimal("12")) - 1)
 
-    # spec: emprestimos-quitacao/emprestimos-quitacao v0.57 — critério 78
+    # spec: emprestimos-quitacao/emprestimos-quitacao v0.61 — critério 78
     def test_payoff_vs_cdi_compares_same_extra_contributions_over_baseline_horizon(self) -> None:
         observed = {
             "daily_rate": Decimal("0.0005"), "annual_rate": Decimal("0.134",),
@@ -305,7 +307,7 @@ class LoansTest(unittest.TestCase):
         self.assertEqual(comparison["advantage_cents"], 30_000 - (expected_ending - 120_000))
         self.assertEqual(comparison["rate_date"], "2026-09-23")
 
-    # spec: emprestimos-quitacao/emprestimos-quitacao v0.57 — critérios 84–90
+    # spec: emprestimos-quitacao/emprestimos-quitacao v0.61 — critérios 84–90
     def test_full_payoff_uses_estimated_principal_and_compares_it_with_cdi(self) -> None:
         create_loan(self.user["id"], self.loan_payload())
         loan = list_loans(self.user["id"])[0]
@@ -365,7 +367,7 @@ class LoansTest(unittest.TestCase):
             "category": "Empréstimos e Financiamentos", "loan_id": loan["id"],
         })
         set_transaction_reconciled(self.user["id"], str(transaction["id"]), True)
-        # spec: emprestimos-quitacao/emprestimos-quitacao v0.57 — critério 77
+        # spec: emprestimos-quitacao/emprestimos-quitacao v0.61 — critério 77
         current = list_loans(self.user["id"])[0]
         self.assertTrue(current["principal_review_required"])
         self.assertIsNone(current["principal_balance_cents"])
@@ -486,6 +488,117 @@ class LoansTest(unittest.TestCase):
         self.assertEqual(refreshed["remaining_installments"], 11)
         self.assertEqual(refreshed["paid_installments"], 1)
         self.assertEqual(refreshed["total_paid_cents"], 106_619)
+
+    def test_pending_payment_edited_before_reconciliation_still_reduces_installments(self) -> None:
+        loan = create_loan(self.user["id"], self.loan_payload())
+        account = create_checking_account(self.user["id"], {
+            "name": "Conta corrente", "bank_name": "Banco", "currency": "BRL", "initial_balance": "5000,00",
+        })
+        transaction = create_transaction(self.user["id"], {
+            "type": "expense", "description": "Parcela financiamento", "amount": "1.066,19",
+            "date": "2026-10-10", "account_id": str(account["id"]),
+            "category": "Empréstimos e Financiamentos", "loan_id": loan["id"],
+        })
+        update_transaction(self.user["id"], str(transaction["id"]), {
+            "type": "expense", "description": "Parcela financiamento editada", "amount": "1.066,19",
+            "date": "2026-10-10", "account_id": str(account["id"]),
+            "category": "Empréstimos e Financiamentos", "loan_id": loan["id"],
+        })
+        self.assertFalse(list_loans(self.user["id"])[0]["review_required"])
+        set_transaction_reconciled(self.user["id"], str(transaction["id"]), True)
+        refreshed = list_loans(self.user["id"])[0]
+        self.assertEqual(refreshed["remaining_installments"], 11)
+        self.assertEqual(refreshed["paid_installments"], 1)
+        self.assertEqual(refreshed["total_paid_cents"], 106_619)
+
+    def test_reconciled_payment_reduces_contract_even_with_review_pending(self) -> None:
+        loan = create_loan(self.user["id"], self.loan_payload())
+        with get_connection() as conn:
+            conn.execute("UPDATE loans SET review_required=1 WHERE id=?", (loan["id"],))
+        account = create_checking_account(self.user["id"], {
+            "name": "Conta corrente", "bank_name": "Banco", "currency": "BRL", "initial_balance": "5000,00",
+        })
+        transaction = create_transaction(self.user["id"], {
+            "type": "expense", "description": "Parcela financiamento", "amount": "1.066,19",
+            "date": "2026-10-10", "account_id": str(account["id"]),
+            "category": "Empréstimos e Financiamentos", "loan_id": loan["id"],
+        })
+        set_transaction_reconciled(self.user["id"], str(transaction["id"]), True)
+        refreshed = list_loans(self.user["id"])[0]
+        self.assertEqual(refreshed["remaining_installments"], 11)
+        self.assertEqual(refreshed["paid_installments"], 1)
+        self.assertTrue(refreshed["review_required"])
+
+    def test_single_installment_of_loan_payment_series_can_be_linked_individually(self) -> None:
+        loan = create_loan(self.user["id"], self.loan_payload())
+        account = create_checking_account(self.user["id"], {
+            "name": "Conta corrente", "bank_name": "Banco", "currency": "BRL", "initial_balance": "5000,00",
+        })
+        series = create_transaction(self.user["id"], {
+            "type": "expense", "description": "Pagto financiamento", "amount": "1.066,19",
+            "date": "2026-10-10", "account_id": str(account["id"]),
+            "category": "Empréstimos e Financiamentos", "series_kind": "installment", "installment_count": 3,
+        })
+        occurrences = [item for item in list_transactions(self.user["id"], account_id=account["id"]) if item["series_id"] == series["series_id"]]
+        self.assertEqual(len(occurrences), 3)
+        target = occurrences[1]
+        update_transaction(self.user["id"], str(target["id"]), {
+            "type": "expense", "description": "Pagto financiamento", "amount": "1.066,19",
+            "date": target["date"], "account_id": str(account["id"]),
+            "category": "Empréstimos e Financiamentos", "series_kind": "installment",
+            "installment_count": 3, "loan_id": loan["id"],
+        })
+        set_transaction_reconciled(self.user["id"], str(target["id"]), True)
+        refreshed = list_loans(self.user["id"])[0]
+        self.assertEqual(refreshed["paid_installments"], 1)
+        self.assertEqual(refreshed["remaining_installments"], 11)
+        with get_connection() as conn:
+            links = conn.execute("SELECT transaction_id FROM loan_payment_links").fetchall()
+        self.assertEqual([row[0] for row in links], [target["id"]])
+
+    def test_series_outside_loan_payment_category_or_creation_cannot_link_to_loan(self) -> None:
+        loan = create_loan(self.user["id"], self.loan_payload())
+        account = create_checking_account(self.user["id"], {
+            "name": "Conta corrente", "bank_name": "Banco", "currency": "BRL", "initial_balance": "5000,00",
+        })
+        with self.assertRaises(TransactionError):
+            create_transaction(self.user["id"], {
+                "type": "expense", "description": "Parcela", "amount": "100,00", "date": "2026-10-10",
+                "account_id": str(account["id"]), "category": "Empréstimos e Financiamentos",
+                "series_kind": "installment", "installment_count": 2, "loan_id": loan["id"],
+            })
+        other = create_transaction(self.user["id"], {
+            "type": "expense", "description": "Compra", "amount": "100,00", "date": "2026-10-10",
+            "account_id": str(account["id"]), "category": "Alimentação",
+            "series_kind": "installment", "installment_count": 2,
+        })
+        with self.assertRaises(TransactionError):
+            update_transaction(self.user["id"], str(other["id"]), {
+                "type": "expense", "description": "Compra", "amount": "100,00", "date": "2026-10-10",
+                "account_id": str(account["id"]), "category": "Alimentação",
+                "series_kind": "installment", "installment_count": 2, "loan_id": loan["id"],
+            })
+
+    def test_recognized_payment_edited_after_reconciliation_flags_review(self) -> None:
+        loan = create_loan(self.user["id"], self.loan_payload())
+        account = create_checking_account(self.user["id"], {
+            "name": "Conta corrente", "bank_name": "Banco", "currency": "BRL", "initial_balance": "5000,00",
+        })
+        transaction = create_transaction(self.user["id"], {
+            "type": "expense", "description": "Parcela financiamento", "amount": "1.066,19",
+            "date": "2026-10-10", "account_id": str(account["id"]),
+            "category": "Empréstimos e Financiamentos", "loan_id": loan["id"],
+        })
+        set_transaction_reconciled(self.user["id"], str(transaction["id"]), True)
+        update_transaction(self.user["id"], str(transaction["id"]), {
+            "type": "expense", "description": "Parcela financiamento editada", "amount": "1.066,19",
+            "date": "2026-10-10", "account_id": str(account["id"]),
+            "category": "Empréstimos e Financiamentos", "loan_id": loan["id"],
+        })
+        refreshed = list_loans(self.user["id"])[0]
+        self.assertTrue(refreshed["review_required"])
+        self.assertEqual(refreshed["remaining_installments"], 11)
+        self.assertEqual(refreshed["paid_installments"], 1)
 
     def test_payment_link_rejects_wrong_currency(self) -> None:
         loan = create_loan(self.user["id"], self.loan_payload(currency="USD"))

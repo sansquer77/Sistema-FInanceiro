@@ -43,6 +43,7 @@ def build_cockpit_notifications(
     critical.extend(_overdue_account_notifications(calendar.get("overdue_payables") or []))
     critical.extend(_overdue_invoice_notifications(user_id, reference_date))
     critical.extend(_loan_due_notifications(user_id, reference_date))
+    critical.extend(_revolving_zero_balance_notifications(user_id))
     critical.extend(_backup_failure_notifications(user_id))
     critical.extend(_password_recovery_notifications(user_id, reference_date))
 
@@ -80,6 +81,28 @@ def _loan_due_notifications(user_id: int, reference_date: date) -> list[dict]:
             f"Parcela de {row['name']} vence hoje",
             f"Confira o pagamento do empréstimo em {row['currency']} e associe o lançamento da conta.",
             due_date, "Ver empréstimo", "loans", {"loan_id": row["id"]},
+        )
+        for row in rows
+    ]
+
+
+def _revolving_zero_balance_notifications(user_id: int) -> list[dict]:
+    # spec: emprestimos-quitacao/emprestimos-quitacao v0.61 — critério 97
+    # Saldo zerado não encerra o rotativo sozinho; o alerta pede a decisão do usuário.
+    with get_connection() as conn:
+        rows = conn.execute(
+            """SELECT id, name, currency, balance_date FROM revolving_loans
+               WHERE user_id=? AND status='active' AND balance_cents<=0
+               ORDER BY name, id""",
+            (user_id,),
+        ).fetchall()
+    return [
+        _item(
+            f"revolving_zero_balance:{row['id']}", "revolving_zero_balance", "loans",
+            f"Saldo zerado: {row['name']}",
+            f"O saldo do rotativo em {row['currency']} está zerado. Encerre o acompanhamento como quitação definitiva ou troca de dívida.",
+            str(row["balance_date"]), "Encerrar acompanhamento", "loans",
+            {"revolving_loan_id": row["id"], "action": "close_revolving"},
         )
         for row in rows
     ]

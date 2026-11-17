@@ -7,9 +7,10 @@ from financeiro import database
 from financeiro.auth import create_user
 from financeiro.database import begin_immediate, get_connection, initialize_database
 from financeiro.accounts import create_checking_account
-from financeiro.transactions import create_transaction, set_transaction_reconciled
+from financeiro.transactions import create_transaction, set_transaction_reconciled, update_transaction
 from financeiro.operation_logs import OperationLogError, create_operation_log_with_conn
-from financeiro.revolving_loans import (create_revolving_loan, create_revolving_loan_with_conn,
+from financeiro.cockpit_notifications import build_cockpit_notifications
+from financeiro.revolving_loans import (close_revolving_loan, create_revolving_loan, create_revolving_loan_with_conn,
                                         link_payment, list_revolving_loans, update_revolving_loan)
 from financeiro.revolving_loans import (RevolvingLoanError, project_revolving_balance,
                                         simulate_revolving_repayment)
@@ -130,6 +131,57 @@ class RevolvingLoanMonitoringTest(unittest.TestCase):
         with get_connection() as conn:
             self.assertEqual(conn.execute("SELECT COUNT(*) FROM transactions WHERE user_id=?", (self.user["id"],)).fetchone()[0], 1)
             self.assertEqual(conn.execute("SELECT amount_cents FROM transactions WHERE id=?", (transaction["id"],)).fetchone()[0], 20_000)
+
+    def test_review_flag_survives_reconciliation_of_another_payment(self):
+        loan = create_revolving_loan(self.user["id"], {
+            "name": "Cheque especial", "debt_type": "overdraft", "currency": "BRL",
+            "balance": "1.000,00", "balance_date": "2026-09-25", "rate_percent": "0",
+            "rate_period": "daily", "capitalization": "daily",
+        })
+        account = create_checking_account(self.user["id"], {
+            "name": "Conta", "bank_name": "Banco", "currency": "BRL", "initial_balance": "2.000,00",
+        })
+        payload = {
+            "type": "expense", "description": "Pagamento A", "amount": "100,00",
+            "date": "2026-09-26", "account_id": str(account["id"]),
+            "category": "Empréstimos e Financiamentos", "revolving_loan_id": loan["id"],
+        }
+        first = create_transaction(self.user["id"], payload)
+        set_transaction_reconciled(self.user["id"], str(first["id"]), True)
+        update_transaction(self.user["id"], str(first["id"]), {**payload, "description": "Pagamento A editado"})
+        self.assertTrue(list_revolving_loans(self.user["id"])[0]["review_required"])
+        second = create_transaction(self.user["id"], {**payload, "description": "Pagamento B", "amount": "50,00"})
+        set_transaction_reconciled(self.user["id"], str(second["id"]), True)
+        refreshed = list_revolving_loans(self.user["id"])[0]
+        self.assertTrue(refreshed["review_required"])
+        self.assertEqual(refreshed["balance_cents"], 85_000)
+
+    def test_zero_balance_active_revolving_creates_central_alert_until_closed(self):
+        loan = create_revolving_loan(self.user["id"], {
+            "name": "Cheque especial", "debt_type": "overdraft", "currency": "BRL",
+            "balance": "100,00", "balance_date": "2026-09-25", "rate_percent": "0",
+            "rate_period": "daily", "capitalization": "daily",
+        })
+        update_revolving_loan(self.user["id"], loan["id"], {
+            "name": "Cheque especial", "debt_type": "overdraft", "currency": "BRL",
+            "balance": "0", "balance_date": "2026-09-26", "rate_percent": "0",
+            "rate_period": "daily", "capitalization": "daily",
+        })
+        alerts = build_cockpit_notifications(
+            self.user["id"], reference_date=date(2026, 9, 26),
+            limits_loader=lambda *_: [], calendar_loader=lambda *_, **__: {},
+            totals_loader=lambda *_: [], portfolio_positions_loader=lambda _uid: [],
+        )["critical"]
+        zero = [item for item in alerts if item["type"] == "revolving_zero_balance"]
+        self.assertEqual(len(zero), 1)
+        self.assertEqual(zero[0]["action"]["params"], {"revolving_loan_id": loan["id"], "action": "close_revolving"})
+        close_revolving_loan(self.user["id"], loan["id"], "paid")
+        alerts = build_cockpit_notifications(
+            self.user["id"], reference_date=date(2026, 9, 26),
+            limits_loader=lambda *_: [], calendar_loader=lambda *_, **__: {},
+            totals_loader=lambda *_: [], portfolio_positions_loader=lambda _uid: [],
+        )["critical"]
+        self.assertFalse([item for item in alerts if item["type"] == "revolving_zero_balance"])
 
     def test_individual_study_does_not_persist_contract_or_create_transactions(self):
         loan = create_revolving_loan(self.user["id"], {

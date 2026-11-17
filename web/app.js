@@ -949,6 +949,10 @@ const cockpitView = registerCockpitView({
     }
     if (action?.route === "loans") {
       showModule("loans");
+      if (params.action === "close_revolving" && params.revolving_loan_id) {
+        await loansView.openRevolvingLoanClosure(Number(params.revolving_loan_id));
+        return;
+      }
       if (params.revolving_loan_id) {
         await loansView.openPriceConversionDraft(Number(params.revolving_loan_id));
       }

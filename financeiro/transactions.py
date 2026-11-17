@@ -240,7 +240,7 @@ def create_transaction_with_conn(conn: sqlite3.Connection, user_id: int, data: d
     if destination:
         recompute_account_balance(conn, user_id, destination["id"])
     if transaction.get("loan_id"):
-        # spec: emprestimos-quitacao/emprestimos-quitacao v0.54 — critérios 24–25
+        # spec: emprestimos-quitacao/emprestimos-quitacao v0.61 — critérios 24–25
         # O vínculo nasce na mesma transação do lançamento, sem criar um segundo débito.
         from financeiro.loans import link_payment_with_conn
         link_payment_with_conn(conn, user_id, transaction["loan_id"], int(first_transaction_id))
@@ -266,9 +266,9 @@ def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
         ).fetchone()
         if not existing:
             raise TransactionError("Lancamento nao encontrado.", HTTPStatus.NOT_FOUND)
-        if (transaction.get("loan_id") or transaction.get("revolving_loan_id")) and transaction["series_kind"] != "single":
+        if transaction.get("revolving_loan_id") and transaction["series_kind"] != "single":
             raise TransactionError("Associe empréstimos somente a lançamentos avulsos.")
-        from financeiro.loans import invalidate_loan_payment_links
+        from financeiro.loans import invalidate_loan_payment_links, is_payable_loan_series
         invalidate_loan_payment_links(conn, user_id, normalized_id)
         from financeiro.revolving_loans import invalidate_payment_links_with_conn
         invalidate_payment_links_with_conn(conn, user_id, normalized_id)
@@ -284,6 +284,8 @@ def update_transaction(user_id: int, transaction_id: str, data: dict) -> dict:
             normalize_transfer_amounts(transaction, source, destination)
         exchange_rate_micros = resolve_exchange_rate_micros(source["currency"], transaction["date"], transaction["exchange_rate"])
         category_id, subcategory_id = resolve_transaction_category(conn, user_id, transaction, destination)
+        if transaction.get("loan_id") and transaction["series_kind"] != "single" and not is_payable_loan_series(conn, user_id, category_id, apply_to_future):
+            raise TransactionError("Associe empréstimos somente a lançamentos avulsos ou a uma parcela de pagamento de empréstimo, sem aplicar a outras ocorrências.")
         tag_ids = [get_or_create_tag(conn, user_id, tag) for tag in transaction["tags"]]
         series_id = existing["series_id"]
         current_occurrence = {
