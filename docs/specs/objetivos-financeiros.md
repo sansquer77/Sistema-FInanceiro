@@ -2,8 +2,8 @@
 tipo: spec
 area: objetivos-financeiros
 status: implementado
-versao: 0.23
-atualizado: 2026-10-18
+versao: 0.25
+atualizado: 2026-10-28
 relacionados:
   - "[[limites-gastos]]"
   - "[[investimentos-portfolio]]"
@@ -18,7 +18,7 @@ aliases: ["Objetivos Financeiros", "Fundos de Provisão", "Cofrinhos"]
 # Objetivos Financeiros e Fundos de Provisão
 
 > [!info] Status
-> **implementado** · versão: `0.23` · área: `objetivos-financeiros` · atualizado em 2026-10-18 · relacionados: [[limites-gastos]], [[investimentos-portfolio]], [[score-saude-financeira]], [[cockpit-calendario]], [[historico-operacoes]]
+> **implementado** · versão: `0.25` · área: `objetivos-financeiros` · atualizado em 2026-10-28 · relacionados: [[limites-gastos]], [[investimentos-portfolio]], [[score-saude-financeira]], [[cockpit-calendario]], [[historico-operacoes]]
 
 ## Problema
 
@@ -172,12 +172,13 @@ Um vínculo de cobertura representa o ativo financeiro inteiro na carteira selec
 | `POST` | `/api/financial-goals/{id}/funding-sources` | Vincula um investimento consolidado. |
 | `DELETE` | `/api/financial-goals/{id}/funding-sources/{link_id}` | Remove o vínculo sem apagar as movimentações do objetivo. |
 | `GET` | `/api/financial-goals/emergency-reserve` | Retorna total e componentes atuais da Reserva de Emergência. |
+| `GET` | `/api/financial-goals/funding-options` | Lista os investimentos consolidados elegíveis para vínculo, um item por ativo, com valor atual em BRL. |
 
 Tabelas propostas:
 
 - `financial_goals`: definição, estado e premissas de projeção.
 - `financial_goal_movements`: livro imutável de aportes, retiradas, ajustes e estornos.
-- `financial_goal_funding_sources`: vínculos exclusivos com ativos de investimento consolidados, identificados por uma entrada canônica do ativo.
+- `financial_goal_funding_sources`: vínculos exclusivos com ativos de investimento consolidados, cuja identidade permanece estável após novos aportes; `source_type/source_id` preservam a referência canônica.
 
 As tabelas devem ser criadas pela migração incremental idempotente do schema v2. Valores monetários são inteiros em centavos. Regras, projeções e validações de sobreposição pertencem ao núcleo Python, nunca ao frontend.
 
@@ -240,6 +241,8 @@ As tabelas devem ser criadas pela migração incremental idempotente do schema v
 55. Dado um objetivo com data, quando o aporte mensal necessário atual supera o planejado em até 20%, então o status é `attention`.
 56. Dado um objetivo com data, quando o aporte mensal necessário atual supera o planejado em mais de 20%, então o status é `late`.
 57. Dado um objetivo sem prazo, pausado, concluído ou vencido, quando o status é calculado, então preserva respectivamente os estados `on_track`, `paused`, `completed` ou `overdue` conforme suas condições prioritárias.
+58. Dado um investimento vinculado a um objetivo, quando um novo aporte do mesmo ativo é registrado depois do vínculo, então seu valor continua compondo a cobertura, todos os componentes permanecem marcados no Portfólio e o ativo não fica disponível para outro vínculo.
+59. Dado um investimento com vários aportes, quando a lista de origens para vincular a um objetivo é aberta, então o ativo aparece uma única vez com o valor atual consolidado em BRL, calculado pelo núcleo Python, e não um item por aporte.
 
 ## Pendências
 
@@ -283,9 +286,13 @@ Não há pendências abertas para o MVP aprovado. A possibilidade futura de divi
 - [x] Passo 23 — Preservar a mesma cadência conservadora de aportes no cenário com rendimento, identificar no gráfico o valor planejado e explicitar o caráter estimado do rendimento. Fecha: critérios 51 e 52.
 - [x] Passo 24 — Confirmar que o aporte sugerido usa o saldo presente consolidado das posições vinculadas, já incluído no saldo reservado do núcleo. Fecha: critério 53.
 - [x] Passo 25 — Comparar o aporte mensal necessário na data atual com o plano mensal original e derivar `on_track`, `attention` ou `late`, preservando estados prioritários e excluindo rendimento estimado. Fecha: critérios 54 a 57.
+- [x] Passo 26 — Persistir a identidade consolidada do ativo nos vínculos, aplicar exclusividade e marcação a novos aportes, e manter a seleção de cobertura coerente com o ativo inteiro. Fecha: critério 58.
+- [x] Passo 27 — Montar as origens disponíveis para vínculo no núcleo Python (`available_funding_sources`, rota `/api/financial-goals/funding-options`), eliminando a reconstrução de identidade no navegador. Fecha: critério 59.
 
 ## Changelog
 
+- `0.25` — 2026-10-28 — A lista de origens para vincular passa a ser montada pelo núcleo Python, com um item por investimento consolidado e valor atual agregado.
+- `0.24` — 2026-10-27 — Persiste a identidade consolidada do investimento no vínculo para manter cobertura, exclusividade e marcação após novos aportes.
 - `0.23` — 2026-10-18 — Implementa o status de ritmo pela comparação entre o aporte mensal necessário hoje e o aporte planejado no início, com faixa de atenção de até 20%.
 - `0.22` — 2026-10-18 — Compara cenários com os mesmos aportes futuros, mostra o valor planejado no gráfico e esclarece que o rendimento é estimado; confirma o uso do saldo atual dos investimentos vinculados no aporte sugerido.
 - `0.21` — 2026-09-27 — Adapta os cards e resumos de Objetivos à largura real disponível no painel.

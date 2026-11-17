@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 1.15
-atualizado: 2026-10-12
+versao: 1.18
+atualizado: 2026-11-11
 relacionados:
   - "[[arquitetura]]"
   - "[[sdd]]"
@@ -18,7 +18,7 @@ aliases: ["Qualidade de Código", "Padrões de Qualidade", "Convenções de Cód
 # Qualidade de Código
 
 > [!info] Status
-> **implementado** · área: `meta` · versão: `1.15` · atualizado em 2026-10-12 · relacionados: [[arquitetura]], [[sdd]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]], [[adr/0003-sqlite-fonte-de-verdade]], [[specs/desacoplamento-importacao-parsers]]
+> **implementado** · área: `meta` · versão: `1.18` · atualizado em 2026-11-11 · relacionados: [[arquitetura]], [[sdd]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]], [[adr/0003-sqlite-fonte-de-verdade]], [[specs/desacoplamento-importacao-parsers]]
 
 ## Objetivo
 
@@ -99,6 +99,8 @@ Os limites numéricos da seção "Sinais de alerta" são verificados pelo teste 
 
 ## Changelog
 
+- `1.18` — 2026-11-11 — Limite revisado de `financeiro/transactions.py` elevado para 1.500 linhas, com folga para novas regras de lançamento sem nova revisão a cada ajuste pequeno; a regra de categoria de empréstimos ficou em `financeiro/loans.py` ([[specs/emprestimos-quitacao]] v0.61).
+- `1.17` — 2026-11-11 — Limite revisado de `financeiro/transactions.py` elevado para 1.397 linhas após a associação de parcelas de série da categoria `loan_payment` ([[specs/emprestimos-quitacao]] v0.61); a regra de categoria ficou em `financeiro/loans.py`.
 - `1.16` — 2026-09-04 — Limite revisado de `financeiro/trends.py` elevado para 1.350 linhas após adição da detecção de limites recorrentemente ultrapassados em [[specs/tendencias-saude-financeira]].
 - `1.15` — 2026-09-03 — `financeiro/database.py` reduzido de 1.332 para 97 linhas após segregação em `database_config.py`, `database_maintenance.py`, `database_compatibility.py`, `database_schema.py` e `database_migrations.py`; removida sua exceção no gate de tamanho de módulos.
 - `1.14` — 2026-08-31 — Instituído gate cumulativo para remoção de código morto e registrada a primeira limpeza evidenciada de imports/atribuição sem consumidores; reexports de compatibilidade do Consultor foram explicitamente preservados.

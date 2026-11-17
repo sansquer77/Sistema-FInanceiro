@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 
 BASELINE_SCHEMA_VERSION = 20000
-SCHEMA_VERSION = 20010
+SCHEMA_VERSION = 20011
 
 
 MIGRATIONS_SCHEMA_SQL = """
@@ -461,6 +461,7 @@ CREATE TABLE IF NOT EXISTS financial_goal_funding_sources (
     goal_id INTEGER NOT NULL REFERENCES financial_goals(id) ON DELETE CASCADE,
     source_type TEXT NOT NULL CHECK (source_type IN ('checking_account', 'investment_opening', 'investment_operation')),
     source_id INTEGER NOT NULL,
+    asset_key TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (user_id, source_type, source_id)
 );
@@ -759,6 +760,10 @@ ON financial_goal_movements (user_id, goal_id, movement_date DESC, id DESC);
 
 CREATE INDEX IF NOT EXISTS idx_financial_goal_funding_goal
 ON financial_goal_funding_sources (user_id, goal_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_financial_goal_funding_asset
+ON financial_goal_funding_sources (user_id, asset_key)
+WHERE asset_key IS NOT NULL AND asset_key != '';
 
 CREATE INDEX IF NOT EXISTS idx_transactions_user_date
 ON transactions (user_id, date);

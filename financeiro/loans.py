@@ -21,14 +21,28 @@ AMORTIZATION_SYSTEMS = {"price", "sac"}
 LOAN_INDEXERS = {"none", "TR", "IPCA", "POUPANCA"}
 
 
+def is_payable_loan_series(conn: sqlite3.Connection, user_id: int, category_id: int | None, apply_to_future: bool) -> bool:
+    # spec: emprestimos-quitacao/emprestimos-quitacao v0.61 — critério 99
+    # Só uma parcela de série da categoria loan_payment pode ser associada, sem propagar o vínculo.
+    if not category_id or apply_to_future:
+        return False
+    row = conn.execute(
+        "SELECT system_key, group_type FROM categories WHERE id=? AND user_id=?",
+        (category_id, user_id),
+    ).fetchone()
+    return bool(row) and row["system_key"] == "loan_payment" and row["group_type"] == "expense"
+
+
 def invalidate_loan_payment_links(conn: sqlite3.Connection, user_id: int, transaction_id: int) -> None:
     conn.execute(
         """UPDATE loan_payment_links SET valid=0 WHERE user_id=? AND transaction_id=? AND valid=1""",
         (user_id, transaction_id),
     )
+    # spec: emprestimos-quitacao/emprestimos-quitacao v0.61 — critério 20
+    # Só um pagamento já reconhecido alterou o contrato; um pendente editado segue como pendente.
     conn.execute(
         """UPDATE loans SET review_required=1, updated_at=CURRENT_TIMESTAMP
-           WHERE user_id=? AND id IN (SELECT loan_id FROM loan_payment_links WHERE user_id=? AND transaction_id=? AND valid=0)""",
+           WHERE user_id=? AND id IN (SELECT loan_id FROM loan_payment_links WHERE user_id=? AND transaction_id=? AND valid=0 AND recognized=1)""",
         (user_id, user_id, transaction_id),
     )
 
@@ -60,7 +74,7 @@ def _loan_payload(data: dict) -> dict:
             annual_rate = float(str(annual_value).replace(",", ".")) / 100
             if annual_rate < 0:
                 raise ValueError("negative CET")
-            # spec: emprestimos-quitacao/emprestimos-quitacao v0.57 — critério 6
+            # spec: emprestimos-quitacao/emprestimos-quitacao v0.61 — critério 6
             rate_micros = None if indexer != "none" else round(((1 + annual_rate) ** (1 / 12) - 1) * 1_000_000)
             annual_rate_micros = round(annual_rate * 1_000_000)
         else:
@@ -90,8 +104,8 @@ def _loan_payload(data: dict) -> dict:
         raise LoanError("Para contrato indexado, informe saldo principal, data-base e taxa remuneratória mensal do contrato.")
     if indexer != "none" and rate_value not in (None, ""):
         raise LoanError("Em contrato indexado, informe a taxa no campo de juros remuneratórios; o CET fica apenas como referência.")
-    # spec: emprestimos-quitacao/emprestimos-quitacao v0.57 — critério 56
-    # spec: emprestimos-quitacao/emprestimos-quitacao v0.57 — critério 68
+    # spec: emprestimos-quitacao/emprestimos-quitacao v0.61 — critério 56
+    # spec: emprestimos-quitacao/emprestimos-quitacao v0.61 — critério 68
     if amortization_system == "sac" and indexer == "none" and rate_micros is None:
         raise LoanError("Para cadastrar SAC prefixado, informe a taxa efetiva mensal ou o CET efetivo anual do contrato.")
     return {"name": name, "currency": currency, "loan_type": loan_type,
@@ -144,7 +158,7 @@ def list_loans(user_id: int, include_archived: bool = False) -> list[dict]:
             if loan["principal_review_required"]:
                 # Keep the creditor-provided value in SQLite, but never return it as a current balance.
                 loan["principal_balance_cents"] = None
-            # spec: emprestimos-quitacao/emprestimos-quitacao v0.57 — critério 26
+            # spec: emprestimos-quitacao/emprestimos-quitacao v0.61 — critério 26
             # A base de 100% é o compromisso nominal reconstruído pelo que foi pago mais o que resta.
             loan["total_nominal_cents"] = loan["total_paid_cents"] + int(loan["remaining_commitment_cents"])
             loan["paid_percentage_basis_points"] = (
@@ -185,7 +199,7 @@ def delete_loan(user_id: int, loan_id: int) -> None:
         row = conn.execute("SELECT id FROM loans WHERE id=? AND user_id=?", (loan_id, user_id)).fetchone()
         if not row:
             raise LoanError("Empréstimo não encontrado.", HTTPStatus.NOT_FOUND)
-        # spec: emprestimos-quitacao/emprestimos-quitacao v0.57 — critério de exclusão
+        # spec: emprestimos-quitacao/emprestimos-quitacao v0.61 — critério de exclusão
         # Remover apenas os vínculos preserva integralmente os lançamentos da conta.
         conn.execute("DELETE FROM loan_payment_links WHERE user_id=? AND loan_id=?", (user_id, loan_id))
         conn.execute("DELETE FROM loans WHERE user_id=? AND id=?", (user_id, loan_id))
@@ -201,7 +215,7 @@ def link_payment_with_conn(conn: sqlite3.Connection, user_id: int, loan_id: int,
         loan=conn.execute("SELECT * FROM loans WHERE id=? AND user_id=? AND archived_at IS NULL",(loan_id,user_id)).fetchone()
         tx=conn.execute("""SELECT t.*, a.currency, c.system_key category_system_key, c.group_type category_group_type FROM transactions t JOIN checking_accounts a ON a.id=t.account_id AND a.user_id=t.user_id LEFT JOIN categories c ON c.id=t.category_id AND c.user_id=t.user_id WHERE t.id=? AND t.user_id=? AND t.archived_at IS NULL""",(transaction_id,user_id)).fetchone()
         if not loan or not tx: raise LoanError("Empréstimo ou lançamento não encontrado.",HTTPStatus.NOT_FOUND)
-        # spec: emprestimos-quitacao/emprestimos-quitacao v0.57 — critério 16
+        # spec: emprestimos-quitacao/emprestimos-quitacao v0.61 — critério 16
         if tx['type']!='expense' or tx['category_group_type']!='expense' or tx['category_system_key']!='loan_payment': raise LoanError("Selecione uma despesa vinculada à categoria de empréstimos e financiamentos.")
         if str(tx['currency']).upper()!=str(loan['currency']).upper(): raise LoanError("A moeda do lançamento deve ser igual à do empréstimo.")
         previous=conn.execute("SELECT loan_id,valid FROM loan_payment_links WHERE user_id=? AND transaction_id=?",(user_id,transaction_id)).fetchone()
@@ -211,7 +225,7 @@ def link_payment_with_conn(conn: sqlite3.Connection, user_id: int, loan_id: int,
             conn.execute("UPDATE loan_payment_links SET loan_id=?,valid=1,linked_at=CURRENT_TIMESTAMP WHERE user_id=? AND transaction_id=?",(loan_id,user_id,transaction_id))
         else:
             conn.execute("INSERT INTO loan_payment_links(user_id,loan_id,transaction_id) VALUES(?,?,?)",(user_id,loan_id,transaction_id))
-        # spec: emprestimos-quitacao/emprestimos-quitacao v0.57 — critério 41
+        # spec: emprestimos-quitacao/emprestimos-quitacao v0.61 — critério 41
         # Lançamentos associados só reduzem o compromisso depois da conciliação.
         if tx["reconciled_at"]:
             recognize_loan_payment_with_conn(conn, user_id, transaction_id)
@@ -232,35 +246,35 @@ def recognize_loan_payment_with_conn(conn: sqlite3.Connection, user_id: int, tra
     ).fetchone()
     if not row or not row["reconciled_at"] or row["recognized"]:
         return
-    if not row["review_required"]:
-        # spec: emprestimos-quitacao/emprestimos-quitacao v0.57 — critério 42
-        due_date = date.fromisoformat(row["next_due_date"])
-        next_due = add_months(due_date, 1).isoformat()
-        remaining_installments = max(0, int(row["remaining_installments"]) - 1)
-        next_installment = int(row["installment_cents"])
-        # spec: emprestimos-quitacao/emprestimos-quitacao v0.57 — critério 58
-        # O valor salvo em SAC acompanha a próxima prestação calculada após a amortização regular.
-        if (row["amortization_system"] == "sac" and row["monthly_rate_micros"] is not None
-                and remaining_installments > 0):
-            rate = Decimal(row["monthly_rate_micros"]) / Decimal(1_000_000)
-            principal = _estimate_principal(
-                int(row["installment_cents"]), int(row["remaining_installments"]), rate, "sac"
-            )
-            regular_amortization = _round_cents(Decimal(principal) / int(row["remaining_installments"]))
-            principal_after_payment = max(0, principal - regular_amortization)
-            next_installment = _sac_installment(principal_after_payment, regular_amortization, rate)
-        conn.execute(
-            """UPDATE loans SET remaining_installments=?, remaining_commitment_cents=?,
-                      installment_cents=?, next_due_date=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=?""",
-            (
-                remaining_installments,
-                max(0, int(row["remaining_commitment_cents"]) - int(row["amount_cents"])),
-                next_installment,
-                next_due,
-                row["loan_id"],
-                user_id,
-            ),
+    # spec: emprestimos-quitacao/emprestimos-quitacao v0.61 — critério 98
+    # Revisão pendente é só um alerta: o pagamento conciliado sempre reduz o contrato uma vez.
+    due_date = date.fromisoformat(row["next_due_date"])
+    next_due = add_months(due_date, 1).isoformat()
+    remaining_installments = max(0, int(row["remaining_installments"]) - 1)
+    next_installment = int(row["installment_cents"])
+    # spec: emprestimos-quitacao/emprestimos-quitacao v0.61 — critério 58
+    # O valor salvo em SAC acompanha a próxima prestação calculada após a amortização regular.
+    if (row["amortization_system"] == "sac" and row["monthly_rate_micros"] is not None
+            and remaining_installments > 0):
+        rate = Decimal(row["monthly_rate_micros"]) / Decimal(1_000_000)
+        principal = _estimate_principal(
+            int(row["installment_cents"]), int(row["remaining_installments"]), rate, "sac"
         )
+        regular_amortization = _round_cents(Decimal(principal) / int(row["remaining_installments"]))
+        principal_after_payment = max(0, principal - regular_amortization)
+        next_installment = _sac_installment(principal_after_payment, regular_amortization, rate)
+    conn.execute(
+        """UPDATE loans SET remaining_installments=?, remaining_commitment_cents=?,
+                  installment_cents=?, next_due_date=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=?""",
+        (
+            remaining_installments,
+            max(0, int(row["remaining_commitment_cents"]) - int(row["amount_cents"])),
+            next_installment,
+            next_due,
+            row["loan_id"],
+            user_id,
+        ),
+    )
     conn.execute(
         "UPDATE loan_payment_links SET recognized=1 WHERE user_id=? AND transaction_id=? AND valid=1",
         (user_id, transaction_id),
@@ -275,7 +289,7 @@ def project_payment_plan(installment_cents: int, count: int, monthly_rate_micros
     if amortization_system == "sac" and monthly_rate_micros is None:
         raise LoanError("Informe uma taxa para projetar o sistema SAC.")
     rate = Decimal(monthly_rate_micros or 0) / Decimal(1_000_000)
-    # spec: emprestimos-quitacao/emprestimos-quitacao v0.57 — critério 58
+    # spec: emprestimos-quitacao/emprestimos-quitacao v0.61 — critério 58
     estimated_principal = _estimate_principal(installment_cents, count, rate, amortization_system)
 
     def amortize_price(monthly_extra: int, balance: int, payment_cents: int,
@@ -349,7 +363,7 @@ def project_payment_plan(installment_cents: int, count: int, monthly_rate_micros
             "amortization_system":amortization_system}
 
 
-# spec: emprestimos-quitacao/emprestimos-quitacao v0.57 — critérios 78–81
+# spec: emprestimos-quitacao/emprestimos-quitacao v0.61 — critérios 78–81
 def project_payoff_vs_cdi(result: dict, extra_monthly_cents: int, extraordinary_cents: int) -> dict:
     """Compare nominal interest savings with gross CDI earnings on the same hypothetical contributions."""
     if extra_monthly_cents <= 0 and extraordinary_cents <= 0:
@@ -403,7 +417,7 @@ def project_payoff_vs_cdi(result: dict, extra_monthly_cents: int, extraordinary_
     }
 
 
-# spec: emprestimos-quitacao/emprestimos-quitacao v0.57 — critério 63
+# spec: emprestimos-quitacao/emprestimos-quitacao v0.61 — critério 63
 def _latest_indexer_projection_assumption(indexer: str, as_of_date: date | None = None) -> dict:
     """Return the effective accumulated factor from the latest twelve-month window and its monthly equivalent."""
     from financeiro import portfolio
@@ -568,7 +582,7 @@ def project_indexed_payment_plan(loan: dict, extra_cents: int = 0, extraordinary
             "future_index_period_end": assumption_holder.get("value", {}).get("period_end")}
 
 
-# spec: emprestimos-quitacao/emprestimos-quitacao v0.57 — critérios 84–90
+# spec: emprestimos-quitacao/emprestimos-quitacao v0.61 — critérios 84–90
 def project_full_payoff(loan: dict) -> dict:
     """Compare a full payoff today with investing the estimated payoff amount at 100% CDI."""
     if loan.get("principal_review_required"):
@@ -616,7 +630,7 @@ def estimate_remaining_price_values(installment_cents: int, count: int, monthly_
         return None, None
     rate = Decimal(monthly_rate_micros) / Decimal(1_000_000)
     principal_cents = _estimate_principal(installment_cents, count, rate, amortization_system)
-    # spec: emprestimos-quitacao/emprestimos-quitacao v0.57 — critério 77
+    # spec: emprestimos-quitacao/emprestimos-quitacao v0.61 — critério 77
     future_cost_cents = nominal_commitment_cents - principal_cents
     return principal_cents, future_cost_cents if future_cost_cents >= 0 else None
 
@@ -648,7 +662,7 @@ def _sac_installment(balance_cents: int, principal_amortization_cents: int, rate
 
 def project_payoff_strategy(loans: list[dict], strategy: str, monthly_budget_cents: int,
                             revolving_loans: list[dict] | None = None) -> dict:
-    # spec: emprestimos-quitacao/emprestimos-quitacao v0.57 — critério 59
+    # spec: emprestimos-quitacao/emprestimos-quitacao v0.61 — critério 59
     revolving_loans = list(revolving_loans or [])
     if strategy not in {"avalanche", "snowball"} or not (loans or revolving_loans):
         raise LoanError("Selecione uma estratégia e ao menos um empréstimo ativo.")
@@ -675,7 +689,7 @@ def project_payoff_strategy(loans: list[dict], strategy: str, monthly_budget_cen
     indexed = any(str(loan.get("indexer") or "none").upper() not in {"NONE", ""} for loan in loans)
     assumptions_by_indexer: dict[str, dict] = {}
     if indexed:
-        # spec: emprestimos-quitacao/emprestimos-quitacao v0.57 — critério 73
+        # spec: emprestimos-quitacao/emprestimos-quitacao v0.61 — critério 73
         # Index factors are fetched before any database writes and then applied month by month.
         factor_cache: dict[tuple[str, date, date], Decimal] = {}
         from financeiro import portfolio

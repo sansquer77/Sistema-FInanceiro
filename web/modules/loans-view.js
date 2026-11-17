@@ -227,6 +227,10 @@ export function registerLoansView({ api, elements, escapeHtml }) {
     if (!closeButton) return;
     const loan = revolvingLoansCache.find((item) => Number(item.id) === Number(closeButton.dataset.closeRevolvingLoan));
     if (!loan) return;
+    await closeRevolvingLoan(loan);
+  });
+
+  async function closeRevolvingLoan(loan) {
     const resolution = await decisionModal.choose({
       title: "Encerrar acompanhamento da dívida?",
       message: "Esta ação só encerra o registro de monitoramento. Não cria nem altera lançamentos. Se ainda houver saldo, use arquivamento ou revise antes de encerrar.",
@@ -243,7 +247,7 @@ export function registerLoansView({ api, elements, escapeHtml }) {
       revolvingLoanMessage.textContent = "Acompanhamento encerrado sem criar lançamentos.";
       await loadRevolvingLoans();
     } catch (error) { revolvingLoanMessage.textContent = error.message; }
-  });
+  }
 
   function renderPaymentEvolution(loan) {
     const element = document.querySelector(`#loan-payment-chart-${Number(loan.id)}`);
@@ -613,7 +617,13 @@ export function registerLoansView({ api, elements, escapeHtml }) {
     } catch (error) { studyResult.textContent = error.message; }
   });
 
-  return { loadLoans, loadLoanStudies, openPriceConversionDraft };
+  async function openRevolvingLoanClosure(revolvingLoanId) {
+    await loadRevolvingLoans();
+    const loan = revolvingLoansCache.find((item) => Number(item.id) === Number(revolvingLoanId) && item.status === "active");
+    if (loan) await closeRevolvingLoan(loan);
+  }
+
+  return { loadLoans, loadLoanStudies, openPriceConversionDraft, openRevolvingLoanClosure };
 }
 
 function hasEstimate(value) {

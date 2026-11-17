@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 from decimal import Decimal, ROUND_HALF_UP
+import re
 
 from financeiro.calendar_rules import add_months
 from financeiro.portfolio_positions import aggregate_savings_anniversaries
@@ -65,7 +66,7 @@ class PositionValuation:
         force_refresh: bool = False,
         factor_cache: dict[str, Decimal] | None = None,
     ) -> int:
-        # spec: investimentos/investimentos-portfolio v2.66 — criterios 43 a 45
+        # spec: investimentos/investimentos-portfolio v2.69 — criterios 43 a 45
         # (variacao do dia = valor hoje menos valor no dia anterior, com a base de
         #  comparacao limitada a data de aquisicao: no dia da aquisicao a variacao
         #  exibida e zero. Para pos-fixados, dias sem taxa publicada (fim de
@@ -158,7 +159,8 @@ class PositionValuation:
         if self.should_apply_fixed_income_taxes(position):
             gross_profit_cents = max(gross_cents - position["total_cost_cents"], 0)
             iof_tax_cents = self.fixed_income_iof_tax_cents(gross_profit_cents, days)
-            income_tax_cents = self.fixed_income_income_tax_cents(max(gross_profit_cents - iof_tax_cents, 0), days)
+            if not self.is_ir_exempt_fixed_income(position):
+                income_tax_cents = self.fixed_income_income_tax_cents(max(gross_profit_cents - iof_tax_cents, 0), days)
             net_cents = max(gross_cents - iof_tax_cents - income_tax_cents - custody_fee_cents, 0)
         return net_cents, gross_cents, iof_tax_cents, income_tax_cents, custody_fee_cents, rate_factor, source
 
@@ -357,7 +359,7 @@ class PositionValuation:
         return self.savings_additional_monthly_rate_from_selic(selic_annual)
 
     def savings_additional_monthly_rate_from_selic(self, selic_annual: Decimal) -> Decimal:
-        # spec: investimentos-portfolio v2.66 — secao "Regras > Poupanca"
+        # spec: investimentos-portfolio v2.69 — secao "Regras > Poupanca"
         # (TR + 0,5% a.m. quando Selic > 8,5% a.a.; TR + 70% da Selic equivalente
         #  mensal quando Selic <= 8,5% a.a. — limiar e formula nao sao obvios)
         if selic_annual > Decimal("0.085"):
@@ -395,8 +397,17 @@ class PositionValuation:
             position["source_type"] == "opening" and bool(position.get("apply_tax_estimate"))
         )
 
+    def is_ir_exempt_fixed_income(self, position: dict) -> bool:
+        # spec: investimentos/investimentos-portfolio v2.69 — critérios 108 e 109
+        # LCI/LCA são identificadas pela subcategoria e pelo código/tipo informado.
+        labels = " ".join(str(position.get(field) or "") for field in (
+            "subcategory_name", "asset_identifier", "asset_name", "description"
+        )).upper()
+        tokens = set(re.findall(r"[A-Z0-9]+", labels))
+        return "LCI" in tokens or "LCA" in tokens
+
     def fixed_income_income_tax_cents(self, gross_profit_cents: int, days: int) -> int:
-        # spec: investimentos-portfolio v2.66 — criterio 3 (secao "Regras > Renda Fixa":
+        # spec: investimentos/investimentos-portfolio v2.69 — critério 3 (seção "Regras > Renda Fixa":
         # tabela regressiva de IR, 22,5% a 15% conforme dias corridos desde a aquisicao)
         if gross_profit_cents <= 0:
             return 0
@@ -411,7 +422,7 @@ class PositionValuation:
         return int((Decimal(gross_profit_cents) * tax_rate).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
     def fixed_income_custody_fee_cents(self, position: dict, gross_cents: int, days: int) -> int:
-        # spec: investimentos/investimentos-portfolio v2.66 — critério 25
+        # spec: investimentos/investimentos-portfolio v2.69 — critério 25
         # Tesouro Direto tem taxa B3 de custodia provisionada diariamente. O app
         # estima a taxa na curva, sem tentar reproduzir marcacao a mercado oficial.
         if gross_cents <= 0 or days <= 0 or not self.is_treasury_direct_position(position):
@@ -437,8 +448,8 @@ class PositionValuation:
         ]).upper()
 
     def fixed_income_iof_tax_cents(self, gross_profit_cents: int, days: int) -> int:
-        # spec: investimentos-portfolio v2.66 — criterio 3 (secao "Regras > Renda Fixa":
-        # IOF regressivo so incide ate 30 dias corridos desde a aquisicao)
+        # spec: investimentos/investimentos-portfolio v2.69 — critério 3 (seção "Regras > Renda Fixa":
+        # IOF regressivo só incide antes de completar 30 dias corridos desde a aquisição)
         if gross_profit_cents <= 0 or days >= 30:
             return 0
         daily_rates = {

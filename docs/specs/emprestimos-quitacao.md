@@ -2,8 +2,8 @@
 tipo: spec
 area: emprestimos-quitacao
 status: em-implementacao
-versao: 0.57
-atualizado: 2026-09-27
+versao: 0.61
+atualizado: 2026-11-11
 relacionados:
   - "[[relatorios]]"
   - "[[contas-correntes]]"
@@ -19,7 +19,7 @@ aliases: ["Empréstimos e Financiamentos", "Empréstimos e plano de quitação"]
 # Empréstimos e Financiamentos
 
 > [!info] Status
-> **em-implementacao** · versão: `0.57` · área: `emprestimos-quitacao` · atualizado em 2026-09-27 · relacionados: [[relatorios]], [[contas-correntes]], [[lancamentos]], [[efeito-borboleta]]
+> **em-implementacao** · versão: `0.61` · área: `emprestimos-quitacao` · atualizado em 2026-11-11 · relacionados: [[relatorios]], [[contas-correntes]], [[lancamentos]], [[efeito-borboleta]]
 
 ## Problema
 
@@ -118,7 +118,7 @@ Pessoa que acompanha manualmente empréstimos bancários e dívidas contratuais 
 - Sem taxa, mantém o compromisso nominal e informa que principal e custo financeiro futuro não podem ser estimados. Se o principal Price superar o compromisso nominal, mantém o principal visível e pede revisão dos dados em vez de exibir custo negativo.
 - A estimativa é identificada como teórica e pode divergir do credor por arredondamentos, parcela final diferente, tarifas ou características contratuais que o modelo não representa.
 - Um lançamento associado não pode liquidar dois empréstimos; enquanto válido, sua associação identifica o pagamento sem criar atividade financeira duplicada.
-- Se um lançamento vinculado for editado, reclassificado, desconciliado após reconhecimento, estornado ou removido, o vínculo é invalidado e o card do empréstimo exibe um alerta para revisar/atualizar os dados. Conciliar pela primeira vez reconhece o pagamento e mantém o vínculo.
+- Se um lançamento vinculado já reconhecido for editado, reclassificado, desconciliado, estornado ou removido, o vínculo é invalidado e o card do empréstimo exibe um alerta para revisar/atualizar os dados. Um lançamento vinculado ainda não reconhecido que for editado não altera o contrato: continua pendente e, ao ser conciliado, reconhece o pagamento uma única vez e atualiza compromisso e parcelas restantes.
 - A invalidação do vínculo não desfaz cálculos nem altera automaticamente o compromisso ou o estado do empréstimo; o usuário revisa e atualiza manualmente os dados do contrato.
 - O alerta de revisão permanece até o usuário revisar/salvar os dados do empréstimo; o sistema não infere um novo saldo a partir do lançamento alterado.
 - Crédito Rotativo é um modelo contratual próprio, sem parcelas ou amortização programada; não deve ser calculado como Price ou SAC. A proposta está detalhada em [[#Proposta de desenho — Crédito Rotativo]].
@@ -137,7 +137,7 @@ Pessoa que acompanha manualmente empréstimos bancários e dívidas contratuais 
 
 ## API e dados
 
-- Rotas próprias permitem listar, cadastrar, atualizar e arquivar empréstimos; a associação principal é feita pelo campo opcional de empréstimo no lançamento avulso da conta, mantendo a rota de associação existente compatível.
+- Rotas próprias permitem listar, cadastrar, atualizar e arquivar empréstimos; a associação principal é feita pelo campo opcional de empréstimo no lançamento avulso da conta ou, na categoria `loan_payment`, em cada parcela de série editada individualmente; a rota de associação existente permanece compatível.
 - A associação de pagamento deve referenciar o lançamento original da conta e preservar a fonte única do movimento financeiro.
 - O cálculo de juros, amortização e ordenação das estratégias pertence ao núcleo Python; a interface apenas coleta parâmetros e apresenta resultados.
 
@@ -163,7 +163,7 @@ Pessoa que acompanha manualmente empréstimos bancários e dívidas contratuais 
 - Dado um lançamento associado a um empréstimo, quando o vínculo é salvo, então nenhum segundo lançamento ou débito é criado na conta.
 - Dado um lançamento já associado a um empréstimo, quando o usuário tenta vinculá-lo a outro empréstimo, então a operação é rejeitada sem alterar os vínculos existentes.
 - Dado um lançamento válido associado a um empréstimo, quando o módulo o apresenta no histórico, então mostra a referência ao movimento original sem duplicar a atividade financeira.
-- Dado um lançamento vinculado que é editado, reclassificado, desconciliado após reconhecimento, estornado ou removido, quando o sistema detecta a alteração, então invalida o vínculo e sinaliza revisão no card sem alterar automaticamente os dados do empréstimo; a primeira conciliação reconhece o pagamento e mantém o vínculo.
+- Dado um lançamento vinculado já reconhecido que é editado, reclassificado, desconciliado, estornado ou removido, quando o sistema detecta a alteração, então invalida o vínculo e sinaliza revisão no card sem alterar automaticamente os dados do empréstimo; a nova conciliação do lançamento mantém o vínculo sem reconhecer o pagamento outra vez.
 - Dado um lançamento associado ainda não conciliado, inclusive com data futura/agendada, quando o empréstimo é exibido, então o lançamento aparece como pendente e não conta como parcela paga, valor amortizado ou progresso.
 - Dado um lançamento associado válido ainda não conciliado, quando o usuário o marca como conciliado, então o pagamento é reconhecido uma única vez, reduz o compromisso e as parcelas restantes e mantém o vínculo no histórico.
 - Dado um empréstimo com alerta de revisão, quando o usuário revisa e salva os dados do contrato, então o alerta é removido sem o app inferir valores do lançamento desvinculado.
@@ -239,6 +239,10 @@ Pessoa que acompanha manualmente empréstimos bancários e dívidas contratuais 
 - Dado que a pessoa escolheu **Amortizar**, quando inicia o estudo, então revela os campos de adicional mensal, amortização extraordinária e efeito sobre prazo/parcela; a comparação CDI continua opcional e usa os mesmos aportes simulados.
 - Dado contrato sem dados suficientes para estimar o valor de quitação ou os juros evitados, quando escolhe **Quitar agora**, então explica quais dados do contrato precisam ser informados/revistos e não mostra valores zerados como resultado válido.
 - Dado um contrato rotativo selecionado, quando abre o estudo individual, então mantém a jornada de simulação própria do rotativo e não exibe as escolhas Quitar agora / Amortizar dos contratos parcelados.
+- Dado um lançamento vinculado ainda não reconhecido que é editado, quando o usuário o salva, então o vínculo permanece pendente sem sinalizar revisão, e a conciliação posterior reconhece o pagamento uma única vez, reduzindo as parcelas restantes e o compromisso.
+- Dado um contrato de Crédito Rotativo ativo com saldo zerado, quando a Central de Alertas é compilada, então exibe um alerta crítico pedindo o encerramento como quitação definitiva ou troca de dívida; a ação abre o mesmo diálogo de encerramento da tela, e o alerta some quando o contrato deixa de estar ativo.
+- Dado um lançamento vinculado a um empréstimo com revisão pendente por outro motivo, quando o lançamento é conciliado pela primeira vez, então o pagamento é reconhecido e reduz parcelas restantes e compromisso uma única vez; a revisão continua até o usuário revisar e salvar o contrato.
+- Dado uma parcela de série parcelada de despesa categorizada como `loan_payment`, quando o usuário a edita e associa a um empréstimo ativo da mesma moeda, então apenas essa ocorrência recebe o vínculo, sem propagá-lo às demais parcelas nem criar lançamento; a associação só é aceita ao editar uma parcela existente, não ao criar uma nova série, e lançamentos parcelados ou recorrentes de outras categorias continuam sem associação a empréstimos.
 
 Na premissa automática, TR usa as observações oficiais diárias publicadas na janela móvel de doze meses até a observação mais recente; IPCA e poupança usam as últimas doze observações mensais publicadas. A poupança usa a série oficial SGS 195. A comparação de investimento a 100% CDI usa a última taxa diária CDI publicada, anualizada pela convenção de 252 dias úteis e convertida em equivalente mensal, mantida constante no horizonte do contrato; a observação e a natureza hipotética do cenário são exibidas. Se não houver histórico completo disponível para os indexadores do contrato, a simulação informa que não foi possível estimar, sem substituir por taxa inventada ou solicitar entrada manual.
 
@@ -332,6 +336,7 @@ Esta proposta trata cheque especial e saldo de cartão mantido no rotativo como 
 - Dado um pagamento em data sem horário/data de valor contratual, quando o saldo é projetado, então os juros são calculados até o dia anterior e o pagamento é abatido no início de sua data, com arredondamento dos juros a centavos por capitalização.
 - Dado indisponibilidade de taxa/convenção no contrato originado por pagamento parcial, quando o card é apresentado, então mostra saldo nominal sem estimar juros e oferece alerta para completar os dados.
 - Dado cadastro, revisão ou encerramento de uma dívida rotativa, quando a operação é persistida, então seu registro de auditoria é gravado na mesma transação; se a auditoria falhar, a alteração inteira é revertida.
+- Dado um rotativo com alerta de revisão já ativo, quando outro pagamento conciliado é reconhecido, então o alerta permanece até o usuário revisar e salvar o contrato.
 - Dado um rotativo nas estratégias, quando não há comparação visível sem pagamentos, então o sistema não calcula um baseline sem pagamento; se o cenário com orçamento informado exceder o limite numérico, apresenta uma mensagem acionável sem erro inesperado nem persistência.
 
 ### Plano de implementação — Crédito Rotativo
@@ -402,6 +407,10 @@ Esta proposta trata cheque especial e saldo de cartão mantido no rotativo como 
 
 ## Changelog
 
+- `0.61` — 2026-11-11 — Parcelas de série da categoria `loan_payment` podem ser associadas a um contrato ao serem editadas individualmente, sem propagação às demais parcelas; criar série já associada continua proibido.
+- `0.60` — 2026-11-11 — Pagamento conciliado com revisão pendente por outro motivo passa a reduzir parcelas restantes e compromisso uma única vez; a revisão só é removida ao salvar o contrato.
+- `0.59` — 2026-11-11 — Crédito Rotativo preserva o alerta de revisão ao reconhecer outro pagamento conciliado; rotativo ativo com saldo zerado gera alerta crítico na Central de Alertas com ação de encerramento.
+- `0.58` — 2026-11-11 — Corrige o reconhecimento de parcela vinculada editada antes da conciliação: a revisão só é sinalizada quando o pagamento já reconhecido foi alterado, então a parcela conciliada reduz parcelas restantes e compromisso e o contrato é atualizado.
 - `0.57` — 2026-09-27 — Adiciona aba Histórico para contratos quitados/arquivados e rotativos encerrados, preservando pagamentos e distinguindo saldo arquivado em aberto.
 - `0.56` — 2026-09-27 — Separa estudo individual em Quitar agora e Amortizar; quitação estima o saldo à vista e compara com o CDI pelo prazo remanescente.
 - `0.55` — 2026-09-27 — Simplifica a comparação quitação × investimento para projetar a última taxa diária CDI publicada, com data de referência, conversão pela convenção de 252 dias úteis e taxa constante identificada como cenário hipotético.

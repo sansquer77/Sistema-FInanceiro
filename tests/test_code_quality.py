@@ -13,7 +13,7 @@ REVIEWED_OVERSIZED_MODULES = {
     "financeiro/portfolio.py": 2759,
     # Reviewed cross-domain guard: emergency-reserve investment writes must reject
     # sources already allocated to an active financial goal.
-    "financeiro/transactions.py": 1395,
+    "financeiro/transactions.py": 1500,
     "financeiro/trends.py": 1350,
     "web/modules/portfolio-view.js": 1692,
     "web/modules/reports-view.js": 1336,

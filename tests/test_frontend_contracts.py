@@ -13,6 +13,31 @@ MODULE_ROOT = WEB_ROOT / "modules"
 
 
 class FrontendModuleContractTest(unittest.TestCase):
+    def test_investment_launch_form_explains_total_and_keeps_costs_optional(self) -> None:
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        investment_form = (MODULE_ROOT / "transaction-investment-form.js").read_text(encoding="utf-8")
+        transaction_form = index[index.index('id="transactionForm"'):]
+
+        self.assertIn("Total debitado da conta", transaction_form)
+        self.assertIn("incluindo os custos da operação", transaction_form)
+        self.assertIn("não são somados novamente", transaction_form)
+        for field in (
+            "investment_brokerage_fee", "investment_exchange_fee",
+            "investment_tax", "investment_other_costs",
+        ):
+            markup = re.search(rf'<input[^>]*name="{re.escape(field)}"[^>]*>', transaction_form)
+            self.assertIsNotNone(markup, field)
+            self.assertNotIn("required", markup.group(0), field)
+
+        self.assertIn("investmentAmount.required = isInvestment", investment_form)
+        self.assertIn("investmentTradingCostFields.hidden = !isInvestment || savings", investment_form)
+        self.assertIn("investmentTaxCostFields.hidden = !isInvestment || savings", investment_form)
+        self.assertIn("Math.round(quantity * unitPrice * 100) / 100", investment_form)
+        self.assertIn("Valor bruto de referência:", investment_form)
+        self.assertIn("Calculado por quantidade × preço unitário", transaction_form)
+        self.assertIn("A diferença em relação ao total debitado", transaction_form)
+        self.assertIn("É apenas uma referência e não altera o lançamento", transaction_form)
+
     def test_loan_active_and_history_tabs_preserve_distinct_statuses(self) -> None:
         index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
         app = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
@@ -163,6 +188,34 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn('position.result_percent', view)
         self.assertIn('position.day_result_percent', view)
         self.assertIn('"stock_usd": "Renda variável - USD"', backend)
+
+    def test_ai_timeout_field_is_visible_for_remote_presets(self) -> None:
+        admin = (MODULE_ROOT / "user-admin-view.js").read_text(encoding="utf-8")
+        app = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn("setAIFieldVisibility(elements.aiConfigTimeoutField, customProvider || remoteProvider);", admin)
+        self.assertIn('import { registerUserAdminView } from "./modules/user-admin-view.js?v=176";', app)
+
+    def test_local_model_uses_default_4096_window_and_recognizes_gpu_device_loss(self) -> None:
+        client = (MODULE_ROOT / "webllm-client.js").read_text(encoding="utf-8")
+
+        self.assertIn("const CHAT_OPTIONS = { context_window_size: 4096 };", client)
+        self.assertIn("webllm.CreateWebWorkerMLCEngine(engineWorker, MODEL_ID, engineConfig, CHAT_OPTIONS)", client)
+        self.assertIn("webllm.CreateMLCEngine(MODEL_ID, engineConfig, CHAT_OPTIONS)", client)
+        self.assertIn("device (was )?lost", client)
+        self.assertIn("GPU_MEMORY_PATTERN.test(detail)", client)
+        consultor_view = (MODULE_ROOT / "consultor-view.js").read_text(encoding="utf-8")
+        self.assertIn('if (!order.includes("remota")) throw localError;', consultor_view)
+        for module in ("consultor-view.js", "trends-view.js", "user-admin-view.js"):
+            source = (MODULE_ROOT / module).read_text(encoding="utf-8")
+            self.assertIn('webllm-client.js?v=179"', source, module)
+
+    def test_goal_funding_options_exclude_consolidated_linked_assets(self) -> None:
+        limits = (MODULE_ROOT / "limits-view.js").read_text(encoding="utf-8")
+
+        self.assertIn('api("/api/financial-goals/funding-options")', limits)
+        self.assertNotIn("const used = new Set(state.financialGoals", limits)
+        self.assertNotIn("const assets = new Map()", limits)
 
     def test_long_lists_use_shared_virtualizer_contract(self) -> None:
         virtualizer = (MODULE_ROOT / "virtual-list.js").read_text(encoding="utf-8")

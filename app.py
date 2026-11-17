@@ -132,6 +132,7 @@ from financeiro.financial_health import (
 from financeiro.financial_goals import (
     FinancialGoalError,
     archive_financial_goal,
+    available_funding_sources,
     create_financial_goal,
     create_goal_movement,
     emergency_reserve_summary,
@@ -1224,6 +1225,10 @@ class AppHandler(BaseHTTPRequestHandler):
         user = self.require_user()
         goal_id = self.route_path().split("/")[-2]
         self.send_json({"movements": list_goal_movements(user["id"], goal_id)})
+
+    def handle_available_goal_funding_sources(self) -> None:
+        user = self.require_user()
+        self.send_json({"funding_options": available_funding_sources(user["id"])})
 
     def handle_list_goal_funding_sources(self) -> None:
         user = self.require_user()

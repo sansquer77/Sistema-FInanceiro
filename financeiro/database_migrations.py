@@ -47,6 +47,7 @@ INCREMENTAL_MIGRATIONS = {
     20008: ("loan_amortization_system", lambda conn: _migrate_loan_amortization_system(conn)),
     20009: ("indexed_loan_contract_terms", lambda conn: _migrate_indexed_loan_contract_terms(conn)),
     20010: ("revolving_loans", lambda conn: _migrate_revolving_loans(conn)),
+    20011: ("financial_goal_asset_links", lambda conn: _migrate_financial_goal_asset_links(conn)),
 }
 
 
@@ -136,6 +137,18 @@ def _migrate_revolving_loans(conn: sqlite3.Connection) -> None:
         for statement in sql_block.split(";"):
             if statement.strip():
                 conn.execute(statement)
+
+
+def _migrate_financial_goal_asset_links(conn: sqlite3.Connection) -> None:
+    """Persist goal coverage by consolidated investment identity."""
+    ensure_column(conn, "financial_goal_funding_sources", "asset_key", "TEXT")
+    conn.execute(
+        """CREATE UNIQUE INDEX IF NOT EXISTS idx_financial_goal_funding_asset
+           ON financial_goal_funding_sources (user_id, asset_key)
+           WHERE asset_key IS NOT NULL AND asset_key != ''"""
+    )
+
+
 def _migrate_portfolio_quantity_precision(conn: sqlite3.Connection) -> None:
     """Move portfolio quantities from 1e-6 to 1e-8 without changing values."""
     columns = {

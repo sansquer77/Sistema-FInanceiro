@@ -60,6 +60,43 @@ class ValuationBoundariesTest(unittest.TestCase):
         self.assertTrue(all(isinstance(value, int) for value in expected[:5]))
         self.assertEqual(engine.fixed_income_value_as_of(position, date(2025, 12, 31))[:5], (0, 0, 0, 0, 0))
 
+    def test_lci_lca_skip_income_tax_but_keep_iof_before_day_30(self):
+        engine = self.engine()
+        common = self.position(
+            source_type='operation', first_operation_date='2026-01-01',
+            total_cost_cents=1_000_000, fixed_income_rate='12', fixed_income_mode='pre',
+        )
+        for label in ('LCI', 'LCA'):
+            position = dict(common, subcategory_name='Renda Fixa - ' + label)
+            before_day_30 = engine.fixed_income_value_as_of(position, date(2026, 1, 30))
+            at_day_30 = engine.fixed_income_value_as_of(position, date(2026, 1, 31))
+            self.assertGreater(before_day_30[1], common['total_cost_cents'])
+            self.assertGreater(before_day_30[2], 0)
+            self.assertEqual(before_day_30[3], 0)
+            self.assertEqual(at_day_30[2], 0)
+            self.assertEqual(at_day_30[3], 0)
+            opening_position = dict(
+                common, source_type='opening', subcategory_name='', asset_identifier=label
+            )
+            opening_value = engine.fixed_income_value_as_of(opening_position, date(2026, 8, 31))
+            self.assertEqual(opening_value[3], 0)
+
+    def test_fixed_income_tax_uses_each_lots_own_acquisition_date(self):
+        engine = self.engine()
+        older_lot = self.position(
+            source_type='operation', first_operation_date='2026-01-01',
+            total_cost_cents=1_000_000, fixed_income_rate='12', fixed_income_mode='pre',
+        )
+        newer_lot = dict(older_lot, first_operation_date='2026-06-10')
+        as_of = date(2026, 7, 1)
+
+        older_value = engine.fixed_income_value_as_of(older_lot, as_of)
+        newer_value = engine.fixed_income_value_as_of(newer_lot, as_of)
+
+        self.assertEqual(older_value[2], 0)  # IOF has ended for this lot.
+        self.assertGreater(newer_value[2], 0)  # The newer lot is still within 30 days.
+        self.assertNotEqual(older_value[3], newer_value[3])  # IR bracket follows lot age too.
+
     def test_savings_anniversary_and_maturity_are_preserved(self):
         engine = self.engine()
         savings = self.position(asset_type='savings', first_operation_date='2026-01-31')

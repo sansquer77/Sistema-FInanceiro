@@ -431,54 +431,16 @@ export function registerLimitsView({
     goalFundingForm.elements.goal_id.value = goal.id;
     setMessage(goalActionMessage, "");
     try {
-      if (!state.portfolio) state.portfolio = await api("/api/portfolio");
-      renderFundingOptions();
+      const { funding_options: options } = await api("/api/financial-goals/funding-options");
+      renderFundingOptions(options || []);
     } catch (error) { setMessage(goalActionMessage, error.message, "error"); }
     goalActionPanel.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
-  function renderFundingOptions() {
-    const used = new Set(state.financialGoals.flatMap((goal) => (goal.funding_sources || []).map((source) => `${source.source_type}:${source.source_id}`)));
-    const assets = new Map();
-    (state.portfolio?.positions || []).forEach((position) => {
-      const fixedIncome = position.asset_type === "fixed_income";
-      const identity = [
-        position.account_id,
-        String(position.currency || "BRL").toUpperCase(),
-        position.asset_type || "other",
-        String(position.asset_identifier || "").toUpperCase(),
-        String(position.asset_name || position.asset_identifier || "").trim().toLowerCase(),
-        String(position.cnpj || "").replace(/\D/g, ""),
-        fixedIncome ? String(position.fixed_income_indexer || "").trim().toLowerCase() : "",
-        fixedIncome ? String(position.fixed_income_maturity_date || "").trim() : "",
-      ].join("\u001f");
-      const asset = assets.get(identity) || { position, sources: [], emergency: false, currentValueBrlCents: 0 };
-      asset.emergency ||= Boolean(position.emergency_reserve_eligible);
-      asset.currentValueBrlCents += Number(position.current_value_brl_cents || 0);
-      asset.sources.push(...(position.sources || []));
-      if (!(position.sources || []).length && ["opening", "operation"].includes(position.source_type) && position.source_id) {
-        asset.sources.push({ source_type: position.source_type, source_id: position.source_id, emergency_reserve_eligible: position.emergency_reserve_eligible });
-      }
-      asset.emergency ||= (position.sources || []).some((source) => source.emergency_reserve_eligible);
-      assets.set(identity, asset);
-    });
-    const options = [];
-    for (const asset of assets.values()) {
-      const candidates = [...new Map(asset.sources
-        .filter((source) => ["opening", "operation"].includes(source.source_type) && source.source_id)
-        .map((source) => [`${source.source_type}:${source.source_id}`, source])).values()];
-      if (asset.emergency || !candidates.length) continue;
-      candidates.sort((left, right) => (left.source_type === "opening" ? 0 : 1) - (right.source_type === "opening" ? 0 : 1) || Number(left.source_id) - Number(right.source_id));
-      const canonical = candidates[0];
-      const type = canonical.source_type === "opening" ? "investment_opening" : "investment_operation";
-      const name = asset.position.asset_name || asset.position.asset_identifier || "Investimento";
-      const value = asset.currentValueBrlCents ? asset.currentValueBrlCents / 100 : Number(asset.position.current_value_brl || asset.position.current_value || 0);
-      options.push({ key: `${type}:${canonical.source_id}`, label: `Investimento · ${name} · ${formatMoney(value, "BRL")}` });
-    }
-    const available = options.filter((option) => !used.has(option.key));
-    goalFundingSource.innerHTML = available.map((option) => `<option value="${option.key}">${escapeHtml(option.label)}</option>`).join("") || '<option value="">Nenhuma origem disponível</option>';
-    goalFundingSource.disabled = !available.length;
-    goalFundingForm.querySelector('button[type="submit"]').disabled = !available.length;
+  function renderFundingOptions(options) {
+    goalFundingSource.innerHTML = options.map((option) => `<option value="${escapeHtml(option.key)}">${escapeHtml(`Investimento · ${option.label} · ${formatMoney(Number(option.current_value_brl || 0), "BRL")}`)}</option>`).join("") || '<option value="">Nenhuma origem disponível</option>';
+    goalFundingSource.disabled = !options.length;
+    goalFundingForm.querySelector('button[type="submit"]').disabled = !options.length;
   }
 
   async function unlinkFunding(goal, linkId) {

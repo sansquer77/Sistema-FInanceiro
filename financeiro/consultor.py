@@ -102,9 +102,12 @@ _FORBIDDEN_NEGATION_WINDOW = (
     r"\b(nao|nunca|sem|evite|evitar|evitando|desaconselho|desaconselha|desaconselhar)"
     r"|deixe\s+de|deixa\s+de|deixar\s+de"
 )
-CONSULTOR_MAX_TOKENS = 900
-ANALISE_CARTEIRA_MAX_TOKENS = 2500
+# spec: consultor/consultor v2.37 — critérios 79 e 80 (limite remoto; a análise local mantém 900)
+CONSULTOR_REMOTE_MIN_OUTPUT_TOKENS = 2500
+CONSULTOR_REMOTE_MAX_OUTPUT_TOKENS = 4000
 CONSULTOR_MIN_TIMEOUT_SECONDS = 20
+# Estimativa conservadora: janela local de 4096 tokens, menos 900 de resposta, em ~3 caracteres por token.
+LOCAL_PROMPT_CHAR_BUDGET = 11_000
 CONSULTOR_DAILY_QUOTA = history_store.CONSULTOR_DAILY_QUOTA
 CONSULTOR_FAILURE_COOLDOWN_SECONDS = history_store.CONSULTOR_FAILURE_COOLDOWN_SECONDS
 DEFAULT_TEMPERATURE = provider_adapter.DEFAULT_TEMPERATURE
@@ -136,9 +139,10 @@ def execute_consultor_analysis(
     assert_daily_quota_available(normalized_user_id, current_time.date())
 
     ai_settings = load_ai_settings(normalized_user_id)
-    max_tokens = normalize_consultor_max_tokens(ai_settings.get("max_tokens"))
-    if normalized_analysis_id == "analise_carteira":
-        max_tokens = max(max_tokens, ANALISE_CARTEIRA_MAX_TOKENS)
+    max_tokens = max(
+        normalize_consultor_max_tokens(ai_settings.get("max_tokens")),
+        CONSULTOR_REMOTE_MIN_OUTPUT_TOKENS,
+    )
     timeout_seconds = normalize_consultor_timeout(ai_settings.get("timeout_seconds"))
     macro_research = (
         collect_portfolio_macro_research(ai_settings, timeout_seconds=timeout_seconds)
@@ -257,10 +261,17 @@ def prepare_local_analysis(user_id: int, analysis_id: object, *, period_window: 
         investor_profile=settings["investor_profile"], portfolio_positions=portfolio_positions)
     if macro_research is not None:
         context["macro_research"] = macro_research
+    messages = build_ai_messages(build_system_prompt(normalized_id, investor_profile=settings["investor_profile"], period_window=normalized_period), context)
+    # spec: consultor/consultor v2.36 — critérios 75 e 76
+    prompt_chars = sum(len(message["content"]) for message in messages)
+    if prompt_chars > LOCAL_PROMPT_CHAR_BUDGET and "remota" in execution_settings["order"]:
+        raise ConsultorError(
+            "O contexto desta análise excede a janela da IA local; a IA remota será usada."
+        )
     return {
         "analysis_id": normalized_id,
         "period_window": normalized_period,
-        "messages": build_ai_messages(build_system_prompt(normalized_id, investor_profile=settings["investor_profile"], period_window=normalized_period), context),
+        "messages": messages,
         "max_tokens": 900,
         "temperature": 0.2,
         "macro_research": macro_research,
@@ -467,7 +478,7 @@ def normalize_consultor_max_tokens(value: object) -> int:
         configured = int(value if value not in (None, "") else 700)
     except (TypeError, ValueError):
         configured = 700
-    return max(1, min(configured, CONSULTOR_MAX_TOKENS))
+    return max(1, min(configured, CONSULTOR_REMOTE_MAX_OUTPUT_TOKENS))
 
 
 def normalize_consultor_timeout(value: object) -> int:

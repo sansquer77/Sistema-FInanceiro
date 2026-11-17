@@ -562,7 +562,8 @@ def recognize_payment_with_conn(conn: sqlite3.Connection, user_id: int, transact
     amount = int(link["amount_cents"])
     review = amount > accrued_balance
     remaining = max(0, accrued_balance - amount)
-    conn.execute("""UPDATE revolving_loans SET balance_cents=?,balance_date=?,review_required=?,
+    conn.execute("""UPDATE revolving_loans SET balance_cents=?,balance_date=?,
+               review_required=MAX(review_required, ?),
                updated_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=?""",
                  (remaining, payment_date, int(review), link["revolving_loan_id"], user_id))
     conn.execute("UPDATE revolving_loan_payment_links SET recognized=1 WHERE id=? AND user_id=?",

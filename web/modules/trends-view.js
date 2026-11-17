@@ -1,7 +1,7 @@
 // spec: tendencias-saude-financeira v2.26 — critérios 1, 2, 3, 4, 5, 6, 7, 10, 12, 13, 14, 16, 17, 20, 21, 25, 26, 27, 28, 32, 33 e 34
 import { stateMarkup } from "./dom-utils.js";
 import { chartToken, renderChart } from "./chart-adapter.js";
-import { runLocalInference } from "./webllm-client.js?v=175";
+import { runLocalInference } from "./webllm-client.js?v=179";
 export function registerTrendsView({
   elements,
   api,

@@ -1,6 +1,8 @@
 // spec: consultor/consultor v2.13 — critérios de preparo explícito e execução local
 // WebLLM mantém runtime e pesos no Cache Storage privado da origem do navegador.
 const MODEL_ID = "Qwen2.5-3B-Instruct-q4f16_1-MLC";
+// spec: consultor/consultor v2.35 — critério 71; decisão em adr/0021-janela-contexto-local-consultor v0.2
+const CHAT_OPTIONS = { context_window_size: 4096 };
 let libraryPromise;
 let engine;
 let enginePromise;
@@ -15,6 +17,9 @@ function supported() {
   return Boolean(globalThis.navigator?.gpu);
 }
 
+// spec: consultor/consultor v2.35 — critério de perda do dispositivo GPU ("Device was lost")
+const GPU_MEMORY_PATTERN = /(out of memory|memory allocation|device (was )?lost|insufficient memory|gpudevicelostinfo|gpu.*memory)/;
+
 function classifyInferenceError(error) {
   const detail = String(error?.message || error || "").toLowerCase();
   if (/prompt tokens exceed context window|context window size/.test(detail)) {
@@ -26,7 +31,7 @@ function classifyInferenceError(error) {
       contextWindow: contextWindow ? Number(contextWindow) : undefined,
     };
   }
-  if (/(out of memory|memory allocation|device lost|gpu.*memory)/.test(detail)) {
+  if (GPU_MEMORY_PATTERN.test(detail)) {
     return { category: "gpu_memory_or_device_lost" };
   }
   if (/(webgpu.*(unavailable|unsupported)|navigator\.gpu)/.test(detail)) {
@@ -48,7 +53,7 @@ function normalizeError(error, stage = "initialization") {
   if (!supported() || /(webgpu.*(unavailable|unsupported)|navigator\.gpu)/.test(detail)) {
     return "WebGPU não está disponível neste navegador. Atualize o navegador ou habilite a aceleração gráfica e tente novamente.";
   }
-  if (/(out of memory|memory allocation|device lost|gpu.*memory)/.test(detail)) {
+  if (GPU_MEMORY_PATTERN.test(detail)) {
     return stage === "inference"
       ? "A memória da GPU não foi suficiente para gerar a análise local."
       : "A memória da GPU não foi suficiente para carregar o modelo local.";
@@ -73,8 +78,8 @@ async function ensureEngine(onProgress) {
         initProgressCallback: (progress) => onProgress?.(progress.text || "Baixando modelo local…"),
       };
       try {
-        engineWorker = new Worker(new URL("./webllm-worker.js?v=175", import.meta.url), { type: "module" });
-        return await webllm.CreateWebWorkerMLCEngine(engineWorker, MODEL_ID, engineConfig);
+        engineWorker = new Worker(new URL("./webllm-worker.js?v=179", import.meta.url), { type: "module" });
+        return await webllm.CreateWebWorkerMLCEngine(engineWorker, MODEL_ID, engineConfig, CHAT_OPTIONS);
       } catch (workerError) {
         // spec: consultor/consultor v2.13 — critério de preparo explícito do modelo local
         // Safari pode expor WebGPU à página, mas não ao Dedicated Worker. O fallback
@@ -83,7 +88,7 @@ async function ensureEngine(onProgress) {
         engineWorker = undefined;
         onProgress?.("Este navegador não iniciou a GPU no Worker. Preparando o modelo local diretamente na página…");
         try {
-          return await webllm.CreateMLCEngine(MODEL_ID, engineConfig);
+          return await webllm.CreateMLCEngine(MODEL_ID, engineConfig, CHAT_OPTIONS);
         } catch (mainThreadError) {
           mainThreadError.workerError = workerError;
           throw mainThreadError;

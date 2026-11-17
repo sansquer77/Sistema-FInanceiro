@@ -10,6 +10,7 @@ from unittest.mock import patch
 from financeiro import database, portfolio
 from financeiro.accounts import create_checking_account
 from financeiro.auth import create_user
+from financeiro.transactions import create_transaction
 
 
 class PortfolioTransactionBoundaryTest(unittest.TestCase):
@@ -119,6 +120,26 @@ class PortfolioTransactionBoundaryTest(unittest.TestCase):
         self.assertEqual(inputs, original)
         self.assertEqual(quote.call_count, 1)
         self.assertTrue(quote.call_args.kwargs["force_refresh"])
+
+    def test_position_snapshot_includes_investment_subcategory_for_tax_classification(self):
+        create_transaction(self.user["id"], {
+            "type": "investment", "description": "Aplicação LCI", "amount": "1.000,00",
+            "investment_amount": "1.000,00", "date": "2026-08-31",
+            "account_id": str(self.account["id"]), "category": "Renda Fixa",
+            "subcategory": "LCI / LCA (Letras de Crédito Imobiliário/Agrícola)",
+            "investment_asset_name": "Crédito imobiliário",
+            "investment_asset_identifier": "LCI", "investment_fixed_income_mode": "pre",
+            "investment_fixed_income_rate": "12",
+        })
+
+        with database.get_connection() as conn:
+            inputs = portfolio.positions_store.load_position_inputs(conn, self.user["id"])
+
+        operation = next(row for row in inputs["operations"] if row["description"] == "Aplicação LCI")
+        self.assertIn("LCI", operation["subcategory_name"])
+        positions = portfolio.build_positions(inputs["operations"])
+        fixed_income_position = next(row for row in positions if row["asset_type"] == "fixed_income")
+        self.assertIn("LCI", fixed_income_position["subcategory_name"])
 
     def test_events_close_the_local_snapshot_before_external_lookup(self):
         self.network_calls = 0

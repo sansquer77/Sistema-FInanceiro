@@ -48,6 +48,7 @@ def load_position_inputs(conn, user_id: int) -> dict:
         SELECT investment_operations.*, 'operation' AS source_type, investment_operations.id AS source_id,
             1 AS apply_tax_estimate, transactions.date, transactions.description, transactions.amount_cents,
             transactions.exchange_rate_micros, transactions.amount_brl_cents,
+            subcategories.name AS subcategory_name,
             checking_accounts.name AS account_name, checking_accounts.currency AS account_currency, checking_accounts.archived_at AS account_archived_at
         FROM investment_operations
         JOIN transactions ON transactions.id = investment_operations.transaction_id
@@ -62,6 +63,8 @@ def load_position_inputs(conn, user_id: int) -> dict:
             )
         JOIN checking_accounts ON checking_accounts.id = investment_operations.account_id
             AND checking_accounts.user_id = investment_operations.user_id
+        LEFT JOIN subcategories ON subcategories.id = transactions.subcategory_id
+            AND subcategories.user_id = transactions.user_id
         WHERE investment_operations.user_id = ?
         """,
         (user_id,),

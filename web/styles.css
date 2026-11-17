@@ -4398,6 +4398,23 @@ padding: 8px 16px;
   font-size: 12px;
 }
 
+.transaction-form-panel .investment-cost-heading {
+  margin: 4px 0 -4px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.transaction-form-panel .investment-cost-heading .inline-help-icon {
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+.transaction-form-panel .investment-gross-reference {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .transaction-form-panel .actions {
   gap: 8px;
   padding-top: 2px;
