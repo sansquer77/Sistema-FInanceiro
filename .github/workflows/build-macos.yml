@@ -63,6 +63,7 @@ jobs:
           APP_ROOT="$PACKAGE_ROOT/Aplicativo"
           RUNTIME_ROOT="$APP_ROOT/SistemaFinanceiro"
 
+          mkdir -p "$APP_ROOT"
           rm -rf "$RUNTIME_ROOT"
           cp -R "dist/SistemaFinanceiro" "$RUNTIME_ROOT"
           cp "Sistema Financeiro - Distribuicao/INSTRUCOES-SERVIDOR.md" \
