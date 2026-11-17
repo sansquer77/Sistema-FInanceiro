@@ -2,7 +2,7 @@
 tipo: spec
 area: distribuicao
 status: implementado
-versao: 2.9
+versao: 2.10
 atualizado: 2026-11-17
 relacionados:
   - "[[sdd]]"
@@ -16,7 +16,7 @@ aliases: ["Distribuicao", "Pacotes de Distribuicao", "Instalador macOS", "Instal
 # Distribuicao
 
 > [!info] Status
-> **implementado** · versão: `2.9` · área: `distribuicao` · atualizado em 2026-11-17 · relacionados: [[sdd]], [[arquitetura]], [[requisitos]], [[specs/backup-restauracao]]
+> **implementado** · versão: `2.10` · área: `distribuicao` · atualizado em 2026-11-17 · relacionados: [[sdd]], [[arquitetura]], [[requisitos]], [[specs/backup-restauracao]]
 
 ## Problema
 
@@ -176,6 +176,7 @@ Arquivos e diretorios afetados:
 
 ## Changelog
 
+- `2.10` — 2026-11-17 — Templates Windows restaurados no repositório após remoção acidental da pasta versionada; diagnósticos do workflow confirmam staging do runtime já criado pela etapa de empacotamento.
 - `2.9` — 2026-11-17 — Templates macOS restaurados no repositório e workflow garante a criação da pasta de staging `MacOS/Aplicativo` antes de copiar o runtime PyInstaller.
 - `2.8` — 2026-09-06 — Criado guia genérico de servidor Linux, compartilhado pelos pacotes macOS, Windows e Linux, com instalação e atualização administráveis a partir dos três sistemas sem expor a infraestrutura pessoal.
 - `2.7` — 2026-09-05 — Builds das três plataformas passam a incluir `cryptography 50.0.1`; smoke test de backup/restauração autenticados entra no gate operacional da release.
