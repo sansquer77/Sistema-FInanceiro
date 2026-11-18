@@ -661,7 +661,9 @@ class AppHandler(BaseHTTPRequestHandler):
         if not self.validate_read_source():
             return
         user = self.require_user()
-        self.send_json(ai_settings_status(user["id"]))
+        query = parse_qs(urlsplit(self.path).query)
+        provider = (query.get("provider") or [None])[0]
+        self.send_json(ai_settings_status(user["id"], provider=provider))
 
     def handle_save_ai_settings(self) -> None:
         # spec: tendencias-saude-financeira v2.26 — critérios 17, 18, 19, 21, 23, 27 e 28

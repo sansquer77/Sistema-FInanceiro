@@ -47,6 +47,12 @@ AI_PROVIDER_PRESETS = {
         "base_url": "https://generativelanguage.googleapis.com/v1beta",
         "auth_type": "bearer",
     },
+    "deepseek": {
+        "label": "DeepSeek",
+        "base_url": "https://api.deepseek.com",
+        "auth_type": "bearer",
+        "default_model": "deepseek-flash",
+    },
     "custom": {
         "label": "Custom / Local",
         "base_url": "",
@@ -135,12 +141,12 @@ def save_encrypted_config(config: dict, path: Path, key_path: Path | None = None
 
 
 def encrypt_json_for_storage(config: dict, key_path: Path | None = None) -> str:
-    # spec: consultor/consultor v2.14 - criterio 23
+    # spec: consultor/consultor v2.43 - criterio 23
     return json.dumps(encrypt_config_payload(config, key_path), indent=2, sort_keys=True)
 
 
 def decrypt_json_from_storage(payload_text: str, key_path: Path | None = None) -> dict:
-    # spec: consultor/consultor v2.14 - criterio 23
+    # spec: consultor/consultor v2.43 - criterio 23
     if not str(payload_text or "").strip():
         raise SecureConfigError("Configuracao criptografada nao encontrada.")
     try:
@@ -271,14 +277,88 @@ def ai_provider_presets() -> list[dict]:
             "label": str(value["label"]),
             "base_url": str(value["base_url"]),
             "auth_type": str(value["auth_type"]),
+            "default_model": str(value.get("default_model") or ""),
         }
         for key, value in AI_PROVIDER_PRESETS.items()
     ]
 
 
-def ai_settings_status(user_id: int) -> dict:
+def _ai_provider_secret_map(user_id: int) -> dict[str, dict[str, str]]:
+    if not secure_config_exists(user_id, "ai"):
+        return {}
+    try:
+        payload = load_secure_config(user_id, "ai")
+    except SecureConfigError:
+        return {}
+    providers = payload.get("providers")
+    if not isinstance(providers, dict):
+        providers = {}
+    normalized = {
+        str(provider): value
+        for provider, value in providers.items()
+        if isinstance(value, dict) and str(value.get("api_key") or "").strip()
+    }
+    legacy_key = str(payload.get("api_key") or "").strip()
+    if legacy_key:
+        with database.get_connection() as conn:
+            row = conn.execute(
+                "SELECT provider FROM user_ai_settings WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+        active_provider = str(row["provider"] or "") if row is not None else ""
+        if active_provider and active_provider not in normalized:
+            normalized[active_provider] = {"api_key": legacy_key}
+    return normalized
+
+
+def _ai_provider_api_key(user_id: int, provider: str) -> str:
+    return str(_ai_provider_secret_map(user_id).get(provider, {}).get("api_key") or "").strip()
+
+
+def _save_ai_provider_api_key(user_id: int, provider: str, api_key: str, active_api_key: str) -> None:
+    providers = _ai_provider_secret_map(user_id)
+    if api_key:
+        providers[provider] = {"api_key": api_key}
+    else:
+        providers.pop(provider, None)
+    payload = {"providers": providers}
+    if active_api_key:
+        payload["api_key"] = active_api_key
+    if providers or active_api_key:
+        save_secure_config(user_id, "ai", payload)
+    else:
+        delete_secure_config(user_id, "ai")
+
+
+def _ai_provider_status_row(user_id: int, provider: str):
     with database.get_connection() as conn:
         row = conn.execute(
+            """
+            SELECT base_url, model, auth_type, timeout_seconds,
+                   temperature_micros, max_tokens, secret_config_path
+            FROM user_ai_provider_settings
+            WHERE user_id = ? AND provider = ?
+            """,
+            (user_id, provider),
+        ).fetchone()
+    if row is not None:
+        return row
+    with database.get_connection() as conn:
+        active_row = conn.execute(
+            """
+            SELECT base_url, model, auth_type, timeout_seconds,
+                   temperature_micros, max_tokens, secret_config_path
+            FROM user_ai_settings
+            WHERE user_id = ? AND provider = ?
+            """,
+            (user_id, provider),
+        ).fetchone()
+    return active_row
+
+
+def ai_settings_status(user_id: int, provider: str | None = None) -> dict:
+    with database.get_connection() as conn:
+        active_row = conn.execute(
             """
             SELECT enabled, provider, base_url, model, auth_type, timeout_seconds,
                    temperature_micros, max_tokens, secret_config_path
@@ -287,22 +367,45 @@ def ai_settings_status(user_id: int) -> dict:
             """,
             (user_id,),
         ).fetchone()
-    if row is None:
-        return default_ai_settings_status()
-    has_secret = secure_config_exists(user_id, "ai")
+    active_provider = str(active_row["provider"] or "custom") if active_row is not None else "custom"
+    selected_provider = str(provider or active_provider).strip().lower()
+    if selected_provider not in AI_PROVIDER_PRESETS:
+        selected_provider = active_provider if active_provider in AI_PROVIDER_PRESETS else "custom"
+    selected_row = _ai_provider_status_row(user_id, selected_provider)
+    preset = AI_PROVIDER_PRESETS[selected_provider]
+    has_secret = bool(_ai_provider_api_key(user_id, selected_provider))
+    enabled = bool(active_row["enabled"]) if active_row is not None else False
+    if selected_row is None:
+        base_url = str(preset.get("base_url") or "")
+        model = str(preset.get("default_model") or "")
+        auth_type = str(preset.get("auth_type") or "bearer")
+        timeout_seconds = 10
+        temperature = 0.2
+        max_tokens = 700
+        secret_config_path = "secure_configs:ai"
+    else:
+        base_url = str(selected_row["base_url"] or "")
+        model = str(selected_row["model"] or "")
+        auth_type = str(selected_row["auth_type"] or "bearer")
+        timeout_seconds = int(selected_row["timeout_seconds"] or 10)
+        temperature = micros_to_decimal(selected_row["temperature_micros"], "0.2")
+        max_tokens = int(selected_row["max_tokens"] or 700)
+        secret_config_path = str(selected_row["secret_config_path"] or "secure_configs:ai")
     return {
-        "configured": bool(row["model"]) and (str(row["auth_type"]) == "none" or has_secret),
-        "enabled": bool(row["enabled"]),
-        "provider": str(row["provider"] or "custom"),
-        "base_url": str(row["base_url"] or ""),
-        "model": str(row["model"] or ""),
-        "auth_type": str(row["auth_type"] or "bearer"),
+        "configured": bool(model) and (auth_type == "none" or has_secret),
+        "enabled": enabled,
+        "provider": selected_provider,
+        "active_provider": active_provider,
+        "base_url": base_url,
+        "model": model,
+        "auth_type": auth_type,
         "has_api_key": has_secret,
-        "timeout_seconds": int(row["timeout_seconds"] or 10),
-        "temperature": micros_to_decimal(row["temperature_micros"], "0.2"),
-        "max_tokens": int(row["max_tokens"] or 700),
+        "timeout_seconds": timeout_seconds,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
         "presets": ai_provider_presets(),
         "contract": "openai_chat_completions",
+        "secret_config_path": secret_config_path,
     }
 
 
@@ -311,6 +414,7 @@ def default_ai_settings_status() -> dict:
         "configured": False,
         "enabled": False,
         "provider": "custom",
+        "active_provider": "custom",
         "base_url": "",
         "model": "",
         "auth_type": "bearer",
@@ -338,7 +442,7 @@ def save_ai_settings(user_id: int, data: dict) -> dict:
         raise SecureConfigError("Tipo de autenticacao de IA invalido.")
     if provider in {"custom", "local"} and not base_url:
         raise SecureConfigError("Informe a URL base da IA customizada/local.")
-    if provider in {"openai", "anthropic", "google"} and not base_url:
+    if provider in {"openai", "anthropic", "google", "deepseek"} and not base_url:
         raise SecureConfigError("URL base do provedor de IA invalida.")
     if enabled and not model:
         raise SecureConfigError("Informe o modelo de IA.")
@@ -348,22 +452,44 @@ def save_ai_settings(user_id: int, data: dict) -> dict:
         except AIEndpointSecurityError as exc:
             raise SecureConfigError(str(exc)) from exc
 
-    existing_key = ""
-    if secure_config_exists(user_id, "ai"):
-        try:
-            existing_key = str(load_secure_config(user_id, "ai").get("api_key") or "")
-        except SecureConfigError:
-            existing_key = ""
+    existing_key = _ai_provider_api_key(user_id, provider)
     effective_key = api_key or existing_key
     if enabled and auth_type == "bearer" and not effective_key:
         raise SecureConfigError("Informe a chave de API para ativar a IA.")
-    if auth_type == "bearer" and effective_key:
-        save_secure_config(user_id, "ai", {"api_key": effective_key})
-    elif auth_type == "none":
-        delete_secure_config(user_id, "ai")
+    # spec: consultor/consultor v2.43 — critério 96
+    # Cada provedor conserva sua própria credencial; trocar o provedor ativo
+    # nunca reutiliza nem remove a chave criptografada de outro provedor.
+    _save_ai_provider_api_key(
+        user_id,
+        provider,
+        effective_key if auth_type == "bearer" else "",
+        effective_key if provider == normalize_ai_provider(data.get("provider")) and auth_type == "bearer" else "",
+    )
 
     # spec: tendencias-saude-financeira v2.26 — critérios 17, 21, 23, 27 e 28
     with database.get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO user_ai_provider_settings (
+                user_id, provider, base_url, model, auth_type,
+                timeout_seconds, temperature_micros, max_tokens, secret_config_path
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, provider) DO UPDATE SET
+                base_url = excluded.base_url,
+                model = excluded.model,
+                auth_type = excluded.auth_type,
+                timeout_seconds = excluded.timeout_seconds,
+                temperature_micros = excluded.temperature_micros,
+                max_tokens = excluded.max_tokens,
+                secret_config_path = excluded.secret_config_path,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (
+                user_id, provider, base_url, model, auth_type,
+                timeout_seconds, temperature_micros, max_tokens, "secure_configs:ai",
+            ),
+        )
         conn.execute(
             """
             INSERT INTO user_ai_settings (
@@ -396,14 +522,17 @@ def save_ai_settings(user_id: int, data: dict) -> dict:
                 "secure_configs:ai",
             ),
         )
+    # Mantém o alias legado apontando para o provedor que acabou de ficar ativo.
+    if auth_type == "bearer":
+        providers = _ai_provider_secret_map(user_id)
+        active_key = str(providers.get(provider, {}).get("api_key") or "")
+        _save_ai_provider_api_key(user_id, provider, active_key, active_key)
     return ai_settings_status(user_id)
 
 
 def load_ai_settings(user_id: int) -> dict:
     status = ai_settings_status(user_id)
-    api_key = ""
-    if status["has_api_key"]:
-        api_key = str(load_secure_config(user_id, "ai").get("api_key") or "")
+    api_key = _ai_provider_api_key(user_id, str(status["provider"]))
     return {**status, "api_key": api_key}
 
 

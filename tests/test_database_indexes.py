@@ -109,6 +109,7 @@ class DatabaseIndexTest(unittest.TestCase):
 
         with get_connection() as conn:
             settings_columns = column_names(conn, "consultor_settings")
+            execution_columns = column_names(conn, "ai_execution_settings")
             analyses_columns = column_names(conn, "consultor_analyses")
             perfil_columns = column_names(conn, "consultor_perfil_complementar")
             analyses_indexes = index_names(conn, "consultor_analyses")
@@ -128,6 +129,18 @@ class DatabaseIndexTest(unittest.TestCase):
                 "execution_priority",
             },
             settings_columns,
+        )
+        self.assertEqual(
+            {
+                "user_id",
+                "execution_priority",
+                "local_model_id",
+                "data_access_consent",
+                "consented_at",
+                "created_at",
+                "updated_at",
+            },
+            execution_columns,
         )
         self.assertEqual(
             {

@@ -5,7 +5,7 @@ from datetime import date, timedelta
 from financeiro.balance_projections import card_invoice_date
 from financeiro.database import get_connection
 
-# spec: consultor/consultor v2.34 — critérios 69 e 70
+# spec: consultor/consultor v2.43 — critérios 69 e 70
 MAX_TIMELINE_EVENTS_PER_CURRENCY = 4
 MAX_FORECAST_MONTHS = 3
 MAX_OPEN_INVOICES = 5
@@ -25,7 +25,7 @@ def amount_fields(name: str, amount: int, currency: str) -> dict:
 
 def build_maturity_cashflow_context(user_id: int, reference_date: date) -> dict:
     """Projeção curta a partir de saldos efetivos e compromissos explicitamente registrados."""
-    # spec: consultor/consultor v2.14 — critérios 42, 43 e 45
+    # spec: consultor/consultor v2.43 — critérios 42, 43 e 45
     from financeiro.consultor_context import format_currency_minor_units
 
     horizon = reference_date + timedelta(days=90)

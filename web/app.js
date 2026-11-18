@@ -58,12 +58,12 @@ import {
 import { applyTheme, setTheme, storedTheme, toggleTheme } from "./modules/theme-utils.js";
 import { applyDensity, setDensity, storedDensity, toggleDensity } from "./modules/density-utils.js";
 import { registerAuthView } from "./modules/auth-view.js";
-import { registerUserAdminView } from "./modules/user-admin-view.js?v=176";
+import { registerUserAdminView } from "./modules/user-admin-view.js?v=178";
 import { registerClassificationsView } from "./modules/classifications-view.js";
 import { registerLimitsView } from "./modules/limits-view.js";
 import { registerReportsView } from "./modules/reports-view.js";
 import { registerImportsView } from "./modules/imports-view.js";
-import { registerCockpitView } from "./modules/cockpit-view.js";
+import { registerCockpitView } from "./modules/cockpit-view.js?v=182";
 import { registerAccountsView } from "./modules/accounts-view.js";
 import { registerCardsView } from "./modules/cards-view.js";
 import { registerPortfolioView } from "./modules/portfolio-view.js?v=164";
@@ -354,8 +354,11 @@ const aiConfigTemperature = document.querySelector("#aiConfigTemperature");
 const aiConfigMaxTokens = document.querySelector("#aiConfigMaxTokens");
 const aiConfigMessage = document.querySelector("#aiConfigMessage");
 const aiLocalModelStatus = document.querySelector("#aiLocalModelStatus");
+const aiLocalModel = document.querySelector("#aiLocalModel");
 const aiLocalModelDownload = document.querySelector("#aiLocalModelDownload");
+const aiLocalModelRefresh = document.querySelector("#aiLocalModelRefresh");
 const aiLocalModelClear = document.querySelector("#aiLocalModelClear");
+const aiLocalModelHelp = document.querySelector("#aiLocalModelHelp");
 const userPrefTabs = document.querySelector(".user-pref-tabs");
 const consultorConfigForm = document.querySelector("#consultorConfigForm");
 const consultorEnabled = document.querySelector("#consultorEnabled");
@@ -1442,8 +1445,11 @@ const userAdminViewController = registerUserAdminView({
     aiConfigTemperature,
     aiConfigMaxTokens,
     aiLocalModelStatus,
+    aiLocalModel,
     aiLocalModelDownload,
+    aiLocalModelRefresh,
     aiLocalModelClear,
+    aiLocalModelHelp,
     consultorConfigForm,
     consultorEnabled,
     consultorInvestorProfile,

@@ -318,7 +318,7 @@ def ensure_ai_settings(conn: sqlite3.Connection) -> None:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
-            provider TEXT NOT NULL DEFAULT 'custom' CHECK (provider IN ('openai', 'anthropic', 'google', 'custom', 'local')),
+            provider TEXT NOT NULL DEFAULT 'custom' CHECK (provider IN ('openai', 'anthropic', 'google', 'deepseek', 'custom', 'local')),
             base_url TEXT NOT NULL DEFAULT '',
             model TEXT NOT NULL DEFAULT '',
             auth_type TEXT NOT NULL DEFAULT 'bearer' CHECK (auth_type IN ('none', 'bearer')),
@@ -332,6 +332,46 @@ def ensure_ai_settings(conn: sqlite3.Connection) -> None:
         )
         """
     )
+    table_row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'user_ai_settings'"
+    ).fetchone()
+    table_sql = str(table_row["sql"] or "") if table_row is not None else ""
+    if "'deepseek'" not in table_sql:
+        conn.execute("ALTER TABLE user_ai_settings RENAME TO user_ai_settings_before_deepseek")
+        conn.execute(
+            """
+            CREATE TABLE user_ai_settings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
+                provider TEXT NOT NULL DEFAULT 'custom' CHECK (provider IN ('openai', 'anthropic', 'google', 'deepseek', 'custom', 'local')),
+                base_url TEXT NOT NULL DEFAULT '',
+                model TEXT NOT NULL DEFAULT '',
+                auth_type TEXT NOT NULL DEFAULT 'bearer' CHECK (auth_type IN ('none', 'bearer')),
+                timeout_seconds INTEGER NOT NULL DEFAULT 10 CHECK (timeout_seconds BETWEEN 1 AND 60),
+                temperature_micros INTEGER NOT NULL DEFAULT 200000 CHECK (temperature_micros BETWEEN 0 AND 2000000),
+                max_tokens INTEGER NOT NULL DEFAULT 700 CHECK (max_tokens BETWEEN 1 AND 4000),
+                secret_config_path TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (user_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO user_ai_settings (
+                id, user_id, enabled, provider, base_url, model, auth_type,
+                timeout_seconds, temperature_micros, max_tokens, secret_config_path,
+                created_at, updated_at
+            )
+            SELECT id, user_id, enabled, provider, base_url, model, auth_type,
+                   timeout_seconds, temperature_micros, max_tokens, secret_config_path,
+                   created_at, updated_at
+            FROM user_ai_settings_before_deepseek
+            """
+        )
+        conn.execute("DROP TABLE user_ai_settings_before_deepseek")
     ensure_column(conn, "user_ai_settings", "enabled", "INTEGER NOT NULL DEFAULT 0")
     ensure_column(conn, "user_ai_settings", "provider", "TEXT NOT NULL DEFAULT 'custom'")
     ensure_column(conn, "user_ai_settings", "base_url", "TEXT NOT NULL DEFAULT ''")
@@ -341,6 +381,25 @@ def ensure_ai_settings(conn: sqlite3.Connection) -> None:
     ensure_column(conn, "user_ai_settings", "temperature_micros", "INTEGER NOT NULL DEFAULT 200000")
     ensure_column(conn, "user_ai_settings", "max_tokens", "INTEGER NOT NULL DEFAULT 700")
     ensure_column(conn, "user_ai_settings", "secret_config_path", "TEXT NOT NULL DEFAULT ''")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS user_ai_provider_settings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            provider TEXT NOT NULL,
+            base_url TEXT NOT NULL DEFAULT '',
+            model TEXT NOT NULL DEFAULT '',
+            auth_type TEXT NOT NULL DEFAULT 'bearer' CHECK (auth_type IN ('none', 'bearer')),
+            timeout_seconds INTEGER NOT NULL DEFAULT 10 CHECK (timeout_seconds BETWEEN 1 AND 60),
+            temperature_micros INTEGER NOT NULL DEFAULT 200000 CHECK (temperature_micros BETWEEN 0 AND 2000000),
+            max_tokens INTEGER NOT NULL DEFAULT 700 CHECK (max_tokens BETWEEN 1 AND 4000),
+            secret_config_path TEXT NOT NULL DEFAULT 'secure_configs:ai',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (user_id, provider)
+        )
+        """
+    )
 
 
 def ensure_secure_configs(conn: sqlite3.Connection) -> None:
@@ -398,7 +457,7 @@ def ensure_secure_configs(conn: sqlite3.Connection) -> None:
 
 
 def ensure_consultor_schema(conn: sqlite3.Connection) -> None:
-    # spec: consultor/consultor v2.14 - criterio 23
+    # spec: consultor/consultor v2.43 - criterio 23
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS consultor_settings (

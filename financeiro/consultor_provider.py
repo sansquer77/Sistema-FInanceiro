@@ -46,7 +46,7 @@ class ConsultorProviderError(Exception):
         self.diagnostics = diagnostics or {}
 
 
-# spec: consultor/consultor v2.16 — critérios 64 a 68
+# spec: consultor/consultor v2.43 — critérios 64 a 68
 _MARKET_RESEARCH_QUERY = (
     "Pesquise o cenário macroeconômico mais recente para o mercado de ações do Brasil e global. "
     "Resuma fatos recentes relevantes sobre juros, inflação, crescimento, política monetária, "
@@ -304,7 +304,7 @@ CONSULTOR_RETRY_BACKOFF_SECONDS = (2, 4)
 
 def _is_retryable_consultor_error(exc: ConsultorProviderError) -> bool:
     """Repete apenas erros transitórios do provedor; timeouts não são repetidos para não multiplicar a espera."""
-    # spec: consultor/consultor v2.36 — critérios 77 e 78
+    # spec: consultor/consultor v2.43 — critérios 77 e 78
     cause = exc.__cause__
     if isinstance(cause, HTTPError):
         return int(cause.code) in RETRYABLE_CONSULTOR_STATUS

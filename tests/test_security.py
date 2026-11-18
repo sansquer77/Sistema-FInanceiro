@@ -718,6 +718,48 @@ class IdorProtectionTest(IsolatedDatabaseTest):
         self.assertTrue(status["enabled"])
         self.assertFalse(status["has_api_key"])
 
+    def test_ai_provider_settings_are_isolated_and_switching_restores_previous_key(self) -> None:
+        owner = create_user("Owner", "providers@example.com", "strong-password")
+
+        save_ai_settings(owner["id"], {
+            "enabled": True,
+            "provider": "google",
+            "model": "gemini-test",
+            "api_key": "gemini-secret",
+        })
+        save_ai_settings(owner["id"], {
+            "enabled": True,
+            "provider": "deepseek",
+            "model": "deepseek-test",
+            "api_key": "deepseek-secret",
+        })
+
+        deepseek = load_ai_settings(owner["id"])
+        google_status = ai_settings_status(owner["id"], provider="google")
+        self.assertEqual(deepseek["provider"], "deepseek")
+        self.assertEqual(deepseek["api_key"], "deepseek-secret")
+        self.assertEqual(google_status["model"], "gemini-test")
+        self.assertTrue(google_status["has_api_key"])
+
+        save_ai_settings(owner["id"], {
+            "enabled": True,
+            "provider": "google",
+            "model": google_status["model"],
+            "api_key": "",
+        })
+        restored = load_ai_settings(owner["id"])
+        self.assertEqual(restored["provider"], "google")
+        self.assertEqual(restored["api_key"], "gemini-secret")
+        self.assertEqual(ai_settings_status(owner["id"], provider="deepseek")["model"], "deepseek-test")
+
+        with database.get_connection() as conn:
+            row = conn.execute(
+                "SELECT payload_enc FROM secure_configs WHERE user_id = ? AND config_type = 'ai'",
+                (owner["id"],),
+            ).fetchone()
+        self.assertNotIn("gemini-secret", row["payload_enc"])
+        self.assertNotIn("deepseek-secret", row["payload_enc"])
+
 
 class SessionCookieTest(unittest.TestCase):
     def test_session_cookie_is_httponly_samesite_and_not_secure_on_http(self) -> None:

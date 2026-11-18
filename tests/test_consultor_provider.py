@@ -24,13 +24,27 @@ class ConsultorProviderContractTest(unittest.TestCase):
         os.environ.pop("AI_ALLOWED_LOCAL_ENDPOINTS", None)
 
     def test_facade_and_adapter_preserve_all_request_shapes(self) -> None:
-        for provider in ("openai", "custom", "google", "anthropic"):
+        for provider in ("openai", "custom", "google", "anthropic", "deepseek"):
             with self.subTest(provider=provider):
                 settings = {**self.settings, "provider": provider}
                 self.assertEqual(
                     consultor.build_consultor_ai_request(settings, self.messages, max_tokens=700),
                     consultor_provider.build_consultor_ai_request(settings, self.messages, max_tokens=700),
                 )
+
+    def test_deepseek_uses_openai_compatible_chat_contract(self) -> None:
+        settings = {
+            **self.settings,
+            "provider": "deepseek",
+            "base_url": "https://api.deepseek.com",
+            "model": "deepseek-flash",
+        }
+
+        request = consultor_provider.build_consultor_ai_request(settings, self.messages, max_tokens=700)
+
+        self.assertEqual(request["url"], "https://api.deepseek.com/chat/completions")
+        self.assertEqual(request["headers"]["Authorization"], "Bearer test-key")
+        self.assertEqual(request["body"]["model"], "deepseek-flash")
 
     def test_facade_injects_late_bound_transport_and_helpers(self) -> None:
         with mock.patch.object(consultor, "ai_urlopen") as opener, \

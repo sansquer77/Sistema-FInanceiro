@@ -176,7 +176,7 @@ ANALYSIS_CATALOG: tuple[AnalysisCard, ...] = (
         ),
         input_scope="Score de Saude Financeira e seus 5 pilares.",
     ),
-    # spec: consultor/consultor v2.14 — critérios 8, 9 e 10
+    # spec: consultor/consultor v2.43 — critérios 8, 9 e 10
     AnalysisCard(
         analysis_id="evolucao_score_tempo",
         title="Evolucao do Score no Tempo",
@@ -270,7 +270,7 @@ def validate_analysis_id(value: object) -> str:
 
 
 def validate_period_window(value: object, *, analysis_id: str) -> str | None:
-    # spec: consultor/consultor v2.14 — critérios 9 e 10
+    # spec: consultor/consultor v2.43 — critérios 9 e 10
     card = CATALOG_BY_ID[validate_analysis_id(analysis_id)]
     if not card.requires_period_window:
         return None
@@ -294,7 +294,7 @@ def build_system_prompt(
     investor_profile: object = "moderado",
     period_window: object = None,
 ) -> str:
-    # spec: consultor/consultor v2.16 - criterios 8, 9, 12, 14, 34, 38, 39 e 64 a 68
+    # spec: consultor/consultor v2.43 - criterios 8, 9, 12, 14, 34, 38, 39 e 64 a 68
     normalized_analysis_id = validate_analysis_id(analysis_id)
     profile = validate_investor_profile(investor_profile)
     period = validate_period_window(period_window, analysis_id=normalized_analysis_id)

@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 
 BASELINE_SCHEMA_VERSION = 20000
-SCHEMA_VERSION = 20011
+SCHEMA_VERSION = 20012
 
 
 MIGRATIONS_SCHEMA_SQL = """
@@ -520,7 +520,7 @@ CREATE TABLE IF NOT EXISTS user_ai_settings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
-    provider TEXT NOT NULL DEFAULT 'custom' CHECK (provider IN ('openai', 'anthropic', 'google', 'custom', 'local')),
+    provider TEXT NOT NULL DEFAULT 'custom' CHECK (provider IN ('openai', 'anthropic', 'google', 'deepseek', 'custom', 'local')),
     base_url TEXT NOT NULL DEFAULT '',
     model TEXT NOT NULL DEFAULT '',
     auth_type TEXT NOT NULL DEFAULT 'bearer' CHECK (auth_type IN ('none', 'bearer')),
@@ -531,6 +531,22 @@ CREATE TABLE IF NOT EXISTS user_ai_settings (
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (user_id)
+);
+
+CREATE TABLE IF NOT EXISTS user_ai_provider_settings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    provider TEXT NOT NULL,
+    base_url TEXT NOT NULL DEFAULT '',
+    model TEXT NOT NULL DEFAULT '',
+    auth_type TEXT NOT NULL DEFAULT 'bearer' CHECK (auth_type IN ('none', 'bearer')),
+    timeout_seconds INTEGER NOT NULL DEFAULT 10 CHECK (timeout_seconds BETWEEN 1 AND 60),
+    temperature_micros INTEGER NOT NULL DEFAULT 200000 CHECK (temperature_micros BETWEEN 0 AND 2000000),
+    max_tokens INTEGER NOT NULL DEFAULT 700 CHECK (max_tokens BETWEEN 1 AND 4000),
+    secret_config_path TEXT NOT NULL DEFAULT 'secure_configs:ai',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (user_id, provider)
 );
 
 CREATE TABLE IF NOT EXISTS secure_configs (
@@ -568,6 +584,7 @@ CREATE TABLE IF NOT EXISTS ai_execution_settings (
     user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     execution_priority TEXT NOT NULL DEFAULT 'local_primeiro'
         CHECK (execution_priority IN ('local_primeiro', 'remota_primeiro', 'somente_local', 'somente_remota')),
+    local_model_id TEXT NOT NULL DEFAULT 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC',
     data_access_consent INTEGER NOT NULL DEFAULT 0 CHECK (data_access_consent IN (0, 1)),
     consented_at TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -993,6 +1010,12 @@ def ensure_consultor_settings_schema(conn: sqlite3.Connection) -> None:
 
 def ensure_ai_execution_settings_schema(conn: sqlite3.Connection) -> None:
     """Preserva a preferência do Consultor ao migrá-la para a política compartilhada."""
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(ai_execution_settings)").fetchall()}
+    if "local_model_id" not in columns:
+        conn.execute(
+            "ALTER TABLE ai_execution_settings ADD COLUMN local_model_id TEXT NOT NULL "
+            "DEFAULT 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC'"
+        )
     conn.execute(
         """
         INSERT OR IGNORE INTO ai_execution_settings (user_id, execution_priority, data_access_consent, consented_at)

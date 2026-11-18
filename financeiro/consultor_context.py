@@ -76,7 +76,7 @@ def build_currency_exposure_context(user_id: int, *, portfolio_positions: list[d
 
 
 def build_portfolio_analysis_context(user_id: int, *, portfolio_positions: list[dict] | None = None) -> dict:
-    # spec: consultor/consultor v2.14 - criterio 30
+    # spec: consultor/consultor v2.43 - criterio 30
     from financeiro.financial_health import calculate_financial_health_score
 
     positions = _load_portfolio_positions(user_id, portfolio_positions)
@@ -103,7 +103,7 @@ def build_financial_commitments_context(
     user_id: int, positions: list[dict], *, goals: list[dict] | None = None
 ) -> dict:
     """Agrega objetivos e dívidas sem expor nomes, IDs ou compensar moedas."""
-    # spec: consultor/consultor v2.14 — critérios 40 e 41
+    # spec: consultor/consultor v2.43 - critérios 40 e 41
     from financeiro.financial_goals import list_financial_goals
     from financeiro.loans import list_loans
 
@@ -211,7 +211,7 @@ def build_score_context(
     }
 
 
-# spec: consultor/consultor v2.14 — critérios 8 e 10
+# spec: consultor/consultor v2.43 — critérios 8 e 10
 def build_score_evolution_context(
     user_id: int,
     *,
@@ -308,7 +308,7 @@ def build_maturities_context(
     cashflow = maturity_cashflow
     reserved_identities = _goal_reserved_investment_identities(user_id, goals=goals)
     for asset in maturity_assets:
-        # spec: consultor/consultor v2.14 — critério 40
+        # spec: consultor/consultor v2.43 — critério 40
         from financeiro.financial_goals import investment_asset_identity
         position = next((item for item in positions
                          if str(item.get("source_id") or item.get("id")) == str(asset.get("position_id"))), None)
@@ -455,7 +455,7 @@ def format_brl_cents(value: object) -> str:
 
 def add_money_displays(value, *, path: str = "$"):
     """Adiciona a todo campo *_cents seu equivalente *_display, inclusive aninhado."""
-    # spec: consultor/consultor v2.14 — critério 39
+    # spec: consultor/consultor v2.43 — critério 39
     if isinstance(value, list):
         return [add_money_displays(item, path=f"{path}[{index}]") for index, item in enumerate(value)]
     if not isinstance(value, dict):
