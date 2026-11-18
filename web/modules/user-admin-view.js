@@ -1,6 +1,6 @@
 import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";
 import { createLoadPolicy } from "./load-policy.js";
-import { clearLocalModel, getLocalModelStatus, prepareLocalModel } from "./webllm-client.js?v=179";
+import { clearLocalModel, getLocalModelStatus, prepareLocalModel, refreshLocalModel } from "./webllm-client.js?v=182";
 
 export function registerUserAdminView(context) {
   const {
@@ -21,6 +21,7 @@ export function registerUserAdminView(context) {
   let consultorSettings = null;
   let backupRestoreToken = "";
   let backupRestorePasswordInMemory = "";
+  let localModelCatalog = [];
   const preferencesLoadPolicy = createLoadPolicy();
 
   function loadPreferences({ force = false } = {}) {
@@ -172,7 +173,7 @@ export function registerUserAdminView(context) {
     const customProvider = isAICustomProvider();
     const preset = currentAIPreset();
     const authType = elements.aiConfigAuthType?.value || preset?.auth_type || "bearer";
-    const remoteProvider = ["openai", "anthropic", "google"].includes(elements.aiConfigProvider?.value);
+    const remoteProvider = ["openai", "anthropic", "google", "deepseek"].includes(elements.aiConfigProvider?.value);
     // spec: tendencias-saude-financeira v2.26 — critério 2
     // Provedores remotos conhecidos sempre precisam expor a chave, ainda que
     // uma configuração anterior tenha deixado o seletor de autenticação em estado local.
@@ -211,12 +212,49 @@ export function registerUserAdminView(context) {
   }
 
   function setLocalModelControls({ cached = false, loading = false } = {}) {
+    if (elements.aiLocalModel) {
+      elements.aiLocalModel.disabled = loading || localModelCatalog.length === 0;
+    }
     if (elements.aiLocalModelDownload) {
       elements.aiLocalModelDownload.disabled = cached || loading;
     }
     if (elements.aiLocalModelClear) {
       elements.aiLocalModelClear.disabled = !cached || loading;
     }
+    if (elements.aiLocalModelRefresh) {
+      elements.aiLocalModelRefresh.disabled = loading || localModelCatalog.length === 0;
+    }
+  }
+
+  function selectedLocalModelId() {
+    return elements.aiLocalModel?.value || "Qwen2.5-1.5B-Instruct-q4f16_1-MLC";
+  }
+
+  function selectedLocalModel() {
+    return localModelCatalog.find((model) => model.id === selectedLocalModelId()) || null;
+  }
+
+  function renderLocalModelOptions(models, selectedId) {
+    if (!elements.aiLocalModel) return;
+    localModelCatalog = Array.isArray(models) ? models : [];
+    elements.aiLocalModel.replaceChildren();
+    localModelCatalog.forEach((model) => {
+      const option = document.createElement("option");
+      option.value = model.id;
+      option.textContent = `${model.label} · ${model.estimated_vram} · ${model.description}`;
+      elements.aiLocalModel.append(option);
+    });
+    const preferred = localModelCatalog.some((model) => model.id === selectedId)
+      ? selectedId
+      : localModelCatalog[0]?.id;
+    if (preferred) elements.aiLocalModel.value = preferred;
+    setLocalModelControls();
+  }
+
+  function renderLocalModelHelp() {
+    const model = selectedLocalModel();
+    if (!elements.aiLocalModelHelp || !model) return;
+    elements.aiLocalModelHelp.textContent = `${model.description} Memória estimada: ${model.estimated_vram}. O download fica no cache privado deste navegador e desta origem.`;
   }
 
   function waitForNextPaint() {
@@ -228,13 +266,15 @@ export function registerUserAdminView(context) {
   async function refreshLocalModelStatus() {
     if (!elements.aiLocalModelStatus) return;
     try {
-      const status = await getLocalModelStatus();
+      const status = await getLocalModelStatus(selectedLocalModelId());
+      const model = selectedLocalModel();
+      renderLocalModelHelp();
       if (!status.supported) {
         setLocalModelStatus("WebGPU não está disponível neste navegador. Use o botão para verificar novamente após habilitá-la.", "error");
       } else if (status.cached) {
-        setLocalModelStatus("Modelo local pronto neste navegador.", "success");
+        setLocalModelStatus(`Modelo ${model?.label || status.modelId} pronto neste navegador.`, "success");
       } else {
-        setLocalModelStatus("Modelo local ainda não foi baixado neste navegador.");
+        setLocalModelStatus(`O modelo ${model?.label || status.modelId} ainda não foi baixado neste navegador.`);
       }
       setLocalModelControls(status);
     } catch (error) {
@@ -246,13 +286,13 @@ export function registerUserAdminView(context) {
   async function handleLocalModelDownload() {
     setLocalModelControls({ loading: true });
     setLocalModelStatus("Iniciando o modelo local… o navegador pode levar alguns segundos para preparar o download.");
-    // spec: consultor/consultor v2.13 — critério de preparo explícito do modelo local
+    // spec: consultor/consultor v2.44 — critério de preparo explícito do modelo local
     // Safari pode bloquear a pintura enquanto cria um module worker pesado. Ceder um frame
     // deixa o estado de preparo visível antes de carregar o runtime do WebLLM.
     await waitForNextPaint();
     try {
-      await prepareLocalModel((progress) => setLocalModelStatus(progress));
-      setLocalModelStatus("Modelo local pronto neste navegador.", "success");
+      await prepareLocalModel((progress) => setLocalModelStatus(progress), selectedLocalModelId());
+      setLocalModelStatus(`Modelo ${selectedLocalModel()?.label || "local"} pronto neste navegador.`, "success");
       await refreshLocalModelStatus();
     } catch (error) {
       setLocalModelStatus(error.message, "error");
@@ -263,7 +303,7 @@ export function registerUserAdminView(context) {
   async function handleLocalModelClear() {
     setLocalModelControls({ loading: true });
     try {
-      await clearLocalModel();
+      await clearLocalModel(selectedLocalModelId());
       setLocalModelStatus("Modelo local removido deste navegador.", "success");
       await refreshLocalModelStatus();
     } catch (error) {
@@ -272,13 +312,28 @@ export function registerUserAdminView(context) {
     }
   }
 
-  async function loadAIConfigStatus({ loadConsultor = true } = {}) {
+  async function handleLocalModelRefresh() {
+    setLocalModelControls({ loading: true });
+    setLocalModelStatus("Atualizando o modelo local… o cache selecionado será reconstruído.");
+    await waitForNextPaint();
+    try {
+      await refreshLocalModel((progress) => setLocalModelStatus(progress), selectedLocalModelId());
+      setLocalModelStatus(`Modelo ${selectedLocalModel()?.label || "local"} atualizado neste navegador.`, "success");
+      await refreshLocalModelStatus();
+    } catch (error) {
+      setLocalModelStatus(error.message, "error");
+      setLocalModelControls();
+    }
+  }
+
+  async function loadAIConfigStatus({ loadConsultor = true, provider = "" } = {}) {
     if (!elements.aiConfigForm) {
       return;
     }
     try {
+      const providerQuery = provider ? `?provider=${encodeURIComponent(provider)}` : "";
       const [status, execution] = await Promise.all([
-        api("/api/ai-settings"), api("/api/ai-execution-settings"),
+        api(`/api/ai-settings${providerQuery}`), api("/api/ai-execution-settings"),
       ]);
       aiConfigPresets = status.presets || [];
       elements.aiConfigEnabled.checked = status.enabled === true;
@@ -299,6 +354,8 @@ export function registerUserAdminView(context) {
       if (elements.consultorExecutionPriority) {
         elements.consultorExecutionPriority.value = execution.execution_priority || "local_primeiro";
       }
+      renderLocalModelOptions(execution.local_models, execution.local_model_id);
+      renderLocalModelHelp();
       renderAIConfigFields();
       await refreshLocalModelStatus();
       if (status.configured && status.enabled) {
@@ -344,7 +401,11 @@ export function registerUserAdminView(context) {
       const status = await api("/api/ai-settings", { method: "PUT", body: data });
       await api("/api/ai-execution-settings", {
         method: "PUT",
-        body: { execution_priority: priority, data_access_consent: consent },
+        body: {
+          execution_priority: priority,
+          data_access_consent: consent,
+          local_model_id: selectedLocalModelId(),
+        },
       });
       elements.aiConfigApiKey.value = "";
       aiConfigPresets = status.presets || aiConfigPresets;
@@ -822,15 +883,22 @@ export function registerUserAdminView(context) {
   }
   if (elements.aiConfigForm) {
     elements.aiConfigForm.addEventListener("submit", handleAIConfigSubmit);
-    elements.aiConfigProvider.addEventListener("change", () => {
-      applyAIPreset();
-      renderAIConfigFields();
+    elements.aiConfigProvider.addEventListener("change", async () => {
+      await loadAIConfigStatus({
+        loadConsultor: false,
+        provider: elements.aiConfigProvider.value,
+      });
     });
     if (elements.aiConfigAuthType) {
       elements.aiConfigAuthType.addEventListener("change", renderAIConfigFields);
     }
     elements.aiLocalModelDownload?.addEventListener("click", handleLocalModelDownload);
+    elements.aiLocalModelRefresh?.addEventListener("click", handleLocalModelRefresh);
     elements.aiLocalModelClear?.addEventListener("click", handleLocalModelClear);
+    elements.aiLocalModel?.addEventListener("change", () => {
+      renderLocalModelHelp();
+      refreshLocalModelStatus();
+    });
   }
   if (elements.consultorConfigForm) {
     elements.consultorConfigForm.addEventListener("submit", handleConsultorConfigSubmit);

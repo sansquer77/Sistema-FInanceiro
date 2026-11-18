@@ -2147,6 +2147,7 @@
                       <option value="openai">OpenAI / ChatGPT</option>
                       <option value="anthropic">Anthropic / Claude</option>
                       <option value="google">Google / Gemini</option>
+                      <option value="deepseek">DeepSeek</option>
                       <option value="custom">Custom / Local</option>
                       <option value="local">Local</option>
                     </select>
@@ -2188,12 +2189,18 @@
                   <p class="form-help">A escolha vale para Tendências, Consultor e futuras funções. IA remota, inclusive como fallback, exige consentimento.</p>
                   <section class="local-model-controls" aria-labelledby="aiLocalModelTitle">
                     <h3 id="aiLocalModelTitle">Modelo local</h3>
+                    <label>Modelo para IA local
+                      <select name="local_model_id" id="aiLocalModel" disabled>
+                        <option value="">Carregando modelos locais…</option>
+                      </select>
+                    </label>
                     <p class="form-help" id="aiLocalModelStatus">Verificando a disponibilidade do modelo neste navegador…</p>
                     <div class="form-actions">
                       <button class="ghost" id="aiLocalModelDownload" type="button">Baixar modelo local</button>
+                      <button class="ghost" id="aiLocalModelRefresh" type="button">Atualizar modelo</button>
                       <button class="ghost" id="aiLocalModelClear" type="button">Remover modelo local</button>
                     </div>
-                    <p class="form-help">O download fica no cache privado deste navegador e desta origem. Ele não ocupa espaço no servidor ou na pasta do aplicativo.</p>
+                    <p class="form-help" id="aiLocalModelHelp">O download fica no cache privado deste navegador e desta origem. Ele não ocupa espaço no servidor ou na pasta do aplicativo.</p>
                   </section>
                   <button class="primary" type="submit">Salvar configuração de IA</button>
                 </form>
@@ -2653,6 +2660,6 @@
     </dialog>
     <script src="/vendor/imask/7.6.1/imask.min.js?v=7.6.1"></script>
     <script src="/vendor/apexcharts/4.7.0/apexcharts.min.js?v=4.7.0"></script>
-  <script type="module" src="/app.js?v=175"></script>
+  <script type="module" src="/app.js?v=179"></script>
   </body>
 </html>

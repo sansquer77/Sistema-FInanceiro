@@ -46,7 +46,7 @@ class ConsultorProviderError(Exception):
         self.diagnostics = diagnostics or {}
 
 
-# spec: consultor/consultor v2.16 — critérios 64 a 68
+# spec: consultor/consultor v2.44 — critérios 64 a 68
 _MARKET_RESEARCH_QUERY = (
     "Pesquise o cenário macroeconômico mais recente para o mercado de ações do Brasil e global. "
     "Resuma fatos recentes relevantes sobre juros, inflação, crescimento, política monetária, "
@@ -304,7 +304,7 @@ CONSULTOR_RETRY_BACKOFF_SECONDS = (2, 4)
 
 def _is_retryable_consultor_error(exc: ConsultorProviderError) -> bool:
     """Repete apenas erros transitórios do provedor; timeouts não são repetidos para não multiplicar a espera."""
-    # spec: consultor/consultor v2.36 — critérios 77 e 78
+    # spec: consultor/consultor v2.44 — critérios 77 e 78
     cause = exc.__cause__
     if isinstance(cause, HTTPError):
         return int(cause.code) in RETRYABLE_CONSULTOR_STATUS
@@ -412,8 +412,25 @@ def _call_consultor_ai_provider_once(
 
 def describe_empty_ai_response(payload: object, provider: str) -> dict:
     """Extrai somente metadados não sensíveis para diagnosticar respostas sem texto."""
-    if provider != "google" or not isinstance(payload, dict):
+    if not isinstance(payload, dict):
         return {"response_reason": "empty_response"}
+
+    if provider != "google":
+        provider_error = payload.get("error")
+        if not isinstance(provider_error, dict):
+            return {"response_reason": "empty_response"}
+        diagnostics = {"response_reason": "provider_error_payload"}
+        provider_code = provider_error.get("code")
+        if (
+            isinstance(provider_code, int)
+            and not isinstance(provider_code, bool)
+            and 0 <= provider_code <= 599
+        ):
+            diagnostics["provider_code"] = provider_code
+        provider_status = _safe_provider_status(provider_error.get("status"))
+        if provider_status:
+            diagnostics["provider_status"] = provider_status
+        return diagnostics
 
     prompt_feedback = payload.get("promptFeedback")
     if not isinstance(prompt_feedback, dict):

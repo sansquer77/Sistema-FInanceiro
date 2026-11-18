@@ -42,7 +42,12 @@ from financeiro.consultor import (
     validate_investor_profile,
     validate_period_window,
 )
-from financeiro.secure_config import save_ai_settings
+from financeiro.ai_execution import (
+    DEFAULT_LOCAL_MODEL_ID,
+    get_ai_execution_settings,
+    save_ai_execution_settings,
+)
+from financeiro.secure_config import load_ai_settings, save_ai_settings
 
 
 class ConsultorDomainTest(unittest.TestCase):
@@ -276,6 +281,78 @@ class ConsultorSettingsTest(unittest.TestCase):
         self.assertEqual(settings["blocked_reason"], "")
         self.assertTrue(settings["consented_at"])
 
+    def test_execution_priority_changes_preserve_remote_ai_configuration(self) -> None:
+        user = create_user("Helena", "helena@example.com", "strong-password")
+        save_ai_settings(user["id"], {
+            "enabled": True,
+            "provider": "openai",
+            "model": "gpt-test",
+            "api_key": "sk-test-preserved",
+        })
+
+        for priority, consent in (
+            ("somente_local", False),
+            ("local_primeiro", True),
+            ("remota_primeiro", True),
+            ("somente_remota", True),
+        ):
+            with self.subTest(priority=priority):
+                save_ai_execution_settings(user["id"], {
+                    "execution_priority": priority,
+                    "data_access_consent": consent,
+                })
+                # Simula o formulário de Preferências, que não reenvia a chave
+                # quando o usuário apenas troca a prioridade de execução.
+                save_ai_settings(user["id"], {
+                    "enabled": True,
+                    "provider": "openai",
+                    "model": "gpt-test",
+                    "api_key": "",
+                })
+                execution = get_ai_execution_settings(user["id"])
+                self.assertEqual(execution["execution_priority"], priority)
+                self.assertEqual(execution["data_access_consent"], consent)
+                ai = load_ai_settings(user["id"])
+                self.assertEqual(ai["provider"], "openai")
+                self.assertEqual(ai["model"], "gpt-test")
+                self.assertEqual(ai["api_key"], "sk-test-preserved")
+
+    def test_local_model_selection_is_persisted_and_validated(self) -> None:
+        user = create_user("Lia", "lia@example.com", "strong-password")
+        execution = get_ai_execution_settings(user["id"])
+        self.assertEqual(execution["local_model_id"], DEFAULT_LOCAL_MODEL_ID)
+        self.assertGreaterEqual(len(execution["local_models"]), 5)
+
+        save_ai_execution_settings(user["id"], {"local_model_id": "Qwen3-4B-q4f16_1-MLC"})
+        self.assertEqual(get_ai_execution_settings(user["id"])["local_model_id"], "Qwen3-4B-q4f16_1-MLC")
+        save_ai_execution_settings(user["id"], {"execution_priority": "somente_local"})
+        self.assertEqual(get_ai_execution_settings(user["id"])["local_model_id"], "Qwen3-4B-q4f16_1-MLC")
+
+        with self.assertRaises(ValueError):
+            save_ai_execution_settings(user["id"], {"local_model_id": "modelo-nao-vendido"})
+
+    def test_consultor_toggle_preserves_selected_execution_priority(self) -> None:
+        user = create_user("Igor", "igor@example.com", "strong-password")
+        save_ai_settings(user["id"], {
+            "enabled": True,
+            "provider": "openai",
+            "model": "gpt-test",
+            "api_key": "sk-test-preserved",
+        })
+        save_ai_execution_settings(user["id"], {
+            "execution_priority": "somente_local",
+            "data_access_consent": False,
+        })
+
+        save_consultor_settings(user["id"], {
+            "consultor_enabled": True,
+            "data_access_consent": True,
+        })
+        self.assertEqual(get_ai_execution_settings(user["id"])["execution_priority"], "somente_local")
+
+        save_consultor_settings(user["id"], {"consultor_enabled": False})
+        self.assertEqual(get_ai_execution_settings(user["id"])["execution_priority"], "somente_local")
+
     def test_disabling_consultor_purges_history(self) -> None:
         user = create_user("Eva", "eva@example.com", "strong-password")
         save_ai_settings(user["id"], {
@@ -474,7 +551,7 @@ class ConsultorContextTest(unittest.TestCase):
         self.assertEqual(context["complementary_profile"]["horizonte_investimento_principal"], "longo_prazo")
 
     def test_lifestyle_context_formats_monetary_values_for_ai(self) -> None:
-        # spec: consultor/consultor v2.14 — critério 39
+        # spec: consultor/consultor v2.44 — critério 39
         payload = score_payload(
             receitas_cents=2_000_000,
             despesas_consumo_cents=1_100_000,
@@ -497,7 +574,7 @@ class ConsultorContextTest(unittest.TestCase):
         self.assertIn("nao converta nem reformate os campos `_cents`", prompt)
 
     def test_all_context_money_fields_receive_nested_display_values(self) -> None:
-        # spec: consultor/consultor v2.14 — critério 39
+        # spec: consultor/consultor v2.44 — critério 39
         with mock.patch("financeiro.trends.calculate_trends", return_value=trends_payload()), self.profile_context():
             ralos = build_analysis_context(7, "ralos_financeiros", month="2026-08", period_window="3m")
             subscriptions = build_analysis_context(7, "assinaturas_recorrencias", month="2026-08")
@@ -514,7 +591,7 @@ class ConsultorContextTest(unittest.TestCase):
         self.assertIn("nunca converta, arredonde ou reformate `_cents` ou `_brl`", prompt)
 
     def test_score_evolution_context_builds_six_month_series(self) -> None:
-        # spec: consultor/consultor v2.14 — critérios 8 e 10
+        # spec: consultor/consultor v2.44 — critérios 8 e 10
         score_payloads = {
             "2026-08": score_payload(score_total=720),
             "2026-07": score_payload(score_total=700),
@@ -730,30 +807,17 @@ class ConsultorAIExecutorTest(unittest.TestCase):
         self.assertIn("Expectativas de juros seguem incertas.", captured["messages"][1]["content"])
         self.assertIn("https://bcb.gov.br/noticia", captured["messages"][1]["content"])
 
-    def test_local_portfolio_preparation_includes_remote_research_only_when_allowed(self) -> None:
+    def test_local_portfolio_preparation_never_fetches_remote_research(self) -> None:
         user = create_user("Marcia", "marcia@example.com", "strong-password")
         save_ready_ai_and_consultor(user["id"])
-        research = {
-            "status": "available",
-            "researched_at": "2026-10-11",
-            "summary": "Inflação e juros influenciam as bolsas.",
-            "sources": [{"title": "Fonte", "url": "https://example.com/macro"}],
-        }
         with mock.patch("financeiro.consultor.get_ai_execution_settings", return_value={"order": ["local", "remota"]}), \
-                mock.patch("financeiro.consultor.collect_portfolio_macro_research", return_value=research), \
+                mock.patch("financeiro.consultor.collect_portfolio_macro_research") as research_call, \
                 mock.patch("financeiro.consultor.build_analysis_context", return_value={"analysis_id": "analise_carteira"}):
             prepared = prepare_local_analysis(user["id"], "analise_carteira")
 
-        self.assertIn("Inflação e juros influenciam as bolsas.", prepared["messages"][1]["content"])
-        self.assertIn("https://example.com/macro", prepared["messages"][1]["content"])
-
-        with mock.patch("financeiro.consultor.get_ai_execution_settings", return_value={"order": ["local", "deterministica"]}), \
-                mock.patch("financeiro.consultor.collect_portfolio_macro_research") as research_call, \
-                mock.patch("financeiro.consultor.build_analysis_context", return_value={"analysis_id": "analise_carteira"}):
-            prepared_local_only = prepare_local_analysis(user["id"], "analise_carteira")
-
         research_call.assert_not_called()
-        self.assertIn('"status": "unavailable"', prepared_local_only["messages"][1]["content"])
+        self.assertEqual(prepared["macro_research"]["status"], "unavailable")
+        self.assertIn('"status": "unavailable"', prepared["messages"][1]["content"])
 
     def test_macro_research_failure_is_logged_and_does_not_block_final_analysis(self) -> None:
         with mock.patch(
@@ -1129,7 +1193,7 @@ class ConsultorAIExecutorTest(unittest.TestCase):
         self.assertEqual(postprocess_consultor_output(text), text)
 
     def test_postprocess_accepts_markdown_heading_sections(self) -> None:
-        # spec: consultor/consultor v2.14 - correcao de has_section
+        # spec: consultor/consultor v2.44 - correcao de has_section
         # O padrao #{1,6} dentro de f-string era interpretado como tupla (1, 6),
         # fazendo respostas com "### Secao" (formato comum do Gemini) falharem
         # a validacao de secoes obrigatorias e derrubarem o Consultor.
@@ -1150,7 +1214,7 @@ class ConsultorAIExecutorTest(unittest.TestCase):
         self.assertTrue(has_section("### Análise de Dados\nx", "Analise de Dados"))
 
     def test_postprocess_accepts_accented_markdown_headings(self) -> None:
-        # spec: consultor/consultor v2.14 - modelo alterna "Analise"/"Análise"
+        # spec: consultor/consultor v2.44 - modelo alterna "Analise"/"Análise"
         text = (
             "### Resumo\nTexto educacional.\n\n"
             "### Análise de Dados\nDados agregados.\n\n"
@@ -1220,7 +1284,7 @@ class ConsultorAIExecutorTest(unittest.TestCase):
         self.assertEqual(processed, text)
 
     def test_postprocess_does_not_refuse_defensive_negation_phrases(self) -> None:
-        # spec: consultor/consultor v2.14 - uma advertencia contra venda nao e recomendacao de venda
+        # spec: consultor/consultor v2.44 - uma advertencia contra venda nao e recomendacao de venda
         text = valid_consultor_response().replace(
             "Os dados indicam diferencas entre classes de ativos sem sugerir compra ou venda.",
             "Nao recomendo vender acoes ou fundos especificos; esta analise e apenas informativa.",

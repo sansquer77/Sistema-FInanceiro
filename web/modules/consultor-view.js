@@ -1,7 +1,7 @@
 // spec: cockpit-calendario v0.9 — critérios 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17 e 18
-// spec: consultor/consultor v2.16 — view de análises, pesquisa macro e fontes
+// spec: consultor/consultor v2.44 — view de análises, pesquisa macro e fontes
 import { stateMarkup } from "./dom-utils.js";
-import { runLocalConsultor } from "./webllm-client.js?v=179";
+import { runLocalConsultor } from "./webllm-client.js?v=182";
 export function registerConsultorView({
   elements,
   api,
@@ -243,7 +243,7 @@ export function registerConsultorView({
   }
 
   function renderAnalysisSelector(cards) {
-    // spec: consultor/consultor v2.13 — critérios 8, 9 e 14
+    // spec: consultor/consultor v2.44 — critérios 8, 9 e 14
     // (o catálogo permanece fechado; a interface concentra a escolha em um
     // seletor e renderiza as opções de período declaradas pelo backend para
     // cada card que exige período — ralos usa 3/6/12/YTD; evolução do score
@@ -290,6 +290,13 @@ export function registerConsultorView({
     return allowed.map((value) => ({ value, label: labels[value] || value }));
   }
 
+  function renderAnalysisState(message, kind = "loading") {
+    if (consultorOutput) {
+      consultorOutput.hidden = false;
+      consultorOutput.innerHTML = stateMarkup(message, { kind });
+    }
+  }
+
   async function runAnalysis() {
     const analysisId = selectedAnalysisId;
     if (!analysisId || runningAnalysisId) {
@@ -304,25 +311,33 @@ export function registerConsultorView({
     if (card?.requires_period_window) {
       body.period_window = selectedPeriodWindow;
     }
+    const order = consultorConfig?.order || ["local", "deterministica"];
     try {
       let result;
-      const order = consultorConfig?.order || ["local", "deterministica"];
       for (const source of order) {
         if (source === "deterministica" || result) break;
         if (source === "local") {
           try {
-          const prepared = await api("/api/consultor/prepare-local", { method: "POST", body });
-          macroResearch = prepared.macro_research || null;
-          const output = await runLocalConsultor(prepared.messages, prepared, (progress) => {
-            if (consultorOutput) { consultorOutput.hidden = false; consultorOutput.innerHTML = stateMarkup(progress, { kind: "loading" }); }
-          });
-          result = await api("/api/consultor/complete-local", { method: "POST", body: { ...body, output } });
+            renderAnalysisState("Tentando a IA local. Preparando o contexto desta análise…");
+            const prepared = await api("/api/consultor/prepare-local", { method: "POST", body });
+            macroResearch = prepared.macro_research || null;
+            renderAnalysisState("IA local selecionada. Carregando o modelo ou reutilizando o cache…");
+            const output = await runLocalConsultor(prepared.messages, prepared, (progress) => {
+              renderAnalysisState(progress);
+            });
+            renderAnalysisState("IA local concluiu a geração. Validando a análise…");
+            result = await api("/api/consultor/complete-local", { method: "POST", body: { ...body, output } });
           } catch (localError) {
             localFailure = localError.message || "A IA local não está disponível neste dispositivo.";
             if (!order.includes("remota")) throw localError;
           }
         }
         if (source === "remota") {
+          renderAnalysisState(
+            localFailure
+              ? "A IA local não concluiu. Tentando a IA remota…"
+              : "Tentando a IA remota…",
+          );
           result = await api("/api/consultor/analyze", { method: "POST", body });
           macroResearch = result.macro_research || macroResearch;
         }
@@ -334,9 +349,12 @@ export function registerConsultorView({
       if (consultorOutput) {
         consultorOutput.hidden = false;
         const remoteFailure = err.message || "O Consultor está indisponível no momento.";
-        const errorMessage = localFailure
+        const remoteWasAllowed = order.includes("remota");
+        const errorMessage = localFailure && remoteWasAllowed
           ? `A IA local não concluiu a análise: ${localFailure} O fallback remoto também falhou: ${remoteFailure}`
-          : remoteFailure;
+          : localFailure
+            ? `A IA local não concluiu a análise: ${localFailure}`
+            : remoteFailure;
         consultorOutput.innerHTML = stateMarkup(errorMessage, { kind: "error" });
       }
     } finally {

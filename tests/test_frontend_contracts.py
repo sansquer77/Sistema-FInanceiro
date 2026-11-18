@@ -194,21 +194,43 @@ class FrontendModuleContractTest(unittest.TestCase):
         app = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
 
         self.assertIn("setAIFieldVisibility(elements.aiConfigTimeoutField, customProvider || remoteProvider);", admin)
-        self.assertIn('import { registerUserAdminView } from "./modules/user-admin-view.js?v=176";', app)
+        self.assertIn('import { registerUserAdminView } from "./modules/user-admin-view.js?v=178";', app)
+        self.assertIn('"deepseek"', admin)
+        self.assertIn('provider: elements.aiConfigProvider.value', admin)
+        self.assertIn('/api/ai-settings${providerQuery}', admin)
 
     def test_local_model_uses_default_4096_window_and_recognizes_gpu_device_loss(self) -> None:
         client = (MODULE_ROOT / "webllm-client.js").read_text(encoding="utf-8")
 
         self.assertIn("const CHAT_OPTIONS = { context_window_size: 4096 };", client)
-        self.assertIn("webllm.CreateWebWorkerMLCEngine(engineWorker, MODEL_ID, engineConfig, CHAT_OPTIONS)", client)
-        self.assertIn("webllm.CreateMLCEngine(MODEL_ID, engineConfig, CHAT_OPTIONS)", client)
+        self.assertIn('export const DEFAULT_LOCAL_MODEL_ID = "Qwen2.5-1.5B-Instruct-q4f16_1-MLC";', client)
+        self.assertIn('const LOW_MEMORY_FALLBACK_MODEL_ID = "gemma3-1b-it-q4f16_1-MLC";', client)
+        self.assertIn("Tentando um modelo local mais leve", client)
+        self.assertIn("webllm.CreateWebWorkerMLCEngine(engineWorker, selectedModelId, engineConfig, CHAT_OPTIONS)", client)
+        self.assertIn("webllm.CreateMLCEngine(selectedModelId, engineConfig, CHAT_OPTIONS)", client)
+        self.assertIn("preferMainThread", client)
+        self.assertIn('diagnosis.category === "string_error"', client)
+        self.assertIn("refreshLocalModel", client)
         self.assertIn("device (was )?lost", client)
         self.assertIn("GPU_MEMORY_PATTERN.test(detail)", client)
         consultor_view = (MODULE_ROOT / "consultor-view.js").read_text(encoding="utf-8")
         self.assertIn('if (!order.includes("remota")) throw localError;', consultor_view)
+        self.assertIn('const remoteWasAllowed = order.includes("remota");', consultor_view)
+        self.assertIn('renderAnalysisState("Tentando a IA local. Preparando o contexto desta análise…");', consultor_view)
+        self.assertIn('"A IA local não concluiu. Tentando a IA remota…"', consultor_view)
+        run_analysis = consultor_view[consultor_view.index("async function runAnalysis"):]
+        self.assertLess(
+            run_analysis.index('const order = consultorConfig?.order || ["local", "deterministica"];'),
+            run_analysis.index("try {"),
+        )
         for module in ("consultor-view.js", "trends-view.js", "user-admin-view.js"):
             source = (MODULE_ROOT / module).read_text(encoding="utf-8")
-            self.assertIn('webllm-client.js?v=179"', source, module)
+            self.assertIn('webllm-client.js?v=182"', source, module)
+        admin = (MODULE_ROOT / "user-admin-view.js").read_text(encoding="utf-8")
+        html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        self.assertIn('id="aiLocalModel"', html)
+        self.assertIn('id="aiLocalModelRefresh"', html)
+        self.assertIn("local_model_id: selectedLocalModelId()", admin)
 
     def test_goal_funding_options_exclude_consolidated_linked_assets(self) -> None:
         limits = (MODULE_ROOT / "limits-view.js").read_text(encoding="utf-8")

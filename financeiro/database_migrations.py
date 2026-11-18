@@ -7,7 +7,7 @@ from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
 
-from financeiro.database_compatibility import ensure_column, normalize_legacy_schema
+from financeiro.database_compatibility import ensure_ai_settings, ensure_column, normalize_legacy_schema
 from financeiro.database_config import SQLITE_BUSY_TIMEOUT_MS
 from financeiro.database_schema import (
     BASELINE_SCHEMA_VERSION,
@@ -48,6 +48,7 @@ INCREMENTAL_MIGRATIONS = {
     20009: ("indexed_loan_contract_terms", lambda conn: _migrate_indexed_loan_contract_terms(conn)),
     20010: ("revolving_loans", lambda conn: _migrate_revolving_loans(conn)),
     20011: ("financial_goal_asset_links", lambda conn: _migrate_financial_goal_asset_links(conn)),
+    20012: ("ai_provider_settings", lambda conn: ensure_ai_settings(conn)),
 }
 
 

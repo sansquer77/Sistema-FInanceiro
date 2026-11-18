@@ -47,7 +47,8 @@ class DatabaseV2MigrationTest(unittest.TestCase):
                 (20008, "loan_amortization_system"),
                 (20009, "indexed_loan_contract_terms"),
                 (20010, "revolving_loans"),
-                (20011, "financial_goal_asset_links"),
+            (20011, "financial_goal_asset_links"),
+            (20012, "ai_provider_settings"),
             ],
             [(row["version"], row["name"]) for row in migrations],
         )
@@ -73,7 +74,7 @@ class DatabaseV2MigrationTest(unittest.TestCase):
         self.assertEqual(
             versions,
             [database.BASELINE_SCHEMA_VERSION, 20001, 20002, 20003, 20004, 20005,
-             20006, 20007, 20008, 20009, 20010, 20011],
+             20006, 20007, 20008, 20009, 20010, 20011, 20012],
         )
         with database.get_connection() as conn:
             self.assertIsNotNone(

@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 4.57
-atualizado: 2026-11-01
+versao: 4.63
+atualizado: 2026-11-18
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -19,7 +19,7 @@ tags: [arquitetura, meta]
 # Arquitetura
 
 > [!info] Status
-> **implementado** · versão: `4.56` · área: `meta` · atualizado em 2026-10-31 · relacionados: [[requisitos]], [[qualidade-codigo]], [[specs/consultor]], [[specs/tendencias-saude-financeira]], [[adr/0019-inferencia-local-webllm]], [[adr/0020-pesquisa-macro-consultor]], [[specs/desacoplamento-importacao-parsers]]
+> **implementado** · versão: `4.63` · área: `meta` · atualizado em 2026-11-18 · relacionados: [[requisitos]], [[qualidade-codigo]], [[specs/consultor]], [[specs/tendencias-saude-financeira]], [[adr/0019-inferencia-local-webllm]], [[adr/0020-pesquisa-macro-consultor]], [[adr/0023-configuracoes-ia-por-provedor]], [[specs/desacoplamento-importacao-parsers]]
 
 ## Visão geral
 
@@ -40,7 +40,7 @@ O servidor HTTP revalida arquivos estáticos com `ETag` e `Last-Modified`; arqui
 
 As fronteiras de responsabilidade e os sinais de alerta para crescimento de módulos estão consolidados em [[qualidade-codigo]]. Além da revisão manual, `tests/test_code_quality.py` aplica um gate automatizado aos limites e às fronteiras arquiteturais verificáveis.
 
-O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Cockpit > Consultor**. Em Preferências, o usuário ativa o Consultor, escolhe a prioridade local/remota, configura opcionalmente o provedor remoto, pode preparar/remover o modelo WebLLM e pode preencher/remover o Perfil Complementar criptografado. No Cockpit, a aba Consultor exibe os indicadores de atrasos/vencimentos, a subaba **Análises** com catálogo fechado de 9 análises em seletor (incluindo o card `evolucao_score_tempo` com seletor de 6/12 meses), botão único **Gerar** e a subaba **Histórico** com filtro textual. A prioridade padrão executa WebLLM no navegador e baixa o modelo uma vez; o fallback para provedor externo exige configuração e consentimento prévios. O cache do modelo pertence ao perfil e origem do navegador, portanto não ocupa espaço no host que serve o app. O módulo não possui prompt livre: o backend monta apenas o contexto minimizado da análise escolhida, e recebe de volta a saída local para aplicar os mesmos guardrails e persistir somente respostas bem-sucedidas. Na `analise_carteira`, se a política central permitir uso remoto, o backend pode executar antes uma pesquisa web nativa do provedor remoto com tópico macroeconômico fixo e sem contexto do usuário; o resumo datado e as fontes entram no prompt da carteira antes da inferência local ou remota, e a interface exibe as fontes retornadas como links HTTPS. Provedores customizados/locais sem busca web compatível e falhas na pesquisa seguem sem enriquecimento, sem impedir a análise.
+O fluxo do **Consultor** fica dividido entre **Usuário > Preferências** e **Cockpit > Consultor**. Em Preferências, o usuário ativa o Consultor, escolhe a prioridade local/remota, seleciona o modelo WebLLM de um catálogo fechado persistido em `ai_execution_settings.local_model_id`, configura opcionalmente o provedor remoto, pode baixar/atualizar/remover o modelo selecionado e pode preencher/remover o Perfil Complementar criptografado. No Cockpit, a aba Consultor exibe os indicadores de atrasos/vencimentos, a subaba **Análises** com catálogo fechado de 9 análises em seletor (incluindo o card `evolucao_score_tempo` com seletor de 6/12 meses), botão único **Gerar** e a subaba **Histórico** com filtro textual. A prioridade padrão executa WebLLM no navegador e baixa o modelo uma vez; o fallback para provedor externo exige configuração e consentimento prévios. O cache do modelo pertence ao perfil e origem do navegador, separado por modelo, portanto não ocupa espaço no host que serve o app. O módulo não possui prompt livre: o backend monta apenas o contexto minimizado da análise escolhida, e recebe de volta a saída local para aplicar os mesmos guardrails e persistir somente respostas bem-sucedidas. Na `analise_carteira`, se a política central permitir uso remoto, o backend pode executar antes uma pesquisa web nativa do provedor remoto com tópico macroeconômico fixo e sem contexto do usuário; o resumo datado e as fontes entram no prompt da carteira antes da inferência local ou remota, e a interface exibe as fontes retornadas como links HTTPS. Provedores customizados/locais sem busca web compatível e falhas na pesquisa seguem sem enriquecimento, sem impedir a análise.
 
 ---
 
@@ -323,7 +323,7 @@ As projeções são calculadas em centavos por `financial_goals.py`. O saldo res
 | Método | Rota |
 |---|---|
 | `GET` | `/api/financial-health-trends?month=AAAA-MM` |
-| `GET` | `/api/ai-settings` |
+| `GET` | `/api/ai-settings[?provider=slug]` — retorna a configuração ativa ou o perfil salvo do provedor selecionado, sem segredo. |
 | `PUT` | `/api/ai-settings` |
 | `GET` | `/api/ai-execution-settings` |
 | `PUT` | `/api/ai-execution-settings` |
@@ -472,7 +472,7 @@ O arquivo SQLite recebe `journal_mode=WAL` uma vez no ciclo de inicialização; 
 
 ### Baseline e migração para a linha v2
 
-O baseline inicial da v2 usa `PRAGMA user_version = 20000`; o endurecimento operacional do SQLite inaugura `20001`, a política global de backup usa `20002`, a precisão de oito casas das quantidades do Portfólio usa `20003`, Objetivos Financeiros usa `20004`, Empréstimos usa `20005` e a identidade estável de categorias usa `20006` e o reconhecimento de pagamentos após conciliação usa `20007`; `20008` adiciona `loans.amortization_system` (Price ou SAC), preservando contratos existentes como Price; `20009` acrescenta indexador, saldo principal/data-base e taxa remuneratória, com valores neutros ou nulos nos contratos existentes; `20010` cria tabelas para monitoramento de crédito rotativo, histórico de condições e vínculos a pagamentos existentes sem alterar os lançamentos legados; `20011` persiste `asset_key` e seu índice de exclusividade em `financial_goal_funding_sources`, mantendo os vínculos antigos pela referência canônica. A tabela `schema_migrations` registra baseline e passos posteriores, enquanto `user_version` seleciona e ordena as migrações. Banco ausente é criado diretamente na versão atual; bancos entre `20000` e `20010` avançam transacionalmente em ordem até `20011`; versões futuras ou intermediárias desconhecidas são recusadas. Um `finance.db` com `user_version = 0` continua tratado como legado: na abertura, `financeiro/database_migrations.py` orquestra a cópia de trabalho, as compatibilizações históricas via `financeiro/database_compatibility.py::normalize_legacy_schema`, o candidato compacto por `VACUUM INTO`, as validações de integridade/chaves estrangeiras/versão/contagens e a promoção recuperável. O original passa a `data/finance-v1.bkp`, que nunca é sobrescrito, enquanto o candidato mantém o nome ativo `data/finance.db`. Falhas anteriores à promoção preservam o nome original; falha na segunda renomeação tenta restaurá-lo. Ver [[specs/migracao-banco-v2]] e [[adr/0012-fundacao-v2-contrato-e-migracao-de-dados]].
+O baseline inicial da v2 usa `PRAGMA user_version = 20000`; o endurecimento operacional do SQLite inaugura `20001`, a política global de backup usa `20002`, a precisão de oito casas das quantidades do Portfólio usa `20003`, Objetivos Financeiros usa `20004`, Empréstimos usa `20005` e a identidade estável de categorias usa `20006` e o reconhecimento de pagamentos após conciliação usa `20007`; `20008` adiciona `loans.amortization_system` (Price ou SAC), preservando contratos existentes como Price; `20009` acrescenta indexador, saldo principal/data-base e taxa remuneratória, com valores neutros ou nulos nos contratos existentes; `20010` cria tabelas para monitoramento de crédito rotativo, histórico de condições e vínculos a pagamentos existentes sem alterar os lançamentos legados; `20011` persiste `asset_key` e seu índice de exclusividade em `financial_goal_funding_sources`, mantendo os vínculos antigos pela referência canônica; `20012` cria a configuração isolada por provedor de IA e atualiza a restrição de provedores, preservando a configuração remota ativa. A tabela `schema_migrations` registra baseline e passos posteriores, enquanto `user_version` seleciona e ordena as migrações. Banco ausente é criado diretamente na versão atual; bancos entre `20000` e `20011` avançam transacionalmente em ordem até `20012`; versões futuras ou intermediárias desconhecidas são recusadas. Um `finance.db` com `user_version = 0` continua tratado como legado: na abertura, `financeiro/database_migrations.py` orquestra a cópia de trabalho, as compatibilizações históricas via `financeiro/database_compatibility.py::normalize_legacy_schema`, o candidato compacto por `VACUUM INTO`, as validações de integridade/chaves estrangeiras/versão/contagens e a promoção recuperável. O original passa a `data/finance-v1.bkp`, que nunca é sobrescrito, enquanto o candidato mantém o nome ativo `data/finance.db`. Falhas anteriores à promoção preservam o nome original; falha na segunda renomeação tenta restaurá-lo. Ver [[specs/migracao-banco-v2]] e [[adr/0012-fundacao-v2-contrato-e-migracao-de-dados]].
 
 ### Tabelas
 
@@ -512,7 +512,8 @@ O baseline inicial da v2 usa `PRAGMA user_version = 20000`; o endurecimento oper
 | `market_holidays` | `market_calendar.py` — calendário nacional ANBIMA atual, sem histórico de versões. Ver [[investimentos-portfolio]], [[adr/0016-calendario-mercado-anbima]]. |
 | `market_calendar_state` | `market_calendar.py` — controle da fonte, última tentativa/importação, ano verificado, hash e quantidade de feriados. |
 | `user_ai_settings` | `secure_config.py` — metadados não secretos de configuração opcional de IA por usuário; segredo fica em `secure_configs`. Ver [[tendencias-saude-financeira]]. |
-| `ai_execution_settings` | `ai_execution.py` — política compartilhada por usuário: prioridade local/remota, consentimento de transporte remoto e ordem efetiva com fallback determinístico. |
+| `user_ai_provider_settings` | `secure_config.py` — endpoint, modelo e parâmetros não secretos de cada provedor de IA salvo pelo usuário; apenas um provedor é referenciado como ativo em `user_ai_settings`. Ver [[specs/consultor]], [[adr/0023-configuracoes-ia-por-provedor]]. |
+| `ai_execution_settings` | `ai_execution.py` — política compartilhada por usuário: prioridade local/remota, `local_model_id`, consentimento de transporte remoto e ordem efetiva com fallback determinístico. |
 | `secure_configs` | `secure_config.py` — envelopes criptografados por usuário para SMTP, IA, Mais Retorno e senha lembrada do backup; `source_path` indica arquivo legado migrado quando aplicável. Ver [[specs/preferencias-abas]], [[adr/0010-segredos-criptografados-sqlite]]. |
 | `backup_settings` | `backup_settings.py` — política única da instalação, usuário responsável, frequência, retenção e estado da última execução; nunca contém senha em claro. |
 | `consultor_settings` | `consultor_settings.py` — configuração do Consultor por usuário (`consultor_enabled`, `investor_profile`); a política de IA fica em `ai_execution_settings`. Ver [[specs/consultor]]. |
@@ -525,7 +526,7 @@ O baseline inicial da v2 usa `PRAGMA user_version = 20000`; o endurecimento oper
 
 `import_adjustments` guarda correções de descrição, categoria, subcategoria e tags feitas na revisão quando a linha é importada com sucesso ou explicitamente ignorada como duplicidade ativa. A confirmação revalida a duplicidade antes de salvar o aprendizado; ignorar não cria nem altera lançamento. A chave primária de busca é a descrição original normalizada, com um alias normalizado da descrição editada; ambas são limitadas ao usuário, tipo de lançamento e conta ou cartão. As regras locais são reaplicadas na próxima prévia e não gravam correções de linhas apenas desmarcadas ou rejeitadas.
 
-`user_ai_settings` armazena somente provedor, endpoint/base URL, modelo, estado ligado/desligado, autenticação e parâmetros operacionais. Chaves de API de IA, senha SMTP e chaves de integrações opcionais são salvas em `secure_configs.payload_enc` como envelopes criptografados por usuário; APIs nunca devem retornar o segredo. Instalações antigas com `data/*_config_user_{id}.enc` continuam legíveis: o payload criptografado é copiado para `secure_configs` no primeiro uso, sem exigir que o usuário recadastre a chave.
+`user_ai_settings` referencia o provedor ativo e mantém o estado geral da IA; `user_ai_provider_settings` conserva endpoint, modelo, autenticação e parâmetros operacionais isolados por usuário e provedor. Chaves de API de IA são salvas por provedor em `secure_configs.payload_enc` como envelope criptografado por usuário; APIs nunca devem retornar o segredo. Instalações antigas com `data/*_config_user_{id}.enc` continuam legíveis: o payload criptografado é copiado para `secure_configs` no primeiro uso e a configuração legada ativa é associada ao provedor sem exigir que o usuário recadastre a chave.
 
 A chave mestra padrão de `secure_config.py` fica fora de `data/`, em `secure/config.key` ao lado da pasta de dados; `data/email_config.key` continua aceito e é copiado para o novo caminho no primeiro uso. Operações de servidor podem fixar o caminho com `SISTEMA_FINANCEIRO_CONFIG_KEY_PATH` ou fornecer o material diretamente por `SISTEMA_FINANCEIRO_CONFIG_KEY`.
 
@@ -708,7 +709,13 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `4.63` — 2026-11-18 — Registra a migração `20012`, garantindo que bancos existentes recebam a tabela de configurações por provedor e a permissão de uso do DeepSeek.
+- `4.62` — 2026-11-18 — Documenta `user_ai_provider_settings`, o isolamento de endpoints/modelos por provedor e o payload criptografado de credenciais múltiplas, incluindo DeepSeek. Ver [[adr/0023-configuracoes-ia-por-provedor]].
 - `4.57` — 2026-11-01 — O Consultor remoto passa a usar orçamento de saída com piso de 2500 e teto de 4000 tokens (`CONSULTOR_REMOTE_MIN_OUTPUT_TOKENS`/`CONSULTOR_REMOTE_MAX_OUTPUT_TOKENS` em `financeiro/consultor.py`), porque o raciocínio interno do Gemini consome o mesmo limite e truncava as seções obrigatórias com 700–900 tokens; a análise local mantém 900. Ver [[adr/0022-orcamento-tokens-saida-consultor]] e [[specs/consultor]] v2.37.
+- `4.58` — 2026-11-18 — Documenta o catálogo persistente de modelos WebLLM em `ai_execution_settings.local_model_id`, cache separado por modelo e controles de download, atualização e remoção do modelo selecionado. Ver [[adr/0019-inferencia-local-webllm]] v0.6 e [[specs/consultor]] v2.40.
+- `4.59` — 2026-11-18 — Documenta o fallback local temporário para Gemma 3 1B quando o modelo selecionado perde o dispositivo GPU por falta de memória durante a geração. Ver [[adr/0019-inferencia-local-webllm]] v0.7 e [[specs/consultor]] v2.41.
+- `4.61` — 2026-11-18 — Documenta o cache-buster v182 e o retry do Gemma 3 1B no contexto principal após falha serializada do Worker WebLLM no Safari. Ver [[adr/0019-inferencia-local-webllm]] v0.9.
+- `4.60` — 2026-11-18 — Documenta o cache-buster v181 dos módulos WebLLM e a invalidação dos módulos pais (`app.js`, `cockpit-view.js` e Preferências), necessária para que a produção carregue o fallback local atualizado após alterações do cliente/worker. Ver [[specs/consultor]] v2.42.
 - `4.56` — 2026-10-31 — Documenta o limite de itens enviados pelo card Melhor Destino ao modelo local e a janela de contexto de 8192 tokens do WebLLM, com [[adr/0021-janela-contexto-local-consultor]] e [[specs/consultor]] v2.34.
 - `4.55` — 2026-10-28 — Documenta a rota `/api/financial-goals/funding-options`, que centraliza no núcleo a lista de origens para vínculo de objetivos.
 - `4.54` — 2026-10-27 — Documenta o schema `20011` e a identidade persistente dos ativos vinculados a objetivos.
@@ -934,4 +941,5 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 - [[sdd]]
 - [[glossario]]
 - [[adr/0001-stack-local-sem-framework]]
+- [[adr/0023-configuracoes-ia-por-provedor]]
 - [[adr/0002-modularizacao-frontend]]

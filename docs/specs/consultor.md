@@ -2,8 +2,8 @@
 tipo: spec
 area: consultor
 status: em-implementacao
-versao: 2.37
-atualizado: 2026-11-01
+versao: 2.44
+atualizado: 2026-11-18
 relacionados:
   - "[[instrucoes-app]]"
   - "[[investimentos-portfolio]]"
@@ -17,7 +17,7 @@ aliases: ["Consultor Virtual", "Assistente de Investimentos", "Especialista em F
 # Consultor Virtual de Investimentos e Planejamento Financeiro
 
 > [!info] Status
-> **em-implementacao** · versão: `2.37` · área: `consultor` · atualizado em 2026-11-01 · relacionados: [[instrucoes-app]], [[investimentos-portfolio]], [[score-saude-financeira]], [[tendencias-saude-financeira]], [[cockpit-calendario]], [[objetivos-financeiros]], [[emprestimos-quitacao]], [[cartoes]], [[../adr/0019-inferencia-local-webllm]], [[../adr/0020-pesquisa-macro-consultor]], [[../adr/0021-janela-contexto-local-consultor]], [[../adr/0022-orcamento-tokens-saida-consultor]]
+> **em-implementacao** · versão: `2.44` · área: `consultor` · atualizado em 2026-11-18 · relacionados: [[instrucoes-app]], [[investimentos-portfolio]], [[score-saude-financeira]], [[tendencias-saude-financeira]], [[cockpit-calendario]], [[objetivos-financeiros]], [[emprestimos-quitacao]], [[cartoes]], [[../adr/0019-inferencia-local-webllm]], [[../adr/0020-pesquisa-macro-consultor]], [[../adr/0021-janela-contexto-local-consultor]], [[../adr/0022-orcamento-tokens-saida-consultor]], [[../adr/0023-configuracoes-ia-por-provedor]]
 
 > [!warning] Pivô arquitetural (v0.13, refinado em v0.14/v0.15)
 > A partir desta versão, o Consultor **não possui campo de prompt livre**. O usuário interage exclusivamente através de um **catálogo de análises pré-formatadas** (cards). Essa mudança é uma decisão de **Security by Design**: eliminar a superfície de entrada de texto livre remove pela raiz os vetores de vazamento acidental de dados sensíveis (PII) e de *prompt injection* via chat. As seções "Prevenção de vazamento de dados no prompt (DLP)" e "Blindagem de prompt injection" da v0.12 são **removidas** desta spec — ver "Segurança by Design" e "Nota de segurança residual" abaixo para o que substitui essas salvaguardas.
@@ -38,7 +38,7 @@ Usuário autenticado que já possui os dados no sistema (lançamentos, portfóli
 4. Na primeira ativação, o sistema exibe o formulário opcional **Perfil Complementar** (idade, imóvel próprio, dependentes, objetivo financeiro principal, horizonte de investimento, renda aproximada, tolerância a perdas). O usuário pode responder total ou parcialmente, ou pular todas as perguntas sem impedir a ativação do módulo. As respostas ficam disponíveis para edição ou remoção a qualquer momento em Preferências.
 5. O usuário acessa a aba **Consultor** do Cockpit, único ponto de entrada do módulo. Em vez de um campo de texto, o sistema exibe o **Catálogo de Análises** em um seletor fechado, com categoria e nome de cada análise (Orçamento e Tendências, Portfólio e Risco, Saúde Financeira, Decisões e Planejamento), incluindo a opção de evolução histórica do Score.
 6. O usuário escolhe a análise desejada no seletor (ex.: "Termômetro de Assinaturas e Recorrências") e aciona o botão único **Gerar**. Para "Detecção de Anomalias e 'Ralos' Financeiros", o seletor de período aparece ao lado, com opções fechadas (**3, 6, 12 meses ou YTD**) — nunca um campo de texto ou data livre.
-7. Para **Análise da Carteira**, quando a política central permite IA remota, o sistema primeiro consulta o cenário macroeconômico geral de ações usando busca web nativa do provedor remoto, sem enviar dados do usuário. Depois incorpora o resumo datado e suas fontes ao prompt junto com o contexto minimizado da carteira, tanto para inferência local quanto remota. Se a busca falhar ou o provedor não oferecer busca compatível, a análise continua sem esse enriquecimento.
+7. Para **Análise da Carteira**, a preparação da IA local não consulta o provedor remoto: a análise local continua sem enriquecimento macroeconômico quando a busca ainda não foi realizada. Se o fluxo remoto for selecionado — inclusive após uma falha local — o sistema consulta primeiro o cenário macroeconômico geral de ações usando busca web nativa do provedor remoto, sem enviar dados do usuário, e incorpora o resumo datado e suas fontes ao prompt remoto. Se a busca falhar ou o provedor não oferecer busca compatível, a análise continua sem esse enriquecimento.
 8. O sistema monta o payload minimizado com os dados relevantes daquele domínio (ex.: lançamentos recorrentes da categoria "Assinaturas e Serviços"), aplica o `analysis_id` a um prompt estrito e imutável já blindado no backend, envia à IA e renderiza o relatório estruturado na tela, com o disclaimer educacional ao final.
 9. O usuário pode consultar o histórico de análises já geradas na mesma aba, revisitando relatórios anteriores. Se desabilitar a IA geral ou desabilitar o Consultor nas Preferências (revogando o consentimento), todo o histórico é **expurgado automaticamente**.
 
@@ -343,12 +343,14 @@ A substituição do campo de prompt livre por um catálogo fechado de análises 
 
 O Consultor passa a aceitar execução local no navegador, sem conta, chave de API ou endpoint externo. Em Preferências, o usuário escolhe uma das prioridades `local_primeiro` (padrão), `remota_primeiro`, `somente_local` ou `somente_remota`.
 
-- A execução local usa um modelo previamente aprovado e baixado no primeiro uso; as Preferências também oferecem o botão **Baixar modelo local** para forçar esse preparo antes de uma análise. O progresso é exibido e o modelo é reutilizado pelo cache privado do navegador. O Worker usa o protocolo oficial do WebLLM entre a interface e o runtime WebGPU; quando o navegador expõe WebGPU à página, mas não ao Worker, o app repete o preparo diretamente na página com o mesmo modelo e cache privado.
-- Em `local_primeiro`, uma falha de WebGPU, carregamento, memória ou geração pode usar a IA remota já configurada. Antes da primeira execução que possa enviar dados ao provedor, a interface explica esse fallback e exige o consentimento já definido para acesso remoto.
+- A execução local usa o modelo selecionado em Preferências, com `Qwen2.5-1.5B-Instruct-q4f16_1-MLC` como padrão. O formulário oferece um catálogo fechado com opções leves e opções para Macs com mais memória, informa estimativa de memória e persiste a escolha por usuário em `ai_execution_settings.local_model_id`. Os pesos de cada modelo ficam em cache separado no navegador; trocar a seleção não remove caches anteriores. Os botões **Baixar modelo local**, **Atualizar modelo** e **Remover modelo local** atuam somente sobre o modelo selecionado.
+- O progresso é exibido e o modelo é reutilizado pelo cache privado do navegador. O Worker usa o protocolo oficial do WebLLM entre a interface e o runtime WebGPU; quando o navegador expõe WebGPU à página, mas não ao Worker, o app repete o preparo diretamente na página com o mesmo modelo e cache privado.
+- Em `local_primeiro`, a interface informa quando está preparando o contexto local, carregando/reutilizando o modelo e iniciando a geração. Uma falha de WebGPU, carregamento, memória ou geração pode usar a IA remota já configurada. Antes da primeira execução que possa enviar dados ao provedor, a interface informa a transição e exige o consentimento já definido para acesso remoto.
 - Em `somente_local`, a ausência de WebGPU, memória ou modelo impede somente a análise solicitada e nunca envia dados ao provedor externo.
+- A prioridade de execução controla apenas qual mecanismo pode ser usado; alterar entre `local_primeiro`, `remota_primeiro`, `somente_local` e `somente_remota` não remove, substitui ou desabilita as configurações remotas já cadastradas. Cada provedor mantém seu próprio endpoint, modelo e credencial criptografada em `user_ai_provider_settings`/`secure_configs`; somente o provedor selecionado fica ativo, e ao retornar a ele a configuração anterior continua disponível.
 - O backend continua construindo o contexto minimizado e o prompt fechado de cada card. O navegador recebe exclusivamente o contexto do card solicitado para executar a inferência local; regras financeiras, validações de propriedade e a seleção de dados permanecem em `financeiro/`.
 - A saída local usa o mesmo pós-processamento, limite de tokens, quota, cooldown, histórico e disclaimer da execução remota antes de ser persistida.
-- O modelo inicial é `Qwen2.5-3B-Instruct-q4f16_1-MLC`; opções mais leves ou avançadas poderão ser oferecidas somente após validação de qualidade, licença e requisitos de memória.
+- O catálogo atual inclui `Qwen2.5-1.5B-Instruct-q4f16_1-MLC`, `Qwen3-0.6B-q4f16_1-MLC`, `gemma3-1b-it-q4f16_1-MLC`, `Llama-3.2-1B-Instruct-q4f16_1-MLC`, `Qwen3-1.7B-q4f16_1-MLC`, `Qwen2.5-3B-Instruct-q4f16_1-MLC` e `Qwen3-4B-q4f16_1-MLC`; a seleção continua limitada aos IDs presentes no runtime WebLLM vendorizado.
 
 - Rotas novas: `POST /api/consultor/prepare-local` para entregar o contexto minimizado e prompt fechado de uma análise autenticada; `POST /api/consultor/complete-local` para validar, pós-processar e persistir a saída local.
 - Dados novos em `consultor_settings`: `execution_priority`, com valor padrão `local_primeiro`.
@@ -439,8 +441,8 @@ Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regr
 - Dado uma análise cuja resposta recomende a compra de um ativo específico com fundamentação e riscos, quando o pós-processamento valida a saída, então ela não é recusada apenas por recomendar a compra; o disclaimer informa que as recomendações não garantem resultados e orienta consultar o banco ou profissional financeiro.
 - Dado uma resposta com vários disclaimers ou texto de disclaimer antigo, quando o pós-processamento termina, então existe somente uma seção Disclaimer com o texto oficial atual.
 - Dado uma resposta que inclua uma linha como "Total em Cents", quando o pós-processamento termina, então essa linha e o valor interno em centavos não são exibidos.
-- Dado o card `analise_carteira` e a política central permitindo execução remota, quando o sistema prepara a análise local ou remota, então realiza primeiro uma busca de cenário macroeconômico geral para o mercado de ações, sem incluir carteira, perfil, saldos, histórico, identificadores ou qualquer outro dado do usuário na requisição de pesquisa.
-- Dado que a pesquisa macroeconômica foi concluída, quando o sistema monta o prompt da análise da carteira, então incorpora um resumo com data e fontes identificadas, tratando o conteúdo externo como dado não confiável, e disponibiliza o mesmo contexto à inferência local ou remota.
+- Dado o card `analise_carteira` e a política central permitindo execução remota, quando o fluxo remoto é selecionado, então realiza primeiro uma busca de cenário macroeconômico geral para o mercado de ações, sem incluir carteira, perfil, saldos, histórico, identificadores ou qualquer outro dado do usuário na requisição de pesquisa; quando o fluxo local é preparado em `local_primeiro`, nenhuma busca remota é realizada.
+- Dado que a pesquisa macroeconômica foi concluída no fluxo remoto, quando o sistema monta o prompt da análise da carteira, então incorpora um resumo com data e fontes identificadas, tratando o conteúdo externo como dado não confiável, e disponibiliza esse contexto à inferência remota.
 - Dado outro card, execução configurada como somente local, ou provedor sem busca web nativa compatível, quando a análise é preparada, então nenhuma pesquisa remota é feita para esse propósito e o fluxo permitido continua sem enriquecimento macroeconômico.
 - Dado que a busca falhe, exceda o limite de tempo ou não retorne resumo utilizável, quando a análise da carteira continua, então a falha da pesquisa não bloqueia a análise final e não é apresentada como se tivesse sido obtida informação atual.
 - Dado que a busca retorne fontes, quando a análise da carteira for exibida, então a interface apresenta a data da consulta e as fontes em links HTTPS clicáveis; o prompt instrui a IA a associar afirmações aos identificadores de fonte e a distinguir informação observada de cenário incerto, sem tratar páginas externas como instruções.
@@ -458,6 +460,8 @@ Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regr
 - Dado que a geração local falha com perda do dispositivo GPU ("Device was lost", por falta de memória), quando o erro é classificado, então a categoria é `gpu_memory_or_device_lost` e a mensagem exibida informa que a GPU ficou sem memória, sem cair no texto genérico de falha de geração.
 - Dado que a geração local falha por memória da GPU ou por janela de contexto excedida e a IA remota está configurada e permitida pela política de execução, quando o Consultor executa, então usa a IA remota automaticamente e a interface exibe a falha local antes do resultado.
 - Dado que a geração local falha e a política é somente local, quando o Consultor executa, então nenhuma chamada à IA remota é feita e a falha local é exibida.
+- Dado que o usuário escolhe um modelo local nas Preferências, quando salva a configuração e executa Consultor ou Tendências, então o modelo escolhido é usado em ambos os fluxos; ao trocar de modelo, o cache do modelo anterior permanece disponível e o botão Atualizar reconstrói somente o cache do modelo selecionado.
+- Dado que a geração do modelo local selecionado falha por `GPUDeviceLostInfo`/memória insuficiente, quando a política permite IA local, então o navegador descarrega o engine com falha e tenta automaticamente o modelo local ultraleve `gemma3-1b-it-q4f16_1-MLC`, sem alterar o modelo persistido nas Preferências; a interface informa a troca temporária.
 - Dado um prompt local (instruções e dados) com mais de 11.000 caracteres e IA remota configurada e permitida pela política, quando o Consultor prepara a análise local, então não tenta a geração local, informa que o contexto excede a janela da IA local e usa a IA remota.
 - Dado um prompt local acima de 11.000 caracteres e política somente local (ou sem IA remota permitida), quando o Consultor prepara a análise, então tenta a geração local mesmo assim, pois não há alternativa.
 - Dado que o provedor remoto responde com erro transitório (HTTP 408, 429, 500, 502, 503 ou 504, inclusive quando o código vem no corpo da resposta), quando o Consultor executa a análise, então repete a chamada até 3 tentativas, com espera de 2s e 4s entre elas.
@@ -465,6 +469,10 @@ Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regr
 - Dado uma resposta vazia do provider remoto, quando o erro é registrado, então o log distingue resposta vazia de falha de transporte sem registrar corpo, prompt ou chave.
 - Dado uma resposta Gemini sem texto utilizável, quando o Consultor registra a falha, então o log inclui somente motivos/estados padronizados e contagens de tokens do provedor, sem conteúdo de prompt, resposta, chave ou dados financeiros.
 - Dado uma resposta Gemini sem candidatos que contenha um objeto `error`, quando o Consultor registra a falha, então o log registra apenas código numérico e status padronizado do provedor, sem mensagem ou corpo da resposta.
+- Dado a prioridade `local_primeiro`, quando o usuário aciona um card, então a interface exibe a preparação da IA local antes da geração, informa o carregamento ou reutilização do modelo e, se houver falha, informa a transição para a IA remota antes de realizar a chamada externa.
+- Dado uma configuração de IA remota previamente cadastrada, quando o usuário alterna a prioridade entre qualquer um dos quatro modos de execução, então o provedor, modelo e credencial permanecem armazenados; ao voltar para `remota_primeiro` ou `somente_remota`, a configuração anterior é reutilizada sem exigir novo cadastro da chave.
+- Dado configurações cadastradas para dois provedores remotos, quando o usuário troca o provedor ativo e salva uma alteração no segundo, então a URL, modelo e credencial do primeiro permanecem isolados e disponíveis ao selecioná-lo novamente.
+- Dado uma falha da IA remota após a tentativa local, quando a resposta de erro chega ao navegador, então o tratamento encerra o estado de carregamento e exibe as falhas local e remota sem deixar o card preso em "Tentando a IA remota…".
 
 ## Fora de escopo
 
@@ -509,7 +517,7 @@ Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regr
 - [x] Passo 26 — Integrar o worker WebLLM, download com progresso, detecção de capacidade, controles explícitos de preparo/remoção no navegador e fallback explícito na interface. Fecha: critérios de prioridade e identificação do mecanismo.
 - [ ] Passo 27 — Cobrir os fluxos local, remoto, fallback, ausência de WebGPU, contexto de outro usuário, guardrails, quota e histórico com testes automatizados e validação manual. Fecha: critérios 46 a 52.
 - [x] Passo 28 — Implementar adaptadores de pesquisa web nativa apenas para provedores oficiais suportados e a consulta estática, limitada e sem dados do usuário; manter falha da pesquisa não bloqueante. Fecha: critérios 64 e 67.
-- [x] Passo 29 — Incorporar resumo, data e fontes somente no contexto de `analise_carteira`, cobrindo preparação local e execução remota/fallback sob a política central; exibir fontes como links HTTPS na interface. Fecha: critérios 65, 66 e 68.
+- [x] Passo 29 — Incorporar resumo, data e fontes somente no contexto remoto de `analise_carteira`, cobrindo execução remota/fallback sob a política central; manter a preparação local sem chamada remota e exibir fontes como links HTTPS na interface. Fecha: critérios 65, 66 e 68.
 - [x] Passo 30 — Cobrir privacidade do payload de pesquisa, citações, provedores não suportados, falhas e os fluxos local/remoto com testes automatizados. Fecha: critérios 64 a 68.
 - [x] Passo 31 — Limitar em `financeiro/consultor_cashflow.py` a linha do tempo, as faturas abertas e os meses enviados ao card `destino_vencimentos`, preservando o saldo projetado final e a contagem de itens omitidos. Fecha: critérios 69 e 70.
 - [x] Passo 32 — Solicitar ao WebLLM a janela de contexto em `web/modules/webllm-client.js`, nos modos Worker e página, sem trocar o modelo; alinhar as importações de `webllm-client.js` na versão `v=178`. Fecha: critério 71 (revisado na v2.35).
@@ -522,6 +530,13 @@ Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regr
 - [x] Passo 39 — Cobrir os quatro critérios com testes automatizados (`tests/test_consultor_fallbacks.py`). Fecha: critérios 75 a 78.
 - [x] Passo 40 — Em `financeiro/consultor.py`, elevar o limite de saída remoto do Consultor para piso 2500 e teto 4000, mantendo 900 na análise local. Fecha: critérios 79 e 80.
 - [x] Passo 41 — Atualizar os testes do limite de tokens e cobrir a configuração de 700 tokens com piso de 2500. Fecha: critérios 79 e 80.
+- [x] Passo 42 — Separar a pesquisa macro da preparação local e tornar visíveis na interface as etapas de tentativa local e transição para o fallback remoto. Fecha: critérios 66, 67 e 92.
+- [x] Passo 43 — Preservar a prioridade e as credenciais remotas ao alternar modos de execução ou ativar/desativar o Consultor. Fecha: critério 93.
+- [x] Passo 44 — Adicionar catálogo fechado e seleção persistente de modelo local, usar Qwen 2.5 1.5B como padrão, manter caches separados por modelo e oferecer atualização forçada do cache selecionado. Fecha: critério 94.
+- [x] Passo 45 — Tratar perda de dispositivo/memória na geração local com descarregamento do engine e tentativa temporária do modelo Gemma 3 1B, preservando a seleção persistida. Fecha: critério 95.
+- [x] Passo 46 — Incrementar o cache-buster dos módulos WebLLM após a inclusão do fallback leve, garantindo que navegadores não reutilizem o cliente anterior. Fecha: critério 95.
+- [x] Passo 47 — Isolar metadados e credenciais por provedor remoto em `user_ai_provider_settings`/`secure_configs`, migrar a configuração legada ativa sem perda, adicionar o preset DeepSeek e recarregar a configuração do provedor selecionado na tela de Preferências. Fecha: critério 96.
+- [x] Passo 48 — Corrigir o escopo do estado de prioridade no tratamento de erro do fallback remoto, diagnosticar códigos de erro em payloads OpenAI-compatible sem registrar conteúdo sensível e cobrir o encerramento do estado de carregamento com testes de contrato. Fecha: critério 97.
 
 ### Checklist de homologação do Passo 19
 
@@ -571,6 +586,13 @@ _Nenhuma pendência em aberto._
 
 ## Changelog
 
+- `2.44` — 2026-11-18 — Corrige o tratamento de falha após fallback local/remoto para encerrar o carregamento e exibir o erro; registra apenas código/status allowlisted de respostas OpenAI-compatible, como 429 do OpenRouter.
+- `2.43` — 2026-11-18 — Isola configurações remotas por provedor, preserva Gemini ao cadastrar/trocar para DeepSeek e adiciona o preset DeepSeek.
+- `2.42` — 2026-11-18 — Incrementa o cache-buster do cliente WebLLM para garantir que o fallback Gemma 3 1B seja carregado após a atualização da produção.
+- `2.41` — 2026-11-18 — Quando o modelo selecionado perde o dispositivo GPU por memória insuficiente durante a geração, tenta automaticamente o Gemma 3 1B sem substituir a preferência persistida.
+- `2.40` — 2026-11-18 — Adiciona seleção persistente de modelos WebLLM, usa Qwen 2.5 1.5B como padrão, preserva o cache ao trocar de modelo e oferece botão para atualizar o cache selecionado.
+- `2.39` — 2026-11-18 — A troca de prioridade entre IA local e remota passa a preservar provedor, modelo e credencial cadastrados; ativar ou desativar o Consultor não redefine a prioridade escolhida.
+- `2.38` — 2026-11-18 — A preparação local deixa de chamar pesquisa macro remota; a interface passa a exibir tentativa, carregamento/reuso do modelo local e transição explícita para o fallback remoto.
 - `2.37` — 2026-11-01 — Análises remotas passam a usar limite de saída com piso de 2500 e teto de 4000 (a análise local mantém 900), porque o raciocínio interno do Gemini consumia o limite de 700–900 e truncava as seções obrigatórias.
 - `2.36` — 2026-11-01 — Prompt local acima de 11.000 caracteres usa a IA remota quando permitida, em vez de tentar a janela local; a chamada remota repete erros transitórios (HTTP e código no corpo) em até 3 tentativas, sem repetir timeouts.
 - `2.35` — 2026-11-01 — Reverte a janela de contexto local para 4096 tokens após perda da GPU com 8192; reconhece `Device was lost` como falha de memória da GPU e explicita o fallback remoto quando a política permitir, mantendo `somente_local` sem chamada remota.

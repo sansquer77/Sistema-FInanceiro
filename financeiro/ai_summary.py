@@ -101,6 +101,7 @@ def prepare_local_summary(user_id: int, trends_payload: dict) -> dict:
         ],
         "temperature": DEFAULT_TEMPERATURE,
         "max_tokens": MAX_SUMMARY_TOKENS,
+        "local_model_id": execution.get("local_model_id", "Qwen2.5-1.5B-Instruct-q4f16_1-MLC"),
     }
 
 

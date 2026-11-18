@@ -111,7 +111,7 @@ def consultor_blocked_reason(settings: dict) -> str:
 
 
 def save_consultor_settings(user_id: int, data: dict) -> dict:
-    # spec: consultor/consultor v2.14 - criterios 1, 2, 3, 25, 26 e 32
+    # spec: consultor/consultor v2.44 - criterios 1, 2, 3, 25, 26 e 32
     normalized_user_id = int(user_id)
     current = get_consultor_settings(normalized_user_id)
     consultor_enabled = bool(data.get("consultor_enabled", current["consultor_enabled"]))
@@ -124,13 +124,17 @@ def save_consultor_settings(user_id: int, data: dict) -> dict:
             raise ConsultorError("Configure e habilite uma IA nas Preferencias antes de ativar o Consultor.")
         if not data_access_consent:
             raise ConsultorError("Aceite o consentimento de uso de IA para ativar o Consultor.")
+        # spec: consultor/consultor v2.44 — critério 93
+        # Ativar o Consultor concede o uso remoto sem trocar a prioridade escolhida
+        # nem regravar a configuração/credencial da IA cadastrada.
         save_ai_execution_settings(normalized_user_id, {
-            "execution_priority": "remota_primeiro",
             "data_access_consent": True,
         })
     else:
+        # spec: consultor/consultor v2.44 — critério 93
+        # Desativar o módulo revoga o consentimento, mas preserva a prioridade para
+        # que a configuração seja restaurada ao reativar o uso remoto.
         save_ai_execution_settings(normalized_user_id, {
-            "execution_priority": "somente_local",
             "data_access_consent": False,
         })
 
@@ -194,7 +198,7 @@ def get_complementary_profile(user_id: int) -> dict:
 
 
 def save_complementary_profile(user_id: int, data: dict) -> dict:
-    # spec: consultor/consultor v2.14 - criterios 22, 23, 24, 25 e 33
+    # spec: consultor/consultor v2.44 - criterios 22, 23, 24, 25 e 33
     current = get_complementary_profile(int(user_id))["profile"]
     normalized_patch = normalize_complementary_profile(data, partial=True)
     merged = {**current, **normalized_patch}
