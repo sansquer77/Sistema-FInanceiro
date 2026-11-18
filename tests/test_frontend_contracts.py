@@ -218,6 +218,11 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn('const remoteWasAllowed = order.includes("remota");', consultor_view)
         self.assertIn('renderAnalysisState("Tentando a IA local. Preparando o contexto desta análise…");', consultor_view)
         self.assertIn('"A IA local não concluiu. Tentando a IA remota…"', consultor_view)
+        run_analysis = consultor_view[consultor_view.index("async function runAnalysis"):]
+        self.assertLess(
+            run_analysis.index('const order = consultorConfig?.order || ["local", "deterministica"];'),
+            run_analysis.index("try {"),
+        )
         for module in ("consultor-view.js", "trends-view.js", "user-admin-view.js"):
             source = (MODULE_ROOT / module).read_text(encoding="utf-8")
             self.assertIn('webllm-client.js?v=182"', source, module)

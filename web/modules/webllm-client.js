@@ -1,4 +1,4 @@
-// spec: consultor/consultor v2.43 — critérios de preparo explícito e execução local
+// spec: consultor/consultor v2.44 — critérios de preparo explícito e execução local
 // WebLLM mantém runtime e pesos no Cache Storage privado da origem do navegador.
 export const DEFAULT_LOCAL_MODEL_ID = "Qwen2.5-1.5B-Instruct-q4f16_1-MLC";
 const LOW_MEMORY_FALLBACK_MODEL_ID = "gemma3-1b-it-q4f16_1-MLC";
@@ -11,7 +11,7 @@ const SUPPORTED_MODEL_IDS = new Set([
   "Qwen2.5-3B-Instruct-q4f16_1-MLC",
   "Qwen3-4B-q4f16_1-MLC",
 ]);
-// spec: consultor/consultor v2.43 — critério 71; decisão em adr/0021-janela-contexto-local-consultor v0.2
+// spec: consultor/consultor v2.44 — critério 71; decisão em adr/0021-janela-contexto-local-consultor v0.2
 const CHAT_OPTIONS = { context_window_size: 4096 };
 let libraryPromise;
 let engine;
@@ -34,7 +34,7 @@ function supported() {
   return Boolean(globalThis.navigator?.gpu);
 }
 
-// spec: consultor/consultor v2.43 — critério de perda do dispositivo GPU ("Device was lost")
+// spec: consultor/consultor v2.44 — critério de perda do dispositivo GPU ("Device was lost")
 const GPU_MEMORY_PATTERN = /(out of memory|memory allocation|device (was )?lost|insufficient memory|gpudevicelostinfo|gpu.*memory)/;
 
 function classifyInferenceError(error) {
@@ -120,7 +120,7 @@ async function ensureEngine(modelId, onProgress, { preferMainThread = false } = 
         engineWorker = new Worker(new URL("./webllm-worker.js?v=182", import.meta.url), { type: "module" });
         return await webllm.CreateWebWorkerMLCEngine(engineWorker, selectedModelId, engineConfig, CHAT_OPTIONS);
       } catch (workerError) {
-        // spec: consultor/consultor v2.43 — critério de preparo explícito do modelo local
+        // spec: consultor/consultor v2.44 — critério de preparo explícito do modelo local
         // Safari pode expor WebGPU à página, mas não ao Dedicated Worker. O fallback
         // preserva a execução local e reutiliza o mesmo cache privado do navegador.
         engineWorker?.terminate();

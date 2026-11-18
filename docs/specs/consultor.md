@@ -2,7 +2,7 @@
 tipo: spec
 area: consultor
 status: em-implementacao
-versao: 2.43
+versao: 2.44
 atualizado: 2026-11-18
 relacionados:
   - "[[instrucoes-app]]"
@@ -17,7 +17,7 @@ aliases: ["Consultor Virtual", "Assistente de Investimentos", "Especialista em F
 # Consultor Virtual de Investimentos e Planejamento Financeiro
 
 > [!info] Status
-> **em-implementacao** · versão: `2.43` · área: `consultor` · atualizado em 2026-11-18 · relacionados: [[instrucoes-app]], [[investimentos-portfolio]], [[score-saude-financeira]], [[tendencias-saude-financeira]], [[cockpit-calendario]], [[objetivos-financeiros]], [[emprestimos-quitacao]], [[cartoes]], [[../adr/0019-inferencia-local-webllm]], [[../adr/0020-pesquisa-macro-consultor]], [[../adr/0021-janela-contexto-local-consultor]], [[../adr/0022-orcamento-tokens-saida-consultor]], [[../adr/0023-configuracoes-ia-por-provedor]]
+> **em-implementacao** · versão: `2.44` · área: `consultor` · atualizado em 2026-11-18 · relacionados: [[instrucoes-app]], [[investimentos-portfolio]], [[score-saude-financeira]], [[tendencias-saude-financeira]], [[cockpit-calendario]], [[objetivos-financeiros]], [[emprestimos-quitacao]], [[cartoes]], [[../adr/0019-inferencia-local-webllm]], [[../adr/0020-pesquisa-macro-consultor]], [[../adr/0021-janela-contexto-local-consultor]], [[../adr/0022-orcamento-tokens-saida-consultor]], [[../adr/0023-configuracoes-ia-por-provedor]]
 
 > [!warning] Pivô arquitetural (v0.13, refinado em v0.14/v0.15)
 > A partir desta versão, o Consultor **não possui campo de prompt livre**. O usuário interage exclusivamente através de um **catálogo de análises pré-formatadas** (cards). Essa mudança é uma decisão de **Security by Design**: eliminar a superfície de entrada de texto livre remove pela raiz os vetores de vazamento acidental de dados sensíveis (PII) e de *prompt injection* via chat. As seções "Prevenção de vazamento de dados no prompt (DLP)" e "Blindagem de prompt injection" da v0.12 são **removidas** desta spec — ver "Segurança by Design" e "Nota de segurança residual" abaixo para o que substitui essas salvaguardas.
@@ -472,6 +472,7 @@ Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regr
 - Dado a prioridade `local_primeiro`, quando o usuário aciona um card, então a interface exibe a preparação da IA local antes da geração, informa o carregamento ou reutilização do modelo e, se houver falha, informa a transição para a IA remota antes de realizar a chamada externa.
 - Dado uma configuração de IA remota previamente cadastrada, quando o usuário alterna a prioridade entre qualquer um dos quatro modos de execução, então o provedor, modelo e credencial permanecem armazenados; ao voltar para `remota_primeiro` ou `somente_remota`, a configuração anterior é reutilizada sem exigir novo cadastro da chave.
 - Dado configurações cadastradas para dois provedores remotos, quando o usuário troca o provedor ativo e salva uma alteração no segundo, então a URL, modelo e credencial do primeiro permanecem isolados e disponíveis ao selecioná-lo novamente.
+- Dado uma falha da IA remota após a tentativa local, quando a resposta de erro chega ao navegador, então o tratamento encerra o estado de carregamento e exibe as falhas local e remota sem deixar o card preso em "Tentando a IA remota…".
 
 ## Fora de escopo
 
@@ -535,6 +536,7 @@ Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regr
 - [x] Passo 45 — Tratar perda de dispositivo/memória na geração local com descarregamento do engine e tentativa temporária do modelo Gemma 3 1B, preservando a seleção persistida. Fecha: critério 95.
 - [x] Passo 46 — Incrementar o cache-buster dos módulos WebLLM após a inclusão do fallback leve, garantindo que navegadores não reutilizem o cliente anterior. Fecha: critério 95.
 - [x] Passo 47 — Isolar metadados e credenciais por provedor remoto em `user_ai_provider_settings`/`secure_configs`, migrar a configuração legada ativa sem perda, adicionar o preset DeepSeek e recarregar a configuração do provedor selecionado na tela de Preferências. Fecha: critério 96.
+- [x] Passo 48 — Corrigir o escopo do estado de prioridade no tratamento de erro do fallback remoto, diagnosticar códigos de erro em payloads OpenAI-compatible sem registrar conteúdo sensível e cobrir o encerramento do estado de carregamento com testes de contrato. Fecha: critério 97.
 
 ### Checklist de homologação do Passo 19
 
@@ -584,6 +586,7 @@ _Nenhuma pendência em aberto._
 
 ## Changelog
 
+- `2.44` — 2026-11-18 — Corrige o tratamento de falha após fallback local/remoto para encerrar o carregamento e exibir o erro; registra apenas código/status allowlisted de respostas OpenAI-compatible, como 429 do OpenRouter.
 - `2.43` — 2026-11-18 — Isola configurações remotas por provedor, preserva Gemini ao cadastrar/trocar para DeepSeek e adiciona o preset DeepSeek.
 - `2.42` — 2026-11-18 — Incrementa o cache-buster do cliente WebLLM para garantir que o fallback Gemma 3 1B seja carregado após a atualização da produção.
 - `2.41` — 2026-11-18 — Quando o modelo selecionado perde o dispositivo GPU por memória insuficiente durante a geração, tenta automaticamente o Gemma 3 1B sem substituir a preferência persistida.

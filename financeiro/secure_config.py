@@ -141,12 +141,12 @@ def save_encrypted_config(config: dict, path: Path, key_path: Path | None = None
 
 
 def encrypt_json_for_storage(config: dict, key_path: Path | None = None) -> str:
-    # spec: consultor/consultor v2.43 - criterio 23
+    # spec: consultor/consultor v2.44 - criterio 23
     return json.dumps(encrypt_config_payload(config, key_path), indent=2, sort_keys=True)
 
 
 def decrypt_json_from_storage(payload_text: str, key_path: Path | None = None) -> dict:
-    # spec: consultor/consultor v2.43 - criterio 23
+    # spec: consultor/consultor v2.44 - criterio 23
     if not str(payload_text or "").strip():
         raise SecureConfigError("Configuracao criptografada nao encontrada.")
     try:
@@ -456,7 +456,7 @@ def save_ai_settings(user_id: int, data: dict) -> dict:
     effective_key = api_key or existing_key
     if enabled and auth_type == "bearer" and not effective_key:
         raise SecureConfigError("Informe a chave de API para ativar a IA.")
-    # spec: consultor/consultor v2.43 — critério 96
+    # spec: consultor/consultor v2.44 — critério 96
     # Cada provedor conserva sua própria credencial; trocar o provedor ativo
     # nunca reutiliza nem remove a chave criptografada de outro provedor.
     _save_ai_provider_api_key(

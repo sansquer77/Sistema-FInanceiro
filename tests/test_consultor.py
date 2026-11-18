@@ -551,7 +551,7 @@ class ConsultorContextTest(unittest.TestCase):
         self.assertEqual(context["complementary_profile"]["horizonte_investimento_principal"], "longo_prazo")
 
     def test_lifestyle_context_formats_monetary_values_for_ai(self) -> None:
-        # spec: consultor/consultor v2.43 — critério 39
+        # spec: consultor/consultor v2.44 — critério 39
         payload = score_payload(
             receitas_cents=2_000_000,
             despesas_consumo_cents=1_100_000,
@@ -574,7 +574,7 @@ class ConsultorContextTest(unittest.TestCase):
         self.assertIn("nao converta nem reformate os campos `_cents`", prompt)
 
     def test_all_context_money_fields_receive_nested_display_values(self) -> None:
-        # spec: consultor/consultor v2.43 — critério 39
+        # spec: consultor/consultor v2.44 — critério 39
         with mock.patch("financeiro.trends.calculate_trends", return_value=trends_payload()), self.profile_context():
             ralos = build_analysis_context(7, "ralos_financeiros", month="2026-08", period_window="3m")
             subscriptions = build_analysis_context(7, "assinaturas_recorrencias", month="2026-08")
@@ -591,7 +591,7 @@ class ConsultorContextTest(unittest.TestCase):
         self.assertIn("nunca converta, arredonde ou reformate `_cents` ou `_brl`", prompt)
 
     def test_score_evolution_context_builds_six_month_series(self) -> None:
-        # spec: consultor/consultor v2.43 — critérios 8 e 10
+        # spec: consultor/consultor v2.44 — critérios 8 e 10
         score_payloads = {
             "2026-08": score_payload(score_total=720),
             "2026-07": score_payload(score_total=700),
@@ -1193,7 +1193,7 @@ class ConsultorAIExecutorTest(unittest.TestCase):
         self.assertEqual(postprocess_consultor_output(text), text)
 
     def test_postprocess_accepts_markdown_heading_sections(self) -> None:
-        # spec: consultor/consultor v2.43 - correcao de has_section
+        # spec: consultor/consultor v2.44 - correcao de has_section
         # O padrao #{1,6} dentro de f-string era interpretado como tupla (1, 6),
         # fazendo respostas com "### Secao" (formato comum do Gemini) falharem
         # a validacao de secoes obrigatorias e derrubarem o Consultor.
@@ -1214,7 +1214,7 @@ class ConsultorAIExecutorTest(unittest.TestCase):
         self.assertTrue(has_section("### Análise de Dados\nx", "Analise de Dados"))
 
     def test_postprocess_accepts_accented_markdown_headings(self) -> None:
-        # spec: consultor/consultor v2.43 - modelo alterna "Analise"/"Análise"
+        # spec: consultor/consultor v2.44 - modelo alterna "Analise"/"Análise"
         text = (
             "### Resumo\nTexto educacional.\n\n"
             "### Análise de Dados\nDados agregados.\n\n"
@@ -1284,7 +1284,7 @@ class ConsultorAIExecutorTest(unittest.TestCase):
         self.assertEqual(processed, text)
 
     def test_postprocess_does_not_refuse_defensive_negation_phrases(self) -> None:
-        # spec: consultor/consultor v2.43 - uma advertencia contra venda nao e recomendacao de venda
+        # spec: consultor/consultor v2.44 - uma advertencia contra venda nao e recomendacao de venda
         text = valid_consultor_response().replace(
             "Os dados indicam diferencas entre classes de ativos sem sugerir compra ou venda.",
             "Nao recomendo vender acoes ou fundos especificos; esta analise e apenas informativa.",

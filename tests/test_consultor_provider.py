@@ -182,6 +182,26 @@ class ConsultorProviderContractTest(unittest.TestCase):
             "finish_reasons=OTHER",
         )
 
+    def test_openai_compatible_error_payload_logs_only_allowlisted_status_and_code(self) -> None:
+        diagnostics = consultor_provider.describe_empty_ai_response({
+            "error": {
+                "code": 429,
+                "status": "RESOURCE_EXHAUSTED",
+                "message": "private provider message",
+            },
+            "private": "private response content",
+        }, "custom")
+
+        self.assertEqual(diagnostics, {
+            "response_reason": "provider_error_payload",
+            "provider_code": 429,
+            "provider_status": "RESOURCE_EXHAUSTED",
+        })
+        logged = consultor_provider.format_safe_provider_diagnostics(diagnostics)
+        self.assertIn("provider_code=429", logged)
+        self.assertIn("provider_status=RESOURCE_EXHAUSTED", logged)
+        self.assertNotIn("private", logged)
+
     def test_invalid_configuration_preserves_public_error(self) -> None:
         with self.assertRaises(consultor.ConsultorError):
             consultor.build_consultor_ai_request({}, self.messages, max_tokens=700)

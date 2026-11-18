@@ -100,7 +100,7 @@ def save_ai_execution_settings(user_id: int, data: dict) -> dict:
     consent = bool(data.get("data_access_consent", current["data_access_consent"]))
     if priority not in PRIORITIES:
         raise AIExecutionError("Prioridade de IA inválida.")
-    # spec: consultor/consultor v2.43 — critério 93
+    # spec: consultor/consultor v2.44 — critério 93
     # Fallback remoto também é envio de dados e só entra na política consentida.
     # A revogação explícita deve ser permitida sem forçar a prioridade para local;
     # a mesma prioridade poderá voltar a usar a API quando o consentimento retornar.

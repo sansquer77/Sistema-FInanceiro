@@ -1,5 +1,5 @@
 // spec: cockpit-calendario v0.9 — critérios 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17 e 18
-// spec: consultor/consultor v2.43 — view de análises, pesquisa macro e fontes
+// spec: consultor/consultor v2.44 — view de análises, pesquisa macro e fontes
 import { stateMarkup } from "./dom-utils.js";
 import { runLocalConsultor } from "./webllm-client.js?v=182";
 export function registerConsultorView({
@@ -243,7 +243,7 @@ export function registerConsultorView({
   }
 
   function renderAnalysisSelector(cards) {
-    // spec: consultor/consultor v2.43 — critérios 8, 9 e 14
+    // spec: consultor/consultor v2.44 — critérios 8, 9 e 14
     // (o catálogo permanece fechado; a interface concentra a escolha em um
     // seletor e renderiza as opções de período declaradas pelo backend para
     // cada card que exige período — ralos usa 3/6/12/YTD; evolução do score
@@ -311,9 +311,9 @@ export function registerConsultorView({
     if (card?.requires_period_window) {
       body.period_window = selectedPeriodWindow;
     }
+    const order = consultorConfig?.order || ["local", "deterministica"];
     try {
       let result;
-      const order = consultorConfig?.order || ["local", "deterministica"];
       for (const source of order) {
         if (source === "deterministica" || result) break;
         if (source === "local") {

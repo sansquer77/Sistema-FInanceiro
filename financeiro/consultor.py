@@ -102,7 +102,7 @@ _FORBIDDEN_NEGATION_WINDOW = (
     r"\b(nao|nunca|sem|evite|evitar|evitando|desaconselho|desaconselha|desaconselhar)"
     r"|deixe\s+de|deixa\s+de|deixar\s+de"
 )
-# spec: consultor/consultor v2.43 — critérios 79 e 80 (limite remoto; a análise local mantém 900)
+# spec: consultor/consultor v2.44 — critérios 79 e 80 (limite remoto; a análise local mantém 900)
 CONSULTOR_REMOTE_MIN_OUTPUT_TOKENS = 2500
 CONSULTOR_REMOTE_MAX_OUTPUT_TOKENS = 4000
 CONSULTOR_MIN_TIMEOUT_SECONDS = 20
@@ -125,7 +125,7 @@ def execute_consultor_analysis(
     now: datetime | None = None,
     portfolio_positions: list[dict] | None = None,
 ) -> dict:
-    # spec: consultor/consultor v2.43 - critérios 40 a 43, 64 a 68
+    # spec: consultor/consultor v2.44 - critérios 40 a 43, 64 a 68
     normalized_user_id = int(user_id)
     normalized_analysis_id = validate_analysis_id(analysis_id)
     current_time = now or datetime.now()
@@ -248,7 +248,7 @@ def prepare_local_analysis(user_id: int, analysis_id: object, *, period_window: 
         raise ConsultorError("A política atual não permite IA local para o Consultor.")
     normalized_id = validate_analysis_id(analysis_id)
     normalized_period = validate_period_window(period_window, analysis_id=normalized_id)
-    # spec: consultor/consultor v2.43 — critérios 66 e 67
+    # spec: consultor/consultor v2.44 — critérios 66 e 67
     # A preparação local não pode consultar o provedor remoto. O enriquecimento macro
     # acontece somente quando o fluxo remoto for realmente selecionado.
     macro_research = (
@@ -260,7 +260,7 @@ def prepare_local_analysis(user_id: int, analysis_id: object, *, period_window: 
     if macro_research is not None:
         context["macro_research"] = macro_research
     messages = build_ai_messages(build_system_prompt(normalized_id, investor_profile=settings["investor_profile"], period_window=normalized_period), context)
-    # spec: consultor/consultor v2.43 — critérios 75 e 76
+    # spec: consultor/consultor v2.44 — critérios 75 e 76
     prompt_chars = sum(len(message["content"]) for message in messages)
     if prompt_chars > LOCAL_PROMPT_CHAR_BUDGET and "remota" in execution_settings["order"]:
         raise ConsultorError(
@@ -277,7 +277,7 @@ def prepare_local_analysis(user_id: int, analysis_id: object, *, period_window: 
     }
 
 
-# spec: consultor/consultor v2.43 — critérios 64 a 68
+# spec: consultor/consultor v2.44 — critérios 64 a 68
 def collect_portfolio_macro_research(ai_settings: dict, *, timeout_seconds: int) -> dict:
     try:
         research = provider_adapter.call_consultor_market_research(
@@ -360,7 +360,7 @@ def failure_cooldown_remaining(user_id: int, analysis_id: str, current_time: dat
 
 
 def postprocess_consultor_output(output: object) -> str:
-    # spec: consultor/consultor v2.43 - critérios 62 e 63
+    # spec: consultor/consultor v2.44 - critérios 62 e 63
     text = str(output or "").strip()
     if not text:
         raise ConsultorError("O Consultor esta indisponivel no momento.")
@@ -381,7 +381,7 @@ def postprocess_consultor_output(output: object) -> str:
 
 
 def has_section(text: str, section: str) -> bool:
-    # spec: consultor/consultor v2.43 - cabeçalhos com acentos normalizados
+    # spec: consultor/consultor v2.44 - cabeçalhos com acentos normalizados
     normalized_text = normalize_text(text)
     escaped = re.escape(section)
     return bool(re.search(
@@ -392,7 +392,7 @@ def has_section(text: str, section: str) -> bool:
 
 
 def contains_forbidden_recommendation(normalized_text: str, *, original_text: str | None = None) -> bool:
-    # spec: consultor/consultor v2.43 - bloqueia indicacoes de venda, nao de compra
+    # spec: consultor/consultor v2.44 - bloqueia indicacoes de venda, nao de compra
     # Frases preventivas sobre venda continuam permitidas quando a negacao vem antes do verbo.
     for pattern in FORBIDDEN_OUTPUT_PATTERNS:
         for match in re.finditer(pattern, normalized_text):
@@ -528,7 +528,7 @@ def build_analysis_context(
     investor_profile: object | None = None,
     portfolio_positions: list[dict] | None = None,
 ) -> dict:
-        # spec: consultor/consultor v2.43 - criterios 7, 10, 27, 30, 34 e 38
+        # spec: consultor/consultor v2.44 - criterios 7, 10, 27, 30, 34 e 38
     normalized_analysis_id = validate_analysis_id(analysis_id)
     normalized_period = validate_period_window(period_window, analysis_id=normalized_analysis_id)
     # Otimização: calcula o portfólio uma única vez e repassa aos cards que o consomem,
@@ -557,7 +557,7 @@ def build_analysis_context(
     elif normalized_analysis_id == "score_saude_financeira":
         context = build_score_context(user_id, month=month, portfolio_positions=portfolio_positions)
     elif normalized_analysis_id == "evolucao_score_tempo":
-    # spec: consultor/consultor v2.43 — critério 10
+    # spec: consultor/consultor v2.44 — critério 10
         context = build_score_evolution_context(user_id, period_window=normalized_period or "6m", portfolio_positions=portfolio_positions)
     elif normalized_analysis_id == "sustentabilidade_padrao_vida":
         context = build_lifestyle_context(user_id, month=month, portfolio_positions=portfolio_positions)
@@ -577,7 +577,7 @@ def build_analysis_context(
         )
     else:
         raise ConsultorError("Analise do Consultor invalida.")
-    # spec: consultor/consultor v2.43 - criterios 38 e 39
+    # spec: consultor/consultor v2.44 - criterios 38 e 39
     # Todos os cards recebem perfil de investidor e Perfil Complementar (quando preenchido)
     # para contextualizar a analise - nunca dados de outro usuario.
     if investor_profile is None:

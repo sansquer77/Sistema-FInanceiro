@@ -63,7 +63,7 @@ import { registerClassificationsView } from "./modules/classifications-view.js";
 import { registerLimitsView } from "./modules/limits-view.js";
 import { registerReportsView } from "./modules/reports-view.js";
 import { registerImportsView } from "./modules/imports-view.js";
-import { registerCockpitView } from "./modules/cockpit-view.js?v=182";
+import { registerCockpitView } from "./modules/cockpit-view.js?v=183";
 import { registerAccountsView } from "./modules/accounts-view.js";
 import { registerCardsView } from "./modules/cards-view.js";
 import { registerPortfolioView } from "./modules/portfolio-view.js?v=164";
