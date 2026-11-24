@@ -90,10 +90,11 @@
           </div>
 
           <nav class="app-nav" aria-label="Modulos">
-            <button class="nav-button active" type="button" data-view="cockpit" data-short="CP" title="Cockpit">
+            <div class="app-nav-main">
+              <button class="nav-button active" type="button" data-view="cockpit" data-short="CP" title="Cockpit">
               <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="8" rx="1.5"></rect><rect x="14" y="3" width="7" height="5" rx="1.5"></rect><rect x="14" y="12" width="7" height="9" rx="1.5"></rect><rect x="3" y="15" width="7" height="6" rx="1.5"></rect></svg>
               <span class="nav-label">Cockpit</span>
-            </button>
+              </button>
             <div class="nav-group" data-nav-group="cadastro">
               <button class="nav-group-toggle" type="button" aria-expanded="true" aria-controls="navGroupCadastro">
                 <span class="nav-group-label">Cadastro</span>
@@ -166,7 +167,9 @@
                 </button>
               </div>
             </div>
-            <div class="nav-group" data-nav-group="usuario">
+            </div>
+            <div class="app-nav-utility" aria-label="Utilidades do usuário">
+              <div class="nav-group" data-nav-group="usuario">
               <button class="nav-group-toggle" type="button" aria-expanded="true" aria-controls="navGroupUsuario">
                 <span class="nav-group-label">Usuário</span>
                 <svg class="nav-group-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
@@ -188,6 +191,7 @@
                   <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5"></path><path d="M15 12H3"></path><path d="M13 4h6a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6"></path></svg>
                   <span class="nav-label">Sair</span>
                 </button>
+              </div>
               </div>
             </div>
           </nav>

@@ -2,8 +2,8 @@
 tipo: design
 area: meta
 status: implementado
-versao: 4.2
-atualizado: 2026-09-27
+versao: 4.5
+atualizado: 2026-11-23
 relacionados:
   - "[[arquitetura]]"
   - "[[specs/frontend-modularizacao]]"
@@ -15,11 +15,47 @@ aliases: ["Design System", "Tokens Visuais", "Precisão Institucional"]
 # Design System — Precisão Institucional
 
 > [!info] Status
-> **implementado** · versão: `4.2` · área: `meta` · atualizado em 2026-09-27 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]], [[specs/frontend-fundacao-v2]]
+> **implementado** · versão: `4.5` · área: `meta` · atualizado em 2026-11-23 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]], [[specs/frontend-fundacao-v2]]
 
 ## Personalidade da marca
 
-Autoritária, sistemática e altamente técnica. A interface deve evocar confiabilidade absoluta e clareza — estilo **Corporativo Moderno** com tendências **Minimalistas**. Prioriza densidade de dados e legibilidade em vez de elementos decorativos. Interesse visual gerado por alinhamento preciso e uso estratégico de cores categóricas.
+Confiável, sistemática e premium sem perder precisão. A interface deve evocar segurança e clareza — estilo **Corporativo Moderno** com tendências **Minimalistas e Editoriais**. Prioriza densidade de dados e legibilidade, mas usa hierarquia, espaço e contraste controlado para não parecer uma ferramenta técnica de administração.
+
+## Direção premium do shell
+
+O shell visual — menu, cabeçalho, superfícies e tipografia — deve funcionar como uma moldura silenciosa para os dados financeiros. A sofisticação vem de contenção: superfícies próximas entre si, bordas de baixo contraste, um único destaque de navegação e tipografia com hierarquia clara.
+
+- A navegação principal é neutra por padrão; azul identifica o módulo ativo; vermelho, verde e laranja conservam seus significados semânticos ou de interface.
+- Alertas no menu usam um ponto ou badge discreto e não transformam uma rota inteira em superfície crítica quando ela não está ativa.
+- O menu expandido separa identidade, navegação principal e utilidades do usuário; Preferências, ajuda, Sobre e Sair ficam visualmente subordinados aos módulos financeiros.
+- A sidebar deve ter três zonas explícitas: identidade, navegação principal e utilidades; a zona de utilidades fica ancorada visualmente na parte inferior quando houver espaço.
+- A navegação principal não usa scrollbar própria em desktop; a densidade é ajustada por espaçamento e os grupos podem ser recolhidos para preservar acesso sem criar uma lista operacional contínua.
+- No modo recolhido, cada item mantém `title`, foco visível e estado ativo identificável pelo marcador lateral, mesmo sem o rótulo textual.
+- O cabeçalho global combina um título de tela expressivo, contexto curto e ações compactas, sem transformar todos os controles em caixas de igual peso.
+- A interface pode manter o modo escuro como ambiente analítico, mas reduz a sensação técnica com menos linhas visíveis, mais respiro e contraste de superfície cuidadosamente graduado.
+
+## Camada de conteúdo
+
+A camada de conteúdo continua densa porque precisa apresentar dados financeiros, mas a hierarquia deixa de depender de uma borda em cada elemento. O canvas da área autenticada cria um contraste neutro e discreto; os painéis principais recebem a maior elevação; listas e controles internos usam superfícies secundárias e linhas apenas quando ajudam a separar informação.
+
+| Token | Tema claro | Tema escuro | Uso |
+|---|---|---|---|
+| `--content-canvas` | `#f7f8fc` | `#14161b` | Fundo da área autenticada e respiro entre painéis. |
+| `--content-surface` | `#ffffff` | `#181a20` | Painéis principais, drawers e controles elevados. |
+| `--content-surface-low` | `#fbfcfe` | `#1c1f26` | Linhas, cards internos, campos e estados neutros. |
+| `--content-surface-hover` | `#f1f4f9` | `#20232b` | Hover e foco visual não semântico. |
+| `--content-line` | `rgba(19, 27, 46, .09)` | `rgba(244, 246, 251, .10)` | Divisores e contornos estruturais leves. |
+| `--content-line-strong` | `rgba(19, 27, 46, .14)` | `rgba(244, 246, 251, .16)` | Campos e limites que precisam de leitura adicional. |
+| `--content-shadow` | `0 8px 24px rgba(19, 27, 46, .04)` | `0 10px 30px rgba(0, 0, 0, .16)` | Elevação discreta de painéis; nunca decoração de cada linha. |
+
+Regras de aplicação:
+
+- O canvas deve ser percebido como respiro, não como uma nova cor de marca; no escuro, permanece próximo do fundo para preservar o ambiente analítico.
+- Painéis principais podem usar borda e sombra muito suaves. Linhas de listas e cards internos começam transparentes e aparecem no hover ou quando a separação for necessária.
+- Campos recebem superfície baixa e borda discreta; o foco continua usando o token de acessibilidade existente.
+- Títulos de seção usam peso e tracking para orientar a leitura; labels, metadados e textos auxiliares usam menor peso e contraste secundário.
+- Um painel pode ter várias informações sem criar vários destaques cromáticos: azul fica para ação/seleção, enquanto verde, vermelho, laranja e amarelo mantêm significado semântico.
+- O raio de 14–18px é reservado para agrupamentos de conteúdo; elementos compactos, como controles e linhas de lista, usam raios menores.
 
 ---
 
@@ -47,7 +83,7 @@ Autoritária, sistemática e altamente técnica. A interface deve evocar confiab
 | `--surface-dim` | `#d2d9f4` | Fundos desabilitados / inativos. |
 
 > [!note] Fundo da página
-> No tema claro o fundo da tela é **branco** (`#ffffff`), no escuro é o tom base sólido (`#101114`). A separação entre as seções do layout é feita pelos **cards** (fundo de card + borda `1px` em `--outline-variant`), nunca por tonalidades diferentes no fundo da página. Evite reintroduzir fundos coloridos na página (ex.: lilás) para hierarquizar seções: a hierarquia deve vir dos cards, do espaçamento e do agrupamento.
+> Nas áreas públicas e de autenticação, o fundo pode permanecer branco (`#ffffff`) no tema claro e `#101114` no escuro. Na área autenticada, `--content-canvas` cria um respiro neutro entre o shell e os painéis; não é uma cor de marca nem substitui a hierarquia dos cards, do espaçamento e do agrupamento.
 
 ### Textos e bordas
 
@@ -191,9 +227,16 @@ Grade de linha de base: **4px** (todos os valores são múltiplos de 4px).
 
 ### Menu de navegação (Sidebar)
 
-- **Gaps**: Grupos separados por `12px`. Itens do mesmo grupo separados por `4px` (`--spacing-xs`).
+- **Zonas**: `.sidebar-brand` identifica o produto e o usuário; `.app-nav-main` reúne Cockpit, Cadastro, Lançamentos e Gestão; `.app-nav-utility` reúne Preferências, Instruções, Sobre e Sair.
+- **Gaps**: Grupos separados por `10–12px`. Itens do mesmo grupo separados por `2–4px` (`--spacing-xs`).
 - **Botões (`.nav-button`)**: Altura mínima de `32px` para garantir densidade de dados sem comprometer a área de clique.
 - **Hierarquia**: Títulos de grupos (ex: "Cadastro", "Gestão") devem ser concisos e agrupar itens logicamente.
+- No shell premium, os títulos dos grupos usam escala menor, caixa alta e tracking discreto; não competem visualmente com os itens acionáveis.
+- A zona de utilidades fica separada por uma linha de baixa ênfase e ocupa a zona inferior da sidebar quando houver espaço vertical.
+- Chevrons usam cor neutra e só indicam expansão; não competem com o texto do grupo.
+- O estado ativo usa a superfície do container ativo, borda de baixa ênfase e um marcador primário lateral fino; alertas permanecem como indicador secundário.
+- Em telas curtas, o menu reduz gaps e padding antes de recorrer a rolagem; a navegação não deve exibir uma scrollbar própria no desktop.
+- Em modo recolhido, `title` fornece tooltip nativo, `:focus-visible` fornece foco persistente e o item ativo preserva a barra lateral azul.
 - Itens de menu não devem repetir o mesmo rótulo em grupos diferentes quando a intenção for distinta; prefira nomes orientados à tarefa, como **Minhas Contas**, **Meus Cartões**, **Extrato de Contas** e **Fatura de Cartões**.
 - O título exibido no cabeçalho da página deve reforçar o mesmo significado do item acionado no menu, evitando que a navegação volte a depender apenas do grupo pai para desambiguação.
 
@@ -215,6 +258,7 @@ Grade de linha de base: **4px** (todos os valores são múltiplos de 4px).
 ### Cabeçalho global, filtros e tabelas
 
 - O `.topbar` é sticky em todos os módulos autenticados, usa fundo sólido `--bg`, linha inferior e `isolation: isolate`; conteúdo nunca aparece por transparência atrás dele.
+- O `.topbar` usa título com tracking negativo, eyebrow em caixa alta e ações compactas com bordas de baixo contraste; o título da tela é o elemento de maior peso do shell.
 - Toolbars de busca e filtro usam `.filter-toolbar`, com fundo de superfície baixa, borda `--outline-variant`, raio padrão e espaçamento de 8–12px.
 - Filtros empilham em uma coluna abaixo de 860px; controles segmentados dividem a largura disponível quando isso melhora a leitura.
 - Tabelas ficam em um wrapper com `overflow: auto`, borda e fundo de painel. Não reduza artificialmente colunas monetárias para caber no mobile: preserve `min-width` e permita rolagem horizontal.
@@ -409,6 +453,9 @@ Padrão único em toda a aplicação, conforme o modelo usado no menu **Preferê
 
 ## Changelog
 
+- `4.5` — 2026-11-23 — Formaliza as três zonas do menu, elimina a scrollbar própria em desktop, compacta a navegação em telas curtas e documenta tooltip, foco e estado ativo no modo recolhido.
+- `4.4` — 2026-11-23 — Define a camada de conteúdo premium com canvas neutro, superfícies graduadas, bordas de baixa ênfase, elevação discreta e hierarquia tipográfica para painéis, listas, formulários e estados.
+- `4.3` — 2026-11-23 — Introduz a direção premium do shell: superfícies mais silenciosas, sidebar com zona de utilidades, tipografia editorial no cabeçalho, estado ativo contido e alertas de menu reduzidos a indicadores secundários.
 - `4.2` — 2026-09-27 — Define adaptação por largura real dos containers, com sidebar e painéis sem overflow em telas ampliadas por zoom.
 - `4.1` — 2026-08-30 — Definidos contratos visuais da fundação v2 para gráficos ApexCharts, Command Palette e listas virtualizadas, preservando tokens, acessibilidade, densidade e semântica financeira.
 - `4.0` — 2026-08-29 — Define marcador e cores não financeiras para comparação de alocação atual versus meta.

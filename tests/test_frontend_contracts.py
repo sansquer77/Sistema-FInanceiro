@@ -601,6 +601,22 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("COCKPIT_DISCLOSURE_KEY", cockpit)
         self.assertIn("localStorage.setItem(COCKPIT_DISCLOSURE_KEY", cockpit)
 
+    def test_sidebar_exposes_three_zones_and_reduced_menu_scroll_contract(self) -> None:
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn('<div class="app-nav-main">', index)
+        self.assertIn('<div class="app-nav-utility" aria-label="Utilidades do usuário">', index)
+        self.assertLess(index.index('class="app-nav-main"'), index.index('class="app-nav-utility"'))
+        self.assertIn('title="Preferências"', index)
+        self.assertIn('title="Recolher menu"', index)
+
+        premium_nav = styles[styles.index("/* Design system v4.5") :]
+        self.assertIn("overflow: visible", premium_nav)
+        self.assertIn("grid-template-rows: minmax(0, 1fr) auto", premium_nav)
+        self.assertIn(".nav-button:focus-visible", premium_nav)
+        self.assertIn("border-color: var(--focus-border-soft)", premium_nav)
+
     def test_forms_share_action_validation_and_busy_state_contracts(self) -> None:
         index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
         styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")

@@ -2,12 +2,13 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 4.35
-atualizado: 2026-10-18
+versao: 4.38
+atualizado: 2026-11-23
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
   - "[[arquitetura]]"
   - "[[../qualidade-codigo]]"
+  - "[[../design/design-system]]"
 tags: [spec, "area/frontend", "status/implementado"]
 aliases: ["Modularização Frontend", "ES Modules"]
 ---
@@ -15,7 +16,7 @@ aliases: ["Modularização Frontend", "ES Modules"]
 # Modularização do Frontend
 
 > [!info] Status
-> **implementado** · versão: `4.35` · área: `frontend` · atualizado em 2026-10-18 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]], [[../qualidade-codigo]]
+> **implementado** · versão: `4.38` · área: `frontend` · atualizado em 2026-11-23 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]], [[../qualidade-codigo]], [[../design/design-system]]
 
 ## Problema
 
@@ -178,6 +179,16 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Tabelas de dados oferecem ordenação local por coluna, primeira coluna sticky, contagem de linhas e filtros ativos removíveis quando os controles pertencem a `.filter-toolbar`.
 - Formulários extensos marcados como progressivos agrupam campos opcionais e exibem, somente após interação, um resumo expansível dos valores visíveis e habilitados antes das ações; valores padrão de campos condicionais ocultos não entram no resumo. Em lançamentos à vista o resumo inicia recolhido; ao alternar para parcelamento ou recorrência ele abre automaticamente.
 - Textos de interface usam português brasileiro acentuado e consistente.
+- O shell visual mantém uma hierarquia premium: identidade no topo da sidebar, navegação principal no centro, utilidades do usuário separadas na zona inferior e alertas reduzidos a indicadores secundários.
+- O cabeçalho global usa título de tela expressivo, eyebrow discreto e ações compactas; o shell não cria uma moldura visual de igual peso para cada controle.
+- A camada de conteúdo autenticada usa canvas neutro, painéis principais elevados de forma discreta e superfícies internas graduadas; linhas e sombras não devem competir com os dados.
+- Cards, listas, formulários, toolbars e estados compartilhados devem reutilizar os tokens `--content-*`, mantendo bordas mais fortes somente onde ajudam na leitura ou no foco.
+- Títulos de seção devem carregar o peso visual do agrupamento; labels, metadados e textos auxiliares devem usar peso e contraste secundários sem reduzir legibilidade.
+- Os destaques cromáticos permanecem únicos por contexto: azul para ação/seleção e cores semânticas apenas para receitas, despesas, saldo, saúde financeira e alertas.
+- A sidebar deve separar no DOM as zonas `.sidebar-brand`, `.app-nav-main` e `.app-nav-utility`, preservando os mesmos botões, `data-view`, títulos e contratos de navegação.
+- A navegação desktop não deve exibir uma scrollbar própria; em telas curtas, reduz gaps e padding e mantém os itens acionáveis, enquanto grupos continuam recolhíveis.
+- Todo item de menu recolhido mantém `title` para tooltip nativo, foco visível por teclado e uma indicação ativa identificável sem depender do rótulo textual.
+- A evolução do shell pode alterar HTML/CSS estrutural sem alterar rotas, regras de domínio, contratos de view, chamadas de API ou semântica de acessibilidade.
 
 ## Plano de implementação
 
@@ -204,6 +215,17 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - [x] Enriquecer tabelas, filtros e paginação incremental.
 - [x] Adicionar progressão e resumo aos formulários extensos.
 - [x] Revisar microcopy do Histórico de Operações.
+- [x] Criar tokens de shell para superfícies, bordas, hover e estado ativo nos temas claro e escuro.
+- [x] Refinar sidebar, cabeçalho e tipografia sem alterar navegação, dados ou regras financeiras.
+- [x] Separar visualmente o grupo Usuário, transformar alertas de menu em indicadores secundários e preservar o modo recolhido.
+- [x] Validar a camada visual em desktop, viewport estreito, tema claro e tema escuro.
+- [x] Criar tokens de camada de conteúdo para canvas, superfícies graduadas, bordas, elevação e raios nos temas claro e escuro.
+- [x] Aplicar a hierarquia de superfícies a painéis, formulários, toolbars, cards, listas e estados sem alterar seus contratos funcionais.
+- [x] Reduzir linhas e sombras decorativas, reforçando títulos de seção e suavizando textos auxiliares.
+- [x] Validar a camada de conteúdo em desktop, viewport estreito, tema claro e tema escuro.
+- [x] Separar a sidebar em zonas explícitas de identidade, navegação principal e utilidades sem alterar os seletores funcionais dos itens.
+- [x] Remover a scrollbar própria do menu desktop, aplicar compactação para telas curtas e preservar a distribuição inferior das utilidades.
+- [x] Reforçar tooltips nativos, foco visível, chevrons neutros e marcador ativo no modo recolhido.
 
 ## API e dados
 
@@ -218,6 +240,18 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Dado um mantenedor buscando formatação monetária ou de datas, quando procura, encontra em `money-utils.js` e `date-utils.js`.
 - Dado um mantenedor buscando qualquer área funcional, quando procura, encontra no arquivo de view correspondente.
 - Dado o usuário autenticado, quando alterna `Claro` ou `Escuro` em Preferências, o `data-theme` do documento muda imediatamente e persiste após reload.
+- Dado o usuário autenticado, quando visualiza a sidebar expandida, então identidade, navegação principal e utilidades do usuário possuem hierarquia visual distinta sem remover nenhum módulo.
+- Dado um item de menu com alerta, quando ele não é a rota ativa, então o alerta aparece como indicador secundário e não substitui a superfície neutra da navegação.
+- Dado o usuário autenticado, quando visualiza o cabeçalho, então o título da tela possui maior peso visual que o eyebrow e que as ações de busca/comandos, mantendo todos os acionadores acessíveis.
+- Dado o tema claro ou escuro, quando o shell é renderizado, então sidebar, cabeçalho e superfícies usam tokens de shell consistentes, bordas de baixa ênfase e não introduzem sombras decorativas permanentes.
+- Dado o usuário autenticado, quando uma tela de conteúdo é renderizada, então o canvas, os painéis principais e as superfícies internas formam três níveis perceptíveis sem depender de uma borda em cada elemento.
+- Dado um painel com cards, listas, formulários ou estados, quando o usuário interage, então hover, foco e agrupamento usam os tokens `--content-*` e preservam o destaque cromático da ação ou da semântica financeira.
+- Dado o usuário lendo uma tela, quando compara títulos, labels e textos auxiliares, então a hierarquia tipográfica identifica o agrupamento antes dos metadados sem perder contraste acessível.
+- Dado o tema claro ou escuro, quando o conteúdo é renderizado, então sombras e linhas permanecem discretas, não há contornos decorativos repetidos e as cores semânticas continuam restritas aos significados definidos no design system.
+- Dado o usuário autenticado, quando visualiza a sidebar expandida, então identidade, navegação principal e utilidades aparecem em três zonas distintas, com a zona de utilidades separada na parte inferior.
+- Dado uma viewport desktop, quando a sidebar é exibida, então o menu não apresenta scrollbar própria e os grupos mantêm seus controles acessíveis.
+- Dado uma viewport desktop curta, quando a sidebar é exibida, então gaps e padding são compactados antes de introduzir rolagem no menu.
+- Dado a sidebar recolhida, quando o usuário navega por mouse ou teclado, então cada item mantém tooltip por `title`, foco visível e estado ativo identificado pelo marcador lateral.
 - Dado o tema claro ou escuro ativo, quando navega por Cockpit, Contas, Cartões, Lançamentos, Portfólio, Limites, Relatórios, Categorias, Importação e Preferências, os módulos abrem sem erro de console e mantêm contraste legível.
 - Dado viewport mobile, quando abre Preferências, o controle de tema ocupa a largura disponível sem overflow horizontal.
 - Dado uma decisão de edição/exclusão em cascata ou encerramento de posição, quando a interface solicita confirmação, os botões exibem ações explícitas e `Voltar` aborta a operação.
@@ -276,12 +310,15 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Fora de escopo
 
-- Reescrever HTML/CSS.
+- Redesenhar a informação, os fluxos ou a composição funcional dos módulos; o polimento desta etapa se limita à camada visual compartilhada.
 - Criar build step.
 - Alterar regras financeiras, endpoints ou banco.
 
 ## Changelog
 
+- `4.38` — 2026-11-23 — Estrutura a sidebar em zonas de identidade, navegação principal e utilidades, remove a scrollbar própria no desktop e reforça foco, tooltip, chevrons e estado ativo no modo recolhido.
+- `4.37` — 2026-11-23 — Aplica o segundo passe premium à camada de conteúdo com tokens de superfície, canvas neutro, elevação discreta, hierarquia tipográfica e redução de contornos em painéis, listas e formulários.
+- `4.36` — 2026-11-23 — Implementa a primeira etapa do polimento premium do shell, com tokens visuais, sidebar hierarquizada, alertas discretos, cabeçalho editorial e superfícies de baixo ruído.
 - `4.31` — 2026-09-04 — Busca global reforçada com `role="dialog"`, `aria-modal`, descrição, relação campo/resultados, foco confinado e restauração segura.
 - `4.30` — 2026-09-04 — Adicionado `portfolio-events.js` para carregar e apresentar sob demanda os eventos históricos da carteira, com cache de sessão e sem cálculos financeiros no frontend.
 - `4.29` — 2026-09-04 — Relatórios remove DOM/`outerHTML` intermediário dos rankings virtualizados e preserva detalhes sob demanda; Portfólio elimina a segunda construção das fábricas de linha antes da janela visível.
