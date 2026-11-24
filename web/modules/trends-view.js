@@ -14,6 +14,8 @@ export function registerTrendsView({
     trendsPanel,
     trendsContent,
     trendsMeta,
+    cockpitTrendSummaryContent,
+    monthlyBudgetSummary,
   } = elements;
   let trendsRequestId = 0;
   let currentMonth = null;
@@ -42,6 +44,19 @@ export function registerTrendsView({
       loadTrends(month);
     }
     render();
+  }
+
+  function renderCockpitSummary(month, force = false) {
+    if (!cockpitTrendSummaryContent && !monthlyBudgetSummary) {
+      return;
+    }
+    if (currentMonth !== month || force) {
+      currentMonth = month;
+      currentData = null;
+      error = "";
+      loadTrends(month);
+    }
+    renderCompactSummary();
   }
 
   async function loadTrends(month) {
@@ -73,6 +88,7 @@ export function registerTrendsView({
     }
     if (requestId === trendsRequestId) trendsContent.setAttribute("aria-busy", "false");
     render();
+    renderCompactSummary();
   }
 
   async function loadAISummary(requestId, month) {
@@ -131,14 +147,17 @@ export function registerTrendsView({
     renderMeta();
     if (loading && !currentData) {
       trendsContent.innerHTML = stateMarkup("Analisando receitas, despesas e limites do período.", { kind: "loading" });
+      renderCompactSummary();
       return;
     }
     if (error && !currentData) {
       trendsContent.innerHTML = stateMarkup(error, { kind: "error" });
+      renderCompactSummary();
       return;
     }
     if (!currentData) {
       trendsContent.innerHTML = stateMarkup("Selecione um mês para visualizar tendências e comparações.", { kind: "info" });
+      renderCompactSummary();
       return;
     }
     trendsContent.innerHTML = `
@@ -149,14 +168,66 @@ export function registerTrendsView({
       ${renderConfidenceNotes()}
     `;
     renderTrendsApexChart();
+    renderCompactSummary();
   }
 
   function renderTrendsApexChart() {
     const chartElement = trendsContent.querySelector(".trends-apex-chart");
     if (!chartElement) return;
     const rows = filterMonthlySeries(currentData.serie_mensal || []);
-    renderChart(chartElement, {
-      chart: { type: "line", height: 260, stacked: false },
+    renderChart(chartElement, monthlyChartOptions(rows, 260));
+  }
+
+  function renderCompactSummary() {
+    if (!cockpitTrendSummaryContent && !monthlyBudgetSummary) {
+      return;
+    }
+    if (loading && !currentData) {
+      cockpitTrendSummaryContent && (cockpitTrendSummaryContent.innerHTML = stateMarkup("Analisando a evolução mensal.", { kind: "loading" }));
+      monthlyBudgetSummary && (monthlyBudgetSummary.innerHTML = stateMarkup("Calculando limites e realizado.", { kind: "loading" }));
+      return;
+    }
+    if (error && !currentData) {
+      cockpitTrendSummaryContent && (cockpitTrendSummaryContent.innerHTML = stateMarkup(error, { kind: "error" }));
+      monthlyBudgetSummary && (monthlyBudgetSummary.innerHTML = stateMarkup(error, { kind: "error" }));
+      return;
+    }
+    if (!currentData) {
+      cockpitTrendSummaryContent && (cockpitTrendSummaryContent.innerHTML = stateMarkup("Selecione um mês para visualizar a evolução.", { kind: "info" }));
+      monthlyBudgetSummary && (monthlyBudgetSummary.innerHTML = stateMarkup("Selecione um mês para comparar limites e realizado.", { kind: "info" }));
+      return;
+    }
+    // spec: frontend/frontend-modularizacao v4.40 — critérios 2 e 3
+    const rows = filterMonthlySeries(currentData.serie_mensal || [], "6");
+    const insight = monthlyChartInsight(rows);
+    if (cockpitTrendSummaryContent) {
+      cockpitTrendSummaryContent.innerHTML = rows.length === 0
+        ? stateMarkup("Sem movimento suficiente para formar uma evolução mensal.", { kind: "empty" })
+        : `
+          <div class="cockpit-trend-meta"><span>Últimos seis meses com movimento</span><strong>${escapeHtml(formatMonthLabel(currentData.month))}</strong></div>
+          <div class="trends-chart cockpit-trends-chart">
+            <div class="trends-apex-chart cockpit-trends-apex-chart" role="img" aria-label="Evolução compacta de receitas, despesas e saldo líquido"></div>
+            <div class="trends-chart-legend">
+              <span class="income"><i></i> Receitas</span>
+              <span class="expense"><i></i> Despesas</span>
+              <span class="balance"><i></i> Saldo líquido</span>
+            </div>
+            <p class="trends-chart-insight">${escapeHtml(insight)}</p>
+          </div>
+        `;
+      const chartElement = cockpitTrendSummaryContent.querySelector(".cockpit-trends-apex-chart");
+      if (chartElement && rows.length > 0) {
+        renderChart(chartElement, monthlyChartOptions(rows, 190));
+      }
+    }
+    if (monthlyBudgetSummary) {
+      monthlyBudgetSummary.innerHTML = renderBudgetSummary(currentData.orcamento_realizado || []);
+    }
+  }
+
+  function monthlyChartOptions(rows, height) {
+    return {
+      chart: { type: "line", height, stacked: false, toolbar: { show: false }, zoom: { enabled: false } },
       series: [
         { name: "Receitas", type: "column", data: rows.map((row) => Number(row.income_cents || 0)) },
         { name: "Despesas", type: "column", data: rows.map((row) => Number(row.expense_cents || 0)) },
@@ -168,12 +239,48 @@ export function registerTrendsView({
         chartToken("--accent", "#5f7fff"),
       ],
       stroke: { width: [0, 0, 3], curve: "smooth" },
-      plotOptions: { bar: { borderRadius: 4, columnWidth: "52%" } },
+      fill: { opacity: [0.72, 0.72, 1] },
+      markers: { size: 3, strokeWidth: 2, hover: { size: 5 } },
+      plotOptions: { bar: { borderRadius: 5, columnWidth: "48%" } },
       xaxis: { categories: rows.map((row) => row.month.slice(5, 7) + "/" + row.month.slice(2, 4)) },
       yaxis: { labels: { formatter: formatCompactSignedMoney } },
       tooltip: { y: { formatter: formatCompactSignedMoney } },
       legend: { show: false },
-    });
+      grid: { borderColor: chartToken("--line", "#d9deea"), strokeDashArray: 4, padding: { left: 4, right: 8, top: 0, bottom: 0 } },
+    };
+  }
+
+  function renderBudgetSummary(rows) {
+    if (!rows.length) {
+      return stateMarkup("Cadastre limites de gasto para acompanhar o orçamento do mês.", { kind: "empty" });
+    }
+    const ordered = [...rows].sort((left, right) => Number(right.percentual_usado || 0) - Number(left.percentual_usado || 0));
+    const totalLimit = ordered.reduce((sum, row) => sum + Number(row.limite_cents || 0), 0);
+    const totalUsed = ordered.reduce((sum, row) => sum + Number(row.realizado_cents || 0), 0);
+    const totalPercent = totalLimit > 0 ? totalUsed / totalLimit : 0;
+    const visibleRows = ordered.slice(0, 4);
+    return `
+      <div class="budget-summary-total">
+        <div><span>Realizado</span><strong>${formatMoney(totalUsed / 100, "BRL")}</strong></div>
+        <div><span>Limite total</span><strong>${formatMoney(totalLimit / 100, "BRL")}</strong></div>
+        <b class="budget-summary-percent ${totalPercent > 1 ? "over" : totalPercent >= .8 ? "warning" : "success"}">${formatPercent(totalPercent)}</b>
+      </div>
+      <div class="budget-summary-list">
+        ${visibleRows.map((row) => {
+          const used = Number(row.percentual_usado || 0);
+          const stateClass = row.estado === "Acima do limite" ? "over" : row.estado === "Atenção" ? "warning" : "success";
+          const label = row.subcategory_name ? `${escapeHtml(row.category_name)} › ${escapeHtml(row.subcategory_name)}` : escapeHtml(row.category_name);
+          return `
+            <div class="budget-summary-row ${stateClass}">
+              <div><span>${label}</span><strong>${formatPercent(used / 100)}</strong></div>
+              <div class="budget-summary-bar" aria-hidden="true"><i style="width:${Math.min(100, Math.max(0, used)).toFixed(1)}%"></i></div>
+              <small>${formatMoney(Number(row.realizado_cents || 0) / 100, "BRL")} de ${formatMoney(Number(row.limite_cents || 0) / 100, "BRL")}</small>
+            </div>
+          `;
+        }).join("")}
+      </div>
+      ${rows.length > visibleRows.length ? `<small class="budget-summary-more">${rows.length - visibleRows.length} categorias adicionais em Tendências.</small>` : ""}
+    `;
   }
 
   function renderMeta() {
@@ -269,9 +376,9 @@ export function registerTrendsView({
     return `<button class="${active ? "active" : ""}" type="button" data-trends-period="${escapeHtml(value)}" aria-pressed="${active ? "true" : "false"}">${escapeHtml(label)}</button>`;
   }
 
-  function filterMonthlySeries(series) {
+  function filterMonthlySeries(series, period = chartPeriod) {
     const normalized = Array.isArray(series) ? series : [];
-    if (chartPeriod === "active") {
+    if (period === "active") {
       const activeMonths = normalized.filter((item) => (
         Number(item.income_cents || 0) !== 0
         || Number(item.expense_cents || 0) !== 0
@@ -279,7 +386,7 @@ export function registerTrendsView({
       ));
       return activeMonths.length > 0 ? activeMonths : normalized;
     }
-    const count = Number(chartPeriod || 12);
+    const count = Number(period || 12);
     return normalized.slice(Math.max(0, normalized.length - count));
   }
 
@@ -463,5 +570,6 @@ export function registerTrendsView({
 
   return {
     renderTrends,
+    renderCockpitSummary,
   };
 }

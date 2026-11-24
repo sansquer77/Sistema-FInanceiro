@@ -59,10 +59,34 @@ export function createNotificationFlyout({ onAction, onMarkSeen } = {}) {
     button.type = "button";
     button.id = `notification-tab-${name}`;
     button.className = "notification-flyout-tab";
-    button.textContent = notificationSectionLabel(name);
+    button.classList.add(`notification-tab-${name}`);
+    const label = document.createElement("span");
+    label.className = "notification-flyout-tab-label";
+    label.textContent = notificationSectionLabel(name);
+    const count = document.createElement("b");
+    count.className = "notification-flyout-tab-count";
+    count.textContent = "0";
+    button.append(label, count);
     button.setAttribute("role", "tab");
     button.setAttribute("aria-controls", "cockpitNotificationFlyoutPanel");
     button.addEventListener("click", () => selectSection(name));
+    button.addEventListener("keydown", (event) => {
+      const order = ["critical", "informational"];
+      const currentIndex = order.indexOf(name);
+      const nextIndex = event.key === "ArrowRight" || event.key === "ArrowDown"
+        ? (currentIndex + 1) % order.length
+        : event.key === "ArrowLeft" || event.key === "ArrowUp"
+          ? (currentIndex - 1 + order.length) % order.length
+          : event.key === "Home"
+            ? 0
+            : event.key === "End"
+              ? order.length - 1
+              : -1;
+      if (nextIndex < 0) return;
+      event.preventDefault();
+      selectSection(order[nextIndex]);
+      [criticalTab, informationalTab][nextIndex].focus();
+    });
     return button;
   }
 
@@ -88,6 +112,9 @@ export function createNotificationFlyout({ onAction, onMarkSeen } = {}) {
       const selected = name === section;
       tab.setAttribute("aria-selected", String(selected));
       tab.tabIndex = selected ? 0 : -1;
+      tab.querySelector(".notification-flyout-tab-label").textContent = notificationSectionLabel(name);
+      tab.querySelector(".notification-flyout-tab-count").textContent = String(payload[name].length);
+      tab.setAttribute("aria-label", `${notificationSectionLabel(name)}: ${payload[name].length}`);
     }
     body.setAttribute("aria-labelledby", section === "critical" ? criticalTab.id : informationalTab.id);
     body.replaceChildren();

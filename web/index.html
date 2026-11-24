@@ -8,7 +8,7 @@
     <link rel="icon" href="/assets/app-icon.png">
     <link rel="apple-touch-icon" href="/assets/app-icon.png">
     <script src="/theme-init.js"></script>
-    <link rel="stylesheet" href="/styles.css?v=153">
+    <link rel="stylesheet" href="/styles.css?v=155">
   </head>
   <body>
     <main class="app-shell">
@@ -260,6 +260,13 @@
             </section>
             </div>
 
+            <section class="cockpit-health-summary" id="cockpitHealthSummary" aria-live="polite" aria-label="Situação da saúde financeira">
+              <div class="ui-state empty-state state-loading compact" role="status">
+                <span class="ui-state-icon" aria-hidden="true">↻</span>
+                <span class="ui-state-copy"><strong>Carregando</strong><span>Calculando a situação financeira do mês.</span></span>
+              </div>
+            </section>
+
             <section class="summary-strip executive-summary-strip" aria-label="Indicadores executivos do mês">
               <div class="kpi-income">
                 <span>Receitas do mês</span>
@@ -285,29 +292,46 @@
               </div>
             </section>
 
-            <div class="cockpit-stack">
+            <div class="cockpit-grid cockpit-insight-grid">
+              <section class="panel cockpit-insight-panel" id="cockpitTrendSummary" aria-labelledby="cockpitTrendSummaryTitle">
+                <div class="cockpit-insight-heading">
+                  <div>
+                    <span class="eyebrow">Resumo do período</span>
+                    <h2 id="cockpitTrendSummaryTitle">Evolução mensal</h2>
+                  </div>
+                  <button class="ghost small-button" type="button" data-cockpit-tab-trigger="trends">Ver tendências</button>
+                </div>
+                <div id="cockpitTrendSummaryContent"></div>
+              </section>
+
+              <details class="panel cockpit-disclosure cockpit-budget-panel" data-cockpit-section="budget" open>
+                <summary>Orçamento do mês</summary>
+                <button class="ghost small-button cockpit-disclosure-action" type="button" data-cockpit-tab-trigger="limits">Ver Limites</button>
+                <div id="monthlyBudgetSummary"></div>
+              </details>
+            </div>
+
+            <div class="cockpit-grid cockpit-core-grid">
               <section class="currency-panel">
                 <div class="section-heading">
                   <h2>Saldos por moeda</h2>
                 </div>
                 <div class="currency-list" id="currencyList"></div>
-                <div class="cockpit-portfolio-summary">
+              </section>
+
+              <section class="panel cockpit-portfolio-panel">
+                <div class="section-heading">
                   <h3>Portfólio por tipo</h3>
+                </div>
+                <div class="cockpit-portfolio-summary">
                   <div id="cockpitPortfolioByType"></div>
                 </div>
               </section>
 
-              <div class="cockpit-grid planning-debt-grid">
-              <details class="panel cockpit-disclosure" data-cockpit-section="planning" open>
-                <summary>Planejamento do mês</summary>
-                <div class="planning-list" id="monthlyPlanningList"></div>
-              </details>
-
-              <details class="panel cockpit-disclosure" data-cockpit-section="debts" open>
+              <details class="panel cockpit-disclosure cockpit-debt-panel" data-cockpit-section="debts" open>
                 <summary>Dívidas</summary>
                 <div class="planning-list" id="installmentDebtList"></div>
               </details>
-              </div>
             </div>
 
             <div class="cockpit-grid analytics-grid">
@@ -2664,6 +2688,6 @@
     </dialog>
     <script src="/vendor/imask/7.6.1/imask.min.js?v=7.6.1"></script>
     <script src="/vendor/apexcharts/4.7.0/apexcharts.min.js?v=4.7.0"></script>
-  <script type="module" src="/app.js?v=179"></script>
+  <script type="module" src="/app.js?v=181"></script>
   </body>
 </html>

@@ -1,4 +1,4 @@
-import { registerTrendsView } from "./trends-view.js?v=182";
+import { registerTrendsView } from "./trends-view.js?v=184";
 import { registerConsultorView } from "./consultor-view.js?v=183";
 import { registerFinancialHealthView } from "./financial-health-view.js";
 import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";
@@ -33,6 +33,7 @@ export function registerCockpitView({
   goToPortfolio,
   onNavigateToTransaction,
   onNavigateToPortfolio,
+  onNavigateToLimits,
   onNotificationAction,
   formatDate,
 }) {
@@ -42,6 +43,9 @@ export function registerCockpitView({
     monthInvestment,
     savingsRate,
     cockpitRoot,
+    cockpitHealthSummary,
+    cockpitTrendSummaryContent,
+    monthlyBudgetSummary,
     cockpitTabs,
     cockpitSummaryPanel,
     cockpitMonthLabel,
@@ -49,7 +53,6 @@ export function registerCockpitView({
     todayCockpitMonthButton,
     nextCockpitMonthButton,
     currencyList,
-    monthlyPlanningList,
     installmentDebtList,
     topExpensesChart,
     cashDistributionChart,
@@ -97,7 +100,13 @@ export function registerCockpitView({
   const cockpitDisclosures = Array.from(document.querySelectorAll("[data-cockpit-section]"));
 
   const trendsView = registerTrendsView({
-    elements: { trendsPanel, trendsContent, trendsMeta },
+    elements: {
+      trendsPanel,
+      trendsContent,
+      trendsMeta,
+      cockpitTrendSummaryContent,
+      monthlyBudgetSummary,
+    },
     api,
     formatMoney,
     formatPercent,
@@ -135,6 +144,7 @@ export function registerCockpitView({
   const financialHealthView = registerFinancialHealthView({
     elements: {
       financialHealthContent,
+      financialHealthSummary: cockpitHealthSummary,
     },
     api,
     formatMoney,
@@ -159,6 +169,8 @@ export function registerCockpitView({
   cockpitCriticalNotifications?.addEventListener("click", () => openNotifications("critical", cockpitCriticalNotifications));
   cockpitInformationalNotifications?.addEventListener("click", () => openNotifications("informational", cockpitInformationalNotifications));
   cockpitCombinedNotifications?.addEventListener("click", () => openNotifications("critical", cockpitCombinedNotifications));
+  document.querySelector("[data-cockpit-tab-trigger='trends']")?.addEventListener("click", () => setCockpitTab("trends"));
+  document.querySelector("[data-cockpit-tab-trigger='limits']")?.addEventListener("click", () => onNavigateToLimits?.(cockpitMonthValue()));
   initializeCockpitDisclosures();
 
   function initializeCockpitDisclosures() {
@@ -199,12 +211,13 @@ export function registerCockpitView({
     savingsRate.textContent = formatPercent(monthTotals.savings_rate ?? monthTotals.savingsRate);
     renderCurrencyTotals(totals);
     renderCockpitPortfolioByType();
-    renderMonthlyPlanning();
     renderInstallmentDebts();
     renderLimitAlerts();
     renderPortfolioMaturityAlerts();
     renderTopExpensesChart();
     renderTopIncomeChart();
+    trendsView.renderCockpitSummary(cockpitMonthValue());
+    financialHealthView.renderCompactHealth(cockpitMonthValue());
     if (activeCockpitTab() === "health") {
       financialHealthView.renderFinancialHealth(cockpitMonthValue());
     }
@@ -445,6 +458,11 @@ export function registerCockpitView({
     for (const [currency, amounts] of totals.entries()) {
       const section = document.createElement("section");
       section.className = "currency-section";
+      // spec: frontend/frontend-modularizacao v4.40 — critério 4
+      const reconciledTotal = [...amounts.accounts, ...amounts.cards].reduce(
+        (total, item) => total + Number(item.reconciled || 0),
+        0,
+      );
       const accountRows = amounts.accounts.map((account) => currencyTableRow(
         account.name,
         account.type,
@@ -465,16 +483,15 @@ export function registerCockpitView({
         <div class="currency-section-header">
           <div>
             <span>${escapeHtml(currency)}</span>
-            <em>Previsto em ${escapeHtml(monthLabel)}</em>
+            <em>Saldo conciliado · ${escapeHtml(monthLabel)}</em>
           </div>
-          <strong class="${amounts.current < 0 ? "danger-text" : ""}">${formatMoney(amounts.current, currency)}</strong>
+          <strong class="${reconciledTotal < 0 ? "danger-text" : ""}">${formatMoney(reconciledTotal, currency)}</strong>
         </div>
         <div class="currency-table" role="table" aria-label="Saldos em ${escapeHtml(currency)}">
           <div class="currency-table-head" role="row">
-            <span>Conta</span>
+            <span>Conta ou cartão</span>
             <span>Tipo</span>
-            <span>Saldo</span>
-            <span>Conciliado</span>
+            <span>Saldo conciliado</span>
           </div>
           ${accountRows || '<div class="currency-empty-row">Nenhuma conta ativa nesta moeda.</div>'}
           ${cardRows ? `<div class="currency-subgroup">Cartões de crédito</div>${cardRows}` : ""}
@@ -485,100 +502,14 @@ export function registerCockpitView({
   }
 
   function currencyTableRow(name, detail, amount, reconciled, currency, kind = "account") {
-    const amountClass = amount < 0 ? "danger-text" : "";
     const reconciledClass = reconciled < 0 ? "danger-text" : "";
     return `
       <div class="currency-table-row ${kind}" role="row">
         <span><b>${escapeHtml(name)}</b></span>
         <span>${escapeHtml(detail)}</span>
-        <strong class="${amountClass}">${formatMoney(amount, currency)}</strong>
         <strong class="${reconciledClass}">${formatMoney(reconciled || 0, currency)}</strong>
       </div>
     `;
-  }
-
-  function renderMonthlyPlanning() {
-    const monthLabel = formatMonthLabel(cockpitMonthValue());
-    if (state.cockpit?.planning) {
-      monthlyPlanningList.innerHTML = "";
-      monthlyPlanningList.append(
-        planningSectionFromRows(`Receitas recorrentes · ${monthLabel}`, state.cockpit.planning.income || [], "income"),
-        planningSectionFromRows(`Investimentos planejados · ${monthLabel}`, state.cockpit.planning.investment || [], "investment"),
-        planningSectionFromRows(`Despesas recorrentes · ${monthLabel}`, state.cockpit.planning.expense || [], "expense"),
-      );
-      return;
-    }
-    const prefix = cockpitMonthValue();
-    const sections = [
-      [`Receitas recorrentes · ${monthLabel}`, "income", (transaction) => transaction.type === "income" && transaction.series_kind === "recurring"],
-      [`Investimentos planejados · ${monthLabel}`, "investment", (transaction) => isInvestmentTransaction(transaction) && transaction.series_kind !== "single"],
-      [`Despesas recorrentes · ${monthLabel}`, "expense", (transaction) => transaction.type === "expense" && transaction.series_kind === "recurring"],
-    ];
-    monthlyPlanningList.innerHTML = "";
-    for (const [title, kind, predicate] of sections) {
-      monthlyPlanningList.append(planningSection(title, state.transactions.filter((transaction) => (
-        transaction.date.startsWith(prefix) && predicate(transaction)
-      )), kind));
-    }
-  }
-
-  function planningSectionFromRows(title, rows, kind = "neutral") {
-    const section = document.createElement("section");
-    section.className = `planning-section planning-section-${kind}`;
-    const content = planningCurrencyGroups(rows);
-    section.innerHTML = `
-      <div class="planning-section-header">
-        <h3>${title}</h3>
-      </div>
-      ${content}
-    `;
-    return section;
-  }
-
-  function planningSection(title, transactions, kind = "neutral") {
-    const totals = new Map();
-    for (const transaction of transactions) {
-      const currency = transaction.account_currency || transaction.card_currency || "BRL";
-      const label = formatCategoryPath(transaction);
-      const key = `${currency}\u0000${label}`;
-      const row = totals.get(key) || { currency, label, total: 0 };
-      row.total += Number(transaction.amount || 0);
-      totals.set(key, row);
-    }
-    return planningSectionFromRows(title, [...totals.values()], kind);
-  }
-
-  function planningCurrencyGroups(rows) {
-    if (!rows.length) {
-      return stateMarkup("Cadastre lançamentos previstos ou selecione outro mês.", { kind: "empty" });
-    }
-    const currencies = new Map();
-    for (const item of rows) {
-      const currency = item.currency || "BRL";
-      const group = currencies.get(currency) || [];
-      group.push(item);
-      currencies.set(currency, group);
-    }
-    return [...currencies.entries()]
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([currency, items]) => {
-        const total = items.reduce((sum, item) => sum + Number(item.total || 0), 0);
-        const itemRows = items.map((item) => `
-          <div class="planning-row">
-            <span>${escapeHtml(item.label)}</span>
-            <strong>${formatMoney(item.total, currency)}</strong>
-          </div>
-        `).join("");
-        return `
-          <div class="planning-currency-group">
-            <div class="planning-currency-header">
-              <span>${escapeHtml(currency)}</span>
-              <strong>${formatMoney(total, currency)}</strong>
-            </div>
-            ${itemRows}
-          </div>
-        `;
-      }).join("");
   }
 
   function renderInstallmentDebts() {

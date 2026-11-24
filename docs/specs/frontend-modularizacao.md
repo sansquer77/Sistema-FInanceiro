@@ -2,7 +2,7 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 4.38
+versao: 4.44
 atualizado: 2026-11-23
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
@@ -16,7 +16,7 @@ aliases: ["Modularização Frontend", "ES Modules"]
 # Modularização do Frontend
 
 > [!info] Status
-> **implementado** · versão: `4.38` · área: `frontend` · atualizado em 2026-11-23 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]], [[../qualidade-codigo]], [[../design/design-system]]
+> **implementado** · versão: `4.44` · área: `frontend` · atualizado em 2026-11-24 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]], [[../qualidade-codigo]], [[../design/design-system]]
 
 ## Problema
 
@@ -154,7 +154,18 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - As subtabs do Cockpit devem permitir navegação por teclado com setas esquerda/direita e teclas Home/End, movendo foco e seleção em conjunto.
 - Cockpit, Portfólio, Relatórios, Consultor e Preferências devem compartilhar o mesmo controlador nativo de abas para clique, setas, Home/End, `aria-selected`, `tabIndex` e transição progressiva.
 - Carregamentos assíncronos localizados devem expor `aria-busy`, preservar conteúdo útil sempre que possível e ignorar respostas obsoletas quando mês, filtro ou aba mudar antes da conclusão.
-- O Cockpit deve priorizar leitura executiva: alertas visíveis aparecem antes dos quatro KPIs; Saldos e Portfólio permanecem expandidos; Planejamento, Dívidas e gráficos de maiores receitas/despesas usam disclosure nativo recolhível com preferência local persistida.
+- O Cockpit deve priorizar leitura executiva: alertas visíveis aparecem antes dos quatro KPIs; Saldos e Portfólio permanecem expandidos; Orçamento do mês, Dívidas e gráficos de maiores receitas/despesas usam disclosure nativo recolhível com preferência local persistida.
+- A Situação do Cockpit deve exibir uma versão compacta do score de Saúde Financeira para o mês selecionado, reutilizando a mesma resposta e classificação da aba Saúde, com link para o diagnóstico completo.
+- A Situação do Cockpit deve exibir uma versão compacta de Evolução mensal usando a mesma série mensal de Tendências, sem recalcular valores financeiros no navegador; o gráfico completo permanece na aba Tendências.
+- O painel Orçamento do mês deve usar limites cadastrados e realizado do mês (`orcamento_realizado`), com barras compactas e acesso à análise detalhada de Tendências; compromissos recorrentes não devem ser apresentados como limites.
+- Saldos no resumo devem usar uma única coluna de valor conciliado por conta ou cartão; valores projetados permanecem nas telas detalhadas de contas e faturas.
+- Notificações devem ocupar visualmente um único sino no cabeçalho; o flyout continua separando alertas críticos e informativos, preservando contagens e prioridade sem duplicar indicadores no shell.
+- O resumo de Orçamento deve oferecer a ação “Ver Limites” alinhada ao título, abrindo a tela de Limites já na competência selecionada.
+- Saldos por moeda e Portfólio por tipo devem ocupar colunas paralelas quando houver largura útil; abaixo de `860px` devem voltar a uma coluna para preservar leitura e evitar overflow.
+- O flyout global de notificações deve ficar ancorado no topo da viewport, com área interna de altura estável e abas sem reposicionamento vertical ao trocar a categoria.
+- O resumo do Cockpit deve usar um ritmo vertical único entre suas faixas, sem margens independentes que criem intervalos inconsistentes.
+- Em desktop amplo, acima de `1280px` de largura CSS, Saldos por moeda, Portfólio por tipo e Dívidas devem compartilhar uma faixa de três colunas; até `1280px`, Dívidas ocupa a faixa inteira abaixo das duas primeiras; em viewport estreito, os três empilham.
+- Os gráficos executivos finais devem iniciar após a altura do maior card da faixa anterior e compartilhar altura visual entre si quando estiverem lado a lado.
 - Enquanto o Cockpit estiver visível, título do módulo e barra de abas/mês permanecem sticky, sem ocultar conteúdo ou bloquear navegação em telas intermediárias e móveis.
 - As duas superfícies sticky do Cockpit devem ser totalmente opacas com `--bg`, contíguas e separadas do conteúdo por linha sólida; conteúdo rolado nunca pode permanecer visível ou misturado por transparência/desfoque atrás delas.
 - Formulários devem expor uma hierarquia previsível: ação primária primeiro, ações secundárias com menor peso e ações destrutivas visualmente separadas no extremo oposto do rodapé.
@@ -188,6 +199,8 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - A sidebar deve separar no DOM as zonas `.sidebar-brand`, `.app-nav-main` e `.app-nav-utility`, preservando os mesmos botões, `data-view`, títulos e contratos de navegação.
 - A navegação desktop não deve exibir uma scrollbar própria; em telas curtas, reduz gaps e padding e mantém os itens acionáveis, enquanto grupos continuam recolhíveis.
 - Todo item de menu recolhido mantém `title` para tooltip nativo, foco visível por teclado e uma indicação ativa identificável sem depender do rótulo textual.
+- O frontend reconhece a largura útil da janela por `matchMedia` e aplica modo desktop compacto até `1180px`, sem sobrescrever permanentemente a preferência manual da sidebar.
+- No desktop compacto, a grade usa sidebar de ícones, cabeçalho flexível, resumo em duas colunas e grids de conteúdo sem overflow horizontal; em larguras menores os layouts existentes empilham progressivamente.
 - A evolução do shell pode alterar HTML/CSS estrutural sem alterar rotas, regras de domínio, contratos de view, chamadas de API ou semântica de acessibilidade.
 
 ## Plano de implementação
@@ -226,6 +239,9 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - [x] Separar a sidebar em zonas explícitas de identidade, navegação principal e utilidades sem alterar os seletores funcionais dos itens.
 - [x] Remover a scrollbar própria do menu desktop, aplicar compactação para telas curtas e preservar a distribuição inferior das utilidades.
 - [x] Reforçar tooltips nativos, foco visível, chevrons neutros e marcador ativo no modo recolhido.
+- [x] Reconhecer a largura útil até `1180px` e alternar a sidebar para modo compacto sem perder a preferência manual fora da faixa.
+- [x] Ajustar cabeçalho, resumo, formulários e grids para janelas de referência `1280×800` e `1024×768`.
+- [x] Validar foco, navegação, ausência de overflow horizontal e comportamento claro/escuro no desktop compacto.
 
 ## API e dados
 
@@ -252,6 +268,9 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Dado uma viewport desktop, quando a sidebar é exibida, então o menu não apresenta scrollbar própria e os grupos mantêm seus controles acessíveis.
 - Dado uma viewport desktop curta, quando a sidebar é exibida, então gaps e padding são compactados antes de introduzir rolagem no menu.
 - Dado a sidebar recolhida, quando o usuário navega por mouse ou teclado, então cada item mantém tooltip por `title`, foco visível e estado ativo identificado pelo marcador lateral.
+- Dado uma janela entre `861px` e `1180px` de largura CSS, quando o app inicia ou a janela muda de faixa, então a sidebar entra em modo compacto sem perder o controle de expansão e sem gravar uma preferência automática como escolha manual.
+- Dado o app em `1280×800` ou `1024×768`, quando o usuário acessa Cockpit, Contas, Lançamentos ou Preferências, então cabeçalho, grids e formulários permanecem legíveis, sem overflow horizontal e sem scrollbar própria da sidebar.
+- Dado o usuário expandindo manualmente a sidebar no modo compacto, quando a janela permanece na mesma faixa, então a escolha continua disponível; ao sair da faixa compacta, a preferência persistida volta a ser aplicada.
 - Dado o tema claro ou escuro ativo, quando navega por Cockpit, Contas, Cartões, Lançamentos, Portfólio, Limites, Relatórios, Categorias, Importação e Preferências, os módulos abrem sem erro de console e mantêm contraste legível.
 - Dado viewport mobile, quando abre Preferências, o controle de tema ocupa a largura disponível sem overflow horizontal.
 - Dado uma decisão de edição/exclusão em cascata ou encerramento de posição, quando a interface solicita confirmação, os botões exibem ações explícitas e `Voltar` aborta a operação.
@@ -282,6 +301,16 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Dado foco em qualquer conjunto analítico de abas do Cockpit, Portfólio, Relatórios, Consultor ou Preferências, quando o usuário navega por teclado, então todos seguem o mesmo comportamento roving e respeitam redução de movimento.
 - Dado uma consulta assíncrona de Tags, Tendências, Saúde Financeira ou Portfólio, quando uma seleção posterior torna a resposta anterior obsoleta, então o resultado antigo não substitui a visão atual e o estado `aria-busy` termina de forma coerente.
 - Dado o Cockpit na aba Situação, quando existem alertas de versão, limites ou vencimentos, então eles aparecem antes dos KPIs; quando não existem, o contêiner de alertas não ocupa espaço.
+- Dado o Cockpit na aba Situação, quando o score de Saúde Financeira está disponível, então a situação compacta mostra pontuação, classificação e link para a aba Saúde, usando o mesmo mês selecionado.
+- Dado o Cockpit na aba Situação, quando há dados de Tendências, então Evolução mensal mostra no máximo seis meses com movimento, uma legenda acessível e o mesmo insight determinístico da análise completa.
+- Dado o Cockpit na aba Situação, quando existem limites cadastrados, então Orçamento do mês compara realizado e limite, prioriza as categorias mais pressionadas e não apresenta compromissos recorrentes como orçamento.
+- Dado o resumo de saldos, então contas e cartões compartilham uma única coluna “Saldo conciliado”, sem repetir ao lado o saldo projetado.
+- Dado o cabeçalho do Cockpit, então existe um único sino visível; ao abri-lo, o usuário ainda consegue distinguir alertas críticos de informativos no flyout.
+- Dado o painel Orçamento do mês, quando o usuário aciona “Ver Limites”, então a tela de Limites abre no mesmo mês do Cockpit.
+- Dado o Cockpit em desktop com largura útil suficiente, então Saldos por moeda e Portfólio por tipo aparecem em colunas paralelas; em viewport estreito, eles se empilham.
+- Dado que o flyout de notificações está aberto, então ele permanece no topo ao alternar entre as categorias e suas abas exibem contagens, foco visível e navegação por teclado.
+- Dado o resumo do Cockpit, então as faixas de conteúdo mantêm espaçamento vertical uniforme, independentemente da altura interna dos cards.
+- Dado um desktop amplo acima de `1280px`, então Saldos, Portfólio e Dívidas ocupam três colunas; em desktop compacto, Dívidas ocupa a largura total da segunda faixa; os gráficos finais começam depois do card mais alto e têm altura alinhada.
 - Dado Planejamento, Dívidas ou os gráficos executivos, quando o usuário recolhe ou expande uma seção, então o estado persiste localmente após recarregar a página e o conteúdo financeiro não é recalculado por essa preferência visual.
 - Dado o usuário rolando o Cockpit, quando o título e os controles alcançam o topo, então permanecem visíveis; em viewport de até 860px o offset é reduzido para preservar área útil.
 - Dado conteúdo passando sob o cabeçalho sticky do Cockpit, quando o usuário continua a rolagem, então nenhuma linha, card ou texto fica visível através do cabeçalho ou da barra de abas.
@@ -316,6 +345,12 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Changelog
 
+- `4.44` — 2026-11-24 — Ajusta o breakpoint do trio executivo para preservar a leitura em desktops compactos até `1280px`.
+- `4.43` — 2026-11-24 — Uniformiza o ritmo vertical do Cockpit, organiza Saldos/Portfólio/Dívidas em faixa adaptativa e alinha a altura dos gráficos finais.
+- `4.42` — 2026-11-24 — Estabiliza o flyout de notificações no topo e aprimora suas abas internas com contagens e navegação por teclado.
+- `4.41` — 2026-11-24 — Adiciona o atalho “Ver Limites” ao Orçamento e organiza Saldos por moeda e Portfólio por tipo em colunas paralelas no desktop.
+- `4.40` — 2026-11-23 — Evolui o resumo do Cockpit com Saúde Financeira compacta, Evolução mensal e Orçamento do mês reaproveitados de Tendências, coluna única de saldos conciliados e sino consolidado de notificações.
+- `4.39` — 2026-11-23 — Implementa adaptação automática para desktop compacto por largura CSS até `1180px`, com sidebar de ícones, cabeçalho flexível e grids preparados para `1280×800` e `1024×768`.
 - `4.38` — 2026-11-23 — Estrutura a sidebar em zonas de identidade, navegação principal e utilidades, remove a scrollbar própria no desktop e reforça foco, tooltip, chevrons e estado ativo no modo recolhido.
 - `4.37` — 2026-11-23 — Aplica o segundo passe premium à camada de conteúdo com tokens de superfície, canvas neutro, elevação discreta, hierarquia tipográfica e redução de contornos em painéis, listas e formulários.
 - `4.36` — 2026-11-23 — Implementa a primeira etapa do polimento premium do shell, com tokens visuais, sidebar hierarquizada, alertas discretos, cabeçalho editorial e superfícies de baixo ruído.

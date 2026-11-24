@@ -2,7 +2,7 @@
 tipo: design
 area: meta
 status: implementado
-versao: 4.5
+versao: 5.1
 atualizado: 2026-11-23
 relacionados:
   - "[[arquitetura]]"
@@ -15,7 +15,7 @@ aliases: ["Design System", "Tokens Visuais", "Precisão Institucional"]
 # Design System — Precisão Institucional
 
 > [!info] Status
-> **implementado** · versão: `4.5` · área: `meta` · atualizado em 2026-11-23 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]], [[specs/frontend-fundacao-v2]]
+> **implementado** · versão: `5.1` · área: `meta` · atualizado em 2026-11-24 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]], [[specs/frontend-fundacao-v2]]
 
 ## Personalidade da marca
 
@@ -33,6 +33,18 @@ O shell visual — menu, cabeçalho, superfícies e tipografia — deve funciona
 - No modo recolhido, cada item mantém `title`, foco visível e estado ativo identificável pelo marcador lateral, mesmo sem o rótulo textual.
 - O cabeçalho global combina um título de tela expressivo, contexto curto e ações compactas, sem transformar todos os controles em caixas de igual peso.
 - A interface pode manter o modo escuro como ambiente analítico, mas reduz a sensação técnica com menos linhas visíveis, mais respiro e contraste de superfície cuidadosamente graduado.
+- O Cockpit deve concentrar a primeira leitura em uma situação compacta de Saúde Financeira, quatro KPIs, Evolução mensal e Orçamento do mês; detalhes completos continuam nas abas e módulos de origem.
+- “Orçamento do mês” representa limites cadastrados versus realizado. Compromissos recorrentes podem aparecer em telas analíticas, mas não devem ser rotulados como orçamento.
+- Gráficos incorporados ao resumo usam altura reduzida, seis meses com movimento por padrão, legenda curta e insight textual; a aba Tendências conserva filtros, Budget x Realizado completo e achados.
+- Saldos do resumo usam uma única coluna de valor conciliado para contas e cartões. Projeções e competência de faturas ficam nas telas detalhadas para evitar duplicidade semântica.
+- O cabeçalho usa um único sino de notificações. Criticidade e informativos são diferenciados dentro do flyout, não por múltiplos botões competindo com as abas.
+- Ações contextuais do resumo, como “Ver Tendências” e “Ver Limites”, ficam alinhadas ao título do painel e usam o mesmo peso visual secundário.
+- Saldos por moeda e Portfólio por tipo podem compartilhar uma faixa em duas colunas no desktop; o breakpoint de `860px` empilha os painéis para preservar largura de leitura.
+- O flyout de notificações é uma superfície de topo: fica ancorado abaixo do cabeçalho, no canto superior direito, com altura de conteúdo estável e rolagem interna.
+- As abas do flyout usam uma faixa própria de baixa ênfase, rótulos explícitos, contadores em pílula e estado ativo com superfície, borda e cor semântica controladas; a troca não desloca o painel.
+- As faixas do resumo do Cockpit usam um único gap vertical estrutural; margens específicas de painéis não devem produzir degraus visuais entre cards.
+- A faixa executiva principal usa três colunas para Saldos, Portfólio e Dívidas acima de `1280px` CSS. O layout compacto até `1280px` reduz para duas colunas e coloca Dívidas em largura total; o estreito empilha tudo.
+- Gráficos executivos de uma mesma faixa devem compartilhar altura e começar após o maior card da faixa anterior, mantendo uma base visual alinhada.
 
 ## Camada de conteúdo
 
@@ -237,6 +249,16 @@ Grade de linha de base: **4px** (todos os valores são múltiplos de 4px).
 - O estado ativo usa a superfície do container ativo, borda de baixa ênfase e um marcador primário lateral fino; alertas permanecem como indicador secundário.
 - Em telas curtas, o menu reduz gaps e padding antes de recorrer a rolagem; a navegação não deve exibir uma scrollbar própria no desktop.
 - Em modo recolhido, `title` fornece tooltip nativo, `:focus-visible` fornece foco persistente e o item ativo preserva a barra lateral azul.
+
+### Desktop compacto
+
+O app considera a largura útil da janela, em pixels CSS, e não o tamanho físico do monitor. Entre `861px` e `1180px`, a sidebar entra automaticamente em modo compacto, a preferência manual continua disponível pelo controle de expandir/recolher e volta a ser respeitada quando a janela deixa essa faixa.
+
+- O cenário de referência é `1280×800`; `1024×768` funciona como estresse de largura e altura.
+- O conteúdo principal mantém no máximo duas colunas quando houver espaço; abaixo disso os grids se reorganizam sem overflow horizontal.
+- O cabeçalho reduz o título e permite que as ações se reorganizem; a busca não deve forçar o título para fora da área útil.
+- A sidebar compacta mantém ícones, tooltip nativo, foco visível e marcador lateral do módulo ativo.
+- O modo compacto não altera regras de negócio, dados, rotas ou preferências de tema/densidade.
 - Itens de menu não devem repetir o mesmo rótulo em grupos diferentes quando a intenção for distinta; prefira nomes orientados à tarefa, como **Minhas Contas**, **Meus Cartões**, **Extrato de Contas** e **Fatura de Cartões**.
 - O título exibido no cabeçalho da página deve reforçar o mesmo significado do item acionado no menu, evitando que a navegação volte a depender apenas do grupo pai para desambiguação.
 
@@ -453,6 +475,12 @@ Padrão único em toda a aplicação, conforme o modelo usado no menu **Preferê
 
 ## Changelog
 
+- `5.1` — 2026-11-24 — Ajusta a faixa adaptativa para preservar o desktop compacto até `1280px` sem estreitar excessivamente os cards.
+- `5.0` — 2026-11-24 — Define ritmo vertical uniforme e a faixa adaptativa de Saldos, Portfólio e Dívidas, com gráficos finais alinhados ao maior card.
+- `4.9` — 2026-11-24 — Define o flyout de notificações como superfície superior estável e refina suas abas internas com contadores, foco e estados ativos claros.
+- `4.8` — 2026-11-24 — Define ações contextuais alinhadas nos painéis do Cockpit e a composição lado a lado de Saldos e Portfólio em desktop.
+- `4.7` — 2026-11-23 — Define a composição premium do Cockpit com Saúde Financeira compacta, Evolução mensal, Orçamento do mês, saldos conciliados em coluna única e sino único de notificações.
+- `4.6` — 2026-11-23 — Define o modo desktop compacto por largura útil, com sidebar responsiva até `1180px`, cabeçalho flexível e grids preparados para `1280×800` e `1024×768`.
 - `4.5` — 2026-11-23 — Formaliza as três zonas do menu, elimina a scrollbar própria em desktop, compacta a navegação em telas curtas e documenta tooltip, foco e estado ativo no modo recolhido.
 - `4.4` — 2026-11-23 — Define a camada de conteúdo premium com canvas neutro, superfícies graduadas, bordas de baixa ênfase, elevação discreta e hierarquia tipográfica para painéis, listas, formulários e estados.
 - `4.3` — 2026-11-23 — Introduz a direção premium do shell: superfícies mais silenciosas, sidebar com zona de utilidades, tipografia editorial no cabeçalho, estado ativo contido e alertas de menu reduzidos a indicadores secundários.

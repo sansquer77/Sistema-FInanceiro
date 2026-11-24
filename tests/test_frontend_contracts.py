@@ -591,8 +591,14 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertLess(index.index('id="cockpitVersionAlert"'), index.index('class="summary-strip executive-summary-strip"'))
         self.assertIn('id="cockpitCriticalNotifications"', index)
         self.assertIn('id="cockpitInformationalNotifications"', index)
-        for section in ("planning", "debts", "top-expenses", "top-income"):
+        for section in ("budget", "debts", "top-expenses", "top-income"):
             self.assertIn(f'data-cockpit-section="{section}"', index)
+        self.assertIn("Orçamento do mês", index)
+        self.assertIn("Ver Limites", index)
+        self.assertIn("cockpit-core-grid", index)
+        self.assertIn("cockpit-portfolio-panel", index)
+        self.assertIn("renderCockpitSummary", cockpit)
+        self.assertIn("renderCompactHealth", cockpit)
         self.assertIn(".dashboard-main:has(#cockpitView:not([hidden])) > .topbar", styles)
         self.assertIn("#cockpitView .cockpit-toolbar", styles)
         self.assertIn("background: var(--bg);", styles)
@@ -616,6 +622,18 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("grid-template-rows: minmax(0, 1fr) auto", premium_nav)
         self.assertIn(".nav-button:focus-visible", premium_nav)
         self.assertIn("border-color: var(--focus-border-soft)", premium_nav)
+
+    def test_compact_desktop_adapts_sidebar_header_and_content_grid(self) -> None:
+        app_source = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn('matchMedia("(max-width: 1180px)")', app_source)
+        self.assertIn('compactDesktopQuery.addEventListener("change"', app_source)
+        compact = styles[styles.index('/* Desktop compacto:'):]
+        self.assertIn("grid-template-columns: 76px minmax(0, 1fr)", compact)
+        self.assertIn("grid-template-columns: repeat(2, minmax(0, 1fr))", compact)
+        self.assertIn("flex-wrap: wrap", compact)
+        self.assertIn("min-width: min(240px, 26vw)", compact)
 
     def test_forms_share_action_validation_and_busy_state_contracts(self) -> None:
         index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")

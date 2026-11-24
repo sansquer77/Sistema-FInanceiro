@@ -7,7 +7,7 @@ export function registerFinancialHealthView({
   formatPercentValue,
   escapeHtml,
 }) {
-  const { financialHealthContent } = elements;
+  const { financialHealthContent, financialHealthSummary } = elements;
   let financialHealthRequestId = 0;
   let currentMonth = null;
   let currentData = null;
@@ -15,7 +15,7 @@ export function registerFinancialHealthView({
   let error = "";
 
   function renderFinancialHealth(month) {
-    if (!financialHealthContent) {
+    if (!financialHealthContent && !financialHealthSummary) {
       return;
     }
     if (currentMonth !== month) {
@@ -61,6 +61,52 @@ export function registerFinancialHealthView({
     `;
   }
 
+  function renderCompactHealth(month) {
+    if (!financialHealthSummary) {
+      return;
+    }
+    if (currentMonth !== month) {
+      currentMonth = month;
+      currentData = null;
+      error = "";
+      if (loading) {
+        financialHealthRequestId += 1;
+        loading = false;
+      }
+    }
+    if (!currentData || currentData.month !== month) {
+      if (!loading && !error) {
+        loadFinancialHealth(month);
+      }
+      financialHealthSummary.innerHTML = error
+        ? stateMarkup(error, { kind: "error" })
+        : stateMarkup("Calculando a situação financeira do mês.", { kind: "loading" });
+      return;
+    }
+    // spec: frontend/frontend-modularizacao v4.40 — critério 1
+    const score = Math.max(0, Math.min(1000, Number(currentData.score_total || 0)));
+    const zone = financialHealthScoreZone(currentData.nivel);
+    financialHealthSummary.innerHTML = `
+      <div class="cockpit-health-summary-copy">
+        <div>
+          <span class="eyebrow">Situação do mês</span>
+          <h2>Saúde financeira</h2>
+          <p>${escapeHtml(zone.meaning)}</p>
+        </div>
+        <a class="ghost small-button" href="#" data-cockpit-tab-trigger="health">Ver análise</a>
+      </div>
+      <div class="cockpit-health-score ${zone.className}">
+        <strong>${score.toLocaleString("pt-BR")}</strong>
+        <span>${escapeHtml(zone.label)}</span>
+        <small>de 1.000 pontos</small>
+      </div>
+    `;
+    financialHealthSummary.querySelector("[data-cockpit-tab-trigger='health']")?.addEventListener("click", (event) => {
+      event.preventDefault();
+      document.querySelector("[data-cockpit-tab='health']")?.click();
+    });
+  }
+
   async function loadFinancialHealth(month) {
     const requestId = ++financialHealthRequestId;
     loading = true;
@@ -84,6 +130,7 @@ export function registerFinancialHealthView({
     }
     if (requestId === financialHealthRequestId) financialHealthContent.setAttribute("aria-busy", "false");
     renderFinancialHealth(month);
+    renderCompactHealth(month);
   }
 
   function invalidateFinancialHealth() {
@@ -323,6 +370,7 @@ export function registerFinancialHealthView({
 
   return {
     renderFinancialHealth,
+    renderCompactHealth,
     invalidateFinancialHealth,
   };
 }

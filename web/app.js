@@ -400,7 +400,7 @@ const backupRestoreConfirmButton = document.querySelector("#backupRestoreConfirm
 const backupRestoreMessage = document.querySelector("#backupRestoreMessage");
 const clearLaunchesMessage = document.querySelector("#clearLaunchesMessage");
 const deleteUserMessage = document.querySelector("#deleteUserMessage");
-const monthlyPlanningList = document.querySelector("#monthlyPlanningList");
+const monthlyBudgetSummary = document.querySelector("#monthlyBudgetSummary");
 const installmentDebtList = document.querySelector("#installmentDebtList");
 const transactionType = document.querySelector("#transactionType");
 const transactionAccount = document.querySelector("#transactionAccount");
@@ -456,6 +456,8 @@ const monthExpense = document.querySelector("#monthExpense");
 const monthInvestment = document.querySelector("#monthInvestment");
 const savingsRate = document.querySelector("#savingsRate");
 const cockpitRoot = document.querySelector("#cockpitView");
+const cockpitHealthSummary = document.querySelector("#cockpitHealthSummary");
+const cockpitTrendSummaryContent = document.querySelector("#cockpitTrendSummaryContent");
 const cockpitTabs = document.querySelectorAll("[data-cockpit-tab]");
 const cockpitSummaryPanel = document.querySelector("#cockpitSummaryPanel");
 const cockpitMonthLabel = document.querySelector("#cockpitMonthLabel");
@@ -850,6 +852,9 @@ const cockpitView = registerCockpitView({
     monthInvestment,
     savingsRate,
     cockpitRoot,
+    cockpitHealthSummary,
+    cockpitTrendSummaryContent,
+    monthlyBudgetSummary,
     cockpitTabs,
     cockpitSummaryPanel,
     cockpitMonthLabel,
@@ -857,7 +862,6 @@ const cockpitView = registerCockpitView({
     todayCockpitMonthButton,
     nextCockpitMonthButton,
     currencyList,
-    monthlyPlanningList,
     installmentDebtList,
     topExpensesChart,
     cashDistributionChart,
@@ -935,6 +939,12 @@ const cockpitView = registerCockpitView({
   onNavigateToPortfolio: (positionId) => {
     state.portfolioHighlightId = String(positionId);
     showModule("portfolio");
+  },
+  // spec: frontend/frontend-modularizacao v4.41 — critério 6
+  onNavigateToLimits: async (month) => {
+    if (isValidMonthValue(month)) state.limitMonth = month;
+    await loadSpendingLimits();
+    showModule("limits");
   },
   onNotificationAction: async (action) => {
     const params = action?.params || {};
@@ -1744,9 +1754,16 @@ function shouldAnimateModuleTransition(previousView, nextView) {
 }
 
 function initializeSidebar() {
-  const storedValue = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
-  const preferCollapsed = window.matchMedia("(max-width: 860px)").matches;
-  setSidebarCollapsed(storedValue === null ? preferCollapsed : storedValue === "1", false);
+  const compactDesktopQuery = window.matchMedia("(max-width: 1180px)");
+  const applyViewportSidebarMode = (matches) => {
+    const preferredCollapsed = localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
+    setSidebarCollapsed(matches || preferredCollapsed, false);
+  };
+
+  applyViewportSidebarMode(compactDesktopQuery.matches);
+  compactDesktopQuery.addEventListener("change", (event) => {
+    applyViewportSidebarMode(event.matches);
+  });
 }
 
 function initializeNavGroups() {

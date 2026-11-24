@@ -2,8 +2,8 @@
 tipo: spec
 area: cockpit
 status: implementado
-versao: 1.5
-atualizado: 2026-09-27
+versao: 1.6
+atualizado: 2026-11-24
 relacionados:
   - "[[cockpit-calendario]]"
   - "[[limites-gastos]]"
@@ -20,7 +20,7 @@ aliases: ["Alertas e Notificações do Cockpit", "Alertas Cockpit", "Central de 
 # Alertas e Notificações do Cockpit
 
 > [!info] Status
-> **implementado** · versão: `1.5` · área: `cockpit` · atualizado em 2026-09-27 · relacionados: [[cockpit-calendario]], [[limites-gastos]], [[cartoes]], [[lancamentos]], [[investimentos-portfolio]], [[backup-restauracao]], [[specs/emprestimos-quitacao]], [[arquitetura]], [[requisitos]]
+> **implementado** · versão: `1.6` · área: `cockpit` · atualizado em 2026-11-24 · relacionados: [[cockpit-calendario]], [[limites-gastos]], [[cartoes]], [[lancamentos]], [[investimentos-portfolio]], [[backup-restauracao]], [[specs/emprestimos-quitacao]], [[arquitetura]], [[requisitos]]
 
 ### Problema
 
@@ -33,10 +33,7 @@ Usuário autenticado localmente que consulta o Cockpit para acompanhar o panoram
 ### Jornada
 
 1. O usuário acessa o **Cockpit** do sistema.
-2. Na barra de ferramentas do Cockpit, ao lado das abas de navegação (**Situação**, **Consultor**, **Tendências**, **Saúde**), ele observa dois indicadores distintos com ícone, contador e cor semântica:
-   - **Alertas Críticos** (ícone em tom vermelho quando houver itens pendentes);
-   - **Informativos** (ícone em tom amarelo quando houver eventos ou novidades da semana).
-   *(Em telas estreitas/mobile, os dois indicadores se consolidam em um único botão de notificações com seções internas separadas).*
+2. Na barra de ferramentas do Cockpit, ao lado das abas de navegação (**Situação**, **Consultor**, **Tendências**, **Saúde**), ele observa um único botão de **Notificações**, com sino, contador total e prioridade visual para alertas críticos.
 3. Se não houver itens em uma categoria, o indicador correspondente exibe contador zero ou estado recolhido neutro sem destaque colorido.
 4. Ao clicar em um dos indicadores, o sistema abre um painel flutuante (**flyout global**) renderizado no nível superior de sobreposições da aplicação, sem sofrer cortes de contêiner ou conflitos de empilhamento de camadas.
 5. O usuário visualiza os itens agrupados por tipo, contendo título curto, explicação clara, competência/data de referência e uma ação contextual direta (ex.: “Ver limites”, “Abrir calendário”, “Ver eventos”, “Ver faturas”).
@@ -176,11 +173,12 @@ Restrição de unicidade: `PRIMARY KEY (user_id, notification_id)`.
   - Quando não houver informativos: exibe mensagem informativa neutra (ex.: "Nenhum novo evento ou provento registrado para esta semana.").
 
 #### 6. Responsividade e Adaptação para Telas Estreitas
-- **Desktop e telas médias**: Dois indicadores independentes posicionados na barra de ferramentas do Cockpit, adjacentes às abas.
+- **Desktop e telas médias**: Um único botão de **Notificações** permanece adjacente às abas e abre o flyout ancorado na região superior da viewport, abaixo do cabeçalho do Cockpit.
 - **Telas estreitas / Mobile**:
-  - Os dois indicadores se fundem em um único botão condensado de **Notificações** na barra de ferramentas.
-  - O botão unificado exibe badge somado ou dois pontos de status (vermelho e amarelo).
-  - Ao abrir o flyout, a interface apresenta as duas seções ("Alertas Críticos" e "Informativos") organizadas internamente (seja por abas internas no flyout ou por blocos verticais colapsáveis).
+  - O botão mantém largura fluida e contador legível na barra de ferramentas.
+  - Ao abrir o flyout, a interface apresenta as duas seções ("Alertas Críticos" e "Informativos") organizadas internamente por abas.
+- O flyout mantém posição superior fixa e uma área de conteúdo com altura estável; trocar de aba ou variar a quantidade de itens não deve deslocar o painel verticalmente.
+- As abas internas exibem rótulo, contagem, estado selecionado e foco visível; setas/Home/End permitem alternar entre elas por teclado.
 
 #### 7. Centralização de Regras no Backend e Endpoint Exclusivo
 - Todas as regras financeiras (limites excedidos, contas atrasadas, parcelas a vencer, saldos projetados, proventos na semana) são calculadas exclusivamente no Python (`financeiro/cockpit.py` ou módulo auxiliar de notificações).
@@ -208,6 +206,8 @@ Restrição de unicidade: `PRIMARY KEY (user_id, notification_id)`.
 - Dado que há proventos detectados na semana corrente para a carteira do usuário, quando ele consulta o Cockpit, então o indicador de Informativos exibe a cor amarela e contador correspondente.
 - Dado que o usuário visualiza a lista de Informativos no flyout e aciona a opção de marcar como vistos, quando o flyout é fechado, então o badge amarelo perde o destaque de novidade, mas os itens continuam acessíveis para consulta na listagem durante a semana.
 - Dado que o usuário acessa o sistema a partir de uma viewport estreita (mobile), quando o Cockpit é renderizado, então os indicadores ao lado das abas se condensam em um botão único de Notificações, cujo clique abre o flyout preservando internamente as seções separadas de Críticos e Informativos.
+- Dado que o usuário abre Notificações em qualquer viewport, então o flyout aparece ancorado no topo, abaixo do cabeçalho, e mantém sua posição ao alternar entre Críticos e Informativos.
+- Dado que o usuário alterna entre as abas internas do flyout, então cada aba mostra rótulo, contagem, foco e estado selecionado com contraste suficiente, sem alterar a posição vertical do painel.
 - Dado que o flyout está aberto sobre o Cockpit e o usuário pressiona a tecla `Escape` ou clica fora da área do diálogo, quando o evento é disparado, então o flyout fecha imediatamente e o foco retorna ao botão que o acionou.
 - Dado que não há nenhum limite excedido nem faturas/contas vencidas, quando o usuário abre a visualização de Alertas Críticos, então a interface apresenta um estado vazio explícito informando que não existem pendências.
 - Dado um usuário não autenticado, quando uma requisição for enviada para `GET /api/cockpit/notifications`, então o servidor retorna status HTTP 401 Unauthorized e nenhum dado é exposto.
@@ -241,6 +241,7 @@ Restrição de unicidade: `PRIMARY KEY (user_id, notification_id)`.
 
 ### Changelog
 
+- `1.6` — 2026-11-24 — Consolida o acionador em um sino único, fixa o flyout no topo da viewport e aprimora abas internas com contagens, foco e navegação por teclado.
 - `1.5` — 2026-09-27 — Inclui alerta persistente para lembrar que a conta não pode ser recuperada sem configuração utilizável de e-mail.
 - `1.4` — 2026-09-25 — Central passa a alertar o responsável quando o backup automático falha, com atalho para Preferências > Backup.
 - `1.3` — 2026-09-24 — Adiciona lembrete crítico na data do vencimento de um empréstimo, com ação para abrir Gestão → Empréstimos.
