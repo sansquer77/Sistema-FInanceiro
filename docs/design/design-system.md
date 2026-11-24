@@ -2,8 +2,8 @@
 tipo: design
 area: meta
 status: implementado
-versao: 5.1
-atualizado: 2026-11-23
+versao: 5.4
+atualizado: 2026-11-24
 relacionados:
   - "[[arquitetura]]"
   - "[[specs/frontend-modularizacao]]"
@@ -15,7 +15,7 @@ aliases: ["Design System", "Tokens Visuais", "Precisão Institucional"]
 # Design System — Precisão Institucional
 
 > [!info] Status
-> **implementado** · versão: `5.1` · área: `meta` · atualizado em 2026-11-24 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]], [[specs/frontend-fundacao-v2]]
+> **implementado** · versão: `5.4` · área: `meta` · atualizado em 2026-11-24 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]], [[specs/frontend-fundacao-v2]]
 
 ## Personalidade da marca
 
@@ -38,6 +38,8 @@ O shell visual — menu, cabeçalho, superfícies e tipografia — deve funciona
 - Gráficos incorporados ao resumo usam altura reduzida, seis meses com movimento por padrão, legenda curta e insight textual; a aba Tendências conserva filtros, Budget x Realizado completo e achados.
 - Saldos do resumo usam uma única coluna de valor conciliado para contas e cartões. Projeções e competência de faturas ficam nas telas detalhadas para evitar duplicidade semântica.
 - O cabeçalho usa um único sino de notificações. Criticidade e informativos são diferenciados dentro do flyout, não por múltiplos botões competindo com as abas.
+- Cabeçalhos de cards do Cockpit usam a mesma gramática: eyebrow contextual discreto, título principal de `18px`/peso `850`, ação alinhada no topo e chevron neutro para disclosures. O texto do eyebrow varia por contexto, mas escala, ritmo e comportamento permanecem únicos.
+- Itens informativos podem ter uma ação primária e uma secundária; os botões ficam agrupados, com peso visual neutro e sem transformar um lembrete em alerta crítico.
 - Ações contextuais do resumo, como “Ver Tendências” e “Ver Limites”, ficam alinhadas ao título do painel e usam o mesmo peso visual secundário.
 - Saldos por moeda e Portfólio por tipo podem compartilhar uma faixa em duas colunas no desktop; o breakpoint de `860px` empilha os painéis para preservar largura de leitura.
 - O flyout de notificações é uma superfície de topo: fica ancorado abaixo do cabeçalho, no canto superior direito, com altura de conteúdo estável e rolagem interna.
@@ -475,6 +477,9 @@ Padrão único em toda a aplicação, conforme o modelo usado no menu **Preferê
 
 ## Changelog
 
+- `5.4` — 2026-11-24 — Define o agrupamento visual de múltiplas ações em informativos do flyout.
+- `5.3` — 2026-11-24 — Unifica os cabeçalhos do Cockpit em uma gramática única para saúde, evolução, orçamento, saldos, portfólio, dívidas e gráficos.
+- `5.2` — 2026-11-24 — Define a ação contextual de consulta em cards analíticos e o destaque contido do agrupamento de destino, preservando ações de edição/exclusão e sem usar semântica financeira como decoração.
 - `5.1` — 2026-11-24 — Ajusta a faixa adaptativa para preservar o desktop compacto até `1280px` sem estreitar excessivamente os cards.
 - `5.0` — 2026-11-24 — Define ritmo vertical uniforme e a faixa adaptativa de Saldos, Portfólio e Dívidas, com gráficos finais alinhados ao maior card.
 - `4.9` — 2026-11-24 — Define o flyout de notificações como superfície superior estável e refina suas abas internas com contadores, foco e estados ativos claros.

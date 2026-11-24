@@ -1,10 +1,10 @@
 import { registerTrendsView } from "./trends-view.js?v=184";
 import { registerConsultorView } from "./consultor-view.js?v=183";
-import { registerFinancialHealthView } from "./financial-health-view.js";
+import { registerFinancialHealthView } from "./financial-health-view.js?v=2";
 import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";
 import { stateMarkup } from "./dom-utils.js";
 import { renderChart } from "./chart-adapter.js";
-import { createNotificationFlyout } from "./notification-flyout.js";
+import { createNotificationFlyout } from "./notification-flyout.js?v=2";
 
 const COCKPIT_DISCLOSURE_KEY = "sf-cockpit-disclosures-v1";
 

@@ -50,6 +50,9 @@ def build_cockpit_notifications(
     informational = _maturity_notifications(calendar.get("maturity_30_days") or [], reference_date)
     informational.extend(_portfolio_event_notifications(portfolio_events or [], reference_date))
     informational.extend(_revolving_swap_notifications(user_id))
+    monthly_close = _monthly_close_notification(user_id, reference_date)
+    if monthly_close:
+        informational.append(monthly_close)
     _apply_seen_state(user_id, informational)
     for item in informational:
         if item["type"] == "revolving_swap" and item["seen"]:
@@ -160,6 +163,82 @@ def _revolving_swap_notifications(user_id: int) -> list[dict]:
         )
         for row in rows
     ]
+
+
+def _monthly_close_notification(user_id: int, reference_date: date) -> dict | None:
+    previous_month_date = reference_date.replace(day=1) - timedelta(days=1)
+    previous_month = previous_month_date.strftime("%Y-%m")
+    with get_connection() as conn:
+        account_pending = conn.execute(
+            """SELECT COUNT(*) AS total, COUNT(DISTINCT t.account_id) AS owners
+               FROM transactions t
+               JOIN checking_accounts a ON a.id = t.account_id AND a.user_id = t.user_id
+               WHERE t.user_id = ? AND t.archived_at IS NULL AND a.archived_at IS NULL
+                 AND substr(t.date, 1, 7) = ? AND (t.reconciled_at IS NULL OR t.reconciled_at = '')""",
+            (user_id, previous_month),
+        ).fetchone()
+        card_pending = conn.execute(
+            """SELECT COUNT(*) AS total, COUNT(DISTINCT t.credit_card_id) AS owners
+               FROM credit_card_transactions t
+               JOIN credit_cards c ON c.id = t.credit_card_id AND c.user_id = t.user_id
+               WHERE t.user_id = ? AND t.archived_at IS NULL AND c.archived_at IS NULL
+                 AND t.invoice_month = ? AND (t.reconciled_at IS NULL OR t.reconciled_at = '')""",
+            (user_id, previous_month),
+        ).fetchone()
+        account_unclassified = conn.execute(
+            """SELECT COUNT(*) AS total
+               FROM transactions t
+               JOIN checking_accounts a ON a.id = t.account_id AND a.user_id = t.user_id
+               WHERE t.user_id = ? AND t.archived_at IS NULL AND a.archived_at IS NULL
+                 AND substr(t.date, 1, 7) = ? AND t.type IN ('income', 'expense')
+                 AND t.category_id IS NULL""",
+            (user_id, previous_month),
+        ).fetchone()
+        card_unclassified = conn.execute(
+            """SELECT COUNT(*) AS total
+               FROM credit_card_transactions t
+               JOIN credit_cards c ON c.id = t.credit_card_id AND c.user_id = t.user_id
+               WHERE t.user_id = ? AND t.archived_at IS NULL AND c.archived_at IS NULL
+                 AND t.invoice_month = ? AND t.category_id IS NULL""",
+            (user_id, previous_month),
+        ).fetchone()
+    pending = int(account_pending["total"] or 0) + int(card_pending["total"] or 0)
+    owners = int(account_pending["owners"] or 0) + int(card_pending["owners"] or 0)
+    unclassified = int(account_unclassified["total"] or 0) + int(card_unclassified["total"] or 0)
+    if pending == 0 and unclassified == 0:
+        return None
+    month_label = _month_label(previous_month)
+    details = []
+    if pending:
+        pending_label = "lançamento" if pending == 1 else "lançamentos"
+        details.append(f"{pending} {pending_label} não conciliado(s)")
+    if owners:
+        details.append(f"{owners} conta(s)/cartão(ões) com pendências")
+    if unclassified:
+        unclassified_label = "lançamento" if unclassified == 1 else "lançamentos"
+        details.append(f"{unclassified} {unclassified_label} sem classificação")
+    description = (
+        f"{month_label} tem {', '.join(details)}. "
+        "Revise o demonstrativo antes de iniciar o novo mês."
+    )
+    return _item(
+        f"monthly_close:{previous_month}", "monthly_close", "cashflow",
+        f"Feche {month_label}", description, previous_month,
+        "Abrir demonstrativo", "reports", {"month": previous_month, "tab": "statement"}, seen=False,
+        actions=[
+            {"label": "Abrir demonstrativo", "route": "reports", "params": {"month": previous_month, "tab": "statement"}},
+            {"label": "Ver pendências", "route": "transactions", "params": {"month": previous_month, "status": "pending"}},
+        ],
+    )
+
+
+def _month_label(month: str) -> str:
+    year, month_number = month.split("-")
+    names = (
+        "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+        "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+    )
+    return f"{names[int(month_number) - 1]} de {year}"
 
 
 def mark_informational_seen(user_id: int, notification_ids: Iterable[str]) -> int:
@@ -320,13 +399,15 @@ def _apply_seen_state(user_id: int, rows: list[dict]) -> None:
         row["seen"] = row["id"] in seen
 
 
-def _item(item_id, item_type, category, title, description, date_or_period, label, route, params, seen=None):
+def _item(item_id, item_type, category, title, description, date_or_period, label, route, params, seen=None, actions=None):
     item = {
         "id": str(item_id), "type": item_type, "category": category,
         "title": str(title)[:45], "description": str(description),
         "date_or_period": str(date_or_period),
         "action": {"label": label, "route": route, "params": params},
     }
+    if actions is not None:
+        item["actions"] = actions
     if seen is not None:
         item["seen"] = bool(seen)
     return item

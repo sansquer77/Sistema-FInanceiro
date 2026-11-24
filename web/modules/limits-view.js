@@ -16,6 +16,7 @@ export function registerLimitsView({
   escapeHtml,
   onLimitsChanged = () => {},
   goToLimits = () => {},
+  onNavigateToReport = () => {},
 }) {
   const {
     limitForm,
@@ -629,11 +630,26 @@ export function registerLimitsView({
         <div class="limit-item-footer">
           <span>${row.remaining >= 0 ? "Disponível" : "Excedido"}: ${formatMoney(Math.abs(row.remaining), "BRL")}</span>
           <div class="card-actions">
+            <button class="ghost small-button" type="button" data-action="report">Ver lançamentos</button>
             <button class="ghost small-button" type="button" data-action="edit">Editar</button>
             <button class="danger small-button" type="button" data-action="delete">Excluir</button>
           </div>
         </div>
       `;
+      const openReport = () => {
+        // spec: limites/limites-gastos v1.11 — critério 12
+        onNavigateToReport({
+          month: state.limitMonth,
+          categoryId: row.limitRecord.category_id,
+          subcategoryId: row.limitRecord.subcategory_id,
+          label: row.label,
+        });
+      };
+      item.addEventListener("click", (event) => {
+        if (event.target.closest("[data-action]")) return;
+        openReport();
+      });
+      item.querySelector('[data-action="report"]').addEventListener("click", openReport);
       item.querySelector('[data-action="edit"]').addEventListener("click", () => editSpendingLimit(row.limitRecord));
       item.querySelector('[data-action="delete"]').addEventListener("click", () => deleteSpendingLimit(row.limitRecord.id));
       spendingLimitList.append(item);

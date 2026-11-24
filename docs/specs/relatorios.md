@@ -2,8 +2,8 @@
 tipo: spec
 area: relatorios
 status: implementado
-versao: 2.24
-atualizado: 2026-09-05
+versao: 2.26
+atualizado: 2026-11-24
 relacionados:
   - "[[lancamentos]]"
   - "[[cartoes]]"
@@ -17,7 +17,7 @@ aliases: ["Relatórios", "Cockpit"]
 # Relatórios
 
 > [!info] Status
-> **implementado** · versão: `2.24` · área: `relatorios` · atualizado em 2026-09-05 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[limites-gastos]]
+> **implementado** · versão: `2.26` · área: `relatorios` · atualizado em 2026-11-24 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[limites-gastos]]
 
 ## Problema
 
@@ -66,6 +66,7 @@ Qualquer usuário autenticado localmente que queira analisar seus gastos e recei
 - Pagamentos de fatura gerados em conta-corrente reduzem o saldo da conta, mas não entram em análises de despesa, relatórios por categoria/subcategoria/tag, evolução de categoria nem totais do Cockpit, pois os lançamentos detalhados do cartão já representam o consumo.
 - Relatórios exibem totais por moeda quando houver movimentações multimoeda.
 - O planejamento do Cockpit separa receitas recorrentes, investimentos planejados e despesas recorrentes por moeda, exibindo os valores originais sem somar moedas distintas.
+- Quando Relatórios é aberto por um limite, preserva o mês do limite, usa Categorias ou Subcategorias conforme a granularidade, expande o agrupamento correspondente e deixa seus lançamentos disponíveis no próprio contexto.
 - O Cockpit deve separar a visão operacional **Situação do mês**, a visão de calendário de vencimentos e atrasos **Calendário**, a visão comparativa **Tendências** e a visão diagnóstica **Saúde Financeira** em abas internas no topo do módulo, evitando que o usuário precise rolar todo o resumo mensal para acessar análises complementares.
 - As abas do Cockpit devem aparecer na ordem **Situação**, **Calendário**, **Tendências** e **Saúde Financeira**.
 - A aba **Situação do mês** é a visão inicial do Cockpit e mantém KPIs, alertas, saldos por moeda, portfólio por tipo, planejamento, dívidas e gráficos de maiores receitas/despesas.
@@ -213,6 +214,7 @@ O ponto crítico é cartão de crédito: a fatura pertence ao mês de competênc
 - Dado o gráfico de evolução exibido, quando há pontos de dados históricos ou projeção SMA, então cada ponto exibe o respectivo valor formatado, mesmo quando a linha de tendência está ativada.
 - Dado uma fatura paga por uma conta em BRL, quando o Cockpit calcula o saldo previsto após a data do pagamento, então considera somente o débito registrado na conta e não subtrai novamente a mesma fatura pela linha do cartão.
 - Dado qualquer volume de histórico, quando `/api/cockpit` consolida saldos por moeda, então usa agregações SQLite e não materializa listas detalhadas de lançamentos, compras ou pagamentos; contas e cartões preservam os mesmos valores do contrato anterior.
+- Dado o usuário abrindo Relatórios a partir de um limite, quando o recorte mensal termina de carregar, então o agrupamento da categoria ou subcategoria é expandido e destacado, com os lançamentos disponíveis no mesmo contexto.
 
 ### Critérios complementares — dívida aberta
 
@@ -239,6 +241,8 @@ Cobertura: `tests/test_statement_report.py` e `tests/frontend_open_debts.test.mj
 
 <!-- Validação automatizada desta etapa: tests/test_evolution_presentation.py e tests/frontend_evolution.test.mjs. Validação visual no Safari não executada. -->
 
+- `2.26` — 2026-11-24 — Registra a gramática visual única dos cabeçalhos e disclosures do Cockpit para evitar mistura de padrões entre cards.
+- `2.25` — 2026-11-24 — Adiciona abertura contextual de Relatórios a partir de Limites, com mês, agrupamento, expansão e destaque do item correspondentes.
 - `2.24` — 2026-09-05 — Reforçada a opacidade do degradê compartilhado da Evolução para preservar sua leitura no tema claro e manter consistência com Contas e Cartões.
 - `2.23` — 2026-09-03 — Relatório de tags passa a usar consultas distintas com e sem competência; o caminho mensal aplica predicados temporais diretos e utiliza os índices de data e `invoice_month`.
 

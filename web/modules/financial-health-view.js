@@ -87,7 +87,7 @@ export function registerFinancialHealthView({
     const score = Math.max(0, Math.min(1000, Number(currentData.score_total || 0)));
     const zone = financialHealthScoreZone(currentData.nivel);
     financialHealthSummary.innerHTML = `
-      <div class="cockpit-health-summary-copy">
+      <div class="cockpit-health-summary-copy cockpit-card-heading">
         <div>
           <span class="eyebrow">Situação do mês</span>
           <h2>Saúde financeira</h2>

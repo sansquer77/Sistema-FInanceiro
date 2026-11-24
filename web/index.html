@@ -8,7 +8,7 @@
     <link rel="icon" href="/assets/app-icon.png">
     <link rel="apple-touch-icon" href="/assets/app-icon.png">
     <script src="/theme-init.js"></script>
-    <link rel="stylesheet" href="/styles.css?v=155">
+    <link rel="stylesheet" href="/styles.css?v=158">
   </head>
   <body>
     <main class="app-shell">
@@ -294,7 +294,7 @@
 
             <div class="cockpit-grid cockpit-insight-grid">
               <section class="panel cockpit-insight-panel" id="cockpitTrendSummary" aria-labelledby="cockpitTrendSummaryTitle">
-                <div class="cockpit-insight-heading">
+                <div class="cockpit-card-heading">
                   <div>
                     <span class="eyebrow">Resumo do período</span>
                     <h2 id="cockpitTrendSummaryTitle">Evolução mensal</h2>
@@ -305,7 +305,12 @@
               </section>
 
               <details class="panel cockpit-disclosure cockpit-budget-panel" data-cockpit-section="budget" open>
-                <summary>Orçamento do mês</summary>
+                <summary>
+                  <span class="cockpit-disclosure-title">
+                    <span class="eyebrow">Planejamento</span>
+                    <strong>Orçamento do mês</strong>
+                  </span>
+                </summary>
                 <button class="ghost small-button cockpit-disclosure-action" type="button" data-cockpit-tab-trigger="limits">Ver Limites</button>
                 <div id="monthlyBudgetSummary"></div>
               </details>
@@ -313,15 +318,21 @@
 
             <div class="cockpit-grid cockpit-core-grid">
               <section class="currency-panel">
-                <div class="section-heading">
-                  <h2>Saldos por moeda</h2>
+                <div class="cockpit-card-heading">
+                  <div>
+                    <span class="eyebrow">Posição financeira</span>
+                    <h2>Saldos por moeda</h2>
+                  </div>
                 </div>
                 <div class="currency-list" id="currencyList"></div>
               </section>
 
               <section class="panel cockpit-portfolio-panel">
-                <div class="section-heading">
-                  <h3>Portfólio por tipo</h3>
+                <div class="cockpit-card-heading">
+                  <div>
+                    <span class="eyebrow">Investimentos</span>
+                    <h2>Portfólio por tipo</h2>
+                  </div>
                 </div>
                 <div class="cockpit-portfolio-summary">
                   <div id="cockpitPortfolioByType"></div>
@@ -329,19 +340,34 @@
               </section>
 
               <details class="panel cockpit-disclosure cockpit-debt-panel" data-cockpit-section="debts" open>
-                <summary>Dívidas</summary>
+                <summary>
+                  <span class="cockpit-disclosure-title">
+                    <span class="eyebrow">Compromissos</span>
+                    <strong>Dívidas</strong>
+                  </span>
+                </summary>
                 <div class="planning-list" id="installmentDebtList"></div>
               </details>
             </div>
 
             <div class="cockpit-grid analytics-grid">
               <details class="panel cockpit-disclosure" data-cockpit-section="top-expenses" open>
-                <summary>Maiores despesas do mês</summary>
+                <summary>
+                  <span class="cockpit-disclosure-title">
+                    <span class="eyebrow">Análise de despesas</span>
+                    <strong>Maiores despesas do mês</strong>
+                  </span>
+                </summary>
                 <div class="chart-panel" id="topExpensesChart"></div>
               </details>
 
               <details class="panel cockpit-disclosure" data-cockpit-section="top-income" open>
-                <summary>Maiores receitas do mês</summary>
+                <summary>
+                  <span class="cockpit-disclosure-title">
+                    <span class="eyebrow">Análise de receitas</span>
+                    <strong>Maiores receitas do mês</strong>
+                  </span>
+                </summary>
                 <div class="chart-panel" id="cashDistributionChart"></div>
               </details>
             </div>
@@ -2688,6 +2714,6 @@
     </dialog>
     <script src="/vendor/imask/7.6.1/imask.min.js?v=7.6.1"></script>
     <script src="/vendor/apexcharts/4.7.0/apexcharts.min.js?v=4.7.0"></script>
-  <script type="module" src="/app.js?v=181"></script>
+  <script type="module" src="/app.js?v=184"></script>
   </body>
 </html>

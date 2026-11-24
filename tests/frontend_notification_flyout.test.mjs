@@ -20,6 +20,13 @@ test("flyout usa camada global, dialog modal e restaura foco", () => {
   assert.doesNotMatch(source, /innerHTML\s*=/);
 });
 
+test("flyout supports a primary and secondary action on one informational item", () => {
+  const source = readFileSync(new URL("../web/modules/notification-flyout.js", import.meta.url), "utf8");
+  assert.match(source, /Array\.isArray\(item\.actions\)/);
+  assert.match(source, /notification-flyout-actions/);
+  assert.match(source, /onAction\?\.\(itemAction, item\)/);
+});
+
 test("Cockpit integra indicadores separados e condensado com carregamento dedicado", () => {
   const html = readFileSync(new URL("../web/index.html", import.meta.url), "utf8");
   const view = readFileSync(new URL("../web/modules/cockpit-view.js", import.meta.url), "utf8");
@@ -40,6 +47,7 @@ test("orquestrador traduz ações contextuais sem calcular regras financeiras", 
   const app = readFileSync(new URL("../web/app.js", import.meta.url), "utf8");
   assert.match(app, /action\?\.route === "limits"/);
   assert.match(app, /action\?\.route === "transactions"/);
+  assert.match(app, /action\?\.route === "reports"/);
   assert.match(app, /action\?\.route === "cards"/);
   assert.match(app, /action\?\.route === "calendar"/);
   assert.match(app, /action\?\.route === "portfolio"/);

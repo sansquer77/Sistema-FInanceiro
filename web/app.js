@@ -60,10 +60,10 @@ import { applyDensity, setDensity, storedDensity, toggleDensity } from "./module
 import { registerAuthView } from "./modules/auth-view.js";
 import { registerUserAdminView } from "./modules/user-admin-view.js?v=178";
 import { registerClassificationsView } from "./modules/classifications-view.js";
-import { registerLimitsView } from "./modules/limits-view.js";
-import { registerReportsView } from "./modules/reports-view.js";
+import { registerLimitsView } from "./modules/limits-view.js?v=2";
+import { registerReportsView } from "./modules/reports-view.js?v=2";
 import { registerImportsView } from "./modules/imports-view.js";
-import { registerCockpitView } from "./modules/cockpit-view.js?v=183";
+import { registerCockpitView } from "./modules/cockpit-view.js?v=186";
 import { registerAccountsView } from "./modules/accounts-view.js";
 import { registerCardsView } from "./modules/cards-view.js";
 import { registerPortfolioView } from "./modules/portfolio-view.js?v=164";
@@ -77,7 +77,7 @@ import { registerCommandPalette } from "./modules/command-palette.js";
 import { initializeOverlayUX } from "./modules/overlay-utils.js";
 import { initializeDataUX } from "./modules/data-ux.js";
 import { applyMasks, destroyMasks } from "./modules/input-mask.js";
-import { createAppState, resetSessionData } from "./modules/app-state.js";
+import { createAppState, resetSessionData } from "./modules/app-state.js?v=2";
 import { createAppDataLoader } from "./modules/app-data-loader.js";
 
 applyTheme();
@@ -756,6 +756,16 @@ const limitsView = registerLimitsView({
   escapeHtml,
   onLimitsChanged: renderCockpit,
   goToLimits: () => showModule("limits"),
+  onNavigateToReport: ({ month, categoryId, subcategoryId, label }) => {
+    state.reportMonth = month;
+    state.reportTab = subcategoryId ? "subcategories" : "categories";
+    state.reportFocus = {
+      categoryId: String(categoryId || ""),
+      subcategoryId: subcategoryId ? String(subcategoryId) : "",
+      label: label || "",
+    };
+    showModule("reports");
+  },
 });
 
 const reportsView = registerReportsView({
@@ -957,7 +967,17 @@ const cockpitView = registerCockpitView({
     if (action?.route === "transactions") {
       if (isValidMonthValue(params.month)) state.transactionMonth = params.month;
       if (params.account_id) state.selectedAccountId = String(params.account_id);
+      state.transactionStatusFilter = ["all", "pending", "reconciled"].includes(params.status) ? params.status : "all";
       showModule("transactions");
+      return;
+    }
+    if (action?.route === "reports") {
+      if (isValidMonthValue(params.month)) state.reportMonth = params.month;
+      state.reportTab = ["categories", "subcategories", "cashflow", "accounts", "tags", "statement"].includes(params.tab)
+        ? params.tab
+        : "statement";
+      state.reportFocus = null;
+      showModule("reports");
       return;
     }
     if (action?.route === "loans") {

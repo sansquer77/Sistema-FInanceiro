@@ -2,8 +2,8 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 4.44
-atualizado: 2026-11-23
+versao: 4.47
+atualizado: 2026-11-24
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
   - "[[arquitetura]]"
@@ -16,7 +16,7 @@ aliases: ["Modularização Frontend", "ES Modules"]
 # Modularização do Frontend
 
 > [!info] Status
-> **implementado** · versão: `4.44` · área: `frontend` · atualizado em 2026-11-24 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]], [[../qualidade-codigo]], [[../design/design-system]]
+> **implementado** · versão: `4.47` · área: `frontend` · atualizado em 2026-11-24 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]], [[../qualidade-codigo]], [[../design/design-system]]
 
 ## Problema
 
@@ -310,6 +310,8 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Dado o Cockpit em desktop com largura útil suficiente, então Saldos por moeda e Portfólio por tipo aparecem em colunas paralelas; em viewport estreito, eles se empilham.
 - Dado que o flyout de notificações está aberto, então ele permanece no topo ao alternar entre as categorias e suas abas exibem contagens, foco visível e navegação por teclado.
 - Dado o resumo do Cockpit, então as faixas de conteúdo mantêm espaçamento vertical uniforme, independentemente da altura interna dos cards.
+- Dado o usuário comparando os cards do Cockpit, então Saúde financeira, Evolução mensal, Orçamento, Saldos, Portfólio, Dívidas e gráficos usam o mesmo padrão de eyebrow, título, ação alinhada e chevron neutro quando recolhíveis.
+- Dado um informativo com ações alternativas, quando o flyout é renderizado, então apresenta os botões de ação agrupados, preserva foco/teclado e fecha somente após a ação escolhida concluir a navegação.
 - Dado um desktop amplo acima de `1280px`, então Saldos, Portfólio e Dívidas ocupam três colunas; em desktop compacto, Dívidas ocupa a largura total da segunda faixa; os gráficos finais começam depois do card mais alto e têm altura alinhada.
 - Dado Planejamento, Dívidas ou os gráficos executivos, quando o usuário recolhe ou expande uma seção, então o estado persiste localmente após recarregar a página e o conteúdo financeiro não é recalculado por essa preferência visual.
 - Dado o usuário rolando o Cockpit, quando o título e os controles alcançam o topo, então permanecem visíveis; em viewport de até 860px o offset é reduzido para preservar área útil.
@@ -345,6 +347,9 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Changelog
 
+- `4.47` — 2026-11-24 — Permite múltiplas ações contextuais em um item do flyout de notificações.
+- `4.46` — 2026-11-24 — Padroniza a gramática visual dos cabeçalhos e disclosures do Cockpit.
+- `4.45` — 2026-11-24 — Registra navegação contextual entre Limites e Relatórios, com preservação de período/aba, expansão do agrupamento e destaque do destino.
 - `4.44` — 2026-11-24 — Ajusta o breakpoint do trio executivo para preservar a leitura em desktops compactos até `1280px`.
 - `4.43` — 2026-11-24 — Uniformiza o ritmo vertical do Cockpit, organiza Saldos/Portfólio/Dívidas em faixa adaptativa e alinha a altura dos gráficos finais.
 - `4.42` — 2026-11-24 — Estabiliza o flyout de notificações no topo e aprimora suas abas internas com contagens e navegação por teclado.

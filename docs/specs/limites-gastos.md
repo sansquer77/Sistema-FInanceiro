@@ -2,8 +2,8 @@
 tipo: spec
 area: limites
 status: implementado
-versao: 1.10
-atualizado: 2026-10-18
+versao: 1.11
+atualizado: 2026-11-24
 relacionados:
   - "[[categorias-tags-gestao]]"
   - "[[cartoes]]"
@@ -17,7 +17,7 @@ aliases: ["Limites de Gastos", "Budgets", "Metas"]
 # Limites de Gastos
 
 > [!info] Status
-> **implementado** · versão: `1.10` · área: `limites` · atualizado em 2026-10-19 · relacionados: [[categorias-tags-gestao]], [[cartoes]], [[relatorios]], [[alertas-cockpit]]
+> **implementado** · versão: `1.11` · área: `limites` · atualizado em 2026-11-24 · relacionados: [[categorias-tags-gestao]], [[cartoes]], [[relatorios]], [[alertas-cockpit]]
 
 ## Problema
 
@@ -84,6 +84,7 @@ Tabelas: `spending_limits`, `categories`, `subcategories`.
 - Dado o usuário navegando entre competências de Limites, quando o mês muda, então cada limite apresenta o consumo daquele mês mesmo que nenhuma lista detalhada dessa competência esteja carregada no navegador.
 - Dado o usuário criando ou ajustando um limite, quando o formulário é exibido, então o mês de início da vigência aparece como campo editável e é enviado como a competência da definição.
 - Dado um limite herdado de uma categoria e uma definição futura existente para outra categoria, quando a edição tenta transferir o limite herdado para a identidade e mês já ocupados, então a API retorna conflito sem alterar valor, observações ou identidade do registro futuro.
+- Dado o usuário visualizando um limite, quando clica no item ou em **Ver lançamentos**, então o app abre Relatórios no mesmo mês, seleciona Categorias para um limite da categoria inteira ou Subcategorias para um limite específico, expande o agrupamento correspondente e destaca o item para consulta dos lançamentos.
 
 ## Changelog
 
@@ -95,6 +96,7 @@ Tabelas: `spending_limits`, `categories`, `subcategories`.
 ## Changelog
 
 - `1.10` — 2026-10-19 — Impede que a edição de um limite herdado sobrescreva uma definição futura independente de outra categoria/subcategoria; retorna conflito para edição explícita do registro existente.
+- `1.11` — 2026-11-24 — Limites passam a abrir Relatórios diretamente no mesmo mês e no agrupamento da categoria/subcategoria, com o item expandido e destacado para consulta dos lançamentos.
 - `1.9` — 2026-10-18 — Reforçada a regressão que mantém a definição futura vigente nos meses seguintes até novo reajuste.
 - `1.8` — 2026-10-18 — Alterar o mês no formulário não recarrega nem limpa a edição; o novo mês é aplicado somente ao salvar.
 

@@ -2,7 +2,7 @@
 tipo: spec
 area: cockpit
 status: implementado
-versao: 1.6
+versao: 1.7
 atualizado: 2026-11-24
 relacionados:
   - "[[cockpit-calendario]]"
@@ -20,7 +20,7 @@ aliases: ["Alertas e Notificações do Cockpit", "Alertas Cockpit", "Central de 
 # Alertas e Notificações do Cockpit
 
 > [!info] Status
-> **implementado** · versão: `1.6` · área: `cockpit` · atualizado em 2026-11-24 · relacionados: [[cockpit-calendario]], [[limites-gastos]], [[cartoes]], [[lancamentos]], [[investimentos-portfolio]], [[backup-restauracao]], [[specs/emprestimos-quitacao]], [[arquitetura]], [[requisitos]]
+> **implementado** · versão: `1.7` · área: `cockpit` · atualizado em 2026-11-24 · relacionados: [[cockpit-calendario]], [[limites-gastos]], [[cartoes]], [[lancamentos]], [[investimentos-portfolio]], [[backup-restauracao]], [[specs/emprestimos-quitacao]], [[arquitetura]], [[requisitos]]
 
 ### Problema
 
@@ -97,6 +97,7 @@ Usuário autenticado localmente que consulta o Cockpit para acompanhar o panoram
 | `date_or_period` | texto | Obrigatório | Data no formato ISO `AAAA-MM-DD` ou competência `AAAA-MM`. |
 | `action` | objeto | Obrigatório | Metadados de redirecionamento: `label` (texto do botão), `route` (módulo de destino) e `params` (parâmetros contextuais opcionais). |
 | `seen` | booleano | Opcional | Presente em informativos para indicar se já foi lido/visualizado pelo usuário. |
+| `actions` | lista de objetos | Opcional | Ações alternativas do item; quando presente, o flyout exibe todas e mantém `action` como a ação primária por compatibilidade. |
 
 #### Contrato de Marcação de Vistos (`POST /api/cockpit/notifications/mark-seen`)
 
@@ -184,6 +185,7 @@ Restrição de unicidade: `PRIMARY KEY (user_id, notification_id)`.
 - Todas as regras financeiras (limites excedidos, contas atrasadas, parcelas a vencer, saldos projetados, proventos na semana) são calculadas exclusivamente no Python (`financeiro/cockpit.py` ou módulo auxiliar de notificações).
 - O endpoint `GET /api/cockpit/notifications` é **exclusivo e desacoplado** da rota `GET /api/cockpit?month=...`, permitindo que revalidações periódicas das notificações ocorram sem o custo de recalcular o snapshot mensal completo do Cockpit.
 - O frontend em `web/` é estritamente de apresentação: consome o payload JSON de `GET /api/cockpit/notifications`, renderiza badges/flyouts e executa a navegação de rota solicitada.
+- O informativo de fechamento mensal é gerado quando o mês anterior tem lançamentos não conciliados ou sem classificação. Ele usa o identificador estável `monthly_close:AAAA-MM`, permanece consultável após ser marcado como visto e oferece as ações **Abrir demonstrativo** (Relatórios, aba Demonstrativo, mês anterior) e **Ver pendências** (Lançamentos, filtro Pendentes).
 
 #### 8. Independência do Banner de Nova Versão
 - O banner de nova versão do aplicativo (`cockpitVersionAlert`) permanece como um componente visual direto e independente no painel executivo do Cockpit com seu próprio botão de dispensar (`cockpitVersionAlertDismiss`).
@@ -216,6 +218,9 @@ Restrição de unicidade: `PRIMARY KEY (user_id, notification_id)`.
 - Dado um empréstimo ativo cuja próxima parcela vence hoje, quando o usuário consulta a Central de Notificações, então há um alerta com ação para abrir Gestão → Empréstimos.
 - Dado que o backup automático da instalação falhou, quando o responsável consulta a Central de Notificações, então vê um alerta crítico persistente com ação para abrir Preferências > Backup; o alerta some após um backup concluído com sucesso.
 - Dado que a configuração SMTP de recuperação do usuário está ausente, ilegível ou sem remetente, senha de app ou servidor, quando ele consulta a Central de Notificações, então vê um alerta crítico persistente com ação para abrir Preferências > Recuperação por email; após salvar uma configuração utilizável, o alerta deixa de aparecer.
+- Dado que o mês anterior possui lançamentos não conciliados ou sem classificação, quando o usuário acessa o sistema no mês seguinte, então Informativos exibe um lembrete de fechamento com o mês de referência, o resumo das pendências e as ações Abrir demonstrativo e Ver pendências.
+- Dado que o mês anterior está conciliado e classificado, quando o usuário consulta a Central de Notificações, então nenhum lembrete de fechamento é criado.
+- Dado que o usuário marca o lembrete de fechamento como visto, quando o flyout é reaberto no mesmo mês, então o item continua consultável, mas não aumenta o contador de informativos não lidos.
 
 ### Pendências
 
@@ -238,9 +243,11 @@ Restrição de unicidade: `PRIMARY KEY (user_id, notification_id)`.
 - [x] Passo 6 — Frontend: implementar a navegação contextual das ações de cada card de notificação e o fluxo de marcar informativos como lidos. Fecha: critérios 2, 6.
 - [x] Passo 7 — Testes automatizados: criar testes unitários e de integração em `tests/test_cockpit_notifications.py` cobrindo cálculo de alertas, persistência na `notification_reads`, tolerância a falhas de cotação e controle de autenticação. Fecha: critérios 1, 3, 4, 10, 11, 12.
 - [x] Passo 8 — Integrar falha do backup automático à seção crítica, restrita ao responsável da instalação, e navegar diretamente para a aba Backup nas Preferências.
+- [x] Passo 9 — Gerar o lembrete mensal de fechamento no backend, persistir a leitura pelo ID da competência e oferecer ações para Demonstrativo e Pendências.
 
 ### Changelog
 
+- `1.7` — 2026-11-24 — Adiciona lembrete informativo de fechamento do mês anterior, com resumo de conciliação/classificação, leitura persistente e ações para Demonstrativo e Pendências.
 - `1.6` — 2026-11-24 — Consolida o acionador em um sino único, fixa o flyout no topo da viewport e aprimora abas internas com contagens, foco e navegação por teclado.
 - `1.5` — 2026-09-27 — Inclui alerta persistente para lembrar que a conta não pode ser recuperada sem configuração utilizável de e-mail.
 - `1.4` — 2026-09-25 — Central passa a alertar o responsável quando o backup automático falha, com atalho para Preferências > Backup.

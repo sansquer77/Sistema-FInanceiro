@@ -1746,7 +1746,7 @@ textarea:focus {
   border-top: 0;
 }
 
-.cockpit-insight-heading {
+.cockpit-card-heading {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -1754,11 +1754,29 @@ textarea:focus {
   margin-bottom: 12px;
 }
 
-.cockpit-insight-heading h2,
-.cockpit-health-summary h2 {
+.cockpit-card-heading > div {
+  min-width: 0;
+}
+
+.cockpit-card-heading h2,
+.cockpit-card-heading h3,
+.cockpit-disclosure-title strong {
   margin: 2px 0 0;
-  font-size: 20px;
+  color: var(--ink);
+  font-size: 18px;
+  line-height: 1.2;
+  font-weight: 850;
   letter-spacing: -0.02em;
+}
+
+.cockpit-disclosure-title {
+  display: grid;
+  min-width: 0;
+  text-align: left;
+}
+
+.cockpit-disclosure-title .eyebrow {
+  margin-bottom: 1px;
 }
 
 .cockpit-trend-meta,
@@ -1810,6 +1828,7 @@ textarea:focus {
   gap: 18px;
   align-items: center;
   min-width: 0;
+  margin-bottom: 0;
 }
 
 .cockpit-health-summary-copy p {
@@ -5555,6 +5574,12 @@ form[aria-busy="true"] .form-actions {
   background: var(--panel);
 }
 
+.report-rank-row.report-focus-row {
+  border-color: color-mix(in srgb, var(--accent) 62%, var(--line));
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
 .report-rank-main {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -7580,6 +7605,22 @@ form[aria-busy="true"] .form-actions {
   border-left: 4px solid var(--accent);
   border-radius: 8px;
   background: var(--panel);
+}
+
+.spending-limit-item {
+  cursor: pointer;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.spending-limit-item:hover {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--accent) 9%, transparent);
+  transform: translateY(-1px);
+}
+
+.spending-limit-item .card-actions,
+.spending-limit-item .card-actions button {
+  cursor: pointer;
 }
 
 .spending-limit-item.over-limit {
@@ -9958,6 +9999,7 @@ form[aria-busy="true"] .form-actions {
 .notification-flyout-item.notification-informational { border-left-color:var(--warning,#d59b00); }
 .notification-flyout-item[data-seen="true"] { opacity:.72; }
 .notification-flyout-item p,.notification-flyout-item time,.notification-flyout-empty { color:var(--on-surface-variant); }
+.notification-flyout-actions { display:flex; flex-wrap:wrap; gap:8px; padding-top:3px; }
 .notification-flyout-action { justify-self:start; }
 .notification-flyout-footer { justify-content:flex-end; border-top:1px solid var(--outline-variant); }
 @media (max-width:640px) { .notification-flyout { inset:72px 8px auto 8px; width:auto; max-height:calc(100vh - 88px); } .notification-flyout-surface { max-height:calc(100vh - 88px); } .notification-flyout-body { height:min(55vh,460px); min-height:150px; } }

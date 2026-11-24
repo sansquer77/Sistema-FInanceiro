@@ -143,20 +143,28 @@ export function createNotificationFlyout({ onAction, onMarkSeen } = {}) {
     const description = document.createElement("p"); description.textContent = item.description || "";
     const time = document.createElement("time"); time.dateTime = item.date_or_period || ""; time.textContent = item.date_or_period || "";
     article.append(heading, description, time);
-    if (item.action?.label) {
-      const action = document.createElement("button");
-      action.type = "button"; action.className = "ghost small-button notification-flyout-action";
-      action.textContent = item.action.label;
-      action.addEventListener("click", async () => {
-        action.disabled = true;
-        try {
-          await onAction?.(item.action, item);
-          close();
-        } catch {
-          status.textContent = "Não foi possível abrir o destino. Tente novamente.";
-        } finally { action.disabled = false; }
+    const actions = Array.isArray(item.actions)
+      ? item.actions
+      : item.action?.label ? [item.action] : [];
+    if (actions.length) {
+      const actionGroup = document.createElement("div");
+      actionGroup.className = "notification-flyout-actions";
+      actions.forEach((itemAction) => {
+        const action = document.createElement("button");
+        action.type = "button"; action.className = "ghost small-button notification-flyout-action";
+        action.textContent = itemAction.label;
+        action.addEventListener("click", async () => {
+          action.disabled = true;
+          try {
+            await onAction?.(itemAction, item);
+            close();
+          } catch {
+            status.textContent = "Não foi possível abrir o destino. Tente novamente.";
+          } finally { action.disabled = false; }
+        });
+        actionGroup.append(action);
       });
-      article.append(action);
+      article.append(actionGroup);
     }
     return article;
   }

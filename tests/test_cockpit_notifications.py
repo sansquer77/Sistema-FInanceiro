@@ -110,6 +110,43 @@ class CockpitNotificationsTest(unittest.TestCase):
         self.assertEqual(payload["critical"], [])
         self.assertEqual(payload["informational"], [])
 
+    def test_monthly_close_notification_summarizes_previous_month_and_offers_two_actions(self):
+        account = create_checking_account(self.user["id"], {
+            "name": "Conta de fechamento", "bank_name": "Banco", "currency": "BRL", "initial_balance": "0,00",
+        })
+        with database.get_connection() as conn:
+            conn.execute(
+                """INSERT INTO transactions
+                   (user_id, type, description, amount_cents, amount_brl_cents, date, account_id)
+                   VALUES (?, 'expense', 'Mercado', 2500, 2500, '2026-08-20', ?)""",
+                (self.user["id"], account["id"]),
+            )
+        payload = self.build()
+        notification = next(item for item in payload["informational"] if item["type"] == "monthly_close")
+        self.assertEqual(notification["title"], "Feche agosto de 2026")
+        self.assertIn("1 lançamento não conciliado(s)", notification["description"])
+        self.assertIn("1 lançamento sem classificação", notification["description"])
+        self.assertEqual([action["label"] for action in notification["actions"]], ["Abrir demonstrativo", "Ver pendências"])
+        self.assertEqual(notification["actions"][0]["route"], "reports")
+        self.assertEqual(notification["actions"][0]["params"], {"month": "2026-08", "tab": "statement"})
+        self.assertEqual(notification["actions"][1]["params"], {"month": "2026-08", "status": "pending"})
+
+    def test_monthly_close_notification_is_not_created_when_previous_month_is_resolved(self):
+        account = create_checking_account(self.user["id"], {
+            "name": "Conta encerrada", "bank_name": "Banco", "currency": "BRL", "initial_balance": "0,00",
+        })
+        category = create_category(self.user["id"], "Mercado resolvido", "expense")
+        with database.get_connection() as conn:
+            transaction_id = conn.execute(
+                """INSERT INTO transactions
+                   (user_id, type, description, amount_cents, amount_brl_cents, date, account_id, category_id, reconciled_at)
+                   VALUES (?, 'expense', 'Mercado', 2500, 2500, '2026-08-20', ?, ?, CURRENT_TIMESTAMP)""",
+                (self.user["id"], account["id"], category["id"]),
+            ).lastrowid
+        self.assertIsNotNone(transaction_id)
+        payload = self.build()
+        self.assertFalse(any(item["type"] == "monthly_close" for item in payload["informational"]))
+
     def test_events_outside_current_week_are_not_listed(self):
         payload = self.build(portfolio_events=[{
             "id": "old", "asset_identifier": "PETR4", "payment_date": "2026-09-12",

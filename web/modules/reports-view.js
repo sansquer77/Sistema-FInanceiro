@@ -200,6 +200,7 @@ export function registerReportsView({
       reportRankedSection(title, groupReportItems(items.filter((item) => item.reportType === type), "category"), `Nenhum item em ${title.toLowerCase()} neste mês.`)
     )).join("");
     mountReportRankings();
+    focusPendingReportItem();
   }
 
   function renderSubcategoriesReport(items) {
@@ -212,6 +213,7 @@ export function registerReportsView({
       reportRankedSection(title, groupReportItems(items.filter((item) => item.reportType === type), "subcategory"), `Nenhuma subcategoria em ${title.toLowerCase()} neste mês.`)
     )).join("");
     mountReportRankings();
+    focusPendingReportItem();
   }
 
   async function renderTagsReport() {
@@ -423,7 +425,7 @@ export function registerReportsView({
       ` : "";
     const detail = deferDetail && !expanded ? "" : reportItemDetails(row.items);
     return `
-        <article class="report-rank-row" data-report-row data-report-row-index="${index}">
+        <article class="report-rank-row" data-report-row data-report-row-index="${index}" data-report-category-id="${escapeHtml(row.categoryId || "")}" data-report-subcategory-id="${escapeHtml(row.subcategoryId || "")}">
           <div class="report-rank-main">
             <div>
               <div class="report-rank-title-line">
@@ -475,6 +477,36 @@ export function registerReportsView({
       deferDetail: true,
     })).join("");
     list.querySelector(`[data-report-row-index="${expandedIndex}"]`)?.scrollIntoView({ block: "nearest" });
+  }
+
+  function focusPendingReportItem() {
+    // spec: relatorios/relatorios v2.25 — critério 39
+    const focus = state.reportFocus;
+    if (!focus || !["categories", "subcategories"].includes(state.reportTab)) return;
+    const categoryId = String(focus.categoryId || "");
+    const subcategoryId = String(focus.subcategoryId || "");
+    let target = Array.from(reportContent.querySelectorAll("[data-report-row]")).find((row) => (
+      String(row.dataset.reportCategoryId || "") === categoryId
+      && String(row.dataset.reportSubcategoryId || "") === subcategoryId
+    ));
+    if (!target) {
+      for (const [rankingId, ranking] of activeReportRankings.entries()) {
+        const index = ranking.rows.findIndex((row) => (
+          String(row.categoryId || "") === categoryId
+          && String(row.subcategoryId || "") === subcategoryId
+        ));
+        if (index < 0) continue;
+        const list = reportContent.querySelector(`[data-report-ranking-id="${rankingId}"]`);
+        if (!list) continue;
+        expandReportRanking(list, ranking, index);
+        target = list.querySelector(`[data-report-row-index="${index}"]`);
+        break;
+      }
+    }
+    state.reportFocus = null;
+    if (!target) return;
+    target.classList.add("report-focus-row");
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
   function reportItemsForMonth(month) {
@@ -704,12 +736,14 @@ export function registerReportsView({
   }
 
   function shiftReportMonth(delta) {
+    state.reportFocus = null;
     state.reportMonth = shiftMonth(state.reportMonth, delta);
     renderReports();
   }
 
   function switchReportTab(tab) {
     if (!tab || tab === state.reportTab) return;
+    state.reportFocus = null;
     transitionView(() => {
       state.reportTab = tab;
       renderReports();
