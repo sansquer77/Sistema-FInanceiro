@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 3.42
-atualizado: 2026-10-11
+versao: 3.43
+atualizado: 2026-11-26
 relacionados:
   - "[[arquitetura]]"
   - "[[visao-produto]]"
@@ -14,7 +14,7 @@ tags: [produto, meta]
 # Requisitos
 
 > [!info] Status
-> **implementado** (escopo vivo) · versão: `3.42` · área: `meta` · atualizado em 2026-10-11 · relacionados: [[arquitetura]], [[visao-produto]], [[specs/consultor]], [[specs/tendencias-saude-financeira]]
+> **implementado** (escopo vivo) · versão: `3.43` · área: `meta` · atualizado em 2026-11-26 · relacionados: [[arquitetura]], [[visao-produto]], [[specs/consultor]], [[specs/tendencias-saude-financeira]]
 
 ## Objetivo
 
@@ -141,6 +141,7 @@ O projeto é disponibilizado gratuitamente como software open source sob a Apach
 
 ## Changelog
 
+- `3.43` — 2026-11-26 — Sincroniza o escopo vivo com a versão `2.2.0`, incluindo a camada visual premium, a adaptação para desktops compactos e a documentação atualizada do schema `20012`.
 - `3.42` — 2026-10-11 — Registra o enriquecimento opcional da Análise da Carteira com cenário macroeconômico pesquisado sem contexto do usuário.
 - `3.41` — 2026-10-10 — Define que o preparo manual do modelo local ocorre no cache privado de cada navegador, sem consumo de armazenamento no servidor.
 - `3.40` — 2026-10-10 — A seleção de IA é centralizada por usuário: local primeiro por padrão, remota somente com consentimento inclusive como fallback, e resumo determinístico como último recurso para Consultor e Tendências.

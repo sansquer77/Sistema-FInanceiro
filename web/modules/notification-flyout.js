@@ -1,4 +1,4 @@
-// spec: cockpit/alertas-cockpit v1.10 — critérios 2, 6, 8 e 9
+// spec: cockpit/alertas-cockpit v1.12 — critérios 2, 6, 8 e 9
 const META = {
   critical: { title: "Alertas críticos", empty: "Nenhum alerta crítico pendente. Suas contas e limites estão em dia." },
   informational: { title: "Informativos", empty: "Nenhum novo evento ou provento registrado para esta semana." },
@@ -146,6 +146,7 @@ export function createNotificationFlyout({ onAction, onMarkSeen } = {}) {
     const actions = Array.isArray(item.actions)
       ? item.actions
       : item.action?.label ? [item.action] : [];
+    const itemActions = [];
     if (actions.length) {
       const actionGroup = document.createElement("div");
       actionGroup.className = "notification-flyout-actions";
@@ -164,8 +165,27 @@ export function createNotificationFlyout({ onAction, onMarkSeen } = {}) {
         });
         actionGroup.append(action);
       });
-      article.append(actionGroup);
+      itemActions.push(actionGroup);
     }
+    if (section === "informational" && !item.seen) {
+      const seenAction = document.createElement("button");
+      seenAction.type = "button";
+      seenAction.className = "ghost small-button notification-flyout-seen-action";
+      seenAction.textContent = "Marcar como lido";
+      seenAction.addEventListener("click", async () => {
+        seenAction.disabled = true;
+        try {
+          await onMarkSeen?.([item.id]);
+          item.seen = true;
+          render();
+        } catch {
+          status.textContent = "Não foi possível marcar o informativo como lido. Tente novamente.";
+          seenAction.disabled = false;
+        }
+      });
+      itemActions.push(seenAction);
+    }
+    if (itemActions.length) article.append(...itemActions);
     return article;
   }
 

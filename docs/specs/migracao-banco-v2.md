@@ -2,8 +2,8 @@
 tipo: spec
 area: migracao-dados
 status: implementado
-versao: 1.14
-atualizado: 2026-10-18
+versao: 1.15
+atualizado: 2026-11-26
 relacionados:
   - "[[../arquitetura]]"
   - "[[importacao-dados]]"
@@ -16,7 +16,7 @@ aliases: ["Migração do banco para a v2", "Banco v2"]
 # Migração do banco para a v2
 
 > [!info] Status
-> **implementado** · versão: `1.14` · área: `migracao-dados` · atualizado em 2026-10-18 · relacionados: [[../arquitetura]], [[importacao-dados]], [[../adr/0003-sqlite-fonte-de-verdade]], [[../adr/0012-fundacao-v2-contrato-e-migracao-de-dados]]
+> **implementado** · versão: `1.15` · área: `migracao-dados` · atualizado em 2026-11-26 · relacionados: [[../arquitetura]], [[importacao-dados]], [[../adr/0003-sqlite-fonte-de-verdade]], [[../adr/0012-fundacao-v2-contrato-e-migracao-de-dados]]
 
 ## Problema
 
@@ -39,7 +39,7 @@ Usuário existente que atualiza o aplicativo para a linha v2 e usuário novo que
 
 - `data/finance.db`: banco ativo; mantém o nome esperado pelo app e por rotinas externas de backup.
 - `data/finance-v1.bkp`: cópia integral e não sobrescrita do banco legado anterior à migração.
-- `PRAGMA user_version`: versão inteira e monotônica do schema; o baseline inicial da linha v2 usa `20000`, o endurecimento operacional usa `20001`, a política global de backup usa `20002` e a precisão de oito casas das quantidades do Portfólio usa `20003`.
+- `PRAGMA user_version`: versão inteira e monotônica do schema; o baseline inicial da linha v2 usa `20000`, o endurecimento operacional usa `20001`, a política global de backup usa `20002`, a precisão de oito casas das quantidades do Portfólio usa `20003`, Objetivos usa `20004`, Empréstimos usa `20005`, identidade de categorias usa `20006`, reconhecimento de pagamentos usa `20007`, Price/SAC usa `20008`, termos indexados usa `20009`, crédito rotativo usa `20010`, vínculos de ativos a objetivos usa `20011` e configurações de IA por provedor usa `20012`.
 - `schema_migrations`: registro auditável dos passos incrementais aplicados após o baseline.
 - arquivos temporários de migração: permanecem no mesmo diretório do banco para permitir promoção por renomeação no mesmo volume e são removidos após sucesso ou falha tratada.
 
@@ -71,7 +71,7 @@ Usuário existente que atualiza o aplicativo para a linha v2 e usuário novo que
 - `financeiro/database_schema.py` descreve canonicamente o baseline v2: tabelas, constraints, chaves estrangeiras, índices obrigatórios e `PERFORMANCE_INDEXES`. Oferece:
   ```python
   BASELINE_SCHEMA_VERSION = 20000
-  SCHEMA_VERSION = 20009
+  SCHEMA_VERSION = 20012
 
   def create_baseline_tables(conn: sqlite3.Connection) -> None:
       ...
@@ -110,7 +110,7 @@ Usuário existente que atualiza o aplicativo para a linha v2 e usuário novo que
 
 ## Critérios de aceite
 
-1. Dado diretório de dados sem banco, quando o app inicializa, então cria `finance.db` diretamente na versão atual `20003` e registra seu histórico de schema.
+1. Dado diretório de dados sem banco, quando o app inicializa, então cria `finance.db` diretamente na versão atual `20012` e registra seu histórico de schema.
 2. Dado banco v2 válido, quando o app inicializa novamente, então não executa o caminho de compatibilidade legado.
 3. Dado `finance.db` legado válido, quando o app inicializa, então preserva o arquivo original como `finance-v1.bkp`.
 4. Dado migração legada concluída, quando os arquivos são inspecionados, então o banco ativo v2 mantém o nome `finance.db`.
@@ -133,6 +133,9 @@ Usuário existente que atualiza o aplicativo para a linha v2 e usuário novo que
 21. Dado banco na versão `20006`, quando o app inicia, então aplica a migração `20007`, registra pagamentos conciliados, sinaliza contratos com vínculos pendentes legados para revisão manual e preserva os valores existentes sem rollback inferido.
 22. Dado banco na versão `20007`, quando o app inicia, então aplica a migração `20008`, adiciona `loans.amortization_system` com `price` aos contratos existentes sem modificar parcela, prazo, taxa, pagamentos ou compromisso.
 23. Dado banco na versão `20008`, quando o app inicia, então aplica a migração `20009` para indexador, saldo principal/data-base e taxa remuneratória, preservando todos os dados financeiros existentes.
+24. Dado banco na versão `20009`, quando o app inicia, então aplica a migração `20010`, cria o acompanhamento de crédito rotativo e preserva os lançamentos existentes.
+25. Dado banco na versão `20010`, quando o app inicia, então aplica a migração `20011`, persiste a identidade dos ativos vinculados a objetivos e preserva os vínculos existentes.
+26. Dado banco na versão `20011`, quando o app inicia, então aplica a migração `20012`, cria configurações isoladas por provedor de IA, preserva a configuração remota ativa e atualiza a restrição de provedores sem expor segredos.
 
 ## Fora de escopo
 
@@ -161,9 +164,13 @@ Usuário existente que atualiza o aplicativo para a linha v2 e usuário novo que
 - [x] Passo 14 — adicionar identidade semântica estável para categorias e mapear nomes legado/atual sem alterar IDs. Fecha: critério 20.
 - [x] Passo 15 — adicionar migração incremental idempotente `20008`, preservando contratos anteriores como Price. Fecha: critério 22.
 - [x] Passo 16 — adicionar migração incremental idempotente `20009` para termos de contratos indexados. Fecha: critério 23.
+- [x] Passo 17 — adicionar migração incremental idempotente `20010` para crédito rotativo. Fecha: critério 24.
+- [x] Passo 18 — adicionar migração incremental idempotente `20011` para vínculos de ativos a objetivos. Fecha: critério 25.
+- [x] Passo 19 — adicionar migração incremental idempotente `20012` para configurações de IA por provedor. Fecha: critério 26.
 
 ## Changelog
 
+- `1.15` — 2026-11-26 — Sincroniza a spec com o schema atual `20012`, incluindo crédito rotativo, vínculos de ativos a objetivos e configurações isoladas de IA por provedor.
 - `1.14` — 2026-09-25 — Documenta schema `20009` com indexador, saldo principal/data-base e juros remuneratórios separados do CET.
 - `1.13` — 2026-09-25 — Critério `20008` documenta que contratos existentes recebem sistema Price sem mudança nos dados financeiros.
 - `1.12` — 2026-09-25 — Schema `20008` adiciona seleção Price/SAC e mantém os contratos existentes no sistema Price.

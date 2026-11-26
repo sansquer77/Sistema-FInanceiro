@@ -4,7 +4,7 @@ import { registerFinancialHealthView } from "./financial-health-view.js?v=2";
 import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";
 import { stateMarkup } from "./dom-utils.js";
 import { renderChart } from "./chart-adapter.js";
-import { createNotificationFlyout } from "./notification-flyout.js?v=2";
+import { createNotificationFlyout } from "./notification-flyout.js?v=3";
 
 const COCKPIT_DISCLOSURE_KEY = "sf-cockpit-disclosures-v1";
 
@@ -563,7 +563,10 @@ export function registerCockpitView({
       <section class="planning-section">
         <div class="planning-section-header">
           <h3>Parcelas em aberto · estado atual</h3>
-          <strong class="danger-text">${formatDebtTotals(debtTotals)}</strong>
+          <div class="debt-total-block">
+            <strong class="danger-text">${formatDebtTotals(debtTotals)}</strong>
+            ${renderDebtTrend(data.trend_by_currency)}
+          </div>
         </div>
         ${debts.map((row) => `
           <div class="debt-group">
@@ -591,6 +594,24 @@ export function registerCockpitView({
       return formatMoney(0, "BRL");
     }
     return [...totals.entries()].map(([currency, total]) => formatMoney(total, currency)).join(" · ");
+  }
+
+
+  function renderDebtTrend(trends) {
+    const entries = Object.entries(trends || {});
+    if (!entries.length) return "";
+    return `<div class="debt-trend-list" aria-label="Variação do endividamento por moeda">${entries.map(([currency, trend]) => {
+      const direction = trend.direction || "stable";
+      const arrow = direction === "up" ? "↑" : direction === "down" ? "↓" : "↔";
+      const previousMonthLabel = formatMonthShortLabel(trend.previous_month);
+      const label = direction === "up"
+        ? `maior que ${previousMonthLabel}`
+        : direction === "down"
+          ? `menor que ${previousMonthLabel}`
+          : `estável vs. ${previousMonthLabel}`;
+      const amount = direction === "stable" ? "sem alteração" : formatMoney(trend.change, currency);
+      return `<span class="debt-trend debt-trend-${direction}" aria-label="${escapeHtml(`Endividamento ${label}: ${amount}`)}"><span aria-hidden="true">${arrow}</span> ${escapeHtml(amount)} <small>vs. ${escapeHtml(previousMonthLabel)}</small></span>`;
+    }).join("")}</div>`;
   }
 
 
@@ -716,7 +737,7 @@ export function registerCockpitView({
       legend: { show: false },
       stroke: { width: 0 },
       tooltip: { y: { formatter: (value) => formatMoney(value, "BRL") } },
-      plotOptions: { pie: { donut: { size: "72%", labels: { show: false } } } },
+      plotOptions: { pie: { donut: { size: "78%", labels: { show: false } } } },
     });
   }
 

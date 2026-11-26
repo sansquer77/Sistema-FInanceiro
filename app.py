@@ -587,7 +587,7 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_json(payload)
 
     def handle_cockpit_notifications(self) -> None:
-        # spec: cockpit/alertas-cockpit v1.5 — critérios 5, 6, 10 e 11
+        # spec: cockpit/alertas-cockpit v1.12 — critérios 5, 6, 10 e 11
         if not self.validate_read_source():
             return
         user = self.require_user()
@@ -600,7 +600,7 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_json(build_cockpit_notifications(user["id"], portfolio_events=portfolio_events))
 
     def handle_mark_cockpit_notifications_seen(self) -> None:
-        # spec: cockpit/alertas-cockpit v1.5 — critérios 6 e 11
+        # spec: cockpit/alertas-cockpit v1.12 — critérios 6 e 11
         user = self.require_user()
         payload = self.read_json()
         notification_ids = payload.get("notification_ids") if isinstance(payload, dict) else None

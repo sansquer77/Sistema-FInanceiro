@@ -57,6 +57,32 @@ class OpenDebtsTest(unittest.TestCase):
         before_due = get_open_debts(self.uid, '2026-02', today=date(2026, 2, 27))
         self.assertEqual(before_due['groups'][0]['debts'][0]['overdue_count'], 0)
 
+    def test_trend_compares_open_installments_by_competence(self):
+        self.item(date='2026-01-10', amount_cents=2000, series_id='previous')
+        self.item(date='2026-02-10', amount_cents=3500, series_id='current')
+        self.item(date='2026-03-10', amount_cents=9000, series_id='future')
+
+        trend = self.read()['trend_by_currency']['BRL']
+
+        self.assertEqual(trend['current_cents'], 3500)
+        self.assertEqual(trend['previous_cents'], 2000)
+        self.assertEqual(trend['change_cents'], 1500)
+        self.assertEqual(trend['direction'], 'up')
+        self.assertEqual(trend['previous_month'], '2026-01')
+
+    def test_trend_is_calculated_independently_for_each_currency(self):
+        usd = create_checking_account(self.uid, dict(name='USD', bank_name='Banco', currency='USD', initial_balance='0,00'))['id']
+        self.item(amount_cents=700, date='2026-01-10', series_id='brl-previous')
+        self.item(amount_cents=700, date='2026-02-10', series_id='brl-current')
+        self.item(account_id=usd, amount_cents=700, date='2026-01-10', series_id='usd-previous')
+        self.item(account_id=usd, amount_cents=500, date='2026-02-10', series_id='usd-current')
+
+        trends = self.read()['trend_by_currency']
+
+        self.assertEqual(trends['BRL']['direction'], 'stable')
+        self.assertEqual(trends['USD']['change_cents'], -200)
+        self.assertEqual(trends['USD']['direction'], 'down')
+
     def test_full_and_partial_payments_close_original_invoice_only(self):
         for amount in (None, '50,00'):
             with self.subTest(amount=amount):

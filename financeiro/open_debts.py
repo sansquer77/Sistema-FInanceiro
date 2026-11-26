@@ -4,7 +4,7 @@ from datetime import date
 import re
 
 from financeiro.accounts import cents_to_money
-from financeiro.calendar_rules import normalize_iso_month
+from financeiro.calendar_rules import normalize_iso_month, shift_month
 from financeiro.database import get_connection
 
 
@@ -79,6 +79,9 @@ def get_open_debts(user_id, month=None, account_ids=None, card_ids=None, currenc
 
 def summarize_open_debts(rows, month, today):
     groups, totals = {}, {}
+    # spec: relatorios/relatorios v2.30 — critérios 20 a 22
+    previous_month = shift_month(month, -1)
+    competence_totals = {}
     for row in rows:
         origin, currency = row['origin'], row['currency']
         group_key = (origin, row['owner_id'])
@@ -97,6 +100,9 @@ def summarize_open_debts(rows, month, today):
         debt['overdue_count'] += int(due < today.isoformat())
         if row['competence'] == month:
             debt['month_total_cents'] += amount
+        if row['competence'] in (month, previous_month):
+            month_totals = competence_totals.setdefault(currency, {month: 0, previous_month: 0})
+            month_totals[row['competence']] += amount
         group['total_cents'] += amount
         totals[currency] = totals.get(currency, 0) + amount
     result = []
@@ -105,6 +111,25 @@ def summarize_open_debts(rows, month, today):
         group['debts'] = [debt | {'total': cents_to_money(debt['total_cents'])} for debt in debts]
         group['total'] = cents_to_money(group['total_cents'])
         result.append(group)
+    trend_by_currency = {}
+    for currency in sorted(set(totals) | set(competence_totals)):
+        values = competence_totals.get(currency, {})
+        current_cents = int(values.get(month, 0))
+        previous_cents = int(values.get(previous_month, 0))
+        change_cents = current_cents - previous_cents
+        direction = 'up' if change_cents > 0 else 'down' if change_cents < 0 else 'stable'
+        trend_by_currency[currency] = {
+            'current': cents_to_money(current_cents),
+            'current_cents': current_cents,
+            'previous': cents_to_money(previous_cents),
+            'previous_cents': previous_cents,
+            'change': cents_to_money(abs(change_cents)),
+            'change_cents': change_cents,
+            'direction': direction,
+            'month': month,
+            'previous_month': previous_month,
+        }
     return dict(month=month, observed_on=today.isoformat(), groups=result,
                 by_currency={key: cents_to_money(value) for key, value in sorted(totals.items())},
-                by_currency_cents=dict(sorted(totals.items())))
+                by_currency_cents=dict(sorted(totals.items())),
+                trend_by_currency=trend_by_currency)

@@ -8,7 +8,7 @@
     <link rel="icon" href="/assets/app-icon.png">
     <link rel="apple-touch-icon" href="/assets/app-icon.png">
     <script src="/theme-init.js"></script>
-    <link rel="stylesheet" href="/styles.css?v=186">
+    <link rel="stylesheet" href="/styles.css?v=194">
   </head>
   <body>
     <main class="app-shell">
@@ -633,28 +633,37 @@
 
         <section class="module-view" id="cardLaunchesView" hidden>
           <section class="panel card-invoice-panel">
-            <div class="section-heading launch-section-heading">
-              <div>
-                <span class="eyebrow">Cartões · Controle mensal</span>
-                <h2>Fatura do cartão</h2>
+            <div class="launch-sticky-header">
+              <div class="section-heading launch-section-heading">
+                <div>
+                  <span class="eyebrow">Cartões · Controle mensal</span>
+                  <h2>Fatura do cartão</h2>
+                </div>
+                <div class="month-navigator">
+                  <button class="ghost small-button month-icon-button" type="button" id="previousCardInvoiceButton" aria-label="Mês anterior" title="Mês anterior">‹</button>
+                  <button class="month-label" type="button" id="cardInvoiceMonthLabel" aria-haspopup="dialog"></button>
+                  <button class="ghost small-button month-icon-button" type="button" id="todayCardInvoiceButton" aria-label="Mês atual" title="Mês atual">●</button>
+                  <button class="ghost small-button month-icon-button" type="button" id="nextCardInvoiceButton" aria-label="Próximo mês" title="Próximo mês">›</button>
+                </div>
               </div>
-              <div class="month-navigator">
-                <button class="ghost small-button month-icon-button" type="button" id="previousCardInvoiceButton" aria-label="Mês anterior" title="Mês anterior">‹</button>
-                <button class="month-label" type="button" id="cardInvoiceMonthLabel" aria-haspopup="dialog"></button>
-                <button class="ghost small-button month-icon-button" type="button" id="todayCardInvoiceButton" aria-label="Mês atual" title="Mês atual">●</button>
-                <button class="ghost small-button month-icon-button" type="button" id="nextCardInvoiceButton" aria-label="Próximo mês" title="Próximo mês">›</button>
-              </div>
-            </div>
 
-            <div class="launch-context-toolbar">
-              <div class="launch-context-copy">
-                <span class="eyebrow">Contexto da consulta</span>
-                <strong>Fatura do cartão selecionado</strong>
-                <small>Troque o cartão sem abrir o formulário.</small>
+              <div class="launch-context-toolbar">
+                <div class="launch-destination-card launch-context-destination-card" id="cardInvoiceDestinationPanel">
+                  <div class="launch-destination-body">
+                    <div class="launch-destination-brand" aria-hidden="true">
+                      <div class="launch-destination-logo" id="cardInvoiceDestinationLogo"></div>
+                      <div class="launch-destination-network" id="cardInvoiceDestinationNetwork"></div>
+                    </div>
+                    <div class="launch-destination-details">
+                      <strong id="cardInvoiceDestinationName">Selecione um cartão</strong>
+                      <span id="cardInvoiceDestinationMeta">O cartão e a fatura serão definidos pelo contexto.</span>
+                    </div>
+                    <label class="launch-destination-selector launch-selection-field">Cartão
+                      <select id="cardInvoiceCard" aria-label="Cartão da fatura"></select>
+                    </label>
+                  </div>
+                </div>
               </div>
-              <label class="transaction-search launch-context-field">Cartão
-                <select id="cardInvoiceCard"></select>
-              </label>
             </div>
 
             <div class="invoice-history-chart" id="cardInvoiceHistoryChart" aria-label="Histórico de faturas"></div>
@@ -715,6 +724,25 @@
                 <input type="hidden" name="id">
                 <input type="hidden" name="credit_card_id">
                 <input type="hidden" name="invoice_month">
+                <section class="launch-destination-card" id="cardTransactionDestinationPanel" aria-labelledby="cardTransactionDestinationTitle">
+                  <div class="launch-destination-heading">
+                    <span class="eyebrow">Destino do lançamento</span>
+                    <strong id="cardTransactionDestinationTitle">Cartão da fatura</strong>
+                  </div>
+                  <div class="launch-destination-body">
+                    <div class="launch-destination-brand" aria-hidden="true">
+                      <div class="launch-destination-logo" id="cardTransactionDestinationLogo"></div>
+                      <div class="launch-destination-network" id="cardTransactionDestinationNetwork"></div>
+                    </div>
+                    <div class="launch-destination-details">
+                      <strong id="cardTransactionDestinationName">Selecione um cartão</strong>
+                      <span id="cardTransactionDestinationMeta">O cartão e a fatura serão definidos pelo contexto.</span>
+                    </div>
+                    <label class="launch-destination-selector launch-selection-field">Cartão
+                      <select id="cardTransactionCard" aria-label="Cartão do lançamento"></select>
+                    </label>
+                  </div>
+                </section>
                 <div class="field-row">
                   <label>Tipo
                     <select name="type" id="cardTransactionType" data-drawer-autofocus>
@@ -831,6 +859,24 @@
                 <div class="drawer-body launch-form-drawer-body transaction-form-panel">
               <form id="transactionForm" class="form" data-progressive-form data-operation-summary>
                 <input type="hidden" name="id">
+                <section class="launch-destination-card" id="transactionDestinationPanel" aria-labelledby="transactionDestinationTitle">
+                  <div class="launch-destination-heading">
+                    <span class="eyebrow">Destino do lançamento</span>
+                    <strong id="transactionDestinationTitle">Conta do lançamento</strong>
+                  </div>
+                  <div class="launch-destination-body">
+                    <div class="launch-destination-brand" aria-hidden="true">
+                      <div class="launch-destination-logo" id="transactionDestinationLogo"></div>
+                    </div>
+                    <div class="launch-destination-details">
+                      <strong id="transactionDestinationName">Selecione uma conta</strong>
+                      <span id="transactionDestinationMeta">O lançamento será registrado na conta selecionada.</span>
+                    </div>
+                    <label class="launch-destination-selector launch-selection-field">Conta
+                      <select id="transactionFormAccount" aria-label="Conta do lançamento"></select>
+                    </label>
+                  </div>
+                </section>
                 <div class="field-row">
                   <label>Tipo
                     <select name="type" id="transactionType">
@@ -1035,30 +1081,38 @@
             </aside>
 
             <section class="panel transaction-ledger-panel">
-              <div class="section-heading launch-section-heading">
-                <div>
-                  <span class="eyebrow">Extrato da conta</span>
-                  <h2>Lançamentos</h2>
-                </div>
-                <div class="launch-heading-actions">
-                  <button class="primary small-button" id="openTransactionFormButton" type="button">Novo lançamento</button>
-                  <div class="month-navigator">
-                  <button class="ghost small-button month-icon-button" type="button" id="previousMonthButton" aria-label="Mês anterior" title="Mês anterior">‹</button>
-                  <button class="month-label" type="button" id="transactionMonthLabel" aria-haspopup="dialog"></button>
-                  <button class="ghost small-button month-icon-button" type="button" id="todayMonthButton" aria-label="Mês atual" title="Mês atual">●</button>
-                  <button class="ghost small-button month-icon-button" type="button" id="nextMonthButton" aria-label="Próximo mês" title="Próximo mês">›</button>
+              <div class="launch-sticky-header">
+                <div class="section-heading launch-section-heading">
+                  <div>
+                    <span class="eyebrow">Extrato da conta</span>
+                    <h2>Lançamentos</h2>
+                  </div>
+                  <div class="launch-heading-actions">
+                    <button class="primary small-button" id="openTransactionFormButton" type="button">Novo lançamento</button>
+                    <div class="month-navigator">
+                      <button class="ghost small-button month-icon-button" type="button" id="previousMonthButton" aria-label="Mês anterior" title="Mês anterior">‹</button>
+                      <button class="month-label" type="button" id="transactionMonthLabel" aria-haspopup="dialog"></button>
+                      <button class="ghost small-button month-icon-button" type="button" id="todayMonthButton" aria-label="Mês atual" title="Mês atual">●</button>
+                      <button class="ghost small-button month-icon-button" type="button" id="nextMonthButton" aria-label="Próximo mês" title="Próximo mês">›</button>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div class="launch-context-toolbar">
-                <div class="launch-context-copy">
-                  <span class="eyebrow">Contexto da consulta</span>
-                  <strong>Extrato da conta selecionada</strong>
-                  <small>Troque a conta sem abrir o formulário.</small>
+                <div class="launch-context-toolbar">
+                  <div class="launch-destination-card launch-context-destination-card" id="transactionContextDestinationPanel">
+                    <div class="launch-destination-body">
+                      <div class="launch-destination-brand" aria-hidden="true">
+                        <div class="launch-destination-logo" id="transactionContextDestinationLogo"></div>
+                      </div>
+                      <div class="launch-destination-details">
+                        <strong id="transactionContextDestinationName">Selecione uma conta</strong>
+                        <span id="transactionContextDestinationMeta">O lançamento será registrado na conta selecionada.</span>
+                      </div>
+                      <label class="launch-destination-selector launch-selection-field">Conta
+                        <select name="account_id" id="transactionAccount" form="transactionForm" required></select>
+                      </label>
+                    </div>
+                  </div>
                 </div>
-                <label class="transaction-search launch-context-field">Conta
-                  <select name="account_id" id="transactionAccount" form="transactionForm" required></select>
-                </label>
               </div>
               <div class="invoice-history-chart account-balance-history-chart" id="transactionBalanceHistoryChart" aria-label="Histórico de saldos previstos"></div>
               <div class="month-balance-summary">
@@ -2811,6 +2865,6 @@
     </dialog>
     <script src="/vendor/imask/7.6.1/imask.min.js?v=7.6.1"></script>
     <script src="/vendor/apexcharts/4.7.0/apexcharts.min.js?v=4.7.0"></script>
-    <script type="module" src="/app.js?v=195"></script>
+    <script type="module" src="/app.js?v=199"></script>
   </body>
 </html>

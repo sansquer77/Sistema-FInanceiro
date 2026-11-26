@@ -707,6 +707,84 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("COCKPIT_DISCLOSURE_KEY", cockpit)
         self.assertIn("localStorage.setItem(COCKPIT_DISCLOSURE_KEY", cockpit)
 
+    def test_cockpit_renders_debt_competence_trend_from_backend_model(self) -> None:
+        cockpit = (MODULE_ROOT / "cockpit-view.js").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn("renderDebtTrend(data.trend_by_currency)", cockpit)
+        self.assertIn('debt-trend-${direction}', cockpit)
+        self.assertIn(".debt-trend-list", styles)
+        self.assertIn(".debt-trend-up", styles)
+        self.assertIn(".debt-trend-down", styles)
+
+    def test_cockpit_distribution_donuts_contain_center_totals(self) -> None:
+        cockpit = (MODULE_ROOT / "cockpit-view.js").read_text(encoding="utf-8")
+        app = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn('class="donut-center"', cockpit)
+        self.assertIn('size: "78%"', cockpit)
+        self.assertIn('.donut-center strong {', styles)
+        self.assertIn('width: min(132px, 58%);', styles)
+        self.assertIn('font-size: clamp(12px, calc(1vw + 2px), 15px);', styles)
+        self.assertIn('registerCockpitView } from "./modules/cockpit-view.js?v=190"', app)
+        self.assertIn('href="/styles.css?v=194"', index)
+
+    def test_launch_forms_expose_and_sync_destination_context(self) -> None:
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        app = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+        transactions = (MODULE_ROOT / "transactions-view.js").read_text(encoding="utf-8")
+        cards = (MODULE_ROOT / "cards-view.js").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+        for element_id in (
+            "transactionDestinationPanel",
+            "transactionFormAccount",
+            "transactionContextDestinationPanel",
+            "transactionContextDestinationLogo",
+            "cardTransactionDestinationPanel",
+            "cardTransactionCard",
+            "cardInvoiceDestinationPanel",
+            "cardInvoiceDestinationLogo",
+            "cardInvoiceDestinationNetwork",
+        ):
+            self.assertIn(f'id="{element_id}"', index)
+        self.assertIn('renderBankLogo({', transactions)
+        self.assertIn('renderBankLogo({', cards)
+        self.assertIn("syncTransactionDestinationAccount", transactions)
+        self.assertIn("renderCardTransactionDestination", cards)
+        self.assertIn("cardTransactionCard?.addEventListener", cards)
+        self.assertIn(".launch-destination-card", styles)
+        self.assertEqual(index.count('class="launch-destination-brand"'), 4)
+        self.assertEqual(index.count('class="launch-destination-details"'), 4)
+        self.assertEqual(index.count('class="launch-destination-selector launch-selection-field"'), 4)
+        self.assertEqual(index.count('class="launch-selection-field">'), 0)
+        self.assertEqual(index.count('launch-selection-field"'), 4)
+        self.assertNotIn("Contexto da consulta", index)
+        self.assertNotIn("Troque a conta sem abrir o formulário", index)
+        self.assertNotIn("Troque o cartão sem abrir o formulário", index)
+        self.assertIn(".launch-selection-field", styles)
+        selection_start = styles.index(".launch-selection-field {")
+        selection_rule = styles[selection_start:styles.index(".launch-context-field {", selection_start)]
+        self.assertIn("gap: 7px;", selection_rule)
+        self.assertIn("margin-top: 1px;", selection_rule)
+        selection_select_start = styles.index(".launch-selection-field select {")
+        context_toolbar_start = styles.index(".launch-context-toolbar {", selection_select_start)
+        selection_select_rule = styles[selection_select_start:context_toolbar_start]
+        self.assertIn("height: 40px;", selection_select_rule)
+        self.assertIn("padding: 0 32px 0 10px;", selection_select_rule)
+        self.assertEqual(index.count('class="launch-sticky-header"'), 2)
+        self.assertIn(".launch-sticky-header {", styles)
+        sticky_rule = styles[styles.index(".launch-sticky-header {"):styles.index(".launch-sticky-header .launch-context-toolbar")]
+        self.assertIn("position: sticky;", sticky_rule)
+        self.assertIn("top: 74px;", sticky_rule)
+        self.assertIn(".launch-destination-network", styles)
+        self.assertIn("attachBankLogoFallbacks", transactions)
+        self.assertIn("attachBankLogoFallbacks", cards)
+        self.assertIn('registerTransactionsView } from "./modules/transactions-view.js?v=198"', app)
+        self.assertIn('registerCardsView } from "./modules/cards-view.js?v=198"', app)
+
     def test_sidebar_exposes_three_zones_and_reduced_menu_scroll_contract(self) -> None:
         index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
         styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
@@ -868,7 +946,8 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("launch-form-drawer-header", index)
         self.assertIn("launch-form-drawer-body", index)
         self.assertIn("launch-context-toolbar", index)
-        self.assertIn('class="transaction-search launch-context-field"', index)
+        self.assertEqual(index.count('launch-context-destination-card'), 2)
+        self.assertIn('class="launch-destination-selector launch-selection-field"', index)
         account_selector = '<select name="account_id" id="transactionAccount" form="transactionForm" required></select>'
         self.assertIn(account_selector, index)
         account_drawer_start = index.index('id="transactionFormDrawer"')

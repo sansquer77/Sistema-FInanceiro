@@ -1681,6 +1681,7 @@ export function registerPortfolioView({
     onEnter,
     onLeave,
     loadPortfolio,
+    showPortfolioTab,
     markPortfolioDirty,
     showPortfolioAssetForm,
     resetPortfolioAssetForm,

@@ -51,6 +51,10 @@ export function registerCardsView({
     archivedCreditCardList,
     cancelCreditCardEditButton,
     cardInvoiceCard,
+    cardInvoiceDestinationLogo,
+    cardInvoiceDestinationNetwork,
+    cardInvoiceDestinationName,
+    cardInvoiceDestinationMeta,
     cardInvoiceMonthLabel,
     previousCardInvoiceButton,
     todayCardInvoiceButton,
@@ -74,6 +78,11 @@ export function registerCardsView({
     openCardTransactionFormButton,
     cardTransactionFormTitle,
     cardTransactionType,
+    cardTransactionCard,
+    cardTransactionDestinationLogo,
+    cardTransactionDestinationNetwork,
+    cardTransactionDestinationName,
+    cardTransactionDestinationMeta,
     cardTransactionCategory,
     cardTransactionSubcategory,
     cardClassificationSuggestion,
@@ -103,6 +112,11 @@ export function registerCardsView({
   creditCardForm.addEventListener("submit", handleCreditCardSubmit);
   creditCardForm.elements.currency.addEventListener("change", renderCreditCardPreferredPaymentAccounts);
   cardInvoiceCard.addEventListener("change", handleCardInvoiceCardChange);
+  cardTransactionCard?.addEventListener("change", () => {
+    if (!cardInvoiceCard || cardTransactionCard.value === cardInvoiceCard.value) return;
+    cardInvoiceCard.value = cardTransactionCard.value;
+    void handleCardInvoiceCardChange();
+  });
   cardInvoiceList.addEventListener("click", handleCardInvoiceListClick);
   if (cardInvoiceSearch) {
     cardInvoiceSearch.addEventListener("input", () => {
@@ -600,6 +614,7 @@ export function registerCardsView({
     cardInvoicePaymentForm.elements.credit_card_id.value = state.selectedCreditCardId;
     cardInvoicePaymentForm.elements.invoice_month.value = state.cardInvoiceMonth;
     const card = selectedCreditCard();
+    renderCardTransactionDestination(card);
     if (!card) {
       renderCardInvoiceHistory(null);
       cardInvoiceTotal.textContent = formatMoney(0, "BRL");
@@ -654,9 +669,55 @@ export function registerCardsView({
       `<option value="${card.id}">${escapeHtml(card.name)} (${escapeHtml(card.currency)})</option>`
     )).join("");
     cardInvoiceCard.innerHTML = options || '<option value="">Cadastre um cartão</option>';
+    if (cardTransactionCard) {
+      cardTransactionCard.innerHTML = options || '<option value="">Cadastre um cartão</option>';
+    }
     cardInvoiceCard.disabled = state.creditCards.length === 0;
+    if (cardTransactionCard) cardTransactionCard.disabled = state.creditCards.length === 0;
     if (state.selectedCreditCardId) {
       cardInvoiceCard.value = state.selectedCreditCardId;
+      if (cardTransactionCard) cardTransactionCard.value = state.selectedCreditCardId;
+    }
+  }
+
+  function renderCardTransactionDestination(card) {
+    const destinationViews = [
+      {
+        logo: cardTransactionDestinationLogo,
+        network: cardTransactionDestinationNetwork,
+        name: cardTransactionDestinationName,
+        meta: cardTransactionDestinationMeta,
+      },
+      {
+        logo: cardInvoiceDestinationLogo,
+        network: cardInvoiceDestinationNetwork,
+        name: cardInvoiceDestinationName,
+        meta: cardInvoiceDestinationMeta,
+      },
+    ];
+    destinationViews.forEach(({ logo, network, name, meta }) => {
+      if (name) {
+        name.textContent = card?.name || "Selecione um cartão";
+      }
+      if (meta) {
+        meta.textContent = card
+          ? `${card.issuer || "Emissor não informado"} · ${card.currency} · Fatura ${formatMonthShortLabel(state.cardInvoiceMonth)}`
+          : "O cartão e a fatura serão definidos pelo contexto.";
+      }
+      if (logo) {
+        logo.innerHTML = renderBankLogo({
+          name: card?.issuer,
+          fallbackTitle: card?.name || "Cartão",
+        });
+        attachBankLogoFallbacks(logo);
+      }
+      if (network) {
+        network.innerHTML = renderCardNetworkLogo({ name: card?.network });
+        attachBankLogoFallbacks(network);
+      }
+    });
+    if (cardTransactionCard) {
+      cardTransactionCard.value = card ? String(card.id) : "";
     }
   }
 

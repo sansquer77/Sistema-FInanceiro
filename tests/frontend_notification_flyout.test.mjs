@@ -27,6 +27,13 @@ test("flyout supports a primary and secondary action on one informational item",
   assert.match(source, /onAction\?\.\(itemAction, item\)/);
 });
 
+test("flyout offers per-item read action for unseen informational items", () => {
+  const source = readFileSync(new URL("../web/modules/notification-flyout.js", import.meta.url), "utf8");
+  assert.match(source, /section === "informational" && !item\.seen/);
+  assert.match(source, /Marcar como lido/);
+  assert.match(source, /onMarkSeen\?\.\(\[item\.id\]\)/);
+});
+
 test("Cockpit integra indicadores separados e condensado com carregamento dedicado", () => {
   const html = readFileSync(new URL("../web/index.html", import.meta.url), "utf8");
   const view = readFileSync(new URL("../web/modules/cockpit-view.js", import.meta.url), "utf8");
@@ -51,4 +58,5 @@ test("orquestrador traduz ações contextuais sem calcular regras financeiras", 
   assert.match(app, /action\?\.route === "cards"/);
   assert.match(app, /action\?\.route === "calendar"/);
   assert.match(app, /action\?\.route === "portfolio"/);
+  assert.match(app, /portfolioView\.showPortfolioTab\(portfolioTab\)/);
 });

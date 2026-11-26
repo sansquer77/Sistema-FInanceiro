@@ -2,7 +2,7 @@
 tipo: adr
 area: seguranca
 status: implementado
-versao: 1.0
+versao: 1.1
 atualizado: 2026-09-03
 relacionados:
   - "[[../specs/seguranca-ai-ssrf]]"

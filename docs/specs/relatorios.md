@@ -2,7 +2,7 @@
 tipo: spec
 area: relatorios
 status: implementado
-versao: 2.29
+versao: 2.31
 atualizado: 2026-11-26
 relacionados:
   - "[[lancamentos]]"
@@ -17,7 +17,7 @@ aliases: ["Relatórios", "Cockpit"]
 # Relatórios
 
 > [!info] Status
-> **implementado** · versão: `2.29` · área: `relatorios` · atualizado em 2026-11-26 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[limites-gastos]]
+> **implementado** · versão: `2.31` · área: `relatorios` · atualizado em 2026-11-26 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[limites-gastos]]
 
 ## Problema
 
@@ -70,6 +70,7 @@ Qualquer usuário autenticado localmente que queira analisar seus gastos e recei
 - O Cockpit deve separar a visão operacional **Situação do mês**, a visão de calendário de vencimentos e atrasos **Calendário**, a visão comparativa **Tendências** e a visão diagnóstica **Saúde Financeira** em abas internas no topo do módulo, evitando que o usuário precise rolar todo o resumo mensal para acessar análises complementares.
 - As abas do Cockpit devem aparecer na ordem **Situação**, **Calendário**, **Tendências** e **Saúde Financeira**.
 - A aba **Situação do mês** é a visão inicial do Cockpit e mantém KPIs, alertas, saldos por moeda, portfólio por tipo, planejamento, dívidas e gráficos de maiores receitas/despesas.
+- Os gráficos de **Análise de despesas** e **Análise de receitas** devem manter o valor total central em escala discreta, com área de respiro dentro do anel e quebra segura para totais longos, sem colidir visualmente com o gráfico.
 - A aba **Calendário** é uma visão de vencimentos e atrasos baseada na data atual do servidor, não no mês selecionado no Cockpit.
 - O Cockpit deve ter um seletor de mês no topo do módulo, compartilhado pelas abas internas que dependem de competência mensal, começando por **Situação do mês**, **Calendário**, **Tendências** e **Saúde Financeira**.
 - O seletor de mês do Cockpit deve seguir o mesmo padrão visual dos seletores mensais de Lançamentos, com botões compactos por ícone para mês anterior, mês atual e próximo mês.
@@ -102,6 +103,7 @@ Qualquer usuário autenticado localmente que queira analisar seus gastos e recei
 - O resumo executivo do demonstrativo e o Cockpit exibem **Parcelas em aberto (estado atual)**, calculadas pelo mesmo serviço Python. Inclui despesas parceladas (`series_kind=installment` ou índice/quantidade de parcelas positivos), ativas e de contas/cartões ativos, sem somar moedas distintas.
 - Em contas, parcela conciliada é liquidada; parcela não conciliada continua aberta mesmo vencida ou anterior ao mês escolhido. Em cartões, conciliação não liquida a dívida: a existência de pagamento da fatura a encerra, independentemente da data de compra ou do mês escolhido. Pagamentos agregados em conta nunca entram novamente.
 - A competência é `date[:7]` em contas e `invoice_month` em cartões. O mês consultado identifica as parcelas daquela competência, mas o estoque aberto inclui competências anteriores e futuras. O estado é o atualmente registrado, não uma reconstrução de pagamentos/conciliações passadas. Atraso usa a data atual do servidor e o vencimento do cartão, limitado ao último dia do mês.
+- O Cockpit exibe, abaixo do total de parcelas em aberto, uma comparação discreta por moeda entre o valor das parcelas abertas na competência selecionada e na competência imediatamente anterior. A comparação usa o estado atual de liquidação, sem reconstruir o passado, e mostra seta, valor absoluto da alteração e mês de referência.
 - Pagamento parcial encerra a fatura original e gera saldo avulso na próxima fatura. Sem vínculo estruturado desse saldo com cada compra, o indicador de **parcelas** não o redistribui nem o identifica por descrição. Não representa a dívida total/rotativa; parcelas futuras continuam incluídas até suas respectivas faturas serem pagas.
 - Filtros de contas/cartões/moeda são aplicados no backend com isolamento por usuário. Seleção vazia mantém o comportamento de todas as contas/cartões ativos. Falha de consulta não produz zero fictício nem recálculo local; impressão aguarda uma resposta válida.
 - Valores monetários do demonstrativo devem usar números tabulares, alinhamento à direita quando em tabela e tamanho de fonte equivalente ao texto descritivo, para manter densidade sem pesar visualmente.
@@ -202,6 +204,9 @@ O ponto crítico é cartão de crédito: a fatura pertence ao mês de competênc
 - Dado o demonstrativo exibido, quando há despesas de conta e cartão, então o resumo e a composição distinguem as duas origens e o detalhamento mostra a conta ou cartão de cada lançamento.
 - Dado o usuário gerando um demonstrativo, quando existem compras parceladas em aberto, então o resumo executivo exibe o endividamento atual da moeda/seção seguindo a mesma regra do Cockpit.
 - Dado o demonstrativo exibido ou impresso, quando valores monetários aparecem em KPIs, tabelas e legendas, então a fonte dos valores tem tamanho equivalente ao texto descritivo e não domina visualmente o layout.
+- Dado o valor de parcelas abertas na competência selecionada maior que o da competência anterior, quando o Cockpit é exibido, então o card de Dívidas mostra abaixo do total uma seta para cima e o valor da diferença por moeda.
+- Dado o valor de parcelas abertas na competência selecionada menor que o da competência anterior, quando o Cockpit é exibido, então o card de Dívidas mostra abaixo do total uma seta para baixo e o valor absoluto da diferença por moeda.
+- Dado o valor de parcelas abertas igual nas duas competências, quando o Cockpit é exibido, então o card de Dívidas mostra uma indicação discreta de estabilidade; moedas diferentes são comparadas separadamente.
 - Dado o usuário abrindo o Cockpit, quando a tela é exibida, então vê abas internas para alternar entre **Situação do mês**, **Calendário**, **Tendências** e **Saúde Financeira**, com **Situação do mês** ativa por padrão e nessa ordem.
 - Dado o usuário alternando para **Saúde Financeira**, quando a aba é ativada, então o score fica acessível sem exigir rolagem pelo resumo mensal.
 - Dado o usuário abrindo o Cockpit, quando a tela é exibida, então o seletor de mês inicia no mês corrente.
@@ -216,6 +221,7 @@ O ponto crítico é cartão de crédito: a fatura pertence ao mês de competênc
 - Dado o usuário visualizando saldos no Cockpit com mês diferente do mês corrente, quando os saldos forem exibidos, então os rótulos indicam claramente o mês selecionado.
 - Dado o usuário visualizando o Cockpit ou Relatórios em telas de 14 polegadas ou menores, quando os painéis de KPIs, demonstrativos e gráficos são exibidos, então os grids de 4 ou 6 colunas se reorganizam em 2 ou 3 colunas e os gráficos do demonstrativo empilham verticalmente para evitar compressão e quebra de layout.
 - Dado o usuário visualizando **Maiores despesas do mês** com a linha `Outros`, quando clica nessa linha, então um pop-up mostra as categorias/subcategorias que compõem `Outros`, com valor de cada item e total agregado, sem alterar os totais do Cockpit.
+- Dado o usuário visualizando **Análise de despesas** ou **Análise de receitas**, quando o gráfico possui um total central, então o rótulo e o valor usam hierarquia compacta, permanecem contidos no centro do anel e não encostam nos segmentos do gráfico, inclusive para valores monetários longos.
 - Dado o usuário abrindo o gráfico de evolução de uma categoria/subcategoria, quando o drawer é exibido, então a área do gráfico é aproximadamente 20% maior que o tamanho anterior.
 - Dado o gráfico de evolução exibido, quando há pontos de dados históricos ou projeção SMA, então cada ponto exibe o respectivo valor formatado, mesmo quando a linha de tendência está ativada.
 - Dado uma fatura paga por uma conta em BRL, quando o Cockpit calcula o saldo previsto após a data do pagamento, então considera somente o débito registrado na conta e não subtrai novamente a mesma fatura pela linha do cartão.
@@ -246,6 +252,8 @@ Cobertura: `tests/test_statement_report.py` e `tests/frontend_open_debts.test.mj
 
 ## Changelog
 
+- `2.31` — 2026-11-26 — Reduz e contém o valor central dos donuts de Análise de Despesas e Análise de Receitas, ampliando o respiro do anel e evitando colisão visual.
+- `2.30` — 2026-11-26 — Adiciona ao card de Dívidas do Cockpit a comparação discreta, por moeda, das parcelas abertas na competência selecionada contra o mês anterior, com seta e valor da alteração.
 - `2.29` — 2026-11-26 — Polimenta Relatórios com cabeçalho editorial, métricas e rankings de baixa ênfase, filtros mais claros e reflow para desktops compactos.
 - `2.28` — 2026-11-25 — Exclui da revisão de classificação os resgates e créditos de encerramento do Portfólio identificados pela origem financeira.
 - `2.27` — 2026-11-25 — Adiciona a visão consolidada de revisão de lançamentos sem classificação para contas e cartões, preservando a distinção entre categoria e conciliação.

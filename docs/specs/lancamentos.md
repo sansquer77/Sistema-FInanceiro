@@ -2,7 +2,7 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 3.50
+versao: 3.56
 atualizado: 2026-11-26
 relacionados:
   - "[[contas-correntes]]"
@@ -18,7 +18,7 @@ aliases: ["Lançamentos", "Transações"]
 # Lançamentos
 
 > [!info] Status
-> **implementado** · versão: `3.50` · área: `lancamentos` · atualizado em 2026-11-26 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]], [[emprestimos-quitacao]]
+> **implementado** · versão: `3.56` · área: `lancamentos` · atualizado em 2026-11-26 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]], [[emprestimos-quitacao]]
 
 ## Problema
 
@@ -31,7 +31,7 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 ## Jornada
 
 1. Usuário abre a área de Lançamentos.
-2. Escolhe a conta no topo do formulário.
+2. Confirma a conta ou cartão no bloco visível de destino do formulário, podendo usar também o seletor de contexto do extrato ou da fatura.
 3. Escolhe o tipo conforme a natureza da conta: receita, despesa, investimento, transferência ou câmbio.
 4. Informa valor, data, descrição e, quando aplicável, categoria, subcategoria e tags.
 5. Para transferência ou câmbio, informa também a conta de destino.
@@ -86,6 +86,13 @@ Qualquer usuário autenticado localmente que registre receitas, despesas, transf
 - Se `use_average` não estiver ativo e a série nunca tiver tido a flag ativa, o comportamento atual de edição/exclusão em cascata se mantém.
 - Lançamentos parcelados exibem índice e total (`1/36`, `2/36`...) sem reiniciar a contagem em edições pontuais.
 - A tela de Lançamentos organiza o formulário em uma composição compacta, mantendo todos os campos relevantes visíveis na edição, sem blocos contextuais escurecidos (inclusive nos campos de renda fixa).
+- O formulário de lançamento deve exibir um bloco destacado de **Destino do lançamento** com logo, nome e moeda da conta ou cartão atual. O bloco deve conter um seletor visível sincronizado com o seletor de contexto do extrato/fatura, para que a troca feita no formulário atualize também a origem da listagem.
+- No formulário de conta, o destino identifica a conta onde o lançamento será registrado; no formulário de cartão, identifica o cartão, emissor, bandeira quando disponível e competência da fatura. Falhas de correspondência de logo usam o fallback visual compartilhado de bancos e bandeiras.
+- Os blocos de destino de Conta e Cartão devem usar a mesma composição visual: marca à esquerda, identificação no centro e seletor na mesma posição à direita; a bandeira do cartão pode aparecer como detalhe sobreposto sem deslocar os demais elementos.
+- Os seletores de contexto da consulta e de destino do lançamento em Contas e Cartões devem usar o mesmo campo compacto, alinhado à direita e sem texto explicativo redundante ocupando a área de seleção.
+- O cabeçalho operacional acima dos gráficos de histórico, incluindo ação de novo lançamento, navegação mensal e seletor de Conta/Cartão, deve permanecer fixo durante a rolagem do Extrato de Contas e da Fatura de Cartões.
+- O seletor de Conta/Cartão da tela e o seletor correspondente do formulário devem compartilhar altura, tipografia, espaçamento interno e comportamento visual, mantendo apenas a largura adaptada ao seu contexto.
+- Os seletores da tela de Conta e da Fatura de Cartões também devem exibir a mesma marca/logo, identificação, metadados e detalhe de bandeira usados nos respectivos formulários, mantendo uma única leitura visual do destino selecionado.
 - A modalidade de renda fixa (Pós-fixada, Pré-fixada, Híbrida) é escolhida em combo na linha do Indexador, com o botão de ajuda (?) alinhado inline ao rótulo Modalidade.
 - O formulário de renda fixa não exibe os atalhos de presets (100% do CDI, 120% do CDI, IPCA + 6,5%) — a modalidade, o indexador e a taxa são preenchidos diretamente; marcadores tipo checkbox (média histórica e reserva de emergência) aparecem como checkbox simples, sem moldura tipo pill.
 - O campo Valor fica logo abaixo da Descrição e acima de Categoria/Subcategoria, mantendo posição estável no formulário independentemente do tipo de lançamento; em investimento, **Total debitado da conta** ocupa exatamente a mesma posição (o campo Valor fica oculto), de forma que o valor aparece na mesma altura em todos os tipos de lançamento.
@@ -187,6 +194,15 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dado o usuário visualizando Lançamentos de Contas, quando aciona `Novo lançamento` ou edita uma linha, então o formulário completo abre em flyover lateral com todos os campos condicionais, mensagens, validações e regras atuais preservados.
 - Dado o usuário visualizando o formulário de Lançamentos de Contas em um flyover estreito, quando campos de investimento, câmbio, empréstimo ou validações são exibidos, então os grupos respondem à largura real do painel e os avisos ocupam a linha completa sem sobrepor controles.
 - Dado o usuário visualizando Lançamentos de Contas, quando troca a conta no seletor de contexto fora do flyover, então o extrato, o saldo e os filtros da conta selecionada são atualizados sem abrir o formulário.
+- Dado o usuário abrindo o formulário de Lançamentos de Contas, quando uma conta está selecionada, então o bloco **Destino do lançamento** exibe sua logo, nome, moeda e seletor visível.
+- Dado o usuário trocando a conta no seletor visível do formulário de Lançamentos de Contas, quando a troca é feita, então o extrato, o saldo e o seletor de contexto passam a usar a nova conta.
+- Dado o usuário abrindo o formulário de Lançamentos de Cartões, quando um cartão está selecionado, então o bloco **Destino do lançamento** exibe nome, emissor, moeda, competência da fatura e logos disponíveis do emissor e da bandeira.
+- Dado uma conta, emissor ou bandeira sem logo catalogada, quando o bloco de destino é exibido, então o fallback visual compartilhado aparece sem ocultar o nome ou impedir o lançamento.
+- Dado o usuário alternando entre Lançamentos de Contas e Lançamentos de Cartões, quando os formulários são exibidos, então os respectivos blocos de destino mantêm a mesma hierarquia, alinhamento e posição do seletor.
+- Dado o usuário visualizando Lançamentos de Contas ou de Cartões, quando o contexto da consulta é exibido, então aparece apenas o seletor compacto de Conta ou Cartão, sem o bloco textual “Contexto da consulta” e sua instrução auxiliar.
+- Dado o usuário rolando o Extrato de Contas ou a Fatura de Cartões, quando o gráfico e a lista avançam pela tela, então o cabeçalho operacional permanece visível e o botão de novo lançamento continua acionável sem retornar ao topo.
+- Dado o usuário comparando o seletor da tela com o seletor do formulário, quando ambos são exibidos em Conta ou Cartão, então controles têm a mesma altura, fonte, padding e hierarquia de rótulo.
+- Dado o usuário visualizando o Extrato de Contas ou a Fatura de Cartões, quando o seletor de destino é renderizado, então ele exibe logo, nome, moeda/emissor e, para cartão, a bandeira, com o mesmo conjunto de elementos do formulário correspondente.
 - Dado o usuário visualizando Lançamentos de Contas em um desktop compacto, quando abre o flyover, então ele usa largura confortável de até `760px` sem comprimir os campos relacionados e continua responsivo em viewports menores.
 - Dado o usuário preenchendo o flyover de Lançamentos, quando compara campos de texto, data e seleção, então os controles mantêm a mesma altura, ritmo vertical e alinhamento, inclusive no modo compacto.
 - Dado qualquer formulário com campos em linhas ou grupos condicionais, quando o usuário visualiza os campos, então os rótulos, controles, mensagens e ações mantêm espaçamento vertical consistente; ações sem campo próprio não exibem um rótulo vazio apenas para reservar espaço.
@@ -263,6 +279,12 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 
 ## Changelog
 
+- `3.56` — 2026-11-26 — Reutiliza nos seletores do Extrato e da Fatura o mesmo conjunto visual de logo, identificação e metadados dos formulários de lançamento.
+- `3.55` — 2026-11-26 — Equaliza o estilo calculado dos seletores de Conta/Cartão da tela e dos formulários, incluindo altura, tipografia e padding.
+- `3.54` — 2026-11-26 — Fixa o cabeçalho operacional de Contas e Cartões acima dos gráficos para manter Novo lançamento, mês e seletor acessíveis durante a rolagem.
+- `3.53` — 2026-11-26 — Remove o texto redundante do contexto da consulta e unifica o campo compacto de seleção de Conta/Cartão entre toolbar e formulário.
+- `3.52` — 2026-11-26 — Unifica o layout dos blocos de destino de Conta e Cartão, mantendo logo/marca, identificação e seletor alinhados na mesma composição.
+- `3.51` — 2026-11-26 — Torna o destino do lançamento visível dentro dos formulários de conta e cartão, com seletor sincronizado, logos, moeda e competência da fatura para reduzir lançamentos no contexto errado.
 - `3.50` — 2026-11-26 — Harmoniza o espaçamento vertical de todos os campos e grupos condicionais dos formulários e remove o rótulo redundante acima de `Buscar cota`.
 - `3.49` — 2026-11-26 — Uniformiza a altura de inputs, seletores e datas no flyover de Lançamentos, incluindo a densidade compacta.
 - `3.48` — 2026-11-26 — Refina a camada visual de Lançamentos com contexto de consulta, toolbar em três níveis, contador hierárquico e linhas com metadados mais leves, sem alterar filtros ou regras financeiras.

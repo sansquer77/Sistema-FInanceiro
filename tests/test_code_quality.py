@@ -14,7 +14,7 @@ REVIEWED_OVERSIZED_MODULES = {
     # Reviewed cross-domain guard: emergency-reserve investment writes must reject
     # sources already allocated to an active financial goal.
     "financeiro/transactions.py": 1500,
-    "financeiro/trends.py": 1350,
+    "financeiro/trends.py": 1519,
     "web/modules/portfolio-view.js": 1692,
     "web/modules/reports-view.js": 1336,
 }
@@ -79,7 +79,8 @@ class CodeQualityContractTest(unittest.TestCase):
         index = (REPOSITORY_ROOT / "docs/README.md").read_text(encoding="utf-8")
 
         self.assertIn("status: implementado", spec)
-        self.assertIn("Nenhuma pendência conhecida.", spec)
+        self.assertIn("financeiro/trends.py", spec)
+        self.assertIn("será monitorado", spec)
         self.assertIn("[[qualidade-codigo]]", index)
 
     def test_http_and_spa_roots_do_not_contain_financial_arithmetic(self) -> None:

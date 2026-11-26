@@ -8,6 +8,7 @@ import { createTransactionBalanceChart } from "./transaction-balance-chart.js";
 import { createTransactionList } from "./transaction-list.js";
 import { createTransactionInvestmentForm } from "./transaction-investment-form.js";
 import { createTransactionForm } from "./transaction-form.js";
+import { attachBankLogoFallbacks, renderBankLogo } from "./bank-logos.js";
 
 export function registerTransactionsView({
   state,
@@ -59,6 +60,13 @@ export function registerTransactionsView({
     transactionTagOptions,
     transactionType,
     transactionAccount,
+    transactionFormAccount,
+    transactionDestinationLogo,
+    transactionDestinationName,
+    transactionDestinationMeta,
+    transactionContextDestinationLogo,
+    transactionContextDestinationName,
+    transactionContextDestinationMeta,
     transactionAmount,
     transactionAmountRow,
     destinationAccount,
@@ -170,6 +178,7 @@ export function registerTransactionsView({
     classificationSuggestion.schedule();
   });
   transactionAccount.addEventListener("change", handleTransactionAccountChange);
+  transactionFormAccount?.addEventListener("change", handleTransactionFormAccountChange);
   investmentAmount.addEventListener("input", () => {
     if (transactionType.value === "investment") {
       transactionAmount.value = investmentAmount.value;
@@ -404,6 +413,7 @@ export function registerTransactionsView({
     if (selectedAccountId && state.accounts.some((account) => String(account.id) === selectedAccountId)) {
       transactionAccount.value = selectedAccountId;
     }
+    syncTransactionDestinationAccount();
     transactionForm.elements.id.value = "";
     transactionForm.elements.date.value = todayLocalDateValue();
     installmentCount.value = "2";
@@ -440,6 +450,7 @@ export function registerTransactionsView({
       ? moneyInputValue(transaction.investment_operation.invested_amount)
       : "";
     transactionAccount.value = String(transaction.account_id);
+    syncTransactionDestinationAccount();
     transactionForm.elements.notes.value = transaction.notes || "";
     transactionForm.elements.tags.value = (transaction.tags || []).join(", ");
     transactionForm.elements.exchange_rate_to_brl.value = (transaction.exchange_rate_to_brl || "1.000000").replace(".", ",");
@@ -499,6 +510,9 @@ export function registerTransactionsView({
       `<option value="${account.id}">${escapeHtml(account.name)} (${escapeHtml(account.currency)})</option>`
     )).join("");
     transactionAccount.innerHTML = options || '<option value="">Cadastre uma conta</option>';
+    if (transactionFormAccount) {
+      transactionFormAccount.innerHTML = options || '<option value="">Cadastre uma conta</option>';
+    }
     transactionForm.querySelector('button[type="submit"]').disabled = state.accounts.length === 0;
     if (openTransactionFormButton) openTransactionFormButton.disabled = state.accounts.length === 0;
     renderImportTargets();
@@ -506,6 +520,7 @@ export function registerTransactionsView({
     if (state.selectedAccountId) {
       transactionAccount.value = state.selectedAccountId;
     }
+    syncTransactionDestinationAccount();
 
     applyWalletAccountDefault();
     applyWalletAccountRestrictions();
@@ -888,11 +903,47 @@ export function registerTransactionsView({
     if (account) {
       state.selectedAccountId = account.id;
     }
+    syncTransactionDestinationAccount();
     applyWalletAccountDefault();
     applyWalletAccountRestrictions();
     updateTransactionTypeState();
     classificationSuggestion.schedule();
     await loadSelectedTransactionSlice();
+  }
+
+  function handleTransactionFormAccountChange() {
+    if (!transactionFormAccount || transactionFormAccount.value === transactionAccount.value) return;
+    transactionAccount.value = transactionFormAccount.value;
+    void handleTransactionAccountChange();
+  }
+
+  function syncTransactionDestinationAccount() {
+    const account = state.accounts.find((entry) => String(entry.id) === String(transactionAccount.value));
+    if (transactionFormAccount) {
+      transactionFormAccount.value = account ? String(account.id) : "";
+    }
+    const destinationViews = [
+      { logo: transactionDestinationLogo, name: transactionDestinationName, meta: transactionDestinationMeta },
+      { logo: transactionContextDestinationLogo, name: transactionContextDestinationName, meta: transactionContextDestinationMeta },
+    ];
+    destinationViews.forEach(({ logo, name, meta }) => {
+      if (name) {
+        name.textContent = account?.name || "Selecione uma conta";
+      }
+      if (meta) {
+        meta.textContent = account
+          ? `${account.bank_name || "Instituição não informada"} · ${account.currency}`
+          : "O lançamento será registrado na conta selecionada.";
+      }
+      if (logo) {
+        logo.innerHTML = renderBankLogo({
+          name: account?.bank_name,
+          kind: account?.account_type === "wallet" ? "wallet" : "bank",
+          fallbackTitle: account?.name || "Conta",
+        });
+        attachBankLogoFallbacks(logo);
+      }
+    });
   }
 
   function applyWalletAccountDefault() {

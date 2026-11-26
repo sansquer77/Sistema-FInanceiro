@@ -133,7 +133,7 @@ class CockpitNotificationsTest(unittest.TestCase):
         )
 
     def test_limit_exceeded_alert_uses_real_spending_limits_loader(self):
-        # spec: cockpit/alertas-cockpit v1.10 — critério 1
+        # spec: cockpit/alertas-cockpit v1.12 — critério 1
         # Regressão: list_spending_limits_with_consumption preserva limit_amount_cents
         # para que o alerta de estouro seja detectado pelo backend.
         account = create_checking_account(self.user["id"], {
@@ -163,6 +163,9 @@ class CockpitNotificationsTest(unittest.TestCase):
         first = self.build(portfolio_events=[event])
         self.assertEqual(first["informational_count"], 1)
         notification_id = first["informational"][0]["id"]
+        self.assertEqual(first["informational"][0]["action"], {
+            "label": "Ver eventos", "route": "portfolio", "params": {"tab": "events"},
+        })
         self.assertEqual(mark_informational_seen(self.user["id"], [notification_id]), 1)
         second = self.build(portfolio_events=[event])
         self.assertEqual(second["informational_count"], 0)

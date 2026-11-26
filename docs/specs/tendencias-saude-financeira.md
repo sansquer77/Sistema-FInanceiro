@@ -2,7 +2,7 @@
 tipo: spec
 area: tendencias-saude-financeira
 status: em-implementacao
-versao: 2.32
+versao: 2.33
 atualizado: 2026-11-26
 relacionados:
   - "[[score-saude-financeira]]"
@@ -20,7 +20,7 @@ aliases: ["Tendências de Saúde Financeira", "Achados Financeiros", "Insights F
 # Tendências e Achados de Saúde Financeira
 
 > [!info] Status
-> **em-implementacao** · versão: `2.32` · área: `tendencias-saude-financeira` · atualizado em 2026-11-26 · relacionados: [[score-saude-financeira]], [[relatorios]], [[lancamentos]], [[cartoes]], [[../adr/0019-inferencia-local-webllm|ADR-0019]]
+> **em-implementacao** · versão: `2.33` · área: `tendencias-saude-financeira` · atualizado em 2026-11-26 · relacionados: [[score-saude-financeira]], [[relatorios]], [[lancamentos]], [[cartoes]], [[../adr/0019-inferencia-local-webllm|ADR-0019]]
 
 ## Problema
 
@@ -305,7 +305,7 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 ## Pendências
 
 > [!question] Pendências
-> Nenhuma pendência conhecida.
+> O módulo `financeiro/trends.py` está com 1.519 linhas e permanece sob monitoramento arquitetural. A próxima evolução relevante de Tendências deve priorizar a extração do bloco de assinaturas para um módulo próprio, sem alterar o contrato da fachada `calculate_trends`.
 
 ## Fora de escopo
 
@@ -339,6 +339,7 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 
 ## Changelog
 
+- `2.33` — 2026-11-26 — Registra o monitoramento arquitetural de `financeiro/trends.py` e a extração futura do bloco de assinaturas como próxima oportunidade de desconcentração.
 - `2.32` — 2026-11-26 — Remove o corte arbitrário de seis serviços na aba Assinaturas e diferencia resumo de detalhes sem ocultar itens.
 - `2.31` — 2026-11-26 — Consolida receitas/despesas pontuais e limites em agrupamentos únicos, com revisão de limite dentro do item recorrente para qualquer categoria.
 - `2.30` — 2026-11-26 — Reorganiza a visão geral de Tendências em Evolução, Orçamento e Achados, reduzindo cards e tratando confiança como contexto.

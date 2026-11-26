@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 1.18
-atualizado: 2026-11-11
+versao: 1.19
+atualizado: 2026-11-26
 relacionados:
   - "[[arquitetura]]"
   - "[[sdd]]"
@@ -18,7 +18,7 @@ aliases: ["Qualidade de Código", "Padrões de Qualidade", "Convenções de Cód
 # Qualidade de Código
 
 > [!info] Status
-> **implementado** · área: `meta` · versão: `1.18` · atualizado em 2026-11-11 · relacionados: [[arquitetura]], [[sdd]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]], [[adr/0003-sqlite-fonte-de-verdade]], [[specs/desacoplamento-importacao-parsers]]
+> **implementado** · área: `meta` · versão: `1.19` · atualizado em 2026-11-26 · relacionados: [[arquitetura]], [[sdd]], [[adr/0001-stack-local-sem-framework]], [[adr/0002-modularizacao-frontend]], [[adr/0003-sqlite-fonte-de-verdade]], [[specs/desacoplamento-importacao-parsers]]
 
 ## Objetivo
 
@@ -89,7 +89,7 @@ Os limites numéricos da seção "Sinais de alerta" são verificados pelo teste 
 ## Pendências
 
 > [!question] Pendências
-> Nenhuma pendência conhecida. As regras desta nota refletem o estado atual do código e devem ser reavaliadas quando novas extrações ou módulos forem implementados.
+> `financeiro/trends.py` permanece acima do sinal heurístico de 1.200 linhas, com 1.519 linhas na revisão atual. O tamanho foi registrado no gate como linha-base revisada, mas o módulo será monitorado: novas funcionalidades de Tendências devem priorizar a extração do bloco de assinaturas para um módulo próprio antes de ampliar novamente a fachada.
 
 ## Fora de escopo
 
@@ -99,6 +99,7 @@ Os limites numéricos da seção "Sinais de alerta" são verificados pelo teste 
 
 ## Changelog
 
+- `1.19` — 2026-11-26 — Registra `financeiro/trends.py` como pendência monitorada em 1.519 linhas e atualiza a linha-base do gate de qualidade sem tratar o crescimento como encerrado.
 - `1.18` — 2026-11-11 — Limite revisado de `financeiro/transactions.py` elevado para 1.500 linhas, com folga para novas regras de lançamento sem nova revisão a cada ajuste pequeno; a regra de categoria de empréstimos ficou em `financeiro/loans.py` ([[specs/emprestimos-quitacao]] v0.61).
 - `1.17` — 2026-11-11 — Limite revisado de `financeiro/transactions.py` elevado para 1.397 linhas após a associação de parcelas de série da categoria `loan_payment` ([[specs/emprestimos-quitacao]] v0.61); a regra de categoria ficou em `financeiro/loans.py`.
 - `1.16` — 2026-09-04 — Limite revisado de `financeiro/trends.py` elevado para 1.350 linhas após adição da detecção de limites recorrentemente ultrapassados em [[specs/tendencias-saude-financeira]].

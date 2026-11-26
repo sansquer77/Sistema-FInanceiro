@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: meta
 status: implementado
-versao: 4.64
-atualizado: 2026-11-18
+versao: 4.67
+atualizado: 2026-11-26
 relacionados:
   - "[[requisitos]]"
   - "[[sdd]]"
@@ -19,7 +19,7 @@ tags: [arquitetura, meta]
 # Arquitetura
 
 > [!info] Status
-> **implementado** · versão: `4.64` · área: `meta` · atualizado em 2026-11-26 · relacionados: [[requisitos]], [[qualidade-codigo]], [[specs/investimentos-portfolio]], [[specs/consultor]], [[specs/tendencias-saude-financeira]], [[adr/0019-inferencia-local-webllm]], [[adr/0020-pesquisa-macro-consultor]], [[adr/0023-configuracoes-ia-por-provedor]], [[specs/desacoplamento-importacao-parsers]]
+> **implementado** · versão: `4.67` · área: `meta` · atualizado em 2026-11-26 · relacionados: [[requisitos]], [[qualidade-codigo]], [[specs/investimentos-portfolio]], [[specs/consultor]], [[specs/tendencias-saude-financeira]], [[adr/0019-inferencia-local-webllm]], [[adr/0020-pesquisa-macro-consultor]], [[adr/0023-configuracoes-ia-por-provedor]], [[specs/desacoplamento-importacao-parsers]]
 
 ## Visão geral
 
@@ -101,10 +101,10 @@ Os assets normalizados do catálogo ficam em `web/assets/banks/` e `web/assets/b
 | `trends-view.js` | Aba **Tendências** do Cockpit: gráfico mês a mês, Budget x Realizado e achados local. |
 | `consultor-view.js` | Aba **Consultor** do Cockpit: seletor fechado de análises, execução sob demanda, período condicional para ralos, histórico, vencimentos e atrasos, com renderização de tabelas markdown nas respostas. |
 | `accounts-view.js` | Contas: cadastro, edição, arquivamento, restauração. |
-| `cards-view.js` | Cartões: cadastro, faturas, pagamento, conciliação. |
+| `cards-view.js` | Cartões: cadastro, faturas, pagamento, conciliação e identificação visual do cartão no formulário de lançamento. |
 | `portfolio-view.js` | Ativos: posições, histórico, resgate e encerramento; libera gráficos, overlays e DOM dinâmico ao sair, reutiliza fábricas de linha agrupadas e formata somente a janela virtual visível. |
 | `portfolio-lifecycle.js` | Política de reaproveitamento do snapshot e limpeza seletiva do DOM dinâmico do Portfólio. |
-| `transactions-view.js` | Lançamentos: formulário, recorrência, parcelas, câmbio. |
+| `transactions-view.js` | Lançamentos: formulário, recorrência, parcelas, câmbio e identificação visual/sincronizada da conta no destino do lançamento. |
 | `transaction-balance-chart.js` | Renderização ApexCharts da evolução mensal de saldos do Extrato. |
 | `transaction-list.js` | Coordenação de busca, filtros e renderização da lista mensal. |
 | `transaction-form.js` | Comportamento base do formulário e prévia cambial fornecida pelo backend. |
@@ -418,7 +418,7 @@ Utilitários puros compartilhados preservam as fronteiras funcionais: `money.py`
 | `http_routes.py` | Tabela declarativa e resolução de rotas, independente do transporte HTTP. Ver [[specs/desconcentracao-arquitetura-v2]]. |
 | `cockpit.py` | Agregações de domínio do resumo mensal do Cockpit com `SUM`, `COUNT` e `GROUP BY` no SQLite, fora do adaptador HTTP e sem materializar lançamentos detalhados. |
 | `cockpit_notifications.py` | Motor desacoplado de notificações financeiras: compila limites, saldo projetado, contas/faturas vencidas, maturidades e eventos semanais; cruza informativos com `notification_reads` sem depender do snapshot mensal ou de rede para maturidades. Ver [[specs/alertas-cockpit]]. |
-| `open_debts.py` | Leitura consistente e agregação de parcelas em aberto, por usuário e moeda, compartilhada entre `/api/cockpit` (`open_debts`) e Relatórios. Conciliação liquida parcela de conta; registro de pagamento encerra fatura. Inclui vencidas, sem reconstrução histórica, rede ou escrita. |
+| `open_debts.py` | Leitura consistente e agregação de parcelas em aberto, por usuário e moeda, compartilhada entre `/api/cockpit` (`open_debts`) e Relatórios. Conciliação liquida parcela de conta; registro de pagamento encerra fatura. Inclui vencidas e comparação de competência atual/anterior para o indicador do Cockpit, sem reconstrução histórica, rede ou escrita. |
 | `balance_projections.py` | Saldos conciliados/projetados e reservas de faturas; a projeção detalhada atende o Extrato, enquanto o Cockpit usa uma consolidação por moeda agregada diretamente no SQLite, sem materializar históricos. |
 | `portfolio.py` | API pública e composição do Portfólio; mantém CRUD, adaptação dos provedores e aplicação de cotações de mercado/fundos. Delega transporte/cache, valorização por data e série histórica. Resgates e encerramentos preparam posições fora da escrita e revalidam entradas locais na transação, sem recotação. Ver [[investimentos-portfolio]]. |
 | `portfolio_positions.py` | Identidade, auxiliares de lotes/FIFO e leituras locais compartilhadas: entradas da carteira e vencimentos abertos de renda fixa filtrados no SQLite; histórico de resgates por conexão recebida. Não contém CRUD completo nem consultas externas. |
@@ -646,7 +646,7 @@ Ver [[investimentos-portfolio]].
 
 ### Cockpit e Relatórios
 
-1. `GET /api/cockpit?month=AAAA-MM` consolida lançamentos de conta pelo mês selecionado e lançamentos de cartão pela fatura (`invoice_month`).
+1. `GET /api/cockpit?month=AAAA-MM` consolida lançamentos de conta pelo mês selecionado e lançamentos de cartão pela fatura (`invoice_month`). O payload `open_debts.trend_by_currency` compara, por moeda, as parcelas abertas na competência selecionada contra a competência anterior para apresentação do indicador de tendência no card de Dívidas.
 2. `GET /api/cockpit/calendar` retorna contas a receber/pagar atrasadas e vencimentos de renda fixa em 30 e 60 dias, calculados pela data atual do servidor, independentemente do mês selecionado. Ver [[specs/cockpit-calendario]].
 3. O Cockpit usa um seletor mensal compartilhado pelas abas **Situação do mês**, **Calendário**, **Tendências** e **Saúde Financeira**.
 4. Planejamento do mês considera receitas/despesas/investimentos recorrentes, incluindo recorrências de cartão.
@@ -709,6 +709,9 @@ Decisões não triviais estão documentadas como ADRs para preservar o raciocín
 
 ## Changelog
 
+- `4.67` — 2026-11-26 — Documenta os blocos visíveis de destino nos formulários de Lançamentos, com seletor sincronizado e logos de conta/emissor/bandeira.
+- `4.66` — 2026-11-26 — Documenta `open_debts.trend_by_currency`, que compara as parcelas abertas nas competências selecionada/anterior para o indicador discreto do card de Dívidas do Cockpit.
+- `4.65` — 2026-11-26 — Sincroniza os metadados da arquitetura com o contrato atual do app e com a documentação do schema `20012`.
 - `4.64` — 2026-11-26 — Atualiza o contrato da rota de Eventos com `estimated_value_micros`, calculado no backend a partir da quantidade aberta atual, e documenta a natureza bruta da estimativa.
 - `4.63` — 2026-11-18 — Registra a migração `20012`, garantindo que bancos existentes recebam a tabela de configurações por provedor e a permissão de uso do DeepSeek.
 - `4.62` — 2026-11-18 — Documenta `user_ai_provider_settings`, o isolamento de endpoints/modelos por provedor e o payload criptografado de credenciais múltiplas, incluindo DeepSeek. Ver [[adr/0023-configuracoes-ia-por-provedor]].

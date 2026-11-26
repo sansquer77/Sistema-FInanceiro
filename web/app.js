@@ -63,11 +63,11 @@ import { registerClassificationsView } from "./modules/classifications-view.js";
 import { registerLimitsView } from "./modules/limits-view.js?v=4";
 import { registerReportsView } from "./modules/reports-view.js?v=3";
 import { registerImportsView } from "./modules/imports-view.js";
-import { registerCockpitView } from "./modules/cockpit-view.js?v=188";
+import { registerCockpitView } from "./modules/cockpit-view.js?v=190";
 import { registerAccountsView } from "./modules/accounts-view.js";
-import { registerCardsView } from "./modules/cards-view.js";
-import { registerPortfolioView } from "./modules/portfolio-view.js?v=164";
-import { registerTransactionsView } from "./modules/transactions-view.js";
+import { registerCardsView } from "./modules/cards-view.js?v=198";
+import { registerPortfolioView } from "./modules/portfolio-view.js?v=165";
+import { registerTransactionsView } from "./modules/transactions-view.js?v=198";
 import { registerSimulationsView } from "./modules/simulations-view.js?v=2";
 import { registerOperationHistoryView } from "./modules/operation-history-view.js";
 import { registerLoansView } from "./modules/loans-view.js?v=2";
@@ -125,6 +125,10 @@ const creditCardList = document.querySelector("#creditCardList");
 const archivedCreditCardList = document.querySelector("#archivedCreditCardList");
 const cancelCreditCardEditButton = document.querySelector("#cancelCreditCardEditButton");
 const cardInvoiceCard = document.querySelector("#cardInvoiceCard");
+const cardInvoiceDestinationLogo = document.querySelector("#cardInvoiceDestinationLogo");
+const cardInvoiceDestinationNetwork = document.querySelector("#cardInvoiceDestinationNetwork");
+const cardInvoiceDestinationName = document.querySelector("#cardInvoiceDestinationName");
+const cardInvoiceDestinationMeta = document.querySelector("#cardInvoiceDestinationMeta");
 const cardInvoiceMonthLabel = document.querySelector("#cardInvoiceMonthLabel");
 const previousCardInvoiceButton = document.querySelector("#previousCardInvoiceButton");
 const todayCardInvoiceButton = document.querySelector("#todayCardInvoiceButton");
@@ -148,6 +152,11 @@ const openCardTransactionFormButton = document.querySelector("#openCardTransacti
 const closeCardTransactionFormButton = document.querySelector("#closeCardTransactionFormButton");
 const cardTransactionFormTitle = document.querySelector("#cardTransactionFormTitle");
 const cardTransactionType = document.querySelector("#cardTransactionType");
+const cardTransactionCard = document.querySelector("#cardTransactionCard");
+const cardTransactionDestinationLogo = document.querySelector("#cardTransactionDestinationLogo");
+const cardTransactionDestinationNetwork = document.querySelector("#cardTransactionDestinationNetwork");
+const cardTransactionDestinationName = document.querySelector("#cardTransactionDestinationName");
+const cardTransactionDestinationMeta = document.querySelector("#cardTransactionDestinationMeta");
 const cardTransactionCategory = document.querySelector("#cardTransactionCategory");
 const cardTransactionSubcategory = document.querySelector("#cardTransactionSubcategory");
 const cardClassificationSuggestion = document.querySelector("#cardClassificationSuggestion");
@@ -169,6 +178,13 @@ const transactionFormDrawerOverlay = document.querySelector("#transactionFormDra
 const openTransactionFormButton = document.querySelector("#openTransactionFormButton");
 const closeTransactionFormButton = document.querySelector("#closeTransactionFormButton");
 const transactionFormTitle = document.querySelector("#transactionFormTitle");
+const transactionFormAccount = document.querySelector("#transactionFormAccount");
+const transactionDestinationLogo = document.querySelector("#transactionDestinationLogo");
+const transactionDestinationName = document.querySelector("#transactionDestinationName");
+const transactionDestinationMeta = document.querySelector("#transactionDestinationMeta");
+const transactionContextDestinationLogo = document.querySelector("#transactionContextDestinationLogo");
+const transactionContextDestinationName = document.querySelector("#transactionContextDestinationName");
+const transactionContextDestinationMeta = document.querySelector("#transactionContextDestinationMeta");
 const transactionMessage = document.querySelector("#transactionMessage");
 const transactionListMessage = document.querySelector("#transactionListMessage");
 const transactionList = document.querySelector("#transactionList");
@@ -1044,7 +1060,12 @@ const cockpitView = registerCockpitView({
       return;
     }
     if (action?.route === "portfolio") {
+      const portfolioTab = ["position", "analysis", "goals", "events", "history"].includes(params.tab)
+        ? params.tab
+        : "position";
+      state.portfolioTab = portfolioTab;
       showModule("portfolio");
+      portfolioView.showPortfolioTab(portfolioTab);
     }
   },
 });
@@ -1101,6 +1122,10 @@ const cardsView = registerCardsView({
     archivedCreditCardList,
     cancelCreditCardEditButton,
     cardInvoiceCard,
+    cardInvoiceDestinationLogo,
+    cardInvoiceDestinationNetwork,
+    cardInvoiceDestinationName,
+    cardInvoiceDestinationMeta,
     cardInvoiceMonthLabel,
     previousCardInvoiceButton,
     todayCardInvoiceButton,
@@ -1124,6 +1149,11 @@ const cardsView = registerCardsView({
     openCardTransactionFormButton,
     cardTransactionFormTitle,
     cardTransactionType,
+    cardTransactionCard,
+    cardTransactionDestinationLogo,
+    cardTransactionDestinationNetwork,
+    cardTransactionDestinationName,
+    cardTransactionDestinationMeta,
     cardTransactionCategory,
     cardTransactionSubcategory,
     cardClassificationSuggestion,
@@ -1182,6 +1212,13 @@ const transactionsView = registerTransactionsView({
     transactionFormDrawerController,
     openTransactionFormButton,
     transactionFormTitle,
+    transactionFormAccount,
+    transactionDestinationLogo,
+    transactionDestinationName,
+    transactionDestinationMeta,
+    transactionContextDestinationLogo,
+    transactionContextDestinationName,
+    transactionContextDestinationMeta,
     transactionMessage,
     transactionListMessage,
     transactionList,
