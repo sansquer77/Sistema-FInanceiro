@@ -28,7 +28,7 @@ def build_cockpit_notifications(
     reference_date = reference_date or date.today()
     month = reference_date.strftime("%Y-%m")
 
-    # spec: cockpit/alertas-cockpit v1.12 — critérios 1, 3, 4, 5, 6, 11 e 22
+    # spec: cockpit/alertas-cockpit v1.13 — critérios 1, 3, 4, 5, 6, 11 e 22
     critical = _limit_notifications(limits_loader(user_id, month), month)
     # totals_loader permanece como ponto de compatibilidade para integrações que
     # já injetavam o agregador do Cockpit; o formato esperado agora é o evento
@@ -116,7 +116,7 @@ def _revolving_zero_balance_notifications(user_id: int) -> list[dict]:
 
 
 def _backup_failure_notifications(user_id: int) -> list[dict]:
-    # spec: cockpit/alertas-cockpit v1.12 — critério 15
+    # spec: cockpit/alertas-cockpit v1.13 — critério 15
     # Backup policy is installation-wide; only its responsible user can resolve settings.
     with get_connection() as conn:
         row = conn.execute(
@@ -196,7 +196,7 @@ def _monthly_close_notification(user_id: int, reference_date: date) -> dict | No
                WHERE t.user_id = ? AND t.archived_at IS NULL AND a.archived_at IS NULL
                  AND substr(t.date, 1, 7) = ? AND t.type IN ('income', 'expense')
                  AND t.category_id IS NULL
-                 -- spec: cockpit/alertas-cockpit v1.12 — critérios 23 e 24
+                 -- spec: cockpit/alertas-cockpit v1.13 — critérios 23 e 24
                  -- Resgates e créditos de encerramento do Portfólio já têm
                  -- classificação pela origem financeira, mesmo sem categoria.
                  AND NOT EXISTS (

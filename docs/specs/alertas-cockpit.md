@@ -2,7 +2,7 @@
 tipo: spec
 area: cockpit
 status: implementado
-versao: 1.12
+versao: 1.13
 atualizado: 2026-11-26
 relacionados:
   - "[[cockpit-calendario]]"
@@ -20,7 +20,7 @@ aliases: ["Alertas e Notificações do Cockpit", "Alertas Cockpit", "Central de 
 # Alertas e Notificações do Cockpit
 
 > [!info] Status
-> **implementado** · versão: `1.12` · área: `cockpit` · atualizado em 2026-11-26 · relacionados: [[cockpit-calendario]], [[limites-gastos]], [[cartoes]], [[lancamentos]], [[investimentos-portfolio]], [[backup-restauracao]], [[specs/emprestimos-quitacao]], [[arquitetura]], [[requisitos]]
+> **implementado** · versão: `1.13` · área: `cockpit` · atualizado em 2026-11-26 · relacionados: [[cockpit-calendario]], [[limites-gastos]], [[cartoes]], [[lancamentos]], [[investimentos-portfolio]], [[backup-restauracao]], [[specs/emprestimos-quitacao]], [[arquitetura]], [[requisitos]]
 
 ### Problema
 
@@ -38,7 +38,7 @@ Usuário autenticado localmente que consulta o Cockpit para acompanhar o panoram
 4. Ao clicar em um dos indicadores, o sistema abre um painel flutuante (**flyout global**) renderizado no nível superior de sobreposições da aplicação, sem sofrer cortes de contêiner ou conflitos de empilhamento de camadas.
 5. O usuário visualiza os itens agrupados por tipo, contendo título curto, explicação clara, competência/data de referência e uma ação contextual direta (ex.: “Ver limites”, “Abrir calendário”, “Ver eventos”, “Ver faturas”).
 6. Para **Alertas Críticos**, o usuário clica na ação para ser direcionado à tela correspondente e corrigir o problema. O alerta permanece ativo no flyout até que a condição de negócio seja sanada (ex.: conciliação de conta, ajuste orçamentário).
-7. Para **Informativos**, cada item não lido oferece **"Marcar como lido"** e a lista também permite marcar todos os itens não lidos como vistos, removendo o destaque do indicador sem retirar os eventos da lista durante o período de vigência.
+7. Para **Informativos**, cada item não lido oferece **"Marcar como lido"** e a lista também permite marcar todos os itens não lidos como vistos. Ao serem lidos, os itens deixam a listagem ativa e o destaque do indicador é removido.
 8. Ao clicar fora, no botão de fechar ou pressionar `Escape`, o flyout fecha suavemente, restaurando o foco acessível.
 9. O banner de nova versão do aplicativo (`cockpitVersionAlert`) permanece visível de forma independente logo acima dos cards de resumo executivo com seu botão de dispensar, sem ser misturado à lista do flyout de notificações financeiras.
 
@@ -210,7 +210,7 @@ Restrição de unicidade: `PRIMARY KEY (user_id, notification_id)`.
 - Dado que uma falha transitória de rede ou indisponibilidade externa de cotações de mercado ocorre, quando o backend monta as notificações, então nenhum alerta crítico vermelho é emitido por essa indisponibilidade temporária.
 - Dado que há proventos detectados na semana corrente para a carteira do usuário, quando ele consulta o Cockpit, então o indicador de Informativos exibe a cor amarela e contador correspondente.
 - Dado que o usuário visualiza a lista de Informativos no flyout e aciona a opção de marcar como vistos, quando o flyout é fechado, então o badge amarelo perde o destaque de novidade, mas os itens continuam acessíveis para consulta na listagem durante a semana.
-- Dado que o usuário visualiza um Informativo não lido, quando aciona **"Marcar como lido"** no próprio item, então somente esse informativo é persistido como visto, o item permanece na lista e o contador de novidades é atualizado.
+- Dado que o usuário visualiza um Informativo não lido, quando aciona **"Marcar como lido"** no próprio item, então somente esse informativo é persistido como visto, deixa a listagem ativa e o contador de novidades é atualizado.
 - Dado que um Informativo de proventos possui a ação **"Ver eventos"**, quando o usuário a aciona, então o sistema abre diretamente **Gestão → Portfólio → Eventos**, sem abrir o calendário do Cockpit.
 - Dado que o usuário acessa o sistema a partir de uma viewport estreita (mobile), quando o Cockpit é renderizado, então os indicadores ao lado das abas se condensam em um botão único de Notificações, cujo clique abre o flyout preservando internamente as seções separadas de Críticos e Informativos.
 - Dado que o usuário abre Notificações em qualquer viewport, então o flyout aparece ancorado no topo, abaixo do cabeçalho, e mantém sua posição ao alternar entre Críticos e Informativos.
@@ -262,6 +262,7 @@ Restrição de unicidade: `PRIMARY KEY (user_id, notification_id)`.
 
 ### Changelog
 
+- `1.13` — 2026-11-26 — Remove da listagem ativa os informativos marcados como lidos e transforma a ação individual em um controle secundário discreto.
 - `1.12` — 2026-11-26 — Restaura a ação individual para marcar informativos como lidos e direciona “Ver eventos” de proventos diretamente para a aba Eventos do Portfólio.
 - `1.11` — 2026-11-26 — Alinha a superfície do flyout de notificações ao tema ativo, removendo a diferença de cor em relação aos demais overlays.
 - `1.10` — 2026-11-25 — Reconhece resgates e créditos de encerramento do Portfólio pela origem financeira, evitando falso lembrete de classificação em fluxos já contextualizados.

@@ -10858,7 +10858,7 @@ form[aria-busy="true"] .form-actions {
     overflow: visible;
   }
 }
-/* spec: cockpit/alertas-cockpit v1.12 — flyout global de notificações */
+/* spec: cockpit/alertas-cockpit v1.13 — flyout global de notificações */
 .notification-flyout { position:fixed; inset:88px 16px auto auto; width:min(520px,calc(100vw - 32px)); max-height:calc(100vh - 104px); margin:0; padding:0; border:1px solid var(--outline-variant); border-radius:18px; color:var(--on-surface); background:var(--surface-container); box-shadow:var(--drawer-shadow); }
 .notification-flyout::backdrop { background:var(--modal-overlay); }
 .notification-flyout-surface { display:grid; grid-template-rows:auto auto minmax(180px,1fr) auto; max-height:calc(100vh - 104px); }
@@ -10885,6 +10885,9 @@ form[aria-busy="true"] .form-actions {
 .notification-flyout-item p,.notification-flyout-item time,.notification-flyout-empty { color:var(--on-surface-variant); }
 .notification-flyout-actions { display:flex; flex-wrap:wrap; gap:8px; padding-top:3px; }
 .notification-flyout-action { justify-self:start; }
+.notification-flyout-seen-action { border:0; border-radius:999px; padding:5px 9px; color:var(--on-surface-variant); background:transparent; font-size:.75rem; font-weight:700; cursor:pointer; }
+.notification-flyout-seen-action:hover,.notification-flyout-seen-action:focus-visible { color:var(--on-surface); background:var(--surface-container-high); }
+.notification-flyout-seen-action:disabled { opacity:.55; cursor:wait; }
 .notification-flyout-footer { justify-content:flex-end; border-top:1px solid var(--outline-variant); }
 @media (max-width:640px) { .notification-flyout { inset:72px 8px auto 8px; width:auto; max-height:calc(100vh - 88px); } .notification-flyout-surface { max-height:calc(100vh - 88px); } .notification-flyout-body { height:min(55vh,460px); min-height:150px; } }
 

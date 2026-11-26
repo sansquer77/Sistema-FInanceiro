@@ -1,4 +1,4 @@
-// spec: cockpit/alertas-cockpit v1.12 — critérios 2, 6, 8 e 9
+// spec: cockpit/alertas-cockpit v1.13 — critérios 2, 6, 8 e 9
 const META = {
   critical: { title: "Alertas críticos", empty: "Nenhum alerta crítico pendente. Suas contas e limites estão em dia." },
   informational: { title: "Informativos", empty: "Nenhum novo evento ou provento registrado para esta semana." },
@@ -113,12 +113,17 @@ export function createNotificationFlyout({ onAction, onMarkSeen } = {}) {
       tab.setAttribute("aria-selected", String(selected));
       tab.tabIndex = selected ? 0 : -1;
       tab.querySelector(".notification-flyout-tab-label").textContent = notificationSectionLabel(name);
-      tab.querySelector(".notification-flyout-tab-count").textContent = String(payload[name].length);
-      tab.setAttribute("aria-label", `${notificationSectionLabel(name)}: ${payload[name].length}`);
+      const count = name === "informational"
+        ? payload[name].filter((item) => !item.seen).length
+        : payload[name].length;
+      tab.querySelector(".notification-flyout-tab-count").textContent = String(count);
+      tab.setAttribute("aria-label", `${notificationSectionLabel(name)}: ${count}`);
     }
     body.setAttribute("aria-labelledby", section === "critical" ? criticalTab.id : informationalTab.id);
     body.replaceChildren();
-    const items = payload[section];
+    const items = section === "informational"
+      ? payload[section].filter((item) => !item.seen)
+      : payload[section];
     if (!items.length) {
       const empty = document.createElement("p");
       empty.className = "notification-flyout-empty";
@@ -146,8 +151,8 @@ export function createNotificationFlyout({ onAction, onMarkSeen } = {}) {
     const actions = Array.isArray(item.actions)
       ? item.actions
       : item.action?.label ? [item.action] : [];
-    const itemActions = [];
-    if (actions.length) {
+    const hasSeenAction = section === "informational" && !item.seen;
+    if (actions.length || hasSeenAction) {
       const actionGroup = document.createElement("div");
       actionGroup.className = "notification-flyout-actions";
       actions.forEach((itemAction) => {
@@ -165,27 +170,26 @@ export function createNotificationFlyout({ onAction, onMarkSeen } = {}) {
         });
         actionGroup.append(action);
       });
-      itemActions.push(actionGroup);
+      if (hasSeenAction) {
+        const seenAction = document.createElement("button");
+        seenAction.type = "button";
+        seenAction.className = "notification-flyout-seen-action";
+        seenAction.textContent = "Marcar como lido";
+        seenAction.addEventListener("click", async () => {
+          seenAction.disabled = true;
+          try {
+            await onMarkSeen?.([item.id]);
+            item.seen = true;
+            render();
+          } catch {
+            status.textContent = "Não foi possível marcar o informativo como lido. Tente novamente.";
+            seenAction.disabled = false;
+          }
+        });
+        actionGroup.append(seenAction);
+      }
+      article.append(actionGroup);
     }
-    if (section === "informational" && !item.seen) {
-      const seenAction = document.createElement("button");
-      seenAction.type = "button";
-      seenAction.className = "ghost small-button notification-flyout-seen-action";
-      seenAction.textContent = "Marcar como lido";
-      seenAction.addEventListener("click", async () => {
-        seenAction.disabled = true;
-        try {
-          await onMarkSeen?.([item.id]);
-          item.seen = true;
-          render();
-        } catch {
-          status.textContent = "Não foi possível marcar o informativo como lido. Tente novamente.";
-          seenAction.disabled = false;
-        }
-      });
-      itemActions.push(seenAction);
-    }
-    if (itemActions.length) article.append(...itemActions);
     return article;
   }
 

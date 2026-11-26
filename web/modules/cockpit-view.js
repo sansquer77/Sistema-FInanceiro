@@ -4,7 +4,7 @@ import { registerFinancialHealthView } from "./financial-health-view.js?v=2";
 import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";
 import { stateMarkup } from "./dom-utils.js";
 import { renderChart } from "./chart-adapter.js";
-import { createNotificationFlyout } from "./notification-flyout.js?v=3";
+import { createNotificationFlyout } from "./notification-flyout.js?v=4";
 
 const COCKPIT_DISCLOSURE_KEY = "sf-cockpit-disclosures-v1";
 

@@ -32,6 +32,7 @@ test("flyout offers per-item read action for unseen informational items", () => 
   assert.match(source, /section === "informational" && !item\.seen/);
   assert.match(source, /Marcar como lido/);
   assert.match(source, /onMarkSeen\?\.\(\[item\.id\]\)/);
+  assert.match(source, /payload\[section\]\.filter\(\(item\) => !item\.seen\)/);
 });
 
 test("Cockpit integra indicadores separados e condensado com carregamento dedicado", () => {

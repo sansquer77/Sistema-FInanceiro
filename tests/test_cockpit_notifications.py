@@ -133,7 +133,7 @@ class CockpitNotificationsTest(unittest.TestCase):
         )
 
     def test_limit_exceeded_alert_uses_real_spending_limits_loader(self):
-        # spec: cockpit/alertas-cockpit v1.12 — critério 1
+        # spec: cockpit/alertas-cockpit v1.13 — critério 1
         # Regressão: list_spending_limits_with_consumption preserva limit_amount_cents
         # para que o alerta de estouro seja detectado pelo backend.
         account = create_checking_account(self.user["id"], {
