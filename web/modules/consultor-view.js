@@ -1,5 +1,5 @@
 // spec: cockpit-calendario v0.9 — critérios 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17 e 18
-// spec: consultor/consultor v2.46 — view de análises, pesquisa macro e fontes
+// spec: consultor/consultor v2.47 — respostas parciais preservadas e sinalizadas
 import { stateMarkup } from "./dom-utils.js";
 import { runLocalConsultor } from "./webllm-client.js?v=182";
 export function registerConsultorView({
@@ -374,10 +374,32 @@ export function registerConsultorView({
         <span>${escapeHtml(result.created_at || "")}</span>
       </div>
       <div class="consultor-response">${formatConsultorText(result.output || "")}</div>
+      ${renderPartialOutputNotice(result.missing_sections)}
       <p class="form-help consultor-generation-source">Gerada com ${escapeHtml(result.provider === "webllm" ? "IA local" : "IA remota")}.</p>
       ${localFailure && result.provider !== "webllm" ? `<p class="form-help">${escapeHtml(localFailure)} Foi usado o fallback remoto.</p>` : ""}
       ${renderMacroResearchSources(research)}
     `;
+  }
+
+  function renderPartialOutputNotice(missingSections) {
+    const sections = Array.isArray(missingSections)
+      ? missingSections.filter((section) => typeof section === "string" && section.trim())
+      : [];
+    if (!sections.length) {
+      return "";
+    }
+    const sectionLabels = {
+      "Resumo": "Resumo",
+      "Analise de Dados": "Análise de Dados",
+      "Pontos de Atencao (Riscos)": "Pontos de Atenção (Riscos)",
+      "Plano de Acao (Educacional)": "Plano de Ação (Educacional)",
+    };
+    const labels = sections.map((section) => escapeHtml(sectionLabels[section] || section)).join(", ");
+    return `<aside class="consultor-partial-warning" role="status">
+      <strong>Resposta parcial preservada</strong>
+      <p>Não identificamos no formato esperado: ${labels}.</p>
+      <p>O conteúdo original foi mantido e nenhuma informação foi preenchida automaticamente.</p>
+    </aside>`;
   }
 
   function renderMacroResearchSources(research) {
@@ -423,6 +445,7 @@ export function registerConsultorView({
           renderAnalysisOutput({
             analysis_id: item.analysis_id,
             output: item.analysis_output,
+            missing_sections: item.missing_sections,
             created_at: item.created_at,
           });
           setConsultorTab("analyses");

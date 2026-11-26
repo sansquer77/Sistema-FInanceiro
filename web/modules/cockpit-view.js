@@ -1,5 +1,5 @@
 import { registerTrendsView } from "./trends-view.js?v=186";
-import { registerConsultorView } from "./consultor-view.js?v=183";
+import { registerConsultorView } from "./consultor-view.js?v=184";
 import { registerFinancialHealthView } from "./financial-health-view.js?v=2";
 import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";
 import { stateMarkup } from "./dom-utils.js";

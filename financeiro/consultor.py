@@ -85,6 +85,14 @@ REFUSAL_MESSAGE = (
     "Nao posso recomendar a venda ou o resgate de investimentos, nem garantir "
     "retornos ou ausencia de risco. Esta analise deve permanecer educacional e informativa."
 )
+CONSULTOR_QUOTA_ERROR_MESSAGE = (
+    "O provedor de IA atingiu o limite de requisições ou a cota disponível. "
+    "Verifique a cota do modelo configurado ou tente novamente mais tarde."
+)
+CONSULTOR_EMPTY_RESPONSE_MESSAGE = (
+    "O provedor de IA não retornou texto para esta análise. "
+    "Tente novamente ou escolha outro modelo nas Preferências."
+)
 _FORBIDDEN_SALE_ACTION = r"(?:venda|vender|venderia|liquide|liquidar|resgate|resgatar|desfaca|desfazer)"
 # Portfolio context omits position names and tickers, so explicit investment sales fail closed.
 _FORBIDDEN_TICKER_SALE_PATTERN = (
@@ -179,7 +187,9 @@ def execute_consultor_analysis(
         text = str(output or "").strip()
         if not text:
             raise ConsultorError("O Consultor esta indisponivel no momento.")
-        text = postprocess_consultor_output(text)
+        processed_output = postprocess_consultor_output_with_metadata(text)
+        text = processed_output["output"]
+        missing_sections = processed_output["missing_sections"]
     except ConsultorError as exc:
         root_cause = exc
         provider_error_reason = ""
@@ -213,7 +223,9 @@ def execute_consultor_analysis(
             http_status if isinstance(http_status, int) else "",
         )
         register_failure_cooldown(normalized_user_id, normalized_analysis_id, current_time)
-        raise ConsultorError("O Consultor esta indisponivel no momento.") from exc
+        raise ConsultorError(
+            consultor_provider_error_message(http_status, provider_diagnostics, provider_error_reason)
+        ) from exc
     execution = persist_consultor_analysis(
         normalized_user_id,
         normalized_analysis_id,
@@ -227,6 +239,7 @@ def execute_consultor_analysis(
         "analysis_id": normalized_analysis_id,
         "period_window": normalized_period,
         "output": text,
+        "missing_sections": missing_sections,
         "created_at": execution["created_at"],
         "context": context,
         "provider": ai_settings.get("provider") or "custom",
@@ -307,12 +320,15 @@ def complete_local_analysis(user_id: int, analysis_id: object, output: object, *
     normalized_id = validate_analysis_id(analysis_id)
     normalized_period = validate_period_window(period_window, analysis_id=normalized_id)
     assert_daily_quota_available(int(user_id), current_time.date())
-    text = postprocess_consultor_output(output)
+    processed_output = postprocess_consultor_output_with_metadata(output)
+    text = processed_output["output"]
     execution_settings = get_ai_execution_settings(int(user_id))
     execution = persist_consultor_analysis(int(user_id), normalized_id, normalized_period, text, current_time)
     clear_failure_cooldown(int(user_id), normalized_id)
     return {"analysis_execution_id": execution["id"], "analysis_id": normalized_id,
-            "period_window": normalized_period, "output": text, "created_at": execution["created_at"],
+            "period_window": normalized_period, "output": text,
+            "missing_sections": processed_output["missing_sections"],
+            "created_at": execution["created_at"],
             "provider": "webllm", "model": execution_settings.get("local_model_id", "Qwen2.5-1.5B-Instruct-q4f16_1-MLC")}
 
 
@@ -336,7 +352,10 @@ def persist_consultor_analysis(
 
 
 def list_consultor_history(user_id: int, *, limit: int = 50) -> list[dict]:
-    return history_store.list_history(user_id, limit=limit)
+    history = history_store.list_history(user_id, limit=limit)
+    for item in history:
+        item["missing_sections"] = missing_consultor_sections(item.get("analysis_output"))
+    return history
 
 
 def assert_not_in_failure_cooldown(user_id: int, analysis_id: str, current_time: datetime) -> None:
@@ -359,25 +378,38 @@ def failure_cooldown_remaining(user_id: int, analysis_id: str, current_time: dat
     return history_store.failure_cooldown_remaining(user_id, analysis_id, current_time)
 
 
-def postprocess_consultor_output(output: object) -> str:
-    # spec: consultor/consultor v2.44 - critérios 62 e 63
+def postprocess_consultor_output_with_metadata(output: object) -> dict:
+    # spec: consultor/consultor v2.48 - critérios 62 e 63
     text = str(output or "").strip()
     if not text:
         raise ConsultorError("O Consultor esta indisponivel no momento.")
     text = remove_internal_cent_summary_lines(text)
     normalized = normalize_text(text)
     if contains_forbidden_recommendation(normalized, original_text=text):
-        return refusal_response()
-    missing_sections = [section for section in RESPONSE_SECTIONS if not has_section(text, section)]
-    missing_without_disclaimer = [section for section in missing_sections if section != "Disclaimer"]
-    if missing_without_disclaimer:
+        return {"output": refusal_response(), "missing_sections": []}
+    missing_sections = missing_consultor_sections(text)
+    if missing_sections:
         LOGGER.warning(
             "consultor output validation failed missing_sections=%s output_prefix=%s",
-            ",".join(missing_without_disclaimer),
+            ",".join(missing_sections),
             text[:800].replace("\n", " "),
         )
-        raise ConsultorError("O Consultor esta indisponivel no momento.")
-    return replace_consultor_disclaimer(text)
+    return {
+        "output": replace_consultor_disclaimer(text),
+        "missing_sections": missing_sections,
+    }
+
+
+def postprocess_consultor_output(output: object) -> str:
+    return postprocess_consultor_output_with_metadata(output)["output"]
+
+
+def missing_consultor_sections(text: object) -> list[str]:
+    return [
+        section
+        for section in RESPONSE_SECTIONS
+        if section != "Disclaimer" and not has_section(str(text or ""), section)
+    ]
 
 
 def has_section(text: str, section: str) -> bool:
@@ -508,7 +540,24 @@ def call_consultor_ai_provider(
             text_extractor=extract_summary_text, request_builder=build_consultor_ai_request,
         )
     except provider_adapter.ConsultorProviderError as exc:
-        raise ConsultorError("O Consultor esta indisponivel no momento.") from exc
+        raise ConsultorError(
+            consultor_provider_error_message(
+                getattr(exc, "code", None), getattr(exc, "diagnostics", None),
+                getattr(exc, "reason", None),
+            )
+        ) from exc
+
+
+def consultor_provider_error_message(
+    http_status: object, diagnostics: object, reason: object = None
+) -> str:
+    provider_code = diagnostics.get("provider_code") if isinstance(diagnostics, dict) else None
+    status_code = provider_code if isinstance(provider_code, int) else http_status
+    if status_code == 429:
+        return CONSULTOR_QUOTA_ERROR_MESSAGE
+    if reason == "empty_response":
+        return CONSULTOR_EMPTY_RESPONSE_MESSAGE
+    return "O Consultor esta indisponivel no momento."
 
 
 def build_consultor_ai_request(ai_settings: dict, messages: list[dict], *, max_tokens: int) -> dict:

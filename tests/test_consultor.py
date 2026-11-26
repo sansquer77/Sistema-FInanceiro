@@ -34,6 +34,7 @@ from financeiro.consultor import (
     has_section,
     list_analysis_cards,
     postprocess_consultor_output,
+    postprocess_consultor_output_with_metadata,
     prepare_local_analysis,
     save_complementary_profile,
     save_consultor_settings,
@@ -888,6 +889,43 @@ class ConsultorAIExecutorTest(unittest.TestCase):
         self.assertIn("prompt_tokens=2317", logged_arguments)
         self.assertNotIn("private provider response", logged_arguments)
 
+    def test_remote_quota_failure_explains_provider_limit(self) -> None:
+        user = create_user("Marta", "marta@example.com", "strong-password")
+        save_ready_ai_and_consultor(user["id"])
+
+        def failed_client(settings: dict, messages: list[dict], *, max_tokens: int, timeout_seconds: int) -> str:
+            raise ConsultorError("O Consultor esta indisponivel no momento.") from ConsultorProviderError(
+                "private provider response",
+                reason="provider_error_payload",
+                diagnostics={"provider_code": 429, "response_reason": "provider_error_payload"},
+            )
+
+        with mock.patch("financeiro.consultor.get_ai_execution_settings", return_value={"order": ["remota"]}), \
+                mock.patch("financeiro.consultor.build_analysis_context", return_value={"analysis_id": "score_saude_financeira"}):
+            with self.assertRaisesRegex(ConsultorError, "cota|limite"):
+                execute_consultor_analysis(
+                    user["id"], "score_saude_financeira", ai_client=failed_client,
+                    now=datetime(2026, 10, 11, 9, 0, 0),
+                )
+
+    def test_remote_empty_response_explains_that_no_text_was_returned(self) -> None:
+        user = create_user("Marina", "marina-empty@example.com", "strong-password")
+        save_ready_ai_and_consultor(user["id"])
+
+        def failed_client(settings: dict, messages: list[dict], *, max_tokens: int, timeout_seconds: int) -> str:
+            raise ConsultorError("O Consultor esta indisponivel no momento.") from ConsultorProviderError(
+                "private provider response",
+                reason="empty_response",
+            )
+
+        with mock.patch("financeiro.consultor.get_ai_execution_settings", return_value={"order": ["remota"]}), \
+                mock.patch("financeiro.consultor.build_analysis_context", return_value={"analysis_id": "score_saude_financeira"}):
+            with self.assertRaisesRegex(ConsultorError, "não retornou texto"):
+                execute_consultor_analysis(
+                    user["id"], "score_saude_financeira", ai_client=failed_client,
+                    now=datetime(2026, 10, 11, 9, 0, 0),
+                )
+
     def test_macro_research_failure_logs_safe_provider_diagnostics(self) -> None:
         error = ConsultorProviderError(
             "Pesquisa indisponível.",
@@ -1110,7 +1148,7 @@ class ConsultorAIExecutorTest(unittest.TestCase):
             with mock.patch("financeiro.consultor.ai_urlopen") as urlopen_mock:
                 urlopen_mock.return_value.__enter__.return_value.read.return_value = b'{"choices":[]}'
 
-                with self.assertRaisesRegex(ConsultorError, "indisponivel"):
+                with self.assertRaisesRegex(ConsultorError, "não retornou texto"):
                     call_consultor_ai_provider(
                         {
                             "provider": "openai",
@@ -1225,9 +1263,27 @@ class ConsultorAIExecutorTest(unittest.TestCase):
 
         self.assertEqual(postprocess_consultor_output(text), text)
 
-    def test_postprocess_rejects_response_without_required_sections(self) -> None:
-        with self.assertRaisesRegex(ConsultorError, "indisponivel"):
-            postprocess_consultor_output("Resumo\nTexto solto sem a estrutura completa.")
+    def test_postprocess_preserves_partial_response_and_reports_missing_sections(self) -> None:
+        text = "Resumo\nTexto solto sem a estrutura completa."
+
+        processed = postprocess_consultor_output_with_metadata(text)
+
+        self.assertIn(text, processed["output"])
+        self.assertIn("Disclaimer", processed["output"])
+        self.assertEqual(
+            processed["missing_sections"],
+            [
+                "Analise de Dados",
+                "Pontos de Atencao (Riscos)",
+                "Plano de Acao (Educacional)",
+            ],
+        )
+
+    def test_postprocess_string_wrapper_preserves_partial_response(self) -> None:
+        processed = postprocess_consultor_output("Resumo\nConteudo preservado.")
+
+        self.assertIn("Conteudo preservado.", processed)
+        self.assertNotIn("O Consultor esta indisponivel", processed)
 
     def test_postprocess_appends_missing_disclaimer(self) -> None:
         text = valid_consultor_response().replace(DISCLAIMER, "Outro encerramento.")

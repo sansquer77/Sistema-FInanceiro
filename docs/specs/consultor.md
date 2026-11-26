@@ -2,7 +2,7 @@
 tipo: spec
 area: consultor
 status: em-implementacao
-versao: 2.46
+versao: 2.49
 atualizado: 2026-11-26
 relacionados:
   - "[[instrucoes-app]]"
@@ -17,7 +17,7 @@ aliases: ["Consultor Virtual", "Assistente de Investimentos", "Especialista em F
 # Consultor Virtual de Investimentos e Planejamento Financeiro
 
 > [!info] Status
-> **em-implementacao** · versão: `2.46` · área: `consultor` · atualizado em 2026-11-26 · relacionados: [[instrucoes-app]], [[investimentos-portfolio]], [[score-saude-financeira]], [[tendencias-saude-financeira]], [[cockpit-calendario]], [[objetivos-financeiros]], [[emprestimos-quitacao]], [[cartoes]], [[../adr/0019-inferencia-local-webllm]], [[../adr/0020-pesquisa-macro-consultor]], [[../adr/0021-janela-contexto-local-consultor]], [[../adr/0022-orcamento-tokens-saida-consultor]], [[../adr/0023-configuracoes-ia-por-provedor]]
+> **em-implementacao** · versão: `2.49` · área: `consultor` · atualizado em 2026-11-26 · relacionados: [[instrucoes-app]], [[investimentos-portfolio]], [[score-saude-financeira]], [[tendencias-saude-financeira]], [[cockpit-calendario]], [[objetivos-financeiros]], [[emprestimos-quitacao]], [[cartoes]], [[../adr/0019-inferencia-local-webllm]], [[../adr/0020-pesquisa-macro-consultor]], [[../adr/0021-janela-contexto-local-consultor]], [[../adr/0022-orcamento-tokens-saida-consultor]], [[../adr/0023-configuracoes-ia-por-provedor]]
 
 > [!warning] Pivô arquitetural (v0.13, refinado em v0.14/v0.15)
 > A partir desta versão, o Consultor **não possui campo de prompt livre**. O usuário interage exclusivamente através de um **catálogo de análises pré-formatadas** (cards). Essa mudança é uma decisão de **Security by Design**: eliminar a superfície de entrada de texto livre remove pela raiz os vetores de vazamento acidental de dados sensíveis (PII) e de *prompt injection* via chat. As seções "Prevenção de vazamento de dados no prompt (DLP)" e "Blindagem de prompt injection" da v0.12 são **removidas** desta spec — ver "Segurança by Design" e "Nota de segurança residual" abaixo para o que substitui essas salvaguardas.
@@ -302,7 +302,7 @@ Toda análise deve encerrar com o disclaimer:
 - Tabelas markdown nas respostas do Consultor devem ser renderizadas como tabelas HTML na aba **Consultor** (primeira linha como cabeçalho), não como texto cru.
 - O card **Detecção de Anomalias e "Ralos" Financeiros** deve consumir o formato atual de `antecipacao_parcelas` em lista, somando `valor_cents` e contando os itens sem depender do formato legado agregado.
 - O prompt do Consultor deve orientar a IA a iniciar a seção **Pontos de Atenção (Riscos)** com `Risco Baixo`, `Risco Medio` ou `Risco Alto`, mas o pós-processamento não deve inserir avisos artificiais de risco quando a IA não trouxer a classificação explicitamente.
-- O pós-processamento pode completar o disclaimer obrigatório quando a IA retorna todas as seções analíticas válidas mas omite ou altera apenas o texto final do disclaimer; demais seções obrigatórias ausentes continuam bloqueando a resposta.
+- O pós-processamento pode completar o disclaimer obrigatório quando a IA omite ou altera apenas o texto final do disclaimer. Quando uma ou mais seções analíticas não são identificadas no formato esperado, o conteúdo recebido é preservado, a execução é exibida e persistida com a lista de seções não identificadas; nenhuma seção ausente é preenchida automaticamente. Recomendações proibidas continuam bloqueando a resposta e gerando a recusa padrão.
 - O catálogo não deve incluir o card **Teste de Estresse da Reserva de Emergência**, pois a cobertura da reserva em meses já é exibida no pilar Reserva da aba **Saúde Financeira**.
 - **Não existe campo de texto livre em nenhum momento do fluxo do Consultor.**
 
@@ -321,7 +321,7 @@ Toda análise deve encerrar com o disclaimer:
 
 O Consultor depende da API do provedor de IA configurada nas Preferências. Falhas na API externa — timeout, erro HTTP, resposta inválida ou provedor fora do ar — **não podem** penalizar o usuário:
 
-- **Mensagem padronizada**: toda falha de chamada exibe **"O Consultor está indisponível no momento."**, sem vazar detalhes técnicos.
+- **Mensagem padronizada**: falhas de chamada exibem **"O Consultor está indisponível no momento."**, sem vazar detalhes técnicos. Quando o provedor informa HTTP/código `429`, a interface explica que o limite de requisições ou a cota disponível foi atingido. Quando o provedor retorna uma resposta sem texto, a interface informa que não houve texto utilizável e orienta tentar novamente ou escolher outro modelo.
 - **Falha operacional protegida**: erro inesperado ao montar o contexto, consultar o Portfólio ou ler a configuração segura também exibe a mesma mensagem padronizada; o log técnico registra rota, etapa, classe da exceção e somente os nomes de arquivo/função/linha dos últimos frames, sem mensagem da exceção, prompt, chave de API ou dados financeiros.
 - **Falha não consome quota**: uma execução cuja chamada falhou **não é persistida** em `consultor_analyses` e **não é descontada** da quota diária de 20 execuções.
 - **Cooldown de reenvio**: após uma falha, o card acionado permanece bloqueado por um **cooldown (default: 30 segundos)**.
@@ -402,6 +402,7 @@ Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regr
 - Dado um usuário que seleciona o período de 12 meses e aciona o card `ralos_financeiros`, quando a requisição é processada, então o `period_window` enviado é `12m` e o relatório compara o período de 12 meses com a média histórica correspondente.
 - Dado uma requisição a `POST /api/consultor/analyze` com `analysis_id: "ralos_financeiros"` e um `period_window` fora do enum (`3m`, `6m`, `12m`, `ytd`), quando processada, então o sistema rejeita a requisição sem acionar a IA.
 - Dado qualquer análise gerada, quando renderizada, então segue o formato padrão (Resumo, Análise de Dados, Pontos de Atenção, Plano de Ação, Disclaimer).
+- Dado uma resposta não vazia que não contenha uma ou mais seções analíticas no formato esperado, quando o pós-processamento termina, então o sistema preserva e exibe o texto recebido, sinaliza as seções não identificadas, não inventa conteúdo para completá-las e persiste a execução no histórico.
 - Dado o resultado de qualquer card, quando ele menciona riscos, então classifica o nível de risco como Baixo, Médio ou Alto.
 - Dado uma análise que recomende vender ou resgatar um investimento, quando o pós-processamento valida a saída, então a resposta é substituída pela mensagem de recusa padrão antes de ser exibida, pois o contexto enviado à IA não permite identificar com segurança se o ativo está na carteira.
 - Dado um usuário autenticado, quando gera várias análises, então o histórico de execuções fica acessível pelo mesmo módulo, com os relatórios completos de cada execução anterior.
@@ -418,7 +419,9 @@ Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regr
 - Dado uma execução remota de card, quando gera resposta, então o número de tokens de saída é o `max_tokens` das Preferências, com piso de 2500 e teto de 4000; dado uma execução local, o limite permanece 900.
 - Dado que o modelo remoto consome tokens de raciocínio do mesmo limite de saída (por exemplo, 450 tokens antes de um texto de 160), quando uma análise remota é gerada com a configuração de 700 tokens das Preferências, então o sistema usa 2500 tokens e não entrega a resposta truncada no meio das seções.
 - Dado um usuário que atingiu 20 execuções no dia, quando tenta acionar um novo card, então o módulo bloqueia com aviso amigável e libera no dia seguinte.
-- Dado uma chamada à API do provedor de IA que falha, quando o usuário aciona um card, então o sistema exibe a mensagem padronizada "O Consultor está indisponível no momento", não persiste a execução em `consultor_analyses` e não desconta da quota diária.
+- Dado uma chamada à API do provedor de IA que falha ou retorna resposta vazia, quando o usuário aciona um card, então o sistema exibe a mensagem padronizada "O Consultor está indisponível no momento", não persiste a execução em `consultor_analyses` e não desconta da quota diária.
+- Dado uma chamada à API do provedor de IA que retorna HTTP/código `429`, quando o usuário aciona um card, então o sistema informa que o limite de requisições ou a cota disponível foi atingido, sem expor a mensagem bruta do provedor.
+- Dado uma chamada à API do provedor de IA que retorna uma resposta sem texto utilizável, quando o usuário aciona um card, então o sistema informa que não houve texto retornado e orienta tentar novamente ou escolher outro modelo, sem exibir apenas uma indisponibilidade genérica.
 - Dado uma falha recente da API do provedor, quando o usuário tenta reacionar o mesmo card durante o cooldown de 30 segundos, então o acionamento permanece bloqueado; ao encerrar o cooldown, o acionamento é liberado normalmente.
 - Dado um usuário com histórico de análises em `consultor_analyses`, quando desabilita a IA nas Preferências, então todo o histórico é expurgado automaticamente; ao reabilitar a IA depois, o Consultor começa com histórico vazio.
 - Dado um usuário com Perfil Complementar preenchido na versão anterior do formulário, quando a versão atual adiciona novos campos, então os campos já preenchidos permanecem válidos e os novos ficam vazios até o usuário preenchê-los.
@@ -588,6 +591,9 @@ _Nenhuma pendência em aberto._
 
 ## Changelog
 
+- `2.49` — 2026-11-26 — Diferencia respostas vazias do provedor e orienta o usuário a tentar novamente ou trocar o modelo.
+- `2.48` — 2026-11-26 — Diferencia falhas de cota/limite (`429`) da indisponibilidade genérica do provedor, exibindo uma orientação clara ao usuário.
+- `2.47` — 2026-11-26 — Preserva respostas não vazias com seções analíticas ausentes, sinaliza na interface as seções não identificadas e evita preencher conteúdo automaticamente ou tratar a execução como indisponibilidade.
 - `2.46` — 2026-11-26 — Completa a equalização visual do Consultor na subaba Histórico, com contexto, filtro e lista linear responsiva.
 - `2.45` — 2026-11-26 — Equaliza a moldura editorial da aba Consultor à Saúde Financeira no Cockpit, preservando calendário, análises, histórico e reflow em desktops compactos.
 - `2.44` — 2026-11-18 — Corrige o tratamento de falha após fallback local/remoto para encerrar o carregamento e exibir o erro; registra apenas código/status allowlisted de respostas OpenAI-compatible, como 429 do OpenRouter.

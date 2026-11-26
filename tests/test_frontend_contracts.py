@@ -729,7 +729,7 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn('width: min(132px, 58%);', styles)
         self.assertIn('font-size: clamp(12px, calc(1vw + 2px), 15px);', styles)
         self.assertIn('registerCockpitView } from "./modules/cockpit-view.js?v=190"', app)
-        self.assertIn('href="/styles.css?v=195"', index)
+        self.assertIn('href="/styles.css?v=196"', index)
 
     def test_launch_forms_expose_and_sync_destination_context(self) -> None:
         index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")

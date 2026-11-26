@@ -2194,6 +2194,24 @@ textarea:focus {
   gap: 10px;
 }
 
+.consultor-partial-warning {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--warning-border, var(--line));
+  border-radius: 10px;
+  background: var(--warning-surface, var(--surface-low));
+  color: var(--ink);
+  font-size: 0.8rem;
+}
+
+.consultor-partial-warning p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
 .consultor-history-list {
   display: grid;
   gap: 8px;

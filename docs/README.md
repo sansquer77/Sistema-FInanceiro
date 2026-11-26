@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 16.41
+versao: 16.44
 atualizado: 2026-11-26
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -159,6 +159,9 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `16.44` — 2026-11-26 — [[specs/consultor]] v2.49 diferencia respostas vazias do provedor e orienta nova tentativa ou troca de modelo.
+- `16.43` — 2026-11-26 — [[specs/consultor]] v2.48 diferencia falhas de cota/limite (`429`) e orienta o usuário sem expor detalhes brutos do provedor.
+- `16.42` — 2026-11-26 — [[specs/consultor]] v2.47 preserva respostas parciais do Consultor, sinaliza seções não identificadas e evita descartar conteúdo válido por falha de formatação.
 - `16.41` — 2026-11-26 — Sincroniza o vault com a versão do app `2.2.0`, registra o polimento visual premium e atualiza a documentação da migração para o schema `20012`; `trends.py` fica registrado como pendência monitorada.
 - `16.40` — 2026-11-01 — [[specs/consultor]] v2.36 e v2.37: prompt local acima da janela de 11.000 caracteres usa a IA remota quando permitida; a chamada remota repete erros transitórios em até 3 tentativas; e o orçamento de saída remoto sobe para piso 2500 / teto 4000 tokens. [[adr/0021-janela-contexto-local-consultor]] v0.3, [[adr/0022-orcamento-tokens-saida-consultor]] e [[arquitetura]] v4.57 registram as decisões.
 - `16.39` — 2026-10-31 — [[specs/consultor]] v2.34 limita o payload do card Melhor Destino enviado ao modelo local e solicita janela de 8192 tokens; [[adr/0021-janela-contexto-local-consultor]] e [[arquitetura]] v4.56 registram a decisão.
