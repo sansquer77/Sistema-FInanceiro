@@ -1,10 +1,172 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from financeiro.calendar_rules import add_months, month_end_date
 from financeiro.database import get_connection
+
+
+def build_projected_negative_balances_for_user(
+    user_id: int,
+    month: str,
+    *,
+    reference_date: date | None = None,
+) -> list[dict]:
+    """Find the first projected negative day for each checking account."""
+    normalized_month = date.fromisoformat(f"{month}-01").strftime("%Y-%m")
+    forecast_reference = reference_date or date.today()
+    month_start = date.fromisoformat(f"{normalized_month}-01")
+    start_date = max(forecast_reference, month_start)
+    end_date = date.fromisoformat(month_end_date(normalized_month))
+    if start_date > end_date:
+        return []
+
+    with get_connection() as conn:
+        account_rows = conn.execute(
+            """
+            SELECT id, name, account_type, currency, initial_balance_cents
+            FROM checking_accounts
+            WHERE user_id = ? AND archived_at IS NULL
+            ORDER BY id
+            """,
+            (user_id,),
+        ).fetchall()
+        transaction_rows = conn.execute(
+            """
+            SELECT account_id, destination_account_id, destination_amount_cents,
+                   type, amount_cents, date, description, series_kind
+            FROM transactions
+            WHERE user_id = ? AND archived_at IS NULL
+            ORDER BY date, id
+            """,
+            (user_id,),
+        ).fetchall()
+        card_rows = conn.execute(
+            """
+            SELECT id, name, currency, due_day, preferred_payment_account_id
+            FROM credit_cards
+            WHERE user_id = ? AND archived_at IS NULL
+            ORDER BY id
+            """,
+            (user_id,),
+        ).fetchall()
+        card_transaction_rows = conn.execute(
+            """
+            SELECT credit_card_id, type, amount_cents, invoice_month, reconciled_at
+            FROM credit_card_transactions
+            WHERE user_id = ? AND archived_at IS NULL
+            ORDER BY invoice_month, id
+            """,
+            (user_id,),
+        ).fetchall()
+        payment_rows = conn.execute(
+            """
+            SELECT credit_card_id, invoice_month
+            FROM credit_card_payments
+            WHERE user_id = ?
+            """,
+            (user_id,),
+        ).fetchall()
+
+    accounts = [
+        {
+            "id": row["id"],
+            "name": row["name"],
+            "account_type": row["account_type"],
+            "currency": normalized_currency(row["currency"]),
+            "initial_balance": cents_to_value(int(row["initial_balance_cents"] or 0)),
+        }
+        for row in account_rows
+    ]
+    transactions = [
+        {
+            "account_id": row["account_id"],
+            "destination_account_id": row["destination_account_id"],
+            "destination_amount": cents_to_value(int(row["destination_amount_cents"] or 0)),
+            "type": row["type"],
+            "amount": cents_to_value(int(row["amount_cents"] or 0)),
+            "date": row["date"],
+            "description": row["description"],
+            "series_kind": row["series_kind"],
+        }
+        for row in transaction_rows
+    ]
+    cards = [
+        {
+            "id": row["id"],
+            "name": row["name"],
+            "currency": normalized_currency(row["currency"]),
+            "due_day": row["due_day"],
+            "preferred_payment_account_id": row["preferred_payment_account_id"],
+        }
+        for row in card_rows
+    ]
+    card_transactions = [
+        {
+            "credit_card_id": row["credit_card_id"],
+            "type": row["type"],
+            "amount": cents_to_value(int(row["amount_cents"] or 0)),
+            "invoice_month": row["invoice_month"],
+            "reconciled_at": row["reconciled_at"],
+        }
+        for row in card_transaction_rows
+    ]
+    card_payments = [dict(row) for row in payment_rows]
+    reservation_events = card_reservation_events(accounts, cards, card_transactions, card_payments)
+
+    results = []
+    for account in accounts:
+        account_id = int(account["id"])
+        currency = normalized_currency(account.get("currency"))
+        account_reservations = [
+            (event_date, amount)
+            for event_date, owner_id, amount in reservation_events
+            if owner_id == account_id
+        ]
+        first_negative = None
+        previous_balance_cents = None
+        day = start_date
+        while day <= end_date:
+            day_value = day.isoformat()
+            balance_cents = account_totals_until(
+                [account], transactions, day_value, reconciled_only=False
+            ).get(currency, 0)
+            balance_cents -= sum(amount for event_date, amount in account_reservations if event_date <= day_value)
+            is_future_crossing = day > forecast_reference and balance_cents < 0 and (
+                previous_balance_cents is None or previous_balance_cents >= 0
+            )
+            if is_future_crossing:
+                first_negative = (day_value, abs(balance_cents))
+                break
+            previous_balance_cents = balance_cents
+            day += timedelta(days=1)
+        if not first_negative:
+            continue
+
+        negative_date, negative_cents = first_negative
+        causes = []
+        if any(event_date == negative_date for event_date, _amount in account_reservations):
+            causes.append("fatura do cartão")
+        if any(
+            str(transaction.get("date")) == negative_date
+            and transaction.get("account_id") == account_id
+            and transaction.get("type") in {"expense", "investment"}
+            and transaction.get("series_kind") == "recurring"
+            for transaction in transactions
+        ):
+            causes.append("contas recorrentes")
+        if not causes:
+            causes.append("compromissos previstos")
+        results.append({
+            "account_id": account_id,
+            "account_name": account.get("name") or "Conta",
+            "currency": currency,
+            "first_negative_date": negative_date,
+            "negative_cents": negative_cents,
+            "causes": causes,
+        })
+    return results
 
 
 def build_currency_totals_for_user(user_id: int, month: str) -> list[dict]:

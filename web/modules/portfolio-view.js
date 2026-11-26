@@ -63,21 +63,11 @@ export function registerPortfolioView({
     portfolioResultSummary,
     portfolioReturnSummary,
     portfolioDayResultSummary,
-    portfolioReturnChartBtn,
-    portfolioReturnDrawer,
-    portfolioReturnDrawerOverlay,
-    portfolioReturnDrawerCloseBtn,
-    portfolioReturnDrawerTitle,
     portfolioGroupDrawer,
     portfolioGroupDrawerOverlay,
     portfolioGroupDrawerCloseBtn,
     portfolioGroupDrawerTitle,
     portfolioGroupDrawerList,
-    portfolioReturnChart,
-    portfolioReturnXLabels,
-    portfolioReturnYAxis,
-    portfolioReturnLegend,
-    portfolioReturnNotice,
     portfolioPositionCount,
     portfolioMessage,
     portfolioTypeList,
@@ -118,11 +108,8 @@ export function registerPortfolioView({
     escapeHtml,
     formatDate,
   });
-  // O drawer precisa ser filho direto do body para não herdar o contexto de
-  // empilhamento criado pelos painéis sticky do Portfólio.
-  if (portfolioReturnDrawer && portfolioReturnDrawer.parentElement !== document.body) {
-    document.body.append(portfolioReturnDrawer);
-  }
+  // O drawer de composição precisa ser filho direto do body para não herdar o
+  // contexto de empilhamento criado pelos painéis sticky do Portfólio.
   if (portfolioGroupDrawer && portfolioGroupDrawer.parentElement !== document.body) {
     document.body.append(portfolioGroupDrawer);
   }
@@ -198,9 +185,6 @@ export function registerPortfolioView({
   portfolioGoalsForm.addEventListener("submit", savePortfolioGoals);
   portfolioGoalsFields.addEventListener("input", updatePortfolioGoalsTotal);
   portfolioPositions.addEventListener("click", handlePortfolioPositionsClick);
-  portfolioReturnChartBtn?.addEventListener("click", portfolioChart.openReturns);
-  portfolioReturnDrawerOverlay?.addEventListener("click", portfolioChart.closeReturns);
-  portfolioReturnDrawerCloseBtn?.addEventListener("click", portfolioChart.closeReturns);
   portfolioGroupDrawerOverlay?.addEventListener("click", closePortfolioGroupDrawer);
   portfolioGroupDrawerCloseBtn?.addEventListener("click", closePortfolioGroupDrawer);
 
@@ -277,7 +261,7 @@ export function registerPortfolioView({
   function onLeave() {
     destroyVirtualLists(portfolioPositions);
     portfolioPreview.clear();
-    portfolioChart.closeReturns();
+    portfolioChart.clearEvolution();
     closePortfolioGroupDrawer();
     portfolioEventsView.clearPresentation();
     clearPortfolioPresentation(portfolioTypeList, portfolioIndexerList, portfolioCurrencyList,
@@ -655,6 +639,7 @@ export function registerPortfolioView({
   function renderPortfolio() {
     const portfolio = state.portfolio;
     if (portfolio && !hasPortfolioPresentation(portfolio)) {
+      portfolioChart.clearEvolution();
       destroyVirtualLists(portfolioPositions);
       clearPortfolioPresentation(portfolioTypeList, portfolioIndexerList, portfolioCurrencyList,
         portfolioAccountList, portfolioPositions, portfolioHistory);
@@ -663,6 +648,7 @@ export function registerPortfolioView({
     }
     portfolioGroupFilter.value = state.portfolioGroup;
     if (!portfolio) {
+      portfolioChart.clearEvolution();
       destroyVirtualLists(portfolioPositions);
       portfolioCostSummary.textContent = formatMoney(0, "BRL");
       portfolioCurrentSummary.textContent = formatMoney(0, "BRL");
@@ -690,9 +676,10 @@ export function registerPortfolioView({
     portfolioReturnSummary.innerHTML = portfolioSummaryMetric(currencyRows, (row) => formatPortfolioPercent(row.result_percent), true, (row) => Number(row.result_brl));
     portfolioDayResultSummary.innerHTML = portfolioSummaryMetric(currencyRows, (row) => `${formatMoney(row.day_result_brl, row.currency)} · ${formatPortfolioPercent(row.day_result_percent)}`, true, (row) => Number(row.day_result_brl));
     portfolioPositionCount.textContent = String(summary.position_count || 0);
-    if (portfolioReturnChartBtn) {
-      const hasPositions = (summary.position_count || 0) > 0;
-      portfolioReturnChartBtn.hidden = !hasPositions;
+    if ((summary.position_count || 0) > 0) {
+      portfolioChart.loadEvolution();
+    } else {
+      portfolioChart.clearEvolution();
     }
   }
   function renderActivePortfolioTab() {
@@ -1120,7 +1107,12 @@ export function registerPortfolioView({
       return;
     }
     const redemptionTable = redemptions.length ? `
-      <h3>Resgates realizados</h3>
+      <section class="portfolio-history-section">
+        <div class="portfolio-history-section-heading">
+          <span class="eyebrow">Movimentos realizados</span>
+          <h3>Resgates realizados</h3>
+          <p class="muted-copy">Valores reconhecidos, custo FIFO consumido e posição remanescente.</p>
+        </div>
       <div class="report-table-wrap">
         <table class="report-table portfolio-table portfolio-redemption-history-table">
           <thead>
@@ -1132,9 +1124,15 @@ export function registerPortfolioView({
           <tbody>${redemptions.map(portfolioRedemptionHistoryRow).join("")}</tbody>
         </table>
       </div>
+      </section>
     ` : "";
     const closedTable = history.length ? `
-      <h3>Posições encerradas</h3>
+      <section class="portfolio-history-section">
+        <div class="portfolio-history-section-heading">
+          <span class="eyebrow">Ciclo concluído</span>
+          <h3>Posições encerradas</h3>
+          <p class="muted-copy">Ativos retirados da carteira, com custo e valor final preservados.</p>
+        </div>
       <div class="report-table-wrap">
         <table class="report-table portfolio-table portfolio-history-table">
           <thead>
@@ -1153,6 +1151,7 @@ export function registerPortfolioView({
           </tbody>
         </table>
       </div>
+      </section>
     ` : "";
     portfolioHistory.innerHTML = `${redemptionTable}${closedTable}`;
   }

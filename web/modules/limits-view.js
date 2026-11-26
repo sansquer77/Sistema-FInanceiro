@@ -33,11 +33,13 @@ export function registerLimitsView({
     previousLimitMonthButton,
     nextLimitMonthButton,
     cancelLimitEditButton,
+    limitFormDrawerController,
+    openLimitFormButton,
     cockpitLimitAlert,
     limitsTabButtons,
     limitsTabPanels,
     goalForm,
-    goalFormPanel,
+    goalFormDrawerController,
     newGoalButton,
     goalFormTitle,
     goalTargetDateField,
@@ -66,7 +68,14 @@ export function registerLimitsView({
   limitCategory.addEventListener("change", renderLimitSubcategories);
   previousLimitMonthButton.addEventListener("click", () => shiftLimitMonth(-1));
   nextLimitMonthButton.addEventListener("click", () => shiftLimitMonth(1));
-  cancelLimitEditButton.addEventListener("click", resetLimitForm);
+  openLimitFormButton?.addEventListener("click", () => {
+    resetLimitForm();
+    limitFormDrawerController?.open();
+  });
+  cancelLimitEditButton.addEventListener("click", () => {
+    resetLimitForm();
+    limitFormDrawerController?.close();
+  });
   limitsTabButtons.forEach((button, index) => {
     button.addEventListener("click", () => selectLimitsTab(button.dataset.limitsTab));
     button.addEventListener("keydown", (event) => {
@@ -82,7 +91,10 @@ export function registerLimitsView({
   newGoalButton.addEventListener("click", openNewGoalForm);
   goalForm.elements.objective_type.addEventListener("change", updateGoalDateRequirement);
   goalYieldMode.addEventListener("change", updateGoalYieldFields);
-  cancelGoalEditButton.addEventListener("click", () => resetGoalForm({ restoreFocus: true }));
+  cancelGoalEditButton.addEventListener("click", () => {
+    resetGoalForm({ restoreFocus: true });
+    goalFormDrawerController?.close();
+  });
   goalMovementForm.addEventListener("submit", handleGoalMovementSubmit);
   goalFundingForm.addEventListener("submit", handleGoalFundingSubmit);
   closeGoalActionButton.addEventListener("click", closeGoalAction);
@@ -160,9 +172,11 @@ export function registerLimitsView({
         method: isEditing ? "PUT" : "POST",
         body: data,
       });
-      resetGoalForm({ restoreFocus: true });
+      resetGoalForm();
       await loadGoalData({ force: true });
       setMessage(goalMessage, isEditing ? "Objetivo atualizado." : "Objetivo criado.", "success");
+      goalFormDrawerController?.close();
+      newGoalButton.focus({ preventScroll: true });
     } catch (error) {
       setMessage(goalMessage, error.message, "error");
     } finally {
@@ -384,10 +398,9 @@ export function registerLimitsView({
     Object.entries(goal).forEach(([key, value]) => { if (goalForm.elements[key]) goalForm.elements[key].value = value ?? ""; });
     goalForm.elements.target_amount.value = String(goal.target_amount || "").replace(".", ",");
     goalFormTitle.textContent = "Editar objetivo";
-    showGoalForm();
     updateGoalDateRequirement();
     updateGoalYieldFields();
-    goalForm.scrollIntoView({ behavior: "smooth", block: "start" });
+    goalFormDrawerController?.open();
     goalForm.elements.name.focus({ preventScroll: true });
   }
 
@@ -459,13 +472,8 @@ export function registerLimitsView({
 
   function openNewGoalForm() {
     resetGoalForm();
-    showGoalForm();
+    goalFormDrawerController?.open();
     goalForm.elements.name.focus({ preventScroll: true });
-    goalFormPanel.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-
-  function showGoalForm() {
-    goalFormPanel.hidden = false;
     newGoalButton.setAttribute("aria-expanded", "true");
   }
 
@@ -474,7 +482,6 @@ export function registerLimitsView({
     goalForm.elements.id.value = "";
     goalForm.elements.start_date.value = localIsoDate();
     goalFormTitle.textContent = "Novo objetivo";
-    goalFormPanel.hidden = true;
     newGoalButton.setAttribute("aria-expanded", "false");
     updateGoalDateRequirement();
     updateGoalYieldFields();
@@ -518,6 +525,7 @@ export function registerLimitsView({
       renderLimits();
       onLimitsChanged();
       setMessage(limitMessage, "Limite salvo.", "success");
+      limitFormDrawerController?.close();
     } catch (error) {
       setMessage(limitMessage, error.message, "error");
     } finally {
@@ -535,7 +543,7 @@ export function registerLimitsView({
     renderLimitSubcategories();
     limitSubcategory.value = limit.subcategory_id ? String(limit.subcategory_id) : "";
     cancelLimitEditButton.hidden = false;
-    limitForm.scrollIntoView({ behavior: "smooth", block: "start" });
+    limitFormDrawerController?.open();
   }
 
   async function deleteSpendingLimit(id) {
@@ -587,6 +595,7 @@ export function registerLimitsView({
     }
     limitCategory.disabled = expenseCategories.length === 0;
     limitForm.querySelector('button[type="submit"]').disabled = expenseCategories.length === 0;
+    if (openLimitFormButton) openLimitFormButton.disabled = expenseCategories.length === 0;
     renderLimitSubcategories();
   }
 
@@ -637,7 +646,7 @@ export function registerLimitsView({
         </div>
       `;
       const openReport = () => {
-        // spec: limites/limites-gastos v1.11 — critério 12
+        // spec: limites/limites-gastos v1.17 — critério 12
         onNavigateToReport({
           month: state.limitMonth,
           categoryId: row.limitRecord.category_id,

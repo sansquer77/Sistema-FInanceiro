@@ -2,8 +2,8 @@
 tipo: spec
 area: cockpit
 status: implementado
-versao: 1.7
-atualizado: 2026-11-24
+versao: 1.11
+atualizado: 2026-11-26
 relacionados:
   - "[[cockpit-calendario]]"
   - "[[limites-gastos]]"
@@ -20,7 +20,7 @@ aliases: ["Alertas e Notificações do Cockpit", "Alertas Cockpit", "Central de 
 # Alertas e Notificações do Cockpit
 
 > [!info] Status
-> **implementado** · versão: `1.7` · área: `cockpit` · atualizado em 2026-11-24 · relacionados: [[cockpit-calendario]], [[limites-gastos]], [[cartoes]], [[lancamentos]], [[investimentos-portfolio]], [[backup-restauracao]], [[specs/emprestimos-quitacao]], [[arquitetura]], [[requisitos]]
+> **implementado** · versão: `1.11` · área: `cockpit` · atualizado em 2026-11-26 · relacionados: [[cockpit-calendario]], [[limites-gastos]], [[cartoes]], [[lancamentos]], [[investimentos-portfolio]], [[backup-restauracao]], [[specs/emprestimos-quitacao]], [[arquitetura]], [[requisitos]]
 
 ### Problema
 
@@ -185,7 +185,10 @@ Restrição de unicidade: `PRIMARY KEY (user_id, notification_id)`.
 - Todas as regras financeiras (limites excedidos, contas atrasadas, parcelas a vencer, saldos projetados, proventos na semana) são calculadas exclusivamente no Python (`financeiro/cockpit.py` ou módulo auxiliar de notificações).
 - O endpoint `GET /api/cockpit/notifications` é **exclusivo e desacoplado** da rota `GET /api/cockpit?month=...`, permitindo que revalidações periódicas das notificações ocorram sem o custo de recalcular o snapshot mensal completo do Cockpit.
 - O frontend em `web/` é estritamente de apresentação: consome o payload JSON de `GET /api/cockpit/notifications`, renderiza badges/flyouts e executa a navegação de rota solicitada.
-- O informativo de fechamento mensal é gerado quando o mês anterior tem lançamentos não conciliados ou sem classificação. Ele usa o identificador estável `monthly_close:AAAA-MM`, permanece consultável após ser marcado como visto e oferece as ações **Abrir demonstrativo** (Relatórios, aba Demonstrativo, mês anterior) e **Ver pendências** (Lançamentos, filtro Pendentes).
+- O informativo de fechamento mensal é gerado quando o mês anterior tem lançamentos não conciliados ou sem classificação. Ele usa o identificador estável `monthly_close:AAAA-MM`, permanece consultável após ser marcado como visto e oferece ações separadas para **Abrir demonstrativo**, **Ver conciliação pendente** (Lançamentos, filtro Pendentes) e **Ver sem classificação** (Relatórios, visão consolidada de contas e cartões sem categoria).
+- O alerta `projected_negative_balance` é calculado por conta e representa o primeiro dia futuro, após a data de referência, em que o saldo projetado daquela conta fica abaixo de zero. Ele informa a conta, a data, o valor negativo estimado e os compromissos identificados (como fatura de cartão ou conta recorrente); não é disparado apenas por um saldo atual negativo ou pelo saldo agregado da moeda.
+- Quando existir esse alerta crítico, o mesmo item é exibido de forma discreta no resumo do Cockpit e no sino de notificações. Quando não existir, o componente discreto do Cockpit permanece oculto.
+- Resgates vinculados a `investment_redemptions` e créditos de encerramento vinculados a `investment_closed_positions` são considerados classificados pela origem do Portfólio e não geram pendência de classificação no fechamento mensal, ainda que não tenham `category_id`.
 
 #### 8. Independência do Banner de Nova Versão
 - O banner de nova versão do aplicativo (`cockpitVersionAlert`) permanece como um componente visual direto e independente no painel executivo do Cockpit com seu próprio botão de dispensar (`cockpitVersionAlertDismiss`).
@@ -210,6 +213,7 @@ Restrição de unicidade: `PRIMARY KEY (user_id, notification_id)`.
 - Dado que o usuário acessa o sistema a partir de uma viewport estreita (mobile), quando o Cockpit é renderizado, então os indicadores ao lado das abas se condensam em um botão único de Notificações, cujo clique abre o flyout preservando internamente as seções separadas de Críticos e Informativos.
 - Dado que o usuário abre Notificações em qualquer viewport, então o flyout aparece ancorado no topo, abaixo do cabeçalho, e mantém sua posição ao alternar entre Críticos e Informativos.
 - Dado que o usuário alterna entre as abas internas do flyout, então cada aba mostra rótulo, contagem, foco e estado selecionado com contraste suficiente, sem alterar a posição vertical do painel.
+- Dado que o flyout de notificações está aberto em tema claro ou escuro, então sua superfície raiz acompanha integralmente o tema ativo, sem usar a superfície azulada/lilás de seções secundárias.
 - Dado que o flyout está aberto sobre o Cockpit e o usuário pressiona a tecla `Escape` ou clica fora da área do diálogo, quando o evento é disparado, então o flyout fecha imediatamente e o foco retorna ao botão que o acionou.
 - Dado que não há nenhum limite excedido nem faturas/contas vencidas, quando o usuário abre a visualização de Alertas Críticos, então a interface apresenta um estado vazio explícito informando que não existem pendências.
 - Dado um usuário não autenticado, quando uma requisição for enviada para `GET /api/cockpit/notifications`, então o servidor retorna status HTTP 401 Unauthorized e nenhum dado é exposto.
@@ -218,9 +222,16 @@ Restrição de unicidade: `PRIMARY KEY (user_id, notification_id)`.
 - Dado um empréstimo ativo cuja próxima parcela vence hoje, quando o usuário consulta a Central de Notificações, então há um alerta com ação para abrir Gestão → Empréstimos.
 - Dado que o backup automático da instalação falhou, quando o responsável consulta a Central de Notificações, então vê um alerta crítico persistente com ação para abrir Preferências > Backup; o alerta some após um backup concluído com sucesso.
 - Dado que a configuração SMTP de recuperação do usuário está ausente, ilegível ou sem remetente, senha de app ou servidor, quando ele consulta a Central de Notificações, então vê um alerta crítico persistente com ação para abrir Preferências > Recuperação por email; após salvar uma configuração utilizável, o alerta deixa de aparecer.
-- Dado que o mês anterior possui lançamentos não conciliados ou sem classificação, quando o usuário acessa o sistema no mês seguinte, então Informativos exibe um lembrete de fechamento com o mês de referência, o resumo das pendências e as ações Abrir demonstrativo e Ver pendências.
+- Dado que o mês anterior possui lançamentos não conciliados ou sem classificação, quando o usuário acessa o sistema no mês seguinte, então Informativos exibe um lembrete de fechamento com o mês de referência, o resumo das pendências e as ações Abrir demonstrativo, Ver conciliação pendente e Ver sem classificação.
+- Dado que o mês anterior possui lançamentos sem classificação já conciliados, quando o usuário aciona Ver sem classificação, então Relatórios abre a competência anterior na visão consolidada e lista esses lançamentos sem exigir que estejam pendentes de conciliação.
+- Dado que o mês anterior possui lançamentos não conciliados, quando o usuário aciona Ver conciliação pendente, então Lançamentos abre a competência anterior com o filtro Pendentes preservado.
 - Dado que o mês anterior está conciliado e classificado, quando o usuário consulta a Central de Notificações, então nenhum lembrete de fechamento é criado.
 - Dado que o usuário marca o lembrete de fechamento como visto, quando o flyout é reaberto no mesmo mês, então o item continua consultável, mas não aumenta o contador de informativos não lidos.
+- Dado que uma conta possui saldo suficiente hoje, mas sua projeção cruza zero em uma data futura do mês, quando o usuário consulta as notificações, então o sistema cria um alerta crítico com o primeiro dia negativo, o valor estimado, o nome da conta e a ação para abrir essa conta no Extrato.
+- Dado que uma conta permanece com projeção não negativa até o fim do mês, quando o Cockpit e o sino são renderizados, então nenhum alerta `projected_negative_balance` é exibido para essa conta.
+- Dado que há um alerta `projected_negative_balance`, quando o usuário acessa a Situação do Cockpit, então uma faixa compacta exibe a mesma conta, data e estimativa do item do sino, com ação contextual; a faixa permanece oculta quando não há esse alerta.
+- Dado que a projeção cruza zero após uma fatura de cartão ou uma conta recorrente, quando o alerta é exibido, então sua descrição identifica esses compromissos como causa contextual sem recalcular regras financeiras no frontend.
+- Dado um resgate ou crédito de encerramento gerado pelo Portfólio sem categoria explícita, quando o fechamento mensal é calculado, então esse fluxo não é contado como lançamento sem classificação.
 
 ### Pendências
 
@@ -244,9 +255,15 @@ Restrição de unicidade: `PRIMARY KEY (user_id, notification_id)`.
 - [x] Passo 7 — Testes automatizados: criar testes unitários e de integração em `tests/test_cockpit_notifications.py` cobrindo cálculo de alertas, persistência na `notification_reads`, tolerância a falhas de cotação e controle de autenticação. Fecha: critérios 1, 3, 4, 10, 11, 12.
 - [x] Passo 8 — Integrar falha do backup automático à seção crítica, restrita ao responsável da instalação, e navegar diretamente para a aba Backup nas Preferências.
 - [x] Passo 9 — Gerar o lembrete mensal de fechamento no backend, persistir a leitura pelo ID da competência e oferecer ações para Demonstrativo e Pendências.
+- [x] Passo 10 — Separar as ações de conciliação e classificação no lembrete, direcionando a revisão de classificação para a visão consolidada de Relatórios.
+- [x] Passo 11 — Calcular o primeiro cruzamento diário abaixo de zero por conta, expor a conta/data/estimativa no alerta crítico e reutilizar o mesmo item na faixa discreta do Cockpit e no sino.
 
 ### Changelog
 
+- `1.11` — 2026-11-26 — Alinha a superfície do flyout de notificações ao tema ativo, removendo a diferença de cor em relação aos demais overlays.
+- `1.10` — 2026-11-25 — Reconhece resgates e créditos de encerramento do Portfólio pela origem financeira, evitando falso lembrete de classificação em fluxos já contextualizados.
+- `1.9` — 2026-11-25 — Substitui o alerta genérico de saldo negativo por uma previsão diária por conta, com primeiro dia abaixo de zero, estimativa, compromissos causadores e faixa discreta no Cockpit.
+- `1.8` — 2026-11-25 — Separa as ações de conciliação e classificação do fechamento mensal; lançamentos sem categoria podem ser consultados mesmo quando já estão conciliados.
 - `1.7` — 2026-11-24 — Adiciona lembrete informativo de fechamento do mês anterior, com resumo de conciliação/classificação, leitura persistente e ações para Demonstrativo e Pendências.
 - `1.6` — 2026-11-24 — Consolida o acionador em um sino único, fixa o flyout no topo da viewport e aprimora abas internas com contagens, foco e navegação por teclado.
 - `1.5` — 2026-09-27 — Inclui alerta persistente para lembrar que a conta não pode ser recuperada sem configuração utilizável de e-mail.

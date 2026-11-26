@@ -286,7 +286,7 @@ export function registerUserAdminView(context) {
   async function handleLocalModelDownload() {
     setLocalModelControls({ loading: true });
     setLocalModelStatus("Iniciando o modelo local… o navegador pode levar alguns segundos para preparar o download.");
-    // spec: consultor/consultor v2.44 — critério de preparo explícito do modelo local
+    // spec: consultor/consultor v2.46 — critério de preparo explícito do modelo local
     // Safari pode bloquear a pintura enquanto cria um module worker pesado. Ceder um frame
     // deixa o estado de preparo visível antes de carregar o runtime do WebLLM.
     await waitForNextPaint();

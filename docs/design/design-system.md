@@ -2,8 +2,8 @@
 tipo: design
 area: meta
 status: implementado
-versao: 5.4
-atualizado: 2026-11-24
+versao: 5.36
+atualizado: 2026-11-26
 relacionados:
   - "[[arquitetura]]"
   - "[[specs/frontend-modularizacao]]"
@@ -15,7 +15,7 @@ aliases: ["Design System", "Tokens Visuais", "Precisão Institucional"]
 # Design System — Precisão Institucional
 
 > [!info] Status
-> **implementado** · versão: `5.4` · área: `meta` · atualizado em 2026-11-24 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]], [[specs/frontend-fundacao-v2]]
+> **implementado** · versão: `5.36` · área: `meta` · atualizado em 2026-11-26 · relacionados: [[arquitetura]], [[specs/frontend-modularizacao]], [[specs/frontend-fundacao-v2]]
 
 ## Personalidade da marca
 
@@ -33,7 +33,20 @@ O shell visual — menu, cabeçalho, superfícies e tipografia — deve funciona
 - No modo recolhido, cada item mantém `title`, foco visível e estado ativo identificável pelo marcador lateral, mesmo sem o rótulo textual.
 - O cabeçalho global combina um título de tela expressivo, contexto curto e ações compactas, sem transformar todos os controles em caixas de igual peso.
 - A interface pode manter o modo escuro como ambiente analítico, mas reduz a sensação técnica com menos linhas visíveis, mais respiro e contraste de superfície cuidadosamente graduado.
+- A superfície raiz de flyovers, drawers e diálogos usa `--content-surface`: branca no tema claro e escura no tema escuro; variações de tom ficam restritas a cartões internos e estados semânticos.
+- Quadros financeiros com colunas numéricas, como Saldos por moeda, mantêm respiro lateral uniforme e uma separação mínima adicional antes dos valores alinhados à direita, evitando colisão visual com a moldura em desktops compactos.
+- Em quadros financeiros compactos, as colunas devem ser fluidas e truncar apenas rótulos auxiliares; a superfície não deve criar uma barra de rolagem horizontal para acomodar os valores.
+- O gráfico completo de Tendências responde à largura real do painel, sem largura mínima fixa ou rolagem horizontal; a profundidade vem dos filtros, tooltips e séries, não de uma tela mais larga que o viewport.
+- A aba Tendências usa três módulos visuais principais — Evolução, Orçamento e Achados — com métricas integradas ao gráfico, listas editoriais sem cards repetidos e notas de confiança tratadas como contexto.
+- Eventos pontuais formam um único agrupamento com bullets de receitas e despesas; limites formam um único agrupamento e qualquer recorrência de ultrapassagem exibe a orientação de revisão dentro do próprio agrupamento.
+- A aba Assinaturas e o flyover analítico usam o mesmo conjunto completo de serviços identificados; a aba resume a leitura e o flyover acrescenta os metadados detalhados, sem ocultar itens por corte arbitrário.
+- Conjuntos de abas do app usam uma faixa leve compartilhada, sem contorno individual nos itens; a aba ativa é indicada por superfície mais elevada, contraste tipográfico e um indicador inferior discreto, com foco visível preservado.
 - O Cockpit deve concentrar a primeira leitura em uma situação compacta de Saúde Financeira, quatro KPIs, Evolução mensal e Orçamento do mês; detalhes completos continuam nas abas e módulos de origem.
+- As abas analíticas do Cockpit, como Consultor e Saúde Financeira, compartilham a mesma moldura editorial: eyebrow, título, contexto curto, divisor discreto e ritmo vertical; cada aba mantém sua densidade e seus controles próprios.
+- Formulários de cadastro de Limites seguem o padrão de flyover de Lançamentos: superfície temática única, cabeçalho fixo, corpo rolável e campos distribuídos em duas colunas quando houver espaço; a listagem de uso também pode usar duas colunas e recolhe para uma em desktops compactos.
+- Objetivos usa a mesma gramática de Limites: cadastro em flyover, ação de abertura junto à listagem, cabeçalho estável, corpo rolável e cards de acompanhamento ocupando a largura disponível.
+- O Histórico do Consultor segue a mesma moldura editorial da aba: cabeçalho contextual, filtro contido e lista linear com separadores discretos, sem transformar cada relatório em um card pesado.
+- Limites e Relatórios usam cabeçalhos editoriais, métricas em superfícies silenciosas, estados compartilhados e listas/tabelas com bordas de baixa ênfase; a densidade se reorganiza em desktops compactos sem criar compressão horizontal desnecessária.
 - “Orçamento do mês” representa limites cadastrados versus realizado. Compromissos recorrentes podem aparecer em telas analíticas, mas não devem ser rotulados como orçamento.
 - Gráficos incorporados ao resumo usam altura reduzida, seis meses com movimento por padrão, legenda curta e insight textual; a aba Tendências conserva filtros, Budget x Realizado completo e achados.
 - Saldos do resumo usam uma única coluna de valor conciliado para contas e cartões. Projeções e competência de faturas ficam nas telas detalhadas para evitar duplicidade semântica.
@@ -47,6 +60,26 @@ O shell visual — menu, cabeçalho, superfícies e tipografia — deve funciona
 - As faixas do resumo do Cockpit usam um único gap vertical estrutural; margens específicas de painéis não devem produzir degraus visuais entre cards.
 - A faixa executiva principal usa três colunas para Saldos, Portfólio e Dívidas acima de `1280px` CSS. O layout compacto até `1280px` reduz para duas colunas e coloca Dívidas em largura total; o estreito empilha tudo.
 - Gráficos executivos de uma mesma faixa devem compartilhar altura e começar após o maior card da faixa anterior, mantendo uma base visual alinhada.
+- Tendências pode ter subtabs contextuais, como **Visão geral** e **Assinaturas**, sem promover cada análise a uma opção da navegação principal.
+- Painéis analíticos de recorrências usam flyover de leitura, com resumo financeiro no topo, lista de itens e metadados em grade responsiva; não devem parecer formulários.
+- O flyover analítico mantém a superfície elevada, borda discreta, cabeçalho estável e rolagem interna; em desktop compacto reduz a grade de metadados sem reduzir a legibilidade dos valores.
+- Identificação de serviços recorrentes é evidencial: nome específico e cor de confiança alta somente quando a descrição sustenta o rótulo; itens ambíguos permanecem neutros.
+- Lançamentos usam três níveis de leitura: contexto selecionado, filtros da consulta e resultado; cada nível recebe sua própria hierarquia de eyebrow, título, controle e metadado.
+- O contador da listagem deve funcionar como resumo de estado, destacando o total e mantendo conciliados/pendentes em texto secundário, sem transformar a contagem em um card concorrente.
+- As linhas de lançamentos priorizam descrição e valor; conta, tipo, categoria, recorrência, tags e conciliação permanecem como metadados leves, com alinhamento tabular e ações subordinadas.
+- Dentro de um mesmo formulário, `input`, `select` e `input[type="date"]` compartilham altura, padding vertical e linha de base; diferenças nativas de controle não devem criar degraus visuais.
+- Todos os formulários usam um ritmo vertical comum entre linhas, grupos condicionais e mensagens; o modo compacto reduz esse ritmo de forma controlada sem encostar rótulos e controles.
+- Uma ação auxiliar sem campo próprio, como `Buscar cota`, alinha-se à base dos controles vizinhos sem criar um rótulo visual vazio ou uma coluna concorrente.
+- A primeira leitura do Portfólio deve privilegiar um KPI patrimonial principal, métricas secundárias e uma única visualização curta; a aba Análise continua sendo o lugar dos detalhamentos de composição.
+- O gráfico de evolução do Portfólio usa altura contida e uma unidade única de rentabilidade percentual: linhas da carteira permanecem separadas por moeda e CDI/IPCA aparecem como benchmarks tracejados, com legenda discreta.
+- A evolução compacta reaproveita séries mensais existentes; se só houver rentabilidade percentual, ela pode ser exibida sem fabricar histórico. Não se misturam valores monetários e percentuais na mesma escala.
+- A comparação de rentabilidade vive no gráfico compacto da aba Posição; botão ou drawer paralelo não devem repetir a mesma leitura.
+- As abas do Portfólio compartilham uma moldura editorial: eyebrow contextual, título da aba, descrição curta e metadado auxiliar quando houver; o conteúdo específico começa depois dessa orientação.
+- Cards de Análise usam `align-items: start` e não se esticam para preencher o card vizinho; a altura deve comunicar o volume real de cada agrupamento.
+- Metas apresenta a orientação antes dos campos e mantém total planejado e ação de salvar no mesmo rodapé, com peso visual secundário para a ação até que o total seja válido.
+- Eventos e Histórico tratam tabelas como superfícies analíticas: cabeçalhos de seção, estados vazios, fontes e subtítulos devem preservar hierarquia e reflow em desktop compacto.
+- A coluna de eventos “Estimativa bruta” usa a mesma moeda do valor por cota/ação, exibe valores monetários com duas casas decimais, fica visualmente separada do valor oficial por unidade e nunca usa cor semântica para sugerir que o recebimento é líquido ou garantido.
+- O rodapé de Eventos deve explicar a fórmula, a origem pública dos dados e as principais limitações financeiras — impostos, taxas, corretagem, retenções, câmbio, alterações de posição e cancelamentos — sem transformar a tabela em um aviso crítico.
 
 ## Camada de conteúdo
 
@@ -426,9 +459,18 @@ Padrão único em toda a aplicação, conforme o modelo usado no menu **Preferê
 
 ### Formulários de lançamento
 
-- Nas telas de Lançamentos de contas e Lançamentos de cartões, o formulário principal deve permanecer visível no desktop/tablet durante a rolagem da lista, usando comportamento sticky dentro da coluna esquerda.
-- Quando o formulário for maior que a altura disponível, a rolagem deve acontecer dentro do próprio painel para manter cabeçalho e ações acessíveis sem ocultar a lista.
-- Em mobile, o formulário volta ao fluxo normal da página para preservar área útil e evitar sobreposição com listas e controles.
+- Nas telas de Lançamentos de contas e Lançamentos de cartões, a listagem ocupa a largura principal e o formulário completo abre em flyover lateral, liberando a tela para consulta dos lançamentos.
+- O flyover usa largura confortável de até `760px` em desktops, reduz proporcionalmente em viewports menores e ocupa a largura disponível em telas estreitas.
+- O seletor de contexto (conta ou cartão) permanece fora do flyover, junto à área consultada, para permitir trocar a origem da listagem sem abrir o formulário.
+- Quando o formulário for maior que a altura disponível, a rolagem deve acontecer dentro do próprio corpo do flyover para manter cabeçalho e ações acessíveis sem ocultar a lista.
+- Em mobile, o flyover ocupa a largura disponível e os campos respondem à largura interna para preservar área útil e evitar compressão dos controles.
+- Lançamentos de contas e cartões devem compartilhar a mesma gramática: eyebrow contextual, título de seção de peso equivalente, toolbar de filtros em superfície baixa e linhas com raio/hover consistentes.
+- O contexto selecionado (conta ou cartão) deve aparecer como controle de contexto discreto, separado visualmente da listagem e sem competir com o título do módulo.
+- Resumos de saldo e fatura usam a mesma superfície interna e os mesmos tokens de linha; cores semânticas ficam restritas ao valor/status e à borda lateral de uma linha quando necessário.
+- Em desktop, a listagem de lançamentos ocupa a largura principal; o formulário completo abre em flyover lateral de até `760px`, com largura suficiente para manter campos relacionados confortáveis e rolagem somente no corpo do formulário.
+- O flyover de lançamento deve preservar foco, fechamento por Escape, clique no overlay, botão explícito de fechar e restauração do foco ao acionador; o formulário não pode perder campos, avisos, validações ou regras condicionais.
+- A grade interna do formulário deve responder à largura real do flyover: campos relacionados podem permanecer em duas colunas quando houver espaço e empilham quando a largura útil ficar estreita, independentemente da largura total da viewport.
+- Mensagens auxiliares vazias não reservam espaço; avisos contextuais ocupam a largura completa quando explicam uma regra que se aplica ao grupo de campos.
 
 ### Gráficos compartilhados da v2
 
@@ -477,6 +519,37 @@ Padrão único em toda a aplicação, conforme o modelo usado no menu **Preferê
 
 ## Changelog
 
+- `5.36` — 2026-11-26 — Estende a camada premium compartilhada a Contas, Cartões, Importação, Categorias, Histórico, Preferências, Instruções e Sobre, com superfícies leves e reflow compacto.
+- `5.35` — 2026-11-26 — Define que orientações de módulo sem necessidade de leitura estreita respondem à largura útil real, evitando quebras artificiais em desktops amplos.
+- `5.34` — 2026-11-26 — Estende a linguagem premium a Empréstimos e Efeito Borboleta: superfícies silenciosas, cards editoriais, hierarquia de resultados e reflow para desktops compactos.
+- `5.33` — 2026-11-26 — Alinha Objetivos ao flyover de Limites e à mesma distribuição responsiva da listagem.
+- `5.32` — 2026-11-26 — Remove a segunda coluna vazia herdada do workspace de Limites e mantém a divisão em colunas apenas nos cards de uso.
+- `5.31` — 2026-11-26 — Corrige a precedência de alinhamento do painel de uso de Limites para ocupar toda a largura disponível.
+- `5.30` — 2026-11-26 — Corrige o alinhamento do workspace de Limites para ocupar toda a largura disponível antes de distribuir os itens em colunas.
+- `5.29` — 2026-11-26 — Padroniza o cadastro de Limites no flyover de Lançamentos e define a distribuição responsiva em duas colunas para formulário e listagem.
+- `5.28` — 2026-11-26 — Aplica a gramática de estados, cabeçalhos, métricas e listas editoriais às telas de Limites e Relatórios, com reflow para desktops compactos.
+- `5.27` — 2026-11-26 — Trata o Histórico do Consultor como subaba editorial, com cabeçalho contextual, filtro contido e linhas leves para leitura de relatórios anteriores.
+- `5.26` — 2026-11-26 — Equaliza Consultor e Saúde Financeira no Cockpit com cabeçalho editorial compartilhado, divisor de baixa ênfase, superfícies internas coerentes e reflow para desktops compactos.
+- `5.25` — 2026-11-26 — Alinha a lista da aba Assinaturas ao conjunto completo do flyover e reduz cards internos redundantes na visão resumida.
+- `5.24` — 2026-11-26 — Consolida eventos pontuais e limites em agrupamentos únicos com bullets, evitando títulos repetidos e mantendo a revisão de limite no contexto correto.
+- `5.23` — 2026-11-26 — Reorganiza a composição visual de Tendências para reduzir cards, integrar métricas à evolução e transformar achados e confiança em leitura editorial.
+- `5.22` — 2026-11-26 — Torna o gráfico completo de Tendências fluido em desktops compactos e remove a rolagem horizontal criada pela largura mínima fixa.
+- `5.21` — 2026-11-26 — Remove a largura mínima fixa do quadro Saldos por moeda e torna as colunas fluidas para eliminar a rolagem lateral em desktops compactos.
+- `5.20` — 2026-11-26 — Ajusta o respiro interno do quadro Saldos por moeda e protege a coluna numérica contra proximidade excessiva da moldura.
+- `5.19` — 2026-11-26 — Padroniza a superfície raiz de flyovers, drawers e diálogos para acompanhar integralmente o tema claro/escuro, eliminando o fundo lilás dos alertas.
+- `5.18` — 2026-11-26 — Unifica a linguagem visual das abas do app em uma faixa leve, com seleção por contraste, indicador discreto e foco acessível.
+- `5.16` — 2026-11-26 — Define a apresentação conservadora da estimativa bruta de Eventos, com fórmula e disclaimers financeiros no rodapé.
+- `5.15` — 2026-11-26 — Define a moldura editorial compartilhada das abas do Portfólio, cards de Análise sem estiramento e tratamento responsivo de Metas, Eventos e Histórico.
+- `5.14` — 2026-11-26 — Unifica no gráfico compacto do Portfólio a rentabilidade por moeda com CDI e IPCA, usando benchmarks tracejados e removendo a visualização redundante por botão/drawer.
+- `5.13` — 2026-11-26 — Define o reaproveitamento das séries mensais existentes na evolução compacta do Portfólio, com fallback explícito para rentabilidade.
+- `5.12` — 2026-11-26 — Define a hierarquia premium do topo do Portfólio e o gráfico compacto de evolução patrimonial por moeda.
+- `5.11` — 2026-11-26 — Harmoniza o ritmo vertical de todos os formulários e define o alinhamento de ações auxiliares sem rótulo visual redundante.
+- `5.10` — 2026-11-26 — Padroniza altura e alinhamento entre campos de texto, seleção e data nos flyovers de formulário.
+- `5.9` — 2026-11-26 — Consolida a hierarquia visual de contexto, filtros, contagem e linhas nas telas de Lançamentos, mantendo a densidade adequada para desktops compactos.
+- `5.8` — 2026-11-25 — Define subtabs analíticas dentro de Tendências e o padrão visual do flyover de assinaturas, com leitura conservadora da confiança de identificação.
+- `5.7` — 2026-11-25 — Amplia o flyover de lançamentos para até `760px` e mantém os seletores de conta/cartão fora do formulário para troca de contexto sem abrir o painel.
+- `5.6` — 2026-11-24 — Define o formulário de lançamentos como flyover lateral, com largura confortável, foco acessível, grupos responsivos e mensagens condicionais sem espaço vazio.
+- `5.5` — 2026-11-24 — Padroniza a camada visual das telas de lançamentos de contas e cartões, unificando cabeçalhos, formulários, toolbars, resumos e linhas sem alterar os contratos funcionais.
 - `5.4` — 2026-11-24 — Define o agrupamento visual de múltiplas ações em informativos do flyout.
 - `5.3` — 2026-11-24 — Unifica os cabeçalhos do Cockpit em uma gramática única para saúde, evolução, orçamento, saldos, portfólio, dívidas e gráficos.
 - `5.2` — 2026-11-24 — Define a ação contextual de consulta em cards analíticos e o destaque contido do agrupamento de destino, preservando ações de edição/exclusão e sem usar semântica financeira como decoração.

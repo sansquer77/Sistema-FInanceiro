@@ -11,13 +11,33 @@ export function initializeOverlayUX(root = document) {
     if (attributeName !== "hidden" || !target.classList?.contains("drawer")) return;
     if (!target.hidden) {
       overlayFocus.set(target, document.activeElement);
-      queueMicrotask(() => focusableElements(target)[0]?.focus() || target.focus());
+      queueMicrotask(() => target.querySelector("[data-drawer-autofocus]")?.focus() || focusableElements(target)[0]?.focus() || target.focus());
     } else {
       overlayFocus.get(target)?.focus?.();
       overlayFocus.delete(target);
     }
   }));
   root.querySelectorAll(".drawer").forEach((overlay) => observer.observe(overlay, { attributes: true }));
+}
+
+export function createDrawerController({ drawer, closeButton, overlay } = {}) {
+  if (!drawer) {
+    return { open() {}, close() {}, isOpen: () => false };
+  }
+
+  const setOpen = (open) => {
+    drawer.hidden = !open;
+    drawer.setAttribute("aria-hidden", open ? "false" : "true");
+  };
+
+  closeButton?.addEventListener("click", () => setOpen(false));
+  overlay?.addEventListener("click", () => setOpen(false));
+
+  return {
+    open: () => setOpen(true),
+    close: () => setOpen(false),
+    isOpen: () => !drawer.hidden,
+  };
 }
 
 function handleOverlayKeydown(event) {

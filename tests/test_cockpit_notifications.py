@@ -11,10 +11,12 @@ from financeiro.accounts import create_checking_account
 from financeiro.auth import create_user
 from financeiro.categories import create_category
 from financeiro.cockpit_notifications import build_cockpit_notifications, mark_informational_seen
+from financeiro.balance_projections import build_projected_negative_balances_for_user
 from financeiro.backup_settings import record_backup_result
 from financeiro.spending_limits import create_spending_limit, list_spending_limits_with_consumption
 from financeiro.revolving_loans import close_revolving_loan, create_revolving_loan
 from financeiro.secure_config import save_email_config
+from financeiro.transactions import list_transactions
 import app
 
 
@@ -57,7 +59,11 @@ class CockpitNotificationsTest(unittest.TestCase):
                 "id": 7, "category_name": "Alimentação", "subcategory_name": None,
                 "spent_amount_cents": 135000, "limit_amount_cents": 120000,
             }],
-            totals_loader=lambda _user, _month: [{"currency": "BRL", "current": "-10.50"}],
+            totals_loader=lambda _user, _month: [{
+                "account_id": 7, "account_name": "Conta principal", "currency": "BRL",
+                "first_negative_date": "2026-09-24", "negative_cents": 84230,
+                "causes": ["fatura do cartão", "contas recorrentes"],
+            }],
             calendar_loader=lambda _user, **_kwargs: {
                 "overdue_payables": [{"id": 9, "date": "2026-09-01", "description": "Conta", "account_name": "Banco", "account_id": 3}],
                 "maturity_30_days": [],
@@ -68,8 +74,66 @@ class CockpitNotificationsTest(unittest.TestCase):
             "limit_exceeded", "projected_negative_balance", "overdue_payable",
         })
 
+    def test_projected_negative_balance_identifies_first_day_and_account(self):
+        account = create_checking_account(self.user["id"], {
+            "name": "Conta principal", "bank_name": "Banco", "currency": "BRL", "initial_balance": "100,00",
+        })
+        with database.get_connection() as conn:
+            conn.execute(
+                """INSERT INTO transactions
+                   (user_id, type, description, amount_cents, amount_brl_cents, date, account_id, series_kind)
+                   VALUES (?, 'expense', 'Conta recorrente', 15000, 15000, '2026-09-05', ?, 'recurring')""",
+                (self.user["id"], account["id"]),
+            )
+
+        rows = build_projected_negative_balances_for_user(
+            self.user["id"], "2026-09", reference_date=date(2026, 9, 3)
+        )
+        self.assertEqual(rows[0]["account_name"], "Conta principal")
+        self.assertEqual(rows[0]["first_negative_date"], "2026-09-05")
+        self.assertEqual(rows[0]["negative_cents"], 5000)
+        self.assertEqual(rows[0]["causes"], ["contas recorrentes"])
+
+        payload = self.build(totals_loader=None, negative_balance_loader=lambda _user, _month: rows)
+        notification = next(item for item in payload["critical"] if item["type"] == "projected_negative_balance")
+        self.assertIn("05/09", notification["title"])
+        self.assertIn("Conta: Conta principal", notification["description"])
+        self.assertIn("-R$ 50,00", notification["description"])
+        self.assertEqual(notification["action"]["params"], {
+            "month": "2026-09", "account_id": account["id"],
+        })
+
+    def test_projected_negative_balance_is_absent_when_forecast_stays_positive(self):
+        account = create_checking_account(self.user["id"], {
+            "name": "Conta estável", "bank_name": "Banco", "currency": "BRL", "initial_balance": "100,00",
+        })
+        with database.get_connection() as conn:
+            conn.execute(
+                """INSERT INTO transactions
+                   (user_id, type, description, amount_cents, amount_brl_cents, date, account_id)
+                   VALUES (?, 'expense', 'Conta futura', 5000, 5000, '2026-09-05', ?)""",
+                (self.user["id"], account["id"]),
+            )
+        self.assertEqual(
+            build_projected_negative_balances_for_user(
+                self.user["id"], "2026-09", reference_date=date(2026, 9, 3)
+            ),
+            [],
+        )
+
+    def test_currently_negative_balance_is_not_reclassified_as_future_crossing(self):
+        account = create_checking_account(self.user["id"], {
+            "name": "Conta já negativa", "bank_name": "Banco", "currency": "BRL", "initial_balance": "-50,00",
+        })
+        self.assertEqual(
+            build_projected_negative_balances_for_user(
+                self.user["id"], "2026-09", reference_date=date(2026, 9, 3)
+            ),
+            [],
+        )
+
     def test_limit_exceeded_alert_uses_real_spending_limits_loader(self):
-        # spec: cockpit/alertas-cockpit v1.5 — critério 1
+        # spec: cockpit/alertas-cockpit v1.10 — critério 1
         # Regressão: list_spending_limits_with_consumption preserva limit_amount_cents
         # para que o alerta de estouro seja detectado pelo backend.
         account = create_checking_account(self.user["id"], {
@@ -126,10 +190,15 @@ class CockpitNotificationsTest(unittest.TestCase):
         self.assertEqual(notification["title"], "Feche agosto de 2026")
         self.assertIn("1 lançamento não conciliado(s)", notification["description"])
         self.assertIn("1 lançamento sem classificação", notification["description"])
-        self.assertEqual([action["label"] for action in notification["actions"]], ["Abrir demonstrativo", "Ver pendências"])
+        self.assertEqual([action["label"] for action in notification["actions"]], [
+            "Abrir demonstrativo", "Ver conciliação pendente", "Ver sem classificação",
+        ])
         self.assertEqual(notification["actions"][0]["route"], "reports")
         self.assertEqual(notification["actions"][0]["params"], {"month": "2026-08", "tab": "statement"})
+        self.assertEqual(notification["actions"][1]["route"], "transactions")
         self.assertEqual(notification["actions"][1]["params"], {"month": "2026-08", "status": "pending"})
+        self.assertEqual(notification["actions"][2]["route"], "reports")
+        self.assertEqual(notification["actions"][2]["params"], {"month": "2026-08", "tab": "unclassified"})
 
     def test_monthly_close_notification_is_not_created_when_previous_month_is_resolved(self):
         account = create_checking_account(self.user["id"], {
@@ -145,6 +214,30 @@ class CockpitNotificationsTest(unittest.TestCase):
             ).lastrowid
         self.assertIsNotNone(transaction_id)
         payload = self.build()
+        self.assertFalse(any(item["type"] == "monthly_close" for item in payload["informational"]))
+
+    def test_portfolio_redemption_is_not_counted_as_unclassified_monthly_close(self):
+        account = create_checking_account(self.user["id"], {
+            "name": "Carteira Wise", "bank_name": "Wise", "currency": "USD", "initial_balance": "0,00",
+        })
+        with database.get_connection() as conn:
+            transaction_id = conn.execute(
+                """INSERT INTO transactions
+                   (user_id, type, description, amount_cents, amount_brl_cents, date, account_id, reconciled_at)
+                   VALUES (?, 'income', 'Resgate - Reserva Wise', 13500, 13500, '2026-10-12', ?, CURRENT_TIMESTAMP)""",
+                (self.user["id"], account["id"]),
+            ).lastrowid
+            conn.execute(
+                """INSERT INTO investment_redemptions
+                   (user_id, account_id, transaction_id, source_type, source_id,
+                    redeemed_value_cents, redeemed_cost_cents, redeemed_quantity_micros, date)
+                   VALUES (?, ?, ?, 'opening', 10, 13500, 13500, 1350000000, '2026-10-12')""",
+                (self.user["id"], account["id"], transaction_id),
+            )
+        listed = next(item for item in list_transactions(self.user["id"], month="2026-10")
+                      if item["id"] == transaction_id)
+        self.assertTrue(listed["classification_exempt"])
+        payload = self.build(reference_date=date(2026, 11, 1))
         self.assertFalse(any(item["type"] == "monthly_close" for item in payload["informational"]))
 
     def test_events_outside_current_week_are_not_listed(self):

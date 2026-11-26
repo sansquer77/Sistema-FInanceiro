@@ -1,4 +1,4 @@
-// spec: score-saude-financeira v3.7 — critérios 15, 16, 17, 22, 23, 24, 25, 26, 27, 28, 29, 30 e 31
+// spec: score-saude-financeira v3.8 — critérios 15, 16, 17, 22, 23, 24, 25, 26, 27, 28, 29, 30 e 31
 import { stateMarkup } from "./dom-utils.js";
 export function registerFinancialHealthView({
   elements,

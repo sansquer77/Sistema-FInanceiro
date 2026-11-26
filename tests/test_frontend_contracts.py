@@ -64,6 +64,44 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("loan-study-result-primary", loans)
         self.assertIn("loan-study-result-footnote", loans)
         self.assertLess(loans.index("${primaryMessage ?"), loans.index("${notes.map"))
+
+    def test_loans_and_simulations_use_shared_premium_surface_contract(self) -> None:
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+        for selector in (
+            "#loansView .loan-data-guidance",
+            "#loansView #loanList",
+            "#loansView .loan-card",
+            "#simulationsView .simulation-shell",
+            "#simulationsView .simulations-workspace",
+            "#simulationsView .loan-study-result-card",
+        ):
+            self.assertIn(selector, styles)
+        self.assertIn('id="loanActivePanel"', index)
+        self.assertIn('id="simulationCashflowPanel"', index)
+        self.assertIn('id="simulationLoansPanel"', index)
+        self.assertIn('data-simulation-mode-tab="cashflow"', index)
+        self.assertIn('data-simulation-mode-tab="loans"', index)
+
+    def test_remaining_modules_use_shared_premium_surface_contract(self) -> None:
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+        for module_id in (
+            "accountsView", "creditCardsView", "importsView", "classificationsView",
+            "operationHistoryView", "userView", "instructionsView", "aboutView",
+        ):
+            self.assertIn(f'id="{module_id}"', index)
+        for selector in (
+            "#accountsView .account-card",
+            "#creditCardsView .credit-card-item",
+            "#importsView .import-result",
+            "#classificationsView .classification-item",
+            "#operationHistoryView .operation-log-item",
+            "#userView .user-pref-tabs",
+            "#instructionsView .instructions-group",
+            "#aboutView .about-feature-list span",
+        ):
+            self.assertIn(selector, styles)
         self.assertIn("font-weight: 650", styles)
 
     def test_backup_preferences_expose_full_validated_flow(self) -> None:
@@ -276,8 +314,10 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("clearPortfolioPresentation", portfolio)
         self.assertIn("portfolioView.onLeave()", app)
         self.assertIn("portfolioView.onEnter()", app)
-        self.assertIn("destroyChart(portfolioReturnChart)", portfolio_chart)
-        self.assertIn("function closeReturns()", portfolio_chart)
+        self.assertIn("destroyChart(portfolioEvolutionChart)", portfolio_chart)
+        self.assertNotIn("function closeReturns()", portfolio_chart)
+        self.assertIn('"cdi_return_pct"', portfolio_chart)
+        self.assertIn('"ipca_return_pct"', portfolio_chart)
         self.assertIn("REVALIDATE_AFTER_MS = 30_000", portfolio_lifecycle)
         self.assertIn("now - state.portfolioLoadedAt", portfolio_lifecycle)
         hidden_rule = styles[styles.index(".portfolio-group-drawer[hidden] {"):]
@@ -288,7 +328,7 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("-webkit-backdrop-filter: none", overlay_rule)
         self.assertIn("backdrop-filter: none", overlay_rule)
 
-    def test_portfolio_events_are_lazy_and_do_not_estimate_total(self) -> None:
+    def test_portfolio_events_are_lazy_and_show_gross_estimate(self) -> None:
         index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
         facade = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
         events = (MODULE_ROOT / "portfolio-events.js").read_text(encoding="utf-8")
@@ -307,7 +347,10 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("portfolio-events-month", events)
         self.assertIn("formatMonth", events)
         self.assertIn("portfolio-event-empty", events)
-        self.assertIn("Dados obtidos de fontes públicas; sempre validar com seu Banco/Corretora.", events)
+        self.assertIn("Estimativa bruta = valor por cota/ação × quantidade atualmente aberta", events)
+        self.assertIn("Não é valor líquido", events)
+        self.assertIn("estimated_value_micros", events)
+        self.assertIn('maximumFractionDigits: 2', events)
         self.assertIn("Proventos futuros anunciados para ações, ETFs e BDRs da carteira.", index)
         self.assertIn("event.source", events)
         self.assertIn('role="columnheader">Fonte', events)
@@ -315,6 +358,19 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertNotIn("events.map(eventRow)", events)
         self.assertNotIn("position.quantity", events)
         self.assertNotIn("estimated_total", events)
+
+    def test_portfolio_tabs_share_premium_hierarchy_and_compact_reflow(self) -> None:
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+        history = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
+
+        self.assertIn('class="portfolio-tab-intro"', index)
+        self.assertIn("portfolio-analysis-grid", index)
+        self.assertIn('class="portfolio-goals-guidance"', index)
+        self.assertIn('class="portfolio-history-section-heading"', history)
+        self.assertIn("align-items: start", styles[styles.index(".portfolio-grid {"):styles.index(".portfolio-goals-grid {")])
+        self.assertIn(".portfolio-events-grid {\n    min-width: 940px;", styles)
+        self.assertIn(".portfolio-events-grid {\n    min-width: 850px;", styles)
 
     def test_apexcharts_overlays_races_and_history_bounds_are_guarded(self) -> None:
         portfolio = (MODULE_ROOT / "portfolio-view.js").read_text(encoding="utf-8")
@@ -324,7 +380,8 @@ class FrontendModuleContractTest(unittest.TestCase):
         transactions = (MODULE_ROOT / "transaction-balance-chart.js").read_text(encoding="utf-8")
         styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
 
-        self.assertIn("document.body.append(portfolioReturnDrawer)", portfolio)
+        self.assertIn("portfolioChart.clearEvolution()", portfolio)
+        self.assertNotIn("portfolioReturnDrawer", portfolio)
         self.assertIn("const requestId = ++evolutionRequestId", evolution)
         self.assertIn("requestId !== evolutionRequestId || context !== currentEvolutionContext", evolution)
         self.assertIn('height: 92, sparkline: { enabled: true }', cards)
@@ -449,6 +506,49 @@ class FrontendModuleContractTest(unittest.TestCase):
         for direction in ("top", "bottom"):
             arrow = styles.split(f".trends-chart .apexcharts-canvas .apexcharts-xaxistooltip-{direction}::after {{", 1)[1].split("}", 1)[0]
             self.assertIn(f"border-{direction}-color: var(--panel)", arrow)
+
+    def test_trends_chart_uses_available_width_without_horizontal_scroll(self) -> None:
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+        chart = styles.split(".trends-chart {", 1)[1].split("}", 1)[0]
+        apex = styles.split(".trends-apex-chart {", 1)[1].split("}", 1)[0]
+        self.assertIn("overflow: visible", chart)
+        self.assertIn("width: 100%", apex)
+        self.assertIn("min-width: 0", apex)
+        self.assertNotIn("min-width: 520px", apex)
+
+    def test_trends_overview_uses_editorial_module_hierarchy(self) -> None:
+        source = (MODULE_ROOT / "trends-view.js").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn("Design system v5.24 — evolução como hero", styles)
+        self.assertNotIn("${renderSummaryCard()}", source)
+        self.assertIn("${renderSummaryMetrics()}", source)
+        self.assertIn('class="trends-section-eyebrow">ACOMPANHAMENTO', source)
+        self.assertIn('class="trends-confidence-list"', source)
+        self.assertIn("border-left: 3px solid transparent", styles)
+        self.assertIn("background: transparent;", styles)
+
+    def test_trends_findings_group_point_events_and_limit_review(self) -> None:
+        source = (MODULE_ROOT / "trends-view.js").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn('class="trends-finding trends-finding-group trends-finding-events info"', source)
+        self.assertIn('class="trends-finding trends-finding-group trends-finding-limits warning"', source)
+        self.assertIn('class="trends-finding-bullets"', source)
+        self.assertIn('finding.tipo === "limite_recorrente"', source)
+        self.assertIn('>Revisar limite</small>', source)
+        self.assertIn(".trends-finding-group {", styles)
+        self.assertIn(".trends-finding-action {", styles)
+
+    def test_subscriptions_overview_matches_complete_item_set(self) -> None:
+        source = (MODULE_ROOT / "trends-view.js").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+        self.assertNotIn("items.slice(0, 6)", source)
+        self.assertIn("${items.map((item) => `", source)
+        self.assertIn("Ver detalhes completos", source)
+        self.assertIn(".subscriptions-overview-total > div + div", styles)
+        self.assertIn(".subscriptions-overview-list", styles)
 
     def test_portfolio_return_tooltip_reuses_theme_contrast_rules(self) -> None:
         styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
@@ -756,6 +856,44 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("scrollbar-gutter: stable", styles)
         self.assertIn('class="report-table-wrap"><table class="report-table consultor-table"', consultor)
 
+    def test_account_and_card_launches_share_premium_content_grammar(self) -> None:
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+        self.assertEqual(index.count("launch-section-heading"), 3)
+        for shared_class in ("launch-form-drawer", "launch-filter-toolbar"):
+            self.assertGreaterEqual(index.count(shared_class), 2, shared_class)
+            self.assertIn(f".{shared_class}", styles)
+        self.assertIn(".launch-section-heading", styles)
+        self.assertIn("launch-form-drawer-header", index)
+        self.assertIn("launch-form-drawer-body", index)
+        self.assertIn("launch-context-toolbar", index)
+        self.assertIn('class="transaction-search launch-context-field"', index)
+        account_selector = '<select name="account_id" id="transactionAccount" form="transactionForm" required></select>'
+        self.assertIn(account_selector, index)
+        account_drawer_start = index.index('id="transactionFormDrawer"')
+        account_drawer_end = index.index("</aside>", account_drawer_start)
+        self.assertNotIn(account_selector, index[account_drawer_start:account_drawer_end])
+        card_drawer_start = index.index('id="cardTransactionFormDrawer"')
+        card_drawer_end = index.index("</aside>", card_drawer_start)
+        self.assertNotIn('id="cardInvoiceCard"', index[card_drawer_start:card_drawer_end])
+        self.assertIn('width: min(760px, calc(100vw - 20px));', styles)
+        self.assertIn("#cardLaunchesView .card-invoice-summary > div", styles)
+        self.assertIn("#transactionsView .month-balance-summary > div", styles)
+        self.assertIn("#cardLaunchesView .card-invoice-row", styles)
+        self.assertIn("#transactionsView .transaction-row", styles)
+
+    def test_unclassified_report_review_is_a_global_monthly_destination(self) -> None:
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        app = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+        reports = (MODULE_ROOT / "reports-view.js").read_text(encoding="utf-8")
+
+        self.assertIn('data-report-tab="unclassified"', index)
+        self.assertIn('"unclassified"]', app)
+        self.assertIn('state.reportTab === "unclassified"', reports)
+        self.assertIn("Lançamentos sem classificação", reports)
+        self.assertIn("reconciledAt", reports)
+
     def test_portfolio_and_preferences_tabs_stay_below_global_header(self) -> None:
         styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
 
@@ -769,6 +907,117 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn(".launch-form-sticky {\n  position: sticky;\n  top: 88px", styles)
         self.assertIn(".instructions-toolbar {\n  position: sticky;\n  top: 82px", styles)
         self.assertIn(".transaction-day-heading {\n  position: sticky;\n  top: 82px", styles)
+
+    def test_global_tabs_share_light_surface_language(self) -> None:
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn("Design system v5.18 — abas globais", styles)
+        self.assertIn("border: 1px solid var(--content-line);", styles)
+        self.assertIn("box-shadow: inset 0 -2px 0 var(--accent), var(--content-shadow);", styles)
+        self.assertIn(".trends-tabs", styles)
+        self.assertIn(".portfolio-tabs", styles)
+        self.assertIn(".report-tabs", styles)
+        self.assertIn(".notification-flyout-tabs", styles)
+        self.assertIn(".notification-flyout-tab[aria-selected=\"true\"]", styles)
+
+    def test_cockpit_consultor_and_health_share_editorial_shell(self) -> None:
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+        consultor = (MODULE_ROOT / "consultor-view.js").read_text(encoding="utf-8")
+        health = (MODULE_ROOT / "financial-health-view.js").read_text(encoding="utf-8")
+
+        self.assertIn('class="panel cockpit-calendar-panel cockpit-analysis-panel cockpit-tab-panel"', index)
+        self.assertIn('class="panel financial-health-panel cockpit-analysis-panel cockpit-tab-panel"', index)
+        self.assertIn('class="cockpit-calendar-header cockpit-analysis-header"', index)
+        self.assertIn('class="financial-health-header cockpit-analysis-header"', index)
+        self.assertIn('<span class="eyebrow">CONSULTOR</span>', index)
+        self.assertIn('<span class="eyebrow">DIAGNÓSTICO</span>', index)
+        self.assertIn(".cockpit-analysis-panel {", styles)
+        self.assertIn(".cockpit-analysis-header {", styles)
+        self.assertIn(".cockpit-calendar-panel .consultor-workspace {", styles)
+        self.assertIn(".financial-health-panel .financial-health-content {", styles)
+        self.assertIn("bindRovingTablist", consultor)
+        self.assertIn("financialHealthGauge", health)
+
+    def test_consultor_history_uses_the_same_editorial_shell(self) -> None:
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn('class="consultor-history-heading"', index)
+        self.assertIn('<span class="eyebrow">CONSULTOR</span>', index)
+        self.assertIn('class="consultor-history-filter"', index)
+        self.assertIn(".consultor-history-heading {", styles)
+        self.assertIn(".cockpit-calendar-panel .consultor-history-list {", styles)
+        self.assertIn("background: var(--content-surface-hover);", styles)
+
+    def test_limits_and_reports_use_editorial_states_and_compact_reflow(self) -> None:
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+        for expected in (
+            'class="module-editorial-header limits-page-intro"',
+            'class="module-editorial-header reports-page-intro"',
+            'class="panel limits-overview-panel"',
+            'class="panel limits-list-panel"',
+            'class="panel reports-overview-panel"',
+        ):
+            self.assertIn(expected, index)
+        self.assertIn("Design system v5.28 — Limites e Relatórios", styles)
+        self.assertIn("#limitsView .spending-limit-item", styles)
+        self.assertIn("#reportsView .report-rank-row", styles)
+        self.assertIn("#reportsView .statement-controls", styles)
+        self.assertIn("min-width: 680px", styles)
+
+    def test_limits_form_uses_transaction_style_flyover_and_two_column_list(self) -> None:
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn('id="limitFormDrawer" class="drawer limit-form-drawer"', index)
+        self.assertIn('id="openLimitFormButton"', index)
+        self.assertIn('class="limit-form-field-wide"', index)
+        self.assertNotIn('class="panel limits-editor-panel"', index)
+        self.assertIn(".limit-form-drawer .drawer-content", styles)
+        self.assertIn("#limitsView .spending-limit-list", styles)
+        self.assertIn("grid-template-columns: repeat(2, minmax(0, 1fr));", styles)
+        self.assertIn("#limitsView .limits-workspace {\n  align-items: stretch;", styles)
+        self.assertIn("#limitsView .limits-list-panel {\n  align-self: stretch;", styles)
+
+    def test_overlays_share_theme_surface_language(self) -> None:
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn("Design system v5.19 — superfícies de flyovers", styles)
+        self.assertIn(
+            ":is(.drawer-content, .subscription-flyover, .notification-flyout, .global-search-dialog, .command-palette-dialog, .decision-modal)",
+            styles,
+        )
+        self.assertIn("background: var(--content-surface);", styles)
+        self.assertIn(".notification-flyout-header,\n.notification-flyout-tabs,\n.notification-flyout-footer", styles)
+
+    def test_goals_share_limits_flyover_and_full_width_list_layout(self) -> None:
+        index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+        limits = (MODULE_ROOT / "limits-view.js").read_text(encoding="utf-8")
+
+        self.assertIn('id="goalFormDrawer" class="drawer goal-form-drawer"', index)
+        self.assertIn('id="closeGoalFormButton"', index)
+        self.assertIn('aria-controls="goalFormDrawer"', index)
+        self.assertNotIn('id="goalFormPanel"', index)
+        self.assertIn("goalFormDrawerController?.open()", limits)
+        self.assertIn(".goal-form-drawer .drawer-content", styles)
+        self.assertIn("#financialGoalsPanel .goals-workspace", styles)
+        self.assertIn("#financialGoalsPanel .financial-goal-list", styles)
+
+    def test_currency_balances_keep_numeric_values_clear_of_frame(self) -> None:
+        styles = (WEB_ROOT / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn(".currency-section-header {", styles)
+        self.assertIn("padding: 14px 18px;", styles)
+        self.assertIn("padding: 11px 18px;", styles)
+        self.assertIn("overflow-x: hidden;", styles)
+        self.assertIn("grid-template-columns: minmax(0, 1.5fr) minmax(80px, 0.8fr) minmax(108px, auto);", styles)
+        self.assertIn("min-width: 0;", styles)
+        self.assertIn(".currency-table-row strong {\n  padding-inline-start: 6px;", styles)
+        self.assertIn("padding: 10px 18px;", styles)
 
     def test_global_search_is_bounded_keyboard_accessible_and_preserves_view_context(self) -> None:
         index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")

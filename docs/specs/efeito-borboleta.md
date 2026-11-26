@@ -2,8 +2,8 @@
 tipo: spec
 area: simulacoes
 status: implementado
-versao: 2.16
-atualizado: 2026-09-27
+versao: 2.17
+atualizado: 2026-11-26
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -19,7 +19,7 @@ aliases: ["Efeito Borboleta", "Simulador Financeiro"]
 # Efeito Borboleta
 
 > [!info] Status
-> **implementado** · versão: `2.16` · área: `simulacoes` · atualizado em 2026-09-27 · relacionados: [[contas-correntes]], [[lancamentos]], [[cartoes]], [[limites-gastos]], [[relatorios]], [[emprestimos-quitacao]]
+> **implementado** · versão: `2.17` · área: `simulacoes` · atualizado em 2026-11-26 · relacionados: [[contas-correntes]], [[lancamentos]], [[cartoes]], [[limites-gastos]], [[relatorios]], [[emprestimos-quitacao]]
 
 ## Problema
 
@@ -194,6 +194,7 @@ A aba **Empréstimos** inclui o estudo individual do Crédito Rotativo: pagament
 
 ## Changelog
 
+- `2.17` — 2026-11-26 — Equaliza a moldura visual das simulações de Receitas/Despesas e Empréstimos, com hierarquia editorial, superfícies leves e reflow para desktops compactos.
 - `2.16` — 2026-09-27 — Resultado de amortização passa a explicar em destaque a parcela após o aporte, prazo antes/depois e a redução de ênfase das ressalvas.
 - `2.15` — 2026-09-27 — Separa o estudo individual entre quitação integral e amortização; apresenta comparação automática quitação × CDI no primeiro fluxo.
 - `2.14` — 2026-09-27 — Define que o comparativo CDI usa a última taxa diária publicada, projetada constante como cenário hipotético pelo prazo restante.

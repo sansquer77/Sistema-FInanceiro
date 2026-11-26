@@ -70,6 +70,8 @@ export function registerCardsView({
     cardInvoiceSearch,
     cardInvoiceStatusFilterButtons,
     cardTransactionForm,
+    cardTransactionFormDrawerController,
+    openCardTransactionFormButton,
     cardTransactionFormTitle,
     cardTransactionType,
     cardTransactionCategory,
@@ -143,7 +145,14 @@ export function registerCardsView({
   cardTransactionForm.elements.description.addEventListener("input", classificationSuggestion.schedule);
   cardSeriesKind.addEventListener("change", updateCardSeriesState);
   cancelCreditCardEditButton.addEventListener("click", resetCreditCardForm);
-  cancelCardTransactionEditButton.addEventListener("click", resetCardTransactionForm);
+  openCardTransactionFormButton?.addEventListener("click", () => {
+    resetCardTransactionForm();
+    cardTransactionFormDrawerController?.open();
+  });
+  cancelCardTransactionEditButton.addEventListener("click", () => {
+    resetCardTransactionForm();
+    cardTransactionFormDrawerController?.close();
+  });
 
 
   async function loadCreditCards() {
@@ -269,6 +278,7 @@ export function registerCardsView({
       resetCardTransactionForm();
       await refreshCardLaunches();
       setMessage(cardInvoiceMessage, isEditing ? "Lançamento do cartão atualizado." : "Lançamento do cartão salvo.", "success");
+      cardTransactionFormDrawerController?.close();
     } catch (error) {
       setMessage(cardInvoiceMessage, error.message, "error");
     } finally {
@@ -534,7 +544,7 @@ export function registerCardsView({
     cardTransactionFormTitle.textContent = "Editar lançamento no cartão";
     cancelCardTransactionEditButton.hidden = false;
     cardTransactionForm.querySelector('button[type="submit"]').textContent = "Salvar alterações";
-    cardTransactionForm.scrollIntoView({ behavior: "smooth", block: "start" });
+    cardTransactionFormDrawerController?.open();
   }
 
   function updateCardSeriesState() {
@@ -598,6 +608,7 @@ export function registerCardsView({
       cardInvoiceDueDate.textContent = "--";
       cardPaymentDate.value = "";
       cardTransactionForm.querySelector('button[type="submit"]').disabled = true;
+      if (openCardTransactionFormButton) openCardTransactionFormButton.disabled = true;
       payCardInvoiceButton.disabled = true;
       payPartialCardInvoiceButton.hidden = true;
       updateCardInvoiceOpenCount();
@@ -619,6 +630,7 @@ export function registerCardsView({
     }
     const alreadyPaid = state.cardInvoicePayments.length > 0;
     cardTransactionForm.querySelector('button[type="submit"]').disabled = alreadyPaid;
+    if (openCardTransactionFormButton) openCardTransactionFormButton.disabled = alreadyPaid;
     payCardInvoiceButton.disabled = total <= 0 || alreadyPaid || !cardPaymentAccount.value;
     payCardInvoiceButton.textContent = alreadyPaid ? "Fatura paga" : "Pagar fatura integral";
     payPartialCardInvoiceButton.hidden = alreadyPaid || total <= 0 || !cardPaymentAccount.value;
@@ -696,6 +708,9 @@ export function registerCardsView({
     }
     cardTransactionCategory.disabled = categories.length === 0;
     cardTransactionForm.querySelector('button[type="submit"]').disabled = categories.length === 0 || !state.selectedCreditCardId;
+    if (openCardTransactionFormButton) {
+      openCardTransactionFormButton.disabled = categories.length === 0 || !state.selectedCreditCardId || state.cardInvoicePayments.length > 0;
+    }
     renderCardTransactionSubcategories();
   }
 

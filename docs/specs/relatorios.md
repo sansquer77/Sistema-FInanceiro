@@ -2,8 +2,8 @@
 tipo: spec
 area: relatorios
 status: implementado
-versao: 2.26
-atualizado: 2026-11-24
+versao: 2.29
+atualizado: 2026-11-26
 relacionados:
   - "[[lancamentos]]"
   - "[[cartoes]]"
@@ -17,7 +17,7 @@ aliases: ["Relatórios", "Cockpit"]
 # Relatórios
 
 > [!info] Status
-> **implementado** · versão: `2.26` · área: `relatorios` · atualizado em 2026-11-24 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[limites-gastos]]
+> **implementado** · versão: `2.29` · área: `relatorios` · atualizado em 2026-11-26 · relacionados: [[lancamentos]], [[cartoes]], [[categorias-tags-gestao]], [[limites-gastos]]
 
 ## Problema
 
@@ -173,8 +173,14 @@ O ponto crítico é cartão de crédito: a fatura pertence ao mês de competênc
 - [x] Criar testes automatizados para Cockpit mensal, especialmente fatura paga em mês selecionado e exclusão do pagamento agregado.
 - [x] Separar o consolidado de saldos por moeda da projeção detalhada do Extrato e calculá-lo por agregações SQLite.
 - [x] Caracterizar o contrato financeiro anterior e provar que `/api/cockpit` não chama leitores de históricos detalhados.
+- [x] Criar a visão consolidada de revisão de lançamentos sem classificação, reutilizando os recortes mensais já carregados de contas e cartões.
 
 ## Critérios de aceite
+
+- Dado o usuário na aba de revisão de classificação, quando a competência é carregada, então a visão lista contas e cartões ativos do mês selecionado com categoria ausente, exibindo data, descrição, origem, tipo, situação de conciliação, moeda e valor.
+- Dado um lançamento sem classificação já conciliado, quando a visão de revisão é aberta, então ele permanece listado e não depende do filtro de conciliação pendente.
+- Dado que não existem lançamentos sem classificação na competência, quando a visão de revisão é aberta, então exibe estado vazio orientando que o mês está classificado.
+- Dado um resgate ou crédito de encerramento gerado pelo Portfólio sem `category_id`, quando a visão de revisão é aberta, então esse fluxo não é listado como sem classificação, pois sua origem financeira já identifica a natureza.
 
 - Dado o usuário alternando o tipo de relatório, quando alterna, o período selecionado é mantido.
 - Dado o usuário escolhendo período rápido ou personalizado, quando selecionado, os totais refletem exatamente o intervalo escolhido.
@@ -215,6 +221,7 @@ O ponto crítico é cartão de crédito: a fatura pertence ao mês de competênc
 - Dado uma fatura paga por uma conta em BRL, quando o Cockpit calcula o saldo previsto após a data do pagamento, então considera somente o débito registrado na conta e não subtrai novamente a mesma fatura pela linha do cartão.
 - Dado qualquer volume de histórico, quando `/api/cockpit` consolida saldos por moeda, então usa agregações SQLite e não materializa listas detalhadas de lançamentos, compras ou pagamentos; contas e cartões preservam os mesmos valores do contrato anterior.
 - Dado o usuário abrindo Relatórios a partir de um limite, quando o recorte mensal termina de carregar, então o agrupamento da categoria ou subcategoria é expandido e destacado, com os lançamentos disponíveis no mesmo contexto.
+- Dado o usuário acessando Relatórios, quando a tela é exibida, então encontra cabeçalho editorial, filtros e abas com hierarquia leve, métricas silenciosas e listas/tabelas adaptadas a desktops compactos.
 
 ### Critérios complementares — dívida aberta
 
@@ -238,6 +245,10 @@ Validação automatizada: `tests/test_open_debts.py` cobre o domínio e o compar
 Cobertura: `tests/test_statement_report.py` e `tests/frontend_open_debts.test.mjs`. Conferência visual no Safari e impressão física permanecem manuais, não executadas nesta etapa. Agregações das demais abas permanecem dívida técnica separada; evolução não usa mais cálculo/fallback local.
 
 ## Changelog
+
+- `2.29` — 2026-11-26 — Polimenta Relatórios com cabeçalho editorial, métricas e rankings de baixa ênfase, filtros mais claros e reflow para desktops compactos.
+- `2.28` — 2026-11-25 — Exclui da revisão de classificação os resgates e créditos de encerramento do Portfólio identificados pela origem financeira.
+- `2.27` — 2026-11-25 — Adiciona a visão consolidada de revisão de lançamentos sem classificação para contas e cartões, preservando a distinção entre categoria e conciliação.
 
 <!-- Validação automatizada desta etapa: tests/test_evolution_presentation.py e tests/frontend_evolution.test.mjs. Validação visual no Safari não executada. -->
 

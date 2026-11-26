@@ -2,8 +2,8 @@
 tipo: spec
 area: lancamentos
 status: implementado
-versao: 3.44
-atualizado: 2026-11-11
+versao: 3.50
+atualizado: 2026-11-26
 relacionados:
   - "[[contas-correntes]]"
   - "[[categorias-tags-gestao]]"
@@ -18,7 +18,7 @@ aliases: ["Lançamentos", "Transações"]
 # Lançamentos
 
 > [!info] Status
-> **implementado** · versão: `3.44` · área: `lancamentos` · atualizado em 2026-11-11 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]], [[emprestimos-quitacao]]
+> **implementado** · versão: `3.50` · área: `lancamentos` · atualizado em 2026-11-26 · relacionados: [[contas-correntes]], [[categorias-tags-gestao]], [[cartoes]], [[investimentos-portfolio]], [[emprestimos-quitacao]]
 
 ## Problema
 
@@ -183,6 +183,14 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dado o tipo Investimento com categoria Renda Fixa selecionado, quando o usuário aciona o ícone de ajuda, então vê orientação contextual para pré-fixada, pós-fixada e híbrida sem alterar o alinhamento dos campos.
 - Dado o tipo Investimento com categoria Renda Fixa selecionado, quando o usuário escolhe a modalidade por chips, então o valor do formulário é atualizado como se o `select` nativo tivesse sido alterado.
 - Dado o tipo Investimento com categoria Renda Fixa selecionado, quando o usuário alterna modalidade, então o campo de taxa muda rótulo e placeholder para a unidade correta.
+- Dado o usuário visualizando Lançamentos de Contas, quando a tela é exibida, então cabeçalho, formulário, resumo de saldo, filtros e listagem usam a mesma gramática visual premium da tela de Lançamentos de Cartões, sem alterar os filtros, a conciliação ou os dados apresentados.
+- Dado o usuário visualizando Lançamentos de Contas, quando aciona `Novo lançamento` ou edita uma linha, então o formulário completo abre em flyover lateral com todos os campos condicionais, mensagens, validações e regras atuais preservados.
+- Dado o usuário visualizando o formulário de Lançamentos de Contas em um flyover estreito, quando campos de investimento, câmbio, empréstimo ou validações são exibidos, então os grupos respondem à largura real do painel e os avisos ocupam a linha completa sem sobrepor controles.
+- Dado o usuário visualizando Lançamentos de Contas, quando troca a conta no seletor de contexto fora do flyover, então o extrato, o saldo e os filtros da conta selecionada são atualizados sem abrir o formulário.
+- Dado o usuário visualizando Lançamentos de Contas em um desktop compacto, quando abre o flyover, então ele usa largura confortável de até `760px` sem comprimir os campos relacionados e continua responsivo em viewports menores.
+- Dado o usuário preenchendo o flyover de Lançamentos, quando compara campos de texto, data e seleção, então os controles mantêm a mesma altura, ritmo vertical e alinhamento, inclusive no modo compacto.
+- Dado qualquer formulário com campos em linhas ou grupos condicionais, quando o usuário visualiza os campos, então os rótulos, controles, mensagens e ações mantêm espaçamento vertical consistente; ações sem campo próprio não exibem um rótulo vazio apenas para reservar espaço.
+- Dado um lançamento de investimento classificado como Fundo de Investimentos ou Previdência Privada, quando o formulário exibe CNPJ e a ação `Buscar cota`, então a ação aparece alinhada ao campo sem o rótulo visual redundante `Cota`.
 - Dado o tipo Investimento com categoria Renda Fixa selecionado, quando o usuário aciona um atalho comum, então modalidade, indexador e taxa são preenchidos e o resumo do título é atualizado.
 - Dado o tipo Investimento com categoria Renda Fixa selecionado, quando modalidade, indexador ou taxa mudam, então a confirmação compacta reflete a configuração atual sem ocupar espaço de ajuda permanente.
 - Dado um novo lançamento de conta em preenchimento, quando o usuário aciona `Cancelar`, então o formulário é limpo e volta ao estado inicial sem criar lançamento.
@@ -202,6 +210,7 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 - Dado o usuário preenchendo ou editando um lançamento, quando o tipo ou categoria exige campos específicos, então os campos aparecem em blocos contextuais claramente rotulados e os campos não aplicáveis permanecem ocultos/desabilitados sem deixar espaços vazios no formulário.
 - Dado o usuário visualizando Lançamentos, quando o painel superior é exibido, então o gráfico e os saldos previsto/conciliado usam apresentação compacta para deixar mais área útil para a lista.
 - Dado uma lista mensal com filtros, quando exibida, então busca, filtro de conciliação e contador ficam destacados antes dos grupos diários.
+- Dado o usuário visualizando uma tela de lançamentos, quando a listagem é exibida, então contexto selecionado, busca, filtro de conciliação e contador seguem uma hierarquia visual única, com leitura preservada em desktop compacto.
 - Dado uma lista agrupada por dia, quando exibida, então os cabeçalhos diários, contadores, linhas e subtotais usam hierarquia visual compacta e preservam ações, metadados e valores sem ocultar informações importantes.
 - Dado um lançamento recorrente existente sendo editado, quando o formulário é aberto, então o checkbox de cálculo pela média permanece habilitado e reflete a marcação da ocorrência.
 - Dado um lançamento recorrente existente sem `use_average` sendo editado, quando o usuário marca a opção de média e salva, então o sistema não exibe o modal de escopo, aplica a alteração a todas as ocorrências futuras não conciliadas, persiste a marcação nelas e recalcula seus valores pela média dos últimos 12 lançamentos com a mesma descrição, tipo e categoria/subcategoria.
@@ -254,6 +263,12 @@ Tabelas: `transactions`, `transaction_tags`, `checking_accounts`, `categories`, 
 
 ## Changelog
 
+- `3.50` — 2026-11-26 — Harmoniza o espaçamento vertical de todos os campos e grupos condicionais dos formulários e remove o rótulo redundante acima de `Buscar cota`.
+- `3.49` — 2026-11-26 — Uniformiza a altura de inputs, seletores e datas no flyover de Lançamentos, incluindo a densidade compacta.
+- `3.48` — 2026-11-26 — Refina a camada visual de Lançamentos com contexto de consulta, toolbar em três níveis, contador hierárquico e linhas com metadados mais leves, sem alterar filtros ou regras financeiras.
+- `3.47` — 2026-11-25 — Mantém o seletor de conta fora do flyover para troca de contexto independente e amplia o painel de lançamento para até `760px`.
+- `3.46` — 2026-11-24 — Move o formulário de Lançamentos de Contas para flyover lateral e melhora a densidade responsiva de campos, avisos e validações.
+- `3.45` — 2026-11-24 — Uniformiza a camada visual de Lançamentos de Contas com a tela de Lançamentos de Cartões, preservando comportamento e contratos existentes.
 - `3.44` — 2026-11-11 — Parcelas de série da categoria `loan_payment` podem ser associadas a um contrato de empréstimo ao serem editadas individualmente ([[emprestimos-quitacao]] v0.61).
 - `3.43` — 2026-10-20 — Move orientações do formulário de aportes para tooltips acessíveis e reduz a referência bruta ao valor calculado.
 

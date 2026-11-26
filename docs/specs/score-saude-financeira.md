@@ -2,8 +2,8 @@
 tipo: spec
 area: score-saude-financeira
 status: implementado
-versao: 3.7
-atualizado: 2026-08-31
+versao: 3.8
+atualizado: 2026-11-26
 relacionados:
   - "[[relatorios]]"
   - "[[limites-gastos]]"
@@ -18,7 +18,7 @@ aliases: ["Score de Saúde Financeira", "Diagnóstico Financeiro", "Financial He
 # Score de Saúde Financeira
 
 > [!info] Status
-> **implementado** · área: `score-saude-financeira` · atualizado em 2026-08-31 · relacionados: [[relatorios]], [[limites-gastos]], [[investimentos-portfolio]], [[cartoes]], [[contas-correntes]]
+> **implementado** · versão: `3.8` · área: `score-saude-financeira` · atualizado em 2026-11-26 · relacionados: [[relatorios]], [[limites-gastos]], [[investimentos-portfolio]], [[cartoes]], [[contas-correntes]]
 
 ## Problema
 
@@ -152,6 +152,7 @@ Tabelas: consulta `transactions`, `credit_card_transactions`, `spending_limits`,
 - Dado a aba Saúde Financeira exibindo o gauge, quando o usuário observa o gráfico, então o centro do velocímetro não exibe texto que concorra com o ponteiro; score, status e interpretação aparecem no bloco lateral.
 - Dado a seção **Análise detalhada dos pilares**, quando a tela carrega, então cada card de pilar aparece em estado recolhido com cabeçalho sintético e pode ser expandido para revelar as métricas e explicações.
 - Dado a seção **Paz Financeira**, quando a tela carrega, então cada card aparece em estado recolhido com ícone, nome e valor, e pode ser expandido para revelar fórmula, base usada e confiança.
+- Dado o usuário que acessa a aba **Saúde Financeira** do Cockpit, então a moldura usa o mesmo cabeçalho editorial, divisor discreto e ritmo vertical da aba **Consultor**, mantendo gauge, pilares, detalhes e Paz Financeira com adaptação fluida em desktops compactos.
 
 ## Pendências
 
@@ -176,6 +177,7 @@ Nenhuma pendência conhecida.
 
 ## Changelog
 
+- `3.8` — 2026-11-26 — Equaliza a moldura visual da aba Saúde Financeira à aba Consultor no Cockpit, preservando a hierarquia diagnóstica e a adaptação a desktops compactos.
 - `3.7` — 2026-08-31 — Faixas uniformes no gauge e na classificação normalizada dos pilares; interface usa nível retornado pelo backend. Sem mudança na pontuação ou nos pesos.
 
 - `3.6` — 2026-08-09 — Histórico de Score passa a reutilizar uma única fotografia do Portfólio por request, evitando recálculo de cotações externas para cada mês solicitado.

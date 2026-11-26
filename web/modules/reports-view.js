@@ -89,6 +89,15 @@ export function registerReportsView({
       return;
     }
     renderReportOverview();
+    if (state.reportTab === "unclassified") {
+      if (state.reportDataMonth !== state.reportMonth) {
+        renderReportLoading();
+        loadReportMonth(state.reportMonth);
+        return;
+      }
+      renderUnclassifiedReport(reportItemsForMonth(state.reportMonth));
+      return;
+    }
     if (state.reportTab === "tags" || state.reportTab === "statement") {
       if (state.reportTab === "tags") renderTagsReport();
       else statement.renderStatementReport();
@@ -203,6 +212,49 @@ export function registerReportsView({
     focusPendingReportItem();
   }
 
+  function renderUnclassifiedReport(items) {
+    const unclassified = items
+      .filter((item) => !item.categoryId && !item.classificationExempt)
+      .sort((a, b) => a.date.localeCompare(b.date) || a.description.localeCompare(b.description));
+    const countLabel = unclassified.length === 1 ? "lançamento" : "lançamentos";
+    const rows = unclassified.map((item) => `
+      <tr>
+        <td>${formatDate(item.date)}</td>
+        <td>
+          <strong>${escapeHtml(item.description || "Sem descrição")}</strong>
+          <span>${escapeHtml(reportTypeLabel(item))} · ${escapeHtml(item.reconciledAt ? "Conciliado" : "Pendente de conciliação")}</span>
+        </td>
+        <td>${escapeHtml(`${item.source} · ${item.accountName || "Origem não identificada"}`)}</td>
+        <td>Sem categoria</td>
+        <td class="money-cell">${formatMoney(item.amount, item.currency)}</td>
+      </tr>
+    `).join("");
+    reportContent.innerHTML = `
+      <section class="classification-review" aria-labelledby="classificationReviewTitle">
+        <header class="classification-review-header">
+          <div>
+            <span class="eyebrow">REVISÃO DE DADOS</span>
+            <h3 id="classificationReviewTitle">Lançamentos sem classificação</h3>
+            <p>Contas e cartões do período selecionado com categoria ainda não definida. A conciliação é independente desta revisão.</p>
+          </div>
+          <strong class="classification-review-count">${unclassified.length} ${countLabel}</strong>
+        </header>
+        ${unclassified.length ? `
+          <div class="report-table-wrap">
+            <table class="report-table classification-review-table">
+              <thead><tr><th>Data</th><th>Lançamento</th><th>Origem</th><th>Classificação</th><th>Valor</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        ` : stateMarkup("Nenhum lançamento sem classificação neste mês. O período está classificado.", { kind: "empty" })}
+      </section>
+    `;
+  }
+
+  function reportTypeLabel(item) {
+    return item.reportType === "income" ? "Receita" : item.reportType === "investment" ? "Investimento" : "Despesa";
+  }
+
   function renderSubcategoriesReport(items) {
     const sections = [
       ["Despesas", "expense"],
@@ -217,7 +269,7 @@ export function registerReportsView({
   }
 
   async function renderTagsReport() {
-    // spec: relatorios/relatorios v2.23 — relatório de tags agrupado por tag com
+    // spec: relatorios/relatorios v2.29 — relatório de tags agrupado por tag com
     // Receitas, Despesas, Saldo e Investimentos, separados por moeda.
     const requestId = ++tagsRequestId;
     const requestedMonth = state.reportMonth;
@@ -480,7 +532,7 @@ export function registerReportsView({
   }
 
   function focusPendingReportItem() {
-    // spec: relatorios/relatorios v2.25 — critério 39
+    // spec: relatorios/relatorios v2.29 — critério 39
     const focus = state.reportFocus;
     if (!focus || !["categories", "subcategories"].includes(state.reportTab)) return;
     const categoryId = String(focus.categoryId || "");
@@ -545,9 +597,11 @@ export function registerReportsView({
       tag: "",
       tags: Array.isArray(transaction.tags) ? transaction.tags : transaction.tag_name ? [transaction.tag_name] : [],
       categoryId: transaction.category_id || "",
+      classificationExempt: Boolean(transaction.classification_exempt),
       subcategoryId: transaction.subcategory_id == null ? "null" : transaction.subcategory_id,
       accountId: transaction.account_id,
       accountName: transaction.account_name,
+      reconciledAt: transaction.reconciled_at || "",
       source: "Conta",
     };
   }
@@ -571,6 +625,7 @@ export function registerReportsView({
       accountId: "",
       cardId: transaction.credit_card_id || "",
       accountName: transaction.credit_card_name || "Cartão",
+      reconciledAt: transaction.reconciled_at || "",
       source: "Cartão",
     };
   }

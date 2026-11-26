@@ -2,8 +2,8 @@
 tipo: spec
 area: investimentos
 status: implementado
-versao: 2.69
-atualizado: 2026-10-20
+versao: 2.75
+atualizado: 2026-11-26
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -16,7 +16,7 @@ aliases: ["Investimentos", "Portfólio"]
 # Investimentos e Portfólio
 
 > [!info] Status
-> **implementado** · versão: `2.69` · área: `investimentos` · atualizado em 2026-10-20 · relacionados: [[contas-correntes]], [[lancamentos]], [[relatorios]]
+> **implementado** · versão: `2.75` · área: `investimentos` · atualizado em 2026-11-26 · relacionados: [[contas-correntes]], [[lancamentos]], [[relatorios]]
 
 ## Problema
 
@@ -107,10 +107,10 @@ Qualquer usuário autenticado localmente que possua investimentos e queira monit
 - Ativos internacionais cujo ticker operacional precisa de sufixo de bolsa podem usar alias explícito do provedor; `VWRA` em carteira USD resolve para `VWRA.L` (London Stock Exchange, listagem USD) no Yahoo Finance.
 - Quantidades de cripto e stablecoins são exibidas com oito casas decimais em posições, origens e histórico; os demais ativos mantêm até duas casas. A precisão operacional permanece independente da formatação.
 - Resgates descontam o valor bruto do valor manual da posição correspondente na mesma transação da baixa FIFO e do crédito líquido. Taxas não reduzem novamente o valor manual. O valor remanescente tem piso zero; falhas revertem todas as escritas.
-- A aba **Eventos** consulta sob demanda os próximos eventos anunciados somente para ações, ETFs e BDRs ainda presentes na carteira, em uma janela do mês atual mais dois meses. Para ativos brasileiros, usa a API pública da B3 como fonte primária; para ativos internacionais, usa a API pública da Nasdaq (sem chave) e Yahoo Finance como fallback. O cache é diário por ativo para capturar alterações sem repetir consultas no mesmo dia. Os resultados são agrupados por mês e informam Data ex, data de pagamento quando fornecida, ativo, carteira(s), evento, valor por cota/ação e a fonte (`B3`, `Nasdaq` ou `Yahoo Finance`) na coluna própria. A nota de rodapé mantém apenas a orientação abrangente: “Dados obtidos de fontes públicas; sempre validar com seu Banco/Corretora”.
+- A aba **Eventos** consulta sob demanda os próximos eventos anunciados somente para ações, ETFs e BDRs ainda presentes na carteira, em uma janela do mês atual mais dois meses. Para ativos brasileiros, usa a API pública da B3 como fonte primária; para ativos internacionais, usa a API pública da Nasdaq (sem chave) e Yahoo Finance como fallback. O cache é diário por ativo para capturar alterações sem repetir consultas no mesmo dia. Os resultados são agrupados por mês e informam Data ex, data de pagamento quando fornecida, ativo, carteira(s), evento, valor por cota/ação, estimativa bruta e a fonte (`B3`, `Nasdaq` ou `Yahoo Finance`) na coluna própria. A estimativa bruta usa valor por cota/ação multiplicado pela quantidade atualmente aberta no Portfólio; a nota de rodapé explica que ela não é líquida e deve ser validada com o Banco/Corretora.
 - A B3 preserva a natureza divulgada para dividendos, JCP, rendimentos, bonificações, desdobramentos e grupamentos. Yahoo Finance continua exibindo `Dividendo/JCP` quando o payload de fallback não permite distinguir a natureza fiscal. Para eventos societários sem valor monetário unitário, o app não converte o fator em dinheiro nem estima benefício financeiro.
 - A Data ex derivada de `lastDatePrior` usa o calendário nacional ANBIMA persistido no SQLite. A planilha oficial é obtida na primeira execução e revalidada no máximo uma vez por ano; indisponibilidade externa preserva a última cópia válida, não bloqueia a abertura do app e não aciona outra fonte de feriados.
-- A aba não multiplica o provento pela quantidade atual ou histórica e não estima valor total a receber. Falhas de um ativo não impedem os demais resultados e nenhuma consulta é feita antes de a aba ser aberta.
+- A aba considera somente a quantidade atualmente aberta para exibir uma estimativa bruta quando o evento fornece valor unitário; não projeta valor líquido nem usa quantidade histórica. Falhas de um ativo não impedem os demais resultados e nenhuma consulta é feita antes de a aba ser aberta.
 
 **Fundos (`fund`):**
 - Cotas dos fundos de investimento buscadas via **API Mais Retorno** quando a integração estiver ativada em Preferências (aba APIs — ver [[preferencias-abas]]), a posição tiver **CNPJ** preenchido e a carteira for em **BRL**.
@@ -191,7 +191,7 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - [x] Criar a aba Metas e comparar atual versus planejado no gráfico Por Classe.
 - [x] Separar a meta de Renda Variável em BRL e USD, preservando metas existentes.
 - [x] Usar a meta específica de Renda Variável em USD na comparação da Análise e no Consultor.
-- [x] Criar consulta isolada de eventos históricos de renda variável, com cache limitado, falha parcial por ativo e sem estimativa de valor total.
+- [x] Criar consulta isolada de eventos históricos de renda variável, com cache limitado, falha parcial por ativo e estimativa bruta conservadora quando valor unitário e quantidade aberta estiverem disponíveis.
 - [x] Carregar e renderizar a aba Eventos somente no primeiro acesso ou após mudança da carteira, mantendo fonte e confirmação visíveis.
 - [x] Limitar a consulta de eventos usada pelo Cockpit à semana corrente, validar os campos externos e virtualizar/desmontar a apresentação extensa da aba Eventos.
 - [x] Consultar `calendarEvents` com sessão Yahoo, exibir somente a janela futura de três meses, agrupar por competência e associar carteiras.
@@ -232,9 +232,19 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado uma posição de Poupança com resgate total, quando o Portfólio é recalculado, então a posição deixa de aparecer como aberta.
 - Dado uma posição de Tesouro Prefixado, IPCA+ ou Selic padrão com cálculo na curva, quando o Portfólio calcula o valor líquido, então deduz a Taxa B3 estimada de 0,20% a.a. pro rata, aplicando isenção simplificada de R$ 10.000,00 apenas para Tesouro Selic.
 - Dado uma posição de Tesouro Direto exibida no Portfólio, quando o usuário lê a listagem, então há nota discreta informando que o cálculo é na curva e pode divergir da marcação a mercado do site do Tesouro.
-- Dado o usuário abrindo o Portfólio, quando a seção "Resumo da Carteira" é exibida, então o card "Rentabilidade" mantém o percentual total por moeda e exibe um botão para abrir o gráfico mês a mês.
-- Dado o usuário clicando no botão de gráfico do card "Rentabilidade", quando o drawer é aberto, então ele exibe barras comparando a carteira e o CDI.
-- Dado uma carteira com posições em BRL e USD, quando o gráfico de rentabilidade é exibido, então há séries separadas para cada moeda, mantendo o CDI como benchmark visível.
+- Dado o usuário abrindo o Portfólio, quando a seção "Resumo da Carteira" é exibida, então o card "Rentabilidade" mantém o percentual total por moeda sem um botão redundante para abrir outra visualização.
+- Dado o usuário abrindo a aba **Posição**, quando existem dados mensais de patrimônio, então o topo apresenta um KPI principal, métricas secundárias e um único gráfico compacto de evolução por moeda, sem materializar os gráficos detalhados da aba Análise.
+- Dado que a resposta mensal ainda não possui valores patrimoniais, mas possui rentabilidade mensal válida, quando a evolução é exibida, então o gráfico usa essa série percentual existente e a identifica como rentabilidade mensal, sem criar pontos sintéticos.
+- Dado uma carteira sem nenhum ponto mensal válido, quando a aba **Posição** é exibida, então o bloco do gráfico não exibe uma curva vazia nem bloqueia a tabela de posições.
+- Dado o usuário abrindo a aba **Posição**, quando a carteira possui ativos, então o topo apresenta um KPI principal de patrimônio, métricas secundárias com hierarquia visual e um único gráfico compacto de evolução mensal, sem materializar os gráficos detalhados da aba Análise.
+- Dado uma carteira com posições em moedas diferentes, quando a evolução compacta é exibida, então as séries percentuais permanecem separadas por moeda, com legenda e a mesma unidade de rentabilidade do CDI e do IPCA, sem somar moedas incompatíveis ou misturar valores monetários com percentuais.
+- Dado uma carteira sem histórico suficiente para a evolução compacta, quando a aba **Posição** é exibida, então o espaço do gráfico mantém um estado neutro e não bloqueia a tabela de posições.
+- Dado uma carteira com ao menos um ponto mensal válido, quando a evolução compacta é exibida, então ela mostra linhas de rentabilidade por moeda, CDI e IPCA em um único gráfico, com benchmarks em traço e legenda acessível.
+- Dado a aba **Posição** exibindo a evolução compacta, então não existe um botão ou drawer paralelo para repetir a comparação de rentabilidade.
+- Dado o usuário alternando entre as abas do Portfólio, quando uma aba é exibida, então ela apresenta contexto, título e descrição em uma hierarquia editorial consistente, sem alterar os dados ou o fluxo da aba.
+- Dado a aba **Análise** em desktop amplo ou compacto, quando os agrupamentos são exibidos, então cada card ocupa apenas a altura do próprio conteúdo e mantém a leitura separada por classe, indexador, moeda e carteira.
+- Dado a aba **Metas**, quando o formulário é exibido, então a orientação de uso, os campos e o total planejado formam uma sequência visual única, com a ação de salvar subordinada ao resumo.
+- Dado a aba **Eventos** ou **Histórico**, quando há tabelas ou estados vazios, então títulos, descrições, fontes e dados permanecem em superfícies analíticas consistentes e adaptáveis a desktops compactos.
 - Dado o primeiro investimento cadastrado em Jun/2026, quando o usuário consulta rentabilidade em Ago/2026, então o gráfico mostra os meses disponíveis (Jun, Jul, Ago), usando 100% do período cadastrado.
 - Dado uma posição de fundo com CNPJ em carteira BRL e a integração Mais Retorno ativada nas Preferências, quando o Portfólio é carregado, então a posição usa a última cota da API como valor atual, com fonte e data da cota.
 - Dado um CNPJ de fundo ou previdência e Mais Retorno configurada, quando o formulário de Lançamentos consulta `/api/portfolio/fund-quote`, então recebe a última cota disponível, data e fonte sem persistir alterações.
@@ -288,11 +298,13 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado que os dados locais não mudaram, quando a operação é confirmada, então FIFO, custos, valores e crédito opt-in mantêm o comportamento atual, mesmo que o cache expire durante a confirmação.
 - Dado ações, ETFs ou BDRs abertos na carteira, quando o usuário abre a aba **Eventos**, então o app consulta sob demanda e lista os eventos anunciados na janela futura, preservando os campos Data ex, Pagamento, Ativo, Carteira, Evento, Valor por cota/ação e Fonte; o nível de confirmação permanece no texto acessível do selo da fonte.
 - Dado um ativo brasileiro elegível, quando a aba consulta eventos, então usa B3 primeiro e Yahoo Finance como fallback; para ativo internacional usa Nasdaq primeiro e Yahoo Finance como fallback.
-- Dado qualquer quantidade atual ou histórica da posição, quando os eventos são apresentados, então o app não calcula nem exibe valor total estimado a receber.
+- Dado qualquer quantidade atual ou histórica da posição, quando os eventos são apresentados, então somente a quantidade atualmente aberta é considerada; posições históricas encerradas não entram na estimativa.
 - Dado falha de consulta para um ativo, quando outros ativos possuem eventos válidos, então os resultados disponíveis continuam visíveis e a indisponibilidade parcial é informada sem bloquear a aba.
 - Dado o usuário navegando pelas demais abas do Portfólio, quando **Eventos** ainda não foi aberta, então nenhuma chamada ao endpoint de eventos ou ao provedor externo é realizada.
 - Dado o calendário de proventos retornado pelo provedor, quando a aba **Eventos** é exibida, então somente eventos futuros do mês atual e dos dois meses seguintes são listados, agrupados por mês; a data principal é identificada como **Data ex** e a **Data de pagamento** aparece somente quando informada pelo provedor, usando `Não informada` nos demais casos.
 - Dado um evento sem valor unitário anunciado pelo calendário, quando exibido, então o valor aparece como `Não informado`, sem utilizar dividend rate ou qualquer estimativa.
+- Dado um evento de provento com valor unitário e quantidade atualmente aberta positivas, quando exibido, então a coluna **Estimativa bruta** mostra `valor por cota/ação × quantidade aberta`, na moeda do evento, com duas casas decimais e sem cálculo por ponto flutuante; o valor por cota/ação preserva a precisão informada pelo provedor.
+- Dado um evento sem valor unitário, sem quantidade aberta ou de natureza societária, quando exibido, então a coluna mostra `Não estimado`; o rodapé informa que a estimativa é bruta e pode sofrer IR, IOF, taxas, corretagem, retenções, câmbio, cancelamentos e diferenças no pagamento efetivo.
 - Dado um evento associado a uma ou mais posições, quando exibido, então as carteiras são apresentadas na linha e a moeda permanece no valor unitário formatado.
 - Dado que o provedor não anuncia eventos na janela futura ou não disponibiliza calendário para um ativo, quando a aba é exibida, então a interface apresenta um estado vazio neutro e não rotula o ativo como erro ou indisponibilidade.
 - Dado mais de 200 eventos históricos, quando a listagem é apresentada, então somente a janela visível e uma pequena margem são materializadas no DOM; ao sair da aba Eventos, a apresentação é desmontada e os dados válidos permanecem em memória para reconstrução sem nova consulta.
@@ -300,7 +312,7 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 - Dado um evento externo com valor excessivo, data inválida ou timestamp fora do período solicitado, quando o payload é interpretado, então somente esse evento é descartado e os demais ativos/resultados continuam disponíveis.
 - Dado consultas repetidas ao mesmo ativo no mesmo dia, quando não há atualização forçada, então B3, Nasdaq e Yahoo reutilizam o cache diário sem nova requisição externa.
 - Dado valor monetário retornado por B3 ou Nasdaq, quando normalizado, então o backend usa `Decimal` e micros inteiros, sem cálculo por ponto flutuante.
-- Dado a aba Eventos com qualquer combinação de fontes, quando a lista é exibida, então a nota apresenta somente “Dados obtidos de fontes públicas; sempre validar com seu Banco/Corretora.”.
+- Dado a aba Eventos com qualquer combinação de fontes, quando a lista é exibida, então a nota identifica a fórmula da estimativa bruta, seus principais limites e a orientação para validar dados públicos com o Banco/Corretora.
 - Dado um evento obtido pela cadeia de provedores, quando exibido na coluna Fonte, então o selo identifica diretamente `B3`, `Nasdaq` ou `Yahoo Finance`; o nível de detecção permanece disponível no texto acessível do selo.
 - Dado um evento cuja Data ex já ocorreu dentro do mês atual e cujo pagamento ainda é futuro, quando a aba Eventos é carregada, então o evento permanece na janela mensal e não cai no fallback apenas por ser anterior ao dia corrente.
 - Dado que a B3 retorna uma bonificação, um desdobramento ou um grupamento compatível com a espécie do ativo, quando o evento está na janela mensal, então ele é listado com sua natureza, fonte B3 e valor unitário `Não informado`, sem converter o fator societário em dinheiro.
@@ -333,6 +345,12 @@ Tabelas: `investment_opening_positions` e `investment_operations` (incluem `emer
 
 ## Changelog
 
+- `2.75` — 2026-11-26 — Normaliza a apresentação da estimativa bruta de Eventos para duas casas decimais, preservando a precisão do valor unitário por cota/ação.
+- `2.74` — 2026-11-26 — Adiciona a estimativa bruta de proventos na aba Eventos pela multiplicação do valor unitário pela quantidade aberta, com distinção explícita de impostos, taxas e demais limitações.
+- `2.73` — 2026-11-26 — Uniformiza a moldura editorial das abas do Portfólio, compacta a Análise, orienta Metas e refina Eventos/Histórico para desktops compactos.
+- `2.72` — 2026-11-26 — Consolida no gráfico compacto a comparação percentual por moeda com CDI e IPCA, removendo o botão e o drawer redundantes de rentabilidade.
+- `2.71` — 2026-11-26 — Faz a evolução compacta reaproveitar dados mensais existentes, usando rentabilidade como fallback quando valores patrimoniais ainda não estiverem disponíveis, sem inventar histórico.
+- `2.70` — 2026-11-26 — Refina a primeira leitura do Portfólio com resumo patrimonial hierárquico e gráfico compacto de evolução mensal por moeda, sem trazer de volta os painéis extensos da Análise.
 - `2.69` — 2026-10-20 — Reduz a poluição visual do formulário de aporte, movendo orientações para ícones de informação e mantendo apenas o valor bruto de referência visível.
 
 - `2.68` — 2026-10-20 — Implementa a isenção de IR estimado para LCI/LCA e registra tributos de renda fixa por lote, com IOF zerado ao completar 30 dias.

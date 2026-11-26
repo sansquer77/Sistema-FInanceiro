@@ -60,10 +60,10 @@ import { applyDensity, setDensity, storedDensity, toggleDensity } from "./module
 import { registerAuthView } from "./modules/auth-view.js";
 import { registerUserAdminView } from "./modules/user-admin-view.js?v=178";
 import { registerClassificationsView } from "./modules/classifications-view.js";
-import { registerLimitsView } from "./modules/limits-view.js?v=2";
-import { registerReportsView } from "./modules/reports-view.js?v=2";
+import { registerLimitsView } from "./modules/limits-view.js?v=4";
+import { registerReportsView } from "./modules/reports-view.js?v=3";
 import { registerImportsView } from "./modules/imports-view.js";
-import { registerCockpitView } from "./modules/cockpit-view.js?v=186";
+import { registerCockpitView } from "./modules/cockpit-view.js?v=188";
 import { registerAccountsView } from "./modules/accounts-view.js";
 import { registerCardsView } from "./modules/cards-view.js";
 import { registerPortfolioView } from "./modules/portfolio-view.js?v=164";
@@ -74,7 +74,7 @@ import { registerLoansView } from "./modules/loans-view.js?v=2";
 import { registerInstructionsView } from "./modules/instructions-view.js";
 import { registerGlobalSearch } from "./modules/global-search.js";
 import { registerCommandPalette } from "./modules/command-palette.js";
-import { initializeOverlayUX } from "./modules/overlay-utils.js";
+import { createDrawerController, initializeOverlayUX } from "./modules/overlay-utils.js";
 import { initializeDataUX } from "./modules/data-ux.js";
 import { applyMasks, destroyMasks } from "./modules/input-mask.js";
 import { createAppState, resetSessionData } from "./modules/app-state.js?v=2";
@@ -142,6 +142,10 @@ const payPartialCardInvoiceButton = document.querySelector("#payPartialCardInvoi
 const cardInvoiceMessage = document.querySelector("#cardInvoiceMessage");
 const cardInvoiceOpenCount = document.querySelector("#cardInvoiceOpenCount");
 const cardTransactionForm = document.querySelector("#cardTransactionForm");
+const cardTransactionFormDrawer = document.querySelector("#cardTransactionFormDrawer");
+const cardTransactionFormDrawerOverlay = document.querySelector("#cardTransactionFormDrawerOverlay");
+const openCardTransactionFormButton = document.querySelector("#openCardTransactionFormButton");
+const closeCardTransactionFormButton = document.querySelector("#closeCardTransactionFormButton");
 const cardTransactionFormTitle = document.querySelector("#cardTransactionFormTitle");
 const cardTransactionType = document.querySelector("#cardTransactionType");
 const cardTransactionCategory = document.querySelector("#cardTransactionCategory");
@@ -160,8 +164,13 @@ const cardInvoiceSearch = document.querySelector("#cardInvoiceSearch");
 const cardInvoiceStatusFilterButtons = document.querySelectorAll("[data-card-invoice-status-filter]");
 const cancelCardTransactionEditButton = document.querySelector("#cancelCardTransactionEditButton");
 const transactionForm = document.querySelector("#transactionForm");
+const transactionFormDrawer = document.querySelector("#transactionFormDrawer");
+const transactionFormDrawerOverlay = document.querySelector("#transactionFormDrawerOverlay");
+const openTransactionFormButton = document.querySelector("#openTransactionFormButton");
+const closeTransactionFormButton = document.querySelector("#closeTransactionFormButton");
 const transactionFormTitle = document.querySelector("#transactionFormTitle");
 const transactionMessage = document.querySelector("#transactionMessage");
+const transactionListMessage = document.querySelector("#transactionListMessage");
 const transactionList = document.querySelector("#transactionList");
 const transactionTagOptions = document.querySelector("#transactionTagOptions");
 const categoryForm = document.querySelector("#categoryForm");
@@ -178,6 +187,10 @@ const tagSearch = document.querySelector("#tagSearch");
 const categoryListSummary = document.querySelector("#categoryListSummary");
 const tagListSummary = document.querySelector("#tagListSummary");
 const limitForm = document.querySelector("#limitForm");
+const limitFormDrawer = document.querySelector("#limitFormDrawer");
+const limitFormDrawerOverlay = document.querySelector("#limitFormDrawerOverlay");
+const openLimitFormButton = document.querySelector("#openLimitFormButton");
+const closeLimitFormButton = document.querySelector("#closeLimitFormButton");
 const limitFormTitle = document.querySelector("#limitFormTitle");
 const limitCategory = document.querySelector("#limitCategory");
 const limitSubcategory = document.querySelector("#limitSubcategory");
@@ -194,7 +207,9 @@ const cancelLimitEditButton = document.querySelector("#cancelLimitEditButton");
 const limitsTabButtons = document.querySelectorAll("[data-limits-tab]");
 const limitsTabPanels = document.querySelectorAll("[data-limits-panel]");
 const goalForm = document.querySelector("#goalForm");
-const goalFormPanel = document.querySelector("#goalFormPanel");
+const goalFormDrawer = document.querySelector("#goalFormDrawer");
+const goalFormDrawerOverlay = document.querySelector("#goalFormDrawerOverlay");
+const closeGoalFormButton = document.querySelector("#closeGoalFormButton");
 const newGoalButton = document.querySelector("#newGoalButton");
 const goalFormTitle = document.querySelector("#goalFormTitle");
 const goalTargetDateField = document.querySelector("#goalTargetDateField");
@@ -263,21 +278,14 @@ const portfolioCurrentSummary = document.querySelector("#portfolioCurrentSummary
 const portfolioResultSummary = document.querySelector("#portfolioResultSummary");
 const portfolioReturnSummary = document.querySelector("#portfolioReturnSummary");
 const portfolioDayResultSummary = document.querySelector("#portfolioDayResultSummary");
-const portfolioReturnChartBtn = document.querySelector("#portfolioReturnChartBtn");
-const portfolioReturnDrawer = document.querySelector("#portfolioReturnDrawer");
-const portfolioReturnDrawerOverlay = document.querySelector("#portfolioReturnDrawerOverlay");
-const portfolioReturnDrawerCloseBtn = document.querySelector("#portfolioReturnDrawerCloseBtn");
-const portfolioReturnDrawerTitle = document.querySelector("#portfolioReturnDrawerTitle");
 const portfolioGroupDrawer = document.querySelector("#portfolioGroupDrawer");
 const portfolioGroupDrawerOverlay = document.querySelector("#portfolioGroupDrawerOverlay");
 const portfolioGroupDrawerCloseBtn = document.querySelector("#portfolioGroupDrawerCloseBtn");
 const portfolioGroupDrawerTitle = document.querySelector("#portfolioGroupDrawerTitle");
 const portfolioGroupDrawerList = document.querySelector("#portfolioGroupDrawerList");
-const portfolioReturnChart = document.querySelector("#portfolioReturnChart");
-const portfolioReturnXLabels = document.querySelector("#portfolioReturnXLabels");
-const portfolioReturnYAxis = document.querySelector("#portfolioReturnYAxis");
-const portfolioReturnLegend = document.querySelector("#portfolioReturnLegend");
-const portfolioReturnNotice = document.querySelector("#portfolioReturnNotice");
+const portfolioEvolutionChart = document.querySelector("#portfolioEvolutionChart");
+const portfolioEvolutionLegend = document.querySelector("#portfolioEvolutionLegend");
+const portfolioEvolutionStatus = document.querySelector("#portfolioEvolutionStatus");
 const portfolioPositionCount = document.querySelector("#portfolioPositionCount");
 const portfolioMessage = document.querySelector("#portfolioMessage");
 const portfolioTypeList = document.querySelector("#portfolioTypeList");
@@ -471,6 +479,10 @@ const cockpitPortfolioMaturityAlert = document.querySelector("#cockpitPortfolioM
 const cockpitVersionAlert = document.querySelector("#cockpitVersionAlert");
 const cockpitVersionAlertVersion = document.querySelector("#cockpitVersionAlertVersion");
 const cockpitVersionAlertDismiss = document.querySelector("#cockpitVersionAlertDismiss");
+const cockpitNegativeBalanceNotice = document.querySelector("#cockpitNegativeBalanceNotice");
+const cockpitNegativeBalanceNoticeTitle = document.querySelector("#cockpitNegativeBalanceNoticeTitle");
+const cockpitNegativeBalanceNoticeDescription = document.querySelector("#cockpitNegativeBalanceNoticeDescription");
+const cockpitNegativeBalanceNoticeAction = document.querySelector("#cockpitNegativeBalanceNoticeAction");
 const cockpitCriticalNotifications = document.querySelector("#cockpitCriticalNotifications");
 const cockpitInformationalNotifications = document.querySelector("#cockpitInformationalNotifications");
 const cockpitCombinedNotifications = document.querySelector("#cockpitCombinedNotifications");
@@ -497,6 +509,7 @@ const financialHealthContent = document.querySelector("#financialHealthContent")
 const trendsPanel = document.querySelector("#trendsPanel");
 const trendsContent = document.querySelector("#trendsContent");
 const trendsMeta = document.querySelector("#trendsMeta");
+const trendsTabs = document.querySelectorAll("[data-trends-tab]");
 const topExpensesChart = document.querySelector("#topExpensesChart");
 const cashDistributionChart = document.querySelector("#cashDistributionChart");
 const previousMonthButton = document.querySelector("#previousMonthButton");
@@ -716,6 +729,18 @@ const classificationsView = registerClassificationsView({
   },
 });
 
+const limitFormDrawerController = createDrawerController({
+  drawer: limitFormDrawer,
+  closeButton: closeLimitFormButton,
+  overlay: limitFormDrawerOverlay,
+});
+
+const goalFormDrawerController = createDrawerController({
+  drawer: goalFormDrawer,
+  closeButton: closeGoalFormButton,
+  overlay: goalFormDrawerOverlay,
+});
+
 const limitsView = registerLimitsView({
   state,
   elements: {
@@ -733,8 +758,10 @@ const limitsView = registerLimitsView({
     previousLimitMonthButton,
     nextLimitMonthButton,
     cancelLimitEditButton,
+    limitFormDrawerController,
+    openLimitFormButton,
     cockpitLimitAlert,
-    limitsTabButtons, limitsTabPanels, goalForm, goalFormPanel, newGoalButton, goalFormTitle, goalTargetDateField,
+    limitsTabButtons, limitsTabPanels, goalForm, goalFormDrawerController, newGoalButton, goalFormTitle, goalTargetDateField,
     goalYieldMode, goalYieldPercentageField,
     cancelGoalEditButton, goalMessage, financialGoalList, emergencyReserveTotal,
     emergencyReserveComponents, activeGoalsCount, goalsReservedTotal, goalsMonthlyTotal,
@@ -880,6 +907,10 @@ const cockpitView = registerCockpitView({
     cockpitVersionAlert,
     cockpitVersionAlertVersion,
     cockpitVersionAlertDismiss,
+    cockpitNegativeBalanceNotice,
+    cockpitNegativeBalanceNoticeTitle,
+    cockpitNegativeBalanceNoticeDescription,
+    cockpitNegativeBalanceNoticeAction,
     cockpitCriticalNotifications,
     cockpitInformationalNotifications,
     cockpitCombinedNotifications,
@@ -906,6 +937,7 @@ const cockpitView = registerCockpitView({
     trendsPanel,
     trendsContent,
     trendsMeta,
+    trendsTabs,
   },
   api,
   currentMonthValue,
@@ -973,7 +1005,7 @@ const cockpitView = registerCockpitView({
     }
     if (action?.route === "reports") {
       if (isValidMonthValue(params.month)) state.reportMonth = params.month;
-      state.reportTab = ["categories", "subcategories", "cashflow", "accounts", "tags", "statement"].includes(params.tab)
+      state.reportTab = ["categories", "subcategories", "cashflow", "accounts", "tags", "statement", "unclassified"].includes(params.tab)
         ? params.tab
         : "statement";
       state.reportFocus = null;
@@ -1015,6 +1047,18 @@ const cockpitView = registerCockpitView({
       showModule("portfolio");
     }
   },
+});
+
+const cardTransactionFormDrawerController = createDrawerController({
+  drawer: cardTransactionFormDrawer,
+  closeButton: closeCardTransactionFormButton,
+  overlay: cardTransactionFormDrawerOverlay,
+});
+
+const transactionFormDrawerController = createDrawerController({
+  drawer: transactionFormDrawer,
+  closeButton: closeTransactionFormButton,
+  overlay: transactionFormDrawerOverlay,
 });
 
 const accountsView = registerAccountsView({
@@ -1076,6 +1120,8 @@ const cardsView = registerCardsView({
     cardInvoiceSearch,
     cardInvoiceStatusFilterButtons,
     cardTransactionForm,
+    cardTransactionFormDrawerController,
+    openCardTransactionFormButton,
     cardTransactionFormTitle,
     cardTransactionType,
     cardTransactionCategory,
@@ -1133,8 +1179,11 @@ const transactionsView = registerTransactionsView({
   state,
   elements: {
     transactionForm,
+    transactionFormDrawerController,
+    openTransactionFormButton,
     transactionFormTitle,
     transactionMessage,
+    transactionListMessage,
     transactionList,
     transactionTagOptions,
     transactionType,
@@ -1295,21 +1344,14 @@ const portfolioView = registerPortfolioView({
     portfolioResultSummary,
     portfolioReturnSummary,
     portfolioDayResultSummary,
-    portfolioReturnChartBtn,
-    portfolioReturnDrawer,
-    portfolioReturnDrawerOverlay,
-    portfolioReturnDrawerCloseBtn,
-    portfolioReturnDrawerTitle,
     portfolioGroupDrawer,
     portfolioGroupDrawerOverlay,
     portfolioGroupDrawerCloseBtn,
     portfolioGroupDrawerTitle,
     portfolioGroupDrawerList,
-    portfolioReturnChart,
-    portfolioReturnXLabels,
-    portfolioReturnYAxis,
-    portfolioReturnLegend,
-    portfolioReturnNotice,
+    portfolioEvolutionChart,
+    portfolioEvolutionLegend,
+    portfolioEvolutionStatus,
     portfolioPositionCount,
     portfolioMessage,
     portfolioTypeList,

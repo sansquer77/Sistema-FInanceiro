@@ -2,8 +2,8 @@
 tipo: spec
 area: tendencias-saude-financeira
 status: em-implementacao
-versao: 2.27
-atualizado: 2026-11-01
+versao: 2.32
+atualizado: 2026-11-26
 relacionados:
   - "[[score-saude-financeira]]"
   - "[[relatorios]]"
@@ -20,7 +20,7 @@ aliases: ["Tendências de Saúde Financeira", "Achados Financeiros", "Insights F
 # Tendências e Achados de Saúde Financeira
 
 > [!info] Status
-> **em-implementacao** · área: `tendencias-saude-financeira` · atualizado em 2026-11-01 · relacionados: [[score-saude-financeira]], [[relatorios]], [[lancamentos]], [[cartoes]], [[../adr/0019-inferencia-local-webllm|ADR-0019]]
+> **em-implementacao** · versão: `2.32` · área: `tendencias-saude-financeira` · atualizado em 2026-11-26 · relacionados: [[score-saude-financeira]], [[relatorios]], [[lancamentos]], [[cartoes]], [[../adr/0019-inferencia-local-webllm|ADR-0019]]
 
 ## Problema
 
@@ -60,6 +60,7 @@ Usuário autenticado que consulta o Cockpit e deseja entender, em linguagem simp
 | `achados` | lista | Sinais estruturados com tipo, severidade, título, descrição, valores em centavos e referência de comparação. |
 | `eventos_pontuais` | lista | Eventos detectados que podem distorcer o mês, como PLR, bônus, férias e antecipação de parcelas. |
 | `antecipacao_parcelas` | lista | Lançamentos antecipados para a fatura do mês, por histórico operacional ou por parcelas futuras concentradas na competência, com valor em centavos e descrição da compra quando identificável. |
+| `assinaturas_detalhadas` | objeto | Painel analítico local de recorrências: total mensal, estimativa anual e itens com serviço, valor, periodicidade, próximo lançamento, conta/cartão, categoria e confiança da identificação. |
 | `resumo_local` | texto | Texto determinístico gerado por templates locais. |
 | `resumo_ia` | texto opcional | Texto reescrito por IA, quando ativado explicitamente e disponível. |
 | `ia_ativa` | booleano | Indica se a preferência do usuário permite uso de IA para esta função. |
@@ -121,6 +122,12 @@ Usuário autenticado que consulta o Cockpit e deseja entender, em linguagem simp
 - Com histórico inferior a 3 meses, a confiança da tendência deve ser `baixa` ou `intermediaria`, e o resumo deve evitar afirmar tendência permanente.
 - O aviso de confiança por histórico curto, como **Histórico curto**, deve ser exibido como texto de seção fora da lista de cards de achados, para preservar hierarquia visual semelhante a **Tendências e achados** e **Budget x Realizado**.
 - A área analítica da aba deve usar fluxo vertical em largura total, na ordem **Tendências e achados**, **Budget x Realizado** e, ao final, os cards/avisos de confiança como **Histórico curto**, evitando colunas lado a lado em telas menores como MacBook Air.
+- A visão geral deve reduzir a composição a três módulos principais: **Evolução mensal**, **Orçamento do mês** e **Tendências e achados**; Receitas, Despesas e Saldo ficam integrados ao módulo de evolução, sem três cards independentes.
+- O resumo textual e os achados devem usar leitura editorial com divisórias leves e marcador semântico, evitando uma moldura completa para cada item; a chamada de Assinaturas permanece uma ação contextual.
+- A confiança do histórico e a origem da IA devem aparecer como contexto da análise, sem criar cards concorrentes aos módulos financeiros.
+- Eventos de receita pontual e despesa pontual devem ser consolidados em um único bloco **Eventos pontuais**, com bullets e valores, sem repetir um card por ocorrência.
+- Achados `limite` e `limite_recorrente` devem ser consolidados em um único bloco **Limites de gastos**; quando o limite for recorrente, a orientação **Revisar limite** aparece dentro do bullet correspondente, valendo para qualquer categoria ou subcategoria.
+- A aba **Assinaturas** deve exibir o mesmo conjunto completo de itens retornado em `assinaturas_detalhadas.itens`; o flyover acrescenta periodicidade, próximo lançamento, origem, categoria e confiança, mas não uma lista diferente.
 - Com histórico de 3 a 5 meses, a comparação pode usar média disponível recente, mas deve informar confiança intermediária.
 - Com 6 meses ou mais, a comparação pode usar média móvel de 3 meses, 6 meses ou 12 meses, conforme o contexto do achado.
 - O sistema deve identificar receitas pontuais conhecidas por descrição, categoria, tag ou recorrência ausente, incluindo férias, PLR, bônus, 13º salário, restituição e eventos similares.
@@ -147,6 +154,11 @@ Usuário autenticado que consulta o Cockpit e deseja entender, em linguagem simp
 - O sistema deve identificar despesas recorrentes mensais na categoria `Assinaturas e Serviços` e suas subcategorias, agregando o custo mensal por subcategoria para sinalizar o peso relativo no orçamento.
 - O achado de assinaturas e serviços deve ser explicativo e não prescritivo, apontando o valor mensal por subcategoria e sugerindo que o usuário avalie o uso, sem recomendar cancelamento ou classificar a despesa como problema.
 - Lançamentos de cartão de crédito recorrentes mensais na categoria `Assinaturas e Serviços` também devem entrar na agregação, pela competência da fatura (`invoice_month`).
+- A aba **Assinaturas** pertence a **Tendências** e não cria uma opção principal nova no menu.
+- O acionador **Assinaturas e serviços recorrentes** abre um flyover analítico; ele não contém formulário nem permite alterar lançamentos.
+- O flyover deve exibir total mensal, estimativa anual, lista de serviços, valor, periodicidade, próximo lançamento, conta ou cartão de origem, categoria e nível de confiança da identificação.
+- A identificação específica de serviços deve ser conservadora: descrições com evidência explícita podem ser agrupadas como AI, iCloud, Google Drive, Office ou celular; descrições sem evidência suficiente permanecem como cobrança recorrente não identificada ou com confiança intermediária.
+- O próximo lançamento só deve ser exibido quando existir uma ocorrência futura da mesma recorrência; a ausência desse dado deve aparecer como indisponível, sem estimar uma data financeira no frontend.
 - Quando um mesmo limite de gastos for ultrapassado nos 3 meses consecutivos anteriores ao mês consultado (incluindo-o), o sistema deve sinalizar um achado estruturado do tipo `limite_recorrente`, sugerindo ao usuário revisar o valor do limite, pois o padrão de consumo pode ter mudado. O achado deve indicar a categoria/subcategoria, o limite vigente e a média de ultrapassagem nos 3 meses, sem recomendar valores específicos.
 - A detecção de limite recorrente deve comparar o realizado mensal da categoria/subcategoria com o limite vigente no mês consultado, reaproveitando a mesma chave de agregação usada na tabela **Budget x Realizado**.
 - Limite recorrente só deve ser sinalizado quando houver ultrapassagem em todos os 3 meses consecutivos; 2 meses ou meses intercalados não geram o achado.
@@ -253,6 +265,12 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 - Dado um usuário em cenário multi-moeda, quando houver dados em mais de uma moeda, então o sistema não mistura moedas sem indicar a base usada.
 - Dado um usuário em cenário multi-moeda, quando visualiza a aba **Tendências**, então o aviso de moeda aparece uma única vez no bloco **Tendências e achados**.
 - Dado um usuário com despesas recorrentes mensais na categoria `Assinaturas e Serviços`, quando consulta a aba **Tendências**, então o sistema exibe o custo mensal agregado por subcategoria como achado estruturado em centavos, sem recomendar cancelamento.
+- Dado um usuário com despesas recorrentes classificadas em `Assinaturas e Serviços`, quando consulta **Tendências > Assinaturas**, então visualiza a aba contextual sem uma nova opção no menu principal.
+- Dado um usuário com recorrências no mês, quando aciona **Assinaturas e serviços recorrentes**, então o sistema abre um flyover analítico com total mensal, estimativa anual e itens detalhados, sem campos de edição.
+- Dado um lançamento recorrente com descrição explícita de AI, iCloud, Google Drive, Office ou celular, quando o painel é calculado, então o serviço recebe o rótulo correspondente e confiança alta.
+- Dado um lançamento recorrente cuja descrição não permite identificar o serviço com segurança, quando o painel é calculado, então o item não recebe um nome específico inventado e exibe confiança intermediária ou baixa.
+- Dado um item detalhado com ocorrência futura registrada na mesma recorrência, quando o flyover é aberto, então o próximo lançamento exibe a data futura; sem ocorrência registrada, exibe `Não disponível`.
+- Dado o flyover em desktop compacto ou viewport estreito, quando a lista de serviços é exibida, então os metadados fluem verticalmente sem comprimir valores ou esconder origem.
 - Dado um usuário que acessa Preferências de IA, quando abre o campo de provedor, então visualiza as opções principais `OpenAI / ChatGPT`, `Anthropic / Claude`, `Google / Gemini` e `Custom / Local`.
 - Dado um usuário que seleciona `OpenAI / ChatGPT`, `Anthropic / Claude` ou `Google / Gemini`, quando a tela de configuração é exibida, então visualiza os campos `Modelo` e `API key`, sem precisar configurar endpoint ou tipo de autenticação.
 - Dado um usuário que seleciona `OpenAI / ChatGPT`, `Anthropic / Claude` ou `Google / Gemini`, quando a tela de configuração é exibida, então também visualiza o campo `Timeout (segundos)`, de 1 a 60, e o valor salvo é o tempo limite usado nas chamadas a esse provedor.
@@ -274,6 +292,10 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 - Dado um usuário com IA ativa e resumo reescrito com sucesso, quando visualiza o bloco **Tendências e achados**, então o título do bloco exibe um marcador discreto com ícone indicando IA.
 - Dado um usuário com histórico curto, quando visualiza **Tendências e achados**, então o aviso **Histórico curto** aparece fora dos cards de achados, como texto de seção.
 - Dado um usuário em tela estreita ou intermediária, quando visualiza a aba **Tendências**, então **Tendências e achados**, **Budget x Realizado** e os cards de confiança aparecem em fluxo vertical usando a largura disponível.
+- Dado um usuário em desktop compacto ou viewport estreito, quando visualiza o gráfico completo de Tendências, então o gráfico ocupa a largura real disponível, não impõe largura mínima de `520px` e não cria rolagem horizontal no contêiner.
+- Dado um usuário visualizando a visão geral de Tendências, quando a tela é renderizada, então o módulo de Evolução contém as métricas inline, o gráfico, a legenda e a microfrase; Orçamento e Achados aparecem como módulos subsequentes com hierarquia de superfície reduzida.
+- Dado que existam receitas ou despesas pontuais, quando Tendências é renderizada, então elas aparecem juntas em um único agrupamento com bullets; dado que existam limites mensais ou recorrentes, então aparecem juntas em um único agrupamento e a revisão é contextual ao limite recorrente correspondente.
+- Dado que existam mais de seis serviços recorrentes, quando o usuário acessa **Tendências > Assinaturas**, então todos os serviços aparecem na lista resumida e o acionador informa que o flyover contém os detalhes completos, sem sugerir que os demais itens não existam.
 - Dado um usuário com saldo previsto no fim do mês em contas de liquidez/carteira igual ou acima de 2x as despesas planejadas, quando consulta a aba **Tendências**, então o resumo exibe um aviso explicativo de oportunidade de revisar o caixa usando o saldo previsto que considera lançamentos futuros e faturas abertas dos cartões vinculados.
 - Dado um usuário com limite de gastos ultrapassado nos últimos 3 meses consecutivos para uma mesma categoria/subcategoria, quando consulta a aba **Tendências**, então o sistema exibe um achado estruturado do tipo `limite_recorrente` sugerindo revisar o valor do limite, indicando a categoria/subcategoria, o limite vigente e a média de ultrapassagem nos 3 meses.
 - Dado um usuário com limite de gastos ultrapassado em apenas 2 dos últimos 3 meses, quando consulta a aba **Tendências**, então não é exibido o achado de limite recorrente.
@@ -310,9 +332,18 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 - [x] Passo 8 — Exibir o campo `Timeout (segundos)` também para os provedores predefinidos (OpenAI, Anthropic e Google), mantendo-o oculto apenas quando nenhum provedor remoto estiver selecionado. Fecha: critério de timeout visível para provedores remotos.
 - [x] Passo 8 — Criar testes automatizados para núcleo local, segurança de preferências, fallback de IA e isolamento por usuário. Fecha: critérios 1 a 28.
 - [x] Passo 9 — Detectar limites de gastos ultrapassados em 3 meses consecutivos e exibir achado estruturado `limite_recorrente` sugerindo revisão do valor. Fecha: novos critérios de limite recorrente.
+- [x] Passo 10 — Adicionar aba contextual **Assinaturas**, payload detalhado no núcleo local e flyover analítico responsivo para recorrências. Fecha: critérios 55 a 60.
+- [x] Passo 11 — Reorganizar a composição visual da visão geral, integrando métricas à Evolução, reduzindo molduras de Achados/Confiança e consolidando a hierarquia em três módulos. Fecha: critérios de composição visual.
+- [x] Passo 12 — Consolidar eventos pontuais e limites recorrentes em agrupamentos editoriais com bullets e orientação contextual de revisão. Fecha: critérios de composição de achados.
+- [x] Passo 13 — Alinhar a lista da aba Assinaturas ao conjunto completo do flyover e reduzir cards internos da visão resumida. Fecha: critérios de consistência entre visões.
 
 ## Changelog
 
+- `2.32` — 2026-11-26 — Remove o corte arbitrário de seis serviços na aba Assinaturas e diferencia resumo de detalhes sem ocultar itens.
+- `2.31` — 2026-11-26 — Consolida receitas/despesas pontuais e limites em agrupamentos únicos, com revisão de limite dentro do item recorrente para qualquer categoria.
+- `2.30` — 2026-11-26 — Reorganiza a visão geral de Tendências em Evolução, Orçamento e Achados, reduzindo cards e tratando confiança como contexto.
+- `2.29` — 2026-11-26 — Remove a largura mínima do gráfico completo de Tendências e documenta o comportamento fluido sem rolagem horizontal.
+- `2.28` — 2026-11-25 — Adicionada a aba contextual **Assinaturas** em Tendências e o flyover analítico de recorrências, com identificação conservadora do serviço, origem, periodicidade, próximo lançamento e confiança.
 - `2.27` — 2026-11-01 — Preferências de IA passam a exibir o campo Timeout (segundos) para os provedores remotos predefinidos (OpenAI, Anthropic e Google), não apenas para Custom / Local, permitindo aumentar o tempo limite das análises remotas.
 - `2.26` — 2026-10-10 — Inicia centralização da política local/remota/determinística em `ai_execution_settings`; Tendências passa a consumir a mesma ordem do Consultor e a expor a origem efetiva do resumo.
 

@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import re
 import sqlite3
+import unicodedata
 from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 from http import HTTPStatus
 
 from financeiro.database import get_connection
 from financeiro.simulations import account_projected_balance_until, month_end_date
-from financeiro.calendar_rules import days_in_month
+from financeiro.calendar_rules import days_in_month, shift_month
 
 MONTH_PATTERN = re.compile(r"^\d{4}-\d{2}$")
 
@@ -82,6 +83,7 @@ def calculate_trends(user_id: int, month: object | None = None, currency: str = 
         point_events = detect_point_events(conn, user_id, normalized_month)
         acceleration = detect_installment_acceleration(conn, user_id, normalized_month)
         subscriptions = detect_recurring_subscriptions(conn, user_id, normalized_month)
+        subscription_details = detect_subscription_details(conn, user_id, normalized_month)
         cash_opportunity = detect_cash_opportunity(conn, user_id, normalized_month)
         limit_overruns = detect_recurring_limit_overruns(conn, user_id, normalized_month)
         findings = build_findings(
@@ -138,6 +140,7 @@ def calculate_trends(user_id: int, month: object | None = None, currency: str = 
         "eventos_pontuais": point_events,
         "antecipacao_parcelas": acceleration,
         "assinaturas_e_servicos": subscriptions,
+        "assinaturas_detalhadas": subscription_details,
         "oportunidade_caixa": cash_opportunity,
         "resumo_local": summary,
         "resumo_ia": None,
@@ -937,6 +940,172 @@ def detect_recurring_subscriptions(conn, user_id: int, month: str) -> list[dict]
         [value for value in results.values() if value["valor_cents"] > 0],
         key=lambda item: item["subcategory_name"],
     )
+
+
+# spec: tendencias-saude-financeira v2.28 — critérios 29 e 55 a 60
+SUBSCRIPTION_SERVICE_ALIASES = (
+    ("icloud", ("icloud", "apple icloud", "apple storage"), "iCloud"),
+    ("google_drive", ("google drive", "google one", "drive google"), "Google Drive"),
+    ("office", ("microsoft 365", "office 365", "microsoft office", "office", "onedrive"), "Office"),
+    ("ai", ("chatgpt", "openai", "claude", "anthropic", "gemini", "perplexity", "copilot"), "Serviços de IA"),
+    ("celular", ("celular", "telefone", "tim", "vivo", "claro", "oi"), "Celular"),
+)
+
+
+def _subscription_normalized_text(value: object) -> str:
+    normalized = unicodedata.normalize("NFKD", str(value or ""))
+    without_marks = "".join(char for char in normalized if not unicodedata.combining(char))
+    return re.sub(r"[^a-z0-9]+", " ", without_marks.lower()).strip()
+
+
+def identify_subscription_service(description: object) -> tuple[str, str, str]:
+    """Return a conservative service key, label and confidence."""
+    raw_description = str(description or "").strip()
+    normalized = _subscription_normalized_text(raw_description)
+    for key, aliases, label in SUBSCRIPTION_SERVICE_ALIASES:
+        if any(alias in normalized for alias in aliases):
+            return key, label, "alta"
+    if normalized:
+        label = raw_description[:64].strip()
+        return normalized, label or "Cobrança recorrente", "intermediaria"
+    return "unknown", "Cobrança recorrente não identificada", "baixa"
+
+
+def detect_subscription_details(conn, user_id: int, month: str) -> dict:
+    """
+    spec: tendencias-saude-financeira v2.28 — critérios 55 a 60
+    Detalha somente despesas recorrentes já classificadas na categoria de
+    assinaturas. O nome do serviço só é promovido quando a descrição contém
+    um identificador seguro; não há inferência externa nem classificação nova.
+    """
+    future_month = shift_month(month, 12)
+    start, end = month_bounds(month)
+    future_end = month_end_date(future_month)
+    rows = [
+        *conn.execute(
+            """
+            SELECT
+                transactions.id,
+                transactions.description,
+                transactions.amount_cents,
+                COALESCE(NULLIF(transactions.amount_brl_cents, 0), transactions.amount_cents) AS amount_brl_cents,
+                transactions.date AS occurrence_date,
+                transactions.series_id,
+                transactions.recurrence_frequency,
+                checking_accounts.name AS origin_name,
+                checking_accounts.currency AS origin_currency,
+                categories.name AS category_name,
+                subcategories.name AS subcategory_name,
+                'conta' AS origin_type,
+                substr(transactions.date, 1, 7) AS competence_month
+            FROM transactions
+            JOIN checking_accounts
+                ON checking_accounts.id = transactions.account_id
+                AND checking_accounts.user_id = transactions.user_id
+            JOIN categories
+                ON categories.id = transactions.category_id
+                AND categories.user_id = transactions.user_id
+                AND categories.group_type = 'expense'
+            LEFT JOIN subcategories
+                ON subcategories.id = transactions.subcategory_id
+                AND subcategories.user_id = transactions.user_id
+            WHERE transactions.user_id = ?
+                AND transactions.archived_at IS NULL
+                AND transactions.date BETWEEN ? AND ?
+                AND transactions.type = 'expense'
+                AND categories.name = ?
+                AND transactions.series_kind = 'recurring'
+                AND (transactions.recurrence_frequency IS NULL OR transactions.recurrence_frequency = 'monthly')
+            """,
+            (user_id, start, future_end, SUBSCRIPTIONS_CATEGORY),
+        ).fetchall(),
+        *conn.execute(
+            """
+            SELECT
+                credit_card_transactions.id,
+                credit_card_transactions.description,
+                credit_card_transactions.amount_cents,
+                COALESCE(NULLIF(credit_card_transactions.amount_brl_cents, 0), credit_card_transactions.amount_cents) AS amount_brl_cents,
+                credit_card_transactions.date AS occurrence_date,
+                credit_card_transactions.series_id,
+                credit_card_transactions.recurrence_frequency,
+                credit_cards.name AS origin_name,
+                credit_cards.currency AS origin_currency,
+                categories.name AS category_name,
+                subcategories.name AS subcategory_name,
+                'cartao' AS origin_type,
+                credit_card_transactions.invoice_month AS competence_month
+            FROM credit_card_transactions
+            JOIN credit_cards
+                ON credit_cards.id = credit_card_transactions.credit_card_id
+                AND credit_cards.user_id = credit_card_transactions.user_id
+            JOIN categories
+                ON categories.id = credit_card_transactions.category_id
+                AND categories.user_id = credit_card_transactions.user_id
+                AND categories.group_type = 'expense'
+            LEFT JOIN subcategories
+                ON subcategories.id = credit_card_transactions.subcategory_id
+                AND subcategories.user_id = credit_card_transactions.user_id
+            WHERE credit_card_transactions.user_id = ?
+                AND credit_card_transactions.archived_at IS NULL
+                AND credit_card_transactions.invoice_month BETWEEN ? AND ?
+                AND credit_card_transactions.type = 'expense'
+                AND categories.name = ?
+                AND credit_card_transactions.series_kind = 'recurring'
+                AND (credit_card_transactions.recurrence_frequency IS NULL OR credit_card_transactions.recurrence_frequency = 'monthly')
+            """,
+            (user_id, month, future_month, SUBSCRIPTIONS_CATEGORY),
+        ).fetchall(),
+    ]
+
+    grouped: dict[str, dict] = {}
+    for row in rows:
+        if str(row["competence_month"] or "") < month:
+            continue
+        service_key, service_label, confidence = identify_subscription_service(row["description"])
+        item = grouped.setdefault(service_key, {
+            "servico": service_label,
+            "valor_mensal_cents": 0,
+            "periodicidade": "mensal",
+            "periodicidade_label": "Mensal",
+            "proximo_lancamento": None,
+            "origens": [],
+            "categoria": row["category_name"] or SUBSCRIPTIONS_CATEGORY,
+            "subcategoria": row["subcategory_name"] or "Geral",
+            "confianca": confidence,
+            "confianca_label": {"alta": "Alta", "intermediaria": "Intermediária", "baixa": "Baixa"}[confidence],
+            "_future_dates": [],
+        })
+        if str(row["competence_month"] or "") == month:
+            item["valor_mensal_cents"] += int(row["amount_brl_cents"] or row["amount_cents"] or 0)
+            origin = {
+                "tipo": row["origin_type"],
+                "nome": row["origin_name"] or "Origem não informada",
+                "moeda": row["origin_currency"] or "BRL",
+            }
+            if origin not in item["origens"]:
+                item["origens"].append(origin)
+        elif str(row["competence_month"] or "") > month:
+            item["_future_dates"].append(str(row["occurrence_date"] or "")[:10])
+        if confidence == "alta":
+            item["confianca"] = "alta"
+            item["confianca_label"] = "Alta"
+
+    items = []
+    for item in grouped.values():
+        if item["valor_mensal_cents"] <= 0:
+            continue
+        future_dates = sorted(value for value in item.pop("_future_dates") if value)
+        item["proximo_lancamento"] = future_dates[0] if future_dates else None
+        items.append(item)
+    items.sort(key=lambda item: (-item["valor_mensal_cents"], item["servico"]))
+    total = sum(item["valor_mensal_cents"] for item in items)
+    return {
+        "mes": month,
+        "total_mensal_cents": total,
+        "estimativa_anual_cents": total * 12,
+        "itens": items,
+    }
 
 
 def build_findings(

@@ -896,6 +896,14 @@ class TrendsCalculationTest(unittest.TestCase):
         self.assertIn("Assinaturas e serviços recorrentes", result["resumo_local"])
         self.assertIn("R$ 1.800,00", result["resumo_local"])
 
+        details = result["assinaturas_detalhadas"]
+        self.assertEqual(details["total_mensal_cents"], 180_000)
+        self.assertEqual(details["estimativa_anual_cents"], 2_160_000)
+        self.assertEqual({item["servico"] for item in details["itens"]}, {"Netflix", "Disney+", "Spotify", "Celular"})
+        celular = next(item for item in details["itens"] if item["servico"] == "Celular")
+        self.assertEqual(celular["confianca"], "alta")
+        self.assertEqual(celular["origens"][0]["tipo"], "conta")
+
     def test_multi_currency_warning(self) -> None:
         # spec: tendencias-saude-financeira v2.23 — critério 27
         user = create_user("T9", "t9@example.com", "strong-password")

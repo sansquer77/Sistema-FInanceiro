@@ -28,6 +28,12 @@ class PortfolioReturns:
         denominator = max(prev_value + max(net_contribution, 0), 1)
         return (Decimal(end_value - prev_value - net_contribution) * Decimal("100")) / Decimal(denominator)
 
+    @staticmethod
+    def _display_value(cents: int) -> str | None:
+        if not cents:
+            return None
+        return str((Decimal(int(cents)) / Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
     def get_portfolio_returns(self, user_id: int, force_refresh: bool = False, positions: list[dict] | None = None) -> dict:
         # spec: rentabilidade-portfolio v2.9 — critérios 1 a 10
         # Rentabilidade mensal (em percentual) por moeda consolidada (BRL e USD),
@@ -91,6 +97,7 @@ class PortfolioReturns:
                         "cdi_return_pct": 0.0,
                         "ipca_return_pct": 0.0,
                         **{f"{currency}_return_pct": 0.0 for currency in currency_order},
+                        **{f"{currency}_value": None for currency in currency_order},
                     })
                     continue
                 as_of = min(month_end, today)
@@ -159,6 +166,7 @@ class PortfolioReturns:
                     else:
                         portfolio_return = Decimal("0")
                     entry[f"{currency}_return_pct"] = float(portfolio_return.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP))
+                    entry[f"{currency}_value"] = self._display_value(value)
                     prev_by_currency[currency] = value
                     prev_invested_by_currency[currency] = invested
 

@@ -2,8 +2,8 @@
 tipo: spec
 area: limites
 status: implementado
-versao: 1.11
-atualizado: 2026-11-24
+versao: 1.17
+atualizado: 2026-11-26
 relacionados:
   - "[[categorias-tags-gestao]]"
   - "[[cartoes]]"
@@ -17,7 +17,7 @@ aliases: ["Limites de Gastos", "Budgets", "Metas"]
 # Limites de Gastos
 
 > [!info] Status
-> **implementado** · versão: `1.11` · área: `limites` · atualizado em 2026-11-24 · relacionados: [[categorias-tags-gestao]], [[cartoes]], [[relatorios]], [[alertas-cockpit]]
+> **implementado** · versão: `1.17` · área: `limites` · atualizado em 2026-11-26 · relacionados: [[categorias-tags-gestao]], [[cartoes]], [[relatorios]], [[alertas-cockpit]]
 
 ## Problema
 
@@ -85,9 +85,19 @@ Tabelas: `spending_limits`, `categories`, `subcategories`.
 - Dado o usuário criando ou ajustando um limite, quando o formulário é exibido, então o mês de início da vigência aparece como campo editável e é enviado como a competência da definição.
 - Dado um limite herdado de uma categoria e uma definição futura existente para outra categoria, quando a edição tenta transferir o limite herdado para a identidade e mês já ocupados, então a API retorna conflito sem alterar valor, observações ou identidade do registro futuro.
 - Dado o usuário visualizando um limite, quando clica no item ou em **Ver lançamentos**, então o app abre Relatórios no mesmo mês, seleciona Categorias para um limite da categoria inteira ou Subcategorias para um limite específico, expande o agrupamento correspondente e destaca o item para consulta dos lançamentos.
+- Dado o usuário acessando Limites, quando a tela é exibida, então encontra cabeçalho editorial, resumo mensal com superfícies leves e lista de uso sem bordas pesadas, com reflow adequado a desktops compactos.
+- Dado o usuário criando ou editando um limite, quando aciona a ação correspondente, então o formulário abre em um flyover com o mesmo padrão estrutural de Lançamentos, mantendo foco, fechamento e corpo rolável acessíveis.
+- Dado o usuário visualizando a lista de uso em uma largura confortável, então os limites podem ser apresentados em duas colunas; em uma tela compacta, a lista e o formulário recolhem para uma coluna sem rolagem horizontal.
+- Dado o usuário visualizando a lista de uso, quando houver espaço horizontal disponível, então o painel ocupa toda a largura do conteúdo antes de dividir os limites em colunas, sem deixar uma área vazia lateral nem comprimir os itens.
 
 ## Changelog
 
+- `1.17` — 2026-11-26 — Alinha a aba Objetivos ao padrão de flyover de Limites, preservando os campos, regras e ações existentes.
+- `1.16` — 2026-11-26 — Remove a coluna vazia do workspace de Limites e preserva a distribuição em duas colunas somente na lista de uso.
+- `1.15` — 2026-11-26 — Corrige a precedência de alinhamento que mantinha o painel de uso comprimido em desktops largos.
+- `1.14` — 2026-11-26 — Corrige o encolhimento do painel de uso e preserva a distribuição confortável dos cards em duas colunas.
+- `1.13` — 2026-11-26 — Move o formulário de Limites para flyover reutilizável e amplia a listagem para duas colunas com reflow compacto.
+- `1.12` — 2026-11-26 — Polimenta a hierarquia visual de Limites com cabeçalho editorial, resumo silencioso, lista de uso mais leve e reflow compacto.
 - `1.3` — 2026-09-01 — Consumo por limite passa a ser agregado no SQLite para a competência consultada, removendo a dependência do estado mensal compartilhado do frontend.
 - `1.2` — 2026-08-02 — Seletor mensal de Limites padronizado com botões compactos por ícone e rótulo `MM/AAAA`.
 - `1.1` — 2026-07-08 — Limites passam a ser documentados como recorrentes, com `month` representando início de vigência.

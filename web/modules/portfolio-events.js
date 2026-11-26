@@ -92,12 +92,14 @@ export function createPortfolioEvents({ state, container, refreshButton, api, es
             <span role="columnheader">Data ex</span><span role="columnheader">Pagamento</span>
             <span role="columnheader">Ativo</span><span role="columnheader">Carteira</span>
             <span role="columnheader">Evento</span><span role="columnheader">Valor por cota/ação</span>
-            <span role="columnheader">Fonte</span>
+            <span role="columnheader">Estimativa bruta</span><span role="columnheader">Fonte</span>
           </div>
           <div class="portfolio-events-list" role="rowgroup" data-month-index="${index}"></div>
         </div>
       </section>`).join("")}</div>
-      <p class="portfolio-footnote">Dados obtidos de fontes públicas; sempre validar com seu Banco/Corretora.</p>
+      <p class="portfolio-footnote portfolio-events-footnote">
+        Estimativa bruta = valor por cota/ação × quantidade atualmente aberta no Portfólio no momento da consulta. Não é valor líquido: pode haver IR, IOF, taxas, corretagem, retenções e outros descontos, além de alterações na posição, câmbio, cancelamentos ou diferenças no pagamento efetivo. Eventos sem valor unitário, bonificações, desdobramentos e grupamentos não recebem estimativa. Dados obtidos de fontes públicas; sempre validar com seu Banco/Corretora.
+      </p>
     `;
     [...groups.values()].forEach((rows, index) => renderCollectionRows(container.querySelector(`[data-month-index="${index}"]`), rows, {
       threshold: 60, rowHeight: 64, viewportHeight: 560, renderItem: eventRow,
@@ -106,7 +108,8 @@ export function createPortfolioEvents({ state, container, refreshButton, api, es
 
   function eventRow(event) {
     const paymentDate = event.payment_date ? formatDate(event.payment_date) : "Não informada";
-    const amount = event.amount_per_share_micros == null ? "Não informado" : formatUnitAmount(event.amount_per_share_micros, event.currency);
+    const amount = event.amount_per_share_micros == null ? "Não informado" : formatCurrencyAmount(event.amount_per_share_micros, event.currency);
+    const estimate = event.estimated_value_micros == null ? "Não estimado" : formatCurrencyAmount(event.estimated_value_micros, event.currency, { maximumFractionDigits: 2 });
     const portfolios = (event.portfolio_names || []).join(", ") || "Carteira não informada";
     const source = event.source || "Fonte pública";
     const sourceDescription = event.confirmation_label || `Evento detectado por ${source}`;
@@ -117,6 +120,7 @@ export function createPortfolioEvents({ state, container, refreshButton, api, es
       <span role="cell">${escapeHtml(portfolios)}</span>
       <span role="cell">${escapeHtml(event.event_label)}</span>
       <span role="cell" class="money-cell${event.amount_per_share_micros == null ? " portfolio-event-empty" : ""}">${amount}</span>
+      <span role="cell" class="money-cell${event.estimated_value_micros == null ? " portfolio-event-empty" : ""}" title="${event.estimated_value_micros == null ? "Sem estimativa: falta valor unitário ou quantidade aberta" : "Estimativa bruta antes de impostos e taxas"}">${estimate}</span>
       <span role="cell"><span class="portfolio-event-confirmation" title="${escapeHtml(sourceDescription)}" aria-label="${escapeHtml(sourceDescription)}">${escapeHtml(source)}</span></span>
     </div>`;
   }
@@ -127,13 +131,13 @@ export function createPortfolioEvents({ state, container, refreshButton, api, es
     return new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" });
   }
 
-  function formatUnitAmount(amountMicros, currency) {
+  function formatCurrencyAmount(amountMicros, currency, options = {}) {
     const value = Number(amountMicros || 0) / 1_000_000;
     return value.toLocaleString("pt-BR", {
       style: "currency",
       currency: currency || "BRL",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 6,
+      minimumFractionDigits: options.minimumFractionDigits ?? 2,
+      maximumFractionDigits: options.maximumFractionDigits ?? 6,
     });
   }
 

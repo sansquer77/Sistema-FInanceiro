@@ -2,13 +2,12 @@ from __future__ import annotations
 
 from calendar import monthrange
 from datetime import date, datetime, timedelta, timezone
-from decimal import Decimal
 from typing import Callable, Iterable
 
-from financeiro.balance_projections import build_currency_totals_for_user
+from financeiro.balance_projections import build_projected_negative_balances_for_user
 from financeiro.calendar import get_cockpit_calendar
 from financeiro.database import get_connection
-from financeiro.money import cents_to_money, decimal_to_cents
+from financeiro.money import cents_to_money
 from financeiro.portfolio_positions import load_open_fixed_income_maturities
 from financeiro.secure_config import SecureConfigError, load_email_config
 from financeiro.spending_limits import list_spending_limits_with_consumption
@@ -21,16 +20,21 @@ def build_cockpit_notifications(
     portfolio_events: Iterable[dict] | None = None,
     limits_loader: Callable = list_spending_limits_with_consumption,
     calendar_loader: Callable = get_cockpit_calendar,
-    totals_loader: Callable = build_currency_totals_for_user,
+    totals_loader: Callable | None = None,
+    negative_balance_loader: Callable = build_projected_negative_balances_for_user,
     portfolio_positions_loader: Callable | None = None,
 ) -> dict:
     """Compila notificações financeiras sem depender do snapshot mensal do Cockpit."""
     reference_date = reference_date or date.today()
     month = reference_date.strftime("%Y-%m")
 
-    # spec: cockpit/alertas-cockpit v1.5 — critérios 1, 3, 4, 5, 6 e 11
+    # spec: cockpit/alertas-cockpit v1.10 — critérios 1, 3, 4, 5, 6, 11 e 22
     critical = _limit_notifications(limits_loader(user_id, month), month)
-    critical.extend(_negative_balance_notifications(totals_loader(user_id, month), month))
+    # totals_loader permanece como ponto de compatibilidade para integrações que
+    # já injetavam o agregador do Cockpit; o formato esperado agora é o evento
+    # diário produzido por negative_balance_loader.
+    negative_rows = (totals_loader or negative_balance_loader)(user_id, month)
+    critical.extend(_negative_balance_notifications(negative_rows, month))
 
     try:
         positions = list(
@@ -112,7 +116,7 @@ def _revolving_zero_balance_notifications(user_id: int) -> list[dict]:
 
 
 def _backup_failure_notifications(user_id: int) -> list[dict]:
-    # spec: cockpit/alertas-cockpit v1.5 — critério 15
+    # spec: cockpit/alertas-cockpit v1.10 — critério 15
     # Backup policy is installation-wide; only its responsible user can resolve settings.
     with get_connection() as conn:
         row = conn.execute(
@@ -191,7 +195,26 @@ def _monthly_close_notification(user_id: int, reference_date: date) -> dict | No
                JOIN checking_accounts a ON a.id = t.account_id AND a.user_id = t.user_id
                WHERE t.user_id = ? AND t.archived_at IS NULL AND a.archived_at IS NULL
                  AND substr(t.date, 1, 7) = ? AND t.type IN ('income', 'expense')
-                 AND t.category_id IS NULL""",
+                 AND t.category_id IS NULL
+                 -- spec: cockpit/alertas-cockpit v1.10 — critérios 23 e 24
+                 -- Resgates e créditos de encerramento do Portfólio já têm
+                 -- classificação pela origem financeira, mesmo sem categoria.
+                 AND NOT EXISTS (
+                     SELECT 1 FROM investment_redemptions r
+                     WHERE r.user_id = t.user_id AND r.transaction_id = t.id
+                 )
+                 AND NOT (
+                     t.type = 'income'
+                     AND t.description LIKE 'Encerramento - %'
+                     AND EXISTS (
+                         SELECT 1
+                         FROM investment_closed_positions p
+                         WHERE p.user_id = t.user_id
+                           AND p.account_id = t.account_id
+                           AND substr(p.closed_at, 1, 10) = t.date
+                           AND p.closing_value_cents = t.amount_cents
+                     )
+                 )""",
             (user_id, previous_month),
         ).fetchone()
         card_unclassified = conn.execute(
@@ -227,7 +250,8 @@ def _monthly_close_notification(user_id: int, reference_date: date) -> dict | No
         "Abrir demonstrativo", "reports", {"month": previous_month, "tab": "statement"}, seen=False,
         actions=[
             {"label": "Abrir demonstrativo", "route": "reports", "params": {"month": previous_month, "tab": "statement"}},
-            {"label": "Ver pendências", "route": "transactions", "params": {"month": previous_month, "status": "pending"}},
+            {"label": "Ver conciliação pendente", "route": "transactions", "params": {"month": previous_month, "status": "pending"}},
+            {"label": "Ver sem classificação", "route": "reports", "params": {"month": previous_month, "tab": "unclassified"}},
         ],
     )
 
@@ -277,18 +301,47 @@ def _limit_notifications(rows: Iterable[dict], month: str) -> list[dict]:
 def _negative_balance_notifications(rows: Iterable[dict], month: str) -> list[dict]:
     result = []
     for row in rows:
-        amount = Decimal(str(row.get("current") or "0"))
-        if amount >= 0:
+        negative_cents = int(row.get("negative_cents") or 0)
+        negative_date = str(row.get("first_negative_date") or "")
+        if negative_cents <= 0 or not negative_date:
             continue
-        cents = decimal_to_cents(abs(amount))
         currency = str(row.get("currency") or "BRL")
+        account_id = row.get("account_id")
+        account_name = str(row.get("account_name") or "Conta")
+        formatted_date = _short_date(negative_date)
+        causes = list(dict.fromkeys(str(item) for item in (row.get("causes") or []) if str(item).strip()))
+        cause_text = _join_causes(causes or ["compromissos previstos"])
         result.append(_item(
-            f"projected_negative_balance:{currency}:{month}", "projected_negative_balance", "cashflow",
-            f"Saldo projetado negativo em {currency}",
-            f"A projeção do mês indica saldo negativo de {currency} {cents_to_money(cents)}.",
-            month, "Ver extrato", "transactions", {"month": month},
+            f"projected_negative_balance:{account_id}:{negative_date}", "projected_negative_balance", "cashflow",
+            f"Saldo previsto ficará negativo em {formatted_date}",
+            f"Conta: {account_name}. Estimativa de -{_localized_money(negative_cents, currency)} após {cause_text}.",
+            negative_date, "Ver extrato", "transactions", {"month": month, "account_id": account_id},
         ))
     return result
+
+
+def _short_date(value: str) -> str:
+    try:
+        parsed = date.fromisoformat(value)
+    except ValueError:
+        return value
+    return parsed.strftime("%d/%m")
+
+
+def _localized_money(cents: int, currency: str) -> str:
+    symbol = {"BRL": "R$", "USD": "US$", "EUR": "€"}.get(currency, currency)
+    raw = cents_to_money(abs(int(cents)))
+    integer, fraction = raw.split(".", 1)
+    grouped = f"{int(integer):,}".replace(",", ".")
+    return f"{symbol} {grouped},{fraction}"
+
+
+def _join_causes(causes: list[str]) -> str:
+    if len(causes) == 1:
+        return causes[0]
+    if len(causes) == 2:
+        return f"{causes[0]} e {causes[1]}"
+    return f"{', '.join(causes[:-1])} e {causes[-1]}"
 
 
 def _overdue_account_notifications(rows: Iterable[dict]) -> list[dict]:

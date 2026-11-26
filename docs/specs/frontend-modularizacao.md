@@ -2,8 +2,8 @@
 tipo: spec
 area: frontend
 status: implementado
-versao: 4.47
-atualizado: 2026-11-24
+versao: 4.80
+atualizado: 2026-11-26
 relacionados:
   - "[[adr/0002-modularizacao-frontend]]"
   - "[[arquitetura]]"
@@ -16,7 +16,7 @@ aliases: ["Modularização Frontend", "ES Modules"]
 # Modularização do Frontend
 
 > [!info] Status
-> **implementado** · versão: `4.47` · área: `frontend` · atualizado em 2026-11-24 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]], [[../qualidade-codigo]], [[../design/design-system]]
+> **implementado** · versão: `4.80` · área: `frontend` · atualizado em 2026-11-26 · relacionados: [[adr/0002-modularizacao-frontend]], [[arquitetura]], [[../qualidade-codigo]], [[../design/design-system]]
 
 ## Problema
 
@@ -43,6 +43,7 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `dom-utils.js` | Helpers de formulário, mensagens e empty state. |
 | `chart-adapter.js` | Ciclo de vida, tokens, movimento reduzido e fallback dos gráficos ApexCharts locais. |
 | `notification-flyout.js` | Diálogo global acessível de alertas do Cockpit, com abas, ações delegadas, persistência de leitura injetada e restauração de foco. |
+| `subscriptions-flyover.js` | Flyover analítico de assinaturas recorrentes; renderiza somente dados calculados no backend, sem formulário ou regra financeira local. |
 | `transaction-kind.js` | Predicados de tipo de lançamento. |
 | `labels.js` | Labels de domínio usados pela interface. |
 | `month-picker.js` | Popover reutilizável de seleção de mês. |
@@ -54,7 +55,7 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `density-utils.js` | Preferência visual local de densidade e aplicação de `data-density` no documento. |
 | `overlay-utils.js` | Semântica, foco e teclado compartilhados por drawers e overlays persistentes. |
 | `data-ux.js` | Ordenação local, contagem de linhas e chips removíveis para tabelas e filtros. |
-| `portfolio-chart.js` | Renderização e ciclo de vida do gráfico de rentabilidade do Portfólio. |
+| `portfolio-chart.js` | Renderização e ciclo de vida da evolução compacta de rentabilidade do Portfólio, incluindo as séries por moeda e os benchmarks CDI/IPCA. |
 | `portfolio-grouping.js` | Identidade estável de agrupamentos visuais de posições, sem cálculo de consolidação. |
 | `portfolio-preview.js` | Coordenação das prévias no servidor e descarte de respostas obsoletas antes da confirmação. |
 | `portfolio-form.js` | Normalização dos payloads de formulários e ações de posição no Portfólio. |
@@ -82,7 +83,7 @@ Mantenedores e agentes de IA em IDEs que precisam evoluir a interface local com 
 | `imports-view.js` | Upload, download de modelo e resultado da importação. |
 | `cockpit-view.js` | Resumo, saldos, planejamento, dívidas, portfólio e alertas. |
 | `financial-health-view.js` | Aba Saúde Financeira do Cockpit: score/gauge, pilares, Paz Financeira e recomendações. |
-| `trends-view.js` | Aba Tendências do Cockpit: gráfico de evolução mensal, Budget x Realizado e achados. |
+| `trends-view.js` | Aba Tendências do Cockpit: gráfico de evolução mensal, Budget x Realizado, achados e subaba contextual de Assinaturas. |
 | `consultor-view.js` | Aba Consultor/Calendário do Cockpit: vencimentos, atrasos e plano próximo. |
 | `accounts-view.js` | Contas: cadastro, edição, arquivamento e restauração. |
 | `cards-view.js` | Cartões: cadastro, faturas, busca/filtro da fatura, pagamento e conciliação. |
@@ -282,7 +283,7 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Dado o boot ou uma troca de mês do Cockpit, quando os dados auxiliares são atualizados, então somente a competência necessária de contas/cartões é carregada e nenhum endpoint de pagamentos ou histórico integral é percorrido.
 - Dado um termo com ao menos dois caracteres na Busca Global, quando o usuário digita, então lançamentos de contas e cartões de qualquer competência são consultados sob demanda, limitados e pagináveis, sem carregar históricos completos no estado global; respostas de termos anteriores são descartadas.
 - Dado o usuário alternando o mês de Relatórios, quando a resposta anterior chega depois, então ela é descartada e o estado mantém somente o recorte da competência atual.
-- Dado o usuário abrindo o Portfólio, quando a tela carrega, então a aba **Posição** renderiza primeiro; **Análise**, **Eventos**, **Histórico** e rentabilidade detalhada são renderizados/carregados sob demanda no primeiro acesso.
+- Dado o usuário abrindo o Portfólio, quando a tela carrega, então a aba **Posição** renderiza primeiro; a evolução compacta de rentabilidade é carregada junto do resumo, enquanto **Análise**, **Eventos** e **Histórico** continuam sob demanda no primeiro acesso.
 - Dado o usuário alterando o agrupamento ou colapsando/expandindo grupos no Portfólio, quando a tela já tem dados carregados, então apenas a lista de posições é renderizada novamente.
 - Dado a interface carregando scripts de terceiros não essenciais, quando o HTML é parseado, então esses scripts não bloqueiam a inicialização do app (`async`/`defer` quando aplicável).
 - Dado uma área estrutural de layout como o dashboard principal, quando o menu lateral alterna estado, então a UI não anima propriedades caras como `grid-template-columns`.
@@ -338,6 +339,26 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - Dado um formulário extenso, quando campos opcionais existem, então ficam em seção progressiva e um resumo dos valores preenchidos aparece antes de salvar.
 - Dado um formulário novo ainda sem interação ou um campo condicional oculto/desabilitado, quando o resumo é calculado, então ele permanece vazio ou ignora esse campo, mesmo que o controle tenha valor padrão.
 - Dado um lançamento simples à vista, quando o usuário preenche o formulário, então o resumo fica disponível recolhido; ao mudar a repetição para parcelada ou recorrente, ele se expande automaticamente.
+- Dado o usuário alternando entre Lançamentos de Contas e Lançamentos de Cartões, quando as telas são renderizadas, então cabeçalhos, formulários, resumos, toolbars e linhas compartilham hierarquia tipográfica, espaçamento e superfícies equivalentes, preservando os dados e controles próprios de cada módulo.
+- Dado o usuário visualizando uma listagem de lançamentos, quando aciona `Novo lançamento` ou `Editar lançamento`, então o formulário completo abre em flyover lateral e a listagem permanece disponível no módulo ao fundo.
+- Dado o flyover de lançamentos aberto, quando o usuário usa Escape, o overlay, o botão de fechar ou `Cancelar`, então o flyover fecha, o foco retorna ao acionador e nenhum lançamento é alterado.
+- Dado um formulário de lançamento aberto, quando um lançamento é salvo com sucesso, então o flyover fecha após a confirmação e a listagem é atualizada pelo fluxo existente.
+- Dado o flyover em uma largura estreita, quando campos condicionais, mensagens e validações aparecem, então campos relacionados empilham por largura do painel, avisos ocupam a linha completa e mensagens vazias não criam espaço reservado.
+- Dado um módulo de lançamentos com um contexto selecionável, quando o usuário troca a conta ou o cartão fora do flyover, então o módulo recarrega o contexto consultado sem abrir o formulário.
+- Dado um flyover de lançamento aberto em um desktop compacto, quando o viewport permite, então o painel usa até `760px` de largura e preserva a resposta por container dos campos internos.
+- Dado o usuário acionando uma notificação de classificação, quando Relatórios é aberto, então a aba de revisão lista lançamentos sem categoria de contas e cartões na competência informada, independentemente da conciliação.
+- Dado o usuário abrindo a aba Posição do Portfólio, quando há dados mensais, então a view carrega sob demanda uma única evolução compacta em percentual com séries da carteira por moeda, CDI e IPCA; se não houver pontos válidos, mantém estado neutro e desmonta o gráfico ao sair sem afetar os painéis analíticos.
+- Dado o usuário alternando entre as abas do Portfólio, quando uma aba é exibida, então seus cabeçalhos, descrições, cards, tabelas, estados vazios e ações usam a mesma hierarquia visual e não introduzem rolagem horizontal desnecessária em desktop compacto.
+- Dado a aba Análise renderizando agrupamentos de tamanhos diferentes, quando a grade é exibida, então os painéis começam no mesmo eixo e não usam o estiramento automático de uma coluna para preencher a altura de outra.
+- Dado a aba Histórico com resgates e posições encerradas, quando as seções são renderizadas, então cada tabela tem subtítulo contextual e os dados permanecem no mesmo contrato de apresentação existente.
+- Dado a aba Eventos com valor unitário e estimativa bruta disponível, quando as linhas são renderizadas, então a tabela mostra a coluna de estimativa antes da fonte e o rodapé explica que o valor não é líquido nem garantido.
+- Dado a aba Eventos com estimativa bruta disponível, quando os valores são renderizados, então a estimativa usa duas casas decimais e o valor por cota/ação preserva até seis casas quando informado pelo provedor.
+- Dado qualquer conjunto principal de abas do app, quando renderizado em tema claro ou escuro, então a faixa usa superfície leve compartilhada, itens sem contorno individual, estado ativo por contraste/indicador discreto e foco visível, preservando `aria-selected`, `tabIndex` e navegação por teclado.
+- Dado qualquer flyover, drawer ou diálogo do app, quando renderizado em tema claro ou escuro, então sua superfície raiz usa o token de conteúdo correspondente ao tema, sem introduzir uma tonalidade lilás/azulada independente do restante da interface.
+- Dado o quadro Saldos por moeda em desktop compacto, quando os totais e saldos são alinhados à direita, então existe respiro lateral uniforme e separação adicional entre a coluna numérica e a moldura, sem alterar valores nem criar rolagem horizontal.
+- Dado o usuário na aba Tendências, quando a visão geral é renderizada, então Evolução, Orçamento e Achados formam os três módulos visuais principais; métricas ficam integradas à evolução, achados não usam cards repetidos e notas de confiança permanecem contextuais.
+- Dado que Tendências possui eventos pontuais ou limites recorrentes, quando os achados são renderizados, então cada natureza usa um agrupamento único com bullets; a orientação de revisão de limite fica dentro do agrupamento de limites para qualquer categoria.
+- Dado que o usuário abre Tendências > Assinaturas, quando a visão resumida e o flyover são renderizados, então ambos apresentam o mesmo conjunto de serviços identificados; o flyover adiciona detalhes sem ocultar itens na aba.
 
 ## Fora de escopo
 
@@ -347,6 +368,38 @@ export function createXxxView({ state, elements, services, formatters, actions }
 
 ## Changelog
 
+- `4.80` — 2026-11-26 — Alinha as telas restantes — Contas, Cartões, Importação, Categorias, Histórico, Preferências, Instruções e Sobre — à camada visual premium compartilhada.
+- `4.79` — 2026-11-26 — Ajusta a orientação de Empréstimos para responder à largura útil real do conteúdo.
+- `4.78` — 2026-11-26 — Registra a camada visual compartilhada de Empréstimos e Efeito Borboleta, com superfícies premium, hierarquia de leitura e reflow para desktops compactos.
+- `4.77` — 2026-11-26 — Registra o alinhamento de Objetivos ao padrão de flyover e listagem de Limites.
+- `4.76` — 2026-11-26 — Remove a coluna vazia herdada do workspace de Limites e deixa a grade de duas colunas restrita à listagem.
+- `4.75` — 2026-11-26 — Registra a correção de precedência que mantinha o painel de Limites comprimido após o novo layout.
+- `4.74` — 2026-11-26 — Corrige o encolhimento indevido do workspace de Limites após a migração do formulário para flyover.
+- `4.73` — 2026-11-26 — Registra o flyover de cadastro de Limites como reaproveitamento do padrão de overlay de Lançamentos, com abertura para novo registro e edição.
+- `4.72` — 2026-11-26 — Polimenta Limites e Relatórios com cabeçalhos editoriais, métricas silenciosas, listas/tabelas de baixa ênfase e reflow compacto.
+- `4.71` — 2026-11-26 — Completa o tratamento visual do Histórico do Consultor com cabeçalho, filtro e lista editorial responsiva.
+- `4.70` — 2026-11-26 — Equaliza a moldura visual das abas Consultor e Saúde Financeira no Cockpit, preservando os estados locais e a adaptação a desktops compactos.
+- `4.69` — 2026-11-26 — Garante consistência entre a lista resumida de Assinaturas e o conjunto completo do flyover analítico.
+- `4.68` — 2026-11-26 — Registra o agrupamento editorial de eventos pontuais e limites recorrentes dentro da visão de Tendências.
+- `4.67` — 2026-11-26 — Registra a composição editorial de Tendências com métricas integradas, menos molduras e achados/contexto sem cards redundantes.
+- `4.66` — 2026-11-26 — Torna as colunas de Saldos por moeda fluidas e elimina a rolagem horizontal no quadro compacto.
+- `4.65` — 2026-11-26 — Registra o ajuste de espaçamento do quadro Saldos por moeda para proteger a leitura dos valores em desktops compactos.
+- `4.64` — 2026-11-26 — Padroniza a superfície raiz dos overlays para seguir o tema claro/escuro e elimina a divergência cromática dos flyovers.
+- `4.63` — 2026-11-26 — Unifica a linguagem visual das abas do app em uma faixa leve, com seleção por contraste, indicador discreto e foco acessível.
+- `4.62` — 2026-11-26 — Registra a normalização da coluna de estimativa bruta para duas casas decimais, preservando a precisão do valor unitário.
+- `4.61` — 2026-11-26 — Registra a coluna de estimativa bruta dos Eventos, o estado `Não estimado` e o rodapé de limitações financeiras.
+- `4.60` — 2026-11-26 — Uniformiza a hierarquia visual das abas do Portfólio, evita estiramento dos cards de Análise e prepara Eventos/Histórico para desktops compactos.
+- `4.59` — 2026-11-26 — Consolida o gráfico compacto de rentabilidade com CDI/IPCA e remove o contrato frontend do botão/drawer duplicado.
+- `4.58` — 2026-11-26 — Registra o fallback da evolução compacta para séries mensais de rentabilidade já existentes.
+- `4.57` — 2026-11-26 — Registra a evolução compacta do Portfólio e o carregamento/desmontagem do gráfico sem duplicar a Análise.
+- `4.56` — 2026-11-26 — Atualiza o contrato visual compartilhado dos formulários para ritmo vertical consistente e ações auxiliares alinhadas sem rótulo redundante.
+- `4.55` — 2026-11-26 — Padroniza altura e alinhamento de campos de texto, seleção e data no flyover de Lançamentos, incluindo o modo compacto.
+- `4.54` — 2026-11-26 — Refina `transactions-view.js` e `transaction-list.js` com hierarquia compartilhada de contexto, filtros, contador e linhas para Lançamentos.
+- `4.53` — 2026-11-25 — Adiciona `subscriptions-flyover.js` e registra a subaba contextual de Assinaturas em Tendências, mantendo a leitura analítica fora do menu principal.
+- `4.51` — 2026-11-25 — Documenta a aba consolidada de revisão de classificação acionada pelo fechamento mensal.
+- `4.50` — 2026-11-25 — Documenta a largura confortável de até `760px` e os seletores de contexto fora dos flyovers de lançamentos.
+- `4.49` — 2026-11-24 — Move os formulários de lançamentos para flyovers acessíveis e documenta a resposta por largura real do painel e o tratamento de mensagens condicionais.
+- `4.48` — 2026-11-24 — Reaplica a gramática premium compartilhada à camada de lançamentos de contas e cartões.
 - `4.47` — 2026-11-24 — Permite múltiplas ações contextuais em um item do flyout de notificações.
 - `4.46` — 2026-11-24 — Padroniza a gramática visual dos cabeçalhos e disclosures do Cockpit.
 - `4.45` — 2026-11-24 — Registra navegação contextual entre Limites e Relatórios, com preservação de período/aba, expansão do agrupamento e destaque do destino.
@@ -428,6 +481,8 @@ export function createXxxView({ state, elements, services, formatters, actions }
 - `1.9` — 2026-07-24 — Tela estática Sobre documentada como view simples roteada por `app.js`.
 
 ## Changelog
+
+- `4.52` — 2026-11-25 — A revisão consolidada de classificação respeita a marcação backend de fluxos de Portfólio cuja origem financeira já é a classificação.
 
 - `4.35` — 2026-10-18 — Inventaria explicitamente os módulos do Portfólio usados pelo app e cobertos pelos contratos frontend.
 - `4.34` — 2026-10-11 — Inventariados `webllm-client.js` e `webllm-worker.js` como módulos utilitários da inferência local; documentada a origem de `theme-init.js` para inicialização de tema/privacidade/densidade sem script inline.

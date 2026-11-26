@@ -2,8 +2,8 @@
 tipo: spec
 area: cartoes
 status: implementado
-versao: 2.27
-atualizado: 2026-09-25
+versao: 2.30
+atualizado: 2026-11-25
 relacionados:
   - "[[contas-correntes]]"
   - "[[lancamentos]]"
@@ -18,7 +18,7 @@ aliases: ["Cartões de Crédito", "Faturas"]
 # Cartões de Crédito
 
 > [!info] Status
-> **implementado** · versão: `2.27` · área: `cartoes` · atualizado em 2026-09-25 · relacionados: [[contas-correntes]], [[lancamentos]], [[limites-gastos]], [[relatorios]]
+> **implementado** · versão: `2.30` · área: `cartoes` · atualizado em 2026-11-25 · relacionados: [[contas-correntes]], [[lancamentos]], [[limites-gastos]], [[relatorios]]
 
 ## Problema
 
@@ -207,9 +207,17 @@ O primeiro pagamento parcial cria o card rotativo e alerta que a taxa precisa se
 - Dado o usuário visualizando o gráfico de evolução de faturas, quando há valores nas 5 faturas em tela, então uma linha horizontal de referência é desenhada na altura da média aritmética dos valores absolutos dessas faturas, no mesmo estilo das linhas atuais (contínua, `--chart-average-line`: branca no tema escuro, cinza no claro) e na mesma escala vertical do gráfico.
 - Dado o usuário visualizando o gráfico de evolução de faturas, quando a linha de referência da média é exibida, então o valor da média formatado na moeda do cartão aparece em texto compacto ao final (lado direito) da linha.
 - Dado qualquer volume de histórico de cartões, quando o usuário entra em Lançamentos de Cartões ou troca de fatura, então são transferidos somente os lançamentos e pagamentos da competência ativa e cinco totais mensais agregados para o gráfico, sem percorrer as listagens históricas completas.
+- Dado o usuário visualizando Lançamentos de Cartões, quando a tela é exibida, então cabeçalho, contexto do cartão, formulário, resumo da fatura, filtros e listagem usam a mesma gramática visual premium de Lançamentos de Contas, sem alterar a competência, a busca ou a conciliação.
+- Dado o usuário visualizando Lançamentos de Cartões, quando aciona `Novo lançamento` ou edita uma linha, então o formulário completo abre em flyover lateral com os campos de série, classificação, mensagens e regras atuais preservados.
+- Dado o usuário visualizando o formulário de Lançamentos de Cartões em um flyover estreito, quando campos condicionais, validações ou mensagens de classificação são exibidos, então os grupos respondem à largura real do painel sem comprimir os controles.
+- Dado o usuário visualizando Lançamentos de Cartões, quando troca o cartão no seletor de contexto fora do flyover, então a fatura, o resumo e a listagem do cartão selecionado são atualizados sem abrir o formulário.
+- Dado o usuário visualizando Lançamentos de Cartões em um desktop compacto, quando abre o flyover, então ele usa largura confortável de até `760px` sem comprimir os campos relacionados e continua responsivo em viewports menores.
 
 ## Changelog
 
+- `2.30` — 2026-11-25 — Mantém o seletor de cartão fora do flyover para troca de contexto independente e amplia o painel de lançamento para até `760px`.
+- `2.29` — 2026-11-24 — Move o formulário de Lançamentos de Cartões para flyover lateral e melhora a densidade responsiva de campos e mensagens.
+- `2.28` — 2026-11-24 — Uniformiza a camada visual de Lançamentos de Cartões com a tela de Lançamentos de Contas, preservando comportamento e contratos existentes.
 - `2.27` — 2026-09-25 — Pagamentos parciais passam a iniciar ou atualizar o monitoramento rotativo com o residual já existente, sem duplicar lançamento; quitação integral de rotativo pede a resolução.
 - `2.26` — 2026-09-25 — Explicita a integração de mão única entre o processamento de faturas e o monitoramento futuro de Crédito Rotativo.
 - `2.25` — 2026-09-25 — Pagamento integral de fatura com rotativo pergunta se houve quitação definitiva ou troca de dívida; a troca gera alerta para cadastro manual do Price.

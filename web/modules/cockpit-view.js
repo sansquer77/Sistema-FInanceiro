@@ -1,4 +1,4 @@
-import { registerTrendsView } from "./trends-view.js?v=184";
+import { registerTrendsView } from "./trends-view.js?v=186";
 import { registerConsultorView } from "./consultor-view.js?v=183";
 import { registerFinancialHealthView } from "./financial-health-view.js?v=2";
 import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";
@@ -61,6 +61,10 @@ export function registerCockpitView({
     cockpitVersionAlert,
     cockpitVersionAlertVersion,
     cockpitVersionAlertDismiss,
+    cockpitNegativeBalanceNotice,
+    cockpitNegativeBalanceNoticeTitle,
+    cockpitNegativeBalanceNoticeDescription,
+    cockpitNegativeBalanceNoticeAction,
     cockpitCriticalNotifications,
     cockpitInformationalNotifications,
     cockpitCombinedNotifications,
@@ -87,6 +91,7 @@ export function registerCockpitView({
     trendsPanel,
     trendsContent,
     trendsMeta,
+    trendsTabs,
   } = elements;
   let versionAlertDismissed = false;
   let activeChartBreakdownClose = null;
@@ -104,6 +109,7 @@ export function registerCockpitView({
       trendsPanel,
       trendsContent,
       trendsMeta,
+      trendsTabs,
       cockpitTrendSummaryContent,
       monthlyBudgetSummary,
     },
@@ -112,6 +118,7 @@ export function registerCockpitView({
     formatPercent,
     escapeHtml,
     formatMonthLabel: formatMonthLabel || formatMonthShortLabel,
+    formatDate,
   });
 
   const consultorView = registerConsultorView({
@@ -165,6 +172,10 @@ export function registerCockpitView({
   cockpitVersionAlertDismiss?.addEventListener("click", () => {
     versionAlertDismissed = true;
     renderVersionAlert();
+  });
+  cockpitNegativeBalanceNoticeAction?.addEventListener("click", () => {
+    const notification = (notifications.critical || []).find((item) => item.type === "projected_negative_balance");
+    if (notification?.action) onNotificationAction?.(notification.action, notification);
   });
   cockpitCriticalNotifications?.addEventListener("click", () => openNotifications("critical", cockpitCriticalNotifications));
   cockpitInformationalNotifications?.addEventListener("click", () => openNotifications("informational", cockpitInformationalNotifications));
@@ -257,6 +268,19 @@ export function registerCockpitView({
     updateNotificationButton(cockpitCombinedNotifications, cockpitCombinedNotificationCount, criticalCount + informationalCount, "notificação financeira", "notificações financeiras");
     cockpitCombinedNotifications?.classList.toggle("has-critical", criticalCount > 0);
     cockpitCombinedNotifications?.classList.toggle("has-informational", criticalCount === 0 && informationalCount > 0);
+    renderNegativeBalanceNotice();
+  }
+
+  function renderNegativeBalanceNotice() {
+    if (!cockpitNegativeBalanceNotice) return;
+    const notification = (notifications.critical || []).find((item) => item.type === "projected_negative_balance");
+    if (!notification) {
+      cockpitNegativeBalanceNotice.hidden = true;
+      return;
+    }
+    if (cockpitNegativeBalanceNoticeTitle) cockpitNegativeBalanceNoticeTitle.textContent = notification.title || "Saldo previsto ficará negativo";
+    if (cockpitNegativeBalanceNoticeDescription) cockpitNegativeBalanceNoticeDescription.textContent = notification.description || "Revise os compromissos previstos desta conta.";
+    cockpitNegativeBalanceNotice.hidden = false;
   }
 
   function updateNotificationButton(button, badge, count, singular, plural) {

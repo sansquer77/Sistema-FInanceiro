@@ -96,11 +96,14 @@ class PortfolioReturnsTest(unittest.TestCase):
         for entry in result["series"]:
             self.assertIn("month", entry)
             self.assertIn("BRL_return_pct", entry)
+            self.assertIn("BRL_value", entry)
             self.assertIn("cdi_return_pct", entry)
             self.assertIn("ipca_return_pct", entry)
         observed = [entry for entry in result["series"] if entry["month"] <= "2026-09"][-1]
         self.assertGreater(observed["cdi_return_pct"], 0)
         self.assertGreater(observed["ipca_return_pct"], 0)
+        self.assertIsNotNone(observed["BRL_value"])
+        self.assertGreater(Decimal(observed["BRL_value"]), Decimal("1000.00"))
 
     def test_series_has_brl_and_usd_lines_when_both_currencies(self) -> None:
         user = create_user("Alice", "alice@example.com", "correct-password")

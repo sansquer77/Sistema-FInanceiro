@@ -96,7 +96,16 @@ export function createTransactionList({
   function renderContextCount(transactions) {
     const reconciled = transactions.filter((transaction) => transaction.reconciled_at).length;
     const pending = transactions.length - reconciled;
-    transactionContextCount.textContent = `${transactions.length} ${transactions.length === 1 ? "lançamento" : "lançamentos"} · ${reconciled} ${reconciled === 1 ? "conciliado" : "conciliados"} · ${pending} ${pending === 1 ? "pendente" : "pendentes"}`;
+    const markup = `
+      <strong>${transactions.length}</strong> ${transactions.length === 1 ? "lançamento" : "lançamentos"}
+      <span aria-hidden="true">·</span> ${reconciled} ${reconciled === 1 ? "conciliado" : "conciliados"}
+      <span aria-hidden="true">·</span> ${pending} ${pending === 1 ? "pendente" : "pendentes"}
+    `;
+    if ("innerHTML" in transactionContextCount) {
+      transactionContextCount.innerHTML = markup;
+    } else {
+      transactionContextCount.textContent = `${transactions.length} ${transactions.length === 1 ? "lançamento" : "lançamentos"} · ${reconciled} ${reconciled === 1 ? "conciliado" : "conciliados"} · ${pending} ${pending === 1 ? "pendente" : "pendentes"}`;
+    }
   }
 
   function matchesStatusFilter(transaction) {

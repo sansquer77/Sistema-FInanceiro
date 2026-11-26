@@ -93,6 +93,24 @@ def list_transactions(
                 investment_operations.fixed_income_maturity_date AS investment_fixed_income_maturity_date,
                 investment_operations.emergency_reserve_eligible AS investment_emergency_reserve_eligible,
                 investment_operations.savings_anniversaries_json AS investment_savings_anniversaries_json,
+                CASE
+                    WHEN EXISTS (
+                        SELECT 1 FROM investment_redemptions r
+                        WHERE r.user_id = transactions.user_id
+                          AND r.transaction_id = transactions.id
+                    ) THEN 1
+                    WHEN transactions.type = 'income'
+                        AND transactions.description LIKE 'Encerramento - %'
+                        AND EXISTS (
+                            SELECT 1
+                            FROM investment_closed_positions p
+                            WHERE p.user_id = transactions.user_id
+                              AND p.account_id = transactions.account_id
+                              AND substr(p.closed_at, 1, 10) = transactions.date
+                              AND p.closing_value_cents = transactions.amount_cents
+                        ) THEN 1
+                    ELSE 0
+                END AS classification_exempt,
                 credit_card_payments.id AS credit_card_payment_id,
                 (SELECT p.loan_id FROM loan_payment_links p WHERE p.user_id=transactions.user_id
                   AND p.transaction_id=transactions.id AND p.valid=1) AS loan_id,
@@ -1297,6 +1315,7 @@ def format_transaction(transaction: dict) -> dict:
     transaction["tags"] = [tag for tag in raw_tags.split("||") if tag]
     transaction["tag_name"] = ", ".join(transaction["tags"])
     transaction["investment_operation"] = investment_operation
+    transaction["classification_exempt"] = bool(transaction.pop("classification_exempt", 0))
     return transaction
 
 

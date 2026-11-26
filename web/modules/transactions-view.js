@@ -50,8 +50,11 @@ export function registerTransactionsView({
   const transactionSliceLoader = createTransactionSliceLoader({ state, api, fetchAllListed, ensureSelectedAccount });
   const {
     transactionForm,
+    transactionFormDrawerController,
+    openTransactionFormButton,
     transactionFormTitle,
     transactionMessage,
+    transactionListMessage,
     transactionList,
     transactionTagOptions,
     transactionType,
@@ -114,7 +117,7 @@ export function registerTransactionsView({
   const reconciliation = createTransactionReconciliation({
     state, api, markDirty: transactionSliceLoader.markDirty,
     loadSlice: transactionSliceLoader.load, render: renderTransactions, markPortfolioDirty,
-    reportError: (message) => setMessage(transactionMessage, message, "error"),
+    reportError: (message) => setMessage(transactionListMessage || transactionMessage, message, "error"),
   });
   const expandedTransactionDays = new Map();
   const investmentAssetIdentifier = transactionForm.elements.investment_asset_identifier;
@@ -194,7 +197,16 @@ export function registerTransactionsView({
   });
   nextMonthButton.addEventListener("click", () => shiftTransactionMonth(1));
   transactionList.addEventListener("click", handleTransactionListClick);
-  cancelTransactionEditButton.addEventListener("click", resetTransactionForm);
+  openTransactionFormButton?.addEventListener("click", () => {
+    resetTransactionForm();
+    setMessage(transactionMessage, "");
+    transactionFormDrawerController?.open();
+  });
+  cancelTransactionEditButton.addEventListener("click", () => {
+    resetTransactionForm();
+    setMessage(transactionMessage, "");
+    transactionFormDrawerController?.close();
+  });
 
   const loadTransactionSlice = transactionSliceLoader.load;
 
@@ -241,7 +253,7 @@ export function registerTransactionsView({
     state, api, fetchAllListed, loader: transactionSliceLoader,
     render: renderTransactions, markPortfolioDirty,
     renderAuxiliary: () => { renderBaseViews(); renderFinanceViews(); },
-    reportError: message => setMessage(transactionMessage, message, "error"),
+    reportError: message => setMessage(transactionListMessage || transactionMessage, message, "error"),
   });
 
   async function handleTransactionSubmit(event) {
@@ -310,6 +322,7 @@ export function registerTransactionsView({
       setMessage(transactionMessage, isEditing ? "Lançamento atualizado." : "Lançamento salvo.", "success");
       await refreshAfterTransactionChange({ transaction: response.transaction });
       highlightSavedTransaction();
+      transactionFormDrawerController?.close();
     } catch (error) {
       setMessage(transactionMessage, error.message, "error");
     } finally {
@@ -331,10 +344,10 @@ export function registerTransactionsView({
         return;
       }
       await api(`/api/transactions/${id}${scope}`, { method: "DELETE" });
-      setMessage(transactionMessage, "Lançamento excluído.", "success");
+      setMessage(transactionListMessage || transactionMessage, "Lançamento excluído.", "success");
       await refreshAfterTransactionChange({ deletedId: id });
     } catch (error) {
-      setMessage(transactionMessage, error.message, "error");
+      setMessage(transactionListMessage || transactionMessage, error.message, "error");
     }
   }
 
@@ -466,7 +479,7 @@ export function registerTransactionsView({
     transactionFormTitle.textContent = "Editar lançamento";
     cancelTransactionEditButton.hidden = false;
     transactionForm.querySelector('button[type="submit"]').textContent = "Salvar alterações";
-    transactionForm.scrollIntoView({ behavior: "smooth", block: "start" });
+    transactionFormDrawerController?.open();
   }
 
   function fillInvestmentOperation(operation) {
@@ -487,6 +500,7 @@ export function registerTransactionsView({
     )).join("");
     transactionAccount.innerHTML = options || '<option value="">Cadastre uma conta</option>';
     transactionForm.querySelector('button[type="submit"]').disabled = state.accounts.length === 0;
+    if (openTransactionFormButton) openTransactionFormButton.disabled = state.accounts.length === 0;
     renderImportTargets();
 
     if (state.selectedAccountId) {
@@ -506,6 +520,7 @@ export function registerTransactionsView({
       transactionCategory.required = false;
       transactionSubcategory.disabled = true;
       transactionForm.querySelector('button[type="submit"]').disabled = state.accounts.length === 0;
+      if (openTransactionFormButton) openTransactionFormButton.disabled = state.accounts.length === 0;
       return;
     }
     const groupType = selectedTransactionGroup();
@@ -516,6 +531,7 @@ export function registerTransactionsView({
     transactionCategory.disabled = categories.length === 0;
     transactionCategory.required = true;
     transactionForm.querySelector('button[type="submit"]').disabled = state.accounts.length === 0 || categories.length === 0;
+    if (openTransactionFormButton) openTransactionFormButton.disabled = state.accounts.length === 0 || categories.length === 0;
     renderTransactionSubcategories();
   }
 
@@ -704,9 +720,9 @@ export function registerTransactionsView({
     const conversionDetails = isDestinationView ? "" : destinationConvertedAmount;
     return `
       <article class="transaction-row ${signal} ${String(transaction.id) === state.transactionHighlightId ? "recently-saved" : ""}" data-rendered-transaction-id="${transaction.id}">
-        <div>
+        <div class="transaction-row-copy">
           <strong>${escapeHtml(transaction.description)}</strong>
-          <div class="account-meta">
+          <div class="account-meta transaction-row-meta">
             <span class="transaction-meta-secondary">${typeLabel}</span>
             <span class="transaction-account-route">${accountRoute}</span>
             <span class="reconciliation-status ${isReconciled ? "reconciled" : "pending"}"><span aria-hidden="true">${isReconciled ? "✓" : "○"}</span> ${isReconciled ? "Conciliado" : "Pendente"}</span>
@@ -715,7 +731,7 @@ export function registerTransactionsView({
             ${transaction.tags && transaction.tags.length ? `<span class="transaction-meta-secondary">${transaction.tags.map((tag) => `#${escapeHtml(tag)}`).join(" ")}</span>` : ""}
           </div>
         </div>
-        <div class="transaction-amount">
+        <div class="transaction-amount transaction-row-side">
           <strong>${amountPrefix}${formatMoney(displayAmount, displayCurrency)}</strong>
           ${conversionDetails}
           ${compact ? "" : `

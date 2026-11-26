@@ -1,7 +1,8 @@
-// spec: tendencias-saude-financeira v2.26 — critérios 1, 2, 3, 4, 5, 6, 7, 10, 12, 13, 14, 16, 17, 20, 21, 25, 26, 27, 28, 32, 33 e 34
+// spec: tendencias-saude-financeira v2.32 — critérios 1, 2, 3, 4, 5, 6, 7, 10, 12, 13, 14, 16, 17, 20, 21, 25, 26, 27, 28, 32, 33 e 34
 import { stateMarkup } from "./dom-utils.js";
 import { chartToken, renderChart } from "./chart-adapter.js";
 import { runLocalInference } from "./webllm-client.js?v=182";
+import { createSubscriptionsFlyover } from "./subscriptions-flyover.js?v=2";
 export function registerTrendsView({
   elements,
   api,
@@ -9,11 +10,13 @@ export function registerTrendsView({
   formatPercent,
   escapeHtml,
   formatMonthLabel,
+  formatDate,
 }) {
   const {
     trendsPanel,
     trendsContent,
     trendsMeta,
+    trendsTabs,
     cockpitTrendSummaryContent,
     monthlyBudgetSummary,
   } = elements;
@@ -23,8 +26,21 @@ export function registerTrendsView({
   let loading = false;
   let error = "";
   let chartPeriod = "active";
+  let activeTrendsTab = "overview";
+  const subscriptionsFlyover = createSubscriptionsFlyover({ formatMoney, escapeHtml, formatDate });
 
-  trendsContent?.addEventListener("click", (event) => {
+  trendsPanel?.addEventListener("click", (event) => {
+    const tab = event.target.closest("[data-trends-tab]");
+    if (tab) {
+      activeTrendsTab = tab.dataset.trendsTab || "overview";
+      render();
+      return;
+    }
+    const subscriptionTrigger = event.target.closest("[data-open-subscriptions]");
+    if (subscriptionTrigger) {
+      subscriptionsFlyover.open(currentData?.assinaturas_detalhadas || {});
+      return;
+    }
     const button = event.target.closest("[data-trends-period]");
     if (!button) {
       return;
@@ -160,8 +176,13 @@ export function registerTrendsView({
       renderCompactSummary();
       return;
     }
+    renderTabState();
+    if (activeTrendsTab === "subscriptions") {
+      trendsContent.innerHTML = renderSubscriptionsTab();
+      renderCompactSummary();
+      return;
+    }
     trendsContent.innerHTML = `
-      ${renderSummaryCard()}
       ${renderSeriesChart()}
       ${renderFindings()}
       ${renderBudgetActualTable()}
@@ -169,6 +190,47 @@ export function registerTrendsView({
     `;
     renderTrendsApexChart();
     renderCompactSummary();
+  }
+
+  function renderTabState() {
+    trendsTabs?.forEach((tab) => {
+      const active = tab.dataset.trendsTab === activeTrendsTab;
+      tab.classList.toggle("active", active);
+      tab.setAttribute("aria-selected", active ? "true" : "false");
+      tab.tabIndex = active ? 0 : -1;
+    });
+  }
+
+  function renderSubscriptionsTab() {
+    const data = currentData.assinaturas_detalhadas || {};
+    const items = Array.isArray(data.itens) ? data.itens : [];
+    return `
+      <section class="subscriptions-overview">
+        <div class="subscriptions-overview-heading">
+          <div>
+            <span class="eyebrow">PAINEL ANALÍTICO</span>
+            <h3>Assinaturas e serviços recorrentes</h3>
+            <p>Consolidado do mês a partir dos lançamentos recorrentes já classificados em contas e cartões.</p>
+          </div>
+          <button class="primary" type="button" data-open-subscriptions>Ver detalhes completos</button>
+        </div>
+        <div class="subscriptions-overview-total">
+          <div><span>Total mensal</span><strong>${formatMoney(Number(data.total_mensal_cents || 0) / 100, "BRL")}</strong></div>
+          <div><span>Estimativa anual</span><strong>${formatMoney(Number(data.estimativa_anual_cents || 0) / 100, "BRL")}</strong></div>
+          <div><span>Serviços identificados</span><strong>${items.length}</strong></div>
+        </div>
+        ${items.length ? `
+          <div class="subscriptions-overview-list">
+            ${items.map((item) => `
+              <button class="subscription-overview-row" type="button" data-open-subscriptions>
+                <span><strong>${escapeHtml(item.servico || "Cobrança recorrente")}</strong><small>${escapeHtml(item.subcategoria || "Geral")} · ${escapeHtml(item.confianca_label || "Intermediária")}</small></span>
+                <strong>${formatMoney(Number(item.valor_mensal_cents || 0) / 100, "BRL")}</strong>
+              </button>
+            `).join("")}
+          </div>
+        ` : stateMarkup("Nenhum lançamento recorrente identificado neste mês.", { kind: "empty" })}
+      </section>
+    `;
   }
 
   function renderTrendsApexChart() {
@@ -306,20 +368,20 @@ export function registerTrendsView({
     `;
   }
 
-  function renderSummaryCard() {
+  function renderSummaryMetrics() {
     const income = Number(currentData.receitas_mes_cents || 0);
     const expense = Number(currentData.despesas_mes_cents || 0);
     const balance = Number(currentData.saldo_mes_cents || 0);
     const baseIncome = Number(currentData.receitas_base_comparacao_cents || 0);
     const baseExpense = Number(currentData.despesas_base_comparacao_cents || 0);
     return `
-      <section class="trends-summary">
-        <article class="trends-summary-item income">
+      <div class="trends-summary" aria-label="Resumo financeiro do período">
+        <div class="trends-summary-item income">
           <span>Receitas</span>
           <strong>${formatMoney(income / 100, "BRL")}</strong>
           <small>${baseIncome > 0 ? `base: ${formatMoney(baseIncome / 100, "BRL")}` : "&nbsp;"}</small>
-        </article>
-        <article class="trends-summary-item expense">
+        </div>
+        <div class="trends-summary-item expense">
           <span class="trends-summary-label-with-info">
             Despesas
             <button
@@ -331,26 +393,36 @@ export function registerTrendsView({
           </span>
           <strong>${formatMoney(expense / 100, "BRL")}</strong>
           <small>${baseExpense > 0 ? `base: ${formatMoney(baseExpense / 100, "BRL")}` : "&nbsp;"}</small>
-        </article>
-        <article class="trends-summary-item balance">
+        </div>
+        <div class="trends-summary-item balance">
           <span>Saldo</span>
           <strong class="${balance < 0 ? "danger-text" : ""}">${formatMoney(balance / 100, "BRL")}</strong>
           <small>&nbsp;</small>
-        </article>
-      </section>
+        </div>
+      </div>
     `;
   }
 
   function renderSeriesChart() {
     const filteredSeries = filterMonthlySeries(currentData.serie_mensal || []);
-    if (filteredSeries.length === 0) {
-      return "";
-    }
-    const insight = monthlyChartInsight(filteredSeries);
+    const chartMarkup = filteredSeries.length === 0
+      ? stateMarkup("Sem meses com movimento suficiente para formar uma evolução.", { kind: "empty" })
+      : `
+          <div class="trends-apex-chart" role="img" aria-label="Gráfico de evolução de receitas, despesas e saldo"></div>
+          <div class="trends-chart-legend">
+            <span class="income"><i></i> Receitas</span>
+            <span class="expense"><i></i> Despesas</span>
+            <span class="balance"><i></i> Saldo líquido</span>
+          </div>
+          <p class="trends-chart-insight">${escapeHtml(monthlyChartInsight(filteredSeries))}</p>
+        `;
     return `
       <section class="trends-chart-section">
         <div class="trends-chart-heading">
-          <h3>Evolução mensal</h3>
+          <div>
+            <span class="trends-section-eyebrow">RESUMO DO PERÍODO</span>
+            <h3>Evolução mensal</h3>
+          </div>
           <div class="trends-chart-periods" aria-label="Período do gráfico">
             ${renderPeriodButton("active", "Com movimento")}
             ${renderPeriodButton("3", "3 meses")}
@@ -358,14 +430,9 @@ export function registerTrendsView({
             ${renderPeriodButton("12", "12 meses")}
           </div>
         </div>
-        <div class="trends-chart mixed">
-          <div class="trends-apex-chart" role="img" aria-label="Gráfico de evolução de receitas, despesas e saldo"></div>
-          <div class="trends-chart-legend">
-            <span class="income"><i></i> Receitas</span>
-            <span class="expense"><i></i> Despesas</span>
-            <span class="balance"><i></i> Saldo líquido</span>
-          </div>
-          <p class="trends-chart-insight">${escapeHtml(insight)}</p>
+        <div class="trends-chart trends-hero">
+          ${renderSummaryMetrics()}
+          ${chartMarkup}
         </div>
       </section>
     `;
@@ -443,14 +510,26 @@ export function registerTrendsView({
     if (rows.length === 0) {
       return `
         <section class="trends-budget-section">
-          <h3>Budget x Realizado</h3>
+          <div class="trends-section-heading">
+            <div>
+              <span class="trends-section-eyebrow">ACOMPANHAMENTO</span>
+              <h3>Orçamento do mês</h3>
+            </div>
+            <span class="trends-section-note">Limites cadastrados x realizado</span>
+          </div>
           ${stateMarkup("Cadastre limites de gasto para comparar orçamento e realizado.", { kind: "empty" })}
         </section>
       `;
     }
     return `
       <section class="trends-budget-section">
-        <h3>Budget x Realizado</h3>
+        <div class="trends-section-heading">
+          <div>
+            <span class="trends-section-eyebrow">ACOMPANHAMENTO</span>
+            <h3>Orçamento do mês</h3>
+          </div>
+          <span class="trends-section-note">Limites cadastrados x realizado</span>
+        </div>
         <div class="trends-budget-table" role="table" aria-label="Budget x Realizado">
           <div class="trends-budget-head" role="row">
             <span role="columnheader">Categoria</span>
@@ -482,6 +561,9 @@ export function registerTrendsView({
     const findings = currentData.achados || [];
     const textOnlyTypes = new Set(["confianca", "receita", "despesa", "assinatura_servico", "oportunidade_caixa"]);
     const cardFindings = findings.filter((finding) => !textOnlyTypes.has(finding.tipo));
+    const pointFindings = cardFindings.filter((finding) => finding.tipo === "evento_pontual");
+    const limitFindings = cardFindings.filter((finding) => finding.tipo === "limite" || finding.tipo === "limite_recorrente");
+    const individualFindings = cardFindings.filter((finding) => !pointFindings.includes(finding) && !limitFindings.includes(finding));
     const hasIaSummary = currentData.ia_usada && currentData.ia_resumo;
     const summaryText = hasIaSummary ? currentData.ia_resumo : currentData.resumo_local;
     const aiSummaryMarker = hasIaSummary
@@ -493,19 +575,77 @@ export function registerTrendsView({
     if (cardFindings.length === 0 && !summaryText) {
       return `
         <section class="trends-findings-section">
-          <h3>Tendências e achados</h3>
+          <div class="trends-section-heading">
+            <div>
+              <span class="trends-section-eyebrow">LEITURA EXECUTIVA</span>
+              <h3>Tendências e achados</h3>
+            </div>
+          </div>
           ${stateMarkup("Selecione outro mês ou aguarde novos dados para gerar achados.", { kind: "empty" })}
         </section>
       `;
     }
     return `
       <section class="trends-findings-section">
-        <h3 class="trends-findings-title">Tendências e achados ${aiSummaryMarker}</h3>
+        <div class="trends-section-heading">
+          <div>
+            <span class="trends-section-eyebrow">LEITURA EXECUTIVA</span>
+            <h3 class="trends-findings-title">Tendências e achados ${aiSummaryMarker}</h3>
+          </div>
+        </div>
         ${summaryText ? renderSummaryText(summaryText) : ""}
+        ${(currentData.assinaturas_detalhadas?.itens || []).length ? `
+          <button class="trends-subscription-link" type="button" data-open-subscriptions>
+            <span>Assinaturas e serviços recorrentes</span><span aria-hidden="true">→</span>
+          </button>
+        ` : ""}
         ${sourceNotice}
-        ${cardFindings.length ? `
+        ${pointFindings.length ? `
+          <article class="trends-finding trends-finding-group trends-finding-events info">
+            <header>
+              <strong>Eventos pontuais</strong>
+              <span>${pointFindings.length} ocorrência${pointFindings.length === 1 ? "" : "s"}</span>
+            </header>
+            <ul class="trends-finding-bullets">
+              ${pointFindings.map((finding) => {
+                const title = String(finding.titulo || "Evento pontual")
+                  .replace(/^Receita pontual:\s*/i, "")
+                  .replace(/^Despesa pontual:\s*/i, "");
+                const kind = /^Receita pontual:/i.test(finding.titulo || "") ? "Receita" : "Despesa";
+                const value = Number(finding.valor_cents || 0);
+                return `
+                  <li>
+                    <div><strong>${kind}</strong><span>${escapeHtml(title)}</span>${value ? `<b>${formatMoney(value / 100, "BRL")}</b>` : ""}</div>
+                    <p>${escapeHtml(finding.descricao)}</p>
+                  </li>
+                `;
+              }).join("")}
+            </ul>
+          </article>
+        ` : ""}
+        ${limitFindings.length ? `
+          <article class="trends-finding trends-finding-group trends-finding-limits warning">
+            <header>
+              <strong>Limites de gastos</strong>
+              <span>${limitFindings.length} item${limitFindings.length === 1 ? "" : "ns"}</span>
+            </header>
+            <ul class="trends-finding-bullets">
+              ${limitFindings.map((finding) => {
+                const value = Number(finding.valor_cents || 0);
+                return `
+                  <li>
+                    <div><strong>${escapeHtml(finding.titulo)}</strong>${value ? `<b>${formatMoney(value / 100, "BRL")}</b>` : ""}</div>
+                    <p>${escapeHtml(finding.descricao)}</p>
+                    ${finding.tipo === "limite_recorrente" ? `<small class="trends-finding-action">Revisar limite</small>` : ""}
+                  </li>
+                `;
+              }).join("")}
+            </ul>
+          </article>
+        ` : ""}
+        ${individualFindings.length ? `
           <div class="trends-findings-list">
-            ${cardFindings.map((finding) => {
+            ${individualFindings.map((finding) => {
             const severityClass = finding.severidade === "atencao" ? "warning" : "info";
             const value = Number(finding.valor_cents || 0);
             return `
@@ -531,12 +671,20 @@ export function registerTrendsView({
     }
     return `
       <section class="trends-confidence-section">
+        <div class="trends-section-heading">
+          <div>
+            <span class="trends-section-eyebrow">CONTEXTO DA ANÁLISE</span>
+            <h3>Confiança e limitações</h3>
+          </div>
+        </div>
+        <div class="trends-confidence-list">
         ${confidenceFindings.map((finding) => `
           <article class="trends-confidence-card">
             <h3>${escapeHtml(finding.titulo)}</h3>
             <p>${escapeHtml(finding.descricao)}</p>
           </article>
         `).join("")}
+        </div>
       </section>
     `;
   }

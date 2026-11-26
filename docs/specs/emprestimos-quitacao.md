@@ -2,8 +2,8 @@
 tipo: spec
 area: emprestimos-quitacao
 status: em-implementacao
-versao: 0.61
-atualizado: 2026-11-11
+versao: 0.63
+atualizado: 2026-11-26
 relacionados:
   - "[[relatorios]]"
   - "[[contas-correntes]]"
@@ -19,7 +19,7 @@ aliases: ["Empréstimos e Financiamentos", "Empréstimos e plano de quitação"]
 # Empréstimos e Financiamentos
 
 > [!info] Status
-> **em-implementacao** · versão: `0.61` · área: `emprestimos-quitacao` · atualizado em 2026-11-11 · relacionados: [[relatorios]], [[contas-correntes]], [[lancamentos]], [[efeito-borboleta]]
+> **em-implementacao** · versão: `0.63` · área: `emprestimos-quitacao` · atualizado em 2026-11-26 · relacionados: [[relatorios]], [[contas-correntes]], [[lancamentos]], [[efeito-borboleta]]
 
 ## Problema
 
@@ -407,6 +407,8 @@ Esta proposta trata cheque especial e saldo de cartão mantido no rotativo como 
 
 ## Changelog
 
+- `0.63` — 2026-11-26 — Libera a orientação inicial para ocupar toda a largura útil da tela, evitando que o texto seja quebrado por uma medida máxima conservadora.
+- `0.62` — 2026-11-26 — Registra o polimento visual dos contratos, histórico e crédito rotativo com cards editoriais, agrupamento responsivo e adaptação para desktops compactos, sem alterar regras ou cálculos.
 - `0.61` — 2026-11-11 — Parcelas de série da categoria `loan_payment` podem ser associadas a um contrato ao serem editadas individualmente, sem propagação às demais parcelas; criar série já associada continua proibido.
 - `0.60` — 2026-11-11 — Pagamento conciliado com revisão pendente por outro motivo passa a reduzir parcelas restantes e compromisso uma única vez; a revisão só é removida ao salvar o contrato.
 - `0.59` — 2026-11-11 — Crédito Rotativo preserva o alerta de revisão ao reconhecer outro pagamento conciliado; rotativo ativo com saldo zerado gera alerta crítico na Central de Alertas com ação de encerramento.

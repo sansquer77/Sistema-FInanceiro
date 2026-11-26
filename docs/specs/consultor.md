@@ -2,8 +2,8 @@
 tipo: spec
 area: consultor
 status: em-implementacao
-versao: 2.44
-atualizado: 2026-11-18
+versao: 2.46
+atualizado: 2026-11-26
 relacionados:
   - "[[instrucoes-app]]"
   - "[[investimentos-portfolio]]"
@@ -17,7 +17,7 @@ aliases: ["Consultor Virtual", "Assistente de Investimentos", "Especialista em F
 # Consultor Virtual de Investimentos e Planejamento Financeiro
 
 > [!info] Status
-> **em-implementacao** · versão: `2.44` · área: `consultor` · atualizado em 2026-11-18 · relacionados: [[instrucoes-app]], [[investimentos-portfolio]], [[score-saude-financeira]], [[tendencias-saude-financeira]], [[cockpit-calendario]], [[objetivos-financeiros]], [[emprestimos-quitacao]], [[cartoes]], [[../adr/0019-inferencia-local-webllm]], [[../adr/0020-pesquisa-macro-consultor]], [[../adr/0021-janela-contexto-local-consultor]], [[../adr/0022-orcamento-tokens-saida-consultor]], [[../adr/0023-configuracoes-ia-por-provedor]]
+> **em-implementacao** · versão: `2.46` · área: `consultor` · atualizado em 2026-11-26 · relacionados: [[instrucoes-app]], [[investimentos-portfolio]], [[score-saude-financeira]], [[tendencias-saude-financeira]], [[cockpit-calendario]], [[objetivos-financeiros]], [[emprestimos-quitacao]], [[cartoes]], [[../adr/0019-inferencia-local-webllm]], [[../adr/0020-pesquisa-macro-consultor]], [[../adr/0021-janela-contexto-local-consultor]], [[../adr/0022-orcamento-tokens-saida-consultor]], [[../adr/0023-configuracoes-ia-por-provedor]]
 
 > [!warning] Pivô arquitetural (v0.13, refinado em v0.14/v0.15)
 > A partir desta versão, o Consultor **não possui campo de prompt livre**. O usuário interage exclusivamente através de um **catálogo de análises pré-formatadas** (cards). Essa mudança é uma decisão de **Security by Design**: eliminar a superfície de entrada de texto livre remove pela raiz os vetores de vazamento acidental de dados sensíveis (PII) e de *prompt injection* via chat. As seções "Prevenção de vazamento de dados no prompt (DLP)" e "Blindagem de prompt injection" da v0.12 são **removidas** desta spec — ver "Segurança by Design" e "Nota de segurança residual" abaixo para o que substitui essas salvaguardas.
@@ -382,6 +382,8 @@ Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regr
 - Dado um usuário com IA geral ativa, Consultor habilitado e consentimento aceito, quando acessa a aba **Consultor**, então o seletor de análises e o botão **Gerar** ficam disponíveis; se qualquer uma dessas três condições faltar, eles não são exibidos.
 - Dado um usuário com o Consultor desativado, quando acessa a aba **Consultor** no Cockpit, então a aba exibe o aviso de que a função precisa ser ativada nas Preferências, sem exibir os cards.
 - Dado um usuário com o Consultor habilitado, quando acessa a aba **Consultor** do Cockpit, então encontra um seletor com as 9 análises, identificadas por categoria e nome, um único botão **Gerar** e a resposta abaixo dos controles ocupando toda a largura disponível, **sem nenhum campo de digitação de texto livre**.
+- Dado um usuário com o Consultor habilitado, quando acessa a aba **Consultor** do Cockpit, então a moldura usa o mesmo cabeçalho editorial, divisor discreto e ritmo vertical da aba **Saúde Financeira**, sem remover os cards operacionais, subtabs, estados ou histórico próprios do Consultor.
+- Dado um usuário que abre a subaba **Histórico** do Consultor, então encontra cabeçalho contextual, filtro contido e uma lista linear de relatórios com separadores discretos, adaptada a desktops compactos sem cartões visualmente pesados.
 - Dado um usuário com o Consultor habilitado, quando procura por um botão flutuante ou ícone de cartola em outras telas, então não encontra nenhum ponto de acesso fora da aba **Consultor**.
 - Dado um usuário que clica no card "Diagnóstico do Score de Saúde Financeira", quando o sistema processa a requisição, então o endpoint `POST /api/consultor/analyze` é acionado com `analysis_id: "score_saude_financeira"` e o payload enviado à IA contém apenas os agregados do Score, sem transações cruas.
 - Dado um usuário que seleciona o card "Evolução do Score no Tempo", quando visualiza os controles antes de acionar a análise, então encontra um seletor com as opções fechadas **6 meses** e **12 meses**, pré-selecionado em **6 meses**, sem campo de texto ou data livre.
@@ -586,6 +588,8 @@ _Nenhuma pendência em aberto._
 
 ## Changelog
 
+- `2.46` — 2026-11-26 — Completa a equalização visual do Consultor na subaba Histórico, com contexto, filtro e lista linear responsiva.
+- `2.45` — 2026-11-26 — Equaliza a moldura editorial da aba Consultor à Saúde Financeira no Cockpit, preservando calendário, análises, histórico e reflow em desktops compactos.
 - `2.44` — 2026-11-18 — Corrige o tratamento de falha após fallback local/remoto para encerrar o carregamento e exibir o erro; registra apenas código/status allowlisted de respostas OpenAI-compatible, como 429 do OpenRouter.
 - `2.43` — 2026-11-18 — Isola configurações remotas por provedor, preserva Gemini ao cadastrar/trocar para DeepSeek e adiciona o preset DeepSeek.
 - `2.42` — 2026-11-18 — Incrementa o cache-buster do cliente WebLLM para garantir que o fallback Gemma 3 1B seja carregado após a atualização da produção.

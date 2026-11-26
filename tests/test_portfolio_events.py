@@ -23,11 +23,12 @@ class PortfolioEventsTest(unittest.TestCase):
 
     def test_assets_keep_all_portfolios_for_the_same_symbol(self):
         positions = [
-            {"asset_type": "stock", "asset_identifier": "PETR4", "currency": "BRL", "account_name": "Carteira A", "first_operation_date": "2025-01-01"},
-            {"asset_type": "stock", "asset_identifier": "PETR4", "currency": "BRL", "account_name": "Carteira B", "first_operation_date": "2025-02-01"},
+            {"asset_type": "stock", "asset_identifier": "PETR4", "currency": "BRL", "account_name": "Carteira A", "first_operation_date": "2025-01-01", "quantity": "2.5"},
+            {"asset_type": "stock", "asset_identifier": "PETR4", "currency": "BRL", "account_name": "Carteira B", "first_operation_date": "2025-02-01", "quantity": "1.25"},
         ]
         assets = portfolio_events.build_event_assets(positions, lambda position: f"{position['asset_identifier']}.SA")
         self.assertEqual(assets[0]["portfolio_names"], ["Carteira A", "Carteira B"])
+        self.assertEqual(assets[0]["quantity_micros"], 375_000_000)
 
     def test_yahoo_dividends_keep_unit_amount_and_provider_confirmation(self):
         timestamp = int(datetime(2026, 8, 20, tzinfo=timezone.utc).timestamp())
@@ -40,8 +41,19 @@ class PortfolioEventsTest(unittest.TestCase):
         self.assertEqual(events[0]["event_label"], "Dividendo/JCP")
         self.assertEqual(events[0]["confirmation_label"], "Detectado · Yahoo Finance")
         self.assertIsNone(events[0]["payment_date"])
-        self.assertNotIn("estimated", events[0])
-        self.assertNotIn("total", events[0])
+        self.assertIsNone(events[0]["estimated_value_micros"])
+
+    def test_estimate_multiplies_unit_value_by_open_quantity_using_decimal(self):
+        timestamp = int(datetime(2026, 8, 20, tzinfo=timezone.utc).timestamp())
+        events = portfolio_events.parse_yahoo_events({
+            "chart": {"result": [{"events": {"dividends": {
+                str(timestamp): {"amount": "0.357891", "date": timestamp},
+            }}}]},
+        }, {
+            "asset_identifier": "PETR4", "asset_name": "Petrobras", "currency": "BRL",
+            "quantity_micros": 250_000_000,
+        })
+        self.assertEqual(events[0]["estimated_value_micros"], 894_728)
 
     def test_failure_is_partial_and_cache_receives_bounded_period(self):
         calls = []

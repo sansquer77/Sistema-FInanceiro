@@ -15,6 +15,7 @@ EVENT_MEMORY_TTL_SECONDS = 24 * 60 * 60
 EVENT_CALENDAR_TTL_SECONDS = 24 * 60 * 60
 EVENT_MAX_WORKERS = 4
 MICRO_SCALE = Decimal("1000000")
+QUANTITY_SCALE = Decimal("100000000")
 MAX_PROVIDER_NUMBER_LENGTH = 64
 MAX_SAFE_MICROS = 9_007_199_254_740_991
 MIN_PROVIDER_DATE = date(1970, 1, 1)
@@ -55,14 +56,17 @@ def build_event_assets(positions: list[dict], symbol_resolver) -> list[dict]:
         currency = str(position.get("currency") or "BRL").upper()
         key = (symbol, currency)
         acquired_at = str(position.get("first_operation_date") or date.today().isoformat())
+        quantity_micros = _quantity_to_micros(position.get("quantity"))
         current = assets.get(key)
         portfolio_name = str(position.get("account_name") or "Carteira não informada")
         existing_portfolios = set(current.get("portfolio_names", [])) if current else set()
         if current:
             existing_portfolios.add(portfolio_name)
+            current["quantity_micros"] += quantity_micros
             current["portfolio_names"] = existing_portfolios
         if current and current["acquired_at"] <= acquired_at:
             continue
+        existing_quantity_micros = current.get("quantity_micros", 0) if current else quantity_micros
         assets[key] = {
             "symbol": symbol,
             "asset_identifier": str(position.get("asset_identifier") or symbol),
@@ -70,6 +74,7 @@ def build_event_assets(positions: list[dict], symbol_resolver) -> list[dict]:
             "currency": currency,
             "acquired_at": acquired_at,
             "portfolio_names": existing_portfolios or {portfolio_name},
+            "quantity_micros": existing_quantity_micros,
         }
     result = []
     for item in assets.values():
@@ -294,9 +299,11 @@ def parse_nasdaq_events(payload: object, asset: dict, *, minimum_date: date, max
 
 
 def _event_record(asset, event_date, payment_date, amount_micros, *, event_type, event_label, source, confirmation_label, currency=None):
+    # spec: investimentos/investimentos-portfolio v2.74 — critérios 103 e 104
+    estimated_value_micros = estimate_event_value(amount_micros, asset.get("quantity_micros"))
     return {
-        "date": event_date.isoformat(),
-        "payment_date": payment_date.isoformat() if payment_date else None,
+        "date": event_date.isoformat() if hasattr(event_date, "isoformat") else str(event_date),
+        "payment_date": payment_date.isoformat() if hasattr(payment_date, "isoformat") else payment_date,
         "event_type": event_type,
         "event_label": event_label,
         "asset_identifier": asset["asset_identifier"],
@@ -304,10 +311,34 @@ def _event_record(asset, event_date, payment_date, amount_micros, *, event_type,
         "currency": currency or asset["currency"],
         "portfolio_names": asset.get("portfolio_names", []),
         "amount_per_share_micros": amount_micros,
+        "estimated_value_micros": estimated_value_micros,
         "source": source,
         "confirmation_level": "provider_detected",
         "confirmation_label": confirmation_label,
     }
+
+
+def estimate_event_value(amount_per_share_micros: object, quantity_micros: object) -> int | None:
+    if amount_per_share_micros is None or quantity_micros is None:
+        return None
+    try:
+        amount = int(amount_per_share_micros)
+        quantity = int(quantity_micros)
+    except (TypeError, ValueError):
+        return None
+    if amount <= 0 or quantity <= 0:
+        return None
+    return int((Decimal(amount) * Decimal(quantity) / QUANTITY_SCALE).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
+def _quantity_to_micros(value: object) -> int:
+    try:
+        quantity = Decimal(str(value or "0")).quantize(Decimal("0.00000001"), rounding=ROUND_HALF_UP)
+    except (InvalidOperation, ValueError):
+        return 0
+    if not quantity.is_finite() or quantity <= 0:
+        return 0
+    return int((quantity * QUANTITY_SCALE).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
 def _is_brazilian_asset(asset: dict) -> bool:
@@ -430,19 +461,11 @@ def parse_yahoo_events(
         if identity in seen:
             continue
         seen.add(identity)
-        parsed.append({
-            "date": event_date,
-            "payment_date": payment_date,
-            "event_type": "dividend_or_jcp",
-            "event_label": "Dividendo/JCP",
-            "asset_identifier": asset["asset_identifier"],
-            "asset_name": asset["asset_name"],
-            "currency": asset["currency"],
-            "amount_per_share_micros": amount_micros,
-            "source": "Yahoo Finance",
-            "confirmation_level": "provider_detected",
-            "confirmation_label": "Detectado · Yahoo Finance",
-        })
+        parsed.append(_event_record(
+            asset, event_date, payment_date, amount_micros,
+            event_type="dividend_or_jcp", event_label="Dividendo/JCP",
+            source="Yahoo Finance", confirmation_label="Detectado · Yahoo Finance",
+        ))
     return parsed
 
 
@@ -465,20 +488,11 @@ def parse_yahoo_calendar_events(payload: object, asset: dict, *, minimum_date: d
         parsed_date = date.fromisoformat(event_date)
         if not (minimum_date <= parsed_date <= maximum_date):
             continue
-        parsed.append({
-            "date": event_date,
-            "payment_date": payment,
-            "event_type": "dividend_or_jcp",
-            "event_label": "Dividendo/JCP",
-            "asset_identifier": asset["asset_identifier"],
-            "asset_name": asset["asset_name"],
-            "currency": asset["currency"],
-            "portfolio_names": asset.get("portfolio_names", []),
-            "amount_per_share_micros": None,
-            "source": "Yahoo Finance",
-            "confirmation_level": "provider_detected",
-            "confirmation_label": "Detectado · Yahoo Finance",
-        })
+        parsed.append(_event_record(
+            asset, event_date, payment, None,
+            event_type="dividend_or_jcp", event_label="Dividendo/JCP",
+            source="Yahoo Finance", confirmation_label="Detectado · Yahoo Finance",
+        ))
     return parsed
 
 

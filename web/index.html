@@ -8,7 +8,7 @@
     <link rel="icon" href="/assets/app-icon.png">
     <link rel="apple-touch-icon" href="/assets/app-icon.png">
     <script src="/theme-init.js"></script>
-    <link rel="stylesheet" href="/styles.css?v=158">
+    <link rel="stylesheet" href="/styles.css?v=186">
   </head>
   <body>
     <main class="app-shell">
@@ -258,6 +258,14 @@
               </a>
               <button class="version-alert-dismiss" type="button" id="cockpitVersionAlertDismiss" aria-label="Dispensar alerta de nova versão">×</button>
             </section>
+            <section class="cockpit-forecast-alert" id="cockpitNegativeBalanceNotice" aria-live="polite" hidden>
+              <span class="cockpit-forecast-alert-beacon" aria-hidden="true"></span>
+              <div class="cockpit-forecast-alert-copy">
+                <strong id="cockpitNegativeBalanceNoticeTitle"></strong>
+                <span id="cockpitNegativeBalanceNoticeDescription"></span>
+              </div>
+              <button class="button button-quiet cockpit-forecast-alert-action" id="cockpitNegativeBalanceNoticeAction" type="button">Ver conta</button>
+            </section>
             </div>
 
             <section class="cockpit-health-summary" id="cockpitHealthSummary" aria-live="polite" aria-label="Situação da saúde financeira">
@@ -373,9 +381,10 @@
             </div>
           </div>
 
-          <section class="panel cockpit-calendar-panel cockpit-tab-panel" id="cockpitCalendarPanel" role="tabpanel" hidden>
-            <div class="cockpit-calendar-header">
+          <section class="panel cockpit-calendar-panel cockpit-analysis-panel cockpit-tab-panel" id="cockpitCalendarPanel" role="tabpanel" hidden>
+            <div class="cockpit-calendar-header cockpit-analysis-header">
               <div>
+                <span class="eyebrow">CONSULTOR</span>
                 <h2>Consultor</h2>
                 <p class="muted-copy">Apoio no acompanhamento das suas contas</p>
               </div>
@@ -425,9 +434,13 @@
                 <section class="consultor-output" id="consultorOutput" hidden></section>
               </section>
               <section class="consultor-history consultor-tab-panel" id="consultorHistoryPanel" role="tabpanel" hidden>
-                <div class="calendar-card-heading">
-                  <h3>Histórico de análises</h3>
-                  <button class="ghost" id="consultorHistoryRefreshButton" type="button">Atualizar</button>
+                <div class="consultor-history-heading">
+                  <div>
+                    <span class="eyebrow">CONSULTOR</span>
+                    <h3>Histórico de análises</h3>
+                    <p class="muted-copy">Revisite os relatórios já gerados sem perder o contexto do mês.</p>
+                  </div>
+                  <button class="ghost small-button" id="consultorHistoryRefreshButton" type="button">Atualizar</button>
                 </div>
                 <label class="consultor-history-filter">Filtrar por análise
                   <input id="consultorHistoryFilter" type="search" placeholder="Ex.: ralos, score, assinatura">
@@ -445,7 +458,11 @@
               </div>
               <div class="trends-meta" id="trendsMeta"></div>
             </div>
-            <div class="trends-content" id="trendsContent">
+            <div class="trends-tabs" role="tablist" aria-label="Seções de Tendências">
+              <button class="trends-tab active" type="button" role="tab" aria-selected="true" aria-controls="trendsContent" data-trends-tab="overview">Visão geral</button>
+              <button class="trends-tab" type="button" role="tab" aria-selected="false" aria-controls="trendsContent" data-trends-tab="subscriptions" tabindex="-1">Assinaturas</button>
+            </div>
+            <div class="trends-content" id="trendsContent" role="tabpanel">
               <div class="ui-state empty-state state-loading compact" role="status" aria-live="polite" aria-busy="true">
                 <span class="ui-state-icon" aria-hidden="true">↻</span>
                 <span class="ui-state-copy"><strong>Carregando</strong><span>Analisando receitas, despesas e limites do período.</span></span>
@@ -453,9 +470,10 @@
             </div>
           </section>
 
-          <section class="panel financial-health-panel cockpit-tab-panel" id="financialHealthPanel" role="tabpanel" hidden>
-            <div class="financial-health-header">
+          <section class="panel financial-health-panel cockpit-analysis-panel cockpit-tab-panel" id="financialHealthPanel" role="tabpanel" hidden>
+            <div class="financial-health-header cockpit-analysis-header">
               <div>
+                <span class="eyebrow">DIAGNÓSTICO</span>
                 <h2>Saúde Financeira</h2>
                 <p class="muted-copy">Diagnóstico mensal baseado em poupança, reserva, endividamento, limites e concentração da carteira.</p>
               </div>
@@ -615,8 +633,11 @@
 
         <section class="module-view" id="cardLaunchesView" hidden>
           <section class="panel card-invoice-panel">
-            <div class="section-heading">
-              <h2>Fatura do cartão</h2>
+            <div class="section-heading launch-section-heading">
+              <div>
+                <span class="eyebrow">Cartões · Controle mensal</span>
+                <h2>Fatura do cartão</h2>
+              </div>
               <div class="month-navigator">
                 <button class="ghost small-button month-icon-button" type="button" id="previousCardInvoiceButton" aria-label="Mês anterior" title="Mês anterior">‹</button>
                 <button class="month-label" type="button" id="cardInvoiceMonthLabel" aria-haspopup="dialog"></button>
@@ -625,9 +646,16 @@
               </div>
             </div>
 
-            <label class="transaction-search">Cartão
-              <select id="cardInvoiceCard"></select>
-            </label>
+            <div class="launch-context-toolbar">
+              <div class="launch-context-copy">
+                <span class="eyebrow">Contexto da consulta</span>
+                <strong>Fatura do cartão selecionado</strong>
+                <small>Troque o cartão sem abrir o formulário.</small>
+              </div>
+              <label class="transaction-search launch-context-field">Cartão
+                <select id="cardInvoiceCard"></select>
+              </label>
+            </div>
 
             <div class="invoice-history-chart" id="cardInvoiceHistoryChart" aria-label="Histórico de faturas"></div>
 
@@ -669,16 +697,27 @@
             <p class="message" id="cardInvoiceMessage" role="alert"></p>
           </section>
 
-          <div class="workspace card-transaction-workspace">
-            <section class="panel launch-form-sticky">
-              <h2 id="cardTransactionFormTitle">Novo lançamento no cartão</h2>
+          <div class="card-transaction-workspace">
+            <aside id="cardTransactionFormDrawer" class="drawer launch-form-drawer" hidden aria-hidden="true" aria-labelledby="cardTransactionFormTitle">
+              <div class="drawer-overlay" id="cardTransactionFormDrawerOverlay"></div>
+              <div class="drawer-content launch-form-drawer-content">
+                <header class="drawer-header launch-form-drawer-header">
+                  <div>
+                    <span class="eyebrow">Lançamentos da fatura</span>
+                    <h2 id="cardTransactionFormTitle">Novo lançamento no cartão</h2>
+                  </div>
+                  <button class="drawer-close-button" id="closeCardTransactionFormButton" type="button" aria-label="Fechar formulário" title="Fechar formulário">
+                    <span aria-hidden="true">×</span>
+                  </button>
+                </header>
+                <div class="drawer-body launch-form-drawer-body transaction-form-panel">
               <form id="cardTransactionForm" class="form" data-progressive-form data-operation-summary>
                 <input type="hidden" name="id">
                 <input type="hidden" name="credit_card_id">
                 <input type="hidden" name="invoice_month">
                 <div class="field-row">
                   <label>Tipo
-                    <select name="type" id="cardTransactionType">
+                    <select name="type" id="cardTransactionType" data-drawer-autofocus>
                       <option value="expense">Despesa</option>
                       <option value="income">Receita</option>
                     </select>
@@ -744,13 +783,23 @@
                   <button class="ghost small-button" id="cancelCardTransactionEditButton" type="button">Cancelar</button>
                 </div>
               </form>
-            </section>
-
-            <section class="panel">
-              <div class="section-heading">
-                <h2>Lançamentos da fatura <span class="invoice-open-count ok" id="cardInvoiceOpenCount">0 não conciliados</span></h2>
+                </div>
               </div>
-              <div class="invoice-list-toolbar filter-toolbar">
+            </aside>
+
+            <section class="panel card-invoice-list-panel">
+              <div class="section-heading launch-section-heading">
+                <div>
+                  <span class="eyebrow">Movimentações da fatura</span>
+                  <h2>Lançamentos da fatura <span class="invoice-open-count ok" id="cardInvoiceOpenCount">0 não conciliados</span></h2>
+                </div>
+                <button class="primary small-button" id="openCardTransactionFormButton" type="button">Novo lançamento</button>
+              </div>
+              <div class="invoice-list-toolbar filter-toolbar launch-filter-toolbar">
+                <div class="launch-filter-caption">
+                  <span class="eyebrow">Consulta</span>
+                  <strong>Filtre a fatura</strong>
+                </div>
                 <label class="transaction-search">Buscar lançamento
                   <input id="cardInvoiceSearch" type="search" placeholder="Descrição, categoria, tag, valor...">
                 </label>
@@ -766,14 +815,22 @@
         </section>
 
         <section class="module-view" id="transactionsView" hidden>
-          <div class="workspace">
-            <section class="transaction-form-panel launch-form-sticky">
-              <h2 id="transactionFormTitle">Novo lançamento</h2>
+          <div class="transactions-content-shell">
+            <aside id="transactionFormDrawer" class="drawer launch-form-drawer" hidden aria-hidden="true" aria-labelledby="transactionFormTitle">
+              <div class="drawer-overlay" id="transactionFormDrawerOverlay"></div>
+              <div class="drawer-content launch-form-drawer-content">
+                <header class="drawer-header launch-form-drawer-header">
+                  <div>
+                    <span class="eyebrow">Movimentações</span>
+                    <h2 id="transactionFormTitle">Novo lançamento</h2>
+                  </div>
+                  <button class="drawer-close-button" id="closeTransactionFormButton" type="button" aria-label="Fechar formulário" title="Fechar formulário">
+                    <span aria-hidden="true">×</span>
+                  </button>
+                </header>
+                <div class="drawer-body launch-form-drawer-body transaction-form-panel">
               <form id="transactionForm" class="form" data-progressive-form data-operation-summary>
                 <input type="hidden" name="id">
-                <label>Conta
-                  <select name="account_id" id="transactionAccount" required></select>
-                </label>
                 <div class="field-row">
                   <label>Tipo
                     <select name="type" id="transactionType">
@@ -832,9 +889,9 @@
                     <label>CNPJ do fundo/plano
                       <input name="investment_cnpj" id="investmentCnpj" type="text" placeholder="00.000.000/0000-00 ou alfanumérico">
                     </label>
-                    <label class="field-action-label">Cota
+                    <div class="field-action-label">
                       <button class="ghost small-button" type="button" id="fetchInvestmentFundQuoteButton">Buscar cota</button>
-                    </label>
+                    </div>
                   </div>
                   <p class="field-hint" id="investmentFundQuoteHint" aria-live="polite"></p>
                   <div class="investment-fixed-fields" id="investmentFixedFields" hidden>
@@ -973,17 +1030,35 @@
                 </div>
               </form>
               <p class="message" id="transactionMessage" role="alert"></p>
-            </section>
+                </div>
+              </div>
+            </aside>
 
             <section class="panel transaction-ledger-panel">
-              <div class="section-heading">
-                <h2>Lançamentos</h2>
-                <div class="month-navigator">
+              <div class="section-heading launch-section-heading">
+                <div>
+                  <span class="eyebrow">Extrato da conta</span>
+                  <h2>Lançamentos</h2>
+                </div>
+                <div class="launch-heading-actions">
+                  <button class="primary small-button" id="openTransactionFormButton" type="button">Novo lançamento</button>
+                  <div class="month-navigator">
                   <button class="ghost small-button month-icon-button" type="button" id="previousMonthButton" aria-label="Mês anterior" title="Mês anterior">‹</button>
                   <button class="month-label" type="button" id="transactionMonthLabel" aria-haspopup="dialog"></button>
                   <button class="ghost small-button month-icon-button" type="button" id="todayMonthButton" aria-label="Mês atual" title="Mês atual">●</button>
                   <button class="ghost small-button month-icon-button" type="button" id="nextMonthButton" aria-label="Próximo mês" title="Próximo mês">›</button>
+                  </div>
                 </div>
+              </div>
+              <div class="launch-context-toolbar">
+                <div class="launch-context-copy">
+                  <span class="eyebrow">Contexto da consulta</span>
+                  <strong>Extrato da conta selecionada</strong>
+                  <small>Troque a conta sem abrir o formulário.</small>
+                </div>
+                <label class="transaction-search launch-context-field">Conta
+                  <select name="account_id" id="transactionAccount" form="transactionForm" required></select>
+                </label>
               </div>
               <div class="invoice-history-chart account-balance-history-chart" id="transactionBalanceHistoryChart" aria-label="Histórico de saldos previstos"></div>
               <div class="month-balance-summary">
@@ -996,7 +1071,11 @@
                   <strong id="forecastBalanceSummary">R$ 0,00</strong>
                 </div>
               </div>
-              <div class="transaction-list-toolbar filter-toolbar">
+              <div class="transaction-list-toolbar filter-toolbar launch-filter-toolbar">
+                <div class="launch-filter-caption">
+                  <span class="eyebrow">Consulta</span>
+                  <strong>Filtre o extrato</strong>
+                </div>
                 <label class="transaction-search">Buscar lançamento
                   <span class="search-input-wrap">
                     <input id="transactionSearch" type="search" placeholder="Descrição, conta, categoria, tag...">
@@ -1009,6 +1088,7 @@
                   <button type="button" data-transaction-status-filter="reconciled">Conciliados</button>
                 </div>
               </div>
+              <p class="message transaction-list-message" id="transactionListMessage" role="alert"></p>
               <p class="transaction-context-count" id="transactionContextCount" aria-live="polite"></p>
               <div class="transaction-list" id="transactionList"></div>
             </section>
@@ -1139,9 +1219,13 @@
           </div>
 
           <section class="portfolio-tab-panel" id="portfolioPositionPanel" role="tabpanel" data-portfolio-panel="position">
-          <section class="panel">
-            <div class="section-heading">
-              <h2>Resumo da carteira</h2>
+          <section class="panel portfolio-overview-panel">
+            <div class="section-heading portfolio-overview-heading">
+              <div>
+                <span class="eyebrow">Patrimônio investido</span>
+                <h2>Resumo da carteira</h2>
+                <p class="muted-copy">Uma leitura rápida do valor atual, resultado e composição da sua carteira.</p>
+              </div>
               <div class="card-actions">
                 <time class="last-updated" id="portfolioLastUpdated"></time>
                 <button class="ghost small-button" type="button" id="addPortfolioAssetButton">Adicionar ativo</button>
@@ -1150,30 +1234,27 @@
             </div>
 
             <div class="portfolio-summary">
-              <div>
+              <div class="portfolio-summary-primary">
                 <span>Patrimônio atual</span>
                 <strong id="portfolioCurrentSummary">R$ 0,00</strong>
               </div>
-              <div>
+              <div class="portfolio-summary-secondary">
                 <span>Custo de aquisição</span>
                 <strong id="portfolioCostSummary">R$ 0,00</strong>
               </div>
-              <div>
+              <div class="portfolio-summary-secondary">
                 <span>Resultado</span>
                 <strong id="portfolioResultSummary">R$ 0,00</strong>
               </div>
-              <div class="portfolio-summary-with-action">
-                <span class="portfolio-summary-label">Rentabilidade</span>
-                <button class="portfolio-return-chart-btn" type="button" id="portfolioReturnChartBtn" aria-label="Ver rentabilidade mensal vs CDI" title="Rentabilidade mensal vs CDI" hidden>
-                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                </button>
+              <div class="portfolio-summary-secondary">
+                <span>Rentabilidade</span>
                 <strong id="portfolioReturnSummary">0,00%</strong>
               </div>
-              <div>
+              <div class="portfolio-summary-secondary">
                 <span>Variação do dia</span>
                 <strong id="portfolioDayResultSummary">R$ 0,00</strong>
               </div>
-              <div>
+              <div class="portfolio-summary-secondary">
                 <span>Ativos em carteira</span>
                 <strong id="portfolioPositionCount">0</strong>
               </div>
@@ -1181,34 +1262,18 @@
             <p class="message" id="portfolioMessage" role="alert"></p>
           </section>
 
-          <!-- Portfolio Return Drawer -->
-          <aside id="portfolioReturnDrawer" class="drawer portfolio-return-drawer" hidden aria-hidden="true" aria-labelledby="portfolioReturnDrawerTitle">
-            <div class="drawer-overlay" id="portfolioReturnDrawerOverlay"></div>
-            <div class="drawer-content">
-              <header class="drawer-header">
-                <div>
-                  <p class="eyebrow">Rentabilidade</p>
-                  <h2 id="portfolioReturnDrawerTitle">Rentabilidade</h2>
-                </div>
-                <button class="drawer-close-button" id="portfolioReturnDrawerCloseBtn" type="button" aria-label="Fechar gráfico" title="Fechar">
-                  <span aria-hidden="true">×</span>
-                </button>
-              </header>
-              <div class="drawer-body">
-                <div class="portfolio-return-chart-wrap">
-                  <div class="portfolio-return-chart-row">
-                    <div class="portfolio-return-y-axis" id="portfolioReturnYAxis" aria-hidden="true"></div>
-                    <div id="portfolioReturnChart" class="portfolio-return-chart" role="img" aria-label="Gráfico de rentabilidade mensal da carteira e benchmarks"></div>
-                  </div>
-                  <div id="portfolioReturnXLabels" class="portfolio-return-x-labels"></div>
-                </div>
-                <div class="portfolio-return-legend" id="portfolioReturnLegend"></div>
-                <p class="portfolio-return-notice" id="portfolioReturnNotice" hidden>
-                  <small>Variações refletem a valorização líquida dos aportes do mês; renda variável/cripto usam o valor atual como aproximação quando não há cotação histórica. Meses futuros ficam zerados até serem observados.</small>
-                </p>
+          <section class="panel portfolio-evolution-panel">
+            <div class="section-heading">
+              <div>
+                <span class="eyebrow">Acompanhamento</span>
+                <h2>Evolução da rentabilidade</h2>
+                <p class="muted-copy">Carteira comparada ao CDI e IPCA com os dados mensais disponíveis.</p>
               </div>
+              <span class="portfolio-evolution-status" id="portfolioEvolutionStatus">Últimos meses disponíveis</span>
             </div>
-          </aside>
+            <div class="portfolio-evolution-chart" id="portfolioEvolutionChart" role="img" aria-label="Evolução mensal da rentabilidade da carteira, CDI e IPCA"></div>
+            <div class="portfolio-evolution-legend" id="portfolioEvolutionLegend" aria-label="Legenda da rentabilidade da carteira, CDI e IPCA"></div>
+          </section>
 
           <aside id="portfolioGroupDrawer" class="drawer portfolio-group-drawer" hidden aria-hidden="true" aria-labelledby="portfolioGroupDrawerTitle">
             <div class="drawer-overlay" id="portfolioGroupDrawerOverlay"></div>
@@ -1375,7 +1440,11 @@
 
           <section class="panel report-content-panel">
             <div class="section-heading">
-              <h2>Posição atual</h2>
+              <div>
+                <span class="eyebrow">Composição atual</span>
+                <h2>Posição atual</h2>
+                <p class="muted-copy">Acompanhe ativos, valores, resultado e ações da carteira em uma única leitura.</p>
+              </div>
               <label class="compact-filter">Agrupar
                 <select id="portfolioGroupFilter">
                   <option value="none">Ativo</option>
@@ -1391,31 +1460,39 @@
           </section>
 
           <section class="portfolio-tab-panel" id="portfolioAnalysisPanel" role="tabpanel" data-portfolio-panel="analysis" hidden>
-          <div class="portfolio-grid">
-            <section class="panel">
+          <section class="portfolio-tab-intro">
+            <div>
+              <span class="eyebrow">Leitura da carteira</span>
+              <h2>Análise da composição</h2>
+              <p class="muted-copy">Veja onde o patrimônio está concentrado e consulte os detalhes de cada agrupamento.</p>
+            </div>
+            <span class="portfolio-tab-meta">Valores atuais · resultado acumulado</span>
+          </section>
+          <div class="portfolio-grid portfolio-analysis-grid">
+            <section class="panel portfolio-analysis-card">
               <div class="section-heading">
-                <h2>Por classe</h2>
+                <div><span class="eyebrow">Distribuição</span><h2>Por classe</h2></div>
               </div>
               <div class="portfolio-group-list" id="portfolioTypeList"></div>
             </section>
 
-            <section class="panel">
+            <section class="panel portfolio-analysis-card">
               <div class="section-heading">
-                <h2>Por indexador</h2>
+                <div><span class="eyebrow">Renda fixa</span><h2>Por indexador</h2></div>
               </div>
               <div class="portfolio-group-list" id="portfolioIndexerList"></div>
             </section>
 
-            <section class="panel">
+            <section class="panel portfolio-analysis-card">
               <div class="section-heading">
-                <h2>Por moeda</h2>
+                <div><span class="eyebrow">Exposição</span><h2>Por moeda</h2></div>
               </div>
               <div class="portfolio-group-list" id="portfolioCurrencyList"></div>
             </section>
 
-            <section class="panel">
+            <section class="panel portfolio-analysis-card">
               <div class="section-heading">
-                <h2>Por carteira</h2>
+                <div><span class="eyebrow">Custódia</span><h2>Por carteira</h2></div>
               </div>
               <div class="portfolio-group-list" id="portfolioAccountList"></div>
             </section>
@@ -1425,7 +1502,15 @@
           <section class="portfolio-tab-panel" id="portfolioGoalsPanel" role="tabpanel" data-portfolio-panel="goals" hidden>
             <section class="panel portfolio-goals-panel">
               <div class="section-heading">
-                <div><h2>Metas de alocação</h2><p class="muted-copy">Defina a proporção desejada por classe. A soma deve ser 100%.</p></div>
+                <div>
+                  <span class="eyebrow">Planejamento</span>
+                  <h2>Metas de alocação</h2>
+                  <p class="muted-copy">Defina a proporção desejada por classe. A soma deve ser 100%.</p>
+                </div>
+              </div>
+              <div class="portfolio-goals-guidance">
+                <span class="eyebrow">Como usar</span>
+                <p>As metas servem como referência para comparar a composição atual da carteira. Ajuste apenas as classes que deseja acompanhar.</p>
               </div>
               <form id="portfolioGoalsForm" class="form portfolio-goals-form">
                 <div id="portfolioGoalsFields" class="portfolio-goals-grid"></div>
@@ -1442,6 +1527,7 @@
             <section class="panel report-content-panel">
               <div class="section-heading">
                 <div>
+                  <span class="eyebrow">Agenda da carteira</span>
                   <h2>Eventos da carteira</h2>
                   <p class="muted-copy">Proventos futuros anunciados para ações, ETFs e BDRs da carteira.</p>
                 </div>
@@ -1454,7 +1540,11 @@
           <section class="portfolio-tab-panel" id="portfolioHistoryPanel" role="tabpanel" data-portfolio-panel="history" hidden>
           <section class="panel report-content-panel">
             <div class="section-heading">
-              <h2>Histórico</h2>
+              <div>
+                <span class="eyebrow">Memória da carteira</span>
+                <h2>Histórico</h2>
+                <p class="muted-copy">Consulte resgates realizados e posições encerradas sem perder o contexto da origem.</p>
+              </div>
             </div>
             <div id="portfolioHistory" class="portfolio-positions"></div>
           </section>
@@ -1462,13 +1552,58 @@
         </section>
 
         <section class="module-view" id="limitsView" hidden>
+          <header class="module-editorial-header limits-page-intro">
+            <div>
+              <span class="eyebrow">PLANEJAMENTO</span>
+              <h2>Limites de gastos</h2>
+              <p class="muted-copy">Acompanhe o consumo do mês e ajuste suas referências por categoria.</p>
+            </div>
+          </header>
           <div class="portfolio-tabs limits-tabs" role="tablist" aria-label="Áreas de limites">
             <button class="portfolio-tab active" type="button" role="tab" aria-selected="true" aria-controls="spendingLimitsPanel" data-limits-tab="spending">Gastos</button>
             <button class="portfolio-tab" type="button" role="tab" aria-selected="false" aria-controls="financialGoalsPanel" data-limits-tab="goals" tabindex="-1">Objetivos</button>
           </div>
 
+          <aside id="limitFormDrawer" class="drawer limit-form-drawer" hidden aria-hidden="true" aria-labelledby="limitFormTitle">
+            <div class="drawer-overlay" id="limitFormDrawerOverlay"></div>
+            <div class="drawer-content limit-form-drawer-content">
+              <header class="drawer-header limit-form-drawer-header">
+                <div>
+                  <span class="eyebrow">Planejamento</span>
+                  <h2 id="limitFormTitle">Novo limite</h2>
+                </div>
+                <button class="drawer-close-button" id="closeLimitFormButton" type="button" aria-label="Fechar formulário" title="Fechar formulário"><span aria-hidden="true">×</span></button>
+              </header>
+              <div class="drawer-body limit-form-drawer-body">
+                <form id="limitForm" class="form limit-form">
+                  <input type="hidden" name="id">
+                  <label>Vigência a partir de
+                    <input name="month" id="limitMonthInput" type="month" required data-drawer-autofocus>
+                  </label>
+                  <label>Categoria
+                    <select name="category_id" id="limitCategory" required></select>
+                  </label>
+                  <label>Subcategoria
+                    <select name="subcategory_id" id="limitSubcategory"></select>
+                  </label>
+                  <label>Limite mensal
+                    <input name="limit_amount" type="text" inputmode="decimal" placeholder="0,00" data-mask="money" required>
+                  </label>
+                  <label class="limit-form-field-wide">Observações
+                    <textarea name="notes" rows="3"></textarea>
+                  </label>
+                  <div class="form-actions">
+                    <button class="primary" type="submit">Salvar limite</button>
+                    <button class="ghost" id="cancelLimitEditButton" type="button" hidden>Cancelar</button>
+                  </div>
+                </form>
+                <p class="message" id="limitMessage" role="alert"></p>
+              </div>
+            </div>
+          </aside>
+
           <section id="spendingLimitsPanel" role="tabpanel" data-limits-panel="spending">
-          <section class="panel">
+          <section class="panel limits-overview-panel">
             <div class="section-heading">
               <h2>Resumo mensal</h2>
               <div class="month-navigator">
@@ -1495,36 +1630,13 @@
           </section>
 
           <div class="workspace limits-workspace">
-            <section class="panel">
-              <h2 id="limitFormTitle">Novo limite</h2>
-              <form id="limitForm" class="form">
-                <input type="hidden" name="id">
-                <label>Vigência a partir de
-                  <input name="month" id="limitMonthInput" type="month" required>
-                </label>
-                <label>Categoria
-                  <select name="category_id" id="limitCategory" required></select>
-                </label>
-                <label>Subcategoria
-                  <select name="subcategory_id" id="limitSubcategory"></select>
-                </label>
-                <label>Limite mensal
-                  <input name="limit_amount" type="text" inputmode="decimal" placeholder="0,00" data-mask="money" required>
-                </label>
-                <label>Observações
-                  <textarea name="notes" rows="3"></textarea>
-                </label>
-                <div class="form-actions">
-                  <button class="primary" type="submit">Salvar limite</button>
-                  <button class="ghost" id="cancelLimitEditButton" type="button" hidden>Cancelar</button>
-                </div>
-              </form>
-              <p class="message" id="limitMessage" role="alert"></p>
-            </section>
-
-            <section class="panel">
+            <section class="panel limits-list-panel">
               <div class="section-heading">
-                <h2>Uso do mês</h2>
+                <div>
+                  <span class="eyebrow">ACOMPANHAMENTO</span>
+                  <h2>Uso do mês</h2>
+                </div>
+                <button class="primary small-button" id="openLimitFormButton" type="button">Novo limite</button>
               </div>
               <div class="spending-limit-list" id="spendingLimitList"></div>
             </section>
@@ -1557,73 +1669,79 @@
               <article><strong>Reserva contínua</strong><p>Saldo que você quer manter ou reforçar, sem uma data final obrigatória.</p></article>
             </section>
 
-            <section class="panel goal-form-panel" id="goalFormPanel" hidden>
-                <div class="section-heading">
+            <aside id="goalFormDrawer" class="drawer goal-form-drawer" hidden aria-hidden="true" aria-labelledby="goalFormTitle">
+              <div class="drawer-overlay" id="goalFormDrawerOverlay"></div>
+              <div class="drawer-content goal-form-drawer-content">
+                <header class="drawer-header goal-form-drawer-header">
                   <div>
                     <span class="eyebrow">Planejamento</span>
                     <h2 id="goalFormTitle">Novo objetivo</h2>
                   </div>
-                </div>
-                <form id="goalForm" class="form">
+                  <button class="drawer-close-button" id="closeGoalFormButton" type="button" aria-label="Fechar formulário" title="Fechar formulário"><span aria-hidden="true">×</span></button>
+                </header>
+                <div class="drawer-body goal-form-drawer-body">
+                  <form id="goalForm" class="form goal-form">
                   <input type="hidden" name="id">
-                  <label>Nome do objetivo
-                    <input name="name" type="text" maxlength="80" placeholder="Ex.: IPVA 2027" required>
-                  </label>
-                  <div class="field-row">
-                    <label>Tipo
-                      <select name="objective_type" required>
-                        <option value="target">Meta</option>
-                        <option value="annual_provision">Provisão anual</option>
-                        <option value="continuous_reserve">Reserva contínua</option>
-                      </select>
+                    <label>Nome do objetivo
+                      <input name="name" type="text" maxlength="80" placeholder="Ex.: IPVA 2027" required data-drawer-autofocus>
                     </label>
-                    <label>Valor-alvo
-                      <input name="target_amount" type="text" inputmode="decimal" placeholder="0,00" required>
+                    <div class="field-row">
+                      <label>Tipo
+                        <select name="objective_type" required>
+                          <option value="target">Meta</option>
+                          <option value="annual_provision">Provisão anual</option>
+                          <option value="continuous_reserve">Reserva contínua</option>
+                        </select>
+                      </label>
+                      <label>Valor-alvo
+                        <input name="target_amount" type="text" inputmode="decimal" placeholder="0,00" required>
+                      </label>
+                    </div>
+                    <div class="field-row">
+                      <label>Data inicial
+                        <input name="start_date" type="date" required>
+                      </label>
+                      <label id="goalTargetDateField">Data desejada
+                        <input name="target_date" type="date" required>
+                      </label>
+                    </div>
+                    <div class="field-row">
+                      <label>Estado
+                        <select name="status">
+                          <option value="active">Ativo</option>
+                          <option value="paused">Pausado</option>
+                          <option value="completed">Concluído</option>
+                        </select>
+                      </label>
+                      <label>Dia preferido do aporte
+                        <input name="preferred_contribution_day" type="number" min="1" max="28" placeholder="1 a 28">
+                      </label>
+                    </div>
+                    <label>Observações
+                      <textarea name="notes" rows="2" placeholder="Contexto opcional"></textarea>
                     </label>
-                  </div>
-                  <div class="field-row">
-                    <label>Data inicial
-                      <input name="start_date" type="date" required>
-                    </label>
-                    <label id="goalTargetDateField">Data desejada
-                      <input name="target_date" type="date" required>
-                    </label>
-                  </div>
-                  <div class="field-row">
-                    <label>Estado
-                      <select name="status">
-                        <option value="active">Ativo</option>
-                        <option value="paused">Pausado</option>
-                        <option value="completed">Concluído</option>
-                      </select>
-                    </label>
-                    <label>Dia preferido do aporte
-                      <input name="preferred_contribution_day" type="number" min="1" max="28" placeholder="1 a 28">
-                    </label>
-                  </div>
-                  <label>Observações
-                    <textarea name="notes" rows="2" placeholder="Contexto opcional"></textarea>
-                  </label>
-                  <div class="field-row">
-                    <label>Projeção de rendimento
-                      <select name="yield_mode" id="goalYieldMode">
-                        <option value="none">Sem rendimento</option>
-                        <option value="cdi_percentage">Percentual do CDI</option>
-                        <option value="custom_annual_rate">Taxa anual personalizada</option>
-                      </select>
-                    </label>
-                    <label id="goalYieldPercentageField" hidden>Percentual
-                      <input name="yield_percentage" type="text" inputmode="decimal" value="100" placeholder="100,00">
-                    </label>
-                  </div>
-                  <input type="hidden" name="tax_treatment" value="conservative">
-                  <div class="form-actions">
-                    <button class="primary" type="submit">Salvar objetivo</button>
-                    <button class="ghost" id="cancelGoalEditButton" type="button">Cancelar</button>
-                  </div>
-                </form>
-            </section>
-            <p class="message goal-message" id="goalMessage" role="alert"></p>
+                    <div class="field-row">
+                      <label>Projeção de rendimento
+                        <select name="yield_mode" id="goalYieldMode">
+                          <option value="none">Sem rendimento</option>
+                          <option value="cdi_percentage">Percentual do CDI</option>
+                          <option value="custom_annual_rate">Taxa anual personalizada</option>
+                        </select>
+                      </label>
+                      <label id="goalYieldPercentageField" hidden>Percentual
+                        <input name="yield_percentage" type="text" inputmode="decimal" value="100" placeholder="100,00">
+                      </label>
+                    </div>
+                    <input type="hidden" name="tax_treatment" value="conservative">
+                    <div class="form-actions">
+                      <button class="primary" type="submit">Salvar objetivo</button>
+                      <button class="ghost" id="cancelGoalEditButton" type="button">Cancelar</button>
+                    </div>
+                  </form>
+                  <p class="message goal-message" id="goalMessage" role="alert"></p>
+                </div>
+              </div>
+            </aside>
 
             <div class="workspace goals-workspace">
               <section class="panel goals-list-panel">
@@ -1634,7 +1752,7 @@
                   </div>
                   <div class="goal-list-heading-actions">
                     <span class="muted-copy">Valores atualizados manualmente</span>
-                    <button class="primary" id="newGoalButton" type="button" aria-controls="goalFormPanel" aria-expanded="false">+ Novo objetivo</button>
+                    <button class="primary" id="newGoalButton" type="button" aria-controls="goalFormDrawer" aria-expanded="false">+ Novo objetivo</button>
                   </div>
                 </div>
                 <div class="financial-goal-list" id="financialGoalList"></div>
@@ -1853,7 +1971,14 @@
         </section>
 
         <section class="module-view" id="reportsView" hidden>
-          <section class="panel">
+          <header class="module-editorial-header reports-page-intro">
+            <div>
+              <span class="eyebrow">LEITURA FINANCEIRA</span>
+              <h2>Relatórios</h2>
+              <p class="muted-copy">Transforme os lançamentos do período em uma leitura clara por categoria, conta, tag e demonstrativo.</p>
+            </div>
+          </header>
+          <section class="panel reports-overview-panel">
             <div class="section-heading">
               <h2>Resumo do período</h2>
               <div class="month-navigator">
@@ -1870,6 +1995,7 @@
               <button id="reportTabAccounts" class="report-tab" type="button" role="tab" aria-selected="false" aria-controls="reportContent" data-report-tab="accounts" tabindex="-1">Contas</button>
               <button id="reportTabTags" class="report-tab" type="button" role="tab" aria-selected="false" aria-controls="reportContent" data-report-tab="tags" tabindex="-1">Tags</button>
               <button id="reportTabStatement" class="report-tab" type="button" role="tab" aria-selected="false" aria-controls="reportContent" data-report-tab="statement" tabindex="-1">Demonstrativos</button>
+              <button id="reportTabUnclassified" class="report-tab" type="button" role="tab" aria-selected="false" aria-controls="reportContent" data-report-tab="unclassified" tabindex="-1">Sem classificação</button>
             </div>
 
             <div class="report-summary">
@@ -2578,35 +2704,6 @@
         </div>
       </section>
 
-      <!-- Portfolio Return Drawer -->
-      <aside id="portfolioReturnDrawer" class="drawer portfolio-return-drawer" hidden aria-hidden="true" aria-labelledby="portfolioReturnDrawerTitle">
-        <div class="drawer-overlay" id="portfolioReturnDrawerOverlay"></div>
-        <div class="drawer-content">
-          <header class="drawer-header">
-            <div>
-              <p class="eyebrow">Rentabilidade</p>
-              <h2 id="portfolioReturnDrawerTitle">Rentabilidade</h2>
-            </div>
-            <button class="drawer-close-button" id="portfolioReturnDrawerCloseBtn" type="button" aria-label="Fechar gráfico" title="Fechar">
-              <span aria-hidden="true">×</span>
-            </button>
-          </header>
-          <div class="drawer-body">
-            <div class="portfolio-return-chart-wrap">
-              <div class="portfolio-return-chart-row">
-                <div class="portfolio-return-y-axis" id="portfolioReturnYAxis" aria-hidden="true"></div>
-                <svg id="portfolioReturnChart" class="portfolio-return-chart" viewBox="0 0 100 64" preserveAspectRatio="none" role="img" aria-label="Gráfico de rentabilidade mensal da carteira e benchmarks"></svg>
-              </div>
-              <div id="portfolioReturnXLabels" class="portfolio-return-x-labels"></div>
-            </div>
-            <div class="portfolio-return-legend" id="portfolioReturnLegend"></div>
-            <p class="portfolio-return-notice" id="portfolioReturnNotice" hidden>
-              <small>Renda variável/cripto usam o valor atual como aproximação do período, pois cotações históricas ainda não são armazenadas.</small>
-            </p>
-          </div>
-        </div>
-      </aside>
-
       <!-- Cockpit Forecast Drawer -->
       <aside id="forecastDrawer" class="drawer" hidden aria-hidden="true" aria-labelledby="forecastDrawerTitle">
         <div class="drawer-overlay" id="forecastDrawerCloseOverlay"></div>
@@ -2714,6 +2811,6 @@
     </dialog>
     <script src="/vendor/imask/7.6.1/imask.min.js?v=7.6.1"></script>
     <script src="/vendor/apexcharts/4.7.0/apexcharts.min.js?v=4.7.0"></script>
-  <script type="module" src="/app.js?v=184"></script>
+    <script type="module" src="/app.js?v=195"></script>
   </body>
 </html>
