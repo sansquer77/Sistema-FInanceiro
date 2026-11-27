@@ -1,6 +1,6 @@
 import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";
 import { createLoadPolicy } from "./load-policy.js";
-import { clearLocalModel, getLocalModelStatus, prepareLocalModel, refreshLocalModel } from "./webllm-client.js?v=184";
+import { clearLocalModel, getLocalModelStatus, prepareLocalModel, refreshLocalModel } from "./webllm-client.js?v=185";
 
 export function registerUserAdminView(context) {
   const {

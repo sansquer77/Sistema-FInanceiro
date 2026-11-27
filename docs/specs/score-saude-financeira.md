@@ -2,8 +2,8 @@
 tipo: spec
 area: score-saude-financeira
 status: implementado
-versao: 3.8
-atualizado: 2026-11-26
+versao: 3.9
+atualizado: 2026-11-27
 relacionados:
   - "[[relatorios]]"
   - "[[limites-gastos]]"
@@ -18,7 +18,7 @@ aliases: ["Score de Saúde Financeira", "Diagnóstico Financeiro", "Financial He
 # Score de Saúde Financeira
 
 > [!info] Status
-> **implementado** · versão: `3.8` · área: `score-saude-financeira` · atualizado em 2026-11-26 · relacionados: [[relatorios]], [[limites-gastos]], [[investimentos-portfolio]], [[cartoes]], [[contas-correntes]]
+> **implementado** · versão: `3.9` · área: `score-saude-financeira` · atualizado em 2026-11-27 · relacionados: [[relatorios]], [[limites-gastos]], [[investimentos-portfolio]], [[cartoes]], [[contas-correntes]]
 
 ## Problema
 
@@ -177,6 +177,7 @@ Nenhuma pendência conhecida.
 
 ## Changelog
 
+- `3.9` — 2026-11-27 — Centraliza vertical e horizontalmente o texto do botão **Ver análise** no resumo de Saúde Financeira do Cockpit.
 - `3.8` — 2026-11-26 — Equaliza a moldura visual da aba Saúde Financeira à aba Consultor no Cockpit, preservando a hierarquia diagnóstica e a adaptação a desktops compactos.
 - `3.7` — 2026-08-31 — Faixas uniformes no gauge e na classificação normalizada dos pilares; interface usa nível retornado pelo backend. Sem mudança na pontuação ou nos pesos.
 

@@ -248,7 +248,7 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("webllm.CreateMLCEngine(selectedModelId, engineConfig, CHAT_OPTIONS)", client)
         self.assertIn("preferMainThread", client)
         self.assertIn("let preferMainThread = true;", client)
-        self.assertIn('new URL("./webllm-worker.js?v=184", import.meta.url)', client)
+        self.assertIn('new URL("./webllm-worker.js?v=185", import.meta.url)', client)
         self.assertLess(
             client.index("webllm.CreateMLCEngine(selectedModelId, engineConfig, CHAT_OPTIONS)"),
             client.index("webllm.CreateWebWorkerMLCEngine(engineWorker, selectedModelId, engineConfig, CHAT_OPTIONS)"),
@@ -257,6 +257,8 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn('diagnosis.category === "string_error"', client)
         self.assertIn("refreshLocalModel", client)
         self.assertIn("LOCAL_MODEL_PREPARE_TIMEOUT_MS = 60_000", client)
+        self.assertIn("O navegador expôs WebGPU", client)
+        self.assertNotIn("O Edge expôs WebGPU", client)
         self.assertIn("LOCAL_INFERENCE_TIMEOUT_MS = 90_000", client)
         self.assertIn("webgpu_adapter_unavailable", client)
         self.assertIn("adapter_available", client)
@@ -282,7 +284,7 @@ class FrontendModuleContractTest(unittest.TestCase):
         )
         for module in ("consultor-view.js", "trends-view.js", "user-admin-view.js"):
             source = (MODULE_ROOT / module).read_text(encoding="utf-8")
-            self.assertIn('webllm-client.js?v=184"', source, module)
+            self.assertIn('webllm-client.js?v=185"', source, module)
         admin = (MODULE_ROOT / "user-admin-view.js").read_text(encoding="utf-8")
         html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
         self.assertIn('id="aiLocalModel"', html)
@@ -1036,6 +1038,9 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn(".financial-health-panel .financial-health-content {", styles)
         self.assertIn("bindRovingTablist", consultor)
         self.assertIn("financialHealthGauge", health)
+        self.assertIn(".cockpit-health-summary-copy .small-button {", styles)
+        self.assertIn("display: inline-flex", styles)
+        self.assertIn("justify-content: center", styles)
 
     def test_consultor_history_uses_the_same_editorial_shell(self) -> None:
         index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")

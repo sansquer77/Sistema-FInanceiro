@@ -2,8 +2,8 @@
 tipo: spec
 area: consultor
 status: em-implementacao
-versao: 2.55
-atualizado: 2026-11-26
+versao: 2.56
+atualizado: 2026-11-27
 relacionados:
   - "[[instrucoes-app]]"
   - "[[investimentos-portfolio]]"
@@ -17,7 +17,7 @@ aliases: ["Consultor Virtual", "Assistente de Investimentos", "Especialista em F
 # Consultor Virtual de Investimentos e Planejamento Financeiro
 
 > [!info] Status
-> **em-implementacao** · versão: `2.55` · área: `consultor` · atualizado em 2026-11-26 · relacionados: [[instrucoes-app]], [[investimentos-portfolio]], [[score-saude-financeira]], [[tendencias-saude-financeira]], [[cockpit-calendario]], [[objetivos-financeiros]], [[emprestimos-quitacao]], [[cartoes]], [[../adr/0019-inferencia-local-webllm]], [[../adr/0020-pesquisa-macro-consultor]], [[../adr/0021-janela-contexto-local-consultor]], [[../adr/0022-orcamento-tokens-saida-consultor]], [[../adr/0023-configuracoes-ia-por-provedor]]
+> **em-implementacao** · versão: `2.56` · área: `consultor` · atualizado em 2026-11-27 · relacionados: [[instrucoes-app]], [[investimentos-portfolio]], [[score-saude-financeira]], [[tendencias-saude-financeira]], [[cockpit-calendario]], [[objetivos-financeiros]], [[emprestimos-quitacao]], [[cartoes]], [[../adr/0019-inferencia-local-webllm]], [[../adr/0020-pesquisa-macro-consultor]], [[../adr/0021-janela-contexto-local-consultor]], [[../adr/0022-orcamento-tokens-saida-consultor]], [[../adr/0023-configuracoes-ia-por-provedor]]
 
 > [!warning] Pivô arquitetural (v0.13, refinado em v0.14/v0.15)
 > A partir desta versão, o Consultor **não possui campo de prompt livre**. O usuário interage exclusivamente através de um **catálogo de análises pré-formatadas** (cards). Essa mudança é uma decisão de **Security by Design**: eliminar a superfície de entrada de texto livre remove pela raiz os vetores de vazamento acidental de dados sensíveis (PII) e de *prompt injection* via chat. As seções "Prevenção de vazamento de dados no prompt (DLP)" e "Blindagem de prompt injection" da v0.12 são **removidas** desta spec — ver "Segurança by Design" e "Nota de segurança residual" abaixo para o que substitui essas salvaguardas.
@@ -601,6 +601,7 @@ _Nenhuma pendência em aberto._
 
 ## Changelog
 
+- `2.56` — 2026-11-27 — Remove a referência fixa ao Edge na mensagem de falha do adaptador WebGPU, usa texto neutro para Safari, Edge e demais navegadores e incrementa o cache-buster do WebLLM.
 - `2.55` — 2026-11-26 — Otimiza os prompts de todos os cards, reduz instruções comuns repetidas e compacta a série histórica de pilares do card Evolução do Score para manter a janela de 12 meses dentro do orçamento local.
 - `2.54` — 2026-11-26 — Compacta o contexto da Análise da Carteira para IA local e remota, agrupando classes, moedas e mercados, preservando totais de grupos omitidos e removendo duplicidades monetárias.
 - `2.53` — 2026-11-26 — Corrige o mapeamento dos valores de orçamento do card de Ralos, envia a série da janela selecionada, exige período explícito no Resumo e impede rankings artificiais quando faltam dados.

@@ -1831,6 +1831,14 @@ textarea:focus {
   margin-bottom: 0;
 }
 
+.cockpit-health-summary-copy .small-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
 .cockpit-health-summary-copy p {
   max-width: 660px;
   margin: 5px 0 0;

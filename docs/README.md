@@ -159,6 +159,10 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `16.53` — 2026-11-27 — [[specs/Update Server]] v1.6 e [[server]] v1.10 corrigem a cópia de caminho Unicode para o volume Linux Endor montado no macOS, evitando falha `chflags`.
+- `16.54` — 2026-11-27 — [[specs/consultor]] v2.56 remove a referência fixa ao Edge nas mensagens de falha do adaptador WebGPU.
+- `16.55` — 2026-11-27 — [[specs/score-saude-financeira]] v3.9 corrige o alinhamento do botão **Ver análise** no card de Saúde Financeira do Cockpit.
+- `16.52` — 2026-11-27 — [[specs/tendencias-saude-financeira]] v2.34 corrige a separação de listas numeradas retornadas pela IA na tela de Tendências.
 - `16.51` — 2026-11-27 — [[specs/Update Server]] v1.5 e [[server]] v1.9 corrigem a sincronização de `docs/distribuição.md` entre a homologação e o volume Endor com normalizações Unicode diferentes.
 - `16.50` — 2026-11-26 — [[specs/consultor]] v2.55 otimiza os prompts dos cards e compacta a série histórica do Score, mantendo a janela de 12 meses abaixo do orçamento local.
 - `16.49` — 2026-11-26 — [[specs/consultor]] v2.54 e [[adr/0021-janela-contexto-local-consultor]] v0.5 compactam o contexto da Análise da Carteira para IA local e remota, preservando agregados e totais omitidos.

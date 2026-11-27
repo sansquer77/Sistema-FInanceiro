@@ -1,8 +1,34 @@
-// spec: tendencias-saude-financeira v2.32 — critérios 1, 2, 3, 4, 5, 6, 7, 10, 12, 13, 14, 16, 17, 20, 21, 25, 26, 27, 28, 32, 33 e 34
+// spec: tendencias-saude-financeira v2.34 — critérios 1, 2, 3, 4, 5, 6, 7, 10, 12, 13, 14, 16, 17, 20, 21, 25, 26, 27, 28, 32, 33, 34 e 74
 import { stateMarkup } from "./dom-utils.js";
 import { chartToken, renderChart } from "./chart-adapter.js";
-import { runLocalInference } from "./webllm-client.js?v=184";
+import { runLocalInference } from "./webllm-client.js?v=185";
 import { createSubscriptionsFlyover } from "./subscriptions-flyover.js?v=2";
+
+export function splitSummarySentences(text) {
+  const normalized = String(text || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!normalized) return [];
+
+  // Modelos podem devolver uma lista numerada apesar do prompt pedir frases.
+  // O marcador deve permanecer unido ao item, em vez de virar uma frase isolada.
+  const markers = [...normalized.matchAll(/(?:^|\s)\d+\\?\.\s+/g)];
+  if (markers.length >= 2) {
+    const items = markers.map((marker, index) => {
+      const start = marker.index + marker[0].length;
+      const end = index + 1 < markers.length ? markers[index + 1].index : normalized.length;
+      return normalized.slice(start, end).trim();
+    }).filter(Boolean);
+    const intro = normalized.slice(0, markers[0].index).trim();
+    return intro ? [intro, ...items] : items;
+  }
+
+  return normalized
+    .split(/(?<=\.)\s+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 export function registerTrendsView({
   elements,
   api,
@@ -706,14 +732,6 @@ export function registerTrendsView({
         ` : ""}
       </div>
     `;
-  }
-
-  function splitSummarySentences(text) {
-    return String(text || "")
-      .replace(/\s+/g, " ")
-      .split(/(?<=\.)\s+/)
-      .map((item) => item.trim())
-      .filter(Boolean);
   }
 
   return {

@@ -1,4 +1,4 @@
-// spec: consultor/consultor v2.52 — inicialização direta na página antes do Worker
+// spec: consultor/consultor v2.56 — inicialização direta na página antes do Worker
 // WebLLM mantém runtime e pesos no Cache Storage privado da origem do navegador.
 export const DEFAULT_LOCAL_MODEL_ID = "Qwen2.5-1.5B-Instruct-q4f16_1-MLC";
 const LOW_MEMORY_FALLBACK_MODEL_ID = "gemma3-1b-it-q4f16_1-MLC";
@@ -139,7 +139,7 @@ function normalizeError(error, stage = "initialization") {
       : "O preparo do modelo local excedeu 60 segundos. Verifique o cache e a conexão e tente novamente.";
   }
   if (error?.code === "webgpu_adapter_unavailable") {
-    return "O Edge expôs WebGPU, mas não disponibilizou um adaptador para esta página. Verifique a aceleração gráfica e tente novamente.";
+    return "O navegador expôs WebGPU, mas não disponibilizou um adaptador para esta página. Verifique a aceleração gráfica e tente novamente.";
   }
   if (diagnosis?.category === "context_window_exceeded") {
     const contextWindow = diagnosis.contextWindow ? ` (${diagnosis.contextWindow} tokens)` : "";
@@ -216,11 +216,11 @@ async function ensureEngine(modelId, onProgress, { preferMainThread = true } = {
       }
       try {
         onProgress?.("Preparando o modelo local no Worker do WebLLM…");
-        engineWorker = new Worker(new URL("./webllm-worker.js?v=184", import.meta.url), { type: "module" });
+        engineWorker = new Worker(new URL("./webllm-worker.js?v=185", import.meta.url), { type: "module" });
         return await webllm.CreateWebWorkerMLCEngine(engineWorker, selectedModelId, engineConfig, CHAT_OPTIONS);
       } catch (workerError) {
         // spec: consultor/consultor v2.52 — critério de preparo explícito do modelo local
-        // O Edge pode expor WebGPU à página, mas falhar ao inicializar o Dedicated Worker.
+        // Alguns navegadores podem expor WebGPU à página, mas falhar ao inicializar o Dedicated Worker.
         // A página é a primeira tentativa; o Worker permanece como fallback compatível.
         logInitializationFailure(selectedModelId, "worker", workerError);
         engineWorker?.terminate();

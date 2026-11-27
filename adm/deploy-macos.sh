@@ -34,13 +34,14 @@ rsync -avh --progress --delete \
 
 # O openrsync do macOS não oferece --iconv. O volume Endor apresenta nomes
 # Unicode em NFD, enquanto a homologação usa NFC; copie estes poucos caminhos
-# fora do rsync para evitar exclusão/reenvio a cada deploy.
+# fora do rsync para evitar exclusão/reenvio a cada deploy. Não usar `cp -p`:
+# o volume não aceita o `chflags` acionado pela preservação de flags do macOS.
 for relative_path in "${UNICODE_FILES[@]}"; do
   source_path="$SRC/$relative_path"
   destination_path="$DEST/$relative_path"
   if [ -f "$source_path" ]; then
     mkdir -p "$(dirname "$destination_path")"
-    cp -p "$source_path" "$destination_path"
+    cp -f "$source_path" "$destination_path"
   elif [ -e "$destination_path" ]; then
     rm -f "$destination_path"
   fi

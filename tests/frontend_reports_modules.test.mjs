@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 const coordinator = readFileSync(new URL('../web/modules/reports-view.js', import.meta.url), 'utf8');
 const statement = readFileSync(new URL('../web/modules/report-statement.js', import.meta.url), 'utf8');
 const evolution = readFileSync(new URL('../web/modules/report-evolution.js', import.meta.url), 'utf8');
+const { splitSummarySentences } = await import('../web/modules/trends-view.js');
 
 test('reports facade composes statement and evolution exactly once outside render', () => {
   assert.match(coordinator, /createReportStatement\(\{/);
@@ -47,4 +48,13 @@ test('trends creates the Apex container directly without a legacy financial SVG'
   assert.doesNotMatch(trends, /<svg viewBox=/);
   assert.doesNotMatch(trends, /function buildTicks\(/);
   assert.doesNotMatch(trends, /function monthlyTooltip\(/);
+});
+
+test('trends keeps numbered AI summary items together', () => {
+  const summary = '1. Primeiro achado do mês. 2. As receitas diminuíram. A assinatura custa R$ 56,90. 3. O armazenamento caiu.';
+  assert.deepEqual(splitSummarySentences(summary), [
+    'Primeiro achado do mês.',
+    'As receitas diminuíram. A assinatura custa R$ 56,90.',
+    'O armazenamento caiu.',
+  ]);
 });

@@ -2,8 +2,8 @@
 tipo: spec
 area: tendencias-saude-financeira
 status: em-implementacao
-versao: 2.33
-atualizado: 2026-11-26
+versao: 2.34
+atualizado: 2026-11-27
 relacionados:
   - "[[score-saude-financeira]]"
   - "[[relatorios]]"
@@ -20,7 +20,7 @@ aliases: ["Tendências de Saúde Financeira", "Achados Financeiros", "Insights F
 # Tendências e Achados de Saúde Financeira
 
 > [!info] Status
-> **em-implementacao** · versão: `2.33` · área: `tendencias-saude-financeira` · atualizado em 2026-11-26 · relacionados: [[score-saude-financeira]], [[relatorios]], [[lancamentos]], [[cartoes]], [[../adr/0019-inferencia-local-webllm|ADR-0019]]
+> **em-implementacao** · versão: `2.34` · área: `tendencias-saude-financeira` · atualizado em 2026-11-27 · relacionados: [[score-saude-financeira]], [[relatorios]], [[lancamentos]], [[cartoes]], [[../adr/0019-inferencia-local-webllm|ADR-0019]]
 
 ## Problema
 
@@ -301,6 +301,7 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 - Dado um usuário com limite de gastos ultrapassado em apenas 2 dos últimos 3 meses, quando consulta a aba **Tendências**, então não é exibido o achado de limite recorrente.
 
 - Dado o gráfico de Tendências em tema claro ou escuro, quando o tooltip é exibido ou o tema muda, então texto, cabeçalho e indicadores dos eixos mantêm cores de texto e superfície do tema ativo, sem alterar as cores das séries. Contrato CSS automatizado; aparência no Safari requer validação manual.
+- Dado que a IA retorne o resumo com marcadores numerados, quando Tendências renderizar o texto, então cada marcador permanece unido ao respectivo item e não aparece como uma frase isolada.
 
 ## Pendências
 
@@ -339,6 +340,7 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 
 ## Changelog
 
+- `2.34` — 2026-11-27 — Corrige a renderização de resumos de IA numerados em Tendências, mantendo cada marcador unido ao texto correspondente.
 - `2.33` — 2026-11-26 — Registra o monitoramento arquitetural de `financeiro/trends.py` e a extração futura do bloco de assinaturas como próxima oportunidade de desconcentração.
 - `2.32` — 2026-11-26 — Remove o corte arbitrário de seis serviços na aba Assinaturas e diferencia resumo de detalhes sem ocultar itens.
 - `2.31` — 2026-11-26 — Consolida receitas/despesas pontuais e limites em agrupamentos únicos, com revisão de limite dentro do item recorrente para qualquer categoria.

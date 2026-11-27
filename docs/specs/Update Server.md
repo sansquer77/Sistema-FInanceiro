@@ -2,7 +2,7 @@
 tipo: spec
 area: distribuicao
 status: implementado
-versao: 1.5
+versao: 1.6
 atualizado: 2026-11-27
 relacionados:
   - "[[sdd]]"
@@ -63,6 +63,7 @@ Mantenedor responsável por atualizar a instância Linux do Sistema Financeiro e
 - Para reduzir regressões, o procedimento recomendado usa `rsync` com `--delete` e exclusões explícitas de dados/runtime.
 - O script macOS deve propagar falhas de `rsync`, SSH e atualização remota, anunciando sucesso somente depois de confirmar o serviço ativo.
 - O script macOS deve tratar explicitamente caminhos Unicode conhecidos quando o `openrsync` local não oferecer conversão `--iconv`, evitando exclusão e reenvio recorrentes por diferença NFC/NFD no volume Endor.
+- A cópia especial de caminhos Unicode deve funcionar quando o Endor for um volume Linux montado no macOS, sem tentar aplicar flags/chflags exclusivos do macOS.
 - Se uma falha ocorrer depois da interrupção do serviço, o script remoto deve tentar iniciá-lo novamente antes de encerrar com erro.
 - Após a cópia, `/opt/sistema-financeiro` deve pertencer a `sistema:sistema`.
 - Após iniciar o serviço, os logs devem ser acompanhados até confirmar inicialização sem erro crítico.
@@ -257,6 +258,7 @@ sudo systemctl reload nginx
 - Dado falha crítica após deploy, quando o rollback é executado, então o backup volta para `/opt/sistema-financeiro` e o serviço inicia novamente.
 - Dado certificado expirado, quando a renovação é executada, então o nginx recarrega sem reiniciar a aplicação Python.
 - Dado um caminho Unicode conhecido em NFC na homologação e NFD no volume Endor, quando `deploysf` sincroniza a homologação, então o caminho não é removido e reenviado pelo `rsync` a cada execução, e seu conteúdo é atualizado no destino.
+- Dado que o volume Endor seja Linux montado no macOS, quando `deploysf` copiar o caminho Unicode especial, então a cópia não falha por tentativa de aplicar flags do macOS.
 
 ## Fora de escopo
 
@@ -268,6 +270,7 @@ sudo systemctl reload nginx
 
 ## Changelog
 
+- `1.6` — 2026-11-27 — Remove a preservação de flags do `cp` na cópia especial para volumes Linux montados no macOS, evitando falha `chflags: Invalid argument`.
 - `1.5` — 2026-11-27 — Trata `docs/distribuição.md` fora do `openrsync` para evitar exclusão e reenvio recorrentes causados pela normalização NFC/NFD do volume Endor.
 - `1.4` — 2026-09-06 — Removida a validação `sudo systemctl` duplicada no cliente; a confirmação permanece no script remoto autorizado e seu status é propagado pelo SSH.
 - `1.3` — 2026-09-06 — Deploy macOS e remoto passam a compartilhar exclusões, usar sincronização limpa, propagar falhas e validar a recuperação/atividade do serviço.
