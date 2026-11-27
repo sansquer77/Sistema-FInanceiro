@@ -38,6 +38,8 @@ from financeiro.consultor_context import (
     amount_from_row,
     compact_named_amounts,
     compact_maturities,
+    compact_destination_context,
+    compact_portfolio_context,
 )
 from financeiro.consultor_cashflow import build_maturity_cashflow_context
 from financeiro import consultor_history as history_store
@@ -634,7 +636,12 @@ def build_analysis_context(
     complementary = get_complementary_profile(int(user_id))
     context["investor_profile"] = INVESTOR_PROFILES[validate_investor_profile(investor_profile)]["label"]
     context["complementary_profile"] = complementary["profile"] if complementary["configured"] else {}
-    return add_money_displays(context)
+    context = add_money_displays(context)
+    if normalized_analysis_id == "analise_carteira":
+        context = compact_portfolio_context(context)
+    elif normalized_analysis_id == "destino_vencimentos":
+        context = compact_destination_context(context)
+    return context
 
 
 def delete_consultor_history(user_id: int) -> int:

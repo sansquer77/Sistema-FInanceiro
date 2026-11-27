@@ -16,16 +16,31 @@ MARKET_DATA_SOURCES = (
 LOGGER = logging.getLogger(__name__)
 
 
+# spec: consultor/consultor v2.53 — contexto do período, orçamento e ausência de dados
 def build_ralos_context(user_id: int, *, month: object | None, period_window: str) -> dict:
     from financeiro.trends import calculate_trends
 
     trends = calculate_trends(user_id, month)
+    reference_month = str(trends.get("month") or "")
+    period_series = compact_period_series(
+        trends.get("serie_mensal") or [],
+        period_window=period_window,
+        reference_month=reference_month,
+    )
+    previous_series = [row for row in period_series if row.get("month") != reference_month]
     return {
         "analysis_id": "ralos_financeiros",
         "period_window": period_window,
+        "period_label": period_window_label(period_window),
         "month": trends["month"],
         "confidence": trends["confianca"],
         "summary": money_context(trends),
+        "monthly_series": period_series,
+        "period_comparison": {
+            "income_base_cents": average_series_value(previous_series, "income_cents"),
+            "expense_base_cents": average_series_value(previous_series, "expense_cents"),
+            "months_available": len(previous_series),
+        },
         "comparison": {
             "income_base_cents": int(trends.get("receitas_base_comparacao_cents") or 0),
             "expense_base_cents": int(trends.get("despesas_base_comparacao_cents") or 0),
@@ -231,21 +246,34 @@ def build_score_evolution_context(
     )["month"]
     months = trailing_months(reference_month, 12 if period_window == "12m" else 6)
     series = []
+    pillar_definitions: list[dict] = []
     for month in months:
         score = calculate_financial_health_score(
             user_id, month, portfolio_positions=portfolio_positions
         )
+        pillars = score.get("pilares") or []
+        if not pillar_definitions:
+            pillar_definitions = [
+                {
+                    "id": pillar.get("id"),
+                    "label": pillar.get("label"),
+                    "max_score": int(pillar.get("max_score") or 0),
+                }
+                for pillar in pillars
+            ]
         series.append({
             "month": month,
             "score_total": int(score.get("score_total") or 0),
             "level": score.get("nivel"),
             "insufficient_data": bool(score.get("dados_insuficientes")),
-            "pillars": _compact_pillars(score.get("pilares") or []),
+            # spec: consultor/consultor v2.55 — definição dos pilares uma vez por janela
+            "pillars": _compact_score_pillars(pillars),
         })
     return {
         "analysis_id": "evolucao_score_tempo",
         "period_window": period_window,
         "reference_month": reference_month,
+        "pillar_definitions": pillar_definitions,
         "series": series,
     }
 
@@ -257,6 +285,19 @@ def _compact_pillars(pillars: list[dict]) -> list[dict]:
             "label": pillar.get("label"),
             "score": int(pillar.get("score") or 0),
             "max_score": int(pillar.get("max_score") or 0),
+            "percentual": pillar.get("percentual"),
+            "nivel": pillar.get("nivel"),
+        }
+        for pillar in pillars
+    ]
+
+
+def _compact_score_pillars(pillars: list[dict]) -> list[dict]:
+    """Mantém apenas os valores variáveis; nomes e limites ficam no esquema da janela."""
+    return [
+        {
+            "id": pillar.get("id"),
+            "score": int(pillar.get("score") or 0),
             "percentual": pillar.get("percentual"),
             "nivel": pillar.get("nivel"),
         }
@@ -377,6 +418,38 @@ def money_context(trends: dict) -> dict:
     }
 
 
+def period_window_label(period_window: str) -> str:
+    return {
+        "3m": "3 meses",
+        "6m": "6 meses",
+        "12m": "12 meses",
+        "ytd": "YTD (ano corrente)",
+    }.get(period_window, period_window)
+
+
+def compact_period_series(rows: list[dict], *, period_window: str, reference_month: str) -> list[dict]:
+    normalized = [
+        {
+            "month": str(row.get("month") or ""),
+            "income_cents": int(row.get("income_cents") or 0),
+            "expense_cents": int(row.get("expense_cents") or 0),
+        }
+        for row in rows
+        if str(row.get("month") or "")
+    ]
+    if period_window == "ytd":
+        year = reference_month[:4]
+        return [row for row in normalized if row["month"].startswith(f"{year}-")]
+    count = {"3m": 3, "6m": 6, "12m": 12}.get(period_window, 3)
+    return normalized[-count:]
+
+
+def average_series_value(rows: list[dict], field: str) -> int | None:
+    if not rows:
+        return None
+    return sum(int(row.get(field) or 0) for row in rows) // len(rows)
+
+
 def summarize_portfolio(positions: list[dict]) -> dict:
     total_brl_cents = sum(int(position.get("current_value_brl_cents") or 0) for position in positions)
     return {
@@ -492,9 +565,23 @@ def compact_budget_alerts(rows: list[dict], *, limit: int = 8) -> list[dict]:
         {
             "category": row.get("category_name") or row.get("category") or "",
             "subcategory": row.get("subcategory_name") or row.get("subcategory") or "",
-            "limit_cents": int(row.get("limit_cents") or 0),
-            "actual_cents": int(row.get("actual_cents") or row.get("spent_cents") or 0),
-            "usage_pct": row.get("usage_pct"),
+            "limit_cents": int(
+                row.get("limit_cents")
+                if row.get("limit_cents") is not None
+                else row.get("limite_cents") or 0
+            ),
+            "actual_cents": int(
+                row.get("actual_cents")
+                if row.get("actual_cents") is not None
+                else row.get("realizado_cents")
+                if row.get("realizado_cents") is not None
+                else row.get("spent_cents") or 0
+            ),
+            "usage_pct": (
+                row.get("usage_pct")
+                if row.get("usage_pct") is not None
+                else row.get("percentual_usado")
+            ),
         }
         for row in rows[:limit]
     ]
@@ -576,3 +663,357 @@ def compact_maturities(rows: list[dict], *, limit: int = 12) -> list[dict]:
         }
         for row in rows[:limit]
     ]
+
+
+def compact_destination_context(context: dict) -> dict:
+    """Remove redundâncias do card de vencimentos antes da inferência.
+
+    # spec: consultor/consultor v2.50 — critérios 461 a 463
+    O backend calcula o contexto completo, mas cada vencimento mantém somente os dados
+    que mudam a decisão, e a projeção usa uma linha do tempo por data em vez de repetir
+    a mesma informação em projeção mensal, eventos e lista de faturas. O mesmo payload
+    compacto é usado por qualquer provedor para manter o contrato único do card.
+    """
+    local_context = {
+        key: context.get(key)
+        for key in (
+            "analysis_id",
+            "reference_date",
+            "investor_profile",
+            "complementary_profile",
+            "market_data",
+        )
+        if key in context
+    }
+
+    maturity_groups: dict[tuple, dict] = {}
+    for row in context.get("maturity_assets") or []:
+        currency = str(row.get("currency") or "BRL").upper()
+        value_minor_units = int(row.get("current_value_minor_units") or 0)
+        value_brl_cents = int(
+            row.get("current_value_brl_cents")
+            or (value_minor_units if currency == "BRL" else 0)
+        )
+        group_key = (
+            str(row.get("maturity_date") or ""),
+            currency,
+            str(row.get("asset_type") or "Nao informado"),
+            bool(row.get("reserved_for_objective")),
+            bool(row.get("reserved_for_emergency")),
+        )
+        group = maturity_groups.setdefault(
+            group_key,
+            {
+                "maturity_date": group_key[0],
+                "currency": currency,
+                "asset_type": group_key[2],
+                "reserved_for_objective": group_key[3],
+                "reserved_for_emergency": group_key[4],
+                "value_minor_units": 0,
+                "value_brl_cents": 0,
+                "count": 0,
+            },
+        )
+        group["value_minor_units"] += value_minor_units
+        group["value_brl_cents"] += value_brl_cents
+        group["count"] += int(row.get("count") or 1)
+
+    maturity_assets = []
+    for group in maturity_groups.values():
+        item = {
+            "maturity_date": group["maturity_date"],
+            "currency": group["currency"],
+            "asset_type": group["asset_type"],
+            "value_display": format_currency_minor_units(
+                group["value_minor_units"], group["currency"]
+            ),
+            "count": group["count"],
+            "reserved_for_objective": group["reserved_for_objective"],
+            "reserved_for_emergency": group["reserved_for_emergency"],
+        }
+        if group["value_brl_cents"]:
+            item["value_brl_display"] = format_brl_cents(group["value_brl_cents"])
+        maturity_assets.append(item)
+    local_context["maturity_assets"] = sorted(
+        maturity_assets,
+        key=lambda item: (item["maturity_date"], item["currency"], item["asset_type"]),
+    )
+
+    cashflow = context.get("cashflow_projection") or {}
+
+    def compact_currency_amounts(rows: object) -> list[dict]:
+        compacted = []
+        for row in rows if isinstance(rows, list) else []:
+            compacted.append({
+                "currency": row.get("currency"),
+                "amount_display": row.get("amount_display")
+                or format_currency_minor_units(
+                    row.get("amount_minor_units") or 0,
+                    str(row.get("currency") or "BRL"),
+                ),
+            })
+        return compacted
+
+    def compact_timeline(rows: object) -> list[dict]:
+        compacted = []
+        for row in rows if isinstance(rows, list) else []:
+            item = {
+                "currency": row.get("currency"),
+                "opening_balance_display": row.get("opening_balance_display")
+                or format_currency_minor_units(
+                    row.get("opening_balance_minor_units") or 0,
+                    str(row.get("currency") or "BRL"),
+                ),
+                "projected_balance_at_horizon_display": row.get(
+                    "projected_balance_at_horizon_display"
+                )
+                or format_currency_minor_units(
+                    row.get("projected_balance_at_horizon_minor_units") or 0,
+                    str(row.get("currency") or "BRL"),
+                ),
+                "omitted_events": int(row.get("omitted_events") or 0),
+                "events": [],
+            }
+            for event in row.get("events") or []:
+                compact_event = {"date": event.get("date")}
+                for field in (
+                    "planned_income_display",
+                    "planned_expense_display",
+                    "open_card_invoices_display",
+                    "projected_balance_display",
+                ):
+                    if event.get(field):
+                        compact_event[field] = event[field]
+                compact_event["projected_balance_display"] = compact_event.get(
+                    "projected_balance_display"
+                ) or format_currency_minor_units(
+                    event.get("projected_balance_after_recorded_bills_minor_units") or 0,
+                    str(row.get("currency") or "BRL"),
+                )
+                item["events"].append(compact_event)
+            compacted.append(item)
+        return compacted
+
+    local_context["cashflow_projection"] = {
+        key: cashflow[key]
+        for key in ("month", "confidence", "horizon_days", "scope_note")
+        if key in cashflow
+    }
+    local_context["cashflow_projection"].update({
+        "current_liquid_balances_by_currency": compact_currency_amounts(
+            cashflow.get("current_liquid_balances_by_currency")
+        ),
+        "investment_account_balances_by_currency": compact_currency_amounts(
+            cashflow.get("investment_account_balances_by_currency")
+        ),
+        "timeline_by_currency": compact_timeline(cashflow.get("timeline_by_currency")),
+        "omitted_open_card_invoices": int(cashflow.get("omitted_open_card_invoices") or 0),
+    })
+
+    commitments = context.get("financial_commitments") or {}
+    goals = commitments.get("goals") or {}
+    local_goals = {
+        "count": int(goals.get("count") or 0),
+    }
+    for field in (
+        "target_brl",
+        "reserved_brl",
+        "remaining_brl",
+        "linked_investments_brl",
+        "emergency_reserve_investments_brl",
+    ):
+        display_key = f"{field}_display"
+        raw_key = f"{field}_cents"
+        if display_key in goals:
+            local_goals[display_key] = goals[display_key]
+        elif raw_key in goals:
+            local_goals[display_key] = format_brl_cents(goals[raw_key])
+    local_goals["linked_investments_by_asset_type"] = [
+        {
+            "asset_type": row.get("asset_type"),
+            "current_value_display": row.get("current_value_display")
+            or format_brl_cents(row.get("current_value_brl_cents") or 0),
+        }
+        for row in goals.get("linked_investments_by_asset_type") or []
+    ]
+    local_context["financial_commitments"] = {
+        "goals": local_goals,
+        "loans_by_currency": [
+            {
+                "currency": row.get("currency"),
+                "count": int(row.get("count") or 0),
+                "remaining_commitment_display": row.get("remaining_commitment_display"),
+                "monthly_installments_display": row.get("monthly_installments_display"),
+                "loans_without_rate": int(row.get("loans_without_rate") or 0),
+            }
+            for row in commitments.get("loans_by_currency") or []
+        ],
+    }
+
+    score = context.get("score_pillars") or {}
+    local_context["score_pillars"] = {
+        "reserve": int(score.get("reserve") or 0),
+        "debt": int(score.get("debt") or 0),
+        "eligible_reserve_display": score.get("eligible_reserve_display")
+        or format_brl_cents(score.get("eligible_reserve_cents") or 0),
+        "debt_installments_display": score.get("debt_installments_display")
+        or format_brl_cents(score.get("debt_installments_month_cents") or 0),
+    }
+    return local_context
+
+
+def compact_portfolio_group_rows(
+    rows: object,
+    *,
+    label_prefix: str,
+    limit: int = 12,
+) -> list[dict]:
+    """Preserva agregados de carteira sem repetir centavos e valores em float."""
+    normalized = rows if isinstance(rows, list) else []
+    compacted = []
+    for row in normalized[:limit]:
+        if not isinstance(row, dict):
+            continue
+        value_cents = int(row.get("current_value_brl_cents") or 0)
+        compacted.append({
+            "label": row.get("label") or "Nao informado",
+            "current_value_display": (
+                row.get("current_value_brl_display")
+                or row.get("current_value_display")
+                or format_brl_cents(value_cents)
+            ),
+            "position_count": int(row.get("position_count") or 0),
+        })
+
+    omitted = [row for row in normalized[limit:] if isinstance(row, dict)]
+    if omitted:
+        omitted_value_cents = sum(int(row.get("current_value_brl_cents") or 0) for row in omitted)
+        omitted_position_count = sum(int(row.get("position_count") or 0) for row in omitted)
+        compacted.append({
+            "label": f"{label_prefix} omitidas",
+            "current_value_display": format_brl_cents(omitted_value_cents),
+            "position_count": omitted_position_count,
+            "omitted_group_count": len(omitted),
+        })
+    return compacted
+
+
+def compact_portfolio_context(context: dict) -> dict:
+    """Retém apenas os agregados necessários para interpretar a carteira.
+
+    # spec: consultor/consultor v2.54 — contexto compacto de carteira para IA local e remota
+    O backend calcula a carteira completa antes desta etapa. O contrato final usa somente
+    valores exibíveis, limita grupos e conserva o total dos grupos omitidos; assim o mesmo
+    payload reduzido é enviado para a IA local e para o fallback remoto.
+    """
+    portfolio = context.get("portfolio") or {}
+    market_data = context.get("market_data") or {}
+    compacted_sources = set()
+    for source in market_data.get("observed_sources") or []:
+        normalized_source = str(source or "").strip()
+        for provider_name in ("Yahoo Finance", "CoinGecko", "Mais Retorno"):
+            if normalized_source.startswith(provider_name):
+                normalized_source = provider_name
+                break
+        if normalized_source:
+            compacted_sources.add(normalized_source)
+    compacted = {
+        key: context.get(key)
+        for key in (
+            "analysis_id",
+            "investor_profile",
+            "complementary_profile",
+        )
+        if key in context
+    }
+    compacted["market_data"] = {
+        "uses_portfolio_quotes": bool(market_data.get("uses_portfolio_quotes")),
+        "uses_quote_cache": bool(market_data.get("uses_quote_cache")),
+        "observed_sources": sorted(compacted_sources),
+    }
+    compacted["portfolio"] = {
+        "total_display": portfolio.get("total_display")
+        or format_brl_cents(portfolio.get("total_brl_cents") or 0),
+        "position_count": int(portfolio.get("position_count") or 0),
+        "by_asset_type": compact_portfolio_group_rows(
+            portfolio.get("by_asset_type"), label_prefix="Outras classes"
+        ),
+    }
+    compacted["allocation_goals"] = [
+        {
+            "asset_type": row.get("asset_type"),
+            "label": row.get("label"),
+            "target_percent": row.get("target_percent"),
+            "current_percent": row.get("current_percent"),
+            "deviation_percentage_points": row.get("deviation_percentage_points"),
+            "current_value_display": row.get("current_value_brl_display")
+            or row.get("current_value_display")
+            or format_brl_cents(row.get("current_value_brl_cents") or 0),
+            "target_defined_by_user": bool(row.get("target_defined_by_user")),
+        }
+        for row in context.get("allocation_goals") or []
+        if isinstance(row, dict)
+    ]
+    commitments = context.get("financial_commitments") or {}
+    goals = commitments.get("goals") or {}
+    compacted["financial_commitments"] = {
+        "goals": {
+            "count": int(goals.get("count") or 0),
+            "target_display": goals.get("target_brl_display")
+            or format_brl_cents(goals.get("target_brl_cents") or 0),
+            "reserved_display": goals.get("reserved_brl_display")
+            or format_brl_cents(goals.get("reserved_brl_cents") or 0),
+            "remaining_display": goals.get("remaining_brl_display")
+            or format_brl_cents(goals.get("remaining_brl_cents") or 0),
+            "linked_investments_display": goals.get("linked_investments_brl_display")
+            or format_brl_cents(goals.get("linked_investments_brl_cents") or 0),
+            "emergency_reserve_investments_display": goals.get(
+                "emergency_reserve_investments_brl_display"
+            ) or format_brl_cents(goals.get("emergency_reserve_investments_brl_cents") or 0),
+            "linked_investments_by_asset_type": [
+                {
+                    "asset_type": row.get("asset_type"),
+                    "current_value_display": row.get("current_value_brl_display")
+                    or row.get("current_value_display")
+                    or format_brl_cents(row.get("current_value_brl_cents") or 0),
+                }
+                for row in goals.get("linked_investments_by_asset_type") or []
+                if isinstance(row, dict)
+            ],
+        },
+        "loans_by_currency": [
+            {
+                "currency": row.get("currency"),
+                "count": int(row.get("count") or 0),
+                "remaining_commitment_display": row.get("remaining_commitment_display")
+                or format_currency_minor_units(
+                    row.get("remaining_commitment_minor_units") or 0,
+                    str(row.get("currency") or "BRL"),
+                ),
+                "monthly_installments_display": row.get("monthly_installments_display")
+                or format_currency_minor_units(
+                    row.get("monthly_installments_minor_units") or 0,
+                    str(row.get("currency") or "BRL"),
+                ),
+                "loans_without_rate": int(row.get("loans_without_rate") or 0),
+            }
+            for row in commitments.get("loans_by_currency") or []
+            if isinstance(row, dict)
+        ],
+    }
+    score = context.get("score") or {}
+    compacted["score"] = {
+        "month": score.get("month"),
+        "reserve_months": score.get("reserve_months") or 0,
+        "reserve_pillar": int(score.get("reserve_pillar") or 0),
+        "eligible_reserve_display": score.get("eligible_reserve_display")
+        or format_brl_cents(score.get("eligible_reserve_cents") or 0),
+        "debt_pillar": int(score.get("debt_pillar") or 0),
+    }
+    compacted["by_currency"] = compact_portfolio_group_rows(
+        context.get("by_currency"), label_prefix="Outras moedas"
+    )
+    compacted["by_market"] = compact_portfolio_group_rows(
+        context.get("by_market"), label_prefix="Outros mercados"
+    )
+    return compacted

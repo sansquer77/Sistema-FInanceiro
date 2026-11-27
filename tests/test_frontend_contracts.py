@@ -247,8 +247,23 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("webllm.CreateWebWorkerMLCEngine(engineWorker, selectedModelId, engineConfig, CHAT_OPTIONS)", client)
         self.assertIn("webllm.CreateMLCEngine(selectedModelId, engineConfig, CHAT_OPTIONS)", client)
         self.assertIn("preferMainThread", client)
+        self.assertIn("let preferMainThread = true;", client)
+        self.assertIn('new URL("./webllm-worker.js?v=184", import.meta.url)', client)
+        self.assertLess(
+            client.index("webllm.CreateMLCEngine(selectedModelId, engineConfig, CHAT_OPTIONS)"),
+            client.index("webllm.CreateWebWorkerMLCEngine(engineWorker, selectedModelId, engineConfig, CHAT_OPTIONS)"),
+        )
+        self.assertIn('stage,\n    errorType:', client)
         self.assertIn('diagnosis.category === "string_error"', client)
         self.assertIn("refreshLocalModel", client)
+        self.assertIn("LOCAL_MODEL_PREPARE_TIMEOUT_MS = 60_000", client)
+        self.assertIn("LOCAL_INFERENCE_TIMEOUT_MS = 90_000", client)
+        self.assertIn("webgpu_adapter_unavailable", client)
+        self.assertIn("adapter_available", client)
+        self.assertIn("ready: Boolean(engine", client)
+        self.assertIn("loading: Boolean(enginePromise)", client)
+        self.assertIn("local_operation_timeout", client)
+        self.assertIn("local_operation_cancelled", client)
         self.assertIn("device (was )?lost", client)
         self.assertIn("GPU_MEMORY_PATTERN.test(detail)", client)
         consultor_view = (MODULE_ROOT / "consultor-view.js").read_text(encoding="utf-8")
@@ -256,6 +271,10 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn('const remoteWasAllowed = order.includes("remota");', consultor_view)
         self.assertIn('renderAnalysisState("Tentando a IA local. Preparando o contexto desta análise…");', consultor_view)
         self.assertIn('"A IA local não concluiu. Tentando a IA remota…"', consultor_view)
+        self.assertIn('data-consultor-cancel', consultor_view)
+        self.assertIn("Nenhuma chamada remota foi feita.", consultor_view)
+        self.assertIn("new AbortController()", consultor_view)
+        self.assertIn("appendRetryAction", consultor_view)
         run_analysis = consultor_view[consultor_view.index("async function runAnalysis"):]
         self.assertLess(
             run_analysis.index('const order = consultorConfig?.order || ["local", "deterministica"];'),
@@ -263,7 +282,7 @@ class FrontendModuleContractTest(unittest.TestCase):
         )
         for module in ("consultor-view.js", "trends-view.js", "user-admin-view.js"):
             source = (MODULE_ROOT / module).read_text(encoding="utf-8")
-            self.assertIn('webllm-client.js?v=182"', source, module)
+            self.assertIn('webllm-client.js?v=184"', source, module)
         admin = (MODULE_ROOT / "user-admin-view.js").read_text(encoding="utf-8")
         html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
         self.assertIn('id="aiLocalModel"', html)

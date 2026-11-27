@@ -1,7 +1,7 @@
 // spec: cockpit-calendario v0.9 — critérios 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17 e 18
-// spec: consultor/consultor v2.47 — respostas parciais preservadas e sinalizadas
+// spec: consultor/consultor v2.51 — respostas parciais preservadas, timeout e cancelamento local
 import { stateMarkup } from "./dom-utils.js";
-import { runLocalConsultor } from "./webllm-client.js?v=182";
+import { runLocalConsultor } from "./webllm-client.js?v=184";
 export function registerConsultorView({
   elements,
   api,
@@ -35,6 +35,7 @@ export function registerConsultorView({
   let consultorHistory = [];
   let consultorLoading = false;
   let runningAnalysisId = "";
+  let localRunController = null;
   let selectedAnalysisId = "";
   let selectedPeriodWindow = "3m";
   let macroResearch = null;
@@ -207,6 +208,7 @@ export function registerConsultorView({
     consultorCardGrid.querySelectorAll("[data-consultor-run]").forEach((button) => {
       button.addEventListener("click", () => runAnalysis());
     });
+    consultorCardGrid.querySelector("[data-consultor-cancel]")?.addEventListener("click", cancelAnalysis);
     renderConsultorHistory();
   }
 
@@ -243,7 +245,7 @@ export function registerConsultorView({
   }
 
   function renderAnalysisSelector(cards) {
-    // spec: consultor/consultor v2.46 — critérios 8, 9 e 14
+    // spec: consultor/consultor v2.51 — critérios 8, 9 e 14
     // (o catálogo permanece fechado; a interface concentra a escolha em um
     // seletor e renderiza as opções de período declaradas pelo backend para
     // cada card que exige período — ralos usa 3/6/12/YTD; evolução do score
@@ -272,9 +274,12 @@ export function registerConsultorView({
           ${period}
         </div>
         <p class="consultor-analysis-description">${escapeHtml(card.short_description || "")}</p>
-        <button class="primary consultor-run-button" type="button" data-consultor-run ${isRunning ? "disabled" : ""}>
-          ${isRunning ? "Gerando..." : "Gerar"}
-        </button>
+        <div class="consultor-run-actions">
+          <button class="primary consultor-run-button" type="button" data-consultor-run ${isRunning ? "disabled" : ""}>
+            ${isRunning ? "Preparando..." : "Gerar"}
+          </button>
+          ${isRunning ? '<button class="ghost consultor-cancel-button" type="button" data-consultor-cancel>Cancelar</button>' : ""}
+        </div>
       </section>
     `;
   }
@@ -297,12 +302,30 @@ export function registerConsultorView({
     }
   }
 
+  function cancelAnalysis() {
+    if (!localRunController) return;
+    localRunController.abort();
+    renderAnalysisState("Cancelando a execução local…");
+  }
+
+  function appendRetryAction() {
+    if (!consultorOutput) return;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "ghost consultor-retry-button";
+    button.textContent = "Tentar novamente";
+    button.addEventListener("click", () => runAnalysis());
+    consultorOutput.append(button);
+  }
+
   async function runAnalysis() {
     const analysisId = selectedAnalysisId;
     if (!analysisId || runningAnalysisId) {
       return;
     }
     runningAnalysisId = analysisId;
+    localRunController = new AbortController();
+    const localSignal = localRunController.signal;
     macroResearch = null;
     renderConsultor();
     let localFailure = "";
@@ -323,12 +346,13 @@ export function registerConsultorView({
             macroResearch = prepared.macro_research || null;
             renderAnalysisState("IA local selecionada. Carregando o modelo ou reutilizando o cache…");
             const output = await runLocalConsultor(prepared.messages, prepared, (progress) => {
-              renderAnalysisState(progress);
-            });
+              renderAnalysisState(`IA local: ${progress}`);
+            }, localSignal);
             renderAnalysisState("IA local concluiu a geração. Validando a análise…");
             result = await api("/api/consultor/complete-local", { method: "POST", body: { ...body, output } });
           } catch (localError) {
             localFailure = localError.message || "A IA local não está disponível neste dispositivo.";
+            if (localSignal.aborted) throw localError;
             if (!order.includes("remota")) throw localError;
           }
         }
@@ -348,6 +372,11 @@ export function registerConsultorView({
     } catch (err) {
       if (consultorOutput) {
         consultorOutput.hidden = false;
+        if (localSignal.aborted) {
+          consultorOutput.innerHTML = stateMarkup("A execução foi cancelada. Nenhuma chamada remota foi feita.", { kind: "empty" });
+          appendRetryAction();
+          return;
+        }
         const remoteFailure = err.message || "O Consultor está indisponível no momento.";
         const remoteWasAllowed = order.includes("remota");
         const errorMessage = localFailure && remoteWasAllowed
@@ -356,9 +385,11 @@ export function registerConsultorView({
             ? `A IA local não concluiu a análise: ${localFailure}`
             : remoteFailure;
         consultorOutput.innerHTML = stateMarkup(errorMessage, { kind: "error" });
+        appendRetryAction();
       }
     } finally {
       runningAnalysisId = "";
+      localRunController = null;
       renderConsultor();
     }
   }
@@ -640,6 +671,7 @@ export function registerConsultorView({
     consultorConfig = null;
     consultorHistory = [];
     runningAnalysisId = "";
+    localRunController = null;
   }
 
   if (consultorHistoryRefreshButton) {

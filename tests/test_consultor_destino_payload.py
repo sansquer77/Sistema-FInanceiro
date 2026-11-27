@@ -13,6 +13,7 @@ from financeiro.consultor_cashflow import (
     MAX_TIMELINE_EVENTS_PER_CURRENCY,
     build_maturity_cashflow_context,
 )
+from financeiro.consultor_context import compact_destination_context
 from financeiro.consultor_catalog import build_system_prompt
 from financeiro.consultor_provider import build_ai_messages
 from financeiro.credit_cards import create_credit_card, create_credit_card_transaction
@@ -135,6 +136,87 @@ class DestinoVencimentosPayloadTest(unittest.TestCase):
         self.assertLessEqual(len(payload), 8_000, f"payload com {len(payload)} caracteres")
         self.assertIn("omitted_events", payload)
         self.assertIn("omitted_open_card_invoices", payload)
+
+    def test_compact_context_keeps_decision_data_without_repeated_payload(self) -> None:
+        context = {
+            "analysis_id": "destino_vencimentos",
+            "reference_date": "2026-10-31",
+            "investor_profile": "Moderado",
+            "complementary_profile": {},
+            "market_data": {"uses_portfolio_quotes": True},
+            "maturity_assets": [
+                {
+                    "maturity_date": "2026-12-28",
+                    "currency": "BRL",
+                    "asset_type": "fixed_income",
+                    "current_value_minor_units": 10_000,
+                    "current_value_brl_cents": 10_000,
+                    "reserved_for_objective": False,
+                    "reserved_for_emergency": True,
+                    "count": 1,
+                },
+                {
+                    "maturity_date": "2026-12-28",
+                    "currency": "BRL",
+                    "asset_type": "fixed_income",
+                    "current_value_minor_units": 20_000,
+                    "current_value_brl_cents": 20_000,
+                    "reserved_for_objective": False,
+                    "reserved_for_emergency": True,
+                    "count": 1,
+                },
+            ],
+            "cashflow_projection": {
+                "horizon_days": 90,
+                "months_by_currency": [{"month": "2026-11"}],
+                "open_card_invoices": [{"due_date": "2026-11-10"}],
+                "current_liquid_balances_by_currency": [
+                    {"currency": "BRL", "amount_minor_units": 50_000, "amount_display": "R$ 500,00"},
+                ],
+                "investment_account_balances_by_currency": [],
+                "timeline_by_currency": [
+                    {
+                        "currency": "BRL",
+                        "opening_balance_minor_units": 50_000,
+                        "opening_balance_display": "R$ 500,00",
+                        "projected_balance_at_horizon_minor_units": 40_000,
+                        "projected_balance_at_horizon_display": "R$ 400,00",
+                        "omitted_events": 0,
+                        "events": [
+                            {
+                                "date": "2026-11-10",
+                                "open_card_invoices_display": "R$ 100,00",
+                                "projected_balance_after_recorded_bills_minor_units": 40_000,
+                            },
+                        ],
+                    },
+                ],
+                "omitted_open_card_invoices": 0,
+            },
+            "financial_commitments": {"goals": {"count": 0}, "loans_by_currency": []},
+            "score_pillars": {
+                "reserve": 3,
+                "debt": 4,
+                "eligible_reserve_cents": 50_000,
+                "debt_installments_month_cents": 10_000,
+            },
+        }
+
+        compacted = compact_destination_context(context)
+
+        self.assertEqual(len(compacted["maturity_assets"]), 1)
+        self.assertEqual(compacted["maturity_assets"][0]["count"], 2)
+        self.assertEqual(compacted["maturity_assets"][0]["value_display"], "R$ 300,00")
+        self.assertEqual(compacted["maturity_assets"][0]["reserved_for_emergency"], True)
+        self.assertNotIn("current_value_minor_units", compacted["maturity_assets"][0])
+        self.assertNotIn("months_by_currency", compacted["cashflow_projection"])
+        self.assertNotIn("open_card_invoices", compacted["cashflow_projection"])
+        self.assertEqual(
+            compacted["cashflow_projection"]["timeline_by_currency"][0]["events"][0][
+                "projected_balance_display"
+            ],
+            "R$ 400,00",
+        )
 
 
 if __name__ == "__main__":

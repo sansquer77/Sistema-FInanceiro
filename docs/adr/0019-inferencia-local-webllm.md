@@ -2,8 +2,8 @@
 tipo: adr
 area: ia-local
 status: em-implementacao
-versao: 0.9
-atualizado: 2026-11-18
+versao: 1.1
+atualizado: 2026-11-26
 relacionados:
   - "[[0002-modularizacao-frontend]]"
   - "[[0006-classificacao-assistida-local]]"
@@ -17,7 +17,7 @@ aliases: ["ADR-0019", "Inferência local WebLLM"]
 # ADR-0019 — Inferência local compartilhada com WebLLM
 
 > [!info] Status
-> **em-implementacao** · área: `ia-local` · atualizado em 2026-11-18 · relacionados: [[0002-modularizacao-frontend]], [[0006-classificacao-assistida-local]], [[0010-segredos-criptografados-sqlite]], [[../specs/consultor]], [[../specs/tendencias-saude-financeira]], [[../distribuição]]
+> **em-implementacao** · área: `ia-local` · atualizado em 2026-11-26 · relacionados: [[0002-modularizacao-frontend]], [[0006-classificacao-assistida-local]], [[0010-segredos-criptografados-sqlite]], [[../specs/consultor]], [[../specs/tendencias-saude-financeira]], [[../distribuição]]
 
 ## Contexto
 
@@ -29,13 +29,15 @@ Adotar WebLLM como opção de inferência local no navegador, com `Qwen2.5-1.5B-
 
 Se a geração perder o dispositivo GPU por memória insuficiente, o cliente descarrega o engine e tenta temporariamente `gemma3-1b-it-q4f16_1-MLC`, sem regravar a preferência do usuário. A troca temporária é informada na interface; o usuário continua podendo escolher outro modelo nas Preferências.
 
-Quando o WebLLM executado em Worker serializar a falha como texto após a perda do dispositivo, o cliente também trata esse retorno como falha recuperável: descarrega o engine, tenta o Gemma 3 1B e cria essa segunda tentativa diretamente na página, preservando a preferência persistida.
+Como alguns navegadores expõem WebGPU à página mas falham ao inicializar o Dedicated Worker, o cliente tenta primeiro criar o engine diretamente na página. Se essa tentativa falhar, usa o protocolo oficial do WebLLM no Worker como fallback. Falhas de ambas as etapas são registradas no Console somente com etapa, tipo e mensagem truncada, sem prompt, resposta ou dados financeiros.
 
 As Preferências exibem um catálogo fechado de modelos WebLLM já presentes no runtime vendorizado, com estimativa de memória e indicação de uso. A troca de seleção não apaga o cache anterior; cada modelo é identificado separadamente pelo cache privado do navegador. O botão de atualização permite remover e reconstruir o cache do modelo selecionado quando houver falha ou atualização dos pesos.
 
 O runtime JavaScript e seu worker serão vendorizados com versão, hash e licença auditáveis. A CSP libera somente `wasm-unsafe-eval` para a compilação do runtime WebAssembly, sem liberar `unsafe-eval` para JavaScript. Os pesos do modelo não entram no instalador principal: serão baixados no primeiro uso a partir de origem fixada e mantidos no cache privado do navegador. Um pacote offline opcional poderá ser avaliado separadamente.
 
 As Preferências oferecem controle explícito para baixar, verificar e remover o modelo. Esse cache pertence ao perfil e à origem do navegador, portanto não fica na pasta do aplicativo e não pode ser compartilhado por um servidor entre usuários ou máquinas. Instalações via servidor exigem download uma vez por perfil cliente compatível.
+
+Arquivos presentes no cache não significam engine pronto: o cliente verifica `navigator.gpu`, solicita um adaptador WebGPU e só apresenta o modelo como pronto depois que o engine é criado com sucesso. O preparo e a inferência têm timeout e cancelamento explícitos; o descarte do engine impede que uma promessa antiga reative um runtime depois de uma falha ou cancelamento.
 
 O backend continua montando o contexto minimizado, validando propriedade, aplicando quota/cooldown e pós-processando a saída. A inferência local recebe o prompt fechado e o contexto do card por uma rota autenticada; a resposta volta ao backend para a validação e persistência usuais. Nenhuma chave de provedor é exposta ao navegador.
 
@@ -45,7 +47,7 @@ O backend continua montando o contexto minimizado, validando propriedade, aplica
 - Consentimento e ordem de execução têm uma única origem; um recurso não pode usar IA remota se a política central não o permitir.
 - O primeiro uso requer download e WebGPU; a interface deve indicar progresso, capacidade e erros recuperáveis.
 - O modelo ocupa espaço no cache do navegador e pode ser removido por políticas do próprio navegador.
-- A dependência adiciona worker, política de Content Security Policy e cabeçalhos de isolamento; todos precisam ser compatíveis com a distribuição local e LAN.
+- A dependência adiciona worker, política de Content Security Policy e cabeçalhos de isolamento; todos precisam ser compatíveis com a distribuição local e LAN. A inicialização preferencial na página reduz a dependência operacional do Worker, mantendo-o para navegadores em que o engine direto não seja viável.
 - A qualidade local é inferior à de alguns provedores remotos. A escolha explícita de prioridade permite equilibrar privacidade, velocidade e qualidade.
 
 ## Alternativas consideradas
@@ -59,6 +61,8 @@ O backend continua montando o contexto minimizado, validando propriedade, aplica
 
 ## Changelog
 
+- `1.1` — 2026-11-26 — Prioriza o engine direto na página diante de falhas recorrentes no Worker do Edge, mantém fallback para Worker e adiciona diagnóstico técnico seguro no Console.
+- `1.0` — 2026-11-26 — Diferencia pesos baixados de engine pronto, verifica o adaptador WebGPU e adiciona timeout/cancelamento seguro para impedir carregamento infinito e fallback remoto após cancelamento explícito.
 - `0.9` — 2026-11-18 — Documenta o retry do modelo local ultraleve no contexto principal quando o Worker Safari devolve a perda da GPU como `string_error`.
 - `0.8` — 2026-11-18 — Registra a necessidade de invalidar o cache dos módulos cliente e worker quando o fallback local é alterado, evitando que navegadores executem o cliente WebLLM anterior.
 - `0.7` — 2026-11-18 — Adiciona fallback local temporário para o Gemma 3 1B quando o modelo selecionado perde o dispositivo GPU por memória insuficiente durante a geração.

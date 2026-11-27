@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 16.44
+versao: 16.50
 atualizado: 2026-11-26
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -159,6 +159,12 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `16.50` — 2026-11-26 — [[specs/consultor]] v2.55 otimiza os prompts dos cards e compacta a série histórica do Score, mantendo a janela de 12 meses abaixo do orçamento local.
+- `16.49` — 2026-11-26 — [[specs/consultor]] v2.54 e [[adr/0021-janela-contexto-local-consultor]] v0.5 compactam o contexto da Análise da Carteira para IA local e remota, preservando agregados e totais omitidos.
+- `16.48` — 2026-11-26 — [[specs/consultor]] v2.53 corrige o contexto do card de Ralos Financeiros, incluindo série da janela, valores de orçamento e proteção contra ranking sem dados.
+- `16.47` — 2026-11-26 — [[specs/consultor]] v2.52 e [[adr/0019-inferencia-local-webllm]] v1.1 priorizam a criação do engine WebLLM na página para contornar falhas do Worker no Edge, mantendo fallback e diagnóstico técnico seguro.
+- `16.46` — 2026-11-26 — [[specs/consultor]] v2.51 e [[adr/0019-inferencia-local-webllm]] v1.0 diferenciam pesos baixados de engine local pronto, verificam o adaptador WebGPU e adicionam timeout/cancelamento do preparo e da inferência.
+- `16.45` — 2026-11-26 — [[specs/consultor]] v2.50 e [[adr/0021-janela-contexto-local-consultor]] v0.4 compactam o payload de vencimentos para IA local e remota, agrupando ativos equivalentes e removendo projeções repetidas.
 - `16.44` — 2026-11-26 — [[specs/consultor]] v2.49 diferencia respostas vazias do provedor e orienta nova tentativa ou troca de modelo.
 - `16.43` — 2026-11-26 — [[specs/consultor]] v2.48 diferencia falhas de cota/limite (`429`) e orienta o usuário sem expor detalhes brutos do provedor.
 - `16.42` — 2026-11-26 — [[specs/consultor]] v2.47 preserva respostas parciais do Consultor, sinaliza seções não identificadas e evita descartar conteúdo válido por falha de formatação.

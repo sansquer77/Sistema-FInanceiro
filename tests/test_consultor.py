@@ -4,6 +4,7 @@ import unittest
 import tempfile
 import os
 import contextlib
+import json
 from datetime import datetime, timedelta
 from http import HTTPStatus
 from pathlib import Path
@@ -616,7 +617,23 @@ class ConsultorContextTest(unittest.TestCase):
         self.assertEqual(context["series"][-1]["month"], "2026-08")
         self.assertEqual(context["series"][-1]["score_total"], 720)
         self.assertEqual(context["series"][0]["pillars"][0]["id"], "poupanca")
+        self.assertEqual(context["pillar_definitions"][0]["label"], "Poupanca")
+        self.assertNotIn("max_score", context["series"][0]["pillars"][0])
         self.assertNotIn("transactions", context)
+
+    def test_score_evolution_12_month_prompt_fits_local_budget(self) -> None:
+        def fake_score(user_id, month=None, **kwargs):
+            return score_payload(month=month or "2026-08", score_total=700)
+
+        with mock.patch("financeiro.financial_health.calculate_financial_health_score", side_effect=fake_score), \
+                mock.patch("financeiro.portfolio.current_portfolio_positions", return_value=[]), self.profile_context():
+            context = build_analysis_context(7, "evolucao_score_tempo", period_window="12m")
+
+        messages = build_ai_messages(
+            build_system_prompt("evolucao_score_tempo", period_window="12m"), context
+        )
+        self.assertLessEqual(sum(len(message["content"]) for message in messages), 11_000)
+        self.assertIn("pillar_definitions", context)
 
     def test_score_evolution_context_rejects_invalid_period(self) -> None:
         with self.assertRaisesRegex(ConsultorError, "Periodo"):
@@ -627,10 +644,18 @@ class ConsultorContextTest(unittest.TestCase):
             context = build_analysis_context(7, "ralos_financeiros", month="2026-08", period_window="12m")
 
         self.assertEqual(context["period_window"], "12m")
+        self.assertEqual(context["period_label"], "12 meses")
         self.assertEqual(context["summary"]["expense_cents"], 320000)
         self.assertEqual(context["budget_alerts"][0]["category"], "Restaurantes")
+        self.assertEqual(context["budget_alerts"][0]["actual_cents"], 120000)
+        self.assertEqual(context["monthly_series"][0]["month"], "2026-08")
+        self.assertIsNone(context["period_comparison"]["expense_base_cents"])
         self.assertEqual(context["installment_acceleration"]["total_cents"], 10000)
-        self.assertNotIn("serie_mensal", context)
+
+        prompt = build_system_prompt("ralos_financeiros", period_window="12m")
+        self.assertIn("Periodo analisado: 12 meses", prompt)
+        self.assertIn("nao invente um ranking", prompt)
+        self.assertIn("Use sempre o termo Carteira, nunca Carta", prompt)
 
     def test_ralos_context_accepts_current_acceleration_list_shape(self) -> None:
         payload = trends_payload()
@@ -710,14 +735,16 @@ class ConsultorContextTest(unittest.TestCase):
         self.assertEqual(context["complementary_profile"]["idade"], 42)
         self.assertEqual(context["score"]["reserve_months"], 0.78)
         self.assertEqual(context["score"]["reserve_pillar"], 180)
-        self.assertEqual(context["portfolio"]["total_brl_cents"], 300000)
         self.assertEqual(context["portfolio"]["total_display"], "R$ 3.000,00")
         self.assertEqual(context["portfolio"]["by_asset_type"][0]["label"], "Renda Fixa")
         self.assertEqual(context["by_currency"][0]["label"], "BRL")
         self.assertEqual(context["by_market"][0]["label"], "Brasil")
-        self.assertIn("Yahoo Finance (AAPL)", context["market_data"]["observed_sources"])
+        self.assertIn("Yahoo Finance", context["market_data"]["observed_sources"])
+        self.assertNotIn("Yahoo Finance (AAPL)", context["market_data"]["observed_sources"])
         self.assertTrue(context["market_data"]["uses_quote_cache"])
         self.assertNotIn("positions", context["portfolio"])
+        self.assertNotIn("total_brl_cents", context["portfolio"])
+        self.assertNotIn("total_brl", context["portfolio"])
 
     def test_portfolio_analysis_context_uses_configured_profile_when_not_filled(self) -> None:
         with mock.patch("financeiro.portfolio.current_portfolio_positions", return_value=portfolio_positions()), mock.patch("financeiro.portfolio.get_allocation_goals", return_value=[]):
@@ -728,6 +755,36 @@ class ConsultorContextTest(unittest.TestCase):
 
         self.assertEqual(context["investor_profile"], "Conservador")
         self.assertEqual(context["complementary_profile"], {})
+
+    def test_portfolio_analysis_payload_is_compact_for_local_and_remote(self) -> None:
+        positions = [
+            {
+                "asset_type": f"asset_{index}",
+                "asset_type_label": f"Classe {index}",
+                "currency": f"CUR{index}",
+                "market_label": f"Mercado {index}",
+                "current_value_brl_cents": 100000 + index,
+                "quote_source": "Yahoo Finance",
+                "emergency_reserve_eligible": index == 0,
+            }
+            for index in range(80)
+        ]
+        with mock.patch("financeiro.portfolio.current_portfolio_positions", return_value=positions), \
+                mock.patch("financeiro.portfolio.get_allocation_goals", return_value=[]), \
+                mock.patch("financeiro.financial_goals.list_financial_goals", return_value=[]), \
+                mock.patch("financeiro.loans.list_loans", return_value=[]), \
+                mock.patch("financeiro.financial_health.calculate_financial_health_score", return_value=score_payload()), \
+                self.profile_context():
+            context = build_analysis_context(7, "analise_carteira")
+
+        payload = build_ai_messages(build_system_prompt("analise_carteira"), context)[1]["content"]
+        serialized_context = json.dumps(context, ensure_ascii=False, sort_keys=True)
+        self.assertLessEqual(len(serialized_context), 8000)
+        self.assertLessEqual(len(payload), 11000)
+        self.assertEqual(len(context["portfolio"]["by_asset_type"]), 13)
+        self.assertEqual(context["portfolio"]["by_asset_type"][-1]["omitted_group_count"], 68)
+        self.assertNotIn("current_value_brl_cents", serialized_context)
+        self.assertNotIn("current_value_brl\"", serialized_context)
 
     def test_system_prompt_requires_cited_research_for_portfolio_macro_context(self) -> None:
         prompt = build_system_prompt("analise_carteira")

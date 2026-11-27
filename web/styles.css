@@ -2170,6 +2170,17 @@ textarea:focus {
   padding: 0 16px;
 }
 
+.consultor-run-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.consultor-cancel-button {
+  min-height: 36px;
+}
+
 .consultor-analysis-select,
 .consultor-period-select,
 .consultor-response {

@@ -1,6 +1,6 @@
 import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";
 import { createLoadPolicy } from "./load-policy.js";
-import { clearLocalModel, getLocalModelStatus, prepareLocalModel, refreshLocalModel } from "./webllm-client.js?v=182";
+import { clearLocalModel, getLocalModelStatus, prepareLocalModel, refreshLocalModel } from "./webllm-client.js?v=184";
 
 export function registerUserAdminView(context) {
   const {
@@ -271,8 +271,14 @@ export function registerUserAdminView(context) {
       renderLocalModelHelp();
       if (!status.supported) {
         setLocalModelStatus("WebGPU não está disponível neste navegador. Use o botão para verificar novamente após habilitá-la.", "error");
-      } else if (status.cached) {
+      } else if (status.ready) {
         setLocalModelStatus(`Modelo ${model?.label || status.modelId} pronto neste navegador.`, "success");
+      } else if (!status.adapter_available) {
+        setLocalModelStatus("O navegador expõe WebGPU, mas não disponibilizou um adaptador para esta página.", "error");
+      } else if (status.loading) {
+        setLocalModelStatus("O engine do modelo local está sendo preparado neste navegador…");
+      } else if (status.cached) {
+        setLocalModelStatus(`Modelo ${model?.label || status.modelId} baixado neste navegador; será preparado na primeira análise.`);
       } else {
         setLocalModelStatus(`O modelo ${model?.label || status.modelId} ainda não foi baixado neste navegador.`);
       }
@@ -286,7 +292,7 @@ export function registerUserAdminView(context) {
   async function handleLocalModelDownload() {
     setLocalModelControls({ loading: true });
     setLocalModelStatus("Iniciando o modelo local… o navegador pode levar alguns segundos para preparar o download.");
-    // spec: consultor/consultor v2.46 — critério de preparo explícito do modelo local
+    // spec: consultor/consultor v2.51 — critério de preparo explícito do modelo local
     // Safari pode bloquear a pintura enquanto cria um module worker pesado. Ceder um frame
     // deixa o estado de preparo visível antes de carregar o runtime do WebLLM.
     await waitForNextPaint();
