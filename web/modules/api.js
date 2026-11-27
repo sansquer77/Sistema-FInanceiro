@@ -1,14 +1,21 @@
 let unauthorizedHandler = null;
 let unauthorizedHandled = false;
 let mutationHandler = null;
+let authenticationStateReader = null;
 
-export function configureApi({ onUnauthorized, onMutation } = {}) {
+export function configureApi({ onUnauthorized, onMutation, isAuthenticated } = {}) {
   unauthorizedHandler = typeof onUnauthorized === "function" ? onUnauthorized : null;
   mutationHandler = typeof onMutation === "function" ? onMutation : null;
+  authenticationStateReader = typeof isAuthenticated === "function" ? isAuthenticated : null;
   unauthorizedHandled = false;
 }
 
 export async function api(path, options = {}) {
+  if (shouldSkipUnauthenticatedRequest(path)) {
+    const error = new Error("Sessao nao autenticada.");
+    error.code = "UNAUTHENTICATED";
+    throw error;
+  }
   let response;
   try {
     response = await fetch(path, {
@@ -31,6 +38,11 @@ export async function api(path, options = {}) {
 }
 
 export async function upload(path, body) {
+  if (shouldSkipUnauthenticatedRequest(path)) {
+    const error = new Error("Sessao nao autenticada.");
+    error.code = "UNAUTHENTICATED";
+    throw error;
+  }
   let response;
   try {
     response = await fetch(path, {
@@ -102,14 +114,23 @@ function handleUnauthorized(response, path, options) {
 }
 
 function isPublicAuthPath(path) {
-  const publicPaths = new Set([
-    "/api/login",
-    "/api/register",
-    "/api/password-reset/request",
-    "/api/password-reset/confirm",
-    "/api/me",
-  ]);
-  return publicPaths.has(String(path).split("?")[0]);
+  return PUBLIC_API_PATHS.has(String(path).split("?")[0]);
+}
+
+const PUBLIC_API_PATHS = new Set([
+  "/api/app-info",
+  "/api/latest-version",
+  "/api/login",
+  "/api/register",
+  "/api/password-reset/request",
+  "/api/password-reset/confirm",
+  "/api/me",
+]);
+
+function shouldSkipUnauthenticatedRequest(path) {
+  return Boolean(authenticationStateReader)
+    && !authenticationStateReader()
+    && !PUBLIC_API_PATHS.has(String(path).split("?")[0]);
 }
 
 function resetUnauthorizedStateOnAuthSuccess(path) {

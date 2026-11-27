@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 16.58
+versao: 16.62
 atualizado: 2026-11-27
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -159,6 +159,10 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `16.62` — 2026-11-27 — [[specs/consultor]] v2.62, [[specs/tendencias-saude-financeira]] v2.35 e [[adr/0019-inferencia-local-webllm]] v1.5 serializam gerações locais entre Tendências e Consultor para evitar perda cruzada do engine WebGPU.
+- `16.61` — 2026-11-27 — [[specs/seguranca-autenticacao]] v1.9 impede o frontend de disparar endpoints privados antes da confirmação de `/api/me`, removendo `401` esperados ao abrir a página sem login.
+- `16.60` — 2026-11-27 — [[specs/consultor]] v2.61 e [[adr/0019-inferencia-local-webllm]] v1.4 tratam `BindingError`/`GPUDeviceLostInfo` como perda da GPU, evitam warning de limpeza incompatível e orientam recarregar o Safari.
+- `16.59` — 2026-11-27 — [[specs/consultor]] v2.60 e [[adr/0019-inferencia-local-webllm]] v1.3 sincronizam a tela de Preferências com preparos locais em segundo plano, cancelam o polling ao sair, forçam nova leitura ao retornar e incluem o source map do WebLLM.
 - `16.58` — 2026-11-27 — [[specs/consultor]] v2.59 e [[adr/0019-inferencia-local-webllm]] v1.2 atualizam o WebLLM para 0.2.89, tornam o engine cancelável/single-flight, encerram falhas do Worker rapidamente, evitam o fallback automático pelo Worker no Safari e usam Qwen3 0.6B como fallback de memória.
 
 - `16.53` — 2026-11-27 — [[specs/Update Server]] v1.6 e [[server]] v1.10 corrigem a cópia de caminho Unicode para o volume Linux Endor montado no macOS, evitando falha `chflags`.

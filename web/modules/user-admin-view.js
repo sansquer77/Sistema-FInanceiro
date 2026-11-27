@@ -1,6 +1,6 @@
 import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";
 import { createLoadPolicy } from "./load-policy.js";
-import { clearLocalModel, getLocalModelStatus, prepareLocalModel, refreshLocalModel } from "./webllm-client.js?v=188";
+import { clearLocalModel, getLocalModelStatus, prepareLocalModel, refreshLocalModel } from "./webllm-client.js?v=189";
 
 export function registerUserAdminView(context) {
   const {
@@ -22,6 +22,8 @@ export function registerUserAdminView(context) {
   let backupRestoreToken = "";
   let backupRestorePasswordInMemory = "";
   let localModelCatalog = [];
+  let localModelStatusPollTimer = null;
+  let localModelStatusRequest = null;
   const preferencesLoadPolicy = createLoadPolicy();
 
   function loadPreferences({ force = false } = {}) {
@@ -226,6 +228,23 @@ export function registerUserAdminView(context) {
     }
   }
 
+  // spec: consultor/consultor v2.60 — critérios de sincronização do preparo em segundo plano
+  function stopLocalModelStatusPolling() {
+    if (localModelStatusPollTimer !== null) {
+      clearTimeout(localModelStatusPollTimer);
+      localModelStatusPollTimer = null;
+    }
+  }
+
+  function scheduleLocalModelStatusRefresh(status) {
+    stopLocalModelStatusPolling();
+    if (!status?.loading || state.view !== "user") return;
+    localModelStatusPollTimer = setTimeout(() => {
+      localModelStatusPollTimer = null;
+      refreshLocalModelStatus();
+    }, 1000);
+  }
+
   function selectedLocalModelId() {
     return elements.aiLocalModel?.value || "Qwen2.5-1.5B-Instruct-q4f16_1-MLC";
   }
@@ -265,30 +284,40 @@ export function registerUserAdminView(context) {
 
   async function refreshLocalModelStatus() {
     if (!elements.aiLocalModelStatus) return;
-    try {
-      const status = await getLocalModelStatus(selectedLocalModelId());
-      const model = selectedLocalModel();
-      renderLocalModelHelp();
-      if (status.timed_out) {
-        setLocalModelStatus("O preparo do modelo local excedeu 60 segundos e foi encerrado. Tente novamente ou atualize o cache.", "error");
-      } else if (!status.supported) {
-        setLocalModelStatus("WebGPU não está disponível neste navegador. Use o botão para verificar novamente após habilitá-la.", "error");
-      } else if (status.ready) {
-        setLocalModelStatus(`Modelo ${model?.label || status.modelId} pronto neste navegador.`, "success");
-      } else if (!status.adapter_available) {
-        setLocalModelStatus("O navegador expõe WebGPU, mas não disponibilizou um adaptador para esta página.", "error");
-      } else if (status.loading) {
-        setLocalModelStatus("O engine do modelo local está sendo preparado neste navegador…");
-      } else if (status.cached) {
-        setLocalModelStatus(`Modelo ${model?.label || status.modelId} baixado neste navegador; será preparado na primeira análise.`);
-      } else {
-        setLocalModelStatus(`O modelo ${model?.label || status.modelId} ainda não foi baixado neste navegador.`);
+    if (localModelStatusRequest) return localModelStatusRequest;
+    const request = (async () => {
+      try {
+        const status = await getLocalModelStatus(selectedLocalModelId());
+        const model = selectedLocalModel();
+        renderLocalModelHelp();
+        if (status.timed_out) {
+          setLocalModelStatus("O preparo do modelo local excedeu 60 segundos e foi encerrado. Tente novamente ou atualize o cache.", "error");
+        } else if (!status.supported) {
+          setLocalModelStatus("WebGPU não está disponível neste navegador. Use o botão para verificar novamente após habilitá-la.", "error");
+        } else if (status.ready) {
+          setLocalModelStatus(`Modelo ${model?.label || status.modelId} pronto neste navegador.`, "success");
+        } else if (!status.adapter_available) {
+          setLocalModelStatus("O navegador expõe WebGPU, mas não disponibilizou um adaptador para esta página.", "error");
+        } else if (status.loading) {
+          setLocalModelStatus("O engine do modelo local está sendo preparado neste navegador…");
+        } else if (status.cached) {
+          setLocalModelStatus(`Modelo ${model?.label || status.modelId} baixado neste navegador; será preparado na primeira análise.`);
+        } else {
+          setLocalModelStatus(`O modelo ${model?.label || status.modelId} ainda não foi baixado neste navegador.`);
+        }
+        setLocalModelControls(status);
+        scheduleLocalModelStatusRefresh(status);
+      } catch (error) {
+        stopLocalModelStatusPolling();
+        setLocalModelStatus("Não foi possível verificar o modelo local. Clique em Baixar modelo local para tentar o preparo.", "error");
+        setLocalModelControls();
       }
-      setLocalModelControls(status);
-    } catch (error) {
-      setLocalModelStatus("Não foi possível verificar o modelo local. Clique em Baixar modelo local para tentar o preparo.", "error");
-      setLocalModelControls();
-    }
+    })();
+    const trackedRequest = request.finally(() => {
+      if (localModelStatusRequest === trackedRequest) localModelStatusRequest = null;
+    });
+    localModelStatusRequest = trackedRequest;
+    return trackedRequest;
   }
 
   async function handleLocalModelDownload() {
@@ -951,6 +980,7 @@ export function registerUserAdminView(context) {
     loadMaisRetornoConfigStatus,
     loadBackupSettings,
     switchUserTab,
+    stopLocalModelStatusPolling,
     syncThemePreference,
     syncDensityPreference,
   };

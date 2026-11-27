@@ -2,7 +2,7 @@
 tipo: spec
 area: consultor
 status: em-implementacao
-versao: 2.59
+versao: 2.62
 atualizado: 2026-11-27
 relacionados:
   - "[[instrucoes-app]]"
@@ -17,7 +17,7 @@ aliases: ["Consultor Virtual", "Assistente de Investimentos", "Especialista em F
 # Consultor Virtual de Investimentos e Planejamento Financeiro
 
 > [!info] Status
-> **em-implementacao** · versão: `2.59` · área: `consultor` · atualizado em 2026-11-27 · relacionados: [[instrucoes-app]], [[investimentos-portfolio]], [[score-saude-financeira]], [[tendencias-saude-financeira]], [[cockpit-calendario]], [[objetivos-financeiros]], [[emprestimos-quitacao]], [[cartoes]], [[../adr/0019-inferencia-local-webllm]], [[../adr/0020-pesquisa-macro-consultor]], [[../adr/0021-janela-contexto-local-consultor]], [[../adr/0022-orcamento-tokens-saida-consultor]], [[../adr/0023-configuracoes-ia-por-provedor]]
+> **em-implementacao** · versão: `2.62` · área: `consultor` · atualizado em 2026-11-27 · relacionados: [[instrucoes-app]], [[investimentos-portfolio]], [[score-saude-financeira]], [[tendencias-saude-financeira]], [[cockpit-calendario]], [[objetivos-financeiros]], [[emprestimos-quitacao]], [[cartoes]], [[../adr/0019-inferencia-local-webllm]], [[../adr/0020-pesquisa-macro-consultor]], [[../adr/0021-janela-contexto-local-consultor]], [[../adr/0022-orcamento-tokens-saida-consultor]], [[../adr/0023-configuracoes-ia-por-provedor]]
 
 > [!warning] Pivô arquitetural (v0.13, refinado em v0.14/v0.15)
 > A partir desta versão, o Consultor **não possui campo de prompt livre**. O usuário interage exclusivamente através de um **catálogo de análises pré-formatadas** (cards). Essa mudança é uma decisão de **Security by Design**: eliminar a superfície de entrada de texto livre remove pela raiz os vetores de vazamento acidental de dados sensíveis (PII) e de *prompt injection* via chat. As seções "Prevenção de vazamento de dados no prompt (DLP)" e "Blindagem de prompt injection" da v0.12 são **removidas** desta spec — ver "Segurança by Design" e "Nota de segurança residual" abaixo para o que substitui essas salvaguardas.
@@ -470,6 +470,9 @@ Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regr
 - Dado que os pesos do modelo local estejam no cache do navegador, quando o status de Preferências for exibido, então o sistema informa "baixado" até que o engine WebLLM tenha sido inicializado com sucesso; somente o engine pronto pode ser chamado de "pronto".
 - Dado que `navigator.gpu` exista, quando o modelo local for preparado, então o cliente também solicita um adaptador WebGPU e diferencia a ausência do adaptador de uma falha de carregamento do modelo.
 - Dado que o preparo do engine local permaneça pendente por 60 segundos, quando o status for consultado, então o cliente encerra o preparo pendurado, libera os controles do modelo e informa que o preparo excedeu o limite.
+- Dado que a tela de Preferências seja aberta enquanto uma preparação local iniciada por outro card esteja pendente, quando o status retornar `loading`, então a interface consulta o status novamente até o preparo terminar ou exceder o limite e reabilita os controles sem exigir recarregar a página.
+- Dado que o usuário saia da tela de Preferências durante esse acompanhamento, quando outro módulo for exibido, então o polling do status é cancelado; ao retornar às Preferências, a carga é forçada para refletir o estado atual do engine.
+- Dado que o Safari perca o `GPUDevice` e o runtime retorne `GPUDeviceLostInfo` ou `BindingError`, quando a análise terminar, então o cliente classifica a falha como perda de GPU, evita um novo `unload()` incompatível e orienta recarregar a página para recriar o dispositivo.
 - Dado que o preparo ou a inferência local ultrapasse o tempo limite ou seja cancelado pelo usuário, quando o fluxo terminar, então o engine é descartado, a mensagem identifica a causa e o fallback remoto só é iniciado para falha local, nunca para cancelamento explícito.
 - Dado um navegador que exponha WebGPU à página mas falhe ao carregar o WebLLM no Dedicated Worker, quando o modelo local for preparado, então o cliente tenta primeiro o engine diretamente na página e só usa o Worker como fallback; cada falha técnica é registrada no Console apenas com etapa, tipo e mensagem truncada, sem prompt, resposta ou dados financeiros.
 - Dado o modelo local WebLLM, quando o engine é criado no modo Worker ou na página, então solicita a janela de contexto padrão do modelo (4096 tokens), sem aumentá-la, pois 8192 tokens causou perda do dispositivo GPU por falta de memória no navegador (ver [[adr/0021-janela-contexto-local-consultor]] v0.2).
@@ -494,6 +497,8 @@ Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regr
 - Dado uma configuração de IA remota previamente cadastrada, quando o usuário alterna a prioridade entre qualquer um dos quatro modos de execução, então o provedor, modelo e credencial permanecem armazenados; ao voltar para `remota_primeiro` ou `somente_remota`, a configuração anterior é reutilizada sem exigir novo cadastro da chave.
 - Dado configurações cadastradas para dois provedores remotos, quando o usuário troca o provedor ativo e salva uma alteração no segundo, então a URL, modelo e credencial do primeiro permanecem isolados e disponíveis ao selecioná-lo novamente.
 - Dado uma falha da IA remota após a tentativa local, quando a resposta de erro chega ao navegador, então o tratamento encerra o estado de carregamento e exibe as falhas local e remota sem deixar o card preso em "Tentando a IA remota…".
+- Dado que Tendências e Consultor solicitem inferência local ao mesmo tempo, quando o engine WebLLM estiver compartilhado, então as gerações são executadas em fila e nunca simultaneamente no mesmo dispositivo WebGPU.
+- Dado que uma análise local aguardando na fila seja cancelada pelo usuário, quando chegar sua vez, então ela é descartada sem inicializar ou descarregar o engine usado pela análise anterior.
 
 ## Fora de escopo
 
@@ -559,6 +564,9 @@ Todas as rotas devem ser autenticadas e validar `Host`/`Origin` conforme as regr
 - [x] Passo 47 — Isolar metadados e credenciais por provedor remoto em `user_ai_provider_settings`/`secure_configs`, migrar a configuração legada ativa sem perda, adicionar o preset DeepSeek e recarregar a configuração do provedor selecionado na tela de Preferências. Fecha: critério 96.
 - [x] Passo 48 — Corrigir o escopo do estado de prioridade no tratamento de erro do fallback remoto, diagnosticar códigos de erro em payloads OpenAI-compatible sem registrar conteúdo sensível e cobrir o encerramento do estado de carregamento com testes de contrato. Fecha: critério 97.
 - [x] Passo 49 — Atualizar o WebLLM para 0.2.89, tornar a inicialização single-flight e cancelável via `reload()`/`unload()`, capturar falhas e timeout do Worker, evitar o fallback automático pelo Worker no Safari e trocar o fallback de memória para Qwen3 0.6B. Fecha os critérios de estabilidade local adicionados nesta versão.
+- [x] Passo 50 — Atualizar o ciclo de vida da tela de Preferências: acompanhar preparos iniciados em Tendências/Consultor, cancelar o polling ao sair da tela, forçar nova leitura ao retornar e incluir o source map do runtime vendorizado para eliminar o 404 de diagnóstico.
+- [x] Passo 51 — Classificar `BindingError`/`GPUDeviceLostInfo` como perda de dispositivo, suprimir o warning de descarte incompatível e orientar recarga da página quando o Safari não conseguir recriar a GPU.
+- [x] Passo 52 — Serializar as gerações locais de Tendências e Consultor em uma fila compartilhada, preservando cancelamento antes do início e impedindo que o descarte de uma tentativa invalide outra análise em andamento. Fecha os critérios de concorrência local adicionados nesta versão.
 
 ### Checklist de homologação do Passo 19
 
@@ -608,6 +616,10 @@ _Nenhuma pendência em aberto._
 
 ## Changelog
 
+- `2.62` — 2026-11-27 — Serializa as gerações locais compartilhadas por Tendências e Consultor, evitando inferências simultâneas e descarte cruzado do engine WebGPU.
+- `2.61` — 2026-11-27 — Reconhece `BindingError`/`GPUDeviceLostInfo` após perda do dispositivo WebGPU, evita warning enganoso no descarte e orienta recarregar o Safari para recriar a GPU.
+- `2.60` — 2026-11-27 — Atualiza o ciclo de vida das Preferências para acompanhar preparos locais iniciados em segundo plano, cancelar o polling ao sair da tela, forçar nova leitura ao retornar e incluir o source map do runtime WebLLM.
+- `2.59` — 2026-11-27 — Atualiza o WebLLM para 0.2.89, torna a inicialização single-flight e cancelável, captura falhas/timeout do Worker, evita fallback automático pelo Worker no Safari e usa Qwen3 0.6B como fallback de memória.
 - `2.58` — 2026-11-27 — Adiciona watchdog ao status do engine local para encerrar preparos pendurados após 60 segundos e reabilitar os controles do modelo.
 - `2.57` — 2026-11-27 — Corrige o status persistente de carregamento do engine local, reabilitando o seletor e os controles do modelo após a inicialização bem-sucedida.
 - `2.56` — 2026-11-27 — Remove a referência fixa ao Edge na mensagem de falha do adaptador WebGPU, usa texto neutro para Safari, Edge e demais navegadores e incrementa o cache-buster do WebLLM.

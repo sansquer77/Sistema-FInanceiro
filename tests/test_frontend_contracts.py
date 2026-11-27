@@ -13,6 +13,17 @@ MODULE_ROOT = WEB_ROOT / "modules"
 
 
 class FrontendModuleContractTest(unittest.TestCase):
+    def test_unauthenticated_bootstrap_does_not_request_private_data(self) -> None:
+        app = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+        api = (MODULE_ROOT / "api.js").read_text(encoding="utf-8")
+
+        self.assertIn("isAuthenticated: () => Boolean(state.user)", app)
+        self.assertIn("if (state.user && !dashboardView.hidden) {\n    renderCockpit();", app)
+        self.assertIn("if (!state.user) {\n    return;\n  }\n  cockpitView.renderCockpit();", app)
+        self.assertIn("shouldSkipUnauthenticatedRequest", api)
+        self.assertIn('"/api/app-info"', api)
+        self.assertIn('"/api/latest-version"', api)
+
     def test_investment_launch_form_explains_total_and_keeps_costs_optional(self) -> None:
         index = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
         investment_form = (MODULE_ROOT / "transaction-investment-form.js").read_text(encoding="utf-8")
@@ -254,6 +265,9 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("if (engineModelId === selectedModelId) return enginePromise;", client)
         self.assertIn("await unloadWithTimeout(failedEngine);", client)
         self.assertIn("if (isSafariWebGPUEnvironment()) throw error;", client)
+        self.assertIn("bindingerror", client)
+        self.assertIn("gpuDeviceLost", client)
+        self.assertIn("Recarregue a página para recriar a GPU", client)
         self.assertIn("await pageEngine.reload(selectedModelId, CHAT_OPTIONS)", client)
         self.assertIn("workerEngine.reload(selectedModelId, CHAT_OPTIONS)", client)
         self.assertIn("preferMainThread", client)
@@ -277,8 +291,16 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("enginePromiseStartedAt", client)
         self.assertIn("timed_out: timedOut", client)
         self.assertIn("status.timed_out", admin)
+        self.assertIn("scheduleLocalModelStatusRefresh", admin)
+        self.assertIn("localModelStatusRequest", admin)
+        self.assertIn("stopLocalModelStatusPolling", admin)
         self.assertIn("local_operation_timeout", client)
         self.assertIn("local_operation_cancelled", client)
+        self.assertIn("let localInferenceQueue = Promise.resolve();", client)
+        self.assertIn("let localInferenceQueueDepth = 0;", client)
+        self.assertIn("runLocalInferenceInternal", client)
+        self.assertIn("Aguardando outra análise local terminar", client)
+        self.assertIn("A falha de uma análise não pode interromper a fila", client)
         self.assertIn("device (was )?lost", client)
         self.assertIn("GPU_MEMORY_PATTERN.test(detail)", client)
         consultor_view = (MODULE_ROOT / "consultor-view.js").read_text(encoding="utf-8")
@@ -297,12 +319,15 @@ class FrontendModuleContractTest(unittest.TestCase):
         )
         for module in ("consultor-view.js", "trends-view.js", "user-admin-view.js"):
             source = (MODULE_ROOT / module).read_text(encoding="utf-8")
-            self.assertIn('webllm-client.js?v=188"', source, module)
+            self.assertIn('webllm-client.js?v=189"', source, module)
         admin = (MODULE_ROOT / "user-admin-view.js").read_text(encoding="utf-8")
         html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
         self.assertIn('id="aiLocalModel"', html)
         self.assertIn('id="aiLocalModelRefresh"', html)
         self.assertIn("local_model_id: selectedLocalModelId()", admin)
+        app = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
+        self.assertIn('userAdminViewController.loadPreferences({ force: true });', app)
+        self.assertIn('userAdminViewController.stopLocalModelStatusPolling();', app)
 
     def test_goal_funding_options_exclude_consolidated_linked_assets(self) -> None:
         limits = (MODULE_ROOT / "limits-view.js").read_text(encoding="utf-8")

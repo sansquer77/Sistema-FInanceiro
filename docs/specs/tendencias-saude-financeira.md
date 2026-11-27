@@ -2,7 +2,7 @@
 tipo: spec
 area: tendencias-saude-financeira
 status: em-implementacao
-versao: 2.34
+versao: 2.35
 atualizado: 2026-11-27
 relacionados:
   - "[[score-saude-financeira]]"
@@ -20,7 +20,7 @@ aliases: ["Tendências de Saúde Financeira", "Achados Financeiros", "Insights F
 # Tendências e Achados de Saúde Financeira
 
 > [!info] Status
-> **em-implementacao** · versão: `2.34` · área: `tendencias-saude-financeira` · atualizado em 2026-11-27 · relacionados: [[score-saude-financeira]], [[relatorios]], [[lancamentos]], [[cartoes]], [[../adr/0019-inferencia-local-webllm|ADR-0019]]
+> **em-implementacao** · versão: `2.35` · área: `tendencias-saude-financeira` · atualizado em 2026-11-27 · relacionados: [[score-saude-financeira]], [[relatorios]], [[lancamentos]], [[cartoes]], [[../adr/0019-inferencia-local-webllm|ADR-0019]]
 
 ## Problema
 
@@ -340,6 +340,7 @@ O app deve consumir somente `choices[0].message.content` e descartar qualquer te
 
 ## Changelog
 
+- `2.35` — 2026-11-27 — Gerações locais iniciadas automaticamente por Tendências passam a compartilhar uma fila exclusiva com o Consultor, evitando concorrência no dispositivo WebGPU.
 - `2.34` — 2026-11-27 — Corrige a renderização de resumos de IA numerados em Tendências, mantendo cada marcador unido ao texto correspondente.
 - `2.33` — 2026-11-26 — Registra o monitoramento arquitetural de `financeiro/trends.py` e a extração futura do bloco de assinaturas como próxima oportunidade de desconcentração.
 - `2.32` — 2026-11-26 — Remove o corte arbitrário de seis serviços na aba Assinaturas e diferencia resumo de detalhes sem ocultar itens.

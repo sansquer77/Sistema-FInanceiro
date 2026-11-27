@@ -89,13 +89,13 @@ initializeDataUX();
 applyMasks();
 
 const decisionModal = createDecisionModal();
+const state = createAppState({ currentMonth: currentMonthValue() });
 
 configureApi({
   onUnauthorized: handleSessionExpired,
   onMutation: handleDataMutation,
+  isAuthenticated: () => Boolean(state.user),
 });
-
-const state = createAppState({ currentMonth: currentMonthValue() });
 
 const authView = document.querySelector("#authView");
 const dashboardView = document.querySelector("#dashboardView");
@@ -1665,7 +1665,9 @@ async function loadLatestVersion() {
   } catch (error) {
     state.latestVersion = null;
   }
-  renderCockpit();
+  if (state.user && !dashboardView.hidden) {
+    renderCockpit();
+  }
 }
 
 function resetSessionState() {
@@ -1747,6 +1749,9 @@ function showModule(view) {
   const previousView = state.view;
   if (previousView && previousView !== view) {
     viewScrollPositions.set(previousView, window.scrollY);
+  }
+  if (previousView === "user" && view !== "user") {
+    userAdminViewController.stopLocalModelStatusPolling();
   }
   state.view = view;
   const updateVisibleModule = () => {
@@ -1832,7 +1837,7 @@ function showModule(view) {
     emailForm.elements.email.value = state.user.email;
     userAdminViewController.syncThemePreference();
     userAdminViewController.syncDensityPreference();
-    userAdminViewController.loadPreferences();
+    userAdminViewController.loadPreferences({ force: true });
   }
 }
 
@@ -1982,6 +1987,10 @@ function renderManagementViews() {
 }
 
 function renderCockpit() {
+  // spec: seguranca/seguranca-autenticacao v1.9 — critério 21
+  if (!state.user) {
+    return;
+  }
   cockpitView.renderCockpit();
 }
 

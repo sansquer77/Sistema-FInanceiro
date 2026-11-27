@@ -2,7 +2,7 @@
 tipo: adr
 area: ia-local
 status: em-implementacao
-versao: 1.2
+versao: 1.5
 atualizado: 2026-11-27
 relacionados:
   - "[[0002-modularizacao-frontend]]"
@@ -17,7 +17,7 @@ aliases: ["ADR-0019", "Inferência local WebLLM"]
 # ADR-0019 — Inferência local compartilhada com WebLLM
 
 > [!info] Status
-> **em-implementacao** · área: `ia-local` · atualizado em 2026-11-26 · relacionados: [[0002-modularizacao-frontend]], [[0006-classificacao-assistida-local]], [[0010-segredos-criptografados-sqlite]], [[../specs/consultor]], [[../specs/tendencias-saude-financeira]], [[../distribuição]]
+> **em-implementacao** · área: `ia-local` · atualizado em 2026-11-27 · relacionados: [[0002-modularizacao-frontend]], [[0006-classificacao-assistida-local]], [[0010-segredos-criptografados-sqlite]], [[../specs/consultor]], [[../specs/tendencias-saude-financeira]], [[../distribuição]]
 
 ## Contexto
 
@@ -31,7 +31,9 @@ Se a geração perder o dispositivo GPU por memória insuficiente, o cliente des
 
 Como alguns navegadores expõem WebGPU à página mas falham ao inicializar o Dedicated Worker, o cliente tenta primeiro criar o engine diretamente na página. Em navegadores que não sejam Safari/WebKit, usa o protocolo oficial do WebLLM no Worker como fallback; no Safari, evita essa segunda tentativa automática para não repetir travamentos conhecidos do WebGPU em Worker. Falhas são registradas no Console somente com etapa, tipo e mensagem truncada, sem prompt, resposta ou dados financeiros.
 
-A inicialização é single-flight: chamadas concorrentes para o mesmo modelo compartilham a Promise pendente, enquanto a troca de modelo descarta o preparo anterior. O cliente instancia `MLCEngine` ou `WebWorkerMLCEngine` diretamente e chama `reload()`, preservando uma referência à instância pendente para que `unload()` possa abortar o carregamento antes da terminação do Worker. Eventos `error`/`messageerror` do Worker e um limite de 20 segundos para o handshake encerram falhas que não retornariam pela API do WebLLM.
+A inicialização é single-flight: chamadas concorrentes para o mesmo modelo compartilham a Promise pendente, enquanto a troca de modelo descarta o preparo anterior. O cliente instancia `MLCEngine` ou `WebWorkerMLCEngine` diretamente e chama `reload()`, preservando uma referência à instância pendente para que `unload()` possa abortar o carregamento antes da terminação do Worker. Eventos `error`/`messageerror` do Worker e um limite de 20 segundos para o handshake encerram falhas que não retornariam pela API do WebLLM. A tela de Preferências acompanha por polling curto uma preparação iniciada por Tendências ou Consultor, interrompe esse polling quando o usuário sai da tela e força nova leitura ao retornar. Quando o Safari perde o `GPUDevice`, `BindingError` e `GPUDeviceLostInfo` são tratados como perda de GPU; o descarte não tenta executar `unload()` sobre um binding já inválido e a interface orienta recarregar a página.
+
+Além da inicialização single-flight, toda geração local passa por uma fila única compartilhada por Tendências e Consultor. Uma análise só adquire o engine depois que a anterior conclui ou falha; cancelamentos enquanto aguardam na fila não inicializam nem descarregam o engine de outra análise. Assim, uma perda de GPU ou limpeza de engine em uma tentativa não pode ocorrer simultaneamente à geração de outro módulo.
 
 As Preferências exibem um catálogo fechado de modelos WebLLM já presentes no runtime vendorizado, com estimativa de memória e indicação de uso. A troca de seleção não apaga o cache anterior; cada modelo é identificado separadamente pelo cache privado do navegador. O botão de atualização permite remover e reconstruir o cache do modelo selecionado quando houver falha ou atualização dos pesos.
 
@@ -63,6 +65,9 @@ O backend continua montando o contexto minimizado, validando propriedade, aplica
 
 ## Changelog
 
+- `1.5` — 2026-11-27 — Adiciona fila única de gerações locais entre Tendências e Consultor, com cancelamento seguro antes do início para evitar concorrência no mesmo dispositivo WebGPU.
+- `1.4` — 2026-11-27 — Trata `BindingError`/`GPUDeviceLostInfo` como perda do dispositivo WebGPU, evita warning de limpeza incompatível e orienta recarga da página.
+- `1.3` — 2026-11-27 — Sincroniza o ciclo de vida da tela de Preferências com preparos em segundo plano e inclui o source map do runtime WebLLM para remover o 404 do Console.
 - `1.2` — 2026-11-27 — Atualiza o runtime para WebLLM 0.2.89, torna o preparo single-flight e cancelável, captura falhas/timeout do Worker, evita fallback automático pelo Worker no Safari e usa Qwen3 0.6B como fallback de memória.
 - `1.1` — 2026-11-26 — Prioriza o engine direto na página diante de falhas recorrentes no Worker do Edge, mantém fallback para Worker e adiciona diagnóstico técnico seguro no Console.
 - `1.0` — 2026-11-26 — Diferencia pesos baixados de engine pronto, verifica o adaptador WebGPU e adiciona timeout/cancelamento seguro para impedir carregamento infinito e fallback remoto após cancelamento explícito.

@@ -1,9 +1,9 @@
-// spec: consultor/consultor v2.59 — inicialização cancelável e política segura para Safari
+// spec: consultor/consultor v2.62 — serialização entre Tendências e Consultor
 // WebLLM mantém runtime e pesos no Cache Storage privado da origem do navegador.
 export const DEFAULT_LOCAL_MODEL_ID = "Qwen2.5-1.5B-Instruct-q4f16_1-MLC";
 const LOW_MEMORY_FALLBACK_MODEL_ID = "Qwen3-0.6B-q4f16_1-MLC";
 const WEBLLM_VENDOR_VERSION = "0.2.89";
-const WEBLLM_CACHE_BUSTER = 188;
+const WEBLLM_CACHE_BUSTER = 189;
 const SUPPORTED_MODEL_IDS = new Set([
   DEFAULT_LOCAL_MODEL_ID,
   "Qwen3-0.6B-q4f16_1-MLC",
@@ -28,6 +28,9 @@ let engineModelId = "";
 let lowMemoryModelForSelection = "";
 let engineGeneration = 0;
 let enginePromiseStartedAt = 0;
+let gpuDeviceLost = false;
+let localInferenceQueue = Promise.resolve();
+let localInferenceQueueDepth = 0;
 
 function resolveModelId(value) {
   const modelId = String(value || DEFAULT_LOCAL_MODEL_ID).trim();
@@ -114,10 +117,10 @@ function withLocalGuard(operation, signal, timeoutMs) {
 }
 
 // spec: consultor/consultor v2.51 — critério de perda do dispositivo GPU ("Device was lost")
-const GPU_MEMORY_PATTERN = /(out of memory|memory allocation|device (was )?lost|insufficient memory|gpudevicelostinfo|gpu.*memory)/;
+const GPU_MEMORY_PATTERN = /(out of memory|memory allocation|device (was )?lost|insufficient memory|gpudevicelostinfo|gpu.*memory|bindingerror)/;
 
 function classifyInferenceError(error) {
-  const detail = String(error?.message || error || "").toLowerCase();
+  const detail = [error?.name, error?.code, error?.message, error?.stack, error].filter(Boolean).join(" ").toLowerCase();
   if (/prompt tokens exceed context window|context window size/.test(detail)) {
     const promptTokens = detail.match(/number of prompt tokens:\s*(\d+)/)?.[1];
     const contextWindow = detail.match(/context window size:\s*(\d+)/)?.[1];
@@ -149,6 +152,9 @@ function normalizeError(error, stage = "initialization") {
     return stage === "inference"
       ? "A IA local excedeu 90 segundos sem concluir. Tente novamente ou use a IA remota."
       : "O preparo do modelo local excedeu 60 segundos. Verifique o cache e a conexão e tente novamente.";
+  }
+  if (gpuDeviceLost) {
+    return "O Safari perdeu o dispositivo WebGPU durante a análise. Recarregue a página para recriar a GPU e tente novamente; se persistir, use a IA remota ou o Qwen 3 0.6B.";
   }
   if (error?.code === "worker_init_timeout") {
     return "O Worker do modelo local não respondeu em 20 segundos. O engine foi encerrado para evitar travamento; tente novamente ou use a IA remota.";
@@ -185,13 +191,17 @@ function normalizeError(error, stage = "initialization") {
 
 async function unloadWithTimeout(activeEngine) {
   if (!activeEngine?.unload) return;
+  if (gpuDeviceLost) return;
   try {
     await Promise.race([
       Promise.resolve().then(() => activeEngine.unload()),
       new Promise((resolve) => setTimeout(resolve, ENGINE_UNLOAD_TIMEOUT_MS)),
     ]);
   } catch (error) {
-    console.warn("WebLLM local unload failure", { errorType: error?.name || typeof error });
+    const detail = [error?.name, error?.message, error].filter(Boolean).join(" ").toLowerCase();
+    if (!/bindingerror|device.*lost|gpu.*lost/.test(detail)) {
+      console.warn("WebLLM local unload failure", { errorType: error?.name || typeof error });
+    }
   }
 }
 
@@ -318,6 +328,7 @@ async function ensureEngine(modelId, onProgress, { preferMainThread = true } = {
         throw operationError("local_operation_cancelled");
       }
       engine = readyEngine;
+      gpuDeviceLost = false;
       return readyEngine;
     }).catch(async (error) => {
       const failedEngine = pendingEngine;
@@ -334,7 +345,31 @@ async function ensureEngine(modelId, onProgress, { preferMainThread = true } = {
   return enginePromise;
 }
 
-export async function runLocalInference(messages, options, onProgress, signal) {
+// spec: consultor/consultor v2.62 — critérios 108 e 109
+// O engine é compartilhado por Tendências e Consultor, mas WebLLM não deve
+// receber duas gerações simultâneas no mesmo dispositivo WebGPU. A fila também
+// evita que o descarte de uma tentativa falha invalide a geração de outra tela.
+export function runLocalInference(messages, options, onProgress, signal) {
+  const wasBusy = localInferenceQueueDepth > 0;
+  localInferenceQueueDepth += 1;
+  if (wasBusy) {
+    onProgress?.("Aguardando outra análise local terminar…");
+  }
+  const previous = localInferenceQueue;
+  const next = previous.then(async () => {
+    if (signal?.aborted) {
+      throw operationError("local_operation_cancelled");
+    }
+    return runLocalInferenceInternal(messages, options, onProgress, signal);
+  }).finally(() => {
+    localInferenceQueueDepth -= 1;
+  });
+  // A falha de uma análise não pode interromper a fila das próximas.
+  localInferenceQueue = next.catch(() => {});
+  return next;
+}
+
+async function runLocalInferenceInternal(messages, options, onProgress, signal) {
   const configuredModelId = resolveModelId(options?.local_model_id || options?.modelId);
   const selectedModelId = lowMemoryModelForSelection === configuredModelId
     ? LOW_MEMORY_FALLBACK_MODEL_ID
@@ -362,6 +397,7 @@ export async function runLocalInference(messages, options, onProgress, signal) {
       }
       const diagnosis = classifyInferenceError(error);
       if (index === 0 && diagnosis.category === "gpu_memory_or_device_lost") {
+        gpuDeviceLost = true;
         lowMemoryModelForSelection = configuredModelId;
         await disposeEngine();
         onProgress?.("O modelo selecionado excedeu a memória disponível. Tentando um modelo local mais leve…");
@@ -396,6 +432,7 @@ export async function runLocalInference(messages, options, onProgress, signal) {
         ...diagnosis,
       });
       if (diagnosis.category === "gpu_memory_or_device_lost") {
+        gpuDeviceLost = true;
         await disposeEngine();
       }
       // WebLLM serializa exceções do Worker como strings. No Safari, a perda do

@@ -2,8 +2,8 @@
 tipo: spec
 area: seguranca
 status: implementado
-versao: 1.8
-atualizado: 2026-10-19
+versao: 1.9
+atualizado: 2026-11-27
 relacionados:
   - "[[recuperacao-senha]]"
   - "[[adr/0005-smtp-criptografado-local]]"
@@ -15,7 +15,7 @@ aliases: ["Segurança", "Autenticação"]
 # Segurança de Autenticação
 
 > [!info] Status
-> **implementado** · área: `seguranca` · atualizado em 2026-10-19 · relacionados: [[recuperacao-senha]], [[arquitetura]], [[adr/0019-inferencia-local-webllm]]
+> **implementado** · área: `seguranca` · atualizado em 2026-11-27 · relacionados: [[recuperacao-senha]], [[arquitetura]], [[adr/0019-inferencia-local-webllm]]
 
 ## Problema
 
@@ -73,6 +73,7 @@ Usuários locais do Sistema Financeiro que protegem dados financeiros sensíveis
   - `X-Content-Type-Options: nosniff`
   - `Referrer-Policy: same-origin`
   - `Permissions-Policy` restritiva.
+- O frontend consulta `/api/me` antes de iniciar o carregamento de dados privados; enquanto não há sessão confirmada, endpoints protegidos não são enviados ao servidor.
 
 ## API e dados
 
@@ -109,6 +110,7 @@ Rotas afetadas:
 - Dado `APP_HOST` local com HTTP, quando o app inicia, ele funciona sem alerta de exposição em rede.
 - Dado `APP_HOST` exposto à LAN e `APP_URL` HTTP, quando o app inicia, ele exibe alerta recomendando HTTPS.
 - Dado um caminho `GET` que apenas começa como uma rota válida, quando ele não corresponde ao contrato completo, então o handler da rota válida não é executado.
+- Dado um navegador sem sessão, quando a página é aberta, então o frontend consulta apenas rotas públicas e não envia chamadas privadas antes de concluir `/api/me`.
 
 ## Fora de escopo
 
@@ -119,6 +121,7 @@ Rotas afetadas:
 
 ## Changelog
 
+- `1.9` — 2026-11-27 — O bootstrap do frontend aguarda o estado de autenticação antes de renderizar dados do Cockpit e bloqueia chamadas privadas enquanto não há sessão confirmada, eliminando `401` esperados no console ao abrir a página deslogado.
 - `1.8` — 2026-10-19 — Respostas JSON da API passam a exigir `Cache-Control: no-store` e `Pragma: no-cache` para impedir retenção de dados sensíveis após logout.
 - `1.7` — 2026-10-10 — Libera exclusivamente `wasm-unsafe-eval` na CSP para a compilação local do runtime WebLLM, mantendo `unsafe-eval` bloqueado.
 - `1.6` — 2026-09-01 — Cadastro público passa a reservar orçamento persistente por origem, limitando cinco tentativas em 60 minutos antes da criação do usuário; abusos inválidos também consomem a janela.
