@@ -58,12 +58,12 @@ import {
 import { applyTheme, setTheme, storedTheme, toggleTheme } from "./modules/theme-utils.js";
 import { applyDensity, setDensity, storedDensity, toggleDensity } from "./modules/density-utils.js";
 import { registerAuthView } from "./modules/auth-view.js";
-import { registerUserAdminView } from "./modules/user-admin-view.js?v=178";
+import { registerUserAdminView } from "./modules/user-admin-view.js?v=179";
 import { registerClassificationsView } from "./modules/classifications-view.js";
 import { registerLimitsView } from "./modules/limits-view.js?v=4";
 import { registerReportsView } from "./modules/reports-view.js?v=3";
 import { registerImportsView } from "./modules/imports-view.js";
-import { registerCockpitView } from "./modules/cockpit-view.js?v=190";
+import { registerCockpitView } from "./modules/cockpit-view.js?v=191";
 import { registerAccountsView } from "./modules/accounts-view.js";
 import { registerCardsView } from "./modules/cards-view.js?v=198";
 import { registerPortfolioView } from "./modules/portfolio-view.js?v=165";

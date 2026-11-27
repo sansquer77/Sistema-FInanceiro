@@ -243,7 +243,7 @@ class FrontendModuleContractTest(unittest.TestCase):
         app = (WEB_ROOT / "app.js").read_text(encoding="utf-8")
 
         self.assertIn("setAIFieldVisibility(elements.aiConfigTimeoutField, customProvider || remoteProvider);", admin)
-        self.assertIn('import { registerUserAdminView } from "./modules/user-admin-view.js?v=178";', app)
+        self.assertIn('import { registerUserAdminView } from "./modules/user-admin-view.js?v=179";', app)
         self.assertIn('"deepseek"', admin)
         self.assertIn('provider: elements.aiConfigProvider.value', admin)
         self.assertIn('/api/ai-settings${providerQuery}', admin)
@@ -787,7 +787,7 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn('.donut-center strong {', styles)
         self.assertIn('width: min(132px, 58%);', styles)
         self.assertIn('font-size: clamp(12px, calc(1vw + 2px), 15px);', styles)
-        self.assertIn('registerCockpitView } from "./modules/cockpit-view.js?v=190"', app)
+        self.assertIn('registerCockpitView } from "./modules/cockpit-view.js?v=191"', app)
         self.assertIn('href="/styles.css?v=196"', index)
 
     def test_launch_forms_expose_and_sync_destination_context(self) -> None:
