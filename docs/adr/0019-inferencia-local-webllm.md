@@ -2,8 +2,8 @@
 tipo: adr
 area: ia-local
 status: em-implementacao
-versao: 1.1
-atualizado: 2026-11-26
+versao: 1.2
+atualizado: 2026-11-27
 relacionados:
   - "[[0002-modularizacao-frontend]]"
   - "[[0006-classificacao-assistida-local]]"
@@ -27,13 +27,15 @@ O Consultor e Tendências precisam de sínteses de IA com o mesmo requisito de p
 
 Adotar WebLLM como opção de inferência local no navegador, com `Qwen2.5-1.5B-Instruct-q4f16_1-MLC` como modelo padrão. Uma política central `ai_execution_settings` define `local_primeiro` e o `local_model_id` por usuário, e é consumida por todos os recursos: local → remota consentida → determinística. A IA remota continua disponível como fallback somente quando já configurada e autorizada pelo usuário.
 
-Se a geração perder o dispositivo GPU por memória insuficiente, o cliente descarrega o engine e tenta temporariamente `gemma3-1b-it-q4f16_1-MLC`, sem regravar a preferência do usuário. A troca temporária é informada na interface; o usuário continua podendo escolher outro modelo nas Preferências.
+Se a geração perder o dispositivo GPU por memória insuficiente, o cliente descarrega o engine e tenta temporariamente `Qwen3-0.6B-q4f16_1-MLC`, sem regravar a preferência do usuário. A troca temporária é informada na interface; o usuário continua podendo escolher outro modelo nas Preferências. O Gemma permanece disponível no catálogo, mas não é mais o fallback automático.
 
-Como alguns navegadores expõem WebGPU à página mas falham ao inicializar o Dedicated Worker, o cliente tenta primeiro criar o engine diretamente na página. Se essa tentativa falhar, usa o protocolo oficial do WebLLM no Worker como fallback. Falhas de ambas as etapas são registradas no Console somente com etapa, tipo e mensagem truncada, sem prompt, resposta ou dados financeiros.
+Como alguns navegadores expõem WebGPU à página mas falham ao inicializar o Dedicated Worker, o cliente tenta primeiro criar o engine diretamente na página. Em navegadores que não sejam Safari/WebKit, usa o protocolo oficial do WebLLM no Worker como fallback; no Safari, evita essa segunda tentativa automática para não repetir travamentos conhecidos do WebGPU em Worker. Falhas são registradas no Console somente com etapa, tipo e mensagem truncada, sem prompt, resposta ou dados financeiros.
+
+A inicialização é single-flight: chamadas concorrentes para o mesmo modelo compartilham a Promise pendente, enquanto a troca de modelo descarta o preparo anterior. O cliente instancia `MLCEngine` ou `WebWorkerMLCEngine` diretamente e chama `reload()`, preservando uma referência à instância pendente para que `unload()` possa abortar o carregamento antes da terminação do Worker. Eventos `error`/`messageerror` do Worker e um limite de 20 segundos para o handshake encerram falhas que não retornariam pela API do WebLLM.
 
 As Preferências exibem um catálogo fechado de modelos WebLLM já presentes no runtime vendorizado, com estimativa de memória e indicação de uso. A troca de seleção não apaga o cache anterior; cada modelo é identificado separadamente pelo cache privado do navegador. O botão de atualização permite remover e reconstruir o cache do modelo selecionado quando houver falha ou atualização dos pesos.
 
-O runtime JavaScript e seu worker serão vendorizados com versão, hash e licença auditáveis. A CSP libera somente `wasm-unsafe-eval` para a compilação do runtime WebAssembly, sem liberar `unsafe-eval` para JavaScript. Os pesos do modelo não entram no instalador principal: serão baixados no primeiro uso a partir de origem fixada e mantidos no cache privado do navegador. Um pacote offline opcional poderá ser avaliado separadamente.
+O runtime JavaScript e seu worker serão vendorizados com versão, hash e licença auditáveis. A implementação atual usa WebLLM `0.2.89`; a CSP libera somente `wasm-unsafe-eval` para a compilação do runtime WebAssembly, sem liberar `unsafe-eval` para JavaScript. Os pesos do modelo não entram no instalador principal: serão baixados no primeiro uso a partir de origem fixada e mantidos no cache privado do navegador. Um pacote offline opcional poderá ser avaliado separadamente.
 
 As Preferências oferecem controle explícito para baixar, verificar e remover o modelo. Esse cache pertence ao perfil e à origem do navegador, portanto não fica na pasta do aplicativo e não pode ser compartilhado por um servidor entre usuários ou máquinas. Instalações via servidor exigem download uma vez por perfil cliente compatível.
 
@@ -61,6 +63,7 @@ O backend continua montando o contexto minimizado, validando propriedade, aplica
 
 ## Changelog
 
+- `1.2` — 2026-11-27 — Atualiza o runtime para WebLLM 0.2.89, torna o preparo single-flight e cancelável, captura falhas/timeout do Worker, evita fallback automático pelo Worker no Safari e usa Qwen3 0.6B como fallback de memória.
 - `1.1` — 2026-11-26 — Prioriza o engine direto na página diante de falhas recorrentes no Worker do Edge, mantém fallback para Worker e adiciona diagnóstico técnico seguro no Console.
 - `1.0` — 2026-11-26 — Diferencia pesos baixados de engine pronto, verifica o adaptador WebGPU e adiciona timeout/cancelamento seguro para impedir carregamento infinito e fallback remoto após cancelamento explícito.
 - `0.9` — 2026-11-18 — Documenta o retry do modelo local ultraleve no contexto principal quando o Worker Safari devolve a perda da GPU como `string_error`.

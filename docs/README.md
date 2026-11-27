@@ -2,8 +2,8 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 16.51
-atualizado: 2026-11-26
+versao: 16.58
+atualizado: 2026-11-27
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
 ---
@@ -159,9 +159,13 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `16.58` — 2026-11-27 — [[specs/consultor]] v2.59 e [[adr/0019-inferencia-local-webllm]] v1.2 atualizam o WebLLM para 0.2.89, tornam o engine cancelável/single-flight, encerram falhas do Worker rapidamente, evitam o fallback automático pelo Worker no Safari e usam Qwen3 0.6B como fallback de memória.
+
 - `16.53` — 2026-11-27 — [[specs/Update Server]] v1.6 e [[server]] v1.10 corrigem a cópia de caminho Unicode para o volume Linux Endor montado no macOS, evitando falha `chflags`.
 - `16.54` — 2026-11-27 — [[specs/consultor]] v2.56 remove a referência fixa ao Edge nas mensagens de falha do adaptador WebGPU.
 - `16.55` — 2026-11-27 — [[specs/score-saude-financeira]] v3.9 corrige o alinhamento do botão **Ver análise** no card de Saúde Financeira do Cockpit.
+- `16.56` — 2026-11-27 — [[specs/consultor]] v2.57 corrige os controles do modelo local que permaneciam desabilitados após o engine ficar pronto.
+- `16.57` — 2026-11-27 — [[specs/consultor]] v2.58 encerra preparos locais pendurados após 60 segundos e reabilita os controles do modelo.
 - `16.52` — 2026-11-27 — [[specs/tendencias-saude-financeira]] v2.34 corrige a separação de listas numeradas retornadas pela IA na tela de Tendências.
 - `16.51` — 2026-11-27 — [[specs/Update Server]] v1.5 e [[server]] v1.9 corrigem a sincronização de `docs/distribuição.md` entre a homologação e o volume Endor com normalizações Unicode diferentes.
 - `16.50` — 2026-11-26 — [[specs/consultor]] v2.55 otimiza os prompts dos cards e compacta a série histórica do Score, mantendo a janela de 12 meses abaixo do orçamento local.

@@ -1,6 +1,6 @@
 import { bindRovingTablist, syncRovingTabState, transitionView } from "./tab-utils.js";
 import { createLoadPolicy } from "./load-policy.js";
-import { clearLocalModel, getLocalModelStatus, prepareLocalModel, refreshLocalModel } from "./webllm-client.js?v=185";
+import { clearLocalModel, getLocalModelStatus, prepareLocalModel, refreshLocalModel } from "./webllm-client.js?v=188";
 
 export function registerUserAdminView(context) {
   const {
@@ -269,7 +269,9 @@ export function registerUserAdminView(context) {
       const status = await getLocalModelStatus(selectedLocalModelId());
       const model = selectedLocalModel();
       renderLocalModelHelp();
-      if (!status.supported) {
+      if (status.timed_out) {
+        setLocalModelStatus("O preparo do modelo local excedeu 60 segundos e foi encerrado. Tente novamente ou atualize o cache.", "error");
+      } else if (!status.supported) {
         setLocalModelStatus("WebGPU não está disponível neste navegador. Use o botão para verificar novamente após habilitá-la.", "error");
       } else if (status.ready) {
         setLocalModelStatus(`Modelo ${model?.label || status.modelId} pronto neste navegador.`, "success");

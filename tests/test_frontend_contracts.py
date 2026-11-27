@@ -239,19 +239,29 @@ class FrontendModuleContractTest(unittest.TestCase):
 
     def test_local_model_uses_default_4096_window_and_recognizes_gpu_device_loss(self) -> None:
         client = (MODULE_ROOT / "webllm-client.js").read_text(encoding="utf-8")
+        admin = (MODULE_ROOT / "user-admin-view.js").read_text(encoding="utf-8")
 
         self.assertIn("const CHAT_OPTIONS = { context_window_size: 4096 };", client)
         self.assertIn('export const DEFAULT_LOCAL_MODEL_ID = "Qwen2.5-1.5B-Instruct-q4f16_1-MLC";', client)
-        self.assertIn('const LOW_MEMORY_FALLBACK_MODEL_ID = "gemma3-1b-it-q4f16_1-MLC";', client)
+        self.assertIn('const LOW_MEMORY_FALLBACK_MODEL_ID = "Qwen3-0.6B-q4f16_1-MLC";', client)
         self.assertIn("Tentando um modelo local mais leve", client)
-        self.assertIn("webllm.CreateWebWorkerMLCEngine(engineWorker, selectedModelId, engineConfig, CHAT_OPTIONS)", client)
-        self.assertIn("webllm.CreateMLCEngine(selectedModelId, engineConfig, CHAT_OPTIONS)", client)
+        self.assertIn("new webllm.WebWorkerMLCEngine(engineWorker, engineConfig)", client)
+        self.assertIn("new webllm.MLCEngine(engineConfig)", client)
+        self.assertIn("worker_runtime_error", client)
+        self.assertIn("worker_init_timeout", client)
+        self.assertIn("isSafariWebGPUEnvironment", client)
+        self.assertIn("pendingEngine", client)
+        self.assertIn("if (engineModelId === selectedModelId) return enginePromise;", client)
+        self.assertIn("await unloadWithTimeout(failedEngine);", client)
+        self.assertIn("if (isSafariWebGPUEnvironment()) throw error;", client)
+        self.assertIn("await pageEngine.reload(selectedModelId, CHAT_OPTIONS)", client)
+        self.assertIn("workerEngine.reload(selectedModelId, CHAT_OPTIONS)", client)
         self.assertIn("preferMainThread", client)
         self.assertIn("let preferMainThread = true;", client)
-        self.assertIn('new URL("./webllm-worker.js?v=185", import.meta.url)', client)
+        self.assertIn('new URL(`./webllm-worker.js?v=${WEBLLM_CACHE_BUSTER}`, import.meta.url)', client)
         self.assertLess(
-            client.index("webllm.CreateMLCEngine(selectedModelId, engineConfig, CHAT_OPTIONS)"),
-            client.index("webllm.CreateWebWorkerMLCEngine(engineWorker, selectedModelId, engineConfig, CHAT_OPTIONS)"),
+            client.index("new webllm.MLCEngine(engineConfig)"),
+            client.index("new webllm.WebWorkerMLCEngine(engineWorker, engineConfig)"),
         )
         self.assertIn('stage,\n    errorType:', client)
         self.assertIn('diagnosis.category === "string_error"', client)
@@ -263,7 +273,10 @@ class FrontendModuleContractTest(unittest.TestCase):
         self.assertIn("webgpu_adapter_unavailable", client)
         self.assertIn("adapter_available", client)
         self.assertIn("ready: Boolean(engine", client)
-        self.assertIn("loading: Boolean(enginePromise)", client)
+        self.assertIn("loading: Boolean(enginePromise && !engine)", client)
+        self.assertIn("enginePromiseStartedAt", client)
+        self.assertIn("timed_out: timedOut", client)
+        self.assertIn("status.timed_out", admin)
         self.assertIn("local_operation_timeout", client)
         self.assertIn("local_operation_cancelled", client)
         self.assertIn("device (was )?lost", client)
@@ -284,7 +297,7 @@ class FrontendModuleContractTest(unittest.TestCase):
         )
         for module in ("consultor-view.js", "trends-view.js", "user-admin-view.js"):
             source = (MODULE_ROOT / module).read_text(encoding="utf-8")
-            self.assertIn('webllm-client.js?v=185"', source, module)
+            self.assertIn('webllm-client.js?v=188"', source, module)
         admin = (MODULE_ROOT / "user-admin-view.js").read_text(encoding="utf-8")
         html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
         self.assertIn('id="aiLocalModel"', html)
