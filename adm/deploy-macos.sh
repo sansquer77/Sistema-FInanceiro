@@ -5,6 +5,7 @@ SRC="/Users/sansquer/Documents/Sistema Financeiro"
 DEST="/Volumes/Endor/Sistema Financeiro"
 REMOTE="sansquer@192.168.1.212"
 REMOTE_SCRIPT="/opt/scripts/atualiza-financeiro.sh"
+UNICODE_FILES=("docs/distribuição.md")
 
 echo "Verificando a homologação e o volume do servidor..."
 test -f "$SRC/app.py"
@@ -25,10 +26,25 @@ rsync -avh --progress --delete \
   --exclude 'build/' \
   --exclude 'data/' \
   --exclude 'secure/' \
+  --exclude 'docs/distribuição.md' \
   --exclude 'Sistema Financeiro - Distribuicao/' \
   --exclude 'launcher.applescript' \
   --exclude 'server.log' \
   "$SRC/" "$DEST/"
+
+# O openrsync do macOS não oferece --iconv. O volume Endor apresenta nomes
+# Unicode em NFD, enquanto a homologação usa NFC; copie estes poucos caminhos
+# fora do rsync para evitar exclusão/reenvio a cada deploy.
+for relative_path in "${UNICODE_FILES[@]}"; do
+  source_path="$SRC/$relative_path"
+  destination_path="$DEST/$relative_path"
+  if [ -f "$source_path" ]; then
+    mkdir -p "$(dirname "$destination_path")"
+    cp -p "$source_path" "$destination_path"
+  elif [ -e "$destination_path" ]; then
+    rm -f "$destination_path"
+  fi
+done
 
 echo "Atualizando a produção e validando o serviço..."
 ssh "$REMOTE" \

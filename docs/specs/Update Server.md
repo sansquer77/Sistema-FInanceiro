@@ -2,8 +2,8 @@
 tipo: spec
 area: distribuicao
 status: implementado
-versao: 1.4
-atualizado: 2026-09-06
+versao: 1.5
+atualizado: 2026-11-27
 relacionados:
   - "[[sdd]]"
   - "[[templates/spec-template|Template de spec]]"
@@ -17,7 +17,7 @@ aliases: ["Update Server", "Atualizacao do Servidor", "Deploy do Servidor"]
 # Update Server
 
 > [!info] Status
-> **implementado** · área: `distribuicao` · atualizado em 2026-09-06 · relacionados: [[sdd]], [[templates/spec-template|Template de spec]], [[distribuição]], [[arquitetura]], [[seguranca-autenticacao]]
+> **implementado** · área: `distribuicao` · atualizado em 2026-11-27 · relacionados: [[sdd]], [[templates/spec-template|Template de spec]], [[distribuição]], [[arquitetura]], [[seguranca-autenticacao]]
 
 ## Problema
 
@@ -62,6 +62,7 @@ Mantenedor responsável por atualizar a instância Linux do Sistema Financeiro e
 - A cópia com `cp -r "/mnt/endor/Sistema Financeiro/"* /opt/sistema-financeiro/` é aceita como procedimento simples somente quando a origem não contém `data/` e quando não há necessidade de remover arquivos obsoletos.
 - Para reduzir regressões, o procedimento recomendado usa `rsync` com `--delete` e exclusões explícitas de dados/runtime.
 - O script macOS deve propagar falhas de `rsync`, SSH e atualização remota, anunciando sucesso somente depois de confirmar o serviço ativo.
+- O script macOS deve tratar explicitamente caminhos Unicode conhecidos quando o `openrsync` local não oferecer conversão `--iconv`, evitando exclusão e reenvio recorrentes por diferença NFC/NFD no volume Endor.
 - Se uma falha ocorrer depois da interrupção do serviço, o script remoto deve tentar iniciá-lo novamente antes de encerrar com erro.
 - Após a cópia, `/opt/sistema-financeiro` deve pertencer a `sistema:sistema`.
 - Após iniciar o serviço, os logs devem ser acompanhados até confirmar inicialização sem erro crítico.
@@ -255,6 +256,7 @@ sudo systemctl reload nginx
 - Dado o serviço reiniciado, quando `journalctl -u sistema-financeiro -f` é monitorado, então não aparecem falhas críticas de inicialização.
 - Dado falha crítica após deploy, quando o rollback é executado, então o backup volta para `/opt/sistema-financeiro` e o serviço inicia novamente.
 - Dado certificado expirado, quando a renovação é executada, então o nginx recarrega sem reiniciar a aplicação Python.
+- Dado um caminho Unicode conhecido em NFC na homologação e NFD no volume Endor, quando `deploysf` sincroniza a homologação, então o caminho não é removido e reenviado pelo `rsync` a cada execução, e seu conteúdo é atualizado no destino.
 
 ## Fora de escopo
 
@@ -266,6 +268,7 @@ sudo systemctl reload nginx
 
 ## Changelog
 
+- `1.5` — 2026-11-27 — Trata `docs/distribuição.md` fora do `openrsync` para evitar exclusão e reenvio recorrentes causados pela normalização NFC/NFD do volume Endor.
 - `1.4` — 2026-09-06 — Removida a validação `sudo systemctl` duplicada no cliente; a confirmação permanece no script remoto autorizado e seu status é propagado pelo SSH.
 - `1.3` — 2026-09-06 — Deploy macOS e remoto passam a compartilhar exclusões, usar sincronização limpa, propagar falhas e validar a recuperação/atividade do serviço.
 - `1.2` — 2026-09-06 — Script remoto versionado em `adm/` passa a preservar explicitamente `data/`, `secure/` e `.venv/`, sem antecipar a remoção de arquivos obsoletos.

@@ -2,7 +2,7 @@
 tipo: produto
 area: meta
 status: implementado
-versao: 16.50
+versao: 16.51
 atualizado: 2026-11-26
 tags: [meta, moc]
 aliases: ["Home", "Índice", "Map of Content"]
@@ -159,6 +159,7 @@ O Sistema Financeiro é disponibilizado gratuitamente como projeto open source s
 
 ## Changelog
 
+- `16.51` — 2026-11-27 — [[specs/Update Server]] v1.5 e [[server]] v1.9 corrigem a sincronização de `docs/distribuição.md` entre a homologação e o volume Endor com normalizações Unicode diferentes.
 - `16.50` — 2026-11-26 — [[specs/consultor]] v2.55 otimiza os prompts dos cards e compacta a série histórica do Score, mantendo a janela de 12 meses abaixo do orçamento local.
 - `16.49` — 2026-11-26 — [[specs/consultor]] v2.54 e [[adr/0021-janela-contexto-local-consultor]] v0.5 compactam o contexto da Análise da Carteira para IA local e remota, preservando agregados e totais omitidos.
 - `16.48` — 2026-11-26 — [[specs/consultor]] v2.53 corrige o contexto do card de Ralos Financeiros, incluindo série da janela, valores de orçamento e proteção contra ranking sem dados.

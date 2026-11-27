@@ -2,8 +2,8 @@
 tipo: arquitetura
 area: servidor
 status: implementado
-versao: 1.8
-atualizado: 2026-10-10
+versao: 1.9
+atualizado: 2026-11-27
 relacionados:
   - "[[sdd]]"
   - "[[arquitetura]]"
@@ -17,7 +17,7 @@ aliases: ["Servidor", "Server Setup", "Configuração do Servidor"]
 # Configuração do Servidor
 
 > [!info] Status
-> **implementado** · área: `servidor` · atualizado em 2026-10-10 · relacionados: [[sdd]], [[arquitetura]], [[distribuição]], [[specs/Update Server]], [[specs/seguranca-autenticacao]], [[adr/0019-inferencia-local-webllm]]
+> **implementado** · área: `servidor` · atualizado em 2026-11-27 · relacionados: [[sdd]], [[arquitetura]], [[distribuição]], [[specs/Update Server]], [[specs/seguranca-autenticacao]], [[adr/0019-inferencia-local-webllm]]
 
 Este documento descreve como instalar, configurar e manter o Sistema Financeiro rodando em um servidor Linux dedicado (`192.168.1.212`), acessível por `https://sistema-financeiro.net:8030`. Cobre variáveis de ambiente, systemd, Nginx com HTTPS, certificado SSL, configuração dos clientes e o processo `deploysf`.
 
@@ -505,6 +505,8 @@ echo "Deploy concluído com sucesso!"
 
 O script macOS versionado aplica `--delete` para retirar arquivos obsoletos do staging e exclui `data/`, `secure/`, ambientes virtuais, caches e artefatos de build. Com `set -Eeuo pipefail`, falhas de sincronização ou SSH interrompem o fluxo. A confirmação do serviço ocorre dentro do script remoto — o único comando autorizado por `sudo` — e seu status é propagado ao Mac pela mesma sessão SSH.
 
+O `openrsync` fornecido pelo macOS não suporta `--iconv`. Por isso, o script versionado exclui da transferência rsync o caminho Unicode conhecido `docs/distribuição.md` e o copia separadamente, evitando que a diferença NFC/NFD do volume Endor produza uma exclusão e um reenvio em todos os deploys. Se esse arquivo deixar de existir na homologação, o caminho correspondente do staging é removido.
+
 Para atualizar a cópia executada pelo alias sem alterar a rotina de uso:
 
 ```bash
@@ -742,6 +744,7 @@ openssl x509 -in /etc/ssl/certs/sistema-financeiro.crt -noout -dates
 
 ## Changelog
 
+- `1.9` — 2026-11-27 — Documenta o tratamento de `docs/distribuição.md` fora do `openrsync` para evitar renomeações recorrentes por normalização Unicode no Endor.
 - `1.8` — 2026-10-10 — Documenta a preservação de `wasm-unsafe-eval` na CSP para que o WebLLM compile no navegador sem liberar `unsafe-eval` JavaScript.
 - `1.7` — 2026-10-10 — Documenta que o WebLLM baixa o modelo por perfil de navegador e que o proxy deve preservar os cabeçalhos de isolamento enviados pelo app.
 - `1.6` — 2026-09-06 — Eliminada a segunda chamada privilegiada de validação no cliente; o script remoto confirma o serviço e devolve o resultado ao `deploysf`.
